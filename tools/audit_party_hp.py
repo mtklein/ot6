@@ -46,7 +46,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from savestate_party import (ST1_PETRIFY, ST1_POISON, ST1_WOUND, ST1_ZOMBIE,
-                             checkpoint_payloads, declared_states,
+                             checkpoint_payloads, declared_states, ended_states,
                              load_waivers, read_party, read_party_sram,
                              split_orphans, stem_of)
 
@@ -324,6 +324,13 @@ def main() -> int:
                 continue
             hurt.append((m, why))
         return hurt
+
+    # The line's end follows the ending, which rewrites the party; nothing
+    # boots it, so nothing inherits what this audit guards against.
+    ended = ended_states(args.repo)
+    for name in sorted(ended):
+        print(f"  ({name}: the line's end, after The End; nothing boots it, not audited)")
+    files = [p for p in files if stem_of(p) not in ended]
 
     scanned, skipped, bad = 0, [], []
     for p in files:

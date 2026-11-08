@@ -117,7 +117,7 @@ LIB_HALVES = (
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 FIELDS = {"state", "gen", "prev", "checkpoint", "timeout", "also", "saves",
-          "cutter"}
+          "cutter", "end"}
 # The wall-clock cap of a cutter's capture run.  The longest cutter,
 # gen_terra_returned_checkpoint, allows itself 160000 frames: ~2000 s at a
 # loaded machine's ~80 frames/s.
@@ -146,6 +146,7 @@ def validate(states, root):
     prevents."""
     errors = []
     seen = set()
+    ended = set()
 
     def err(entry, msg):
         errors.append(f"{entry.get('state', '<unnamed>')}: {msg}")
@@ -169,6 +170,14 @@ def validate(states, root):
             err(e, f"no such generator tools/tests/{gen}.lua")
         if prev and prev not in seen:
             err(e, f"prev {prev!r} is not an earlier state")
+        # end=True: the line's end, a savestate after "The End".  The party
+        # and supply audits skip it because nothing inherits it.
+        end = e.get("end")
+        if end is not None and end is not True:
+            err(e, f"end {end!r} must be True or absent")
+        if prev in ended:
+            err(e, f"prev {prev!r} is the line's end (end=True); nothing "
+                   f"boots it")
         # A checkpoint is Continued from the save the run before it made,
         # so a boot from a checkpoint needs that run: prev= names it.
         if checkpoint and not prev:
@@ -216,6 +225,8 @@ def validate(states, root):
         seen.add(s)
         for a in (e.get("also") or []):
             seen.add(a)
+        if end:
+            ended.update([s] + list(e.get("also") or []))
     # A run saves once, so it can stand for one checkpoint, and the capture
     # holds that checkpoint's one payload; and one checkpoint is made by
     # one run.
@@ -937,6 +948,11 @@ def selftest():
               s(state="b", gen="gen_ok", prev="a", checkpoint="empty-v1")]),
             ("unknown field",
              [dict(s(state="a", gen="gen_ok"), checkpointt="oops")]),
+            ("a boot from the line's end",
+             [s(state="a", gen="gen_ok", end=True),
+              s(state="b", gen="gen_ok", prev="a")]),
+            ("end= other than True",
+             [s(state="a", gen="gen_ok", end=1)]),
             ("the retired seed= field", [s(state="a", gen="gen_ok"),
                                          dict(s(state="d"), seed="a")]),
             ("the retired after= field",

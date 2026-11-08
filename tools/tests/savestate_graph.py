@@ -61,10 +61,15 @@
 # TypeError here, not a silently-plain entry downstream.
 
 
+# end=True marks the line's end: a savestate taken after "The End", which
+# no row may boot (savestate_ninja.validate refuses one that does).
+# The party and supply audits skip it: the ending rewrites the party, and
+# their rule is about what the next step inherits.
 def S(state, *, gen=None, prev=None, checkpoint=None, timeout=None,
-      also=None, saves=None, cutter=None):
+      also=None, saves=None, cutter=None, end=None):
     return {"state": state, "gen": gen, "prev": prev, "checkpoint": checkpoint,
-            "timeout": timeout, "also": also, "saves": saves, "cutter": cutter}
+            "timeout": timeout, "also": also, "saves": saves, "cutter": cutter,
+            "end": end}
 
 
 STATES = [
@@ -1358,11 +1363,20 @@ STATES = [
 
     # wor-kt-goddess-v1 -> 412's save point (82,47) again: party 1 onto
     # 411's right plate, party 3 onto its left, and party 2 Saves on 412's
-    # save point: the `wor-kt-plates-v1` checkpoint, Kefka's boot (#274;
-    # docs/design/route-wor-kefka-tower.md).  A cut; saves= until a leg
-    # boots it.  Re-cut by checkpoint_drift.py --recut.
+    # save point: the `wor-kt-plates-v1` checkpoint, Kefka's boot
+    # (docs/design/route-wor-kefka-tower.md).  A cut.  wor_kefka below boots
+    # its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_kt_plates", gen="gen_wor_kt_plates", prev="wor_kt_goddess",
-      checkpoint="wor-kt-goddess-v1", saves="wor-kt-plates-v1", timeout=7200),
+      checkpoint="wor-kt-goddess-v1", timeout=7200),
+
+    # wor-kt-plates-v1 -> The End: each party's care, party 2 onto 411's
+    # middle plate (FinalBattle), the order menu's twelve, Kefka's battle
+    # (event battle 101: the three tiers and Kefka; a game over when lost:
+    # the runner retries from the save), the ending and the staff roll, to
+    # "The End" (#274; docs/design/route-wor-the-end.md).  The line's end:
+    # no save point follows, so its last state is this savestate.
+    S("wor_kefka", gen="gen_wor_kefka", prev="wor_kt_plates",
+      checkpoint="wor-kt-plates-v1", timeout=7200, end=True),
 
 ]
 

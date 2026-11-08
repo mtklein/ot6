@@ -12,6 +12,25 @@ local TERRA, LOCKE, CYAN, SHADOW, EDGAR, SABIN, CELES, STRAGO, RELM, SETZER, MOG
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
 local NAMES = H.SPLIT_NAMES
 local POTION, FENIX, REMEDY, TINCTURE = 0xE9, 0xF0, 0xF5, 0xEB
+-- the bag the tower and Kefka are stocked for at Kohlingen, the last shop before them (gen_wor_kefka asserts its
+-- floor at Kefka's boot)
+local TOWER_FENIX, TOWER_POTIONS = 40, 99
+-- the Barrier Rings party 1's lane wears against the Guardian (gen_wor_kt_guardian's WARDS: EDGAR and SETZER), bought
+-- at Thamasa's relic counter (shop 75), the last one before the tower.  The line held two from gen_wor_cyan on only
+-- by luck: the Harvesters' rare drop ($04E, MonsterItems: Barrier Ring), two of four kills in the v0.39 play
+-- (tracked wor-mtzozo-v1: 2 in the bag) and none in #274's replay (gen_wor_kt_guardian's boot: "the bag holds 2
+-- Barrier Ring(s) for party 1's lane (it holds 0 ...)")
+local BARRIER_RING, TOWER_BARRIER_RINGS = 0xB7, 2
+-- counted as gen_wor_kt_guardian's wardsHeld counts them: the bag, or a ring the lane's wearer has on already
+local function barrierRingsOwned()
+  local n = H.invCountOf(BARRIER_RING)
+  for _, ch in ipairs({ EDGAR, SETZER }) do
+    for s = 4, 5 do
+      if H.readByte(0x1600 + 37 * ch + 0x1F + s) == BARRIER_RING then n = n + 1 end
+    end
+  end
+  return n
+end
 -- the three groups (route-wor-kefka-tower.md section 4): each party a carrier with a cure beside two of the bench;
 -- party 3 walks the factory (Inferno, the Skull Dragon), party 2 the long way west (Atma, the Gold Dragon), party 1
 -- the north-west and the machines' hall.  KT_SPLIT (a lab's global) overrides it.
@@ -172,9 +191,21 @@ H.run({ maxFrames = 2400000 }, {
   -- ---- 1. the bag, the flight and the split -----------------------------------------------------------------
   -- @@stage split
   board(),
+  -- no shop past this stop: the bag is stocked for the whole tower and Kefka (#274: the line's first play of the
+  -- tower spent 14 of 20 Fenix Downs before Kefka, and reached him with 6; route-wor-the-end.md section 6)
   H.cond(function()
-    return H.invCountOf(POTION) < 99 or H.invCountOf(FENIX) < 20
-  end, { K.kohlingenStop("the top-up before Kefka's Tower") }, {}),
+    return H.invCountOf(POTION) < TOWER_POTIONS or H.invCountOf(FENIX) < TOWER_FENIX
+  end, { K.kohlingenStop("the top-up before Kefka's Tower", { fenix = TOWER_FENIX, potions = TOWER_POTIONS }) }, {}),
+  H.cond(function() return barrierRingsOwned() < TOWER_BARRIER_RINGS end, {
+    K.thamasaRelicStop("the tower's wards", { { BARRIER_RING, function()
+      return math.max(0, TOWER_BARRIER_RINGS - barrierRingsOwned()) end, "BARRIER RING for the Guardian's wards" } }),
+  }, {}),
+  H.call(function()
+    H.log(string.format("[deps] Barrier Rings owned %d (bag %d), the Guardian's lane wears %d", barrierRingsOwned(),
+      H.invCountOf(BARRIER_RING), TOWER_BARRIER_RINGS))
+    H.assertEq(barrierRingsOwned() >= TOWER_BARRIER_RINGS, true, string.format("the party owns %d Barrier Rings for "
+      .. "the Guardian's wards (gen_wor_kt_guardian's WARDS), bought at Thamasa's relic counter", TOWER_BARRIER_RINGS))
+  end),
   H.waitUntil(function() return H.airshipControl() end, 3000, "the pilot's controls", 5),
   H.flyTo(TOWER_LANDING[1], TOWER_LANDING[2], { what = "the Falcon to Kefka's Tower", entersMap = true, fight = FIGHT,
     maxFrames = 20000 }),

@@ -11434,7 +11434,11 @@ function M.worLegKit(env)
   -- Fenix Downs about the level, capped at 20; Remedies for the dream's Petrify and Sap), and its weapon and armor
   -- counters are the gear stop (M.gearStop, #434).  The town's south edge returns the party to the world.
   local MAP_KOHLINGEN, MAP_KSTORE, KOHLINGEN_DOOR, SHOP_KITEMS = 189, 194, { 38, 45 }, 67
-  local function kohlingenStop(what)
+  -- opts.fenix: the Fenix Downs to stock (default the level, capped at 20: the band); opts.potions: the Potions
+  -- (default careStockPotions's band, 30 spent ahead).  A stop before a gauntlet with no shop in it (Kefka's Tower
+  -- and Kefka, #274) stocks for the whole of it
+  local function kohlingenStop(what, opts)
+    opts = opts or {}
     return M.seqStep({
       M.waitUntil(function() return M.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
       landNear(KOHLINGEN_DOOR[1], KOHLINGEN_DOOR[2], what .. ": the Falcon down by Kohlingen"),
@@ -11445,11 +11449,11 @@ function M.worLegKit(env)
       M.crossDoor(11, 11, MAP_KSTORE, 12, 39, what .. ": Kohlingen's store 189 (11,11) -> 194", { fight = FIGHT }),
       M.shopTalk(19, 35, what .. ": Kohlingen's item counter", { fight = FIGHT }),
       M.call(function() M.assertEq(M.shopId(), SHOP_KITEMS, "the counter opened shop 67 ($0201)") end),
-      M.buyItem(POTION, function() return math.max(0, M.careStockPotions(M.activeTopLevel(), { spend = 30 })
-        - M.invCountOf(POTION)) end, "POTION to the band"),
+      M.buyItem(POTION, function() return math.max(0, (opts.potions or M.careStockPotions(M.activeTopLevel(),
+        { spend = 30 })) - M.invCountOf(POTION)) end, "POTION to the band"),
       M.buyItem(REMEDY, function() return math.max(0, 20 - M.invCountOf(REMEDY)) end, "REMEDY to 20"),
-      M.buyItem(FENIX, function() return math.max(0, math.min(20, M.activeTopLevel()) - M.invCountOf(FENIX)) end,
-        "FENIX DOWN to the level, capped at 20"),
+      M.buyItem(FENIX, function() return math.max(0, (opts.fenix or math.min(20, M.activeTopLevel()))
+        - M.invCountOf(FENIX)) end, "FENIX DOWN to the level, capped at 20 (or the stop's own count)"),
       M.shopClose(what .. ": Kohlingen's item counter"),
       M.bagArrange({ POTION, FENIX, REMEDY, TINCTURE }, { tag = what .. ": bag: combat items on top" }),
       M.call(function() say("shop", what .. ": Kohlingen") end),
@@ -11458,6 +11462,37 @@ function M.worLegKit(env)
       outToWorld("down", what .. ": out of Kohlingen by the south edge"),
       board(),
     })
+  end
+  -- ---- Thamasa's relic counter (gen_wor_relm's and gen_wor_tower's walk) ----
+  -- The Falcon down by Thamasa (250,229), in at its door (251,230) to map 344, the relic shop's door (40,30) -> 350
+  -- and its keeper (43,8), shop 75 (Barrier Ring 500, Fairy Ring, Wall Ring, Jewel Ring, Czarina Ring, Guard Ring,
+  -- Peace Ring, Cure Ring), then out by the south edge (22,47) and aboard.  buys = { { item, want(), label }, ... }:
+  -- each bought up to what want() returns (M.buyItem's count function).  (22,39) and (23,39) are the street's
+  -- tile events, kept off.
+  local MAP_THAMASA, MAP_THAMASA_RELICS, SHOP_TRELICS = 344, 350, 75
+  local THAMASA_DOOR, THAMASA_LANDING, THAMASA_AVOID = { 251, 230 }, { 250, 229 }, { { 22, 39 }, { 23, 39 } }
+  local function thamasaRelicStop(what, buys)
+    local steps = {
+      M.waitUntil(function() return M.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
+      M.flyTo(THAMASA_LANDING[1], THAMASA_LANDING[2], { what = what .. ": the Falcon to Thamasa", fight = FIGHT }),
+      M.worldNavTo(THAMASA_DOOR[1], THAMASA_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+        arrive = function() return map() == MAP_THAMASA and not M.worldMode() end }),
+      M.waitUntil(function() return map() == MAP_THAMASA and settled() end, 2400, what .. ": Thamasa, map 344", 1),
+      M.crossDoor(40, 30, MAP_THAMASA_RELICS, 44, 13, what .. ": Thamasa's relic shop door 344 (40,30) -> 350",
+        { fight = FIGHT, avoid = THAMASA_AVOID }),
+      M.shopTalk(43, 8, what .. ": Thamasa's relic shop", { fight = FIGHT }),
+      M.call(function() M.assertEq(M.shopId(), SHOP_TRELICS, "the counter opened shop 75 ($0201)") end),
+    }
+    for _, b in ipairs(buys) do steps[#steps + 1] = M.buyItem(b[1], b[2], b[3]) end
+    for _, s in ipairs({
+      M.shopClose(what .. ": Thamasa's relic shop"),
+      M.call(function() say("shop", what .. ": Thamasa's relic counter") end),
+      M.crossDoor(44, 14, MAP_THAMASA, 40, 32, what .. ": Thamasa's relic shop -> the street", { fight = FIGHT }),
+      M.navTo(22, 47, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = THAMASA_AVOID }),
+      outToWorld("down", what .. ": out of Thamasa by the south edge"),
+      board(),
+    }) do steps[#steps + 1] = s end
+    return M.seqStep(steps)
   end
   -- A monster box (TreasureMonster: "Monster-in-a-box!", EventCmd_8e; a game over when lost, _ca5ea9), from
   -- whichever side of it the party can reach (#487): o = { x, y, bit, form, species, what, avoid = tiles,
@@ -11526,7 +11561,7 @@ function M.worLegKit(env)
     walk = walk, chestAt = chestAt, monsterBox = monsterBox, doomLine = doomLine, pace = pace, hunt = hunt, huntLine = huntLine, worldHunt = worldHunt,
     objLine = objLine, worstSteps = worstSteps,
     inParty = inParty, partyCount = partyCount, landNear = landNear, talkNpc = talkNpc,
-    pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,
+    pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop, thamasaRelicStop = thamasaRelicStop,
   }
 end
 
@@ -11641,6 +11676,23 @@ function M.kefkaTowerKit(K, fight)
   -- true.  A random battle can open on the step the talk takes (gen_wor_kt_atma's first graph play: "battle $1AA
   -- WON ... killed s0:$007 s1:$007 s2:$00D" in place of Atma, the talk's wait satisfied by it), so the talk is made
   -- again while the boss still stands, at most four times.
+  -- every member of the given parties (default the walking one) stands: HP above 0, no Wound, Petrify or Zombie
+  -- (#513: the care before a statue revives the fallen, and the dress skips a fallen member with a log line, so a
+  -- care that could not revive would otherwise meet the boss a member short)
+  function T.standing(what, parties)
+    return M.call(function()
+      local down = {}
+      for _, p in ipairs(parties or { M.activeParty() }) do
+        for _, ch in ipairs(M.partyRoster(p)) do
+          if M.charHp(ch) == 0 or (M.charStatus1(ch) & 0xC2) ~= 0 then
+            down[#down + 1] = string.format("%s %d/%d status $%02X", M.SPLIT_NAMES[ch], M.charHp(ch),
+              M.charMaxHp(ch), M.charStatus1(ch))
+          end
+        end
+      end
+      M.assertEq(#down == 0 and "every member" or table.concat(down, ", "), "every member", what .. ": who stands")
+    end)
+  end
   function T.touchBoss(x, y, mapId, done, what, bossFight, tries)
     tries = tries or 0
     return M.lazy(function()

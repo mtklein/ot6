@@ -7372,6 +7372,8 @@ function Driver:dropPlan(reason)
       self.tag or "fight", self.raceActDeclined))
   end
   if reason ~= "confirm_attempt" then self:traceDrop(reason or "back_out") end
+  -- a Megalixir dropped before its confirm (its actor fell on the way) is no longer in flight (Driver:megalixirPlan)
+  if self.plan and self.plan.reason == "megalixir" and reason ~= "confirm_attempt" then self.megalixirAt = nil end
   if self.careActor ~= nil and self.careActor == self.planActor and M.careRefund(reason) then
     self.careActor = nil
   end
@@ -7462,6 +7464,11 @@ end
 -- whole party (Megalixir) instead of the single-target ones.  A flat item
 -- restores what itemRestoreOf says (measured, else its power); a fraction
 -- item the share of max HP it gives, up to what e is missing.
+-- The Megalixir is Kefka's (owner, 2026-11-07): no fight spends it but one whose options say opts.megalixir
+-- (gen_wor_kefka's), here and in the care race's bag.  The tower's one (chest bit 222) went to battle 13, group 329,
+-- in gen_wor_kt_guardian ("party item $EF: 2 members inside their round"), and Kefka's Fallen One then left the whole
+-- party at 1 HP with no Elixir or Megalixir in the bag.
+M.MEGALIXIR = 0xEF
 function Driver:bagHeals(e, hp, all)
   local function member(p)
     return { hp = M.readWord(0x3BF4 + p * 2), maxhp = M.readWord(0x3C1C + p * 2),
@@ -7477,7 +7484,7 @@ function Driver:bagHeals(e, hp, all)
   local list, seen = {}, {}
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
-    if id ~= 0xFF and not seen[id] then
+    if id ~= 0xFF and not seen[id] and (id ~= M.MEGALIXIR or self:megalixirOpen()) then
       local p = M.itemProps(id)
       if (p & M.ITEM_HP) ~= 0 and (p & M.ITEM_CURES) == 0 and M.itemBattleUsable(id)
          and M.itemAllAllies(id) == (all == true) and self:battInvIdx(id) ~= nil then
@@ -10746,7 +10753,9 @@ function Driver:raceState(actor, R)
   st.bag, st.pendingHeal, st.pendingRaise = {}, self.healQueued or {}, self.raiseQueued or {}
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
-    if id ~= 0xFF then st.bag[id] = (st.bag[id] or 0) + M.readByte(BATTLE.BATTINV + i * 5 + 3) end
+    if id ~= 0xFF and (id ~= M.MEGALIXIR or self:megalixirOpen()) then
+      st.bag[id] = (st.bag[id] or 0) + M.readByte(BATTLE.BATTINV + i * 5 + 3)
+    end
   end
   local slot = self:pressTarget()
   if slot == nil then
@@ -11669,6 +11678,10 @@ function Driver:makePlan(actor)
   plan = self:healWeaponPlan(actor, plan)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
+  plan = self:megalixirPlan(actor, plan)
+  plan = self:lifeRaisePlan(actor, plan)
+  plan = self:boostCurePlan(actor, plan)
+  plan = self:reserveBankPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
   plan = self:studyHoldPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
@@ -11926,6 +11939,136 @@ function Driver:buffPlan(actor, plan)
     end
   end
   return plan
+end
+
+-- Life at one point is Life 2 (#274; magicite.md "Life 3 is Life's third tier"): it revives a fallen member at full
+-- HP, where a Fenix Down revives at an eighth.  opts.lifeRaise: an actor whose Magic list holds Life, with a point in
+-- the bank, casts it on a seated fallen member in place of an attack or a Fenix Down (the item care block's raises
+-- are item-only).  Kefka's Fallen One leaves every member at 1 HP and his Goner follows within a cycle: a member
+-- raised at an eighth or topped up by a Potion falls to it (build/attempts/wt/v040-the-end/lab/os_k4_s0: "from
+-- 834/4672 ... atk $DE").  Not on a member Petrified, a Zombie or seized, nor twice inside 600 frames.
+function Driver:lifeRaisePlan(actor, plan)
+  if not self.opts.lifeRaise or plan == nil or plan.buff then return plan end
+  if not (Driver.BUFF_OVER[plan.kind] or (plan.kind == "item" and plan.item == BATTLE.FENIX_DOWN)) then return plan end
+  local row = cmdRow(actor, BATTLE.CMD_MAGIC)
+  if row == nil or spellCell(actor, 0x30, true) == nil or M.readByte(BATTLE.BP + actor * 2) < 1 then return plan end
+  local b = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 1, 0)
+  if b == nil or b < 1 then return plan end
+  self.lifeAt = self.lifeAt or {}
+  for e = 0, 3 do
+    local mx, s1 = M.readWord(0x3C1C + e * 2), M.readByte(0x3EE4 + e * 2)
+    if e ~= actor and mx > 0 and mx ~= 0xFFFF and M.readWord(0x3BF4 + e * 2) == 0 and (s1 & 0x80) ~= 0
+       and (s1 & 0x42) == 0 and not M.seized(e) and M.frame - (self.lifeAt[e] or -100000) > 600 then
+      self.lifeAt[e] = M.frame
+      M.log(string.format("[%s] actor=%d Life at 1 BP (Life 2) on fallen entity %d (full HP): in place of its %s",
+        self.tag or "fight", actor, e, plan.kind == "item" and "Fenix Down" or plan.kind))
+      return { kind = "magic", spell = 0x30, row = row, boostLeft = 1, ally = true, target = e, buff = true,
+               vetoOk = true, reason = "life_raise" }
+    end
+  end
+  return plan
+end
+
+-- A boosted Cure on the member in danger (#274): Cure folds to Cure 2 at one point and Cure 3 at two (Ot6FoldTbl),
+-- several times the plain cast the care lines price (TERRA's +965), and the care block casts single-target cures
+-- unboosted.  opts.boostCure = { below = fraction, notBroken = bool }: an actor whose Magic list holds Cure, with a
+-- point in the bank, casts it at up to two points on the seated member lowest under `below` of its max HP (none in
+-- Reflect: a cure bounces), in place of an attack or a plain Potion or cure; with notBroken, not while a monster is
+-- Broken (it loses its turns then, and the window is the party's to hit).  Kefka's Fallen One leaves every member
+-- at 1 HP and his Goner follows; Potions put back 250.
+function Driver:boostCurePlan(actor, plan)
+  local o = self.opts.boostCure
+  if not o or plan == nil or plan.buff or plan.all then return plan end
+  local over = Driver.BUFF_OVER[plan.kind] or (plan.kind == "item" and (plan.item == 0xE9 or plan.item == 0xE8))
+    or (plan.kind == "heal" and (plan.boostLeft or 0) == 0)
+  if not over then return plan end
+  if o.notBroken then
+    for s = 0, 5 do
+      if monAlive(s) and M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then return plan end
+    end
+  end
+  local row, bank = cmdRow(actor, BATTLE.CMD_MAGIC), M.readByte(BATTLE.BP + actor * 2)
+  if row == nil or bank < 1 or spellCell(actor, 0x2D, true) == nil then return plan end
+  local b = castBoost(actor, 0x2D, select(2, spellCell(actor, 0x2D, true)), math.min(bank, 2), 0)
+  if b == nil or b < 1 then return plan end
+  self.cureAt = self.cureAt or {}
+  local low, lowFrac = nil, o.below or 0.4
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx ~= 0xFFFF and hp > 0 and hp / mx < lowFrac and (M.readByte(0x3EF8 + e * 2) & 0x80) == 0
+       and (M.readByte(0x3EE4 + e * 2) & 0x02) == 0 and M.frame - (self.cureAt[e] or -100000) > 600 then
+      low, lowFrac = e, hp / mx
+    end
+  end
+  if low == nil then return plan end
+  self.cureAt[low] = M.frame
+  M.log(string.format("[%s] actor=%d Cure at %d BP on entity %d (%d/%d): in place of its %s", self.tag or "fight",
+    actor, b, low, M.readWord(0x3BF4 + low * 2), M.readWord(0x3C1C + low * 2), plan.kind))
+  return { kind = "heal", spell = 0x2D, target = low, row = row, boostLeft = b, buff = true, reason = "boost_cure" }
+end
+
+-- The curers' last point (#274): Kefka's break burst spent every bank, and when it ended the members Fallen One left
+-- at 1 HP had no boosted Cure or Life 2 to answer his Goner and HyperDrive (v040-the-end-2/lab/dflt_k0_s8: TERRA at 0
+-- BP through the window, then "not curing entity 0 (2944/6309): $2D restores 965").  opts.reserveBank = { chars =
+-- { [char] = true }, n = points, vs = species }: a listed character's attack, while a body of species `vs` is Broken,
+-- goes at a boost that leaves `n` points in its bank.  A plan whose boost is pressed to an exact count
+-- (exactBoost/boostWant: the care race's) is passed untouched, as studyHoldPlan passes it: boostLeft does not drive
+-- its press, and the cut only mislabelled the hit (v040-the-end-3/lab/d3B_k2_s10: "[race] actor=3 act: Fight at 1
+-- BP", then "keeps 1 BP for care: its fight at 0 BP, not 1", and the submit's "accepted_boost":1).
+function Driver:reserveBankPlan(actor, plan)
+  local rb = self.opts.reserveBank
+  if not rb or plan == nil or plan.buff or plan.ally or not Driver.BUFF_OVER[plan.kind] then return plan end
+  if plan.exactBoost or plan.boostWant ~= nil then return plan end
+  if (plan.boostLeft or 0) == 0 or not rb.chars[M.readByte(0x3ED8 + actor * 2)] then return plan end
+  local broken = false
+  for s = 0, 5 do
+    if monAlive(s) and (not rb.vs or M.readWord(0x57C0 + s * 2) == rb.vs)
+       and M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then broken = true end
+  end
+  if not broken then return plan end
+  local bank = M.readByte(BATTLE.BP + actor * 2)
+  local keep = math.max(0, math.min(plan.boostLeft, bank - (rb.n or 1)))
+  if keep == plan.boostLeft then return plan end
+  M.log(string.format("[%s] actor=%d keeps %d BP for care: its %s at %d BP, not %d", self.tag or "fight", actor,
+    bank - keep, plan.kind, keep, plan.boostLeft))
+  plan.boostLeft = keep
+  return plan
+end
+
+-- Kefka's Megalixir turn (#274; owner, 2026-11-07: the Megalixir is saved for Kefka's fight and used there).
+-- opts.megalixir = { n = count, below = fraction }: with `n` seated members standing under `below` of their max HP
+-- (Kefka's Fallen One leaves all four at 1 HP), an actor with the Item row drinks the bag's Megalixir on the party in
+-- place of whatever it planned; one in flight is not doubled.  The option also opens the bag's Megalixir to the
+-- care lines (M.MEGALIXIR, Driver:bagHeals), which no other fight's options do.  `vs` (a species): only while a body
+-- of it stands -- Kefka's battle is four formations, and the care lines drank it in the first ("party item $EF: 2
+-- members inside their round", v040-the-end-3/lab/m_k0_s0, before Kefka loaded).
+function Driver:megalixirOpen()
+  local o = self.opts.megalixir
+  if not o then return false end
+  if type(o) ~= "table" or not o.vs then return true end
+  for s = 0, 5 do if monAlive(s) and M.readWord(0x57C0 + s * 2) == o.vs then return true end end
+  return false
+end
+function Driver:megalixirPlan(actor, plan)
+  local o = self.opts.megalixir
+  if type(o) ~= "table" or plan == nil or plan.buff or not self:megalixirOpen() then return plan end
+  local row, idx = cmdRow(actor, BATTLE.CMD_ITEM), self:battInvIdx(M.MEGALIXIR)
+  -- one in flight: from its plan until it resolves (the steer, the queue and the drink took up to 2,026 frames
+  -- with the bag unarranged, and the 900 the first cut allowed let a second actor drink the second Megalixir on a
+  -- party the first had already filled: "hp_net":"0,0,0,0", v040-the-end-5/grid/lab/d5_k0_s0), or until the plan is
+  -- dropped (Driver:dropPlan clears it)
+  if row == nil or idx == nil or M.frame - (self.megalixirAt or -100000) < (o.flight or 2400) then return plan end
+  local low, first = 0, nil
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx ~= 0xFFFF and hp > 0 and hp / mx < (o.below or 0.3) then low, first = low + 1, first or e end
+  end
+  if low < (o.n or 3) then return plan end
+  self.megalixirAt = M.frame
+  M.log(string.format("[%s] actor=%d Megalixir on the party: %d seated members under %d%% of their HP, in place of "
+    .. "its %s", self.tag or "fight", actor, low, math.floor((o.below or 0.3) * 100), plan.kind))
+  return { kind = "item", item = M.MEGALIXIR, target = first, row = row, idx = idx, all = true, auto = true,
+           buff = true, reason = "megalixir" }
 end
 
 -- Wrexsoul's Zinger (#271): its first turn (AIScript _290) hides it inside a

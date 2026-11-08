@@ -1641,7 +1641,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ;     tritoch's $0144 is the World of Ruin's (only battle 119 reaches it)
 ;     and has a real row (the narshe block).
 ;
-; kefka has one row; the imperial camp gags need none: MONSTER::KEFKA_NARSHE
+; kefka at narshe has one row ($14a; the final battle's kefka, $12a, is
+; its own record, in the end block); the imperial camp gags need none: MONSTER::KEFKA_NARSHE
 ; ($14a, const.inc:1222) appears in exactly two formation records (489,
 ; 505), and `battle 57` -> group 57 -> 505 is the narshe defense.  the
 ; camp gags run `battle 56` (event_main.asm:40683/:40743) -> group 56,
@@ -2908,6 +2909,49 @@ Ot6ShieldTbl:
         .byte   6, OT6_BLUDG|OT6_SPECIAL ; skull drgn (event battle 136, map
                                 ;   354): bone and a curse.  fire|holy
                                 ;   vanilla; absorbs poison
+        ; ---- the end: kefka's battle (route-wor-the-end.md section 2) ------
+        ; Battle 101 is four formations in one fight, met by whoever the
+        ; order menu puts in front: each tier between its bodies takes every
+        ; hand (slash, pierce, bludgeon, special), so any four the player
+        ; picks hold a key in every tier, and the order decides who breaks
+        ; what.  Kefka takes every hand.  Vanilla elements stay.
+        ; formation 471: the arms and the face
+        .word   $0157
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; short arm: a machine's arm; the
+                                ;   point and the blow.  water vanilla
+        .word   $0158
+        .byte   6, OT6_SLASH|OT6_PIERCE ; long arm: a claw on sinew; cut
+                                ;   it.  wind vanilla
+        .word   $0159
+        .byte   8, OT6_BLUDG|OT6_SPECIAL ; face: magic made stone, as the
+                                ;   statues.  fire vanilla; nulls earth
+        ; formation 512: the four figures
+        .word   $015d
+        .byte   6, OT6_SLASH|OT6_BLUDG ; hit: a warrior in plate.  poison
+                                ;   vanilla
+        .word   $015a
+        .byte   6, OT6_SLASH|OT6_PIERCE ; tiger: a beast's hide.  ice
+                                ;   vanilla; absorbs earth
+        .word   $015b
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; tools: a machine, as the
+                                ;   factory's.  bolt vanilla
+        .word   $015c
+        .byte   8, OT6_SLASH|OT6_SPECIAL ; magic: a sorceress, as the
+                                ;   madam.  earth vanilla
+        ; formation 513: the lady and the sleeper
+        .word   $015e
+        .byte   3, OT6_SLASH|OT6_PIERCE ; girl: 9999 hp; absorbs every
+                                ;   element, so steel is the way in, and a
+                                ;   break holds the life 2 she casts on the
+                                ;   sleeper when she stands alone
+        .word   $015f
+        .byte   8, OT6_BLUDG|OT6_SPECIAL ; sleep: stone asleep.  no
+                                ;   weakness vanilla
+        ; formation 514
+        .word   $012a
+        .byte   12, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; kefka:
+                                ;   every hand finds him.  no weakness
+                                ;   vanilla; nulls poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian (the wob's: battle 75)

@@ -41,9 +41,10 @@ local function ward(ch, item, what)
     })
   end)
 end
--- the wards party 1's lane takes and where each comes from upstream: the Barrier Rings from Figaro Castle's kit
--- (gen_fc_landing's TERRA kit) and the Albrook relic shop (route-wor-sabin.md, shop 51), the Memento Ring from
--- Thamasa's chest (gen_wor_gau: 349 (56,16), $0E3)
+-- the wards party 1's lane takes and where each comes from upstream: the Barrier Rings from Thamasa's relic counter
+-- (shop 75), bought to two at gen_wor_kt_factory's stop before the tower (the line's earlier two were the Harvesters'
+-- rare drop in gen_wor_cyan, which a replay can miss), the Memento Ring from Thamasa's chest (gen_wor_gau: 349
+-- (56,16), $0E3)
 local WARDS = { { EDGAR, BARRIER_RING, "Barrier Ring" }, { SETZER, BARRIER_RING, "Barrier Ring" },
   { RELM, MEMENTO_RING, "Memento Ring" } }
 local function wears(ch, item)
