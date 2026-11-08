@@ -15302,6 +15302,11 @@ function Driver:button(actor)
     local want = loreCell(actor, self.plan.lore, false)
     if want == nil then self:dropPlan("lore_unavailable"); return { "b" } end
     local cur = M.readByte(BATTLE.LSCROLL + actor) + M.readByte(BATTLE.LROW + actor)
+    -- A cursor still moving is progress, not a stall (#512): the stall guard's 600 frames were spent walking
+    -- from row 3 toward GrandTrain's row 22 (the window scrolls a row at a time, to scroll $14) and dropped the
+    -- plan at row 18 ("LORE STALLED 630 frames ... cursor $891F+$8927(+1)=15+3 want-row=22",
+    -- build/attempts/wt/v041-wor-abilities/p1/gt_s1); a cursor that stops moving still trips it.
+    if self.loreCur ~= cur then self.loreCur = cur; self.loreSpinN = 0 end
     if cur < want then return { "down" } end
     if cur > want then return { "up" } end
     return { "a" }
