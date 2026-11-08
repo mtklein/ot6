@@ -511,7 +511,7 @@ the Poltergeist (hand $24)" (the bag's four bludgeons emptied); "the
 Poltergeist not yet fought ($0074)"; party 2 off 337 (8,6), "contract
 wor-kt-doom-v1 (entry) VIOLATED -- 1 field(s) differ: party 2 stands at x:
 expected 8, read 7"; "a Ribbon in the bag for party 1"; "the Goddess not yet
-fought ($0073)"; "no plate of 411 held yet ($02C6)". `gen_wor_kt_gauntlet`:
+fought ($0073)"; "no plate of 411 held yet ($02C6)". (#513, v0.41, build/attempts/wt/v041-tower-asserts/px13/lab/) The boot asserts and `T.standing` each have a red: "a bludgeon for STRAGO in the bag or his hands" (the four bludgeons emptied), "a Wall Ring for each of the 2 members ... (1)" (the bag's four Wall Rings set to one), and "party 2 before the Poltergeist: who stands: got CELES 0/5539" / "party 1 before the Goddess: who stands: got TERRA 0/5995" (a copy of the generator, lap dropped, one member struck to 0 HP just before the assert). `gen_wor_kt_gauntlet`:
 "296's two chests still shut: got true" (the Nutkin Suit's bit set), and
 party 1 walking, "contract wor-kt-inferno-v1 (entry) VIOLATED ... the
 walking party ($1A6D): expected 3, read 1". `T.trainLap`

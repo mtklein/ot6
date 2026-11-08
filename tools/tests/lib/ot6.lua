@@ -7373,7 +7373,7 @@ function Driver:dropPlan(reason)
   end
   if reason ~= "confirm_attempt" then self:traceDrop(reason or "back_out") end
   -- a Megalixir dropped before its confirm (its actor fell on the way) is no longer in flight (Driver:megalixirPlan)
-  if self.plan and self.plan.reason == "megalixir" and reason ~= "confirm_attempt" then self.megalixirAt = nil end
+  if self.plan and self.plan.reason == "megalixir" and reason ~= "confirm_attempt" then self.megalixirAt, self.megalixirId = nil, nil end
   if self.careActor ~= nil and self.careActor == self.planActor and M.careRefund(reason) then
     self.careActor = nil
   end
@@ -11002,6 +11002,7 @@ local function raceDelayKey(actor, kind, id, boost)
 end
 
 function Driver:raceObserve(e)
+  self:megalixirEvent(e)
   if self.raceTimeActive then self:raceTimeEvent(e) end
   local key = raceDelayKey(e.actor, e.kind, e.requested, e.boost)
   if e.event == "hp_effect" then
@@ -12049,22 +12050,43 @@ function Driver:megalixirOpen()
   for s = 0, 5 do if monAlive(s) and M.readWord(0x57C0 + s * 2) == o.vs then return true end end
   return false
 end
+function Driver:megalixirInFlight()
+  local at = self.megalixirAt
+  if at == nil then return false end
+  local o = self.opts.megalixir
+  local age = M.frame - at
+  if self.recovery then return age < ((type(o) == "table" and o.maxFlight) or 6000) end
+  return age < ((type(o) == "table" and o.flight) or 2400)
+end
+-- The trace's events (Driver:raceObserve): the Megalixir plan's id, taken from its "plan" event, ends its flight at
+-- that id's "resolve", "unresolved" or "drop".
+function Driver:megalixirEvent(e)
+  if self.megalixirAt == nil then return end
+  if e.event == "plan" and e.reason == "megalixir" and self.megalixirId == nil then
+    self.megalixirId = e.id
+  elseif self.megalixirId ~= nil and e.id == self.megalixirId
+    and (e.event == "resolve" or e.event == "unresolved" or e.event == "drop") then
+    self.megalixirAt, self.megalixirId = nil, nil
+  end
+end
 function Driver:megalixirPlan(actor, plan)
   local o = self.opts.megalixir
   if type(o) ~= "table" or plan == nil or plan.buff or not self:megalixirOpen() then return plan end
   local row, idx = cmdRow(actor, BATTLE.CMD_ITEM), self:battInvIdx(M.MEGALIXIR)
-  -- one in flight: from its plan until it resolves (the steer, the queue and the drink took up to 2,026 frames
-  -- with the bag unarranged, and the 900 the first cut allowed let a second actor drink the second Megalixir on a
-  -- party the first had already filled: "hp_net":"0,0,0,0", v040-the-end-5/grid/lab/d5_k0_s0), or until the plan is
-  -- dropped (Driver:dropPlan clears it)
-  if row == nil or idx == nil or M.frame - (self.megalixirAt or -100000) < (o.flight or 2400) then return plan end
+  -- one in flight: from its plan until the trace says the drink resolved or was dropped (Driver:megalixirEvent),
+  -- or until the plan is dropped (Driver:dropPlan clears it).  The steer, the queue and the drink took up to 2,026
+  -- frames with the bag unarranged, and the 900 the first cut allowed let a second actor drink the second Megalixir
+  -- on a party the first had already filled ("hp_net":"0,0,0,0", v040-the-end-5/grid/lab/d5_k0_s0).  A driver with
+  -- no action trace falls back to the fixed window o.flight (2400 frames); a traced one holds until the event, with
+  -- o.maxFlight (6000) as the backstop for an event that never comes
+  if row == nil or idx == nil or self:megalixirInFlight() then return plan end
   local low, first = 0, nil
   for e = 0, 3 do
     local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
     if mx > 0 and mx ~= 0xFFFF and hp > 0 and hp / mx < (o.below or 0.3) then low, first = low + 1, first or e end
   end
   if low < (o.n or 3) then return plan end
-  self.megalixirAt = M.frame
+  self.megalixirAt, self.megalixirId = M.frame, nil
   M.log(string.format("[%s] actor=%d Megalixir on the party: %d seated members under %d%% of their HP, in place of "
     .. "its %s", self.tag or "fight", actor, low, math.floor((o.below or 0.3) * 100), plan.kind))
   return { kind = "item", item = M.MEGALIXIR, target = first, row = row, idx = idx, all = true, auto = true,

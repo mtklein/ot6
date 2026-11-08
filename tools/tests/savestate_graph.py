@@ -62,7 +62,9 @@
 
 
 # end=True marks the line's end: a savestate taken after "The End", which
-# no row may boot (savestate_ninja.validate refuses one that does).
+# no row may boot (savestate_ninja.validate refuses one that does), and only
+# a generator carrying the `-- OT6_ASSERTS_END:` directive, beside its assert
+# of The End, may be marked so (gen_wor_kefka).
 # The party and supply audits skip it: the ending rewrites the party, and
 # their rule is about what the next step inherits.
 def S(state, *, gen=None, prev=None, checkpoint=None, timeout=None,

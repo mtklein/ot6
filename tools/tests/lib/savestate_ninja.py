@@ -140,6 +140,15 @@ def capture_inputs(root, key):
          for p in checkpoint_inputs(root, key)[1:]]
 
 
+END_DIRECTIVE = re.compile(r"^-- OT6_ASSERTS_END:", re.M)
+
+
+def has_end_directive(root, gen):
+    """True when tools/tests/<gen>.lua declares `-- OT6_ASSERTS_END:`."""
+    f = root / "tools/tests" / f"{gen}.lua"
+    return f.is_file() and bool(END_DIRECTIVE.search(f.read_text()))
+
+
 def validate(states, root):
     """Every error is fatal and named; a malformed entry must never emit as
     some other kind of edge, which is the quiet-no-op class this design
@@ -175,6 +184,14 @@ def validate(states, root):
         end = e.get("end")
         if end is not None and end is not True:
             err(e, f"end {end!r} must be True or absent")
+        # ...and only a generator that asserts The End may claim to end the line:
+        # its `-- OT6_ASSERTS_END:` directive (a directive survives
+        # lua_fingerprint's comment stripping; the claim sits beside the
+        # assert it vouches for).
+        if end is True and gen and not has_end_directive(root, gen):
+            err(e, f"end=True but tools/tests/{gen}.lua carries no "
+                   f"`-- OT6_ASSERTS_END:` directive (the generator that "
+                   f"asserts The End)")
         if prev in ended:
             err(e, f"prev {prev!r} is the line's end (end=True); nothing "
                    f"boots it")
@@ -908,6 +925,8 @@ def selftest():
         (root / "tools/tests/checkpoints/empty-v1/manifest.json").write_text("{}")
         for g in ("gen_ok", "gen_cut"):
             (root / f"tools/tests/{g}.lua").write_text("-- ok")
+        (root / "tools/tests/gen_end.lua").write_text(
+            "-- ok\n-- OT6_ASSERTS_END: The End is asserted here\n")
 
         # o (power-on) saves k1 with also= sibling o2 standing at the save;
         # p Continues k1.  A cutter booted from p saves k2, which q and q2
@@ -926,7 +945,11 @@ def selftest():
                   saves="k4-v1", timeout=3600)]
         check("a graph with every kind of edge validates",
               validate(full, root) == [])
+        check("end=True on a generator that declares OT6_ASSERTS_END validates",
+              validate([s(state="a", gen="gen_end", end=True)], root) == [])
         bad = [
+            ("end=True on a generator without OT6_ASSERTS_END",
+             [s(state="a", gen="gen_ok", end=True)]),
             ("duplicate state", [s(state="a", gen="gen_ok")] * 2),
             ("no gen", [s(state="a")]),
             ("unknown generator", [s(state="a", gen="gen_missing")]),
@@ -949,7 +972,7 @@ def selftest():
             ("unknown field",
              [dict(s(state="a", gen="gen_ok"), checkpointt="oops")]),
             ("a boot from the line's end",
-             [s(state="a", gen="gen_ok", end=True),
+             [s(state="a", gen="gen_end", end=True),
               s(state="b", gen="gen_ok", prev="a")]),
             ("end= other than True",
              [s(state="a", gen="gen_ok", end=1)]),
