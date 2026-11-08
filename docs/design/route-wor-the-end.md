@@ -48,6 +48,12 @@ Evidence is under `build/attempts/wt/v040-the-end/`. Line numbers are into
    they hold 32 distinct opening keys and 29 distinct Kefka keys
    (`build/attempts/wt/v040-the-end-4/union_keys.txt`). At 16
    shields he still wins 4 of 48, so his row stays at 12.
+7. **The Megalixir near the top of the bag.** On the entry the Barrier
+   Rings' replay made (plates sha256 214d1cc7) the Megalixir sat at bag
+   slot 101, the battle's Item list took 1,260 frames to reach it, and
+   twice the member reaching for it fell first; moved up before the climb,
+   with one Megalixir in flight at a time, the leg wins 48 of 48 again
+   (27 distinct opening keys, 30 distinct Kefka keys: 5.4).
 
 ## 1. The climb
 
@@ -147,7 +153,8 @@ STRAGO and Kirin on LOCKE (party 2's, walking at the boot), the care, the
 plate, the order menu, the battle (the tactical driver, the Girl killed
 first in the third tier, the fallen revived with Life 2 and the member in
 danger cured at a boost: 5.2; the Megalixir when Fallen One leaves the
-party at 1 HP and the curers keeping a point through his break: 5.3), the
+party at 1 HP and the curers keeping a point through his break: 5.3; the
+Megalixir moved to bag slot 5 before the climb: 5.4), the
 ending. It asserts the staff roll and then The End by the code
 the game runs (exec watches on `EndingAirshipScene2_ext` and `TheEnd_ext`)
 and saves its last state, `wor_kefka.mss`, there. No save point follows
@@ -458,6 +465,60 @@ lost 0", every tier "lost 0"); "won 22, lost 2 ... won 21, lost 2" twice
 - **Kefka at 16 shields** (`k16`): the first three tiers play as `d3`; he
   wins 4 of 48 runs on 3 distinct keys (be4C twice, beB8, be0C), so his row
   stays at 12.
+
+### 5.4 The Megalixir within reach (fifth round)
+
+Evidence is under `build/attempts/wt/v040-the-end-6/grid/`
+(`tally_<arm>_A.txt`, `tally_<arm>_B.txt`, `lab/`, `pre/`, `jobs_*.txt`,
+`megal.txt`), px13, the rows' ROM (7f1aba0d), the plates' capture of
+v040-the-end-5's replay (sha256 214d1cc7, which bought the Guardian's two
+Barrier Rings at Thamasa), both grids, 48 runs an arm.
+
+**What the losses were** (v040-the-end-5's `d5`, `d5B`: "won 24, lost 0
+... won 21, lost 0" and "won 22, lost 2 ... won 19, lost 2"). The bag at
+this entry holds two Megalixirs at slot 101. Fallen One left the four at 1
+HP, the Megalixir was chosen at once ("actor=2 Megalixir on the party: 4
+seated members under 30% of their HP", `d5B_k0_s14`), and the Item list's
+walk took the rest of the window ("item steer: row 0 -> 101, walking
+fast"; 1,260 frames from plan to confirm in `d5_k0_s0`): Kefka's Battle and
+Special killed the member on the way ("went down after its item was
+planned"), and the next member to reach for it fell the same way. The same
+in `d5B_k4_s6`. In the wins the first cut's 900-frame guard let a second
+member drink the second Megalixir before the first had landed, on a party it
+had just filled ("hp_net":"0,0,0,0", `d5_k0_s0`).
+
+| arm | the lever (on 5.3's leg) | runs won (A + B) | Kefka lost (keys) | deaths in Kefka's tier (A + B) | runs planning both Megalixirs (`megal.txt`, `megal_d5.txt`) |
+|---|---|---|---|---|---|
+| `d5` (v040-the-end-5) | the leg before | 24 + 22 | 2 (2) | 38 + 40 | 40 of 48 |
+| `r6g` | one Megalixir in flight until it lands or its plan drops | 24 + 22 | 2 (2) | 12 + 23 | 3 of 48 |
+| `r6b` | the Megalixir to bag slot 5 before the climb (`H.bagArrange`) | 24 + 24 | 0 | 5 + 2 | 13 of 48 |
+| **`r6`** | **both (the leg as committed)** | **24 + 24** | 0 | 5 + 2 | 0 |
+
+Quoted: "Kefka's battle: 24 runs; won 24, lost 0, other 0; distinct opening
+keys won 17, lost 0" and "won 24, lost 0 ... won 20, lost 0" (`r6`,
+`tally_r6_A.txt`, `tally_r6_B.txt`; "4 Kefka: won 24, lost 0; distinct keys
+won 20, lost 0" and "... won 22, lost 0"; every tier "lost 0"); the same
+totals for `r6b`; "won 24, lost 0 ... won 21, lost 0" and "won 22, lost 2
+... won 19, lost 2" (`r6g`, the same two losses, `r6gB_k0_s14` and
+`r6gB_k4_s6`). Across `r6`'s two grids: 27 distinct opening keys and 30
+distinct Kefka keys, every one won.
+
+- **The bag.** gen_wor_kefka's care puts the Megalixir under the heals
+  already on top ("slots 0..5 = $E9 $F0 $F5 $EB $EC $EF", one swap, a
+  weapon to slot 101), as a player keeps what the last fight needs one
+  press away; the walk from plan to confirm is 302 frames (`r6B_k0_s14`),
+  and the Megalixir lands before Kefka's next hits ("hp_net":"5705,4671,
+  6357,4669"). `KEFKA_BAG = false` (a lab's) leaves the bag as it came.
+- **One in flight.** `opts.megalixir`'s guard holds from the plan until it
+  resolves (2,400 frames, `flight`) or its plan drops before the confirm
+  (the actor fell). It changes no tally on these grids, but with the bag
+  alone 13 of 48 runs drank the second Megalixir on a party the first had
+  filled, 1,055 to 1,742 frames after the first was chosen ("hp_net":
+  "0,0,0,3128", `r6b_k0_s0`); with it no run of `r6` drinks the second,
+  which stays in the bag for a later crisis (in `r6g` a second came only
+  after the first's member fell before the confirm, or 3,383 frames later
+  on a new crisis, `r6g_k0_s1`). Only gen_wor_kefka sets
+  `opts.megalixir`, so no other leg's play moves.
 
 ## 6. Not done
 
