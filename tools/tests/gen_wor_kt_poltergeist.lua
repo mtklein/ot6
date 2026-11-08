@@ -155,6 +155,9 @@ H.run({ maxFrames = 3000000 }, {
   end),
   H.absorbSafeArms(nil, { POLTERGEIST }, { tag = "arms for the Poltergeist" }),
   H.fieldCare({ threshold = 1.0, tag = "before the Poltergeist" }),
+  -- the lores the boss fight names into STRAGO's battle list (his five-slot loadout, #512); none named, no menu
+  KT_LORE_LOADOUT ~= false and H.loreLoadout(H.fightLores(BOSS_FIGHT), { tag = "STRAGO's lores for the Poltergeist" })
+    or H.call(function() end),
   T.standing("party 2 before the Poltergeist"),
   H.call(function() say("boss", "party 2 before the Poltergeist: " .. H.partiesLine()) end),
   H.navTo(30, 16, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, spare = { POLTERGEIST },

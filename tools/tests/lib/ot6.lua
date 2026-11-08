@@ -3190,6 +3190,87 @@ function M.isStudy(id, boost, actor)
     and M.readByte(0x3ED8 + actor * 2) == M.STRAGO_ID
 end
 M.LORE_PEARL_WIND, M.LORE_DISCHORD = 8, 16   -- $1D29 bit order
+-- STRAGO's battle Lore list (#512): not every lore he knows, but his five-slot loadout (OT6_LORELOAD, $1E27+0..4,
+-- id + 1, all zero = AUTO) plus Aqua Rake, the free row (ot6_lore.asm, Ot6LoreMask).  AUTO is the first five
+-- known lores in id order, Aqua Rake passed over, so a lore past the fifth (GrandTrain, id 22, once he knows Aero,
+-- Blow Fish, Revenge, L.5 Doom and Reflect???) is never in his battle list until the field's Lore page slots it:
+-- the Kefka's Tower arms that named GrandTrain and Pearl Wind played the very fights of the arms without them.
+--   learned  the 24-bit $1D29-$1D2B mask, bit id = lore id
+--   load     the five loadout bytes as stored (id + 1, 0 unset)
+-- M.LORE_FREE is the free row; M.loreList returns the set the battle offers, { [id] = true }
+M.LORE_FREE, M.LORE_SLOTS, M.LORE_GRANDTRAIN = 3, 5, 22
+function M.loreAuto(learned)
+  local t = {}
+  for id = 0, 23 do
+    if #t < M.LORE_SLOTS and id ~= M.LORE_FREE and (learned >> id) & 1 == 1 then t[#t + 1] = id end
+  end
+  return t
+end
+function M.loreList(learned, load)
+  local set, manual = {}, false
+  for i = 1, M.LORE_SLOTS do if (load[i] or 0) ~= 0 then manual = true end end
+  if manual then
+    for i = 1, M.LORE_SLOTS do
+      local id = (load[i] or 0) - 1
+      if id >= 0 and id < 24 and id ~= M.LORE_FREE and (learned >> id) & 1 == 1 then set[id] = true end
+    end
+  else
+    for _, id in ipairs(M.loreAuto(learned)) do set[id] = true end
+  end
+  if (learned >> M.LORE_FREE) & 1 == 1 then set[M.LORE_FREE] = true end
+  return set
+end
+-- The lores a fight's opts name for STRAGO, most wanted first: opts.nukeLore's (a list; a function is read at each
+-- battle and names none here), Pearl Wind for opts.strago.pearlWind, Dischord for opts.strago.dischord.  Aqua Rake
+-- is the free row and needs no slot.
+function M.fightLores(fight)
+  local t, seen = {}, {}
+  local function add(id)
+    if id ~= M.LORE_FREE and not seen[id] then seen[id] = true; t[#t + 1] = id end
+  end
+  if type(fight) ~= "table" then return t end
+  if type(fight.nukeLore) == "table" then for _, id in ipairs(fight.nukeLore) do add(id) end end
+  local so = fight.strago
+  if type(so) == "table" then
+    if so.pearlWind then add(M.LORE_PEARL_WIND) end
+    if so.dischord then add(M.LORE_DISCHORD) end
+  end
+  return t
+end
+-- The five a player would slot to have `want` (lore ids, most wanted first) in the battle list: the list as it
+-- stands (AUTO's window frozen, the Lore page's first edit), each wanted lore he knows and the list lacks put over
+-- the last slot that holds no wanted lore.  nil when nothing needs to move (every wanted lore he knows is offered
+-- already).  The second return names the wanted lores he has not learned, which no loadout can offer.
+function M.loreLoadoutFor(learned, load, want)
+  local list = M.loreList(learned, load)
+  local wanted, missing, lacking = {}, {}, {}
+  for _, id in ipairs(want) do
+    wanted[id] = true
+    if (learned >> id) & 1 == 0 then missing[#missing + 1] = id
+    elseif not list[id] then lacking[#lacking + 1] = id end
+  end
+  if #lacking == 0 then return nil, missing end
+  local slots, manual = {}, false
+  for i = 1, M.LORE_SLOTS do if (load[i] or 0) ~= 0 then manual = true end end
+  if manual then
+    for i = 1, M.LORE_SLOTS do
+      local id = (load[i] or 0) - 1
+      slots[i] = (id >= 0 and list[id] and id ~= M.LORE_FREE) and id or nil
+    end
+  else
+    local auto = M.loreAuto(learned)
+    for i = 1, M.LORE_SLOTS do slots[i] = auto[i] end
+  end
+  for _, id in ipairs(lacking) do
+    local put = nil
+    for i = M.LORE_SLOTS, 1, -1 do
+      if put == nil and (slots[i] == nil or not wanted[slots[i]]) then put = i end
+    end
+    if put == nil then break end
+    slots[put] = id
+  end
+  return slots, missing
+end
 -- A species' row of Ot6StudyTbl: the lores its AI script can cast, in
 -- $1D29's bit order (0 for none), read from the ROM and cached
 M.studyRows = nil
@@ -7222,7 +7303,7 @@ end
 -- InitBattle's own clear left there.  id+$8B is also the lore's ability
 -- id (vanilla lore abilities are $8B..$A2), which names it in the live
 -- list below and answers for its element in the absorb guard.
-local function loreOffered(id) return M.readByte(0x306A + id) == id + 0x8B end
+function M.loreOffered(id) return M.readByte(0x306A + id) == id + 0x8B end
 
 -- Where a lore sits in this actor's live battle Lore list, and what the
 -- engine has priced it at -- spellCell's exact shape, one segment along.
@@ -10676,6 +10757,23 @@ function Driver:loreDiagnose(actor, want)
     M.readByte(BATTLE.LROW + actor), tostring(want), table.concat(seg, " ")))
 end
 
+-- A lore line named in the opts whose lore the battle does not offer (#512): said once a battle per lore, with
+-- the reason, as an unknown config spell is (#182).  Not learned (Pearl Wind on the line), or learned and outside
+-- the loadout (GrandTrain under AUTO): the second is the field's to fix (H.loreLoadout), not the driver's.
+function Driver:loreAbsent(lid, line)
+  if M.loreOffered(lid) then return false end
+  local key = "lore:" .. lid
+  if self.inertSaid[key] then return true end
+  self.inertSaid[key] = true
+  local learned = M.readByte(0x1D29) | (M.readByte(0x1D2A) << 8) | (M.readByte(0x1D2B) << 16)
+  local load = {}
+  for i = 0, M.LORE_SLOTS - 1 do load[#load + 1] = string.format("%02X", M.readByte(0x1E27 + i)) end
+  M.log(string.format("[%s] %s: lore $%02X is not in STRAGO's battle list -- %s (loadout $1E27 = %s) -- inert line",
+    self.tag or "fight", line, lid, (learned >> lid) & 1 == 0 and "he has not learned it"
+      or "learned, but not in his five (the field's Lore page slots it)", table.concat(load, " ")))
+  return true
+end
+
 -- The nuke MP floor: a nuke is refused when paying for it would leave
 -- the caster under a quarter of max MP (opts.nukeFloor overrides, in
 -- absolute MP).  The tail of the bar is owed to the cure line, which
@@ -13684,7 +13782,7 @@ function Driver:makePlanRules(actor)
     local so = self.opts.strago
     if so and so.pearlWind and #cands >= 2 and zombieSeated == nil
        and M.readByte(BATTLE.BCHID + actor * 2) == M.STRAGO_ID and cmdRow(actor, BATTLE.CMD_LORE)
-       and loreOffered(M.LORE_PEARL_WIND) and hpNow[actor] * 2 >= maxOf(actor) then
+       and not self:loreAbsent(M.LORE_PEARL_WIND, "Pearl Wind") and hpNow[actor] * 2 >= maxOf(actor) then
       local cell, cost = loreCell(actor, M.LORE_PEARL_WIND, true)
       if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) >= cost then
         M.log(string.format("[%s] actor=%d party heal: Pearl Wind, %d hurt (worst %d%%), %d HP each, %d MP",
@@ -14049,7 +14147,7 @@ function Driver:makePlanRules(actor)
                  bounceHarmless = true }
       end
     end
-    if so.dischord and cmdRow(actor, BATTLE.CMD_LORE) and loreOffered(M.LORE_DISCHORD) then
+    if so.dischord and cmdRow(actor, BATTLE.CMD_LORE) and not self:loreAbsent(M.LORE_DISCHORD, "Dischord") then
       self.dischorded = self.dischorded or {}
       for s = 0, 5 do
         if monAlive(s) and so.dischord[M.readWord(0x57C0 + s * 2)] and not self.dischorded[s] then
@@ -14129,7 +14227,7 @@ function Driver:makePlanRules(actor)
       self:loreDiagnose(actor, loreCell(actor, self.opts.nukeLore[1], false))
     else
       for _, lid in ipairs(self.opts.nukeLore) do
-        if loreOffered(lid) then
+        if not self:loreAbsent(lid, "nuke lore") then
           local cell, cost = loreCell(actor, lid, true)
           local mp = M.readWord(BATTLE.CURMP + actor * 2)
           if self:castVetoed(0x8B + lid, "lore") then

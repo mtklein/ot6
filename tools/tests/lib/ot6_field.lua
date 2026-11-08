@@ -6758,6 +6758,110 @@ function M.equipEsper(pos, esperIdx, opts)
   })
 end
 
+-- M.loreLoadout(want, opts): put the lores `want` names (ids, most wanted first; a function returning them is read
+-- when the step runs) into STRAGO's battle Lore list the way a player does (#512): X, Skills, STRAGO, Lore -- the
+-- loadout page (MenuState $80, ot6_lore_page.asm) -- the cursor onto a slot (Up/Down) and R until the slot shows
+-- the lore, then B out.  His battle list is his five slots plus Aqua Rake (M.loreList); under AUTO the five are the
+-- first five he knows in id order, so a lore past them (GrandTrain at Kefka's Tower) is never offered until slotted.
+-- M.loreLoadoutFor picks the slots: the list as it stands, each wanted lore put over the last slot holding no
+-- wanted lore.  Nothing to move (every wanted lore he knows is offered) opens no menu.  A wanted lore he has not
+-- learned is said and skipped: no page offers it.  Reads and pad presses only; the bytes are read back after.
+function M.loreLoadout(want, opts)
+  opts = opts or {}
+  local tag = opts.tag or "lore loadout"
+  local ZM, CUR, ROW = 0x26, 0x4b, 0x4e
+  local ST_MAIN, ST_CHAR, ST_SKILLS, ST_LORE, SKILLS_LORE = 0x05, 0x06, 0x0a, 0x80, 4
+  local STRAGO = M.STRAGO_ID
+  local function st() return M.menuRunning() and M.readByte(ZM) or -1 end
+  local function learned() return M.readByte(0x1D29) | (M.readByte(0x1D2A) << 8) | (M.readByte(0x1D2B) << 16) end
+  local function load()
+    local t = {}
+    for i = 0, M.LORE_SLOTS - 1 do t[#t + 1] = M.readByte(0x1E27 + i) end
+    return t
+  end
+  local function said(t)
+    local s = {}
+    for _, b in ipairs(t) do s[#s + 1] = b == 0 and "--" or string.format("%02X", b - 1) end
+    return table.concat(s, " ")
+  end
+  local function pos() return (M.readByte(0x1850 + STRAGO) >> 3) & 0x03 end
+  return M.lazy(function()
+    local ids = type(want) == "function" and want() or want or {}
+    local before = load()
+    local slots, missing = M.loreLoadoutFor(learned(), before, ids)
+    for _, id in ipairs(missing) do
+      M.log(string.format("[%s] lore $%02X: STRAGO has not learned it -- no loadout offers it", tag, id))
+    end
+    if slots == nil then
+      return M.logStep(string.format("[%s] every wanted lore he knows is in STRAGO's battle list (loadout %s)",
+        tag, said(before)))
+    end
+    local pb = M.readByte(0x1850 + STRAGO)
+    M.assertEq((pb & 0x07) ~= 0 and (pb & 0x07) == (M.readByte(0x1A6D) & 0x07), true,
+      tag .. ": STRAGO is in the walking party (the Skills menu shows its own members)")
+    M.assertEq(M.charStatus1(STRAGO) & 0xC2, 0, tag .. ": STRAGO stands (the Skills menu refuses a fallen, "
+      .. "petrified or zombied member: field_menu.asm's $C2 test)")
+    local steps = {
+      M.logStep(string.format("[%s] STRAGO's loadout %s -> %s", tag, said(before), (function()
+        local t = {}
+        for i = 1, M.LORE_SLOTS do t[i] = slots[i] and slots[i] + 1 or 0 end
+        return said(t)
+      end)())),
+      M.driveUntil(function() return st() == ST_MAIN end, 1200,
+        { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
+      M.waitFrames(20),
+      M.driveUntil(function() return st() == ST_MAIN and M.readByte(CUR) == 1 end, 900,
+        { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, tag .. ": cursor on Skills"),
+      M.confirmA(tag .. ": character select",
+        function() return st() == ST_MAIN and M.readByte(CUR) == 1 end,
+        function() return st() == ST_CHAR end),
+      M.waitFrames(10),
+      M.driveUntil(function() return st() == ST_CHAR and M.readByte(CUR) == pos() end, 600,
+        { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, tag .. ": cursor on STRAGO"),
+      M.confirmA(tag .. ": skills submenu",
+        function() return st() == ST_CHAR and M.readByte(CUR) == pos() end,
+        function() return st() == ST_SKILLS end),
+      M.waitFrames(10),
+      M.driveUntil(function() return st() == ST_SKILLS and M.readByte(CUR) == SKILLS_LORE end, 900,
+        { M.pressButtons({ "down" }, 2), M.waitFrames(6) }, tag .. ": cursor on Lore"),
+      M.confirmA(tag .. ": the Lore page",
+        function() return st() == ST_SKILLS and M.readByte(CUR) == SKILLS_LORE end,
+        function() return st() == ST_LORE end),
+      M.waitFrames(60),
+    }
+    for i = 1, M.LORE_SLOTS do
+      local id = slots[i]
+      local stored = before[i]
+      local auto = true
+      for _, b in ipairs(before) do if b ~= 0 then auto = false end end
+      local shows = auto and (M.loreAuto(learned())[i]) or (stored ~= 0 and stored - 1 or nil)
+      if id ~= nil and shows ~= id then
+        steps[#steps + 1] = M.driveUntil(function() return st() == ST_LORE and M.readByte(ROW) == i - 1 end, 600,
+          { M.pressButtons({ "down" }, 2), M.waitFrames(8) },   -- the page opens on slot 0 (Ot6LoreOpen); slots in order
+          string.format("%s: cursor on slot %d", tag, i - 1))
+        steps[#steps + 1] = M.driveUntil(function() return M.readByte(0x1E27 + i - 1) == id + 1 end, 2400,
+          { M.pressButtons({ "r" }, 3), M.waitFrames(12) },
+          string.format("%s: R until slot %d holds lore $%02X", tag, i - 1, id))
+      end
+    end
+    steps[#steps + 1] = M.waitFrames(20)
+    steps[#steps + 1] = M.driveUntil(menuBack(), 1200,
+      { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out")
+    steps[#steps + 1] = M.waitFrames(20)
+    steps[#steps + 1] = M.call(function()
+      local got = M.loreList(learned(), load())
+      for _, id in ipairs(ids) do
+        if (learned() >> id) & 1 == 1 then
+          M.assertEq(got[id] == true, true, string.format("%s: lore $%02X in STRAGO's battle list after the page "
+            .. "(loadout %s)", tag, id, said(load())))
+        end
+      end
+      M.log(string.format("[%s] STRAGO's loadout now %s", tag, said(load())))
+    end)
+    return M.seqStep(steps)
+  end)
+end
+
 -- M.equipWeapon: put a specific item in one gear slot of the character
 -- at char-select position `pos`, through the real Equip menu.  States
 -- (equip.asm): $36 options (cursor 0 = Equip) -> $55 slot select (default
