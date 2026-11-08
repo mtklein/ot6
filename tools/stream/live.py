@@ -199,6 +199,7 @@ const esc=t=>String(t==null?'':t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','
 async function tick(){ try{
   const j = await (await fetch('grid.json?'+Date.now())).json();
   const all = j.workers||[]; const grid=$('grid');
+  grid.style.setProperty('--top', grid.getBoundingClientRect().top+scrollY+'px');
   // A worker that has not emitted a screenshot yet has nothing to show, and a
   // black tile reading "frame —" is worse than nothing: at 32 workers the
   // handful that ARE playing get lost in a wall of them.  Those are listed by
@@ -295,9 +296,13 @@ async function tick(){ try{
       t = document.createElement('a');
       t.id = 't-'+w.id;
       t.href = 'live1.html?w='+encodeURIComponent(w.id);
+      // no wider than lets its whole screen fit under the header (8:7,
+      // plus the two caption lines): a lone tile otherwise spans the page
+      // and runs off the bottom in landscape
       t.style.cssText = 'position:relative;display:block;text-decoration:none;'
         + 'color:inherit;border:2px solid #2a322c;border-radius:6px;'
-        + 'overflow:hidden;background:#181c19';
+        + 'overflow:hidden;background:#181c19;width:100%;justify-self:center;'
+        + 'max-width:max(220px,calc((100vh - var(--top,0px) - 64px)*8/7))';
       t.innerHTML = '<img style="width:100%;display:block;'
         + 'image-rendering:pixelated;aspect-ratio:8/7;background:#000">'
         + '<span class=badge style="position:absolute;top:5px;right:5px;'
@@ -342,7 +347,7 @@ DETAIL_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" cont
 <body style="margin:0;background:#111;color:#cdc;display:grid;place-items:center;min-height:100vh;font:14px ui-monospace,monospace">
 <div style="text-align:center;padding:12px">
 <div style="font-size:16px;padding-bottom:6px"><span id=who style="color:#cdc"></span></div>
-<img id=f src="latest.png" style="image-rendering:pixelated;display:block;margin:0 auto;width:min(768px,95vw);outline:none">
+<img id=f src="latest.png" style="image-rendering:pixelated;display:block;margin:0 auto;width:min(768px,95vw,calc((100vh - 120px)*8/7));outline:none">
 <div style="padding:8px 0;font-size:18px"><span id=frame>-</span> <span id=pad style="color:#8ac"></span></div>
 <div id=notes style="text-align:left;max-width:min(768px,95vw);margin:0 auto;color:#9a9;white-space:pre-wrap;word-break:break-all"></div>
 <div id=s style="color:#575;padding-top:6px">connecting…</div>
