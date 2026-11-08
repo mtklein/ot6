@@ -1884,7 +1884,7 @@ M.contracts["wor-narshe-v1"] = {
 -- wor-owzer-v1: Owzer's basement, map 207's save point (87,41), the retry
 -- point for Chadarnook: the lady's portrait and Still Life fought ($0252,
 -- $0254), Chadarnook not yet ($0253), RELM not yet joined ($02F8); CYAN,
--- TERRA and CELES seated, the fourth seat empty for RELM
+-- TERRA, CELES and SABIN seated (#509; RELM then waits aboard)
 -- (docs/design/route-wor-thamasa.md).  The basement's turning doors run on
 -- timers 1-3 (_cb4987), so no timer is pinned.
 M.contracts["wor-owzer-v1"] = {
@@ -1899,11 +1899,12 @@ M.contracts["wor-owzer-v1"] = {
     { 0x02F8, 0, "RELM not yet joined (_cb4dc6)" },
   },
   party = {
-    size = 3,                     -- CYAN, TERRA and CELES
+    size = 4,                     -- CYAN, TERRA, CELES and SABIN
     members = {
       { 0x02, "CYAN" },
       { 0x00, "TERRA" },
       { 0x06, "CELES" },
+      { 0x05, "SABIN" },
     },
   },
   ram = {

@@ -1,8 +1,8 @@
 -- gen_wor_owzer.lua -- the World of Ruin from Narshe to Owzer's basement:
 -- Continue the `wor-narshe-v1` battery (UMARO, MOG, TERRA and CELES beside
--- the Falcon outside Narshe), the cabin (CYAN, TERRA and CELES; the fourth
--- seat waits for RELM, MOG and UMARO aboard), the Falcon to Jidoor, the item
--- counter, the auction (one item a visit, re-entered while Golem or ZoneSeek
+-- the Falcon outside Narshe), the cabin (CYAN, TERRA, CELES and SABIN; MOG
+-- and UMARO aboard), the Falcon to Jidoor, the item counter, the weapon and
+-- armor counters, the auction (one item a visit, re-entered while Golem or ZoneSeek
 -- has not come up, bounded), Owzer's house: the two paintings that fight,
 -- the basement's lamp and its rotating doors, the painting warp, Still Life,
 -- and the save point beside the goddess's door: the `wor-owzer-v1` battery,
@@ -69,7 +69,11 @@ local function say(tag, what)
   H.log(string.format("[%s] f%d %s %s: %s; %s", tag, H.frame, what, pos, whereLine(), supplies()))
 end
 
-local FIGHT = {}
+-- the kill order in Owzer's basement (field group 157): the SoulDancers
+-- first, gen_wor_relm's order (formation 284, SoulDancer x2 and Crusher x2,
+-- is the one that wipes a party here)
+local SOULDANCER = 0x0AD
+local FIGHT = { focus = { { species = SOULDANCER } } }
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15 and not H.dialogWaiting()
 end
@@ -294,12 +298,9 @@ local function watches()
   end)
 end
 
--- ---- the Falcon's cabin: CYAN, TERRA and CELES -----------------------------
+-- ---- the Falcon's cabin: CYAN, TERRA, CELES and SABIN ----------------------
 -- (gen_wor_cyan's regroup) the cabin's waiting members (map 12) each ask
--- "Change party members?" (_caf59d); the party menu seats the three, and the
--- fourth seat stays empty for MOG, who joins into it (_cc3a4c: char_party
--- MOG when the party has room).  SABIN waits aboard with EDGAR and SETZER
--- (route-wor-narshe.md 5.4).
+-- "Change party members?" (_caf59d); the party menu seats the four.
 local MAP_DECK, MAP_CABIN = 11, 12
 -- the cabin's NPCs (map 12): NPC_n is object $10 + n - 1 (route_data map 12)
 local CABIN_NPCS = { { "CYAN", 0x12, 0x038B }, { "EDGAR", 0x14, 0x038C }, { "SETZER", 0x19, 0x0391 },
@@ -683,7 +684,6 @@ local RELIC_RING_CHEST = { 90, 47, 0x102, "Relic Ring (207 (90,47))", RELIC_RING
 -- changed none of it for the better (build/attempts/wt/v038-wor-sweeps-a/sweeps_r2/tally_owv*.txt); the SoulDancers'
 -- thrown knives (AIScript _173) take 500-1,000 a throw.  wor-coverage.md section 11.2.
 
-local PARTY = { { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" } }
 
 H.run({ maxFrames = 500000 }, {
   H.bootCheckpoint("wor-narshe-v1"),
@@ -694,10 +694,20 @@ H.run({ maxFrames = 500000 }, {
   end),
   -- @@setup-end
 
-  -- ---- 1. the cabin: CYAN, TERRA and CELES; a seat for RELM -----------------
+  -- ---- 1. the cabin: CYAN, TERRA, CELES and SABIN ------------------------------
   -- @@stage cabin
-  regroup({ CYAN, TERRA, CELES }, { MOG, UMARO }),
-  H.call(function() say("regroup", "CYAN, TERRA and CELES") end),
+  -- four seated (#509): with three, Owzer's basement lost SoulDancer x2 and
+  -- Crusher x2 about once in 29 distinct draws (#506) and Chadarnook 2 of 91,
+  -- each to attrition.  SABIN brings the fourth body and, for the demon (weak
+  -- fire and holy), the Dragon Claw's holy and the Fire Knuckle's fire on
+  -- every swing and AuraBolt's holy.  RELM, who joins after Chadarnook, then
+  -- waits aboard (route-wor-thamasa.md finding 1) until gen_wor_relm's cabin
+  -- seats her.  After the regroup the four are dressed: MOG's Ribbon, which
+  -- the cabin's step takes off him, goes on from the bag (#506)
+  regroup({ CYAN, TERRA, CELES, SABIN }, { MOG, UMARO }),
+  H.call(function() say("regroup", "CYAN, TERRA, CELES and SABIN") end),
+  H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { SABIN, "SABIN" } },
+    { tag = "relics for Owzer's house" }),
   liftOff(),
   H.flyTo(JIDOOR_LANDING[1], JIDOOR_LANDING[2], { what = "the Falcon to Jidoor" }),
   H.worldNavTo(JIDOOR_DOOR[1], JIDOOR_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
@@ -725,6 +735,9 @@ H.run({ maxFrames = 500000 }, {
   H.bagArrange({ POTION, FENIX, TONIC, REMEDY }, { tag = "bag: combat items on top (Jidoor)" }),
   H.call(function() say("shop", "Jidoor") end),
   H.crossDoor(34, 21, MAP_JIDOOR, 27, 43, "Jidoor's item shop -> the street", { fight = FIGHT }),
+  -- #434, #509: buy power with gil before Owzer's house, Jidoor's weapon and
+  -- armor counters for the four
+  H.gearStop({ tag = "gear Jidoor (Owzer's house)", fight = FIGHT }),
   auction(),
   H.saveState("wor_owzer_auction.mss"),
 
@@ -802,8 +815,9 @@ H.run({ maxFrames = 500000 }, {
   H.saveAtCheckpoint("wor-owzer-v1"),
   H.saveState("wor_owzer.mss"),
   H.logStep(function()
-    return string.format("wor_owzer generated: CYAN L%d, TERRA L%d and CELES L%d on the basement's save point, "
-      .. "map %d (%d,%d), saved in slot 3; Golem %s, ZoneSeek %s", level(CYAN), level(TERRA), level(CELES), map(),
+    return string.format("wor_owzer generated: CYAN L%d, TERRA L%d, CELES L%d and SABIN L%d on the basement's "
+      .. "save point, map %d (%d,%d), saved in slot 3; Golem %s, ZoneSeek %s", level(CYAN), level(TERRA), level(CELES),
+      level(SABIN), map(),
       H.fieldX(), H.fieldY(), tostring(owns(GOLEM)), tostring(owns(ZONESEEK)))
   end),
 })
