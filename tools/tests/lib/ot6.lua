@@ -7372,6 +7372,8 @@ function Driver:dropPlan(reason)
       self.tag or "fight", self.raceActDeclined))
   end
   if reason ~= "confirm_attempt" then self:traceDrop(reason or "back_out") end
+  -- a Megalixir dropped before its confirm (its actor fell on the way) is no longer in flight (Driver:megalixirPlan)
+  if self.plan and self.plan.reason == "megalixir" and reason ~= "confirm_attempt" then self.megalixirAt = nil end
   if self.careActor ~= nil and self.careActor == self.planActor and M.careRefund(reason) then
     self.careActor = nil
   end
@@ -12051,7 +12053,11 @@ function Driver:megalixirPlan(actor, plan)
   local o = self.opts.megalixir
   if type(o) ~= "table" or plan == nil or plan.buff or not self:megalixirOpen() then return plan end
   local row, idx = cmdRow(actor, BATTLE.CMD_ITEM), self:battInvIdx(M.MEGALIXIR)
-  if row == nil or idx == nil or M.frame - (self.megalixirAt or -100000) < 900 then return plan end
+  -- one in flight: from its plan until it resolves (the steer, the queue and the drink took up to 2,026 frames
+  -- with the bag unarranged, and the 900 the first cut allowed let a second actor drink the second Megalixir on a
+  -- party the first had already filled: "hp_net":"0,0,0,0", v040-the-end-5/grid/lab/d5_k0_s0), or until the plan is
+  -- dropped (Driver:dropPlan clears it)
+  if row == nil or idx == nil or M.frame - (self.megalixirAt or -100000) < (o.flight or 2400) then return plan end
   local low, first = 0, nil
   for e = 0, 3 do
     local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)

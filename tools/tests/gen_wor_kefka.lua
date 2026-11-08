@@ -280,6 +280,14 @@ H.run({ maxFrames = 1500000 }, {
     end
     return H.seqStep(steps)
   end),
+  -- the Megalixir to the top of the bag, under the heals already there (Potion, Fenix Down, Remedy, Tincture,
+  -- Ether): the tower's chests leave it at bag slot 101, and the battle's Item list walked there for 1,260 frames
+  -- while Kefka hit the members Fallen One left at 1 HP; in both losses of v040-the-end-5's grid the member who
+  -- reached for it died on the way ("item steer: row 0 -> 101", then "went down after its item was planned",
+  -- d5B_k0_s14, d5B_k4_s6).  A lab's KEFKA_BAG = false leaves the bag as it came
+  H.cond(function() return KEFKA_BAG ~= false end, {
+    H.bagArrange({ 0xE9, 0xF0, 0xF5, 0xEB, 0xEC, H.MEGALIXIR }, { tag = "bag: the Megalixir on top for Kefka" }),
+  }, {}),
   -- KEFKA_UNRING (a lab's): { { char, relic slot, party }, ... } to take off (the Wall Rings); splitCare walks
   -- party 2 again after
   H.lazy(function()
