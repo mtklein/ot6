@@ -1740,3 +1740,53 @@ clock and so the next fight's key.
 - **Lores weighed per fight**: a picker wants a fight where lores beat the
   boosted Fight, and the Dirt Dragon more keys (encounters used up before
   it) than the seven a seed shift reaches (13.4).
+
+### 13.7 STRAGO's loadout, and his lores at the Poltergeist (#512)
+
+His battle Lore list is not every lore he knows: it is his five-slot
+loadout plus Aqua Rake, the free row (kits.md "Strago", `Ot6LoreMask`).
+On AUTO, which no leg changes, the five are the first five he knows in id
+order. From the Kefka's Tower saves on (12 lores, `wor-kt-doom-v1`) they
+are Aero, Blow Fish, Revenge, L.5 Doom and Reflect???, so GrandTrain (id 22)
+is never in his list, and Pearl Wind (id 8) he has not learned (13.6).
+That is why the tower lab's arms that named them (`pg0`'s `nukeLore = { 22 }`,
+`a5`'s `pearlWind`, build/attempts/wt/v039-kefka-tower-2/) played the very
+fights of the arms without them. Earlier legs are unaffected: Aero and
+Dischord, the lores a line leg names, sit inside AUTO's five where those
+legs play (Dischord at `wor_relm`, five slottable lores at most).
+
+The harness now has the player's tool: `H.loreLoadout(ids)` slots lores
+through X, Skills, STRAGO, Lore (the loadout page), and `H.fightLores`
+reads them off a fight's opts; `M.loreList`/`M.loreLoadoutFor` model the
+mask and pick the slots (`lore_loadout_selftest`, 10 assertions, each
+failed by its own mutant). The driver says once a battle why a lore line
+it was given is inert ("lore $16 is not in STRAGO's battle list --
+learned, but not in his five", or "-- he has not learned it"). Once
+slotted, GrandTrain hit a second drop: the window scrolls a row at a time
+to row 22, and the lore stall guard's 600 frames ran out at row 18
+("LORE STALLED 630 frames ... cursor $891F+$8927(+1)=15+3 want-row=22",
+`p1/gt_s1`); a cursor still moving now counts as progress.
+
+The leg itself labbed it (`gen_wor_kt_poltergeist` at `7108e979`, which
+took a `KT_BOSS_FIGHT` prelude and slotted its lores), from the graph's
+`wor-kt-doom-v1` capture (sha256 10adacc0, the tracked save), one attempt
+a shift; evidence `build/attempts/wt/v041-wor-abilities/` (`tally_p1.txt`,
+`tally_p2.txt`):
+
+| arm | what | runs | keys won | deaths in the fight | ticks (median) |
+|---|---|---|---|---|---|
+| `ln` (p1, p2) | the line | 8 | 7 of 7 | 1 | 12,560-19,240 (16,096) |
+| `gt0` (p1) | GrandTrain and Pearl Wind named, no loadout | 2 | 2 of 2 | 0 | the line's keys and ticks to the tick |
+| `gt` (p1) | slotted, before the stall fix: one plan, then the Fight | 5 | 4 of 4 | 3 | 14,821-21,387 |
+| `gt` (p2) | slotted: 4-8 GrandTrains a fight | 8 | 7 of 7 | 7 | 17,642-20,651 (18,539) |
+
+The p1 and p2 `gt` arms meet the same four keys (the page's frames move
+the clock the same way), so they pair: casting GrandTrain whenever his MP
+clears the floor made three of the four longer (be4C 14,821 against 20,101
+ticks, beA0 15,475 against 17,659, be2C 16,527 against 17,679; beB4 21,387
+against 20,651) and the deaths 3 against 7 over all keys. A GrandTrain
+lands 3,400 on the shielded statue and 9,999 once it breaks ("actor=1's
+lore took 3477 off the monsters", "took 9999"), but each one is a turn
+off his bludgeon, the statue's second key (section 6.2 of
+route-wor-kefka-tower.md). The line keeps the Fight; GrandTrain stays
+unslotted.

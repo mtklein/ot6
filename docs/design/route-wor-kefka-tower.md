@@ -394,7 +394,10 @@ What the labs found:
   and his Pearl Wind (`strago = { pearlWind = true }`, `a5 pwpt50`) was
   never cast: `a5` played the very fights of `a4 pwt50` (the same keys and
   ticks, "won 8, lost 1"), so the boss fight's opts did not reach his
-  turns; worth a driver look before the next Poltergeist lab.
+  turns. Why (#512): his battle list is his five-slot loadout, which on
+  AUTO holds his first five lores in id order and not GrandTrain, and he
+  never learned Pearl Wind; slotted, GrandTrain made the fight longer and
+  costlier than his bludgeon (wor-coverage.md 13.7).
 - **The Goddess** answers a Fight with Love Token and every hit with Bolt 2,
   casts Overcast (Condemned on the party) every eighth, and Bolt 3, Flash
   Rain, Quasar below half. Party 1 (TERRA, RELM, EDGAR, SETZER) holds one
@@ -458,7 +461,7 @@ won 8, lost 1" (`tally_s6.txt`).
   it once or twice: "Poltrgeist: 15 runs; won 15, lost 0, not reached 0;
   distinct keys won 12, lost 0; deaths in the fight 15; ... ticks
   14042-22664" (`tally_kb.txt`). STRAGO's own options (#512) were not
-  needed.
+  needed, and GrandTrain in place of his Fight loses (wor-coverage.md 13.7).
 
 ### 6.3 The Goddess from the Poltergeist's save
 
