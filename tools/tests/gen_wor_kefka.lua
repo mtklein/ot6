@@ -15,6 +15,7 @@
 --     saved there.
 -- No save point follows Kefka, so the line ends on a savestate rather than a battery.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- OT6_ASSERTS_END: The End ($bb) is asserted after the ending's cinematics, before the last state is saved (savestate_ninja.validate: the only generator end=True may name)
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local NAMES = H.SPLIT_NAMES

@@ -1558,6 +1558,63 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: the load-tail rule (#491) checked")
   end),
 
+  -- the Megalixir guard tracks the drink (#516): one in flight from its plan to the trace's resolve (or drop), not for
+  -- a fixed window.  A stubbed driver: the battle memory is a table, the clock M.frame.
+  H.call(function()
+    local mem = {}
+    local rb, rw, fr = H.readByte, H.readWord, H.frame
+    H.readByte = function(a) return mem[a] or 0 end
+    H.readWord = function(a) return (mem[a] or 0) | ((mem[a + 1] or 0) << 8) end
+    local ok, err = pcall(function()
+      mem[0x202E + 0 * 12 + 0 * 3] = 0x01          -- actor 0's first command row: Item
+      mem[0x2686] = H.MEGALIXIR                    -- bag slot 0: the Megalixir, 2 of them
+      mem[0x2686 + 3] = 2
+      for e = 0, 3 do                              -- all four at 1 / 100 HP
+        mem[0x3BF4 + e * 2], mem[0x3C1C + e * 2] = 1, 100
+      end
+      local function fresh(traced)
+        local d = H.newFightDriver("megalixir stub", { actionTrace = true, megalixir = { n = 3, below = 0.3 } }).driver
+        if not traced then d.recovery = nil end
+        return d
+      end
+      local function ask(d, frame)
+        H.frame = frame
+        local p = d:megalixirPlan(0, { kind = "fight", target = 0 })
+        return p and p.reason == "megalixir"
+      end
+      local d = fresh(true)
+      H.assertEq(d.recovery ~= nil, true, "the stub driver traces its actions (M.CARE_RACE)")
+      H.assertEq(ask(d, 1000), true, "four at 1 HP: the Megalixir is planned")
+      d:megalixirEvent({ event = "plan", reason = "megalixir", id = 7 })
+      H.assertEq(ask(d, 1200), false, "...and one in flight is not doubled")
+      d:megalixirEvent({ event = "resolve", id = 8 })
+      H.assertEq(ask(d, 1300), false, "...another action's resolve does not end it")
+      d:megalixirEvent({ event = "resolve", id = 7 })
+      H.assertEq(ask(d, 1400), true, "...its own resolve (400 frames in) does: the party still low plans a second")
+      d = fresh(true)
+      ask(d, 1000)
+      d:megalixirEvent({ event = "plan", reason = "megalixir", id = 9 })
+      H.assertEq(ask(d, 1000 + 2600), false, "a traced drink still unresolved after the old 2400 frames stays in flight")
+      d:megalixirEvent({ event = "unresolved", id = 9 })
+      H.assertEq(ask(d, 3700), true, "...and an unresolved or dropped one releases it")
+      d = fresh(true)
+      ask(d, 1000)
+      H.assertEq(ask(d, 1000 + 6100), true, "the backstop (6000 frames) releases a drink whose event never came")
+      d = fresh(false)
+      ask(d, 1000)
+      H.assertEq(ask(d, 1000 + 2300), false, "an untraced driver holds the fixed window...")
+      H.assertEq(ask(d, 1000 + 2500), true, "...2400 frames")
+      d = fresh(true)
+      ask(d, 1000)
+      d.plan = { reason = "megalixir" }
+      d:dropPlan("actor_down")
+      H.assertEq(ask(d, 1100), true, "a dropped plan releases it at once")
+    end)
+    H.readByte, H.readWord, H.frame = rb, rw, fr
+    if not ok then error(err, 0) end
+    H.log("battle_healpolicy: the Megalixir guard follows the drink (#516) checked")
+  end),
+
   -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(
