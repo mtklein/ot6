@@ -14460,7 +14460,13 @@ function Driver:makePlanRules(actor)
     return { kind = "skill", cmd = BATTLE.CMD_TOOLS, skill = tool,
              row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = toolBp }
   end
-  if self.opts.tactical and id == 5
+  -- opts.blitzVs = { [species] = true }: Blitz only while one of these stands (#509: Chadarnook's AuraBolt, holy,
+  -- went to the holy-absorbing goddess whenever she stood alone, 245 of 430 casts taking nothing)
+  local blitzVsOk = self.opts.blitzVs == nil
+  for _, s in ipairs(blitzVsOk and {} or standingSlots()) do
+    if self.opts.blitzVs[M.readWord(0x57C0 + s * 2)] then blitzVsOk = true end
+  end
+  if self.opts.tactical and id == 5 and blitzVsOk
      and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
      and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = self.opts.blitz or BATTLE.PUMMEL },
        standingSlots(), string.format("Blitz $%02X", self.opts.blitz or BATTLE.PUMMEL),

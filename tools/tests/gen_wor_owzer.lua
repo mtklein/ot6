@@ -697,10 +697,11 @@ H.run({ maxFrames = 500000 }, {
   -- ---- 1. the cabin: CYAN, TERRA, CELES and SABIN ------------------------------
   -- @@stage cabin
   -- four seated (#509): with three, Owzer's basement lost SoulDancer x2 and
-  -- Crusher x2 about once in 29 distinct draws (#506) and Chadarnook 2 of 91,
-  -- each to attrition.  SABIN brings the fourth body and, for the demon (weak
-  -- fire and holy), the Dragon Claw's holy and the Fire Knuckle's fire on
-  -- every swing and AuraBolt's holy.  RELM, who joins after Chadarnook, then
+  -- Crusher x2 on 1 of 29 distinct keys (#505) and Chadarnook 5 of 93
+  -- distinct fights from v0.40's save (route-wor-thamasa.md 12.6), each to
+  -- attrition.  SABIN brings the fourth body and, for the demon (weak fire
+  -- and holy), the Fire Knuckle's fire and AuraBolt's holy (the holy Dragon
+  -- Claw comes off before the goddess, who absorbs it).  RELM, who joins after Chadarnook, then
   -- waits aboard (route-wor-thamasa.md finding 1) until gen_wor_relm's cabin
   -- seats her.  After the regroup the four are dressed: MOG's Ribbon, which
   -- the cabin's step takes off him, goes on from the bag (#506)

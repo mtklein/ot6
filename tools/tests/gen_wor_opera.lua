@@ -226,11 +226,12 @@ local function jidoorStop()
   })
 end
 -- the Dirt Dragon's fight: STRAGO's lores, RELM's Ultima, Shell on the party (labs du_*, dx_*, sweep so2:
--- section 4).  No Dischord: from the same snapshot the fight with it won 49 of 60 trials and without it 55
+-- section 4), else Safe or Haste: whoever knows Shell moves with the play (from v0.41's four at Owzer's, #509,
+-- TERRA learns it and sits out here, and CELES knows Safe and Haste), and battle_wardline tests this list.  No Dischord: from the same snapshot the fight with it won 49 of 60 trials and without it 55
 -- of 60, and it lost every trial of one key the plain fight won (#460; build/attempts/wt/v036-route/lab/
 -- dd_dis*, dd_ward*: 'be70:xxxx', 'be70:WWWW')
 local DRAGON_FIGHT = { nukeLore = { 0x03, 0x04 }, magic = { [RELM] = { spell = 0x14 } },
-  buffVs = { [0x14C] = { 0x25 } } }
+  buffVs = { [0x14C] = { 0x25, 0x1C, 0x1F } } }
 H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-ebot-v1"),
   watches(),

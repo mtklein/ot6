@@ -380,7 +380,7 @@ draws Dispel on every character. Absorbs holy, no weakness.
 ### 5.5 The party
 
 **Into Owzer's:** TERRA, CELES, CYAN and SABIN (v0.41, section 12.6); MOG,
-UMARO, EDGAR, SETZER aboard, and RELM when she joins. CYAN (L40) earns XP toward Quadra Slice (L44)
+UMARO, EDGAR, SETZER aboard, and RELM when she joins. CYAN (L38 at the save point from v0.41; L40 planned) earns XP toward Quadra Slice (L44)
 and carries Ifrit's fire. **Into the tower:** TERRA, CELES, RELM, STRAGO:
 the four with Magic and the most magic power (Umaro has no Magic; the
 tower's Fight row becomes Magic). **Out of the tower:** as the next arc
@@ -1052,6 +1052,10 @@ met over K 0-6 (`runs/mbp/f11c_all.txt`).
 
 The fourth seat moves the line's XP: the four reach the save point at
 CYAN L38, TERRA L40, CELES L40, SABIN L38 (v0.40's: CYAN L39, TERRA L40,
-CELES L41), and the spells learned downstream with it: at the Opera's
+CELES L41). RELM, joining aboard, is seated at L36. The four who climb the
+tower reach it at the same levels (TERRA 48, CELES 49, RELM 46, STRAGO 46),
+and further on the line runs about a level behind v0.40's for some members
+(`wor-opera-v1`: TERRA L54 against L55, CELES L53 against L54, RELM L51
+against L52), with the spells learned downstream moving with it: at the Opera's
 catwalk switch no seated member knows Shell any more (CELES knows Safe and
 Haste), which battle_wardline now allows for.

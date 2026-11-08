@@ -57,11 +57,13 @@ local BOSS_SPECIES = { [GODDESS_SP] = true, [DEMON_SP] = true }
 -- from full HP (#507, build/attempts/wt/v039-chadarnook/)
 -- SABIN (seated from the cabin before Owzer's, #509) Blitzes AuraBolt, holy,
 -- on the holy-weak demon; his Fight carries the Dragon Claw's holy and the
--- Fire Knuckle's fire (the Dragon Claw, which the goddess absorbs, comes off first)
+-- Fire Knuckle's fire (the Dragon Claw, which the goddess absorbs, comes off first).  He Blitzes only while the
+-- demon stands (opts.blitzVs): with the goddess alone the AuraBolt went to her and she absorbs holy (245 of 430
+-- casts on the first grid took nothing, build/attempts/wt/v041-phoenix-chadarnook/runs/px13/new3)
 local FIRE = 0x00
 local AURABOLT = 0x5E
 local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIRE, maxBoost = 2 } }, nuke = { FIRE },
-  trance = true, blitz = AURABOLT, focus = { { species = DEMON_SP } } }
+  trance = true, blitz = AURABOLT, blitzVs = { [DEMON_SP] = true }, focus = { { species = DEMON_SP } } }
 -- STRAGO's kit on the plains (#388): Aqua Rake as the nuke (water: the Reach
 -- Frog's... and the Spek Tors'), Pearl Wind as the party heal, Dischord on
 -- the Mantodea (it halves the killer's level), Study at three points on a

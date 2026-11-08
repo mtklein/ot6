@@ -5,9 +5,10 @@
 -- Played: the wor_opera leg's own snapshot at the Opera House's catwalk
 -- switch (wor_opera_switch; nothing here writes it).  The switch drops the
 -- party onto the Dirt Dragon (event battle 134), and the real driver fights
--- it with buffVs naming the dragon (Shell, as gen_wor_opera fights it, then
--- Safe and Haste: which of them the party has learned is the play's; at
--- e16fac99, with four seated at Owzer's (#509), no member here knows Shell).
+-- it with buffVs naming the dragon: Shell, then Safe, then Haste, the list
+-- gen_wor_opera's DRAGON_FIGHT fights it with.  Which the party has learned
+-- is the play's (from v0.41, #509, no member seated here knows Shell), so a
+-- precondition names who knows one.
 -- Asserted, reading the engine:
 --   a ward plan is made, and within 2400 frames its target is under the
 --   ward's status (ST3 $3EF8: Shell bit 5, Safe bit 6, Haste bit 3);
