@@ -6,9 +6,8 @@
 -- switch (wor_opera_switch; nothing here writes it).  The switch drops the
 -- party onto the Dirt Dragon (event battle 134), and the real driver fights
 -- it with buffVs naming the dragon (Shell, as gen_wor_opera fights it, then
--- Safe and Haste: which of them the party can cast is the play's, and the
--- auction's ZoneSeek, the line's Shell, is a draw: the line at e16fac99 bought
--- Golem alone, and no member cast Shell).
+-- Safe and Haste: which of them the party has learned is the play's; at
+-- e16fac99, with four seated at Owzer's (#509), no member here knows Shell).
 -- Asserted, reading the engine:
 --   a ward plan is made, and within 2400 frames its target is under the
 --   ward's status (ST3 $3EF8: Shell bit 5, Safe bit 6, Haste bit 3);

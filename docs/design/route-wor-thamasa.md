@@ -1051,6 +1051,7 @@ new3.tally.txt`), and the basement's $11C was won on all 41 distinct keys
 met over K 0-6 (`runs/mbp/f11c_all.txt`).
 
 The fourth seat moves the line's XP: the four reach the save point at
-CYAN L38, TERRA L40, CELES L40, SABIN L38. The auction on that play sold
-Golem and not ZoneSeek, so from here on no member knows Shell (Safe and
-Haste remain), which battle_wardline now allows for.
+CYAN L38, TERRA L40, CELES L40, SABIN L38 (v0.40's: CYAN L39, TERRA L40,
+CELES L41), and the spells learned downstream with it: at the Opera's
+catwalk switch no seated member knows Shell any more (CELES knows Safe and
+Haste), which battle_wardline now allows for.
