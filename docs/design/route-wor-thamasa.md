@@ -1024,3 +1024,33 @@ Phantasm (80 to 47 and 160 to 88 counters) and lost as many fights (3 of
 91) (`runs/C`, `runs/C2`). With CELES's Haste and Safe on the party in
 the goddess's turns as well, two of six pilot fights were lost
 (`runs/pB`).
+
+### 12.6 Four into Owzer's house (v0.41, #506, #509)
+
+With three seated, both of the house's attrition fights relied on the
+retry. From the v0.40 line's `wor-owzer-v1`, Chadarnook over K 0-11
+battles used up and 8 seed shifts each lost 5 of 93 distinct fights (K and
+battle key), each a wipe to Doom Kiss, Charm and Bolt 3 (won fights 26,499
+ticks on average, 1.56 deaths a run;
+`build/attempts/wt/v041-phoenix-chadarnook/runs/px13/main2.tally.txt`),
+and the basement's SoulDancer x2 and Crusher x2 lost 1 of 29 (#505).
+
+SABIN now takes the fourth seat (the cabin before Jidoor), and RELM, who
+joins after Chadarnook, waits aboard until a cabin before the tower seats
+her with TERRA, CELES and CYAN (finding 1). In the house his Fire Knuckle
+and AuraBolt (`BOSS_FIGHT.blitz`) hit the demon's weaknesses; his holy
+Dragon Claw comes off before the goddess's room (`H.absorbSafeArms`: she
+absorbs holy). The leg dresses the four after the regroup, so the Ribbon
+MOG leaves in the bag goes on CYAN; the basement fights the SoulDancers
+first; and Jidoor's weapon and armor counters are visited (nothing there
+beat what the four wore). On the same grid from the new `wor-owzer-v1`
+(byte for byte the line's), Chadarnook lost 1 of 91 distinct fights (won
+fights 19,284 ticks on average, 0.67 deaths a run; the loss, K7 shift 13,
+was the same Doom Kiss attrition over 72,000 frames, `runs/px13/
+new3.tally.txt`), and the basement's $11C was won on all 41 distinct keys
+met over K 0-6 (`runs/mbp/f11c_all.txt`).
+
+The fourth seat moves the line's XP: the four reach the save point at
+CYAN L38, TERRA L40, CELES L40, SABIN L38. The auction on that play sold
+Golem and not ZoneSeek, so from here on no member knows Shell (Safe and
+Haste remain), which battle_wardline now allows for.
