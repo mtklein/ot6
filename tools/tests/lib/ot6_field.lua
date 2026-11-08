@@ -11463,6 +11463,37 @@ function M.worLegKit(env)
       board(),
     })
   end
+  -- ---- Thamasa's relic counter (gen_wor_relm's and gen_wor_tower's walk) ----
+  -- The Falcon down by Thamasa (250,229), in at its door (251,230) to map 344, the relic shop's door (40,30) -> 350
+  -- and its keeper (43,8), shop 75 (Barrier Ring 500, Fairy Ring, Wall Ring, Jewel Ring, Czarina Ring, Guard Ring,
+  -- Peace Ring, Cure Ring), then out by the south edge (22,47) and aboard.  buys = { { item, want(), label }, ... }:
+  -- each bought up to what want() returns (M.buyItem's count function).  (22,39) and (23,39) are the street's
+  -- tile events, kept off.
+  local MAP_THAMASA, MAP_THAMASA_RELICS, SHOP_TRELICS = 344, 350, 75
+  local THAMASA_DOOR, THAMASA_LANDING, THAMASA_AVOID = { 251, 230 }, { 250, 229 }, { { 22, 39 }, { 23, 39 } }
+  local function thamasaRelicStop(what, buys)
+    local steps = {
+      M.waitUntil(function() return M.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
+      M.flyTo(THAMASA_LANDING[1], THAMASA_LANDING[2], { what = what .. ": the Falcon to Thamasa", fight = FIGHT }),
+      M.worldNavTo(THAMASA_DOOR[1], THAMASA_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+        arrive = function() return map() == MAP_THAMASA and not M.worldMode() end }),
+      M.waitUntil(function() return map() == MAP_THAMASA and settled() end, 2400, what .. ": Thamasa, map 344", 1),
+      M.crossDoor(40, 30, MAP_THAMASA_RELICS, 44, 13, what .. ": Thamasa's relic shop door 344 (40,30) -> 350",
+        { fight = FIGHT, avoid = THAMASA_AVOID }),
+      M.shopTalk(43, 8, what .. ": Thamasa's relic shop", { fight = FIGHT }),
+      M.call(function() M.assertEq(M.shopId(), SHOP_TRELICS, "the counter opened shop 75 ($0201)") end),
+    }
+    for _, b in ipairs(buys) do steps[#steps + 1] = M.buyItem(b[1], b[2], b[3]) end
+    for _, s in ipairs({
+      M.shopClose(what .. ": Thamasa's relic shop"),
+      M.call(function() say("shop", what .. ": Thamasa's relic counter") end),
+      M.crossDoor(44, 14, MAP_THAMASA, 40, 32, what .. ": Thamasa's relic shop -> the street", { fight = FIGHT }),
+      M.navTo(22, 47, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = THAMASA_AVOID }),
+      outToWorld("down", what .. ": out of Thamasa by the south edge"),
+      board(),
+    }) do steps[#steps + 1] = s end
+    return M.seqStep(steps)
+  end
   -- A monster box (TreasureMonster: "Monster-in-a-box!", EventCmd_8e; a game over when lost, _ca5ea9), from
   -- whichever side of it the party can reach (#487): o = { x, y, bit, form, species, what, avoid = tiles,
   -- heals = the bag's battle heals on top }.  The walk, the arms against the body's absorbs (M.absorbSafeArms),
@@ -11530,7 +11561,7 @@ function M.worLegKit(env)
     walk = walk, chestAt = chestAt, monsterBox = monsterBox, doomLine = doomLine, pace = pace, hunt = hunt, huntLine = huntLine, worldHunt = worldHunt,
     objLine = objLine, worstSteps = worstSteps,
     inParty = inParty, partyCount = partyCount, landNear = landNear, talkNpc = talkNpc,
-    pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,
+    pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop, thamasaRelicStop = thamasaRelicStop,
   }
 end
 
