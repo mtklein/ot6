@@ -57,7 +57,7 @@ local BOSS_SPECIES = { [GODDESS_SP] = true, [DEMON_SP] = true }
 -- from full HP (#507, build/attempts/wt/v039-chadarnook/)
 -- SABIN (seated from the cabin before Owzer's, #509) Blitzes AuraBolt, holy,
 -- on the holy-weak demon; his Fight carries the Dragon Claw's holy and the
--- Fire Knuckle's fire
+-- Fire Knuckle's fire (the Dragon Claw, which the goddess absorbs, comes off first)
 local FIRE = 0x00
 local AURABOLT = 0x5E
 local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIRE, maxBoost = 2 } }, nuke = { FIRE },
@@ -698,6 +698,9 @@ H.run({ maxFrames = 1800000 }, {
   H.fieldCare({ threshold = 1.0, tag = "before Chadarnook" }),
   H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { SABIN, "SABIN" } },
     { tag = "relics for Chadarnook" }),
+  -- the goddess absorbs holy and the demon bolt: a hand that holds either
+  -- (SABIN's Dragon Claw) takes the bag's best other weapon first
+  H.absorbSafeArms(nil, { GODDESS_SP, DEMON_SP }, { tag = "arms for Chadarnook" }),
   door(88, 35, MAP_GODDESS, "the basement -> the goddess's room (208 (75,36))"),
   -- Owzer (208 NPC_2 at (75,14), _cb4cfa): his lines, then event battle 86
   -- (a game over when lost), then $0253
