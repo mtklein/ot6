@@ -82,6 +82,12 @@ UMARO: two of the arc's four casters (L46-49) beside two of the bench
 8. Party 2 onto the step (12,32): the last bridge; down to 313 (18,52),
    LOCKE (6,53). The scene ends with CELES and LOCKE alone in Kohlingen
    (map 189): the regroup and the save are route-wor-locke.md's (#268).
+   The scene leaves everyone else aboard wearing what they wore, out of
+   every field menu's reach until a regroup seats them, so before it each
+   party takes the Ribbons off its members the cabin will not seat (party
+   1 before its walk to the step, party 2 after it switches), and party 2
+   puts the bag's on its members the cabin will (#506: through v0.40 the
+   cave's Ribbon rode aboard on STRAGO from here to wor_belly).
 
 ## 4. The library
 

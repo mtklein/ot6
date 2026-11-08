@@ -101,8 +101,10 @@ From the tracked SRAM (`wor-narshe-v1_dump.txt`, `wor-narshe-v1_roster.txt`):
    (34,156) -> map 198`, `world_entrances1.txt`); the item counter (shop 78)
    for the arc's spend (section 7). The auction (map 200): one visit, and
    re-entry while Golem or ZoneSeek has not come up, bounded (finding 8).
-2. **The cabin.** Seat three, TERRA, CELES and CYAN, and leave the fourth
-   seat for RELM; MOG and UMARO wait aboard (section 5.4).
+2. **The cabin.** Seat four, TERRA, CELES, CYAN and SABIN (v0.41, #509;
+   until then the fourth seat was left for RELM); MOG and UMARO wait
+   aboard (section 5.5). Jidoor's weapon and armor counters before Owzer's
+   house (#434).
 3. **Owzer's house** (map 198 (16,12) -> 209 (118,28)). The hall: the
    Tincture (209 (125,11), already opened, `tools/chests_opened.txt` 66);
    the two paintings that fight when read, A facing up (209 (99,30)
@@ -131,9 +133,11 @@ From the tracked SRAM (`wor-narshe-v1_dump.txt`, `wor-narshe-v1_roster.txt`):
    battle 86 (:48727), a game over when lost (`_ca5ea9`). `$0253` is set at
    :48853.
 7. **Starlet and RELM.** (80,14), A facing up (`_cb4dc6` :48855): Starlet
-   (:48869), then RELM into the empty seat; the map reloads to Jidoor
-   (198 (16,14), :48904). RELM's gear goes on (section 6.2).
-8. **The Fanatics' Tower's foot.** The cabin is not needed: the Falcon flies
+   (:48869), then RELM, who waits aboard with four seated (finding 1); the
+   map reloads to Jidoor (198 (16,14), :48904). The cabin then seats
+   TERRA, CELES, RELM and CYAN (CYAN passes Ifrit to her), and RELM's gear
+   goes on (section 6.2).
+8. **The Fanatics' Tower's foot.** The Falcon flies
    to the tower, world (160,126) -> map 362 (8,13). Stepping onto any of
    (8,12), (7,13), (9,13), (8,14) with RELM seated plays the scene and
    STRAGO joins into the fourth seat (finding 2); map 362 reloads at (8,13)
@@ -375,8 +379,8 @@ draws Dispel on every character. Absorbs holy, no weakness.
 
 ### 5.5 The party
 
-**Into Owzer's:** TERRA, CELES, CYAN, and RELM when she joins; MOG, UMARO,
-SABIN, EDGAR, SETZER aboard. CYAN (L40) earns XP toward Quadra Slice (L44)
+**Into Owzer's:** TERRA, CELES, CYAN and SABIN (v0.41, section 12.6); MOG,
+UMARO, EDGAR, SETZER aboard, and RELM when she joins. CYAN (L40) earns XP toward Quadra Slice (L44)
 and carries Ifrit's fire. **Into the tower:** TERRA, CELES, RELM, STRAGO:
 the four with Magic and the most magic power (Umaro has no Magic; the
 tower's Fight row becomes Magic). **Out of the tower:** as the next arc
