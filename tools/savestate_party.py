@@ -78,6 +78,16 @@ def declared_states(repo: str) -> set[str]:
         return set()
 
 
+def ended_states(repo: str) -> set[str]:
+    """The rows the graph marks end=True: savestates taken after "The End",
+    which savestate_ninja.validate guarantees nothing boots."""
+    path = os.path.join(repo, GRAPH)
+    spec = importlib.util.spec_from_file_location("savestate_graph", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return {s["state"] for s in mod.STATES if s.get("end")}
+
+
 def split_orphans(files: list[str], declared: set[str]):
     """Partition globbed fixtures into (live, orphan stems); with an empty
     `declared`, everything counts as live."""

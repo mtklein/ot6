@@ -61,10 +61,15 @@
 # TypeError here, not a silently-plain entry downstream.
 
 
+# end=True marks the line's end: a savestate taken after "The End", which
+# no row may boot (savestate_ninja.validate refuses one that does).
+# The party and supply audits skip it: the ending rewrites the party, and
+# their rule is about what the next step inherits.
 def S(state, *, gen=None, prev=None, checkpoint=None, timeout=None,
-      also=None, saves=None, cutter=None):
+      also=None, saves=None, cutter=None, end=None):
     return {"state": state, "gen": gen, "prev": prev, "checkpoint": checkpoint,
-            "timeout": timeout, "also": also, "saves": saves, "cutter": cutter}
+            "timeout": timeout, "also": also, "saves": saves, "cutter": cutter,
+            "end": end}
 
 
 STATES = [
@@ -1371,7 +1376,7 @@ STATES = [
     # "The End" (#274; docs/design/route-wor-the-end.md).  The line's end:
     # no save point follows, so its last state is this savestate.
     S("wor_kefka", gen="gen_wor_kefka", prev="wor_kt_plates",
-      checkpoint="wor-kt-plates-v1", timeout=7200),
+      checkpoint="wor-kt-plates-v1", timeout=7200, end=True),
 
 ]
 

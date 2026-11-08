@@ -88,7 +88,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from savestate_party import (biggest_stream, checkpoint_payloads, tracked_payloads,
-                             declared_states, find_char_block, party_at)
+                             declared_states, ended_states, find_char_block,
+                             party_at)
 
 WAIVERS = "tools/supply_waivers.txt"
 
@@ -665,6 +666,12 @@ def main() -> int:
     if not declared:
         print("audit_supplies: the graph declares no states; nothing to audit")
         return 0
+
+    # The line's end follows the ending and nothing boots it: no step
+    # ahead spends what its bag holds.
+    for name in sorted(ended_states(args.repo)):
+        print(f"  ({name}: the line's end, after The End; nothing boots it, not audited)")
+        declared.discard(name)
 
     states, checkpoints = load_graph(args.repo)
     waivers = load_waivers(args.repo, WAIVERS)
