@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "6b1caea111a9e792aa22f5b6f0d69706a69e866a48d22d3adcdd32b769278bab",
+  "sha256": "ebc17f88041202a3d708ac5c65c7ac1d7be4e8cb4543466e50dc2d806addd41b",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "6b1caea111a9e792aa22f5b6f0d69706a69e866a48d22d3adcdd32b769278bab",
-    "generator_sig": "ec1f1ef23c496c0bb6ae1418e4d2fcfcc2f89bdb3432ddcc138af7b8f0f18afa gen_wor_sabin build/checkpoints/wor-tzen-door-v1/manifest.json build/checkpoints/wor-tzen-door-v1/wor-tzen-door.sram",
+    "payload_sha256": "ebc17f88041202a3d708ac5c65c7ac1d7be4e8cb4543466e50dc2d806addd41b",
+    "generator_sig": "ded54ed5e2c484b71352328a18cd881333262d249c54fdf44482d245fdef2711 gen_wor_sabin build/checkpoints/wor-tzen-door-v1/manifest.json build/checkpoints/wor-tzen-door-v1/wor-tzen-door.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-tzen-door-v1/manifest.json",
-        "sha256": "f8c795ae6414a91936242a6dd48df546196315635a2997dfc49217119c7e7c70"
+        "sha256": "cf1e52d27d18313da18dfc5d29956090ee6694851406e903af8d5a0baced6d7e"
       }
     ]
   }
