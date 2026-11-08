@@ -21,9 +21,10 @@ local TOWER_FENIX, TOWER_POTIONS = 40, 99
 -- (tracked wor-mtzozo-v1: 2 in the bag) and none in #274's replay (gen_wor_kt_guardian's boot: "the bag holds 2
 -- Barrier Ring(s) for party 1's lane (it holds 0 ...)")
 local BARRIER_RING, TOWER_BARRIER_RINGS = 0xB7, 2
+-- counted as gen_wor_kt_guardian's wardsHeld counts them: the bag, or a ring the lane's wearer has on already
 local function barrierRingsOwned()
   local n = H.invCountOf(BARRIER_RING)
-  for ch = 0, 13 do
+  for _, ch in ipairs({ EDGAR, SETZER }) do
     for s = 4, 5 do
       if H.readByte(0x1600 + 37 * ch + 0x1F + s) == BARRIER_RING then n = n + 1 end
     end

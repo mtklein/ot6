@@ -491,7 +491,7 @@ had just filled ("hp_net":"0,0,0,0", `d5_k0_s0`).
 |---|---|---|---|---|---|
 | `d5` (v040-the-end-5) | the leg before | 24 + 22 | 2 (2) | 38 + 40 | 40 of 48 |
 | `r6g` | one Megalixir in flight until it lands or its plan drops | 24 + 22 | 2 (2) | 12 + 23 | 3 of 48 |
-| `r6b` | the Megalixir to bag slot 5 before the climb (`H.bagArrange`) | 24 + 24 | 0 | 5 + 2 | 13 of 48 |
+| `r6b` | the Megalixir to bag slot 5 before the climb (`H.bagArrange`; `flight` 900, the plan-drop clearing still on) | 24 + 24 | 0 | 5 + 2 | 13 of 48 |
 | **`r6`** | **both (the leg as committed)** | **24 + 24** | 0 | 5 + 2 | 0 |
 
 Quoted: "Kefka's battle: 24 runs; won 24, lost 0, other 0; distinct opening
@@ -506,7 +506,7 @@ distinct Kefka keys, every one won.
 - **The bag.** gen_wor_kefka's care puts the Megalixir under the heals
   already on top ("slots 0..5 = $E9 $F0 $F5 $EB $EC $EF", one swap, a
   weapon to slot 101), as a player keeps what the last fight needs one
-  press away; the walk from plan to confirm is 302 frames (`r6B_k0_s14`),
+  press away; the walk from plan to confirm is 300 frames (302 to submit) (`r6B_k0_s14`),
   and the Megalixir lands before Kefka's next hits ("hp_net":"5705,4671,
   6357,4669"). `KEFKA_BAG = false` (a lab's) leaves the bag as it came.
 - **One in flight.** `opts.megalixir`'s guard holds from the plan until it
