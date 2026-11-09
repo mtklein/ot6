@@ -1928,7 +1928,14 @@ formation `$18A` early in the tower); from `955b7f9c`'s 12 of 12
 (`tw0_*`). That entry (the hunt after the grind) is one the line no longer
 reaches: the hunt now comes before the grind. Pearl Wind cannot answer
 MagiMaster: the tower is magic-only (battle switch `$38`), and every seat's
-command list there reads `cmds=02,FF,FF,01` (Magic, Item; no Lore). The stall replaced a frame-budget
+command list there reads `cmds=02,FF,FF,01` (Magic, Item; no Lore).
+From the line's current entry (the `wor-tower-v1` the replay at `e6b0136d`
+captured), shifts 0-11, one attempt each (`tw5/`, `tw5/tally.txt`):
+MagiMaster won on all 11 distinct keys that reached him ("ARM tw5: 11
+runs; distinct keys 11: won 11, lost 0; deaths over keys 41; won ticks
+28530-85998 (median 44271)"); the twelfth run (`tw5_s3`) wiped earlier,
+to formation `$12B` on the climb. Three or four deaths in every win: an
+attrition fight, but not one Pearl Wind can reach. The stall replaced a frame-budget
 timeout that was retryable, so `gen_wor_tower` now raises it as a lost
 fight ("LOST: ", class `lost`): retried from the boot and counted like a
 wipe; the replay showed it ("attempt 1/3 FAILED class=lost ... LOST:
