@@ -1713,24 +1713,13 @@ clock and so the next fight's key.
 
 ### 13.6 Left
 
-- **Lores off the line.** Pearl Wind (Sprinter, groups 49, 51, 52 by
-  Jidoor, while STRAGO grinds on 48), Rippler (Reach Frog on that grind,
-  54 battles with him; its `opts.strago.study`, without the hold, fired in
-  none of them in the 10-23 play) and
-  Blow Fish (Phase, Phoenix Cave) are reachable with STRAGO seated; a
-  study on the grind or a branch leg would teach them. Pearl Wind is the
-  one the driver already has a line for (the party heal).
-- **SABIN's Spiraler** comes at L42; he ends the line at L39. Bum Rush (99
-  MP) is learned at Duncan's house, and the line seats him in no battle
-  after it. Fire Dance is never cast; `opts.blitz` is one Blitz per leg. An
-  all-body Blitz by body count was not as good as Pummel (13.5); one that
-  pays would have to break what it hits, or come where the bodies are
-  already broken.
-- **CYAN's Cleave** (3 BP, 99 MP) and Quadra Slice are never cast in the
-  World of Ruin: `opts.bushido` is set on three legs, none after the dream.
-  Stunner by body count lost to the keyed Fight (13.5); Cleave needs a
-  banked bar, so its place is a boss fight, measured against the 3-BP
-  Fight it would replace.
+- **Lores off the line.** Pearl Wind is routed now (13.8). Rippler and
+  Blow Fish are learned on the line (the saves from `wor-tower-v1` and
+  `wor-phoenix-v1` hold them, by sight).
+- **SABIN's Spiraler and Bum Rush, CYAN's Cleave**: learned on the line by
+  level and story; measured at party 3's two bosses and dropped (13.8).
+  Fire Dance is never cast; `opts.blitz` is one Blitz per leg. An
+  all-body Blitz by body count was not as good as Pummel (13.5).
 - **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`. The rages he
   holds are the World of Balance's weak nine and one more; the measured
   loss to his fists (route-wor-gau.md section 7) stands until a Leap on
@@ -1790,3 +1779,75 @@ lore took 3477 off the monsters", "took 9999"), but each one is a turn
 off his bludgeon, the statue's second key (section 6.2 of
 route-wor-kefka-tower.md). The line keeps the Fight; GrandTrain stays
 unslotted.
+
+### 13.8 Pearl Wind routed; Cleave and Bum Rush at party 3's bosses (#388, v0.41)
+
+Evidence under `build/attempts/wt/v041-wor-skills/`.
+
+**Cleave and Bum Rush, measured and dropped.** After the dream CYAN and
+SABIN sit together only in party 3 in Kefka's Tower, whose bosses are
+Inferno (pierce and bludgeon: Bum Rush's four blows key it) and Doom
+(slash: Cleave's cut keys it, and a 3-BP row wants a long fight). Each
+was labbed by its leg with a boss-fight prelude (`KT_BOSS_FIGHT`) from
+the graph's captures at `955b7f9c` (`wor-kt-factory-v1`,
+`wor-kt-guardian-v1`), one attempt a run, paired by battle key (the arms
+share every battle before the boss): `ln` the line, `cl`/`cl2` CYAN's
+SwdTech at the Cleave row (`opts.bushido = 3`; `cl2` adds
+`opts.bushidoAt = 3`, which banks his pips with unboosted Fights until
+three), `br` SABIN's Blitz set to Bum Rush (`opts.blitz = 0x64`, the plan
+rules' line, used once his keyed Fight has nothing to chip). Doom over
+`KT_TRAIN` 46, 47 and 48 (the bench's lap level, which moves the key),
+Inferno over seed shifts 0-11 (`btally.py`, `doom/tally.txt`,
+`inferno/tally.txt`):
+
+| boss | arm | distinct fights | won | deaths | won ticks (median) |
+|---|---|---|---|---|---|
+| Doom | `ln` | 11 | 9 | 20 | 12,930 / 13,322 / 11,335 by level |
+| Doom | `cl2` | 11 | 8 | 27 | 12,780 / 14,826.5 / 14,983 |
+| Doom | `br` | 11 | 9 | 20 | 15,663 / 14,955 / 15,371 |
+| Inferno | `ln` | 10 | 10 | 3 | 7,629.5 |
+| Inferno | `cl2` | 10 | 9 | 10 | 9,012 |
+| Inferno | `br` | 10 | 9 | 3 | 9,985 |
+
+Quoted: "ARM cl2_t46: ... distinct keys 4: won 3, lost 1; deaths over keys
+9", "ARM ln: 12 runs; distinct keys 4: won 3, lost 1; deaths over keys 5",
+"ARM inf_ln: 12 runs; distinct keys 10: won 10, lost 0; deaths over keys
+3; won ticks 4114-16268 (median 7629.5)", "ARM inf_br: ... won 9, lost 1;
+deaths over keys 3; ... (median 9985)", "ARM inf_cl2: ... won 9, lost 1;
+deaths over keys 10; ... (median 9012)".
+
+- Without the bank hold (`cl`) CYAN never reached three points at Doom:
+  every pip went on the keyed Fight, and `cl` played the line's fights to
+  the tick. With the hold the Cleave went off once a fight in 5 of Doom's
+  11 and 3 of Inferno's 10 ("swdtech=1"), and the turns his bank cost
+  were worth more than the cut: more deaths and a loss each on keys the
+  line won (Doom `beAC` at `KT_TRAIN` 47, Inferno `be24`).
+- Bum Rush, 99 MP a cast, went off one to four times a fight; the fights
+  ran longer at both bosses and Inferno lost `be2C`, which the line won.
+  The keyed Fight already chips Inferno's bludgeon, and Doom's shields
+  take no blow.
+- The line itself lost Doom on 2 of 11 (`be30` at `KT_TRAIN` 46, `be98`
+  at 48), four deaths each: a coin flip the route doc's 7 of 7 did not
+  reach.
+
+`opts.bushidoAt` stays in the library as a lab lever (no leg sets it).
+
+**Pearl Wind** (STRAGO's party heal: each member gains his current HP;
+it ignores Reflect, MagicProp +3 bit 1, so it heals a ringed party, where
+a Cure bounces). Its teachers are the Sprinter (world groups 49, 51, 52),
+Peepers and Harpiai (before STRAGO joins), the Abolisher, Curley (the
+dream, without him), Dark Force (Kefka's Tower, 354 and 331's pools: party
+2 met formation 426 once on the line at `955b7f9c`, a draw) and the Girl
+(the last battle). Group 49 is the wood just west of the grind's plain, so
+`gen_wor_relm` walks into it after the grind and fights there until he
+knows it, his study held for the Sprinter and the party killing the
+Mantodea and Spek Tors first (`pearlWindHunt`). In the pilots and the
+line it came after 2-7 battles, by the Sprinter's own cast more often than
+by the study (the battles end before his third turn): "[hunt] ... done
+after 3 battles; lores $990188" (`pilot/p1/s0`), 6 (`p1/s1`-`s3`), 7
+(`p2/s0`), 2 (`p2/s1`-`s3`). The hunt is bounded at 60 battles and
+asserts the lore; its negative (`neg/neg_hunt`, the bound 3 and lore 0):
+"the Pearl Wind hunt: 3 battles in the wood and STRAGO has not learned it
+(lores $990088)". From `wor-tower-v1` on, his AUTO loadout's five holds
+it (lore 8, inside the first five he knows), and the legs that already
+named `pearlWind` (Phoenix Cave and Locke's) use it.
