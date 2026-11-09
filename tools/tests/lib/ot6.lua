@@ -12355,6 +12355,18 @@ function Driver:tranceDue(actor)
   return (M.readByte(BATTLE.ST4 + actor * 2) & 0x08) == 0
 end
 
+-- opts.blitzVs = { [species] = true }: Blitz only while one of these stands (#509: Chadarnook's AuraBolt, holy,
+-- went to the holy-absorbing goddess whenever she stood alone, 245 of 430 casts taking nothing).  Both Blitz
+-- lines read it: the plan rules' and the chip model's offer (bestLine), which the press and spend rules and the
+-- care race take (blitz_gate_selftest).
+function Driver:blitzVsOk()
+  if self.opts.blitzVs == nil then return true end
+  for _, s in ipairs(standingSlots()) do
+    if self.opts.blitzVs[M.readWord(0x57C0 + s * 2)] then return true end
+  end
+  return false
+end
+
 function Driver:makePlanRules(actor)
   -- What a round costs this party, measured rather than assumed.  For each
   -- entity, the most HP it has lost between two consecutive turns of the
@@ -13045,7 +13057,7 @@ function Driver:makePlanRules(actor)
     -- 3-BP Fight on one body over a 3-BP Air Blade on four)
     local blitz = self.opts.blitz or BATTLE.PUMMEL
     local bname = blitz == BATTLE.PUMMEL and "Pummel" or string.format("Blitz $%02X", blitz)
-    if self.parkDropN < 3 and self.opts.tactical and id == 5 and BATTLE.BLITZ_SHAPE[blitz] ~= nil
+    if self.parkDropN < 3 and self.opts.tactical and id == 5 and BATTLE.BLITZ_SHAPE[blitz] ~= nil and self:blitzVsOk()
        and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
        and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = blitz },
          standingSlots(), bname, BATTLE.BLITZ_SHAPE[blitz].aoe == true) then
@@ -14460,13 +14472,7 @@ function Driver:makePlanRules(actor)
     return { kind = "skill", cmd = BATTLE.CMD_TOOLS, skill = tool,
              row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = toolBp }
   end
-  -- opts.blitzVs = { [species] = true }: Blitz only while one of these stands (#509: Chadarnook's AuraBolt, holy,
-  -- went to the holy-absorbing goddess whenever she stood alone, 245 of 430 casts taking nothing)
-  local blitzVsOk = self.opts.blitzVs == nil
-  for _, s in ipairs(blitzVsOk and {} or standingSlots()) do
-    if self.opts.blitzVs[M.readWord(0x57C0 + s * 2)] then blitzVsOk = true end
-  end
-  if self.opts.tactical and id == 5 and blitzVsOk
+  if self.opts.tactical and id == 5 and self:blitzVsOk()
      and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
      and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = self.opts.blitz or BATTLE.PUMMEL },
        standingSlots(), string.format("Blitz $%02X", self.opts.blitz or BATTLE.PUMMEL),
