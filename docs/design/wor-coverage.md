@@ -1934,8 +1934,37 @@ captured), shifts 0-11, one attempt each (`tw5/`, `tw5/tally.txt`):
 MagiMaster won on all 11 distinct keys that reached him ("ARM tw5: 11
 runs; distinct keys 11: won 11, lost 0; deaths over keys 41; won ticks
 28530-85998 (median 44271)"); the twelfth run (`tw5_s3`) wiped earlier,
-to formation `$12B` on the climb. Three or four deaths in every win: an
-attrition fight, but not one Pearl Wind can reach. The stall replaced a frame-budget
+to formation `$12B` on the climb. The leg itself passed 10 of those 12,
+not 11: `tw5_s3` is that wipe, and `tw5_s11` won MagiMaster and then hung
+in the next random on the way down (formation `$0AD`, three ghosts, every
+monster at 0 HP and the victory never starting; #519, below). Three or
+four deaths in every win: an attrition fight, but not one Pearl Wind can
+reach.
+
+**The `$0AD` hang is a battle that is won and never ends, not a
+navigation fault.** `tw5_s11`'s log read "nav (9,14) bfs plan=0" for
+24,000 frames, which is `navTo`'s heartbeat inside a battle; the last
+driver line was "monhp=s0:0/sh2,s1:0/sh0,s2:0/sh2 monsters=0". Reproduced
+(seed shift 11 from `wor-tower-v1`, watchdogs on, `build/attempts/wt/
+v041-nav-hang/wd_s11/`): the ghost in slot 1 took Celes's Poison (921 to 30,
+the `hp_effect` event at f388401) and died of its tick; Terra's boosted
+Break and Relm's Drain, both already submitted at that ghost, were
+"unresolved" to the end of the run. The machine then sat in
+`ExecBtlGfx` command 4 (the battle script) on an animation script whose
+target list was all `$FF` (nothing to hit), looping in the graphics
+thread scheduler and never returning to the main battle loop: `BattleLoop`,
+`CheckBattleEnd` and `WinBattle` executed zero times over 660 frames
+(`probe_hung.lua`: "key C20019 x0 ... key C247ED x0"), while
+`$3A77` (monsters alive) read 0 and `$3A74` 0F, so the end check would
+have won the battle had it run. With watchdogs on the run is not lost for
+50,000 frames: it trips at f391072 ("no-progress: nothing has moved for
+1808 frames"), 2,300 frames after the last kill, and is now named
+"battle-won-never-ended:" (class `wonhang`, retryable like `noprogress`;
+the real hung state reproduces it, `probe_wonhang.lua`: "attempt 1/1
+FAILED class=wonhang frame=1952"). The fault is in the battle-script
+side of the ROM or vanilla's handling of a queued action whose targets all
+died before it ran; the fix belongs with the Cleave/Bum Rush work in the
+same code and is not made here. The stall replaced a frame-budget
 timeout that was retryable, so `gen_wor_tower` now raises it as a lost
 fight ("LOST: ", class `lost`): retried from the boot and counted like a
 wipe; the replay showed it ("attempt 1/3 FAILED class=lost ... LOST:
