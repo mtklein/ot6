@@ -129,8 +129,11 @@ end
 
 local function onList(p)
   if p.boost ~= 2 or p.refused ~= "list" then return end
-  H.assertEq(H.readByte(0x4005 + 7 * 3), BUMRUSH, "cell 7 holds Bum Rush ($64)")
-  H.assertEq(H.readByte(0x4006 + 7 * 3), BUMRUSH_MP, "it draws 99 MP")
+  -- the list packs the learned blitzes in ladder order (Ot6BlitzListOpen), so Bum Rush is the last cell drawn
+  local cell = nil
+  for i = 0, 7 do if H.readByte(0x4005 + i * 3) == BUMRUSH then cell = i end end
+  H.assertEq(cell ~= nil, true, "the list draws Bum Rush ($64)")
+  H.assertEq(H.readByte(0x4006 + cell * 3), BUMRUSH_MP, "it draws 99 MP")
   H.screenshot("bumrush_grey")
 end
 

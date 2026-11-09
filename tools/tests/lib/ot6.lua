@@ -3528,6 +3528,29 @@ function M.boostPlan(o)
     if base == nil then return want, true, "unpriced (free verb)", 0 end
   end
   if base == 0 then return want, true, "free (base 0)", 0 end
+  -- Bum Rush is SABIN's divine (#388, kits.md "Divines"): three points pending or not at all.  The list greys it
+  -- under three and the A buzzes (a refused Blitz row is not offered again that battle), so a want under three,
+  -- or a budget that cannot pay the row at three, drops the verb rather than stepping the boost down
+  if o.id == M.BUMRUSH and not o.spell then
+    local why
+    if want < 3 then
+      why = string.format("Bum Rush is the 3-BP divine: %d BP wanted -- dropping the verb", want)
+    else
+      local budget = pool
+      if o.ration then
+        budget = math.min(pool, (o.reserve or 0) + (o.maxPool or M.readWord(0x3C30 + (o.slot or 0) * 2)) // o.ration)
+      end
+      local got, price, w = M.affordBoost({ base = base, want = 3, pool = budget, reserve = o.reserve or 0 })
+      if got == 3 then
+        boostPlanSaid(o, want, 3, true, w)
+        return 3, true, w, price
+      end
+      why = string.format("Bum Rush is the 3-BP divine and this turn's budget (%d MP of %d) does not pay it at "
+        .. "three -- dropping the verb", budget, pool)
+    end
+    boostPlanSaid(o, want, 0, false, why)
+    return 0, false, why, base
+  end
   local priceAt = nil
   if o.spell then
     priceAt = function(b) return (M.spellPrice(o.id, base, b, o.slot)) end
@@ -7191,6 +7214,7 @@ BATTLE.BLITZ_SHAPE = {
   [0x62] = { aoe = true },                         -- Air Blade
   [0x64] = { class = 0x04, elem = 0, hits = 4 },   -- Bum Rush (#388: bludgeon x4, Ot6HitCountTbl's +3)
 }
+M.BUMRUSH, M.CLEAVE = 0x64, 0x5C      -- the two divines Driver:divineLine plays (#388)
 function M.blitzChips(slot, id)
   local b = BATTLE.BLITZ_SHAPE[id]
   return (b.hits or 1) * hitChips(slot, b.class or 0, b.elem or M.spellElement(id))
@@ -8713,6 +8737,69 @@ function M.slotRowButton(actor)
   if cc ~= want % 2 then return want % 2 > cc and "right" or "left" end
   if cr ~= want // 2 then return want // 2 > cr and "down" or "up" end
   return "a"
+end
+
+-- The 3-BP divines of CYAN and SABIN, where one pays (#388; kits.md "Divines"), else nil (the lines below).
+-- opts.divines = true, or a table: { cleave = false / bumRush = false drop one, cleaveShields = n (2),
+-- bumRushHp = n (6000), hold = false (no banking) }.  Event battles only (OT6_RANDBTL clear): a random battle
+-- is not worth 99 MP and three turns.  An informed policy, and what it reads: the target (the press target,
+-- else the first standing body), its HP, its shields and Broken timer, whether it is death-immune ($3AA1
+-- bit 2, the bit Ot6CleaveStrip reads), the member's bank, MP and known skills.
+--   Cleave (CYAN, the SwdTech window's 3-BP row): on a death-immune target holding at least cleaveShields
+--     shields, not Broken, with the 99 MP: at three points, Cleave (four shields off, then the power-255 cut);
+--     under three, an unboosted Fight that banks the point (the hold), so the bank reaches three.  A killable
+--     target is not this line's: the keyed and boosted Fights below take it.
+--   Bum Rush (SABIN, the Blitz list's eighth row): on a target holding bumRushHp HP or more, with the 99 MP
+--     the event battle's budget pays: at three points, Bum Rush (four bludgeon blows at x8); under three, the
+--     hold.  M.boostPlan refuses it under three, so no other line queues the greyed row.
+function Driver:divineLine(actor, have)
+  local o = self.opts.divines
+  if not o or M.readByte(M.RANDBTL) ~= 0 then return nil end
+  o = type(o) == "table" and o or {}
+  local id = M.readByte(BATTLE.BCHID + actor * 2)
+  if id ~= 2 and id ~= 5 then return nil end
+  local slot = self:pressTarget()
+  if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
+  if slot == nil then return nil end
+  local hp = M.readWord(BATTLE.MON_HP + slot * 2)
+  local sh = M.readByte(BATTLE.SH_CUR + slot * 2)
+  local broken = M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0
+  local mp = M.readWord(BATTLE.CURMP + actor * 2)
+  local tag = self.tag or "fight"
+  local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
+  local function hold(what)
+    if o.hold == false or fight == nil then return nil end
+    local key = "divine_hold:" .. actor .. ":" .. have
+    if not self.statusSaid[key] then
+      self.statusSaid[key] = true
+      M.log(string.format("[%s] actor=%d %s: bank %d of 3 -- an unboosted Fight banks the point", tag, actor, what,
+        have))
+    end
+    return { kind = "fight", row = fight, boostLeft = 0, aim = self:chipAim(actor, 0), reason = "divine_bank" }
+  end
+  if id == 2 then
+    local row = cmdRow(actor, BATTLE.CMD_SWDTECH)
+    local cost = M.abilityCost(M.CLEAVE) or 99
+    if o.cleave == false or row == nil or self.skillDead[BATTLE.CMD_SWDTECH]
+       or (M.readByte(0x1CF7) & 0x80) == 0 or mp < cost then return nil end
+    if (M.readByte(0x3AA1 + 8 + slot * 2) & 0x04) == 0 or broken or sh < (o.cleaveShields or 2) then return nil end
+    if have < 3 then return hold(string.format("CYAN holds for Cleave on slot %d (%d shield(s), death-immune)",
+      slot, sh)) end
+    M.log(string.format("[%s] actor=%d CYAN Cleave on slot %d (%d HP, %d shield(s), death-immune) at 3 BP, %d MP "
+      .. "of %d", tag, actor, slot, hp, sh, cost, mp))
+    return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true, tier = 3, row = row, boostLeft = 0,
+             reason = "divine_cleave" }
+  end
+  local row = cmdRow(actor, BATTLE.CMD_BLITZ)
+  if o.bumRush == false or row == nil or self.skillDead[BATTLE.CMD_BLITZ]
+     or (M.readByte(0x1D28) & 0x80) == 0 or hp < (o.bumRushHp or 6000) then return nil end
+  local b, price, why = M.kitBoost(actor, M.BUMRUSH, 3)
+  if b ~= 3 then return nil end
+  if have < 3 then return hold(string.format("SABIN holds for Bum Rush on slot %d (%d HP)", slot, hp)) end
+  M.log(string.format("[%s] actor=%d SABIN Bum Rush on slot %d (%d HP, %d shield(s)%s) at 3 BP, %d MP of %d -- %s",
+    tag, actor, slot, hp, sh, broken and ", Broken" or "", price or 99, mp, why or ""))
+  return { kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = M.BUMRUSH, row = row, boostLeft = 3,
+           reason = "divine_bumrush" }
 end
 
 -- Which of SETZER's lines pays this turn, or nil (the lines below it: the
@@ -14399,6 +14486,11 @@ function Driver:makePlanRules(actor)
   -- GOGO's Mimic, when the party's last action is worth his turn (#270; Driver:mimicLine)
   if id == 0x0C then
     local line = self:mimicLine(actor, boost)
+    if line then return line end
+  end
+  -- CYAN's Cleave and SABIN's Bum Rush, the 3-BP divines, where one pays (#388; Driver:divineLine)
+  if self.opts.divines then
+    local line = self:divineLine(actor, have)
     if line then return line end
   end
   -- opts.bushidoAt = n (#388 lab lever): CYAN banks to n (3: the Cleave row) with unboosted Fights, then SwdTechs
