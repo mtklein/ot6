@@ -1038,17 +1038,23 @@ and the basement's SoulDancer x2 and Crusher x2 lost 1 of 29 (#505).
 SABIN now takes the fourth seat (the cabin before Jidoor), and RELM, who
 joins after Chadarnook, waits aboard until a cabin before the tower seats
 her with TERRA, CELES and CYAN (finding 1). In the house his Fire Knuckle
-and AuraBolt (`BOSS_FIGHT.blitz`) hit the demon's weaknesses; his holy
+and AuraBolt (`BOSS_FIGHT.blitz`) hit the demon's weaknesses, AuraBolt only
+while the demon stands (`opts.blitzVs`: with the goddess alone it went to
+her, and she absorbs holy: 245 of the first grid's 430 casts took nothing,
+`runs/px13/new3`); his holy
 Dragon Claw comes off before the goddess's room (`H.absorbSafeArms`: she
 absorbs holy). The leg dresses the four after the regroup, so the Ribbon
 MOG leaves in the bag goes on CYAN; the basement fights the SoulDancers
 first; and Jidoor's weapon and armor counters are visited (nothing there
 beat what the four wore). On the same grid from the new `wor-owzer-v1`
-(byte for byte the line's), Chadarnook lost 1 of 91 distinct fights (won
-fights 19,284 ticks on average, 0.67 deaths a run; the loss, K7 shift 13,
-was the same Doom Kiss attrition over 72,000 frames, `runs/px13/
-new3.tally.txt`), and the basement's $11C was won on all 41 distinct keys
-met over K 0-6 (`runs/mbp/f11c_all.txt`).
+(byte for byte the line's), Chadarnook with AuraBolt ungated lost 1 of 91
+distinct fights (won fights 19,284 ticks on average, 0.67 deaths a run; the
+loss, K7 shift 13, the same Doom Kiss attrition over 72,000 frames,
+`runs/px13/new3.tally.txt`), and with it gated won all 91 (K and key), all
+48 distinct battle keys alone, in 17,327 ticks on average (worst 35,613),
+0.41 deaths a run; 13 of its 122 AuraBolts took nothing
+(`runs/px13/new4.tally.txt`). The basement's $11C was won on all 41
+distinct keys met over K 0-6 (`runs/mbp/f11c_all.txt`).
 
 The fourth seat moves the line's XP: the four reach the save point at
 CYAN L38, TERRA L40, CELES L40, SABIN L38 (v0.40's: CYAN L39, TERRA L40,
