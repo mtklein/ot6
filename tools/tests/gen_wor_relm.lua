@@ -678,6 +678,59 @@ local function grind()
   }), function() n0, seen, wp = nil, nil, 1 end)
 end
 
+-- ---- Pearl Wind from a Sprinter, in the wood beside the plain (#388) ----------------
+-- The hunt comes before the grind, so its battles count toward the grind's level target and the four reach the
+-- tower at the grind's levels: after the grind it added a level or so to each, and that stronger party ended the
+-- Veldt cave's battles before GAU's possessed turn (battle_ragedriver red; wor-coverage.md 13.8).
+-- Pearl Wind (lore 8) is in the scripts of the Sprinter ($087) and of species the line meets without STRAGO
+-- seated or not before the tower's end (Ot6StudyTbl): the Sprinter is on world groups 49, 51 and 52, and group
+-- 49 is the wood just west of the grind's plain (world (11-15, 135-137); formation 323, Mantodea, Sprinter and two
+-- Spek Tors, is 96 of its 256: route_data pool group 49).  So after the grind the four walk into the wood and
+-- fight there until STRAGO knows it: he holds his points while a body that can teach him a lore stands and
+-- Studies it (opts.strago.studyHold, gen_wor_ebot's Hidon line), or sees it cast.  The party kills the Mantodea and
+-- the Spek Tors first and STRAGO casts no Aqua Rake there, so the Sprinter stands until his third turn: with the
+-- plain's kit (Aqua Rake, no kill order) it fell before his study in two meetings of three (pilot p1, s1 and s3:
+-- "study hold: slot 1 ($087) can teach lores $000100 he lacks", then the next battle).  Even so the fights end
+-- before his third turn and he learns it from the Sprinter's own cast, not the study.  Pooled over the pilots'
+-- six distinct draws (p1 s0, p1 s1-s3, p2 s0, p2 s1-s3, p3 s0, p3 s1-s3: the runs within each played to the frame),
+-- it came at 6 of 14 meetings of 323, in 30 battles (build/attempts/wt/v041-wor-skills/pilot/).  The bound: about
+-- 0.2 a battle, so 60 battles without it is 0.8^60, about 2 in a million.
+local HUNT = { lap = { { 12, 136 }, { 14, 136 } }, battles = 60, lore = 8 }
+HUNT.fight = { focus = { { species = 0x0D2 }, { species = 0x0B0 } },
+  strago = { study = true, studyHold = true, pearlWind = true, dischord = STRAGO_KIT.dischord } }
+local function knowsPearlWind() return (lores() >> HUNT.lore) & 1 == 1 end
+local function pearlWindHunt()
+  local wp, n0, seen = 1, nil, nil
+  return H.withReset(H.seqStep({
+    H.call(function()
+      n0, seen, wp = #H.outcomes, #H.outcomes, 1
+      say("hunt", string.format("Pearl Wind in the wood (group 49); lores $%06X", lores()))
+    end),
+    H.driveUntil(function()
+      while seen < #H.outcomes do
+        seen = seen + 1
+        local o = H.outcomes[seen]
+        H.log(string.format("[hunt] battle %d $%03X %s after %d ticks: %s; lores $%06X", seen - n0, o.form & 0x1FF,
+          o.kind, o.tick or -1, whereLine(), lores()))
+      end
+      if not knowsPearlWind() and #H.outcomes - n0 >= HUNT.battles then
+        error(string.format("the Pearl Wind hunt: %d battles in the wood and STRAGO has not learned it (lores $%06X)",
+          #H.outcomes - n0, lores()))
+      end
+      return not H.battleLoadStarted() and H.worldSettled() and knowsPearlWind()
+    end, 600000, {
+      H.worldNavTo(function() return HUNT.lap[wp][1] end, function() return HUNT.lap[wp][2] end,
+        { maxFrames = 20000, playBattles = "tactical", fight = HUNT.fight }),
+      H.call(function() wp = wp % 2 + 1 end),
+      H.cond(function() return not H.battleLoadStarted() end, { H.fieldCare({ tag = "care in the wood" }) }, {}),
+    }, "the Pearl Wind hunt in the wood beside the plain"),
+    H.call(function()
+      say("hunt", string.format("done after %d battles; lores $%06X", #H.outcomes - n0, lores()))
+      H.assertEq(knowsPearlWind(), true, "STRAGO knows Pearl Wind (lore 8, $1D2A bit 0) after the hunt")
+    end),
+  }), function() n0, seen, wp = nil, nil, 1 end)
+end
+
 local PARTY = { { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } }
 
 H.run({ maxFrames = 1800000 }, {
@@ -795,6 +848,7 @@ H.run({ maxFrames = 1800000 }, {
   H.dressRelics(PARTY, { tag = "relics for the four" }),
   liftOff(),
   H.flyTo(GRIND_LANDING[1], GRIND_LANDING[2], { what = "the Falcon to the plain north-west of Jidoor" }),
+  pearlWindHunt(),
   grind(),
   H.saveState("wor_relm_grind.mss"),
 

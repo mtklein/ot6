@@ -7189,6 +7189,7 @@ BATTLE.BLITZ_SHAPE = {
   [0x5E] = {},                                     -- Aura Bolt
   [0x5F] = { class = 0x04 },                       -- Suplex
   [0x62] = { aoe = true },                         -- Air Blade
+  [0x64] = { class = 0x04, elem = 0, hits = 4 },   -- Bum Rush (#388: bludgeon x4, Ot6HitCountTbl's +3)
 }
 function M.blitzChips(slot, id)
   local b = BATTLE.BLITZ_SHAPE[id]
@@ -12355,6 +12356,18 @@ function Driver:tranceDue(actor)
   return (M.readByte(BATTLE.ST4 + actor * 2) & 0x08) == 0
 end
 
+-- opts.blitzVs = { [species] = true }: Blitz only while one of these stands (#509: Chadarnook's AuraBolt, holy,
+-- went to the holy-absorbing goddess whenever she stood alone, 245 of 430 casts taking nothing).  Both Blitz
+-- lines read it: the plan rules' and the chip model's offer (bestLine), which the press and spend rules and the
+-- care race take (blitz_gate_selftest).
+function Driver:blitzVsOk()
+  if self.opts.blitzVs == nil then return true end
+  for _, s in ipairs(standingSlots()) do
+    if self.opts.blitzVs[M.readWord(0x57C0 + s * 2)] then return true end
+  end
+  return false
+end
+
 function Driver:makePlanRules(actor)
   -- What a round costs this party, measured rather than assumed.  For each
   -- entity, the most HP it has lost between two consecutive turns of the
@@ -13045,7 +13058,7 @@ function Driver:makePlanRules(actor)
     -- 3-BP Fight on one body over a 3-BP Air Blade on four)
     local blitz = self.opts.blitz or BATTLE.PUMMEL
     local bname = blitz == BATTLE.PUMMEL and "Pummel" or string.format("Blitz $%02X", blitz)
-    if self.parkDropN < 3 and self.opts.tactical and id == 5 and BATTLE.BLITZ_SHAPE[blitz] ~= nil
+    if self.parkDropN < 3 and self.opts.tactical and id == 5 and BATTLE.BLITZ_SHAPE[blitz] ~= nil and self:blitzVsOk()
        and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
        and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = blitz },
          standingSlots(), bname, BATTLE.BLITZ_SHAPE[blitz].aoe == true) then
@@ -13799,16 +13812,18 @@ function Driver:makePlanRules(actor)
       if said ~= self.healSaid then self.healSaid = said; M.log(said) end
     end
     -- STRAGO's Pearl Wind (#388, opts.strago.pearlWind): his party heal, as
-    -- much HP to each member as he has standing, for no boost, ahead of a
-    -- boosted party cure when he is the one deciding and stands above half
+    -- much HP to each member as his max HP on this ROM (AttackerEffect_1b,
+    -- check_pearl_wind.py; vanilla's was his current HP, so the line wanted
+    -- him above half), for no boost, ahead of a boosted party cure when he is
+    -- the one deciding.  It ignores Reflect, so a ringed party takes it.
     local so = self.opts.strago
     if so and so.pearlWind and #cands >= 2 and zombieSeated == nil
        and M.readByte(BATTLE.BCHID + actor * 2) == M.STRAGO_ID and cmdRow(actor, BATTLE.CMD_LORE)
-       and not self:loreAbsent(M.LORE_PEARL_WIND, "Pearl Wind") and hpNow[actor] * 2 >= maxOf(actor) then
+       and not self:loreAbsent(M.LORE_PEARL_WIND, "Pearl Wind") then
       local cell, cost = loreCell(actor, M.LORE_PEARL_WIND, true)
       if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) >= cost then
         M.log(string.format("[%s] actor=%d party heal: Pearl Wind, %d hurt (worst %d%%), %d HP each, %d MP",
-          self.tag or "fight", actor, #cands, cands[1].pct, hpNow[actor], cost))
+          self.tag or "fight", actor, #cands, cands[1].pct, maxOf(actor), cost))
         return orSpend({ kind = "lore", lore = M.LORE_PEARL_WIND, row = cmdRow(actor, BATTLE.CMD_LORE),
                          reason = "party_hurt_lore" }, "Pearl Wind")
       end
@@ -14141,6 +14156,28 @@ function Driver:makePlanRules(actor)
   -- Pearl Wind, his party heal, is the care block's (opts.strago.pearlWind).
   local so = self.opts.strago
   if so and id == M.STRAGO_ID then
+    -- pearlWindBelow = f (#388): on his attack turn, Pearl Wind when two or
+    -- more standing members are under f of their max HP.  The care block's
+    -- Pearl Wind line (pearlWind) rarely reached his turn at the Poltergeist:
+    -- the round's one care turn went to another member, and he Fought
+    -- (build/attempts/wt/v041-wor-skills/polt2/p2wi_k3_s2: 98 Fights, no plan)
+    if so.pearlWindBelow and cmdRow(actor, BATTLE.CMD_LORE)
+       and not self:loreAbsent(M.LORE_PEARL_WIND, "Pearl Wind") then
+      local low, zombie = 0, false
+      for e = 0, 3 do
+        local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+        if hp > 0 and hp ~= 0xFFFF and mx > 0 and mx ~= 0xFFFF and hp < mx * so.pearlWindBelow then low = low + 1 end
+        -- the care line's guard: a party heal reaching a seated Zombie is damage to it
+        if maxOf(e) > 0 and status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) then zombie = true end
+      end
+      local cell, cost = loreCell(actor, M.LORE_PEARL_WIND, true)
+      if low >= 2 and not zombie and cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) >= cost then
+        M.log(string.format("[%s] actor=%d party heal: Pearl Wind, %d under %d%% (pearlWindBelow), %d HP each, %d MP",
+          self.tag or "fight", actor, low, math.floor(so.pearlWindBelow * 100), M.readWord(0x3C1C + actor * 2), cost))
+        return { kind = "lore", lore = M.LORE_PEARL_WIND, row = cmdRow(actor, BATTLE.CMD_LORE),
+                 reason = "party_hurt_lore" }
+      end
+    end
     if so.study and have >= M.STUDY_BOOST and cmdRow(actor, BATTLE.CMD_MAGIC) then
       local slot, want = M.studySlot()
       local cell = spellCell(actor, M.STUDY_SPELL, true)
@@ -14364,9 +14401,19 @@ function Driver:makePlanRules(actor)
     local line = self:mimicLine(actor, boost)
     if line then return line end
   end
+  -- opts.bushidoAt = n (#388 lab lever): CYAN banks to n (3: the Cleave row) with unboosted Fights, then SwdTechs
+  -- at that row; the rest of the party unchanged (opts.bank holds everyone's boost).  Without the hold his bank
+  -- never reached three at Doom: every pip went on the keyed Fight (build/attempts/wt/v041-wor-skills/doom/cl_*)
+  if self.opts.bushido and self.opts.bushidoAt and id == 2 and have < self.opts.bushidoAt
+     and not self.skillDead[BATTLE.CMD_SWDTECH] and cmdRow(actor, BATTLE.CMD_SWDTECH)
+     and cmdRow(actor, BATTLE.CMD_FIGHT) ~= nil then
+    return { kind = "fight", row = cmdRow(actor, BATTLE.CMD_FIGHT), boostLeft = 0, aim = self:chipAim(actor, 0),
+             reason = "bushido_bank" }
+  end
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]
      and cmdRow(actor, BATTLE.CMD_SWDTECH) and have >= 1
-     and not (self.opts.bank and have < self.opts.bank) then
+     and not (self.opts.bank and have < self.opts.bank)
+     and not (self.opts.bushidoAt and have < self.opts.bushidoAt) then
     local cap = type(self.opts.bushido) == "number" and self.opts.bushido or 3
     return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true,
              tier = math.max(1, math.min(have, cap, 3)),
@@ -14460,13 +14507,7 @@ function Driver:makePlanRules(actor)
     return { kind = "skill", cmd = BATTLE.CMD_TOOLS, skill = tool,
              row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = toolBp }
   end
-  -- opts.blitzVs = { [species] = true }: Blitz only while one of these stands (#509: Chadarnook's AuraBolt, holy,
-  -- went to the holy-absorbing goddess whenever she stood alone, 245 of 430 casts taking nothing)
-  local blitzVsOk = self.opts.blitzVs == nil
-  for _, s in ipairs(blitzVsOk and {} or standingSlots()) do
-    if self.opts.blitzVs[M.readWord(0x57C0 + s * 2)] then blitzVsOk = true end
-  end
-  if self.opts.tactical and id == 5 and blitzVsOk
+  if self.opts.tactical and id == 5 and self:blitzVsOk()
      and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
      and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = self.opts.blitz or BATTLE.PUMMEL },
        standingSlots(), string.format("Blitz $%02X", self.opts.blitz or BATTLE.PUMMEL),

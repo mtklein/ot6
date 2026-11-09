@@ -37,7 +37,10 @@ FIGHT.nuke = function()
   if H.formationHas({ [VECTAUR] = true, [BRONTAUR] = true }) then return { ICE } end
   return nil
 end
-local BOSS_FIGHT = KT_BOSS_FIGHT or {}
+-- STRAGO's Pearl Wind (#388, wor-coverage.md 13.8): the party wears Wall Rings, so no Cure reaches it as a party
+-- cure (the driver refuses one: it would bounce onto the statue), and Pearl Wind ignores Reflect and heals each
+-- member as much as his max HP.  Learned in the wood beside Jidoor's plain (gen_wor_relm); in his AUTO five.
+local BOSS_FIGHT = KT_BOSS_FIGHT or { strago = { pearlWind = true, pearlWindBelow = 0.6 } }
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 H.careMagic, H.careCastFirst = true, true

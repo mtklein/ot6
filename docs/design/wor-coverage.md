@@ -1713,24 +1713,13 @@ clock and so the next fight's key.
 
 ### 13.6 Left
 
-- **Lores off the line.** Pearl Wind (Sprinter, groups 49, 51, 52 by
-  Jidoor, while STRAGO grinds on 48), Rippler (Reach Frog on that grind,
-  54 battles with him; its `opts.strago.study`, without the hold, fired in
-  none of them in the 10-23 play) and
-  Blow Fish (Phase, Phoenix Cave) are reachable with STRAGO seated; a
-  study on the grind or a branch leg would teach them. Pearl Wind is the
-  one the driver already has a line for (the party heal).
-- **SABIN's Spiraler** comes at L42; he ends the line at L39. Bum Rush (99
-  MP) is learned at Duncan's house, and the line seats him in no battle
-  after it. Fire Dance is never cast; `opts.blitz` is one Blitz per leg. An
-  all-body Blitz by body count was not as good as Pummel (13.5); one that
-  pays would have to break what it hits, or come where the bodies are
-  already broken.
-- **CYAN's Cleave** (3 BP, 99 MP) and Quadra Slice are never cast in the
-  World of Ruin: `opts.bushido` is set on three legs, none after the dream.
-  Stunner by body count lost to the keyed Fight (13.5); Cleave needs a
-  banked bar, so its place is a boss fight, measured against the 3-BP
-  Fight it would replace.
+- **Lores off the line.** Pearl Wind is routed and used at the Poltergeist (13.8). Rippler and
+  Blow Fish are learned on the line (the saves from `wor-tower-v1` and
+  `wor-phoenix-v1` hold them, by sight).
+- **SABIN's Spiraler and Bum Rush, CYAN's Cleave**: learned on the line by
+  level and story; measured at party 3's two bosses and dropped (13.8).
+  Fire Dance is never cast; `opts.blitz` is one Blitz per leg. An
+  all-body Blitz by body count was not as good as Pummel (13.5).
 - **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`. The rages he
   holds are the World of Balance's weak nine and one more; the measured
   loss to his fists (route-wor-gau.md section 7) stands until a Leap on
@@ -1790,3 +1779,164 @@ lore took 3477 off the monsters", "took 9999"), but each one is a turn
 off his bludgeon, the statue's second key (section 6.2 of
 route-wor-kefka-tower.md). The line keeps the Fight; GrandTrain stays
 unslotted.
+
+### 13.8 Pearl Wind made worth learning; Cleave and Bum Rush measured (#388, v0.41)
+
+Evidence under `build/attempts/wt/v041-wor-skills/`.
+
+**Cleave and Bum Rush, measured and dropped.** After the dream CYAN and
+SABIN sit together only in party 3 in Kefka's Tower, whose bosses are
+Inferno (pierce and bludgeon: Bum Rush's four blows key it) and Doom
+(slash: Cleave's cut keys it, and a 3-BP row wants a long fight). Each
+was labbed by its leg with a boss-fight prelude (`KT_BOSS_FIGHT`) from
+the graph's captures at `955b7f9c` (`wor-kt-factory-v1`,
+`wor-kt-guardian-v1`), one attempt a run, paired by battle key (the arms
+share every battle before the boss): `ln` the line, `cl`/`cl2` CYAN's
+SwdTech at the Cleave row (`opts.bushido = 3`; `cl2` adds
+`opts.bushidoAt = 3`, which banks his pips with unboosted Fights until
+three), `br` SABIN's Blitz set to Bum Rush (`opts.blitz = 0x64`, the plan
+rules' line, used once his keyed Fight has nothing to chip). Doom over
+`KT_TRAIN` 46, 47 and 48 (the bench's lap level, which moves the key),
+Inferno over seed shifts 0-11 (`btally.py`, `doom/tally.txt`,
+`inferno/tally.txt`):
+
+| boss | arm | distinct fights | won | deaths | won ticks (median) |
+|---|---|---|---|---|---|
+| Doom | `ln` | 11 | 9 | 20 | 12,930 / 13,322 / 11,335 by level |
+| Doom | `cl2` | 11 | 8 | 27 | 12,780 / 14,826.5 / 14,983 |
+| Doom | `br` | 11 | 9 | 20 | 15,663 / 14,955 / 15,371 |
+| Inferno | `ln` | 10 | 10 | 3 | 7,629.5 |
+| Inferno | `cl2` | 10 | 9 | 10 | 9,012 |
+| Inferno | `br` | 10 | 9 | 3 | 9,985 |
+
+Quoted: "ARM cl2_t46: ... distinct keys 4: won 3, lost 1; deaths over keys
+9", "ARM ln: 12 runs; distinct keys 4: won 3, lost 1; deaths over keys 5",
+"ARM inf_ln: 12 runs; distinct keys 10: won 10, lost 0; deaths over keys
+3; won ticks 4114-16268 (median 7629.5)", "ARM inf_br: ... won 9, lost 1;
+deaths over keys 3; ... (median 9985)", "ARM inf_cl2: ... won 9, lost 1;
+deaths over keys 10; ... (median 9012)".
+
+- Without the bank hold (`cl`) CYAN never reached three points at Doom:
+  every pip went on the keyed Fight, and `cl` played the line's fights to
+  the tick. With the hold the Cleave went off once a fight in 5 of Doom's
+  11 and 3 of Inferno's 10 ("swdtech=1"), and the turns his bank cost
+  were worth more than the cut: more deaths and a loss each on keys the
+  line won (Doom `beAC` at `KT_TRAIN` 47, Inferno `be24`).
+- Bum Rush, 99 MP a cast, went off one to four times a fight; the fights
+  ran longer at both bosses and Inferno lost `be2C`, which the line won.
+  The keyed Fight already chips Inferno's bludgeon, and Doom's shields
+  take no blow.
+- The line itself lost Doom on 2 of 11 (`be30` at `KT_TRAIN` 46, `be98`
+  at 48), four deaths each: a coin flip the route doc's 7 of 7 did not
+  reach.
+
+`opts.bushidoAt` stays in the library as a lab lever (no leg sets it).
+
+**Pearl Wind.** The owner's direction (2026-11-09): rather than ask whether
+a skill earns its detour, make it worth learning where it fits, without
+making it essential. Pearl Wind fits the Poltergeist: party 2 wears Wall
+Rings there against the statue's Stop, so no party Cure reaches it (the
+driver refuses one: "no party cure: entity 1 wears Reflect and a cure that
+reaches it bounces onto the enemy"), and Pearl Wind ignores Reflect
+(MagicProp +3 bit 1). That fight is attrition (section 6.2 of
+route-wor-kefka-tower.md).
+
+*As it was, it changed nothing.* Vanilla's Pearl Wind heals each member
+as much as STRAGO's current HP, so it is weakest when he is hurt, and the
+driver's care line asked for him above half. The line routed it first
+(commits `c954592c`-`1b8b3874`): it came after 2-7 battles in the wood, by
+the Sprinter's own cast more often than by the study ("[hunt] ... done
+after 3 battles; lores $990188", `pilot/p1/s0`); the line replayed with it
+from power-on (`land1/`, `land2/`) and its use was measured. Phoenix Cave
+(`phx/`, `phx_report.txt`, the leg against `pearlWind = false`, shifts
+0-11): planned in 2 runs of 12, every formation won in both arms with the
+same deaths a fight. The Poltergeist (`polt/`, `KT_BURN` 0, 3, 6 by shifts
+0, 2, 6, 10, paired by key): it went off once in 5 of 12 fights, and both
+arms won the same 10 and lost the same 2 with 17 deaths each.
+
+*The change.* STRAGO's Pearl Wind now heals as much as his max HP
+(`AttackerEffect_1b` loads `$3C1C,y` for a party caster, y < 8, after
+vanilla's `$3BF4,y`); a monster's stays vanilla's, so the Sprinter,
+Harpiai, Peepers and the last battle's Girl heal as before
+(`tools/check_pearl_wind.py`, build check `pearl_wind`; its two mutants,
+the vanilla load and the ungated max load, are red). Its price (45 MP, his lore) and its lack of a boost are
+vanilla's. The driver's line no longer wants him above half, and
+`opts.strago.pearlWindBelow` casts it on his attack turn when two
+standing members are under that fraction (at the Poltergeist the round's
+one care turn went to another member and he Fought: `polt2/p2wi_k3_s2`,
+98 Fights and no Pearl Wind plan). `gen_wor_kt_poltergeist` sets
+`strago = { pearlWind = true, pearlWindBelow = 0.6 }`. `gen_wor_relm`
+routes it the way a player would: before the grind, the four walk into
+the wood (world group 49, (11-15, 135-137); formation 323 with the
+Sprinter is 96 of 256) and fight there until STRAGO knows it, his study
+held for the Sprinter, the Mantodea and Spek Tors killed first, bounded at
+60 battles; the grind's level target then absorbs the hunt's battles (after
+the grind it added about a level each, and `battle_ragedriver`, whose cave
+battles then ended before GAU's possessed turn, went red). Pilots from the
+graph's `wor-owzer-v1` on the new ROM (`pilot/p3`): "[hunt] ... done after
+10 battles" (s0), 2 (s1-s3, one draw: the three played to the frame), each
+run PASS. Pooled over the six distinct draws of the three pilots it came
+at 6 of 14 meetings of 323, in 30 battles. The hunt's negative
+(`neg/neg_hunt`, its bound 3 and lore 0): "the Pearl Wind hunt: 3 battles
+in the wood and STRAGO has not learned it (lores $990088)". Nothing
+asserts he knows it downstream: the Poltergeist leg plays as before
+without it (the driver says the line is inert).
+
+*The payoff*, on the new ROM from the replayed line's `wor-kt-doom-v1`
+(STRAGO knows it), the same 12 runs in each arm (`KT_BURN` 0, 3, 6 by
+shifts 0, 2, 6, 10), which hold 11 distinct battle keys (`beE0` opens both
+`K0 s0` and `K6 s10`, won in both arms), `polt3/` (with) against
+`polt2/p2wo_*` (without, `KT_BOSS_FIGHT = {}`), `btally.py`. These ran on
+the ungated ROM (`583cee0e`); the party-caster gate changes only a monster's
+Pearl Wind, which the Poltergeist does not cast.
+
+| arm | distinct keys | won | deaths | won ticks (median by K) |
+|---|---|---|---|---|
+| without | 11 | 9 | 17 | 16,610.5 / 16,026 / 18,102 |
+| with | 11 | **11** | **5** | 17,263 / 15,915.5 / 16,687.5 |
+
+Quoted: "ARM p2wo_k3: 4 runs; distinct keys 4: won 3, lost 1; deaths over
+keys 7", "ARM p3wi_k3: 4 runs; distinct keys 4: won 4, lost 0; deaths over
+keys 0", "ARM p2wo_k6: ... won 3, lost 1; deaths over keys 7", "ARM
+p3wi_k6: ... won 4, lost 0; deaths over keys 3". It was cast in 10 of the
+12 runs, and the two keys the line lost (`be20`, `beDC`, wipes) are won
+with it (17,934 and 17,197 ticks). Without it the fight is as it was: won
+on 9 of 11 keys, and the leg retries a wipe from Doom's save.
+
+**Bum Rush, the driver's model.** The chip model had no shape for it
+(`BATTLE.BLITZ_SHAPE`), so the line's labs above used it only where the
+keyed Fight had nothing to chip. With its shape (bludgeon x4,
+`Ot6HitCountTbl` +3) at Inferno (`inf2/`, shifts 0-11, new ROM): "ARM
+inf2_br: 12 runs; distinct keys 10: won 9, lost 1; deaths over keys 5; won
+ticks 9176-17215 (median 11122)" against "ARM inf2_ln: ... won 10, lost 0;
+deaths over keys 3; ... (median 7629.5)". Four blows for 99 MP at no boost
+(its price escalates 2.5x a point, so a boosted one is out of reach) do not
+beat a boosted Pummel or Fight. Bum Rush is the one divine kits.md lists
+as not built (a 3-BP gate and what three points buy); making it pay is
+that design, not a data tweak. Cleave is built, but at a boss it is a
+single power-255 cut and one slash chip for a full bank, which the keyed
+Fight's three points out-earn (above). Both are left for a design decision
+(the report on #388 lays out the options).
+
+**MagiMaster's stall is a lost fight.** On the hunt's entry the line's
+`wor_tower` stopped at "no new low under 7569 HP in 120001 battle ticks
+-- the party is not winning this fight" (party HP 448, 0, 0, 0), filed as
+class `other`, which the runner never retries. From that entry, shifts
+0-11: 9 of 12 PASS, the three failures two fights (`tower/tw_s0` and
+`tw_s1` are one, the stall, played to the frame; `tw_s8` a wipe on
+formation `$18A` early in the tower); from `955b7f9c`'s 12 of 12
+(`tw0_*`). That entry (the hunt after the grind) is one the line no longer
+reaches: the hunt now comes before the grind. Pearl Wind cannot answer
+MagiMaster: the tower is magic-only (battle switch `$38`), and every seat's
+command list there reads `cmds=02,FF,FF,01` (Magic, Item; no Lore).
+From the line's current entry (the `wor-tower-v1` the replay at `e6b0136d`
+captured), shifts 0-11, one attempt each (`tw5/`, `tw5/tally.txt`):
+MagiMaster won on all 11 distinct keys that reached him ("ARM tw5: 11
+runs; distinct keys 11: won 11, lost 0; deaths over keys 41; won ticks
+28530-85998 (median 44271)"); the twelfth run (`tw5_s3`) wiped earlier,
+to formation `$12B` on the climb. Three or four deaths in every win: an
+attrition fight, but not one Pearl Wind can reach. The stall replaced a frame-budget
+timeout that was retryable, so `gen_wor_tower` now raises it as a lost
+fight ("LOST: ", class `lost`): retried from the boot and counted like a
+wipe; the replay showed it ("attempt 1/3 FAILED class=lost ... LOST:
+MagiMaster's fight stalled", then "this PASS followed a failed attempt").

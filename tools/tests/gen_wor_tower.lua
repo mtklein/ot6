@@ -1103,10 +1103,31 @@ H.run({ maxFrames = 1500000 }, {
   -- (f+165300), every party cast was nulled for about 7,500 frames ('took 0
   -- off the monsters', 'NULLS fire (live null byte $FD)'), then he healed
   -- to 21,230 by the old limit.  BOSS_FIGHT.progressVs fails a fight that
-  -- sets no new low in 120,000 ticks, inside this bound
-  H.advanceStory(function()
+  -- sets no new low in 120,000 ticks, inside this bound.  That stall is a
+  -- lost fight, as the frame budget's timeout it replaced was, so it is
+  -- raised as one ("LOST: ", the runner's seed-dependent `lost` class:
+  -- retried from the boot and counted, like a wipe here).  Filed as
+  -- `other`, it ended a replay of the line with a Pearl Wind detour before
+  -- the tower (#388, wt/v041-wor-skills, wor-coverage.md 13.8): the four
+  -- at 448, 0, 0 and 0 HP with MagiMaster at 7,569 behind a wall that
+  -- nulled every cast they had ("no new low under 7569 HP in 120001 battle
+  -- ticks"); from that entry 9 of 12 shifts passed (lab tw_*,
+  -- build/attempts/wt/v041-wor-skills/tower/)
+  (function(step)
+    return {
+      tick = function()
+        local ok, r = pcall(step.tick, step)
+        if ok then return r end
+        if tostring(r):find("the party is not winning this fight", 1, true) then
+          error("LOST: MagiMaster's fight stalled: " .. tostring(r), 0)
+        end
+        error(r, 0)
+      end,
+      reset = function() if step.reset then step:reset() end end,
+    }
+  end)(H.advanceStory(function()
     return sw(0x02DB) == 1 and not H.battleLoadStarted() and map() == MAP_TOP and settled()
-  end, 400000, { playBattles = "tactical", fight = BOSS_FIGHT, reserve = walkDownReserve() }),
+  end, 400000, { playBattles = "tactical", fight = BOSS_FIGHT, reserve = walkDownReserve() })),
   fought(MAGIMASTER_FORMATION, "MagiMaster"),
   H.fieldCare({ tag = "after MagiMaster" }),
   H.saveState("wor_tower_won.mss"),

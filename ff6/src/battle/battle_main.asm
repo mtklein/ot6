@@ -10661,8 +10661,11 @@ AttackerEffect_1b:
         tsb     $11a2
         stz     $3414       ; disable damage modification
         longa
-        lda     $3bf4,y
-        sta     $11b0
+        lda     $3bf4,y     ; vanilla: the caster's current hp
+        cpy     #$08        ; ot6 (#388): a party caster (y < 8, strago) heals
+        bcs     @3f60       ;   as much as his max hp, so pearl wind is as strong
+        lda     $3c1c,y     ;   when he is hurt; a monster's stays vanilla's
+@3f60:  sta     $11b0
         rts
 
 ; ------------------------------------------------------------------------------
