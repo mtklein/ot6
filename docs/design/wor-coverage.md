@@ -1713,7 +1713,7 @@ clock and so the next fight's key.
 
 ### 13.6 Left
 
-- **Lores off the line.** Pearl Wind is routed now (13.8). Rippler and
+- **Lores off the line.** Pearl Wind was routed, measured and dropped (13.8). Rippler and
   Blow Fish are learned on the line (the saves from `wor-tower-v1` and
   `wor-phoenix-v1` hold them, by sight).
 - **SABIN's Spiraler and Bum Rush, CYAN's Cleave**: learned on the line by
@@ -1780,7 +1780,7 @@ off his bludgeon, the statue's second key (section 6.2 of
 route-wor-kefka-tower.md). The line keeps the Fight; GrandTrain stays
 unslotted.
 
-### 13.8 Pearl Wind routed; Cleave and Bum Rush at party 3's bosses (#388, v0.41)
+### 13.8 Pearl Wind, Cleave and Bum Rush: measured and dropped (#388, v0.41)
 
 Evidence under `build/attempts/wt/v041-wor-skills/`.
 
@@ -1832,22 +1832,62 @@ deaths over keys 10; ... (median 9012)".
 
 `opts.bushidoAt` stays in the library as a lab lever (no leg sets it).
 
-**Pearl Wind** (STRAGO's party heal: each member gains his current HP;
-it ignores Reflect, MagicProp +3 bit 1, so it heals a ringed party, where
-a Cure bounces). Its teachers are the Sprinter (world groups 49, 51, 52),
+**Pearl Wind** (STRAGO's party heal: each member gains his current HP; it
+ignores Reflect, MagicProp +3 bit 1, so it heals a ringed party where a
+Cure bounces). Its teachers are the Sprinter (world groups 49, 51, 52),
 Peepers and Harpiai (before STRAGO joins), the Abolisher, Curley (the
-dream, without him), Dark Force (Kefka's Tower, 354 and 331's pools: party
-2 met formation 426 once on the line at `955b7f9c`, a draw) and the Girl
-(the last battle). Group 49 is the wood just west of the grind's plain, so
-`gen_wor_relm` walks into it after the grind and fights there until he
-knows it, his study held for the Sprinter and the party killing the
-Mantodea and Spek Tors first (`pearlWindHunt`). In the pilots and the
-line it came after 2-7 battles, by the Sprinter's own cast more often than
-by the study (the battles end before his third turn): "[hunt] ... done
-after 3 battles; lores $990188" (`pilot/p1/s0`), 6 (`p1/s1`-`s3`), 7
-(`p2/s0`), 2 (`p2/s1`-`s3`). The hunt is bounded at 60 battles and
-asserts the lore; its negative (`neg/neg_hunt`, the bound 3 and lore 0):
-"the Pearl Wind hunt: 3 battles in the wood and STRAGO has not learned it
-(lores $990088)". From `wor-tower-v1` on, his AUTO loadout's five holds
-it (lore 8, inside the first five he knows), and the legs that already
-named `pearlWind` (Phoenix Cave and Locke's) use it.
+dream, without him), Dark Force (Kefka's Tower, 354's and 331's pools:
+party 2 met formation 426 once on the line at `955b7f9c`, a draw) and the
+Girl (the last battle). Group 49 is the wood just west of the grind's
+plain, so a branch of `gen_wor_relm` (commits `c954592c`-`1b8b3874`,
+reverted) walked into it after the grind and fought there until he knew
+it, his study held for the Sprinter and the party killing the Mantodea
+and Spek Tors first. It came after 2-7 battles, by the Sprinter's own cast
+more often than by the study (the battles end before his third turn):
+"[hunt] ... done after 3 battles; lores $990188" (`pilot/p1/s0`), 6
+(`p1/s1`-`s3`), 7 (`p2/s0`), 2 (`p2/s1`-`s3`); its bound's negative
+(`neg/neg_hunt`): "the Pearl Wind hunt: 3 battles in the wood and STRAGO
+has not learned it (lores $990088)". With it learned, his AUTO loadout
+holds it from `wor-tower-v1` on, and the line replayed with it from power
+on (`land1/`, `land2/`) to measure its use where a heal could matter:
+
+- **Phoenix Cave** (`gen_wor_phoenix`, which already names
+  `strago.pearlWind`), from that replay's `wor-thamasa-v1` (sha256
+  213b7f1b), shifts 0-11: the leg against a copy with `pearlWind = false`
+  (`phx/`, `phx_report.txt`). He planned it in 2 runs of 12 ("party heal:
+  Pearl Wind, 3 hurt (worst 40%), 1705 HP each, 45 MP"); ten runs played
+  to the frame, and every formation's keys were won in both arms with the
+  same deaths a fight (`$152` 0.60, `$153` 0.44, `$1CF` Doom Gaze 1.50).
+- **The Poltergeist** (party 2 wears Wall Rings, so the line serves no
+  party cure: "no party cure: entity 1 wears Reflect"), from that replay's
+  `wor-kt-doom-v1`, `KT_BURN` 0, 3, 6 by shifts 0, 2, 6, 10, paired by key:
+  the line against `KT_BOSS_FIGHT = { strago = { pearlWind = true } }`
+  (`polt/`, `polt/tally.txt`). It went off once in 5 of 12 fights; both
+  arms won the same 10 and lost the same 2 (`be20`, `beDC`: wipes in which
+  it never fired, STRAGO falling from 527 HP), with the same deaths (17);
+  of the five fights it touched two ran longer (17,022 ticks against
+  16,310; 17,706 against 14,314), one the same, two shorter (15,805
+  against 17,021; 16,178 against 16,226). Quoted: "ARM pln_k3: 4
+  runs; distinct keys 4: won 3, lost 1; deaths over keys 7", "ARM ppw_k3:
+  4 runs; distinct keys 4: won 3, lost 1; deaths over keys 7".
+
+The driver's line asks a lot (STRAGO the one deciding, above half his HP,
+two members hurt), and a heal the size of his HP comes when he is low
+least often, so it changed nothing measurable. The detour did cost: its
+extra XP moved every save downstream, and on that line `battle_ragedriver`
+went red (the stronger party ends the Veldt cave's battles before GAU's
+possessed turn: "no Rage planned and possessed past its start within 16
+cave battles") and MagiMaster's stall surfaced (below). So the line does
+not route it. A player who wants it walks into the wood west of the plain
+for a few battles.
+
+**MagiMaster's stall is a lost fight.** On the hunt's entry the line's
+`wor_tower` stopped at "no new low under 7569 HP in 120001 battle ticks
+-- the party is not winning this fight" (party HP 448, 0, 0, 0), filed as
+class `other`, which the runner never retries. From that entry, shifts
+0-11: 9 of 12 PASS (`tower/tw_s0`, `tw_s1` the stall, `tw_s8` a wipe);
+from `955b7f9c`'s 12 of 12 (`tw0_*`). The stall replaced a frame-budget
+timeout that was retryable, so `gen_wor_tower` now raises it as a lost
+fight ("LOST: ", class `lost`): retried from the boot and counted like a
+wipe; the replay showed it ("attempt 1/3 FAILED class=lost ... LOST:
+MagiMaster's fight stalled", then "this PASS followed a failed attempt").

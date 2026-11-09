@@ -1107,11 +1107,12 @@ H.run({ maxFrames = 1500000 }, {
   -- lost fight, as the frame budget's timeout it replaced was, so it is
   -- raised as one ("LOST: ", the runner's seed-dependent `lost` class:
   -- retried from the boot and counted, like a wipe here).  Filed as
-  -- `other`, it ended the line at the v0.41 replay (#388,
-  -- wt/v041-wor-skills): the four at 448, 0, 0 and 0 HP with MagiMaster at
-  -- 7,569 behind a wall that nulled every cast they had ("no new low under
-  -- 7569 HP in 120001 battle ticks"), on 1 of the new entry's distinct
-  -- MagiMaster draws (lab tw_s0, tw_s1; build/attempts/wt/v041-wor-skills/tower/)
+  -- `other`, it ended a replay of the line with a Pearl Wind detour before
+  -- the tower (#388, wt/v041-wor-skills, wor-coverage.md 13.8): the four
+  -- at 448, 0, 0 and 0 HP with MagiMaster at 7,569 behind a wall that
+  -- nulled every cast they had ("no new low under 7569 HP in 120001 battle
+  -- ticks"); from that entry 9 of 12 shifts passed (lab tw_*,
+  -- build/attempts/wt/v041-wor-skills/tower/)
   (function(step)
     return {
       tick = function()
