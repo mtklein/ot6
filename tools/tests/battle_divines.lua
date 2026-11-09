@@ -87,7 +87,7 @@ local function inProc()
 end
 local function inTake()
   local pc = pcNow()
-  return pc >= TAKE and pc < TAKE + 0x30
+  return pc >= TAKE and pc < TAKE + 0x26   -- Ot6TakeShields's size in ff6-en.dbg
 end
 emu.addMemoryCallback(function(addr, v)
   if not watching or (v & 0x80) == 0 then return end
