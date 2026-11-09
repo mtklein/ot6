@@ -10661,8 +10661,8 @@ AttackerEffect_1b:
         tsb     $11a2
         stz     $3414       ; disable damage modification
         longa
-        lda     $3bf4,y
-        sta     $11b0
+        lda     $3c1c,y     ; ot6 (#388): the caster's max hp, not his current hp
+        sta     $11b0       ;   (vanilla $3bf4): pearl wind heals as much when strago is hurt
         rts
 
 ; ------------------------------------------------------------------------------

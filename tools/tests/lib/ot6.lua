@@ -13811,16 +13811,18 @@ function Driver:makePlanRules(actor)
       if said ~= self.healSaid then self.healSaid = said; M.log(said) end
     end
     -- STRAGO's Pearl Wind (#388, opts.strago.pearlWind): his party heal, as
-    -- much HP to each member as he has standing, for no boost, ahead of a
-    -- boosted party cure when he is the one deciding and stands above half
+    -- much HP to each member as his max HP on this ROM (AttackerEffect_1b,
+    -- check_pearl_wind.py; vanilla's was his current HP, so the line wanted
+    -- him above half), for no boost, ahead of a boosted party cure when he is
+    -- the one deciding.  It ignores Reflect, so a ringed party takes it.
     local so = self.opts.strago
     if so and so.pearlWind and #cands >= 2 and zombieSeated == nil
        and M.readByte(BATTLE.BCHID + actor * 2) == M.STRAGO_ID and cmdRow(actor, BATTLE.CMD_LORE)
-       and not self:loreAbsent(M.LORE_PEARL_WIND, "Pearl Wind") and hpNow[actor] * 2 >= maxOf(actor) then
+       and not self:loreAbsent(M.LORE_PEARL_WIND, "Pearl Wind") then
       local cell, cost = loreCell(actor, M.LORE_PEARL_WIND, true)
       if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) >= cost then
         M.log(string.format("[%s] actor=%d party heal: Pearl Wind, %d hurt (worst %d%%), %d HP each, %d MP",
-          self.tag or "fight", actor, #cands, cands[1].pct, hpNow[actor], cost))
+          self.tag or "fight", actor, #cands, cands[1].pct, maxOf(actor), cost))
         return orSpend({ kind = "lore", lore = M.LORE_PEARL_WIND, row = cmdRow(actor, BATTLE.CMD_LORE),
                          reason = "party_hurt_lore" }, "Pearl Wind")
       end

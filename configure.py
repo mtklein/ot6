@@ -783,6 +783,12 @@ check("study_table",
       "python3 tools/check_study_table.py --selftest"
       " && python3 tools/check_study_table.py",
       ["tools/check_study_table.py", copy_if_changed_from("build/ot6.sfc")])
+# #388: Pearl Wind heals as much as Strago's max HP (AttackerEffect_1b reads
+# $3C1C,y, not vanilla's current HP); the selftest's mutant is the vanilla load.
+check("pearl_wind",
+      "python3 tools/check_pearl_wind.py --selftest"
+      " && python3 tools/check_pearl_wind.py",
+      ["tools/check_pearl_wind.py", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
 check("spell_grants",
       "python3 tools/check_spell_grants.py --selftest"
       " && python3 tools/check_spell_grants.py",
