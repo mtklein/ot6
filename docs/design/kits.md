@@ -85,18 +85,19 @@ nothing it did not deliver.  Each divine is tuned to be worth a full boost
 and to be used more than once a fight; each entry below gives its reason.
 Mimic copies a divine's action, not its price, but the gate is the boost:
 a Gogo's copy takes the full boost from Gogo's own bank where the copy reads
-it (a Jackpot), and is free where it does not (a Cleave: the boost is kept,
-#461).
+it (a Jackpot; a Bum Rush, which under three of Gogo's points is Pummel at
+the boost he has), and is free where it does not (a Cleave: the boost is
+kept, #461, and a copy on a boss strips its four shields too).
 
 | Character | Divine | What three points buy | Built |
 |---|---|---|---|
 | Terra | Trance | her Morph (esper form: magic x2, damage taken halved) until the battle ends or she reverts; under 3 BP Morph lasts a shorter span | yes (`ot6_trance.asm`) |
 | Celes | RunicBlade | a 3-turn Runic that also sends every spell it absorbs back at its caster | yes (`ot6_runicblade.asm`) |
 | Edgar | Overclock | the Tool fires twice, at the boost's x8 each, priced as the two firings | yes (`ot6_overclock.asm`) |
-| Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: instant death on a killable target, a power-255 cut on a death-immune one | yes (`ot6_divine.asm`, learned by story since #379) |
+| Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: instant death on a killable target; on a death-immune one four shields off (Break's 3-BP ceiling) and a power-255 cut | yes (`ot6_divine.asm`, learned by story since #379; the strip #388) |
 | Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
 | Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
-| Sabin | Bum Rush | (built today as a 99-MP Blitz row at any boost; as a divine it will take the full boost) | no |
+| Sabin | Bum Rush | the Blitz list's eighth row at three points pending only: four bludgeon blows, each at the boost's x8, 99 MP | yes (`ot6_divine.asm`, #388) |
 | Locke | Master's Mark | every enemy robbed (its rare item, else its common, no roll) and read, 99 MP | yes (`ot6_thief.asm`) |
 | Mog | (open: none of his dances stands above the others, owner 2026-10-26, #478) | — | no |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
@@ -106,7 +107,7 @@ it (a Jackpot), and is free where it does not (a Cleave: the boost is kept,
 Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
 (Fire at 3 BP, after her World of Ruin return; see Terra below).  `$3ecb`,
 the once-a-battle flag (`OT6_DIVINE_USED`), is retired.
-Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_jackpot`,
+Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_bumrush`, `battle_jackpot`,
 `battle_assassinate`, `battle_trance` and `battle_morphrandom`, `battle_runicblade`,
 `battle_overclock`, `battle_umaro`, `battle_mastersmark`, each with its gate
 (under 3 BP no divine), and an old-ROM red; the menu divines also with a
@@ -115,7 +116,8 @@ second use in one battle.
 The engine picks a command for a character the player is not driving
 (Muddle, Charm, the Colosseum, Berserk) and spends no boost doing it, so
 every divine closes that path: a random SwdTech's range stops short of
-Cleave (`Ot6RandBushidoTop`), a Morph the engine chose takes
+Cleave (`Ot6RandBushidoTop`), a random Blitz never picks Bum Rush
+(`Ot6RandBlitzBits`), a Morph the engine chose takes
 the 0-BP span, whatever is pending (`Ot6MorphTake`), and Umaro's Storm is his only on a dump of all
 three points, which only being hurt makes (`Ot6UmaroArm`).
 
@@ -195,9 +197,23 @@ Levels below are `BlitzLevelTbl` (`field/event.asm:1240`).
 | 5 | Mantra | 16 | — (heal) | 23 |
 | 6 | Air Blade | 28 | wind | 30 |
 | 7 | Spiraler | 50 | — | 42 |
-| 8 | **Bum Rush** (divine; not built as one: a 99-MP Blitz row at any boost today) | **99** | bludgeoning ×4 | 70 / Duncan |
+| 8 | **Bum Rush** (divine, 3 BP) | **99** | bludgeoning ×4 | 70 / Duncan |
 
 The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
+
+- **Bum Rush is the divine** (#388, the TLM's call on the owner's direction
+  of 2026-11-09: make learning it pay in a specific fight without making
+  it essential).  The list draws it at every boost and greys it under three
+  points pending; the A button buzzes there (`Ot6BushidoRowGrey`'s blitz
+  arm, Master's Mark's grey).  At three it is the row at the full boost:
+  four bludgeon blows (`Ot6HitCountTbl`), each at `Ot6BoostDmg`'s x8, for
+  99 MP.  A Blitz commits from the list with no target select, so a pick is
+  never taken back; a copy whose boost is read at execution under three (a
+  Gogo's Mimic) runs as Pummel at that boost and is priced as Pummel
+  (`Ot6BlitzTake` at the command, `Ot6BumRushQueue` at the queue).  *Reason:
+  as a row at any boost it was four blows for 99 MP that a boosted Pummel
+  or Fight out-earned (wor-coverage.md 13.8); at the full boost its four
+  blows each carry the x8.*  `battle_bumrush`.
 Bum Rush is Sabin's ultimate and is
 fixed at **99**, which is 13.0% of his L70 pool of 760 and the same fraction
 Cleave is of Cyan's pool; both are pinned there so the fractions match. Mantra
@@ -226,7 +242,7 @@ against upstream for something a comment already handles.
 | 5 | Empowerer | 2 | 18 | — (drain; strikes ×2 at quarter power) | 24 |
 | 6 | Stunner | 3 | 28 | slashing, all enemies | 34 |
 | 7 | Quadra Slice | 3 | 50 | wind ×4 | 44 |
-| 8 | **Cleave** (divine) | 3 | **99** | — (instant death; a boss takes a power-255 cut) | Phantom Train farewell (story, #379) |
+| 8 | **Cleave** (divine) | 3 | **99** | — (instant death; a boss loses four shields and takes a power-255 cut) | Phantom Train farewell (story, #379) |
 
 SwdTech prices at **parity with the Blitz row of the same index**. This is a
 level claim rather than an index coincidence: `BlitzLevelTbl` is
@@ -350,9 +366,19 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   enemy group, and the other bodies take the record as it stands on that
   pass.  *Reason for the cut: a full boost must pay against a boss too, and
   a single 70 was less than the 2-BP Quadra Slice row; 255 is the most one
-  hit can carry, about Quadra Slice's four strikes.*  It can be used again
+  hit can carry, about Quadra Slice's four strikes.*  Since #388 a
+  death-immune body it strikes also loses four shields first, Break's
+  3-BP ceiling, whatever its keys (`Ot6CleaveStrip`, through
+  `Ot6TakeShields`, the leaf OT6's Break takes shields with); a body that
+  breaks takes the cut Broken.  *Reason (the TLM's call on the owner's
+  direction, 2026-11-09): at a boss the one cut and one slash chip were
+  less than a keyed 3-BP Fight earns (wor-coverage.md 13.8), so learning
+  Cleave paid nowhere against a boss; four shields is what a full boost
+  buys OT6's Break.*  It can be used again
   in the same battle.  `battle_divines` checks the rows, the loadout, a kill
-  on an unbroken soldier and two boss cuts in one battle; `battle_cleave`
+  on an unbroken soldier with no shield taken, and two boss cuts in one
+  battle, the first taking exactly four shields and the second the rest,
+  breaking him; `battle_cleave`
   the learned Cleave and the window from the play past the farewell;
   `battle_bushidoloadout` the windows beside a short run.
 
