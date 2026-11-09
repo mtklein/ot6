@@ -1854,10 +1854,12 @@ same deaths a fight. The Poltergeist (`polt/`, `KT_BURN` 0, 3, 6 by shifts
 0, 2, 6, 10, paired by key): it went off once in 5 of 12 fights, and both
 arms won the same 10 and lost the same 2 with 17 deaths each.
 
-*The change.* Pearl Wind now heals as much as STRAGO's max HP
-(`AttackerEffect_1b` loads `$3C1C,y` for vanilla's `$3BF4,y`;
-`tools/check_pearl_wind.py`, build check `pearl_wind`, whose mutant is the
-vanilla load). Its price (45 MP, his lore) and its lack of a boost are
+*The change.* STRAGO's Pearl Wind now heals as much as his max HP
+(`AttackerEffect_1b` loads `$3C1C,y` for a party caster, y < 8, after
+vanilla's `$3BF4,y`); a monster's stays vanilla's, so the Sprinter,
+Harpiai, Peepers and the last battle's Girl heal as before
+(`tools/check_pearl_wind.py`, build check `pearl_wind`; its two mutants,
+the vanilla load and the ungated max load, are red). Its price (45 MP, his lore) and its lack of a boost are
 vanilla's. The driver's line no longer wants him above half, and
 `opts.strago.pearlWindBelow` casts it on his attack turn when two
 standing members are under that fraction (at the Poltergeist the round's
@@ -1872,29 +1874,34 @@ held for the Sprinter, the Mantodea and Spek Tors killed first, bounded at
 the grind it added about a level each, and `battle_ragedriver`, whose cave
 battles then ended before GAU's possessed turn, went red). Pilots from the
 graph's `wor-owzer-v1` on the new ROM (`pilot/p3`): "[hunt] ... done after
-10 battles" (s0), 2 (s1-s3), each run PASS. The hunt's negative
+10 battles" (s0), 2 (s1-s3, one draw: the three played to the frame), each
+run PASS. Pooled over the six distinct draws of the three pilots it came
+at 6 of 14 meetings of 323, in 30 battles. The hunt's negative
 (`neg/neg_hunt`, its bound 3 and lore 0): "the Pearl Wind hunt: 3 battles
 in the wood and STRAGO has not learned it (lores $990088)". Nothing
 asserts he knows it downstream: the Poltergeist leg plays as before
 without it (the driver says the line is inert).
 
 *The payoff*, on the new ROM from the replayed line's `wor-kt-doom-v1`
-(STRAGO knows it), the same 12 distinct fights (`KT_BURN` 0, 3, 6 by
-shifts 0, 2, 6, 10), `polt3/` (with) against `polt2/p2wo_*` (without,
-`KT_BOSS_FIGHT = {}`), `btally.py`:
+(STRAGO knows it), the same 12 runs in each arm (`KT_BURN` 0, 3, 6 by
+shifts 0, 2, 6, 10), which hold 11 distinct battle keys (`beE0` opens both
+`K0 s0` and `K6 s10`, won in both arms), `polt3/` (with) against
+`polt2/p2wo_*` (without, `KT_BOSS_FIGHT = {}`), `btally.py`. These ran on
+the ungated ROM (`583cee0e`); the party-caster gate changes only a monster's
+Pearl Wind, which the Poltergeist does not cast.
 
-| arm | fights | won | deaths | won ticks (median by K) |
+| arm | distinct keys | won | deaths | won ticks (median by K) |
 |---|---|---|---|---|
-| without | 12 | 10 | 17 | 16,610.5 / 16,026 / 18,102 |
-| with | 12 | **12** | **5** | 17,263 / 15,915.5 / 16,687.5 |
+| without | 11 | 9 | 17 | 16,610.5 / 16,026 / 18,102 |
+| with | 11 | **11** | **5** | 17,263 / 15,915.5 / 16,687.5 |
 
 Quoted: "ARM p2wo_k3: 4 runs; distinct keys 4: won 3, lost 1; deaths over
 keys 7", "ARM p3wi_k3: 4 runs; distinct keys 4: won 4, lost 0; deaths over
 keys 0", "ARM p2wo_k6: ... won 3, lost 1; deaths over keys 7", "ARM
 p3wi_k6: ... won 4, lost 0; deaths over keys 3". It was cast in 10 of the
-12 fights, and the two keys the line lost (`be20`, `beDC`, wipes) are won
+12 runs, and the two keys the line lost (`be20`, `beDC`, wipes) are won
 with it (17,934 and 17,197 ticks). Without it the fight is as it was: won
-on 10 of 12, and the leg retries a wipe from Doom's save.
+on 9 of 11 keys, and the leg retries a wipe from Doom's save.
 
 **Bum Rush, the driver's model.** The chip model had no shape for it
 (`BATTLE.BLITZ_SHAPE`), so the line's labs above used it only where the
@@ -1915,8 +1922,13 @@ Fight's three points out-earn (above). Both are left for a design decision
 `wor_tower` stopped at "no new low under 7569 HP in 120001 battle ticks
 -- the party is not winning this fight" (party HP 448, 0, 0, 0), filed as
 class `other`, which the runner never retries. From that entry, shifts
-0-11: 9 of 12 PASS (`tower/tw_s0`, `tw_s1` the stall, `tw_s8` a wipe);
-from `955b7f9c`'s 12 of 12 (`tw0_*`). The stall replaced a frame-budget
+0-11: 9 of 12 PASS, the three failures two fights (`tower/tw_s0` and
+`tw_s1` are one, the stall, played to the frame; `tw_s8` a wipe on
+formation `$18A` early in the tower); from `955b7f9c`'s 12 of 12
+(`tw0_*`). That entry (the hunt after the grind) is one the line no longer
+reaches: the hunt now comes before the grind. Pearl Wind cannot answer
+MagiMaster: the tower is magic-only (battle switch `$38`), and every seat's
+command list there reads `cmds=02,FF,FF,01` (Magic, Item; no Lore). The stall replaced a frame-budget
 timeout that was retryable, so `gen_wor_tower` now raises it as a lost
 fight ("LOST: ", class `lost`): retried from the boot and counted like a
 wipe; the replay showed it ("attempt 1/3 FAILED class=lost ... LOST:

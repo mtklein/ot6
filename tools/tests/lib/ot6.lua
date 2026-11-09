@@ -14163,13 +14163,15 @@ function Driver:makePlanRules(actor)
     -- (build/attempts/wt/v041-wor-skills/polt2/p2wi_k3_s2: 98 Fights, no plan)
     if so.pearlWindBelow and cmdRow(actor, BATTLE.CMD_LORE)
        and not self:loreAbsent(M.LORE_PEARL_WIND, "Pearl Wind") then
-      local low = 0
+      local low, zombie = 0, false
       for e = 0, 3 do
         local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
         if hp > 0 and hp ~= 0xFFFF and mx > 0 and mx ~= 0xFFFF and hp < mx * so.pearlWindBelow then low = low + 1 end
+        -- the care line's guard: a party heal reaching a seated Zombie is damage to it
+        if maxOf(e) > 0 and status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) then zombie = true end
       end
       local cell, cost = loreCell(actor, M.LORE_PEARL_WIND, true)
-      if low >= 2 and cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) >= cost then
+      if low >= 2 and not zombie and cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) >= cost then
         M.log(string.format("[%s] actor=%d party heal: Pearl Wind, %d under %d%% (pearlWindBelow), %d HP each, %d MP",
           self.tag or "fight", actor, low, math.floor(so.pearlWindBelow * 100), M.readWord(0x3C1C + actor * 2), cost))
         return { kind = "lore", lore = M.LORE_PEARL_WIND, row = cmdRow(actor, BATTLE.CMD_LORE),

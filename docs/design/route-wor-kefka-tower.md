@@ -466,9 +466,9 @@ won 8, lost 1" (`tally_s6.txt`).
 - **Pearl Wind** (#388, wor-coverage.md 13.8): STRAGO learns it in the
   wood west of Jidoor's plain, and on this ROM it heals each member as much
   as his max HP and passes the Wall Rings' Reflect. The leg casts it when
-  two standing members are under 60% (`pearlWindBelow`): on 12 paired
-  fights from the replayed `wor-kt-doom-v1`, 12 won with 5 deaths against
-  the line's 10 won with 17 (`build/attempts/wt/v041-wor-skills/polt3`,
+  two standing members are under 60% (`pearlWindBelow`): on 11 distinct
+  keys paired from the replayed `wor-kt-doom-v1`, 11 won with 5 deaths
+  against 9 won with 17 without it (`build/attempts/wt/v041-wor-skills/polt3`,
   `polt2`).
 
 ### 6.3 The Goddess from the Poltergeist's save
