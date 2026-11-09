@@ -7189,6 +7189,7 @@ BATTLE.BLITZ_SHAPE = {
   [0x5E] = {},                                     -- Aura Bolt
   [0x5F] = { class = 0x04 },                       -- Suplex
   [0x62] = { aoe = true },                         -- Air Blade
+  [0x64] = { class = 0x04, elem = 0, hits = 4 },   -- Bum Rush (#388: bludgeon x4, Ot6HitCountTbl's +3)
 }
 function M.blitzChips(slot, id)
   local b = BATTLE.BLITZ_SHAPE[id]
