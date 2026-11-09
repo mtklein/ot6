@@ -678,6 +678,50 @@ local function grind()
   }), function() n0, seen, wp = nil, nil, 1 end)
 end
 
+-- ---- Pearl Wind from a Sprinter, in the wood beside the plain (#388) ----------------
+-- Pearl Wind (lore 8) is in the scripts of the Sprinter ($087) and of species the line meets without STRAGO
+-- seated or not before the tower's end (Ot6StudyTbl): the Sprinter is on world groups 49, 51 and 52, and group
+-- 49 is the wood just west of the grind's plain (world (11-15, 135-137); formation 323, Mantodea, Sprinter and two
+-- Spek Tors, is 96 of its 256: route_data pool group 49).  So after the grind the four walk into the wood and
+-- fight there until STRAGO knows it: he holds his points while a body that can teach him a lore stands and
+-- Studies it (opts.strago.studyHold, gen_wor_ebot's Hidon line), or sees it cast.  The bound: 323 is 0.375 of
+-- the wood's battles, so 24 battles without it is 0.625^24, about 1 in 80,000.
+local HUNT = { lap = { { 12, 136 }, { 14, 136 } }, battles = 24, lore = 8 }
+HUNT.fight = { nukeLore = FIGHT.nukeLore, focus = FIGHT.focus,
+  strago = { study = true, studyHold = true, pearlWind = true, dischord = STRAGO_KIT.dischord } }
+local function knowsPearlWind() return (lores() >> HUNT.lore) & 1 == 1 end
+local function pearlWindHunt()
+  local wp, n0, seen = 1, nil, nil
+  return H.withReset(H.seqStep({
+    H.call(function()
+      n0, seen, wp = #H.outcomes, #H.outcomes, 1
+      say("hunt", string.format("Pearl Wind in the wood (group 49); lores $%06X", lores()))
+    end),
+    H.driveUntil(function()
+      while seen < #H.outcomes do
+        seen = seen + 1
+        local o = H.outcomes[seen]
+        H.log(string.format("[hunt] battle %d $%03X %s after %d ticks: %s; lores $%06X", seen - n0, o.form & 0x1FF,
+          o.kind, o.tick or -1, whereLine(), lores()))
+      end
+      if not knowsPearlWind() and #H.outcomes - n0 >= HUNT.battles then
+        error(string.format("the Pearl Wind hunt: %d battles in the wood and STRAGO has not learned it (lores $%06X)",
+          #H.outcomes - n0, lores()))
+      end
+      return not H.battleLoadStarted() and H.worldSettled() and knowsPearlWind()
+    end, 600000, {
+      H.worldNavTo(function() return HUNT.lap[wp][1] end, function() return HUNT.lap[wp][2] end,
+        { maxFrames = 20000, playBattles = "tactical", fight = HUNT.fight }),
+      H.call(function() wp = wp % 2 + 1 end),
+      H.cond(function() return not H.battleLoadStarted() end, { H.fieldCare({ tag = "care in the wood" }) }, {}),
+    }, "the Pearl Wind hunt in the wood beside the plain"),
+    H.call(function()
+      say("hunt", string.format("done after %d battles; lores $%06X", #H.outcomes - n0, lores()))
+      H.assertEq(knowsPearlWind(), true, "STRAGO knows Pearl Wind (lore 8, $1D2A bit 0) after the hunt")
+    end),
+  }), function() n0, seen, wp = nil, nil, 1 end)
+end
+
 local PARTY = { { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } }
 
 H.run({ maxFrames = 1800000 }, {
@@ -796,6 +840,7 @@ H.run({ maxFrames = 1800000 }, {
   liftOff(),
   H.flyTo(GRIND_LANDING[1], GRIND_LANDING[2], { what = "the Falcon to the plain north-west of Jidoor" }),
   grind(),
+  pearlWindHunt(),
   H.saveState("wor_relm_grind.mss"),
 
   -- ---- 5. Thamasa's item counter, and the save beside the tower ---------------------
