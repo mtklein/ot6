@@ -14376,9 +14376,12 @@ function Driver:makePlanRules(actor)
     local line = self:mimicLine(actor, boost)
     if line then return line end
   end
+  -- opts.bushidoAt = n (#388 lab lever): CYAN's SwdTech only once his own bank holds n (3: the Cleave row), his
+  -- Fight before it, the rest of the party unchanged (opts.bank holds everyone's boost)
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]
      and cmdRow(actor, BATTLE.CMD_SWDTECH) and have >= 1
-     and not (self.opts.bank and have < self.opts.bank) then
+     and not (self.opts.bank and have < self.opts.bank)
+     and not (self.opts.bushidoAt and have < self.opts.bushidoAt) then
     local cap = type(self.opts.bushido) == "number" and self.opts.bushido or 3
     return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true,
              tier = math.max(1, math.min(have, cap, 3)),
