@@ -14376,8 +14376,15 @@ function Driver:makePlanRules(actor)
     local line = self:mimicLine(actor, boost)
     if line then return line end
   end
-  -- opts.bushidoAt = n (#388 lab lever): CYAN's SwdTech only once his own bank holds n (3: the Cleave row), his
-  -- Fight before it, the rest of the party unchanged (opts.bank holds everyone's boost)
+  -- opts.bushidoAt = n (#388 lab lever): CYAN banks to n (3: the Cleave row) with unboosted Fights, then SwdTechs
+  -- at that row; the rest of the party unchanged (opts.bank holds everyone's boost).  Without the hold his bank
+  -- never reached three at Doom: every pip went on the keyed Fight (build/attempts/wt/v041-wor-skills/doom/cl_*)
+  if self.opts.bushido and self.opts.bushidoAt and id == 2 and have < self.opts.bushidoAt
+     and not self.skillDead[BATTLE.CMD_SWDTECH] and cmdRow(actor, BATTLE.CMD_SWDTECH)
+     and cmdRow(actor, BATTLE.CMD_FIGHT) ~= nil then
+    return { kind = "fight", row = cmdRow(actor, BATTLE.CMD_FIGHT), boostLeft = 0, aim = self:chipAim(actor, 0),
+             reason = "bushido_bank" }
+  end
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]
      and cmdRow(actor, BATTLE.CMD_SWDTECH) and have >= 1
      and not (self.opts.bank and have < self.opts.bank)
