@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "7d12083e97154caeb3fd373b9e8d2a0acbebb0dabcf26a52c295ee4590a0f764",
-  "generator_sig": "d79c33cf1b0eb076ceaba77977da342ae8c9a6b194a19f7c605280dd730ad14f gen_wor_dream build/checkpoints/wor-opera-v1/manifest.json build/checkpoints/wor-opera-v1/wor-opera.sram",
+  "payload_sha256": "e62c327865f67c04ff0683db7b399b60529a17d247e56105e2f3fada3bf635b1",
+  "generator_sig": "8c6a353b8aacc33815ba597a8bd647596e11f6bc6b962918440f8b45faa3a7af gen_wor_dream build/checkpoints/wor-opera-v1/manifest.json build/checkpoints/wor-opera-v1/wor-opera.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-opera-v1/manifest.json",
-      "sha256": "1ab38e07b3923774fbe0b699832c77b5ea0069e99043d37c6321dd12fb571384"
+      "sha256": "ffc224db0fc9d42443d2678f390e7895a0aae0010a2601b3a2c7c6c52bd0b5d9"
     }
   ]
 }

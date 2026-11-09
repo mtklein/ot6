@@ -376,7 +376,11 @@ chain's `wor_opera_switch` (`build/attempts/wt/v036-route/lab/wardline`:
 "entity 2 under Shell 1185 frames after the plan", "the control: 0 ward
 plan(s); entity 2 under Shell: false"), and red with the ward cast on the
 next member (`wardline_mutWA`: "1. its target under Shell within 2400
-frames of the plan: got false, want true").
+frames of the plan: got false, want true"). From v0.41 (#509) the party at
+the switch knows no Shell (TERRA, who learns it, sits out), so the leg's
+`DRAGON_FIGHT` and the suite name Shell, Safe and Haste, the suite checks
+the planned spell's status, and a precondition at the boot names who knows
+a ward.
 
 A Float line (`Driver:floatPlan`, `opts.floatVs`) was built beside it and
 no leg used it: the dragon's 50 Gs removes Float and nothing else

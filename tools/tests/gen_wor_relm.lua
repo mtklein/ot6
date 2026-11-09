@@ -1,10 +1,12 @@
 -- gen_wor_relm.lua -- Chadarnook to the Fanatics' Tower's door: Continue the
--- `wor-owzer-v1` battery (CYAN, TERRA and CELES on the basement's save
--- point), the goddess's room: Owzer, Chadarnook (event battle 86, a game over
--- when lost: the runner retries from the save point), Starlet and RELM into
--- the empty seat; out of Jidoor to the Falcon, the tower's foot, where STRAGO
--- joins (he waits aboard: the party is full), the cabin (TERRA, CELES, RELM
--- and STRAGO; CYAN, MOG and UMARO aboard), the plain north-west of Jidoor (world
+-- `wor-owzer-v1` battery (CYAN, TERRA, CELES and SABIN on the basement's
+-- save point), the goddess's room: Owzer, Chadarnook (event battle 86, a game
+-- over when lost: the runner retries from the save point), Starlet and RELM,
+-- who waits aboard (the party is full); out of Jidoor to the Falcon, the
+-- cabin (TERRA, CELES, RELM and CYAN; SABIN, MOG and UMARO aboard), the
+-- tower's foot, where STRAGO joins (he waits aboard: the party is full), the
+-- cabin (TERRA, CELES, RELM and STRAGO; CYAN, SABIN, MOG and UMARO aboard),
+-- the plain north-west of Jidoor (world
 -- group 48, no Mantodea) to the level the tower asks, Thamasa's item counter,
 -- and the save beside the Falcon at the tower: the `wor-tower-v1` battery.
 -- docs/design/route-wor-thamasa.md has the plan and what this measured.
@@ -53,9 +55,15 @@ local BOSS_SPECIES = { [GODDESS_SP] = true, [DEMON_SP] = true }
 -- the v0.38 save's wipe at shift 0 was her Ultima queued on the demon, the
 -- demon gone and the goddess's Charm on her before it ran, all three dead
 -- from full HP (#507, build/attempts/wt/v039-chadarnook/)
+-- SABIN (seated from the cabin before Owzer's, #509) Blitzes AuraBolt, holy,
+-- on the holy-weak demon; his Fight carries the Dragon Claw's holy and the
+-- Fire Knuckle's fire (the Dragon Claw, which the goddess absorbs, comes off first).  He Blitzes only while the
+-- demon stands (opts.blitzVs): with the goddess alone the AuraBolt went to her and she absorbs holy (245 of 430
+-- casts on the first grid took nothing, build/attempts/wt/v041-phoenix-chadarnook/runs/px13/new3)
 local FIRE = 0x00
+local AURABOLT = 0x5E
 local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIRE, maxBoost = 2 } }, nuke = { FIRE },
-  trance = true, focus = { { species = DEMON_SP } } }
+  trance = true, blitz = AURABOLT, blitzVs = { [DEMON_SP] = true }, focus = { { species = DEMON_SP } } }
 -- STRAGO's kit on the plains (#388): Aqua Rake as the nuke (water: the Reach
 -- Frog's... and the Spek Tors'), Pearl Wind as the party heal, Dischord on
 -- the Mantodea (it halves the killer's level), Study at three points on a
@@ -690,7 +698,11 @@ H.run({ maxFrames = 1800000 }, {
   -- lab/c2_relm_k0, 'relics for Chadarnook')
   walkTo(86, 42, "off the save point"),
   H.fieldCare({ threshold = 1.0, tag = "before Chadarnook" }),
-  H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" } }, { tag = "relics for Chadarnook" }),
+  H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { SABIN, "SABIN" } },
+    { tag = "relics for Chadarnook" }),
+  -- the goddess absorbs holy and the demon bolt: a hand that holds either
+  -- (SABIN's Dragon Claw) takes the bag's best other weapon first
+  H.absorbSafeArms(nil, { GODDESS_SP, DEMON_SP }, { tag = "arms for Chadarnook" }),
   door(88, 35, MAP_GODDESS, "the basement -> the goddess's room (208 (75,36))"),
   -- Owzer (208 NPC_2 at (75,14), _cb4cfa): his lines, then event battle 86
   -- (a game over when lost), then $0253
@@ -704,29 +716,20 @@ H.run({ maxFrames = 1800000 }, {
 
   -- ---- 2. Starlet and RELM ------------------------------------------------------
   -- @@stage relm
-  -- the painting (80,14), A facing up (_cb4dc6): Starlet, then RELM into the
-  -- empty seat; the map reloads to Jidoor (198 (16,14))
+  -- the painting (80,14), A facing up (_cb4dc6): Starlet, then RELM, who
+  -- waits aboard with four seated (finding 1); the map reloads to Jidoor
+  -- (198 (16,14))
   examineUp(80, 14, function() return sw(0x0240) == 1 end, "the goddess's painting (208 (80,14)): face up, A"),
   H.advanceStory(function() return sw(0x02F8) == 1 and map() == MAP_JIDOOR and settled() end, 20000,
     { playBattles = "tactical", fight = FIGHT }),
   H.call(function()
     say("wor", "RELM joined")
     H.assertEq(owns(STARLET), true, "Starlet owned (give_genju, _cb4dc6)")
-    H.assertEq(partyOf(RELM), 1, "RELM joined the party, into the empty seat")
+    H.assertEq(partyOf(RELM), 0, "RELM joined aboard: the party is full (_cb4dc6)")
   end),
-  dressFromBag(RELM, "RELM"),
-  -- Ifrit (Fire, Drain) onto RELM while CYAN, who wears it, is still seated:
-  -- he waits aboard from the cabin on, and a stone a waiting member wears
-  -- cannot be freed from the party menu.  Drain reaches the reflecting
-  -- L.90 Magic (no element, no Reflect), and RELM's magic power is the
-  -- party's best (route-wor-thamasa.md 11.4); it is off MagiMaster's list,
-  -- whom it heals (gen_wor_tower's BOSS_FIGHT)
-  H.equipEsper(function() return posOf(RELM) end, IFRIT, { tag = "IFRIT -> RELM" }),
-  H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" } },
-    { tag = "relics with RELM" }),
-  H.call(function() say("wor", "RELM dressed: " .. kitLine()) end),
-  -- #434: buy power with gil; Jidoor's counters for RELM and the three
-  H.gearStop({ tag = "gear Jidoor (RELM)", fight = FIGHT }),
+  -- #434: buy power with gil; Jidoor's counters for the four and RELM, whom
+  -- the cabin seats next
+  H.gearStop({ tag = "gear Jidoor (RELM)", fight = FIGHT, joining = { RELM } }),
   -- the item counter again before the grind (RELM's join lands the party in
   -- Jidoor): the plain's fights are cared for with Potions (Jidoor sells no
   -- Tonics) and the poison the plain deals with Remedies; the first grind
@@ -751,9 +754,22 @@ H.run({ maxFrames = 1800000 }, {
   toFalconBy(16, 61, "down", "Jidoor", { { 34, 156 }, { 35, 156 } }),
   H.saveState("wor_relm_jidoor.mss"),
 
-  -- ---- 3. the tower's foot: STRAGO ----------------------------------------------
+  -- ---- 3. the cabin: RELM seated; the tower's foot: STRAGO -------------------------
   -- @@stage strago
-  board(),
+  -- RELM seated for STRAGO's scene (finding 2), CYAN with her: Ifrit (Fire,
+  -- Drain) goes onto RELM while CYAN, who wears it, is seated, since a stone
+  -- a waiting member wears cannot be freed from the party menu.  Drain
+  -- reaches the reflecting L.90 Magic (no element, no Reflect), and RELM's
+  -- magic power is the party's best (route-wor-thamasa.md 11.4); it is off
+  -- MagiMaster's list, whom it heals (gen_wor_tower's BOSS_FIGHT)
+  regroup({ TERRA, CELES, RELM, CYAN }, { SABIN, MOG, UMARO }),
+  H.call(function() say("regroup", "TERRA, CELES, RELM and CYAN") end),
+  dressFromBag(RELM, "RELM"),
+  H.equipEsper(function() return posOf(RELM) end, IFRIT, { tag = "IFRIT -> RELM" }),
+  H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" } },
+    { tag = "relics with RELM" }),
+  H.call(function() say("wor", "RELM dressed: " .. kitLine()) end),
+  liftOff(),
   H.flyTo(TOWER_LANDING[1], TOWER_LANDING[2], { what = "the Falcon to the tower" }),
   H.worldNavTo(TOWER_DOOR[1], TOWER_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     arrive = function() return map() == MAP_TOWER_FOOT and not H.worldMode() end }),
@@ -773,7 +789,7 @@ H.run({ maxFrames = 1800000 }, {
 
   -- ---- 4. the cabin and the grind ---------------------------------------------------
   -- @@stage grind
-  regroup({ TERRA, CELES, RELM, STRAGO }, { CYAN, MOG, UMARO }),
+  regroup({ TERRA, CELES, RELM, STRAGO }, { CYAN, SABIN, MOG, UMARO }),
   H.call(function() say("regroup", "TERRA, CELES, RELM and STRAGO") end),
   dressFromBag(STRAGO, "STRAGO"),
   H.dressRelics(PARTY, { tag = "relics for the four" }),

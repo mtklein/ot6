@@ -331,8 +331,19 @@ H.run({ maxFrames = 2400000 }, {
     return H.dressRelics(m, { tag = "relics with the Ribbon, party 1" })
   end),
   door(6, 7, MAP_CAVE, "party 1: -> 315 (6,12)"),
+  -- LOCKE's scene ends the split with CELES and LOCKE alone, and leaves the
+  -- rest aboard wearing what they wear; the Falcon's cabin then seats LOCKE,
+  -- TERRA, CELES and RELM (SEATED), and no field menu reaches the others
+  -- until a regroup seats them.  So before the scene each party takes the
+  -- Ribbons off its members outside SEATED, and party 2, which walks on,
+  -- puts the bag's on its members in SEATED (#506: the line through v0.40
+  -- left the cave's Ribbon on STRAGO aboard from here to wor_belly).
+  -- Party 1's walk to its step is its last; it unequips before it
+  H.ribbonsOffLeavers(SEATED, { noNote = true, tag = "party 1's Ribbons off before LOCKE's scene" }),
   hold(10, 32, 0x02C5, "party 1 across the jumps, on the step (10,32)"),
   H.switchParty(2),
+  H.ribbonsOffLeavers(SEATED, { noNote = true, tag = "party 2's Ribbons off before LOCKE's scene" }),
+  H.ribbonsOnSeated({ only = SEATED, noRegroup = true, tag = "the bag's Ribbons onto party 2's SEATED members" }),
   walk(12, 32, "party 2 onto the step (12,32): the last bridge"),
   H.waitUntil(function() return sw(0x02D6) == 1 and settled() end, 1200, "the bridge (10,35) open ($02D6)", 1),
   H.call(function() say("route", "the last bridge") end),

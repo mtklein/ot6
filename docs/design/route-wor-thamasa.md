@@ -101,8 +101,10 @@ From the tracked SRAM (`wor-narshe-v1_dump.txt`, `wor-narshe-v1_roster.txt`):
    (34,156) -> map 198`, `world_entrances1.txt`); the item counter (shop 78)
    for the arc's spend (section 7). The auction (map 200): one visit, and
    re-entry while Golem or ZoneSeek has not come up, bounded (finding 8).
-2. **The cabin.** Seat three, TERRA, CELES and CYAN, and leave the fourth
-   seat for RELM; MOG and UMARO wait aboard (section 5.4).
+2. **The cabin.** Seat four, TERRA, CELES, CYAN and SABIN (v0.41, #509;
+   until then the fourth seat was left for RELM); MOG and UMARO wait
+   aboard (section 5.5). Jidoor's weapon and armor counters before Owzer's
+   house (#434).
 3. **Owzer's house** (map 198 (16,12) -> 209 (118,28)). The hall: the
    Tincture (209 (125,11), already opened, `tools/chests_opened.txt` 66);
    the two paintings that fight when read, A facing up (209 (99,30)
@@ -131,9 +133,11 @@ From the tracked SRAM (`wor-narshe-v1_dump.txt`, `wor-narshe-v1_roster.txt`):
    battle 86 (:48727), a game over when lost (`_ca5ea9`). `$0253` is set at
    :48853.
 7. **Starlet and RELM.** (80,14), A facing up (`_cb4dc6` :48855): Starlet
-   (:48869), then RELM into the empty seat; the map reloads to Jidoor
-   (198 (16,14), :48904). RELM's gear goes on (section 6.2).
-8. **The Fanatics' Tower's foot.** The cabin is not needed: the Falcon flies
+   (:48869), then RELM, who waits aboard with four seated (finding 1); the
+   map reloads to Jidoor (198 (16,14), :48904). The cabin then seats
+   TERRA, CELES, RELM and CYAN (CYAN passes Ifrit to her), and RELM's gear
+   goes on (section 6.2).
+8. **The Fanatics' Tower's foot.** The Falcon flies
    to the tower, world (160,126) -> map 362 (8,13). Stepping onto any of
    (8,12), (7,13), (9,13), (8,14) with RELM seated plays the scene and
    STRAGO joins into the fourth seat (finding 2); map 362 reloads at (8,13)
@@ -375,8 +379,8 @@ draws Dispel on every character. Absorbs holy, no weakness.
 
 ### 5.5 The party
 
-**Into Owzer's:** TERRA, CELES, CYAN, and RELM when she joins; MOG, UMARO,
-SABIN, EDGAR, SETZER aboard. CYAN (L40) earns XP toward Quadra Slice (L44)
+**Into Owzer's:** TERRA, CELES, CYAN and SABIN (v0.41, section 12.6); MOG,
+UMARO, EDGAR, SETZER aboard, and RELM when she joins. CYAN (L38 at the save point from v0.41; L40 planned) earns XP toward Quadra Slice (L44)
 and carries Ifrit's fire. **Into the tower:** TERRA, CELES, RELM, STRAGO:
 the four with Magic and the most magic power (Umaro has no Magic; the
 tower's Fight row becomes Magic). **Out of the tower:** as the next arc
@@ -1020,3 +1024,44 @@ Phantasm (80 to 47 and 160 to 88 counters) and lost as many fights (3 of
 91) (`runs/C`, `runs/C2`). With CELES's Haste and Safe on the party in
 the goddess's turns as well, two of six pilot fights were lost
 (`runs/pB`).
+
+### 12.6 Four into Owzer's house (v0.41, #506, #509)
+
+With three seated, both of the house's attrition fights relied on the
+retry. From the v0.40 line's `wor-owzer-v1`, Chadarnook over K 0-11
+battles used up and 8 seed shifts each lost 5 of 93 distinct fights (K and
+battle key), each a wipe to Doom Kiss, Charm and Bolt 3 (won fights 26,499
+ticks on average, 1.56 deaths a run;
+`build/attempts/wt/v041-phoenix-chadarnook/runs/px13/main2.tally.txt`),
+and the basement's SoulDancer x2 and Crusher x2 lost 1 of 29 (#505).
+
+SABIN now takes the fourth seat (the cabin before Jidoor), and RELM, who
+joins after Chadarnook, waits aboard until a cabin before the tower seats
+her with TERRA, CELES and CYAN (finding 1). In the house his Fire Knuckle
+and AuraBolt (`BOSS_FIGHT.blitz`) hit the demon's weaknesses, AuraBolt only
+while the demon stands (`opts.blitzVs`: with the goddess alone it went to
+her, and she absorbs holy: 245 of the first grid's 430 casts took nothing,
+`runs/px13/new3`); his holy
+Dragon Claw comes off before the goddess's room (`H.absorbSafeArms`: she
+absorbs holy). The leg dresses the four after the regroup, so the Ribbon
+MOG leaves in the bag goes on CYAN; the basement fights the SoulDancers
+first; and Jidoor's weapon and armor counters are visited (nothing there
+beat what the four wore). On the same grid from the new `wor-owzer-v1`
+(byte for byte the line's), Chadarnook with AuraBolt ungated lost 1 of 91
+distinct fights (won fights 19,284 ticks on average, 0.67 deaths a run; the
+loss, K7 shift 13, the same Doom Kiss attrition over 72,000 frames,
+`runs/px13/new3.tally.txt`), and with it gated won all 91 (K and key), all
+48 distinct battle keys alone, in 17,327 ticks on average (worst 35,613),
+0.41 deaths a run; 13 of its 122 AuraBolts took nothing
+(`runs/px13/new4.tally.txt`). The basement's $11C was won on all 41
+distinct keys met over K 0-6 (`runs/mbp/f11c_all.txt`).
+
+The fourth seat moves the line's XP: the four reach the save point at
+CYAN L38, TERRA L40, CELES L40, SABIN L38 (v0.40's: CYAN L39, TERRA L40,
+CELES L41). RELM, joining aboard, is seated at L36. The four who climb the
+tower reach it at the same levels (TERRA 48, CELES 49, RELM 46, STRAGO 46),
+and further on the line runs about a level behind v0.40's for some members
+(`wor-opera-v1`: TERRA L54 against L55, CELES L53 against L54, RELM L51
+against L52), with the spells learned downstream moving with it: at the Opera's
+catwalk switch no seated member knows Shell any more (CELES knows Safe and
+Haste), which battle_wardline now allows for.
