@@ -684,10 +684,13 @@ end
 -- 49 is the wood just west of the grind's plain (world (11-15, 135-137); formation 323, Mantodea, Sprinter and two
 -- Spek Tors, is 96 of its 256: route_data pool group 49).  So after the grind the four walk into the wood and
 -- fight there until STRAGO knows it: he holds his points while a body that can teach him a lore stands and
--- Studies it (opts.strago.studyHold, gen_wor_ebot's Hidon line), or sees it cast.  The bound: 323 is 0.375 of
--- the wood's battles, so 24 battles without it is 0.625^24, about 1 in 80,000.
+-- Studies it (opts.strago.studyHold, gen_wor_ebot's Hidon line), or sees it cast.  The party kills the Mantodea and
+-- the Spek Tors first and STRAGO casts no Aqua Rake there, so the Sprinter stands until his third turn: with the
+-- plain's kit (Aqua Rake, no kill order) it fell before his study in two meetings of three (pilot p1, s1 and s3:
+-- "study hold: slot 1 ($087) can teach lores $000100 he lacks", then the next battle).  The bound: 323 is 0.375
+-- of the wood's battles, so 24 battles without it is 0.625^24, about 1 in 80,000.
 local HUNT = { lap = { { 12, 136 }, { 14, 136 } }, battles = 24, lore = 8 }
-HUNT.fight = { nukeLore = FIGHT.nukeLore, focus = FIGHT.focus,
+HUNT.fight = { focus = { { species = 0x0D2 }, { species = 0x0B0 } },
   strago = { study = true, studyHold = true, pearlWind = true, dischord = STRAGO_KIT.dischord } }
 local function knowsPearlWind() return (lores() >> HUNT.lore) & 1 == 1 end
 local function pearlWindHunt()
