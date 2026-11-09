@@ -687,9 +687,12 @@ end
 -- Studies it (opts.strago.studyHold, gen_wor_ebot's Hidon line), or sees it cast.  The party kills the Mantodea and
 -- the Spek Tors first and STRAGO casts no Aqua Rake there, so the Sprinter stands until his third turn: with the
 -- plain's kit (Aqua Rake, no kill order) it fell before his study in two meetings of three (pilot p1, s1 and s3:
--- "study hold: slot 1 ($087) can teach lores $000100 he lacks", then the next battle).  The bound: 323 is 0.375
--- of the wood's battles, so 24 battles without it is 0.625^24, about 1 in 80,000.
-local HUNT = { lap = { { 12, 136 }, { 14, 136 } }, battles = 24, lore = 8 }
+-- "study hold: slot 1 ($087) can teach lores $000100 he lacks", then the next battle).  Even so the fights end
+-- before his third turn and he learns it from the Sprinter's own cast, not the study: in the pilots it came at the
+-- 1st, 3rd, 3rd and 1st meeting of 323 (p1 s0, s1; p2 s0, s1: 4 of 8 meetings; build/attempts/wt/v041-wor-skills/
+-- pilot/).  The bound: 323 is 0.375 of the wood's battles, about half of those teach it, so about 0.19 a battle;
+-- 60 battles without it is 0.81^60, about 3 in a million.
+local HUNT = { lap = { { 12, 136 }, { 14, 136 } }, battles = 60, lore = 8 }
 HUNT.fight = { focus = { { species = 0x0D2 }, { species = 0x0B0 } },
   strago = { study = true, studyHold = true, pearlWind = true, dischord = STRAGO_KIT.dischord } }
 local function knowsPearlWind() return (lores() >> HUNT.lore) & 1 == 1 end
