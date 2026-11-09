@@ -897,7 +897,8 @@ check("stall_negative", "nice sh tools/tests/lib/stall_negative.sh",
        copy_if_changed_from("tools/tests/lib/stall_hang_negative.lua"),
        copy_if_changed_from("tools/tests/lib/stall_menu_negative.lua"),
        copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
-      + [copy_if_changed_from(h) for h in LIBS] + checkpoint_files)
+      + [copy_if_changed_from(h) for h in LIBS]
+      + sn.capture_inputs(ROOT, "wor-owzer-v1"))
 check("callback_negative", "nice sh tools/tests/lib/callback_negative.sh",
       ["tools/tests/lib/callback_negative.sh", "tools/tests/run.sh",
        "tools/tests/lib/compose.py",
