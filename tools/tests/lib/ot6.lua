@@ -21198,6 +21198,19 @@ local function watchTick()
 
   if qp >= WATCH.quietFrames and qs >= WATCH.quietFrames then
     W.trips = W.trips + 1
+    if inBattle and monsterHpSum() == 0 then
+      -- the battle is WON (every monster at 0 HP) and nothing moves: the
+      -- victory never starts.  #519: gen_wor_tower's formation $0AD, the
+      -- engine inside ExecBtlGfx command 4 on an action script whose
+      -- target list was empty, 2,300 frames before the trip.  Its own
+      -- class so the count names it, retried like any no-progress.
+      local shot = failEvidence("wonhang")
+      return string.format("battle-won-never-ended: every monster is at 0 HP "
+        .. "and nothing has moved for %d frames at %s -- no menu, monster HP, "
+        .. "party HP or inventory change and no new frame on screen; the "
+        .. "victory never started (#519).  Screenshot %s; ring above.",
+        math.min(qp, qs), prog, shot)
+    end
     local shot = failEvidence("noprogress")
     return string.format("no-progress: nothing has moved for %d frames at "
       .. "%s -- no map, position, menu, dialog, monster HP, party HP or "
@@ -21268,6 +21281,7 @@ end
 local RETRYABLE = {
   wipe = true, nopath = true, timeout = true,
   noeffect = true, noprogress = true, recovery_cap = true, lost = true,
+  wonhang = true,
 }
 
 local function classify(msg)
@@ -21280,6 +21294,7 @@ local function classify(msg)
      or msg:find("exit contract", 1, true) then return "assert" end
   if msg:find("^LOST: ") then return "lost" end
   if msg:find("no-effect:", 1, true) then return "noeffect" end
+  if msg:find("battle-won-never-ended:", 1, true) then return "wonhang" end
   if msg:find("no-progress:", 1, true) then return "noprogress" end
   if msg:find("recovery cap:", 1, true) then return "recovery_cap" end
   if msg:find("no path", 1, true) then return "nopath" end
@@ -21990,7 +22005,7 @@ function M.run(opts, steps)
     -- the note) keeps the stall's own class.
     local go = RUN.goUnhandled
     if go ~= nil and (class == "noprogress" or class == "noeffect"
-                      or class == "timeout") then
+                      or class == "timeout" or class == "wonhang") then
       msg = string.format("a counted game over the body never handled -- %s at "
         .. "f%d (GameOver read x%d, TitleScreen exec x%d, battle wipe x%d; "
         .. "allowGameOver=%s) -- preceded this %s, so the attempt is filed as "
