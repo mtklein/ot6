@@ -4,7 +4,7 @@
 -- completes, no goal is reached, the map, the party, the bag and every HP
 -- hold still.  Frames advancing is not progress (owner, 2026-10-19), so
 -- run.sh must kill it as a STALL.
--- Needs OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-owzer-v1.
+-- Needs OT6_SRAM_CHECKPOINT=build/checkpoints/wor-owzer-v1.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 H.run({ maxFrames = 5000000, retries = 1, watchdog = false }, {
