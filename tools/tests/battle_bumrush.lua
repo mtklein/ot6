@@ -120,7 +120,8 @@ local function decide()
     return
   end
   if stage == 1 then
-    plan = { { who = SABIN, cmd = CMD_BLITZ, row = BUMRUSH, boost = 2, direct = true, refused = "list" },
+    -- (the refused entry is not `direct`: kitBattle closes a direct entry at its first A, refused or not)
+    plan = { { who = SABIN, cmd = CMD_BLITZ, row = BUMRUSH, boost = 2, refused = "list" },
              { who = SABIN, cmd = CMD_BLITZ, row = BUMRUSH, boost = 3, direct = true } }
   else
     plan = { { who = SABIN, cmd = CMD_BLITZ, row = BUMRUSH, boost = 3, direct = true } }
