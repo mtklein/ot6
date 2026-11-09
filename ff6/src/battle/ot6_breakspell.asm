@@ -102,7 +102,23 @@ OT6_BREAK_SPELL = $0c
         cmp     #$08
         bcc     @out            ; a character: no shields
         jsr     Ot6BreakChips   ; A = shields this cast takes
-        sta     OT6_SCR_BIT
+        jsr     Ot6TakeShields
+@out:   pla
+        plp
+        rtl
+.endproc
+
+; [ take up to A shields off one monster, the last one breaking it ]
+; The one shield-taking leaf for the takes that ignore class and element:
+; OT6's Break (above) and Cleave on a death-immune body (Ot6CleaveStrip,
+; ot6_divine.asm).  Nothing is taken from a Broken or shieldless body.  The
+; last shield taken sets the break exactly as a chip does (OT6_BROKEN_TICKS
+; and the pending flash, which Ot6ActionEnd's reveal backstop lands).
+; a8, either index width; y = the target's entity offset (a monster),
+; A = how many (1..).  Preserves x and y; clobbers A.  jsr (rts).
+.proc Ot6TakeShields
+        .a8
+        pha                     ; [$01,s] shields left to take
 @chip:  lda     OT6_BROKEN_TICKS,y
         bne     @out            ; Broken: nothing more to take
         lda     OT6_SHIELD_CUR,y
@@ -115,11 +131,12 @@ OT6_BREAK_SPELL = $0c
         lda     #$ff
         sta     OT6_BRKTICK-8,y         ; the flash, pending (Ot6BreakArm)
         bra     @out
-@more:  dec     OT6_SCR_BIT
+@more:  lda     $01,s
+        dec     a
+        sta     $01,s
         bne     @chip
 @out:   pla
-        plp
-        rtl
+        rts
 .endproc
 
 ; [ how many shields OT6's Break takes: 1, plus the caster's boost ]

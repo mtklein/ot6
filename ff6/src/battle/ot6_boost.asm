@@ -2548,6 +2548,8 @@ OT6_LIFE3_ID = $35
         ; contract above), which is the caster Ot6BoostPriceFor reads the
         ; pending boost of.
         pla                     ; drop the parked cost (it is 0 for these)
+        jsr     Ot6BumRushQueue ; Bum Rush under three points queues as
+                                ;   Pummel, and is priced as Pummel (#388)
         lda     $3a7b           ; the resolved id (attack id / tool item id)
         jsl     Ot6CostFor      ; pure table scan: id -> cost in A
         jsl     Ot6BoostPriceFor

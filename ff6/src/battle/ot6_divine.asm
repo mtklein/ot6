@@ -12,7 +12,17 @@
 ;   Ot6Oblivion     Cleave (Cyan), the SwdTech window's 3-BP row
 ;   Ot6Assassinate  Shadow's divine, on a hit of a 3-BP action
 ; BP is spent through Ot6ActionEnd like any boosted action.
+;
+; Sabin's Bum Rush (#388) is built here too: its gate sits in three places
+; (the Blitz list's grey and confirm, Ot6BushidoRowGrey's blitz arm; the
+; queue's price, Ot6AbilityCost; the command, Ot6BlitzTake), and what the
+; full boost buys is the Blitz row's own: Ot6BoostDmg's x8 on each of its
+; four blows (Ot6HitCountTbl).
 ; ------------------------------------------------------------------------------
+
+OT6_BUMRUSH       = $64         ; Bum Rush's attack id (blitz 8)
+OT6_BUMRUSH_BOOST = 3           ; the divine's one gate: a full boost
+OT6_PUMMEL        = $5d         ; blitz 1, the fallback under three points
 
 ; [ Cleave (Cyan, SwdTech tech 8): instant death, or the heaviest cut ]
 ;
@@ -31,7 +41,8 @@
 ;                              set" ($3dd4, applied by UpdateStatus for every
 ;                              present entity independent of the hit roll): a
 ;                              guaranteed kill.
-;   death-immune (a boss)   -> the props are patched in place to the
+;   death-immune (a boss)   -> four shields off (Ot6CleaveStrip, #388), and
+;                              the props are patched in place to the
 ;                              heaviest single cut a record can carry: power
 ;                              255, Status-1 cleared, the instant-death and
 ;                              auto-miss flags cleared, and the base damage
@@ -52,6 +63,7 @@
 ; x (the caller indexes it right after) and y; may edit $11a6/$11aa/$11a2/$11a7.
 
 OT6_CLEAVE_BOSS_POWER = 255
+OT6_CLEAVE_SHIELDS    = 4       ; Break's 3-BP ceiling (Ot6BreakChips)
 
 .proc Ot6Oblivion
         php
@@ -61,6 +73,7 @@ OT6_CLEAVE_BOSS_POWER = 255
         lda     $3a7d
         cmp     #$5c            ; cleave's attack id?
         bne     done            ; no: this attack is untouched
+        jsr     Ot6CleaveStrip  ; each death-immune body struck: four shields
         phx                     ; save the attacker entity offset (i8, 1 byte)
         ; --- primary target -> entity offset. The mask is split: $b8 low byte
         ;     is characters (bit c -> offset c*2), $b9 high byte is monsters
@@ -107,6 +120,42 @@ OT6_CLEAVE_BOSS_POWER = 255
                                 ;   at the record's power 0 before this hook
 done:   plp
         rtl
+.endproc
+
+; [ Cleave strips four shields off each death-immune body it strikes ]
+;
+; #388 (the TLM's call, 2026-11-09): against a boss Cleave was one power-255
+; cut and one slash chip for a full bank, which a keyed 3-BP Fight out-earns.
+; Now each death-immune body in the record's target mask also loses four
+; shields, Break's 3-BP ceiling (Ot6BreakChips), whatever its keys, the
+; way Shadow's Assassinate makes a full boost pay against what it cannot
+; kill.  Killable bodies are unchanged: Death (Ot6Oblivion).  The take comes
+; before the hit rolls, so a body it breaks takes the cut Broken
+; (Ot6BrokenDmg), and the cut chips nothing more off it.
+; a8/i8 (Ot6Oblivion's shortai), db=$7e.  Preserves x and y; clobbers A.
+.proc Ot6CleaveStrip
+        .a8
+        .i8
+        phy
+        lda     $b9             ; monster mask (slots 0-5)
+        pha                     ; [$01,s] the mask, shifted as it is walked
+        ldy     #$08            ; entity offset of monster slot 0
+@mon:   lda     $01,s
+        lsr
+        sta     $01,s
+        bcc     @next           ; not struck
+        lda     $3aa1,y
+        bit     #$04            ; death-immune (a boss)?
+        beq     @next           ; killable: Death, as before
+        lda     #OT6_CLEAVE_SHIELDS
+        jsr     Ot6TakeShields
+@next:  iny
+        iny
+        cpy     #$14            ; 8 + 6*2
+        bcc     @mon
+        pla
+        ply
+        rts
 .endproc
 
 ; [ a SwdTech picked at random: never Cleave ]
@@ -275,5 +324,83 @@ done:   rts
 @have:  jsr     Ot6AssassinateGate
 done:   ply
         plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ Bum Rush (Sabin's divine): under three points it is Pummel ]
+;
+; #388 (the TLM's call, 2026-11-09; kits.md "Divines").  Bum Rush is the
+; Blitz list's eighth row, taught by Duncan in the World of Ruin, and it is
+; offered at three points pending only: the list greys it under three and
+; the A button refuses it (Ot6BushidoRowGrey's blitz arm, the same grey
+; Master's Mark and Jackpot take).  At three it is the Blitz row at the full
+; boost: four bludgeon blows (Ot6HitCountTbl +3), each at Ot6BoostDmg's x8,
+; for 99 MP (Ot6BoostPriceFor's cap; the row's base is the 99 ceiling).
+;
+; Picked at three and taken back to fewer (L at target select), the action
+; is Pummel at the boost that is left, priced as Pummel at that boost: the
+; queue rewrites the row (Ot6AbilityCost, which runs after the take-back)
+; and this proc is the command's own check, which also covers a copy whose
+; boost is read at execution (a Gogo's Mimic: kits.md "Divines").  So
+; nothing is charged that was not delivered, and the turn is not lost.
+;
+; jsl from Cmd_0a in place of `jsl Ot6HitCount`, with A = $b6, the blitz's
+; attack id, and y = the attacker's entity offset (ExecCmd's txy).  a8,
+; either index width, db=$7e.  Tail-jumps Ot6HitCount, whose rtl returns to
+; Cmd_0a with A = the id (perhaps now Pummel's) and the flags it promises.
+.proc Ot6BlitzTake
+        .a8
+        cmp     #OT6_BUMRUSH
+        bne     @go
+        pha
+        tya                     ; width-neutral: a character's command?
+        cmp     #$08
+        bcs     @keep           ; (a monster carries no boost: untouched)
+        lda     OT6_BOOST_REVEALED,y
+        cmp     #OT6_BUMRUSH_BOOST
+        bcs     @keep           ; the full boost: Bum Rush
+        pla
+        lda     #OT6_PUMMEL     ; under it: Pummel at the boost left
+        sta     $b6
+        bra     @go
+@keep:  pla
+@go:    jml     Ot6HitCount
+.endproc
+
+; [ the queue's half: a Bum Rush queued under three points is Pummel ]
+;
+; jsr from Ot6AbilityCost's Blitz arm (ot6_boost.asm), before the price is
+; looked up, so the row queued and the row priced are the same one.  a8,
+; i16, x = the attacker's entity offset, db=$7e.  Rewrites $3a7b (the
+; queued attack, stored to $3420 a few instructions on, as Ot6QueueFold's
+; rewrites are).  Preserves x and y; clobbers A.
+.proc Ot6BumRushQueue
+        .a8
+        lda     $3a7b
+        cmp     #OT6_BUMRUSH
+        bne     @out
+        lda     OT6_BOOST_REVEALED,x
+        cmp     #OT6_BUMRUSH_BOOST
+        bcs     @out            ; three points pending: Bum Rush, 99 MP
+        lda     #OT6_PUMMEL
+        sta     $3a7b
+@out:   rts
+.endproc
+
+; [ a Blitz picked at random: never Bum Rush ]
+;
+; RandBlitz (battle_main.asm) picks a random known blitz for a Muddled or
+; Charmed Sabin and at the Colosseum, and spends no boost doing it, so it
+; never reaches the divine (kits.md "Divines": every divine closes that
+; path).  Pummel is known from his join, so the mask is never empty.
+; jsl in place of `clr_a / lda $1d28`.  a8, db=$7e.  out: A = the known
+; blitzes but Bum Rush (bit 7), B = 0.  rtl.
+.proc Ot6RandBlitzBits
+        .a8
+        tdc                     ; clr_a: B = 0, as RandBit's caller wants
+        lda     $1d28           ; known blitzes
+        and     #$7f            ; ...but the divine
         rtl
 .endproc

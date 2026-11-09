@@ -934,8 +934,9 @@ RandBushidoRange:               ; observation only: no emitted bytes
 ; [ blitz command (random) ]
 
 RandBlitz:
-@0575:  clr_a
-        lda     $1d28       ; known blitzes
+@0575:  jsl     Ot6RandBlitzBits ; ot6 #388: known blitzes but Bum Rush, the
+                                ;   divine (ot6_divine.asm); was `clr_a /
+                                ;   lda $1d28`
         jsr     RandBit
         jsr     GetBitID
         txa
@@ -3454,7 +3455,9 @@ Cmd_0a:
 @15b0:  lda     #$08
         sta     $3412
 @15b5:  lda     $b6
-        jsl     Ot6HitCount             ; ot6: pummel x2, bum rush x4.
+        jsl     Ot6BlitzTake            ; ot6 #388: Bum Rush under three points
+                                        ;   is Pummel (ot6_divine.asm); then
+                                        ;   Ot6HitCount: pummel x2, bum rush x4.
                                         ;   here rather than in LoadMagicProp
                                         ;   because the multi-attack loop
                                         ;   re-enters ExecAttack, never the
