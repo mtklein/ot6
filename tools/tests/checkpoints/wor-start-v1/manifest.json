@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "e5cadb60cb988cd4b9d6f54201cbd10fa96f292b126509b66ab0020a8e32c356",
+  "sha256": "986b86d0a660f1f0f4e632b8abda1fc7d9bd0cb2c482cb4a848f8b79e160a588",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "e5cadb60cb988cd4b9d6f54201cbd10fa96f292b126509b66ab0020a8e32c356",
-    "generator_sig": "085601a6272f25ee22cfb5a1d930cf4204a0714cee12a5e3dff95bbaa2a42a11 gen_wor_start build/checkpoints/wor-island-v1/manifest.json build/checkpoints/wor-island-v1/wor-island.sram",
+    "payload_sha256": "986b86d0a660f1f0f4e632b8abda1fc7d9bd0cb2c482cb4a848f8b79e160a588",
+    "generator_sig": "fe38247abcc72071a13451b4d4aa6d17ad2353988579b69cdb0fbe8ef2b24f7f gen_wor_start build/checkpoints/wor-island-v1/manifest.json build/checkpoints/wor-island-v1/wor-island.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-island-v1/manifest.json",
-        "sha256": "d52ef1234abbfbac6837e02ce037775203306d3b6fe6d043387469288f4a5b17"
+        "sha256": "229a7172ef6822ccb79bb5af6383106256eac63fb2f3b4303a5fc9618fa6e7f3"
       }
     ]
   }

@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "72c1cf798cf59ba3ee6c44b07702d8f27b924cc2ad5e9a0dd5f5fbd66c76b2d1",
+  "sha256": "aa48c4a499d524bc890d77a4b354ab2acd79e838c9302b263e3d0187022abd29",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "72c1cf798cf59ba3ee6c44b07702d8f27b924cc2ad5e9a0dd5f5fbd66c76b2d1",
-    "generator_sig": "785d922ee0824ffa72905cb5bdcd588c908adbbd38b65cc83dd82eefe54e9ef0 gen_post_opera_checkpoint",
+    "payload_sha256": "aa48c4a499d524bc890d77a4b354ab2acd79e838c9302b263e3d0187022abd29",
+    "generator_sig": "c83085a349d5e62b9681123b6e7366b537ad3586dd57e9d3fea0b7f88f2c4491 gen_post_opera_checkpoint",
     "ancestors": [
       {
         "path": "build/states/blackjack.stamp",
-        "sha256": "031645af929824a407e9bfd2675a8a5136bd28f9389ed29770a075a6438de353"
+        "sha256": "eb58d8edc9ab44879742ee8895dc2cf5aa145c6dde31b3d808ce67c142fbb777"
       }
     ]
   }

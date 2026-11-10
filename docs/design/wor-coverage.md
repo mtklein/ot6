@@ -2019,9 +2019,14 @@ over keys 4; won ticks 4187-13277 (median 8081.5)", "ARM i_br: ... won
   it did: the Goddess leg's laps (party 1, which has neither CYAN nor
   SABIN) spent 15 (24 to 9, 16 deaths, nearly all in random battles),
   where `land1` spent about 5 there. The Kohlingen stop before the tower now
-  stocks 50 rather than 40 (`gen_wor_kt_factory`'s `TOWER_FENIX`). Fenix
-  Downs spent in the Goddess leg's random battles are a lab candidate of
-  their own.
+  stocks 50 rather than 40 (`gen_wor_kt_factory`'s `TOWER_FENIX`), and
+  the line replayed on it (`land4/` at `a67f60b1`) reached Kefka with 19
+  and played to the end ("wor_kefka: fenix=19 -> fenix=19", PASS). In
+  that play Doom was won in 17,715 ticks with neither divine fired (the
+  bank held but the fight ended first): the divines change the odds over
+  many fights, not every one. Fenix Downs spent in the Goddess and
+  Guardian legs' random battles (14 at Guardian in `land4/`) are a lab
+  candidate of their own.
 - **Not essential**: the stock fight still wins 9 of 12 at Doom and 8 of
   10 at Inferno, and the leg retries a wipe from its save.
 - **Cleave alone** is a modest gain (10 of 12 at Doom, the same 8 of 10 at
