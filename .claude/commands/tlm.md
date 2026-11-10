@@ -136,7 +136,17 @@ Every agent prompt ends with this footer, verbatim:
 > tag, or touch main. Follow docs/TESTING.md and docs/guidelines.md; keep
 > failed attempts. Cite evidence under build/attempts/<your branch>/ and
 > quote the raw log lines behind every number you report. Stop anything
-> you started before you report.
+> you started before you report, except a detached replay or grid that is
+> still making progress: leave it running and name it in the report (the
+> machine, the command, its log, and what to do when it ends).
+
+Long waits (owner, 2026-11-10: the full game's replays and grids run three
+hours and more; give them the emulator time). A background wait in this
+harness is capped at two hours, and an agent left idle that long can be told
+to hand back. Launch long jobs detached on the worker (setsid, an inhibitor,
+a log, a done marker), re-arm a watcher when one expires rather than
+treating its expiry as a failure, and pick up a job an agent named in its
+report instead of re-running it.
 
 While agents run, keep live.py up and glance at the worker grid for frozen
 workers; a stuck worker is your problem, not the agent's to hide. Do not
