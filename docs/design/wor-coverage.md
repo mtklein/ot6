@@ -2214,3 +2214,58 @@ the party (`land3/suite_battle_bumrushmimic.log.gz`: "GAME OVER fired ...
 battle wipe x1"). A mechanism suite that a boss's draw can fail is the
 fragility TESTING.md warns of, so it stays in the factory's random battles
 with its declared HP write, as on main.
+
+### 13.11 Cleave on every body, Bum Rush's keyless take: measured, not shipped (#388, v0.41)
+
+Evidence under `build/attempts/wt/v041-divines-2/` (branch `wt/v041-divines-2`, not merged).
+
+The TLM's calls on the owner's direction (2026-11-10), built on the branch: **Cleave** reads every body its record
+strikes (the record already strikes the whole enemy side: SwdTech has no target select), so each killable one dies
+and each death-immune one loses four shields and takes the cut, whole rather than split; **Bum Rush**'s four blows
+each take a shield whatever the body's keys, so one Bum Rush breaks a body at four or fewer shields. The driver:
+`Driver:divineLine` Cleaves when the killable bodies standing hold 6,000 HP or more between them, or, in an event
+battle, a death-immune body holds two shields or more (`opts.divines.laps` adds random battles, CYAN only); its
+Bum Rush line is 13.9's; `cast = false` is the control (the hold, no divine).
+
+*The suites* (`mx/mx3/verdicts.txt`): `battle_divines` passes on the branch's ROM and is red on main's at run time
+("Cleave struck every enemy: one Death mark from inside Ot6Oblivion on each soldier standing: got 2, want 2,3") and on
+both mutants ("... got , want 2,3" with no mark; "the cut beside an add is whole, not split: 1590 against the lone
+cut's 3270" with the split). `battle_bumrush` passes, red on the two-a-blow mutant ("got 1 ($1), want 2 ($2)"); main's
+ROM passes it, since every monster by Duncan's house keys bludgeon and dies to a blow or two.
+
+*The grids*, one attempt a run from wt/v041-tower-laps's replayed captures (`wor-kt-guardian-v1`,
+`wor-kt-factory-v1`), paired by distinct battle key (`scripts/grid.py`): the Doom leg over `KT_TRAIN` 46-49 by
+shifts 0, 2, 6, 10, 14, 18, 22, 26 (its lap battles and Doom), Inferno over shifts 0-35.
+
+| where | arm vs control | keys | won | gains / losses | p | deaths | won ticks (median) | the divine landed |
+|---|---|---|---|---|---|---|---|---|
+| Doom | `br` vs `hS` | 30 | 26 vs 24 | 2 / 0 | 0.5 | 55 vs 58 | 13,244.5 vs 12,431 | on 12 keys |
+| Doom | `hS` vs `wo` | 30 | 24 vs 22 | 5 / 3 | 0.73 | 58 vs 78 | 12,431 vs 13,757 | — |
+| Inferno | `cl` vs `hC` | 28 | 26 vs 26 | 0 / 0 | 1.0 | 23 vs 24 | 10,166 vs 10,021.5 | on 9 keys |
+| Inferno | `br` vs `hS` | 28 | 27 vs 27 | 0 / 0 | 1.0 | 18 vs 18 | 9,006 vs 7,820 | on 3 keys |
+| laps | `lc` vs `lh` | 84 | 84 vs 84 | 0 / 0 | 1.0 | 11 vs 11 | 3,266 vs 3,259 | on 3 keys |
+
+Quoted: "SUMMARY br vs hS: keys 30; won hS 24, br 26; gains 2, losses 0, sign test p=0.500; fewer deaths on 4, more
+on 3 (p=1.000); deaths hS 58, br 55" (`doom_br_hS.txt`), "SUMMARY cl vs hC: keys 28; won hC 26, cl 26; gains 0,
+losses 0" (`inf_cl_hC.txt`), "SUMMARY br vs hS: keys 28; won hS 27, br 27" (`inf_br_hS.txt`), "SUMMARY lc vs lh:
+keys 84; won lh 84, lc 84; ... deaths lh 11, lc 11" and "FORMATION 0190: shared keys 29 (lc Cleaved on 3); deaths lh
+10, lc 10" (`laps_lc_lh.txt`, 0190 the Innocs).
+
+- **Bum Rush** landed in 12 of the 30 Doom fights. On those 12 `br` won all and `hS` 10, with 13 deaths against 16,
+  sooner on 7; in 7 of its 13 casts Doom stood at four shields, so it broke him ("SABIN Bum Rush on slot 0 (49478 HP,
+  4 shield(s))"), and it took 35,903-39,733 off him (13.9: a median 36,182 before the take: the blows already reach
+  the 9,999 cap, so the break adds little to the cast itself). In the other 18 Doom fell, or SABIN fell, or another
+  rule spent the bank, before it reached three. Over the grid the gain is the two keys, inside chance, and no larger
+  than 13.10's before the take (2 / 0 against `hS` there too).
+- **Cleave** went off in 3 of 84 lap fights: CYAN's bank starts at one, so three points come on his third turn,
+  and by then the Innoc fights are mostly decided (the hold and the control die alike, 10 and 10 on the Innoc keys).
+  At Inferno, whose arms Striker and Rough are killable, it went off on 9 of 28 keys and killed both arms each time
+  (15,026-25,531 off the monsters), sooner on 3 of those keys and later on 4; every arm already wins 26 of 28 there.
+- **Neither trivialises a fight**: no Cleave or Bum Rush ended a boss; the stock fight wins 22 of 30 at Doom and 26
+  of 28 at Inferno.
+- **Not shipped.** Neither call measurably pays over the hold that builds its bank. What limits both is how
+  often the bank reaches three while the divine still has work: 12 of 30 at Doom, 9 of 28 at Inferno, 3 of 84 on the
+  laps. Proposed instead: (1) a driver change before any ROM change, measured the same way: keep the hold's bank
+  from the other spending rules once the divine is one point away (in 5 of the 19 Doom runs where it never went off, the bank
+  was spent to nothing); (2) for Cleave, a fight it fits: long, with killable adds that matter, where CYAN starts banking
+  at the fight's first turn. Party 3 in the tower has none (Inferno is already won; its lap fights end too soon).

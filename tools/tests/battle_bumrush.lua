@@ -17,6 +17,12 @@
 --      counter to 3 (four blows) and landed at least one (Ot6HitJoin), cost 99 MP and the bank's three points;
 --   2. a second Bum Rush in the next battle SABIN can afford one: the same (a divine is not once a battle, and the
 --      bank, not a flag, paces it).
+-- In each, every landed blow (Ot6HitJoin) on an unbroken body with a shield left took exactly one, whatever its
+-- keys (#388's second call: Ot6BumRushTake, keyless; a body that keys bludgeon loses it to the class chip
+-- instead), and the body is Broken exactly when the blows took its last.  The monsters by Duncan's house all key
+-- bludgeon, so main's ROM passes here (the class chip takes the same one); the bumrush_double mutant (two a blow)
+-- is red: build/attempts/wt/v041-divines-2/mx/mx3/.  The keyless take's behavioural red needs a body that does
+-- not key bludgeon and outlasts a blow: Doom (battle_bumrushmimic's battle), not yet asserted there.
 -- MP is a soft precondition, topped up the way a player would (field care between battles), and asserted at each
 -- battle's start.  A battle SABIN cannot act in, or one that ends before the action resolves, is fought out and
 -- not counted.

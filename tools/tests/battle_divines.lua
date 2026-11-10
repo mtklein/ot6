@@ -10,7 +10,12 @@
 -- ($3dd4) and turns the cut on a death-immune one into the heaviest single
 -- cut (power 255, Death and the auto-miss cleared); since #388 a death-immune
 -- body it strikes also loses four shields before the hit (Ot6CleaveStrip,
--- through Ot6TakeShields, the leaf OT6's Break takes shields with).
+-- through Ot6TakeShields, the leaf OT6's Break takes shields with).  The
+-- record strikes the whole enemy side (SwdTech has no target select;
+-- ChooseTarget's pick for its targeting is every monster), and since #388's
+-- second call each body struck is read, not only the primary: every killable
+-- one takes the Death mark (Ot6CleaveMark), every death-immune one the strip
+-- and the cut, unsplit ($11a2 bit 6).
 --
 -- Boots cyan_defence: a real solo Cyan (L11, katana) on map 120 beside the
 -- map's own battle-43 grinding soldiers (2x species $001, 100 hp) and the
@@ -38,17 +43,25 @@
 -- Asserted:
 --   battle 1 (the soldiers): the window's rows 0 and 1 (1 and 2 BP) are not
 --     Cleave and row 2 (3 BP) is; with Cleave stored in the 1-BP slot of a
---     manual loadout, row 0 still is not (Ot6CleaveSlot); Cleave at 3 BP
---     kills an unbroken soldier (one in-proc Death mark, the body dead),
---     and, after three Defends bank the points again, a second Cleave in the
---     same battle kills the second soldier; no shield is taken off a
---     killable body (no in-proc OT6_SHIELD_CUR write);
+--     manual loadout, row 0 still is not (Ot6CleaveSlot); one Cleave at 3 BP
+--     kills every unbroken soldier standing (one in-proc Death mark on each,
+--     the bodies dead); no shield is taken off a killable body (no in-proc
+--     OT6_SHIELD_CUR write);
 --   battle 2 (the commander, the boss bit set): two Cleaves in the same
 --     battle, each marking no Death, cutting at power 255 (an in-proc $11a6
 --     write) and landing (the commander's HP falls at each); the first
 --     takes exactly four shields (6 -> 2, one in-proc write each), and the
 --     second takes what is left, the last one breaking him (an in-proc
---     OT6_BROKEN_TICKS write).
+--     OT6_BROKEN_TICKS write);
+--   battle 3 (the soldiers, the highest slot staged as the boss: the bit, HP
+--     30,000, six shields; the primary target is the add): one Cleave marks
+--     Death on every add and none on the boss, takes exactly four of the
+--     boss's shields, cuts at power 255, and the cut on the boss is whole
+--     (at least 3/4 of battle 2's lone first cut through the same shields;
+--     a split halves it).
+-- #388's second call: build/attempts/wt/v041-divines-2/mx/mx3/ (main's ROM red at run time, battle 1: "Death mark
+-- ... on each soldier standing: got 2, want 2,3"; mutants cleave_nomark and cleave_split red; mx1/ is the first
+-- build, whose widening of the mask was a no-op: the mask is already the whole side).
 -- #388's old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/divines/mx/ (main's ROM fails at load,
 -- its symbols lacking Ot6TakeShields; the cleave_nostrip mutant is main's behaviour at run time).
 -- A kill is checked against the mechanism with pc-gated write watches

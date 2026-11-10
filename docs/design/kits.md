@@ -94,10 +94,10 @@ kept, #461, and a copy on a boss strips its four shields too).
 | Terra | Trance | her Morph (esper form: magic x2, damage taken halved) until the battle ends or she reverts; under 3 BP Morph lasts a shorter span | yes (`ot6_trance.asm`) |
 | Celes | RunicBlade | a 3-turn Runic that also sends every spell it absorbs back at its caster | yes (`ot6_runicblade.asm`) |
 | Edgar | Overclock | the Tool fires twice, at the boost's x8 each, priced as the two firings | yes (`ot6_overclock.asm`) |
-| Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: instant death on a killable target; on a death-immune one four shields off (Break's 3-BP ceiling) and a power-255 cut | yes (`ot6_divine.asm`, learned by story since #379; the strip #388) |
+| Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: it strikes every enemy; each killable one dies, each death-immune one loses four shields (Break's 3-BP ceiling) and takes a power-255 cut | yes (`ot6_divine.asm`, learned by story since #379; the strip and every body read #388) |
 | Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
 | Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
-| Sabin | Bum Rush | the Blitz list's eighth row at three points pending only: four bludgeon blows, each at the boost's x8, 99 MP | yes (`ot6_divine.asm`, #388) |
+| Sabin | Bum Rush | the Blitz list's eighth row at three points pending only: four bludgeon blows, each at the boost's x8 and each taking a shield whatever the body's keys, 99 MP | yes (`ot6_divine.asm`, #388) |
 | Locke | Master's Mark | every enemy robbed (its rare item, else its common, no roll) and read, 99 MP | yes (`ot6_thief.asm`) |
 | Mog | (open: none of his dances stands above the others, owner 2026-10-26, #478) | — | no |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
@@ -207,7 +207,12 @@ The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
   points pending; the A button buzzes there (`Ot6BushidoRowGrey`'s blitz
   arm, Master's Mark's grey).  At three it is the row at the full boost:
   four bludgeon blows (`Ot6HitCountTbl`), each at `Ot6BoostDmg`'s x8, for
-  99 MP.  A Blitz commits from the list with no target select, so a pick is
+  99 MP; each landed blow takes a shield whatever the body's keys
+  (`Ot6BumRushTake`, keyless like OT6's Break; a body that keys bludgeon
+  loses it to the class chip instead, so a blow never takes two), so one
+  Bum Rush breaks a body at four or fewer shields and the blows after the
+  break land Broken (#388's second call, the TLM's, 2026-11-10; measured in
+  wor-coverage.md 13.11).  A Blitz commits from the list with no target select, so a pick is
   never taken back, and no queue-side rewrite is needed (#388's first
   build had one, `Ot6BumRushQueue`, which nothing could reach; removed).  A
   copy whose boost is read at execution under three (a Gogo's Mimic) runs as
@@ -359,14 +364,16 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   Muddled or Charmed Cyan, the Colosseum) spends no boost, so its pick
   ranges over the run he knows and never Cleave (`Ot6RandBushidoTop`:
   vanilla's 0..`$2020` would also have reached a tech he does not know,
-  since Cleave sits ahead of the run).  At resolution `Ot6Oblivion`
-  reads the target: a killable one takes a guaranteed Death (no Broken
-  condition any more); a death-immune one (a boss) takes the heaviest
-  single cut a record can carry, power 255 with its damage recomputed
-  (`Ot6CleaveDmg`; CalcDmg runs before the target is known, so the old
-  fallback's power of 70 landed nothing at all).  The record strikes the
-  enemy group, and the other bodies take the record as it stands on that
-  pass.  *Reason for the cut: a full boost must pay against a boss too, and
+  since Cleave sits ahead of the run).  The record strikes the whole enemy side
+  (SwdTech has no target select, and ChooseTarget's pick for its targeting
+  is every monster).  At resolution `Ot6Oblivion` reads every body it
+  strikes (#388's second call; before it, only the primary, and the bodies
+  beside it took the record as it stood): each killable one takes a
+  guaranteed Death (`Ot6CleaveMark`; no Broken condition any more); each
+  death-immune one (a boss) takes the heaviest single cut a record can
+  carry, power 255 with its damage recomputed (`Ot6CleaveDmg`; CalcDmg runs
+  before the target is known, so the old fallback's power of 70 landed
+  nothing at all), whole on each body rather than split across them.  *Reason for the cut: a full boost must pay against a boss too, and
   a single 70 was less than the 2-BP Quadra Slice row; 255 is the most one
   hit can carry, about Quadra Slice's four strikes.*  Since #388 a
   death-immune body it strikes also loses four shields first, Break's
@@ -379,10 +386,15 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   buys OT6's Break.*  Measured since (wor-coverage.md 13.9): the strip
   does not yet pay at Doom or Inferno, nor did a strip of every shield;
   what would is open.  It can be used again
-  in the same battle.  `battle_divines` checks the rows, the loadout, a kill
-  on an unbroken soldier with no shield taken, and two boss cuts in one
-  battle, the first taking exactly four shields and the second the rest,
-  breaking him; `battle_cleave`
+  in the same battle.  *The second call (the TLM's, 2026-11-10): every
+  body read, so a group of killable monsters ends on CYAN's turn and a boss
+  with adds loses its guard; measured in wor-coverage.md 13.11, where it
+  went off too rarely to pay.*  `battle_divines` checks the rows, the
+  loadout, one Cleave killing every unbroken soldier with no shield taken,
+  two boss cuts in one battle, the first taking exactly four shields and
+  the second the rest, breaking him, and a boss beside a killable add (the
+  add the primary target): the add dies, the boss loses four shields and
+  takes the whole cut; `battle_cleave`
   the learned Cleave and the window from the play past the farewell;
   `battle_bushidoloadout` the windows beside a short run.
 
