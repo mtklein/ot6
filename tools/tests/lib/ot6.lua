@@ -8767,17 +8767,11 @@ end
 --     hold.  M.boostPlan refuses it under three, so no other line queues the greyed row.
 -- opts.divines.cast = false (#388 control): the same holds on the same targets, and at three points no divine: the
 -- lines below spend the bank (the banking hold without the divine, the control the Doom grid lacked).
--- opts.divines.laps (#388/#521): random battles too, CYAN's Cleave only (Driver:lapCleave); laps = "strip" also
--- takes the event battles' strip rule on a death-immune body there.
 function Driver:divineLine(actor, have)
   local o = self.opts.divines
-  if not o then return nil end
+  if not o or M.readByte(M.RANDBTL) ~= 0 then return nil end
   o = type(o) == "table" and o or {}
   local id = M.readByte(BATTLE.BCHID + actor * 2)
-  if M.readByte(M.RANDBTL) ~= 0 then
-    if id == 2 and o.laps then return self:lapCleave(actor, have, o) end
-    return nil
-  end
   if id ~= 2 and id ~= 5 then return nil end
   local slot = self:pressTarget()
   if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
@@ -8835,57 +8829,6 @@ function Driver:divineWithheld(actor, what, slot)
       .. "goes to the lines below", self.tag or "fight", actor, what, slot))
   end
   return nil
-end
-
--- CYAN's Cleave in a random battle (opts.divines.laps; #388, #521): the SwdTech window's 3-BP row is instant death
--- on a killable body, so it goes on the most dangerous killable monster standing: one whose script puts a status on
--- the party (statusInflicter: the Innocs' Muddle), else the one with the most HP; only a body holding at least
--- o.lapHp HP (3000), so a Fight's work is not paid 99 MP.  Under three points the hold banks (an unboosted Fight);
--- at three, Cleave aimed at that body.  laps = "strip" also takes the event battles' rule where no killable body
--- qualifies: a death-immune one holding o.cleaveShields (2) shields or more, not Broken (the four-shield strip).
--- Reads: each monster's HP, shields, Broken timer, death immunity ($3AA1 bit 2) and script; CYAN's bank, MP and
--- known techs.
-function Driver:lapCleave(actor, have, o)
-  local row = cmdRow(actor, BATTLE.CMD_SWDTECH)
-  local cost = M.abilityCost(M.CLEAVE) or 99
-  local mp = M.readWord(BATTLE.CURMP + actor * 2)
-  if o.cleave == false or row == nil or self.skillDead[BATTLE.CMD_SWDTECH]
-     or (M.readByte(0x1CF7) & 0x80) == 0 or mp < cost then return nil end
-  local best, bestHp, bestInf, strip = nil, -1, false, nil
-  for s = 0, 5 do
-    if monAlive(s) then
-      local hp = M.readWord(BATTLE.MON_HP + s * 2)
-      local immune = (M.readByte(0x3AA1 + 8 + s * 2) & 0x04) ~= 0
-      if not immune and hp >= (o.lapHp or 3000) then
-        local inf = statusInflicter(s) ~= nil
-        if (inf and not bestInf) or (inf == bestInf and hp > bestHp) then best, bestHp, bestInf = s, hp, inf end
-      elseif immune and o.laps == "strip" and strip == nil and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0
-             and M.readByte(BATTLE.SH_CUR + s * 2) >= (o.cleaveShields or 2) then
-        strip = s
-      end
-    end
-  end
-  local what = "killable"
-  if best == nil then best, what = strip, "death-immune: the strip" end
-  if best == nil then return nil end
-  local tag = self.tag or "fight"
-  local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
-  if have < 3 then
-    if o.hold == false or fight == nil then return nil end
-    local key = "divine_hold:" .. actor .. ":" .. have
-    if not self.statusSaid[key] then
-      self.statusSaid[key] = true
-      M.log(string.format("[%s] actor=%d CYAN holds for Cleave on slot %d (%d HP, %s): bank %d of 3 -- an "
-        .. "unboosted Fight banks the point", tag, actor, best, M.readWord(BATTLE.MON_HP + best * 2), what, have))
-    end
-    return { kind = "fight", row = fight, boostLeft = 0, aim = self:chipAim(actor, 0), reason = "divine_bank" }
-  end
-  if o.cast == false then return self:divineWithheld(actor, "Cleave", best) end
-  M.log(string.format("[%s] actor=%d CYAN Cleave on slot %d (%d HP, %d shield(s), %s) at 3 BP in a random battle, %d "
-    .. "MP of %d", tag, actor, best, M.readWord(BATTLE.MON_HP + best * 2), M.readByte(BATTLE.SH_CUR + best * 2), what,
-    cost, mp))
-  return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true, tier = 3, row = row, boostLeft = 0,
-           aimHard = best, reason = "divine_cleave" }
 end
 
 -- Which of SETZER's lines pays this turn, or nil (the lines below it: the
@@ -10357,6 +10300,17 @@ function Driver:partyWindow(actor, slot)
     end
   end
   return window, table.concat(parts, " "), broken
+end
+
+-- Whether the last monster standing dies to this actor's own measured hit (dmgSeen, x4 on a Broken one): the
+-- Zombie cure gives way to the kill then (#521).  M.FINISH_ZOMBIE = false (or a prelude's global
+-- OT6_FINISH_ZOMBIE = false) is the control.
+function Driver:finishInReach(actor)
+  if M.FINISH_ZOMBIE == false or rawget(_G, "OT6_FINISH_ZOMBIE") == false then return false end
+  local slot = soleTarget()
+  if slot == nil or not self.dmgSeen[actor] then return false end
+  local mult = M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0 and 4 or 1
+  return self.dmgSeen[actor] * mult >= M.readWord(BATTLE.MON_HP + slot * 2)
 end
 
 -- The raise rule's question (#165, #168), read off the hit ledger and
@@ -12946,6 +12900,13 @@ function Driver:makePlanRules(actor)
           local said = string.format("[%s] actor=%d no cure on entity %d: actor %d's "
             .. "$%02X on them is confirmed (tick %d) and has not landed",
             self.tag or "fight", actor, e, queued.by, queued.item, queued.tick)
+          if said ~= self.cureSaid then self.cureSaid = said; M.log(said) end
+        elseif what == "Zombie" and e ~= actor and self:finishInReach(actor) then
+          -- the last monster dies to this actor's own measured hit: the kill ends the battle and the zombie's
+          -- turns with it, where a Revivify only waits for the next Overcast (#521: the Goddess at 104 HP while
+          -- RELM, the last standing, cured Zombies five turns running and died, b3/gd_s0)
+          local said = string.format("[%s] actor=%d no Zombie cure on entity %d: the last monster is inside "
+            .. "this actor's own hit -- the kill first", self.tag or "fight", actor, e)
           if said ~= self.cureSaid then self.cureSaid = said; M.log(said) end
         elseif what ~= nil then
           local open = e == actor or self.careActor == nil or self.careActor == actor

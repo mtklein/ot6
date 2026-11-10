@@ -4091,7 +4091,7 @@ local CARE_STATUS_CURES = {
   -- FC descent delivered LOCKE to the alcove blind with three Remedies in
   -- the bag and nothing reaching for them
   { bit = 0x01, items = { CARE_EYEDROP, CARE_REMEDY }, what = "dark" },
-  { bit = 0x20, items = { CARE_REMEDY }, what = "imp" },
+  { bit = 0x20, items = { 0xF8, CARE_REMEDY }, what = "imp" },   -- Green Cherry, else Remedy
   -- Zombie persists too, and Remedy's mask ($65, item.asm @8bb2) leaves it,
   -- so Revivify is the one field cure.  A zombied member walks into the
   -- next fight attacking the party, and the fight driver's raise rule spent
@@ -4971,6 +4971,15 @@ local function careKernel(opts)
                       why = "cure " .. cure.what }
           if avail(item) > 0 and not failed[key(w)] then return w end
         end
+        -- Every cure the reserve keeps (another party's share of a split bag, #330) is still in the bag: a status
+        -- left on costs more than the item (#521: EDGAR walked on Poison and Imp from 334 to 352 with party 1's
+        -- six Remedies spent and twelve in the bag, "status1=24 ... antidote=0 ... remedy=12", and fell to the
+        -- poison's drain twice -- two Fenix Downs).  So the cure borrows one past the reserve
+        for _, item in ipairs(cure.items) do
+          local w = { kind = "item", char = target, item = item,
+                      why = "cure " .. cure.what .. " (past the reserve)" }
+          if M.invCountOf(item) > 0 and not failed[key(w)] then return w end
+        end
       end
     end
     return nil
@@ -5148,7 +5157,7 @@ local function careKernel(opts)
   local ITEM_NAMES = { [CARE_TONIC] = "tonic", [CARE_POTION] = "potion",
                        [CARE_FENIX] = "fenix", [CARE_REVIVIFY] = "revivify",
                        [CARE_ANTIDOTE] = "antidote", [CARE_EYEDROP] = "eyedrop",
-                       [CARE_SOFT] = "soft", [CARE_REMEDY] = "remedy",
+                       [CARE_SOFT] = "soft", [CARE_REMEDY] = "remedy", [0xF8] = "green cherry",
                        [CARE_TINCTURE] = "tincture", [CARE_TENT] = "tent" }
   local function unserved()
     if pick() ~= nil then return "" end
@@ -11843,7 +11852,8 @@ function M.kefkaTowerKit(K, fight)
   -- the walking party levels on its lane's own floor before a statue (the owner: the bench levels in the tower): a
   -- lap between the tile it stands on and the first of (x, y-2), (x, y+2), (x-2, y), (x+2, y), then the four
   -- neighbours, that the floor reaches, the walker fighting what comes and the care after each battle, until every
-  -- member stands at `level` (and opts.min battles are fought; opts.burn battles more once the level stands: a
+  -- member stands at `level` and none answers opts.also(ch) (a member to level on past, #521: L.5 Doom's fives) (and
+  -- opts.min battles are fought; opts.burn battles more once the level stands: a
   -- lab's encounter history), at most opts.cap battles (default 60).  Asserts the level at the end: a lane whose
   -- floor cannot raise the party fails here, not at the statue.  The steps between two battles are bounded by the
   -- map's own rate (K.worstSteps, the hunt's bound: the most steps to a random battle over every encounter counter,
@@ -11856,7 +11866,9 @@ function M.kefkaTowerKit(K, fight)
     local function low()
       local t = {}
       for _, ch in ipairs(M.partyRoster(M.activeParty())) do
-        if M.readByte(0x1600 + 37 * ch + 8) < level then t[#t + 1] = M.SPLIT_NAMES[ch] end
+        if M.readByte(0x1600 + 37 * ch + 8) < level or (opts.also and opts.also(ch)) then
+          t[#t + 1] = M.SPLIT_NAMES[ch]
+        end
       end
       return t
     end

@@ -68,6 +68,16 @@ local function wardsHeld()
     H.invCountOf(BARRIER_RING), H.invCountOf(MEMENTO_RING), wears(EDGAR, BARRIER_RING) and "wears one" or "none",
     wears(SETZER, BARRIER_RING) and "wears one" or "none", wears(RELM, MEMENTO_RING) and "wears one" or "none"))
 end
+-- a member L.5 Doom kills: its level a multiple of five, and no death guard (the Memento Ring, the Safety Bit) in a
+-- relic slot
+local DEATH_GUARDS = { [MEMENTO_RING] = true, [0xDC] = true }
+local function atFive(ch)
+  if H.readByte(0x1600 + 37 * ch + 8) % 5 ~= 0 then return false end
+  for s = 4, 5 do
+    if DEATH_GUARDS[H.readByte(0x1600 + 37 * ch + 0x1F + s)] then return false end
+  end
+  return true
+end
 local GUARDIAN_SAVE = { 12, 12 }
 local SKULL, GOLD, GUARDIAN = 0x151, 0x150, 0x112
 -- the tower's species whose vanilla weakness a player who knows the tower reads (gen_wor_kt_factory's)
@@ -103,32 +113,19 @@ local walk, door, chest = T.walk, T.door, T.chest
 
 -- party 1's training: a two-tile lap by its landing (334 (9,16)-(9,19); lab_tower_split's lap, where plan M's party 1
 -- won 60 of 60 under the rows: section 7.1), the walker fighting what comes and the care after each battle, until
--- every member of party 1 stands at TRAIN_LEVEL and none at a multiple of five, at most TRAIN_BATTLES battles.
--- TRAIN_LEVEL is the Goddess leg's bench level (gen_wor_kt_goddess's TRAIN_LEVEL), so party 1 does its training
--- here and none in 355's east lane, whose Scullion (half that pool) opens with Condemned and outlasts party 1's
--- kill: there party 1 lost a member in 6 of 10 Scullion battles in the line at 62a8b621 (6 of its leg's 7 Fenix
--- Downs; 11 of 15 at 3eb65922).  This leg over 15-16 runs a grid (route-wor-kefka-tower.md 7.6, #521): trained to
--- L40, 131 deaths in 547 random battles, 8.2 a run, before the Goddess leg's lap; trained to L46, 73 in 886, 4.9 a
--- run, with that lap's levels already in hand.  The five: the Sky Base in 352 (formation 413) opens with L.5 Doom,
--- which kills every member whose level is a multiple of five, and at L40 the training left EDGAR there (TERRA at
--- L65): 68 deaths in its 29 meetings over 16 runs, every one of them won.  Killing the Sky Base first did not help
--- (71 in 29): its L.5 Doom comes before the party's first turn.  A player who reads its script levels past the five
-local TRAIN_LEVEL, TRAIN_BATTLES = KT_TRAIN1 or 46, KT_TRAIN1_CAP or 60
+-- every member of party 1 stands at TRAIN_LEVEL, at most TRAIN_BATTLES battles.  TRAIN_LEVEL is the Goddess leg's
+-- bench level (gen_wor_kt_goddess's TRAIN_LEVEL), so party 1 does its training here and none in 355's east lane,
+-- whose Scullion (half that pool) opens with Condemned and outlasts party 1's kill: there party 1 lost a member in 6
+-- of 10 Scullion battles in the line at 62a8b621 (6 of its leg's 7 Fenix Downs; 11 of 15 at 3eb65922).  This leg
+-- over 16 runs a grid (route-wor-kefka-tower.md 7.6, #521): trained to L40, 131 deaths in 547 random battles, 8.2 a
+-- run, before the Goddess leg's lap; trained to L46, 80 in 945, 5.0 a run, with that lap's levels already in hand
+local TRAIN_LEVEL, TRAIN_BATTLES = 46, 60
 local function trainParty1()
   local lap, wp, n0 = { { 9, 16 }, { 9, 19 } }, 1, 0
   local function low()
     local t = {}
     for _, ch in ipairs(H.partyRoster(1)) do
       if H.readByte(0x1600 + 37 * ch + 8) < TRAIN_LEVEL then t[#t + 1] = NAMES[ch] end
-    end
-    return t
-  end
-  -- the members at a multiple of five (L.5 Doom's), when KT_LEVEL5 is not false (a lab's lever)
-  local function fives()
-    local t = {}
-    if KT_LEVEL5 == false then return t end
-    for _, ch in ipairs(H.partyRoster(1)) do
-      if H.readByte(0x1600 + 37 * ch + 8) % 5 == 0 then t[#t + 1] = NAMES[ch] end
     end
     return t
   end
@@ -146,7 +143,7 @@ local function trainParty1()
     end),
     H.driveUntil(function()
       local calm = not H.battleLoadStarted() and H.hasControl() and H.tileAligned()
-      return calm and ((#low() == 0 and #fives() == 0) or #H.outcomes - n0 >= TRAIN_BATTLES)
+      return calm and (#low() == 0 or #H.outcomes - n0 >= TRAIN_BATTLES)
     end, 2900000, {
       H.navTo(function() return lap[wp][1] end, function() return lap[wp][2] end,
         { maxFrames = 20000, playBattles = "tactical", fight = FIGHT }),
@@ -154,8 +151,7 @@ local function trainParty1()
       H.cond(function() return not H.battleLoadStarted() end, { H.fieldCare({ tag = "care on party 1's lap" }) }, {}),
     }, "party 1's training by its landing"),
     H.call(function()
-      say("train", string.format("party 1 after %d battles by its landing: %s%s", #H.outcomes - n0, levels(),
-        #fives() > 0 and (" (at a multiple of five, the cap reached: " .. table.concat(fives(), ", ") .. ")") or ""))
+      say("train", string.format("party 1 after %d battles by its landing: %s", #H.outcomes - n0, levels()))
       H.assertEq(#low(), 0, string.format("party 1 stands at L%d within %d battles by its landing", TRAIN_LEVEL,
         TRAIN_BATTLES))
     end),
@@ -292,6 +288,13 @@ H.run({ maxFrames = 3000000 }, {
   chest(33, 35, 0x0D7, "Fixed Dice (304 (33,35))"),
   door(32, 51, 334, "party 1: 304 (32,51) -> 334 (11,33)"),
   door(7, 48, 292, "party 1: 334 (7,48) -> 292 (81,7)"),
+  -- The Sky Base in 352 (formation 413, with four IronHitmen) opens with L.5 Doom, which kills every member whose
+  -- level is a multiple of five and who wears no death guard: at L40 the training left EDGAR there (TERRA at L65),
+  -- 68 deaths in its 29 meetings over 16 runs, every battle won; killing the Sky Base first did not help (71 in 29),
+  -- its L.5 Doom comes before the party's first turn (route-wor-kefka-tower.md 7.6).  A player who reads its script
+  -- levels past the five at 352's door, here on 292's floor: the levels it reads are the ones that meet the Sky Base
+  -- (the battles from the landing to here move them; RELM entered 352 at L60 in the replay at c601661e)
+  T.trainLap("party 1 past L.5 Doom's multiples of five before 352", 1, { also = atFive, cap = 20 }),
   door(85, 19, 352, "party 1: 292 (85,19) -> 352 (3,28)"),
   door(31, 27, 295, "party 1: 352 (31,27) -> 295 (52,57)"),
   -- the two Doom Dragons (formation 226) beat party 1 whatever it wore: 0 of 4 with the rows, 0 of 3 with the

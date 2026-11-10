@@ -7,9 +7,10 @@
 -- the boost GOGO has.  Mimic is free (guidelines.md "Mimic is free"), so the copy costs GOGO nothing either way.
 --
 -- Played: Continue wor-kt-guardian-v1 (party 3 -- CYAN, SHADOW, SABIN and GOGO -- on the chamber's west plate in
--- Kefka's Tower), play gen_wor_kt_doom's route (party 2 opens the cell doors, party 3 down the west column and lane,
--- fighting what comes, its bench trained to L46 there and dressed against his ice) to Doom (event battle 98, 63,000 HP), and play his battle through the real menu
--- (H.kitBattle; Defends bank the points, the others Defend): SABIN's Bum Rush at 3 BP, then GOGO's Mimic at 2 BP.
+-- Kefka's Tower), walk gen_wor_kt_doom's route (party 2 opens the cell doors, party 3 down the west column and
+-- lane, fighting what comes), lap on Doom's floor to L46 and dress against his ice, to Doom (event battle 98, 63,000
+-- HP), and play his battle through the real menu (H.kitBattle; Defends bank the points, the others Defend): SABIN's
+-- Bum Rush at 3 BP, then GOGO's Mimic at 2 BP.
 -- Doom outlasts Bum Rush's four blows (at most 4 x 9,999), so the copy runs with no state written (#388: the
 -- factory's random battles needed every monster's HP raised to 60,000, a declared expedient this replaces; in them
 -- the four blows ended all 12 battles before the copy ran, and in Inferno's SABIN fell before his bank reached
@@ -30,7 +31,7 @@ local BUMRUSH, PUMMEL = 0x64, 0x5D
 local MIMIC_BOOST = 2
 local DOOM = 0x127
 
-local seats, recs, mode, battles, done = {}, {}, nil, 0, false
+local seats, recs = {}, {}
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 local function whoY()
@@ -76,9 +77,8 @@ end
 local function closed() return recs[GOGO] ~= nil and recs[GOGO].ended ~= nil and H.frame > recs[GOGO].ended + 30 end
 
 local function decide()
-  battles = battles + 1
   H.assertEq(H.formationHas({ [DOOM] = true }), true, "the battle is Doom's (event battle 98)")
-  seats, recs, plan, mode = {}, {}, {}, "play"
+  seats, recs, plan = {}, {}, {}
   for s = 0, 3 do
     local id = H.readByte(0x3ED8 + s * 2)
     if id == SABIN or id == GOGO then seats[id] = s end
@@ -89,7 +89,7 @@ local function decide()
     return H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3EE4 + e) & 0xE2) == 0 and (H.readByte(0x3EE5 + e) & 0x18) == 0
   end
   local sp = H.readWord(0x3C08 + seats[SABIN] * 2)
-  H.log(string.format("[bumrushmimic] battle %d: SABIN seat %d MP %d bank %d; GOGO seat %d bank %d", battles,
+  H.log(string.format("[bumrushmimic] Doom: SABIN seat %d MP %d bank %d; GOGO seat %d bank %d",
     seats[SABIN], sp, H.readByte(0x3E9C + seats[SABIN] * 2), seats[GOGO], H.readByte(0x3E9C + seats[GOGO] * 2)))
   H.assertEq(can(SABIN) and can(GOGO), true, "SABIN and GOGO can act as Doom's battle opens")
   H.assertEq(sp >= 99, true, "SABIN holds Bum Rush's 99 MP (the care before Doom)")
@@ -120,14 +120,14 @@ local T = H.kefkaTowerKit(K, {})
 local door, walk, sw, settled = T.door, T.walk, K.sw, K.settled
 H.NAV_REFIRE_HOLD = true
 
-H.run({ maxFrames = 1500000 }, {
+H.run({ maxFrames = 900000 }, {
   H.bootCheckpoint("wor-kt-guardian-v1"),
   H.call(function()
     arm()
     H.assertEq(H.readByte(0x1D28) & 0x80, 0x80, "SABIN knows Bum Rush ($1D28 bit 7: Duncan, gen_wor_gau)")
     H.assertEq(sw(0x0072), 0, "Doom not yet fought ($0072)")
   end),
-  -- gen_wor_kt_doom's walk, training and dress: party 2 opens the cell doors, party 3 to Doom
+  -- party 2 opens the cell doors (gen_wor_kt_doom's walk), party 3 to Doom
   H.splitBegin({ shares = { [1] = 1, [2] = 1, [3] = 1 } }),
   H.switchParty(2),
   door(12, 17, 355, "party 2: 291 (12,17) -> the chamber's middle (39,5)"),
@@ -139,8 +139,9 @@ H.run({ maxFrames = 1500000 }, {
   door(2, 5, 355, "party 3: the west cell's door (2,5) -> 355 (31,17)"),
   door(31, 8, 291, "party 3: 355 (31,8) -> 291 (6,15)"),
   door(6, 9, 355, "party 3: 291 (6,9) -> 355 (64,19)"),
-  -- the bench trained and the party dressed as gen_wor_kt_doom does: untrained and undressed, Doom killed SABIN with
-  -- his Bum Rush queued at three points (build/attempts/wt/v041-tower-laps/bumrushmimic/brm1)
+  -- the lap to L46 on Doom's floor (T.trainLap) and the dress against his ice (H.elementDress), the two steps of
+  -- gen_wor_kt_doom's that keep SABIN standing to his third point; without them Doom killed SABIN with his Bum Rush
+  -- queued at three points (build/attempts/wt/v041-tower-laps/bumrushmimic/brm1)
   T.trainLap("party 3 below Doom", 46),
   H.fieldCare({ threshold = 1.0, tag = "before dressing for Doom" }),
   H.elementDress(0x02, { tag = "dress against Doom's ice" }),
