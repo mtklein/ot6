@@ -807,7 +807,18 @@ not met in this grid.
   the old rule (`OT6_FINISH_ZOMBIE = false`) `be80` is lost 3 of 3 and
   the other four keys won, as before.
 
-The line replayed with both: below.
+**The line replayed with both**, from power-on at 3e6e8cea (px13,
+`land3/`; the library's changes replay the whole line, and only the five
+tower saves from Guardian's on moved): the bag's Fenix Downs by leg,
+factory 25 -> 32 (bought to 35), Atma 32 -> 30, Guardian 30 -> 25 (the
+care cured EDGAR's Poison past the reserve, "plan: cure poison (past the
+reserve) char 4 with $F5"; the check at 352's door fought nothing), Doom
+25 -> 21, the Poltergeist 21 -> 20, the Goddess 20 -> 20, won on the
+leg's first attempt ("PASS (frame 11683) attempts=1/3"), and Kefka "the
+bag for Kefka: 20 Fenix Downs (floor 10)", "PASS (frame 165938)
+attempts=1/3". The tower spent 15 of 35 (#388's replays spent 21-29);
+its random battles still spend some on every leg but the Goddess's
+(#521 stays open for them: formation 329's Meteor first).
 
 ## 8. Not done
 - **Kefka** (#274) boots `wor-kt-plates-v1`: party 2 on 412's save point

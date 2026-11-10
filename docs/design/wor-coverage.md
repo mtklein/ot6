@@ -2201,18 +2201,16 @@ test p=0.227; deaths wo 78, hB 52".
   bludgeon-proof shields, which is where the keyed 3-BP Fight out-earns it
   now.
 
-**battle_bumrushmimic in Doom's battle.** The suite now Continues
-`wor-kt-guardian-v1` and plays `gen_wor_kt_doom`'s walk, training and
-dress to Doom (63,000 HP), so the copy runs with no state written; its
-waiver line is gone. Untrained, Doom killed SABIN with Bum Rush queued
-(`bumrushmimic/brm1`, a wipe). As shipped: "[bumrushmimic] SABIN: entered
-$64 at 3 BP, ran $64 | GOGO: entered $64 at 2 BP, ran $5D, $3a70 {1,0}, MP
-605 -> 605", "PASS (frame 98685) attempts=1/1" (`brm2`); red on the
-fallback mutant (`brm_nofall`, `bumrush_nofall` from 13.9's
-`scripts/mutants.py`): "assertEq failed: GOGO's copy of Bum Rush under
-three points ran as Pummel ($5D, Ot6BlitzTake): got 100 ($64), want 93
-($5D)". From the replay's `wor-kt-guardian-v1` (c601661e) at b8e9bca3,
-shifts 0-3 (`b4/brm_*`): all four PASS, two distinct plays ("PASS (frame
-82484) attempts=1/1" at shifts 0 and 1, "PASS (frame 106893)
-attempts=1/1" at 2 and 3; the suite's own edge in that replay logged the
-first, `land2/suite_battle_bumrushmimic.log.gz`).
+**battle_bumrushmimic in Doom's battle: tried and reverted.** Moved to
+Doom (63,000 HP, from `wor-kt-guardian-v1` through `gen_wor_kt_doom`'s walk,
+lap and dress), the copy ran with no state written, but whether it runs
+depends on the draw: untrained, Doom killed SABIN with Bum Rush queued
+(`bumrushmimic/brm1`); trained, it passed on the c601661e capture at shifts
+0-3 (`b4/brm_*`, two distinct plays, "PASS (frame 82484)" and "PASS (frame
+106893)"), and was red as it should be on the fallback mutant
+(`bumrushmimic/brm_nofall`: "got 100 ($64), want 93 ($5D)"); on the
+3e6e8cea replay's capture Doom killed SABIN at two points banked and wiped
+the party (`land3/suite_battle_bumrushmimic.log.gz`: "GAME OVER fired ...
+battle wipe x1"). A mechanism suite that a boss's draw can fail is the
+fragility TESTING.md warns of, so it stays in the factory's random battles
+with its declared HP write, as on main.
