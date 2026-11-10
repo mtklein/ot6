@@ -2025,9 +2025,10 @@ br 61", "SUMMARY both vs wo: keys 28; won wo 26, both 27; gains 2, losses
   ROM, `scripts/mutants.py` `cleave_break`, arms `clB`/`bothB` in
   `doomB/`: "SUMMARY clB vs wo: keys 31; won wo 23, clB 27; gains 5,
   losses 1"), and a hold that banks through Doom's Broken windows
-  (`opts.divines.cleaveHold`, `doomH/`, reverted: it played `cl`'s fights
-  to the tick, since the spend-before-dying and press rules take CYAN's
-  bank first). **Open: what would make Cleave pay** -- the cut ignoring
+  (`opts.divines.cleaveHold`, `doomH/`, reverted: it played 29 of `cl`'s
+  32 runs to the tick and won the same, "SUMMARY clH vs wo: keys 31; won
+  wo 23, clH 27; gains 5, losses 1", since the spend-before-dying and
+  press rules take CYAN's bank first). **Open: what would make Cleave pay** -- the cut ignoring
   the 9,999 cap against a death-immune body (not measured; the damage
   numerals hold four digits), or a boss CYAN meets whose shields his
   katana cannot key in a fight long enough for his bank. Neither is
