@@ -7,14 +7,17 @@
 -- the boost GOGO has.  Mimic is free (guidelines.md "Mimic is free"), so the copy costs GOGO nothing either way.
 --
 -- Played, no writes: Continue wor-kt-factory-v1 (party 3 -- CYAN, SHADOW, SABIN and GOGO -- on the Magitek
--- factory's save point in Kefka's Tower), pace into a random battle (H.paceToEncounter) and play through the real
--- menu (H.kitBattle; Defends bank the points, the others Defend): SABIN's Bum Rush at 3 BP, then GOGO's Mimic at
--- 2 BP.  Asserted, per counted battle:
+-- factory's save point in Kefka's Tower) and walk to Inferno as gen_wor_kt_inferno does (the walk's random
+-- battles fought by the route's driver), and in Inferno's battle play through the real menu (H.kitBattle; Defends
+-- bank the points, the others Defend): SABIN's Bum Rush at 3 BP, then GOGO's Mimic at 2 BP; the fight is then
+-- fought out (H.fightBattleByMenu).  Inferno, because the copy needs the battle to outlast the original: in the
+-- factory's random battles Bum Rush's four blows ended every one of 12 before GOGO's copy ran (dev run brm1).
+-- Asserted:
 --   SABIN's command entered and ran Bum Rush ($64) at 3 BP pending;
 --   GOGO's command entered as Bum Rush ($64, the copy) at 2 BP pending, ran Pummel ($5D: Ot6BlitzTake rewrote $b6),
 --   set the multi-attack counter to 1 (Pummel's two blows, not Bum Rush's four), and cost GOGO no MP.
--- A battle where SABIN or GOGO cannot act, where the battle ends before both resolve, or where GOGO's Mimic copied
--- something else (another member acted between) is fought out and the next taken, at most 12.
+-- The precondition is asserted, not retried: SABIN and GOGO able to act with SABIN's 99 MP at Inferno's open,
+-- the copy resolved before the battle ended, and it was a copy of SABIN's Bum Rush.
 -- Old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/bumrushmimic/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -24,7 +27,9 @@ local CMD_BLITZ, CMD_MIMIC = 0x0A, 0x12
 local BUMRUSH, PUMMEL = 0x64, 0x5D
 local MIMIC_BOOST = 2
 
-local seats, recs, mode, battles, done = {}, {}, nil, 0, false
+local seats, recs, mode, battles = {}, {}, nil, 0
+local MAP_FACTORY, INFERNO_TILE = 410, { 31, 18 }
+local INFERNO, STRIKER, ROUGH = 0x10C, 0x142, 0x141
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 local function whoY()
@@ -71,7 +76,7 @@ local function closed() return recs[GOGO] ~= nil and recs[GOGO].ended ~= nil and
 
 local function decide()
   battles = battles + 1
-  H.assertEq(battles <= 12, true, "a counted Mimic of Bum Rush within 12 battles")
+  H.assertEq(H.formationHas({ [INFERNO] = true }), true, "the battle is Inferno's")
   seats, recs, plan, mode = {}, {}, {}, "play"
   for s = 0, 3 do
     local id = H.readByte(0x3ED8 + s * 2)
@@ -85,11 +90,7 @@ local function decide()
   local sp = H.readWord(0x3C08 + seats[SABIN] * 2)
   H.log(string.format("[bumrushmimic] battle %d: SABIN seat %d MP %d bank %d; GOGO seat %d bank %d", battles,
     seats[SABIN], sp, H.readByte(0x3E9C + seats[SABIN] * 2), seats[GOGO], H.readByte(0x3E9C + seats[GOGO] * 2)))
-  if not (can(SABIN) and can(GOGO)) or sp < 99 then
-    mode = "fightout"
-    H.log("[bumrushmimic] SABIN or GOGO cannot act, or SABIN lacks 99 MP: fought out, the next taken")
-    return
-  end
+  H.assertEq(can(SABIN) and can(GOGO) and sp >= 99, true, "SABIN and GOGO can act, SABIN with 99 MP")
   plan = { { who = SABIN, cmd = CMD_BLITZ, row = BUMRUSH, boost = 3, direct = true },
            { who = GOGO, cmd = CMD_MIMIC, boost = MIMIC_BOOST, self = true } }
 end
@@ -99,10 +100,8 @@ local function judge()
   H.log(string.format("[bumrushmimic] SABIN: entered $%02X at %d BP, ran $%02X | GOGO: entered $%02X at %d BP, "
     .. "ran $%02X, $3a70 {%s}, MP %d -> %d", s and s.cmdId or 0, s and s.pend or -1, s and s.ran or 0, g.cmdId,
     g.pend, g.ran or 0, table.concat(g.sets, ","), g.mp0, g.mp1 or -1))
-  if s == nil or s.cmdId ~= BUMRUSH or g.cmdId ~= BUMRUSH then
-    H.log("[bumrushmimic] GOGO's Mimic did not copy SABIN's Bum Rush here: not counted")
-    return false
-  end
+  H.assertEq(s ~= nil and s.cmdId == BUMRUSH and g.cmdId == BUMRUSH, true,
+    "GOGO's Mimic copied SABIN's Bum Rush (no other member acted between)")
   H.assertEq(s.pend, 3, "SABIN's Bum Rush ran at 3 BP pending")
   H.assertEq(s.ran, BUMRUSH, "and as Bum Rush")
   H.assertEq(g.pend < 3, true, "GOGO's copy ran under three points pending")
@@ -118,22 +117,25 @@ H.run({ maxFrames = 900000 }, {
     arm()
     H.assertEq(H.readByte(0x1D28) & 0x80, 0x80, "SABIN knows Bum Rush ($1D28 bit 7: Duncan, gen_wor_gau)")
     H.assertEq(H.activeParty(), 3, "party 3 walks (gen_wor_kt_factory left it on the factory's save point)")
+    H.assertEq(H.readByte(0x1E80 + (0xBD >> 3)) >> (0xBD & 7) & 1, 0, "Inferno not yet fought ($00BD)")
   end),
-  H.driveUntil(function() return done end, 850000, {
-    H.cond(function() return not H.battleActive() end, { H.paceToEncounter("bumrushmimic", 0) }, {}),
-    H.call(decide),
-    H.cond(function() return mode == "fightout" end, { H.fightBattleByMenu(40000) }, {
-      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed }),
-      H.call(function()
-        if not closed() then
-          H.log("[bumrushmimic] the battle ended before GOGO's copy resolved: not counted")
-          return
-        end
-        if judge() then done = true end
-      end),
-      H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}),
-    }),
-  }, "a counted Mimic of Bum Rush"),
+  H.absorbSafeArms(nil, { INFERNO, STRIKER, ROUGH }, { tag = "arms for Inferno" }),
+  H.fieldCare({ threshold = 1.0, tag = "before Inferno" }),
+  H.navTo(INFERNO_TILE[1], INFERNO_TILE[2], { maxFrames = 6000, playBattles = "tactical", fight = {},
+    spare = { INFERNO },
+    arrive = function()
+      return (H.battleLoadStarted() and H.formationHas({ [INFERNO] = true }))
+        or (H.fieldX() == INFERNO_TILE[1] and H.fieldY() == INFERNO_TILE[2])
+    end }),
+  H.waitUntil(function() return H.battleActive() and H.formationHas({ [INFERNO] = true }) end, 3000,
+    "Inferno's battle is up", 2),
+  H.call(decide),
+  H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed }),
+  H.call(function()
+    H.assertEq(closed(), true, "GOGO's copy resolved before Inferno's battle ended")
+    judge()
+  end),
+  H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(60000) }, {}),
   H.call(function()
     H.log("[bumrushmimic] PASS: GOGO's Mimic of SABIN's Bum Rush, under three of GOGO's points, ran as Pummel "
       .. "and cost nothing")
