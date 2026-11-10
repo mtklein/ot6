@@ -8754,7 +8754,7 @@ end
 
 -- The 3-BP divines of CYAN and SABIN, where one pays (#388; kits.md "Divines"), else nil (the lines below).
 -- opts.divines = true, or a table: { cleave = false / bumRush = false drop one, cleaveShields = n (2),
--- bumRushHp = n (6000), hold = false (no banking) }.  Event battles only (OT6_RANDBTL clear): a random battle
+-- bumRushHp = n (6000), hold = false (no banking), cleaveHold = "always" with cleaveHp = n (10000) }.  Event battles only (OT6_RANDBTL clear): a random battle
 -- is not worth 99 MP and three turns.  An informed policy, and what it reads: the target (the press target,
 -- else the first standing body), its HP, its shields and Broken timer, whether it is death-immune ($3AA1
 -- bit 2, the bit Ot6CleaveStrip reads), the member's bank, MP and known skills.
@@ -8795,7 +8795,21 @@ function Driver:divineLine(actor, have)
     local cost = M.abilityCost(M.CLEAVE) or 99
     if o.cleave == false or row == nil or self.skillDead[BATTLE.CMD_SWDTECH]
        or (M.readByte(0x1CF7) & 0x80) == 0 or mp < cost then return nil end
-    if (M.readByte(0x3AA1 + 8 + slot * 2) & 0x04) == 0 or broken or sh < (o.cleaveShields or 2) then return nil end
+    if (M.readByte(0x3AA1 + 8 + slot * 2) & 0x04) == 0 then return nil end
+    local ready = not broken and sh >= (o.cleaveShields or 2)
+    -- o.cleaveHold = "always" (#388 review lever): bank through the target's Broken windows and thin shields too,
+    -- while it holds cleaveHp HP or more, so the strip is ready when its shields come back; points past three go
+    -- on the Fight meanwhile (the three are kept).  Otherwise the hold lasts only while the strip is ready, and
+    -- the lines below spend the bank whenever it is not (Cleave fired in 4 of 22 Doom fights that way).
+    if o.cleaveHold == "always" and hp >= (o.cleaveHp or 10000) and (have < 3 or not ready) then
+      if have > 3 and fight ~= nil then
+        return { kind = "fight", row = fight, boostLeft = math.min(have - 3, 3), aim = self:chipAim(actor, have - 3),
+                 reason = "divine_bank" }
+      end
+      return hold(string.format("CYAN holds for Cleave on slot %d (%d shield(s)%s, death-immune)", slot, sh,
+        broken and ", Broken" or ""))
+    end
+    if not ready then return nil end
     if have < 3 then return hold(string.format("CYAN holds for Cleave on slot %d (%d shield(s), death-immune)",
       slot, sh)) end
     M.log(string.format("[%s] actor=%d CYAN Cleave on slot %d (%d HP, %d shield(s), death-immune) at 3 BP, %d MP "
