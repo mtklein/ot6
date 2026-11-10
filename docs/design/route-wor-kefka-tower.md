@@ -707,17 +707,133 @@ The graph's play (`graph/graph6.log`): "PASS (frame 238691) attempts=1/3",
 "checkpoint drift wor-kt-guardian-v1: 33 byte(s) differ", re-cut, "none";
 the factory, Inferno and Atma keys "none".
 
-## 8. Not done
+### 7.6 Where the lap battles spent Fenix Downs (#521)
 
+Every replay of the line on #388's branch spent 14-15 Fenix Downs in one
+tower leg, so the Kohlingen stop bought 50 as a stopgap. By battle, from the
+line's logs (`tools/tests` legs' `[key]`, `[death]` and care `fenix=` lines;
+`build/attempts/wt/v041-tower-laps/sh/laps.py`), nearly all of it was party
+1, in two places:
+
+- **The Sky Base's L.5 Doom (formation 413, 352).** The line at 62a8b621
+  spent 7 of the Guardian leg's 9 there, in two battles: "[death] f+1274
+  entity 0 char 0 from 5399/5840 by slot 0 cmd $0C atk $94 (ONE ACTION
+  from >= 80%)", EDGAR beside him. L.5 Doom kills each member whose level
+  is a multiple of five, and the training by party 1's landing stopped at
+  L40 ("party 1 after 20 battles by its landing: TERRA L65, RELM L56,
+  EDGAR L40, SETZER L43"). Every one of those battles was won.
+- **The Scullion's Condemned (formation 399, 355's east lane).** The
+  Scullion (27,000 HP, four shields of pierce and bludgeon) opens with
+  Condemned, about 20 counts of 128 frames. Party 3 kills it in 2,650-3,240
+  ticks and loses nobody (13 meetings, 0 deaths, land4's Doom leg); party
+  1, with one key-holder against it, takes 3,650-5,200 and the count runs
+  out first: 6 deaths in its 10 meetings at 62a8b621, 11 in 13 at
+  3eb65922, a Fenix Down each. The Innocs, the lane's other formation, cost
+  party 1 nothing.
+
+Labbed from the line's `wor-kt-atma-v1` capture (62a8b621), the Guardian
+leg at shifts 0-15, one attempt a run (`b1/g*`, `gtally.txt`,
+`sh/armtally.py`): `gA` the leg as it was, `gF` with the Sky Base killed
+first while a member stands at a multiple of five, `gT` with party 1
+trained by its landing to L46 (the Goddess leg's bench level) instead of
+L40:
+
+| arm | runs PASS | random battles (distinct keys) | deaths | in 413 | in 329 (334) |
+|---|---|---|---|---|---|
+| `gA` | 16 of 16 | 547 (234) | 131 | 68 in 29 | 26 in 160 |
+| `gF` | 16 of 16 | 547 (234) | 127 | 71 in 29 | 25 in 160 |
+| `gT` | 16 of 16 | 945 (253) | 80 | 3 in 3 | 53 in 353 |
+
+Quoted: "ARM gA: 16 runs, 16 PASS; random battles 547 (distinct keys 234),
+won 545; deaths 131", "ARM gT: 16 runs, 16 PASS; random battles 945
+(distinct keys 253), won 945; deaths 80", "gA 352:019D: battles 29 deaths
+68", "gF 352:019D: battles 29 deaths 71". Guardian was won in all 48.
+
+- Killing the Sky Base first changed nothing: its L.5 Doom lands before
+  the party's first turn ("[focus] the Sky Base first: TERRA stands at L65"
+  and the deaths at f+421). Dropped.
+- Training to L46 here does the Goddess leg's training too (her lap runs
+  until the bench stands at L46, so it now fights nothing), on a floor
+  where party 1 loses a member about once in seven battles rather than
+  once in two, and it leaves the bench past L40 ("TERRA L67, RELM L59,
+  EDGAR L46, SETZER L52" after 45 battles). Per run the leg spent 5.0 Fenix
+  Downs against 8.2, and `gA`'s party 1 still had the Goddess lap's six to
+  eleven ahead of it.
+
+**The change** (`gen_wor_kt_guardian`): party 1 trains by its landing to
+L46, at most 60 battles; the Goddess leg's lap stays as a fallback. The
+`gT` arm above is that change alone (it ran at 8615b87b, before any check
+of the fives). The fives are checked where they matter: at 352's door,
+after the battles from the landing, party 1 laps on 292's floor while a
+member who wears no death guard (the Memento Ring, the Safety Bit) stands
+at a multiple of five (`T.trainLap`'s `opts.also`). In the first replay
+RELM had entered 352 at L60, past a check made at the landing's end. The
+Kohlingen stop (`gen_wor_kt_factory`) buys the tower 35 Fenix Downs rather
+than 50: `gen_wor_kefka` wants 10 at Kefka, and the tower's random battles
+still spend some (formation 329's Meteor, above). A replay stocked with 30
+(`land1/`, ee52d864) spent 21 in the tower, six of them in Doom's battle,
+and stopped at Kefka's boot: "the bag for Kefka: 9 Fenix Downs (floor 10)".
+
+**At the final code** (b8e9bca3, from the replay's `wor-kt-atma-v1` at
+c601661e, shifts 0-15, `b4/gZ_*`, `gZtally.txt`): "ARM gZ: 16 runs, 16
+PASS; random battles 944 (distinct keys 256), won 944; deaths 74", of
+them "gZ 334:0149: battles 352 deaths 40". The check at the door ran in
+every run and fought no battle there: RELM stood at L60 and wears the
+Memento Ring ("party 1 past L.5 Doom's multiples of five before 352: after
+0 battles: TERRA L68, RELM L60, EDGAR L46, SETZER L53"); formation 413 was
+not met in this grid.
+
+**Two fixes the replay showed** (#521 review):
+
+- *Field care left Poison and Imp on.* Party 1's six Remedies (its share
+  of the split bag) were spent, and the care would not touch the other
+  parties' twelve: "status1=24 ... antidote=0 ... remedy=12", and EDGAR
+  walked on Poison to 1 HP and died twice before 352 (2 of the Guardian
+  leg's 8 Fenix Downs at c601661e). The Poison and Imp cures now borrow
+  past the reserve when the party's own share is gone (the other rows keep
+  a caller's reserve), and Imp takes a Green Cherry before a Remedy;
+  `field_zombiecure`'s branch E checks it (green, and red on the care
+  before it: "E: the visit cures the poison past the reserve: got false",
+  `zc/`). At the same boot and draw the care cures him
+  (`b4/gZ_s0`: "plan: cure poison (past the reserve) char 4 with $F5
+  (3173/3233 hp, 508/516 mp, status1 25)").
+- *The Goddess lost key `be80` every time* (`b3/gd_s0`-`s2`): her
+  Overcast left three members fallen or Zombied with the Goddess at 925
+  HP, and RELM, the last standing, spent five turns curing Zombies with
+  Revivify while she stood at 104-482 HP, until a Zombied ally killed
+  her: "died holding 5 BP" on each. The Zombie cure now gives way when the
+  last monster is inside the actor's own measured hit
+  (`Driver:finishInReach`: "actor=1 no Zombie cure on entity 2: the last
+  monster is inside this actor's own hit -- the kill first"). From the
+  replay's `wor-kt-poltergeist-v1`, shifts 0-11 (`b4/gdF_*`, `gdW_*`):
+  with it the Goddess is won on all 5 distinct keys, `be80` 3 of 3; with
+  the old rule (`OT6_FINISH_ZOMBIE = false`) `be80` is lost 3 of 3 and
+  the other four keys won, as before.
+
+**The line replayed with both**, from power-on at 3e6e8cea (px13,
+`land3/`; the library's changes replay the whole line, and only the five
+tower saves from Guardian's on moved): the bag's Fenix Downs by leg,
+factory 25 -> 32 (bought to 35), Atma 32 -> 30, Guardian 30 -> 25 (the
+care cured EDGAR's Poison past the reserve, "plan: cure poison (past the
+reserve) char 4 with $F5"; the check at 352's door fought nothing), Doom
+25 -> 21, the Poltergeist 21 -> 20, the Goddess 20 -> 20, won on the
+leg's first attempt ("PASS (frame 11683) attempts=1/3"), and Kefka "the
+bag for Kefka: 20 Fenix Downs (floor 10)", "PASS (frame 165938)
+attempts=1/3". The tower spent 15 of 35 (#388's replays spent 21-29);
+its random battles still spend some on every leg but the Goddess's
+(#521 stays open for them: formation 329's Meteor first).
+
+## 8. Not done
 - **Kefka** (#274) boots `wor-kt-plates-v1`: party 2 on 412's save point
   with parties 1 and 3 on 411's plates. The plate bits stay set once stepped
   on (`_cc193f` sets, only the tower's exit `_cc0f7d` clears), so party 2's
   step from 412 (82,45) to 411's middle plate (109,40) starts FinalBattle.
-- **Party 1's lap deaths** (6.3): about four deaths a run training in 355's
-  east lane. The owner's direction was that the bench levels in the tower;
-  EDGAR and SETZER arrive at L41-42. More training by party 1's landing in
-  `gen_wor_kt_guardian` (334, plan M's measured floor) would replay from
-  Guardian on; not done.
+- **Party 1's lap deaths** (6.3): done in 7.6 (#521): party 1 trains by
+  its landing to L46 and the Goddess leg's lap is a fallback.
+- **The GtBehemoth's Meteor** (formation 329 on 334) is now where party 1's
+  training spends Fenix Downs: 53 deaths in 353 battles of the 7.6 grid,
+  about one in seven. A vanilla mechanic, met at the bench's L34-46; not
+  labbed further.
 - **An older lever, worse** (`swap1`, kept): SETZER and GOGO swapped
   (party 1 TERRA, RELM, EDGAR, GOGO; party 3 CYAN, SHADOW, SABIN, SETZER),
   the chamber in the other order (party 1 west to Doom, party 2 east to the

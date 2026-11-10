@@ -8765,6 +8765,8 @@ end
 --   Bum Rush (SABIN, the Blitz list's eighth row): on a target holding bumRushHp HP or more, with the 99 MP
 --     the event battle's budget pays: at three points, Bum Rush (four bludgeon blows at x8); under three, the
 --     hold.  M.boostPlan refuses it under three, so no other line queues the greyed row.
+-- opts.divines.cast = false (#388 control): the same holds on the same targets, and at three points no divine: the
+-- lines below spend the bank (the banking hold without the divine, the control the Doom grid lacked).
 function Driver:divineLine(actor, have)
   local o = self.opts.divines
   if not o or M.readByte(M.RANDBTL) ~= 0 then return nil end
@@ -8798,6 +8800,7 @@ function Driver:divineLine(actor, have)
     if (M.readByte(0x3AA1 + 8 + slot * 2) & 0x04) == 0 or broken or sh < (o.cleaveShields or 2) then return nil end
     if have < 3 then return hold(string.format("CYAN holds for Cleave on slot %d (%d shield(s), death-immune)",
       slot, sh)) end
+    if o.cast == false then return self:divineWithheld(actor, "Cleave", slot) end
     M.log(string.format("[%s] actor=%d CYAN Cleave on slot %d (%d HP, %d shield(s), death-immune) at 3 BP, %d MP "
       .. "of %d", tag, actor, slot, hp, sh, cost, mp))
     return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true, tier = 3, row = row, boostLeft = 0,
@@ -8809,10 +8812,23 @@ function Driver:divineLine(actor, have)
   local b, price, why = M.kitBoost(actor, M.BUMRUSH, 3)
   if b ~= 3 then return nil end
   if have < 3 then return hold(string.format("SABIN holds for Bum Rush on slot %d (%d HP)", slot, hp)) end
+  if o.cast == false then return self:divineWithheld(actor, "Bum Rush", slot) end
   M.log(string.format("[%s] actor=%d SABIN Bum Rush on slot %d (%d HP, %d shield(s)%s) at 3 BP, %d MP of %d -- %s",
     tag, actor, slot, hp, sh, broken and ", Broken" or "", price or 99, mp, why or ""))
   return { kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = M.BUMRUSH, row = row, boostLeft = 3,
            reason = "divine_bumrush" }
+end
+
+-- The control's three points (opts.divines.cast = false): said once a battle per member, and nil, so the lines
+-- below spend the bank the hold built.
+function Driver:divineWithheld(actor, what, slot)
+  local key = "divine_withheld:" .. actor
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d %s withheld on slot %d at 3 BP (control: the hold, no divine) -- the bank "
+      .. "goes to the lines below", self.tag or "fight", actor, what, slot))
+  end
+  return nil
 end
 
 -- Which of SETZER's lines pays this turn, or nil (the lines below it: the
@@ -10284,6 +10300,17 @@ function Driver:partyWindow(actor, slot)
     end
   end
   return window, table.concat(parts, " "), broken
+end
+
+-- Whether the last monster standing dies to this actor's own measured hit (dmgSeen, x4 on a Broken one): the
+-- Zombie cure gives way to the kill then (#521).  M.FINISH_ZOMBIE = false (or a prelude's global
+-- OT6_FINISH_ZOMBIE = false) is the control.
+function Driver:finishInReach(actor)
+  if M.FINISH_ZOMBIE == false or rawget(_G, "OT6_FINISH_ZOMBIE") == false then return false end
+  local slot = soleTarget()
+  if slot == nil or not self.dmgSeen[actor] then return false end
+  local mult = M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0 and 4 or 1
+  return self.dmgSeen[actor] * mult >= M.readWord(BATTLE.MON_HP + slot * 2)
 end
 
 -- The raise rule's question (#165, #168), read off the hit ledger and
@@ -12873,6 +12900,13 @@ function Driver:makePlanRules(actor)
           local said = string.format("[%s] actor=%d no cure on entity %d: actor %d's "
             .. "$%02X on them is confirmed (tick %d) and has not landed",
             self.tag or "fight", actor, e, queued.by, queued.item, queued.tick)
+          if said ~= self.cureSaid then self.cureSaid = said; M.log(said) end
+        elseif what == "Zombie" and e ~= actor and self:finishInReach(actor) then
+          -- the last monster dies to this actor's own measured hit: the kill ends the battle and the zombie's
+          -- turns with it, where a Revivify only waits for the next Overcast (#521: the Goddess at 104 HP while
+          -- RELM, the last standing, cured Zombies five turns running and died, b3/gd_s0)
+          local said = string.format("[%s] actor=%d no Zombie cure on entity %d: the last monster is inside "
+            .. "this actor's own hit -- the kill first", self.tag or "fight", actor, e)
           if said ~= self.cureSaid then self.cureSaid = said; M.log(said) end
         elseif what ~= nil then
           local open = e == actor or self.careActor == nil or self.careActor == actor

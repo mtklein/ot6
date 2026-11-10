@@ -22,3 +22,6 @@ and its effect. Cite evidence in the commit message.
 - A battle no longer freezes when a monster's spell bounces off a party member's Reflect after every monster has
   fallen, as when the last L.30 Magic in the Fanatics' Tower dies to Poison with its counterattack still coming. The
   spell now bounces off and lands nowhere, and the battle ends in victory. The original game freezes the same way.
+- The included saves for Kefka's Tower were played again. The group of Terra, Relm, Edgar and Setzer now gains its
+  levels near where it lands in the tower, rather than in the long hall below the Goddess, where the Scullions'
+  Condemned kept costing it members. The party enters the tower with 35 Fenix Downs instead of 50.

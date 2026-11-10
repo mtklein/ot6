@@ -14,7 +14,7 @@ local NAMES = H.SPLIT_NAMES
 local POTION, FENIX, REMEDY, TINCTURE = 0xE9, 0xF0, 0xF5, 0xEB
 -- the bag the tower and Kefka are stocked for at Kohlingen, the last shop before them (gen_wor_kefka asserts its
 -- floor at Kefka's boot)
-local TOWER_FENIX, TOWER_POTIONS = 50, 99
+local TOWER_FENIX, TOWER_POTIONS = 35, 99
 -- the Barrier Rings party 1's lane wears against the Guardian (gen_wor_kt_guardian's WARDS: EDGAR and SETZER), bought
 -- at Thamasa's relic counter (shop 75), the last one before the tower.  The line held two from gen_wor_cyan on only
 -- by luck: the Harvesters' rare drop ($04E, MonsterItems: Barrier Ring), two of four kills in the v0.39 play
@@ -194,8 +194,11 @@ H.run({ maxFrames = 2400000 }, {
   -- no shop past this stop: the bag is stocked for the whole tower and Kefka (#274: the line's first play of the
   -- tower spent 14 of 20 Fenix Downs before Kefka, and reached him with 6; route-wor-the-end.md section 6; #388:
   -- stocked with 40, the whole tower (Inferno to the plates) spent 29 of 38 on a reshuffled draw and stopped at
-  -- gen_wor_kefka's floor of 10, the Goddess leg's laps 15 of them: wor-coverage.md 13.9.  The 50 is a stopgap:
-  -- the legs' lap battles spend Fenix Downs a player would not, #521)
+  -- gen_wor_kefka's floor of 10, the Goddess leg's laps 15 of them: wor-coverage.md 13.9; raised to 50 as a stopgap.
+  -- #521: party 1's bench now trains by its landing (gen_wor_kt_guardian), not in 355's east lane, whose Scullion
+  -- condemned a member in most battles, and past L.5 Doom's multiples of five; the tower's random battles still
+  -- spend a few (the GtBehemoth's Meteor on 334, the Innocs' Muddle), and Kefka wants 10: stocked with 30 the line
+  -- spent 21 to the plates (6 of them at Doom, 15 on the way) and stopped at the floor with 9, so 35)
   H.cond(function()
     return H.invCountOf(POTION) < TOWER_POTIONS or H.invCountOf(FENIX) < TOWER_FENIX
   end, { K.kohlingenStop("the top-up before Kefka's Tower", { fenix = TOWER_FENIX, potions = TOWER_POTIONS }) }, {}),
