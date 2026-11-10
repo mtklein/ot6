@@ -7,8 +7,8 @@
 -- the boost GOGO has.  Mimic is free (guidelines.md "Mimic is free"), so the copy costs GOGO nothing either way.
 --
 -- Played: Continue wor-kt-guardian-v1 (party 3 -- CYAN, SHADOW, SABIN and GOGO -- on the chamber's west plate in
--- Kefka's Tower), walk gen_wor_kt_doom's route (party 2 opens the cell doors, party 3 down the west column and lane,
--- fighting what comes) to Doom (event battle 98, 63,000 HP), and play his battle through the real menu
+-- Kefka's Tower), play gen_wor_kt_doom's route (party 2 opens the cell doors, party 3 down the west column and lane,
+-- fighting what comes, its bench trained to L46 there and dressed against his ice) to Doom (event battle 98, 63,000 HP), and play his battle through the real menu
 -- (H.kitBattle; Defends bank the points, the others Defend): SABIN's Bum Rush at 3 BP, then GOGO's Mimic at 2 BP.
 -- Doom outlasts Bum Rush's four blows (at most 4 x 9,999), so the copy runs with no state written (#388: the
 -- factory's random battles needed every monster's HP raised to 60,000, a declared expedient this replaces; in them
@@ -120,14 +120,14 @@ local T = H.kefkaTowerKit(K, {})
 local door, walk, sw, settled = T.door, T.walk, K.sw, K.settled
 H.NAV_REFIRE_HOLD = true
 
-H.run({ maxFrames = 900000 }, {
+H.run({ maxFrames = 1500000 }, {
   H.bootCheckpoint("wor-kt-guardian-v1"),
   H.call(function()
     arm()
     H.assertEq(H.readByte(0x1D28) & 0x80, 0x80, "SABIN knows Bum Rush ($1D28 bit 7: Duncan, gen_wor_gau)")
     H.assertEq(sw(0x0072), 0, "Doom not yet fought ($0072)")
   end),
-  -- gen_wor_kt_doom's walk, without its training and dress: party 2 opens the cell doors, party 3 to Doom
+  -- gen_wor_kt_doom's walk, training and dress: party 2 opens the cell doors, party 3 to Doom
   H.splitBegin({ shares = { [1] = 1, [2] = 1, [3] = 1 } }),
   H.switchParty(2),
   door(12, 17, 355, "party 2: 291 (12,17) -> the chamber's middle (39,5)"),
@@ -139,6 +139,11 @@ H.run({ maxFrames = 900000 }, {
   door(2, 5, 355, "party 3: the west cell's door (2,5) -> 355 (31,17)"),
   door(31, 8, 291, "party 3: 355 (31,8) -> 291 (6,15)"),
   door(6, 9, 355, "party 3: 291 (6,9) -> 355 (64,19)"),
+  -- the bench trained and the party dressed as gen_wor_kt_doom does: untrained and undressed, Doom killed SABIN with
+  -- his Bum Rush queued at three points (build/attempts/wt/v041-tower-laps/bumrushmimic/brm1)
+  T.trainLap("party 3 below Doom", 46),
+  H.fieldCare({ threshold = 1.0, tag = "before dressing for Doom" }),
+  H.elementDress(0x02, { tag = "dress against Doom's ice" }),
   H.fieldCare({ threshold = 1.0, tag = "before Doom" }),
   H.call(function()
     H.assertEq(H.activeParty(), 3, "party 3 walks to Doom")
