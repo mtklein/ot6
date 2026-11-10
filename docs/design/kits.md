@@ -376,7 +376,9 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   direction, 2026-11-09): at a boss the one cut and one slash chip were
   less than a keyed 3-BP Fight earns (wor-coverage.md 13.8), so learning
   Cleave paid nowhere against a boss; four shields is what a full boost
-  buys OT6's Break.*  It can be used again
+  buys OT6's Break.*  Measured since (wor-coverage.md 13.9): the strip
+  does not yet pay at Doom or Inferno, nor did a strip of every shield;
+  what would is open.  It can be used again
   in the same battle.  `battle_divines` checks the rows, the loadout, a kill
   on an unbroken soldier with no shield taken, and two boss cuts in one
   battle, the first taking exactly four shields and the second the rest,

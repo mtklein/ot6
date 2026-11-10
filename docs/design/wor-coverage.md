@@ -1718,8 +1718,9 @@ clock and so the next fight's key.
   `wor-phoenix-v1` hold them, by sight).
 - **SABIN's Spiraler**: learned on the line by level; never cast.
   **Bum Rush and Cleave**: learned on the line by story; measured at party
-  3's two bosses and dropped (13.8), then remade as divines that pay
-  against a boss and measured again (13.9).
+  3's two bosses and dropped (13.8), then remade as divines and measured
+  again (13.9): Bum Rush pays at Doom; Cleave's strip does not yet pay at
+  either boss (open).
   Fire Dance is never cast; `opts.blitz` is one Blitz per leg. An
   all-body Blitz by body count was not as good as Pummel (13.5).
 - **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`. The rages he
@@ -1955,7 +1956,9 @@ without becoming essential. The TLM's calls, built in `581d7e45`
 (kits.md "Divines"): Cleave on a death-immune body also takes four
 shields before its cut, and Bum Rush is SABIN's 3-BP divine (refused
 under three points; at three, four bludgeon blows each at the boost's x8,
-99 MP).
+99 MP). Measured below: **Bum Rush pays at Doom; Cleave, as built or with
+every shield stripped, pays at neither of party 3's bosses** -- the open
+question at the end.
 
 *The driver.* `opts.divines` (`Driver:divineLine`), event battles only:
 CYAN Cleaves a death-immune target holding two or more shields; SABIN
@@ -1966,78 +1969,109 @@ so no other line queues the greyed row. `gen_wor_kt_doom` sets
 `{ divines = true }` (the line's play at Doom from this branch on);
 `gen_wor_kt_inferno` keeps the stock fight (below).
 
-*The labs*, from the replayed line's captures on this ROM (`land1/`, the
+*The labs* boot the replayed line's captures on this ROM (`land1/`, the
 line from power-on at `53118d96`: `wor-kt-guardian-v1`,
-`wor-kt-factory-v1`), one attempt a run, four arms by `KT_BOSS_FIGHT`
-(`wo` the stock fight `{}`, `cl` Cleave only, `br` Bum Rush only, `both`),
-paired by battle key: Doom over `KT_TRAIN` 46, 47, 48 by shifts 0, 2, 6,
-10 (`doom/`, `doom_tally.txt`), Inferno over shifts 0-11 (`inf/`,
-`inf_tally.txt`), `scripts/btally.py`:
+`wor-kt-factory-v1`), one attempt a run, by `KT_BOSS_FIGHT`: `wo` the
+stock fight `{}`, `cl` Cleave only, `br` Bum Rush only, `both`. Doom over
+`KT_TRAIN` 46-49 by shifts 0, 2, 6, 10, 14, 18, 22, 26 (32 runs an arm,
+31 distinct battle keys; `doom/`, `doomw_tally.txt`), Inferno over shifts
+0-35 (36 runs, 28 keys; `infw/`, `infw_tally.txt`). Every arm is
+compared with `wo` key by key (`scripts/pair.py`: `doomw_pair.txt`,
+`infw_pair.txt` list each key's outcomes and the gains and losses; the
+sign test is on the keys whose outcome differs). The first 12-key grids
+(below the table) were too small to tell these apart.
 
-| boss | arm | distinct fights | won | deaths | won ticks (median) | the divine landed |
-|---|---|---|---|---|---|---|
-| Doom | without | 12 | 9 | 35 | 13,859 | — |
-| Doom | Cleave | 12 | 10 | 28 | 14,249 | in 3 fights |
-| Doom | Bum Rush | 12 | 10 | 27 | 14,527.5 | in 4, about 36,000 each |
-| Doom | both | 12 | **11** | 28 | **11,431** | Bum Rush in 5 |
-| Inferno | without | 10 | 8 | 8 | 6,747.5 | — |
-| Inferno | Cleave | 10 | 8 | 8 | 8,053.5 | in 2 |
-| Inferno | Bum Rush | 10 | **10** | 5 | 7,972 | in 1 |
-| Inferno | both | 10 | **10** | **4** | 8,081.5 | in 2 |
+| boss | arm | keys | won | gains / losses vs `wo` | p | deaths | won ticks (median) | the divine landed |
+|---|---|---|---|---|---|---|---|---|
+| Doom | `wo` | 31 | 23 | — | — | 78 | 13,331 | — |
+| Doom | `cl` | 31 | 27 | 5 / 1 | 0.22 | 70 | 14,088 | on 6 keys (9,999 each) |
+| Doom | `br` | 31 | 26 | 7 / 4 | 0.55 | 61 | 13,292 | on 9 keys |
+| Doom | `both` | 31 | 28 | 8 / 3 | 0.23 | 52 | 10,671 | Bum Rush on 11 keys, Cleave on 4 |
+| Inferno | `wo` | 28 | 26 | — | — | 17 | 8,488 | — |
+| Inferno | `cl` | 28 | 26 | 1 / 1 | 1.0 | 15 | 8,369.5 | on 5 keys |
+| Inferno | `br` | 28 | 26 | 2 / 2 | 1.0 | 21 | 7,307.5 | on 2 keys |
+| Inferno | `both` | 28 | 27 | 2 / 1 | 1.0 | 13 | 7,220 | Bum Rush on 1 key |
 
-Quoted: "POOLED d_wo: 12 runs; distinct keys 12: won 9, lost 3; deaths
-over keys 35; won ticks 9136-20015 (median 13859)", "POOLED d_both: 12
-runs; distinct keys 12: won 11, lost 1; deaths over keys 28; won ticks
-8427-40647 (median 11431); bumrush 5 landed, median 36182, max 36934",
-"POOLED d_br: ... won 10, lost 2; deaths over keys 27; ... bumrush 4
-landed, median 36181", "POOLED d_cl: ... won 10, lost 2; deaths over keys
-28", "ARM i_wo: 12 runs; distinct keys 10: won 8, lost 2; deaths over
-keys 8", "ARM i_both: 12 runs; distinct keys 10: won 10, lost 0; deaths
-over keys 4; won ticks 4187-13277 (median 8081.5)", "ARM i_br: ... won
-10, lost 0; deaths over keys 5".
+Quoted: "SUMMARY both vs wo: keys 31; won wo 23, both 28; gains 8,
+losses 3, sign test p=0.227; deaths wo 78, both 52; median won ticks wo
+13331, both 10671.0", "POOLED d_both: 32 runs; distinct keys 31: won 28,
+lost 3; deaths over keys 52; ... bumrush 11 landed, median 36639, max
+37429 cleave 4 landed, median 9999", "SUMMARY cl vs wo: keys 31; won wo
+23, cl 27; gains 5, losses 1, sign test p=0.219", "SUMMARY br vs wo: keys
+31; won wo 23, br 26; gains 7, losses 4, sign test p=0.549; deaths wo 78,
+br 61", "SUMMARY both vs wo: keys 28; won wo 26, both 27; gains 2, losses
+1, sign test p=1.000" (Inferno).
 
-- **Doom** is the fight they pay at. The stock fight now loses 3 of 12
-  (four or more deaths each); with both divines it loses one and wins
-  quicker. A Bum Rush that lands takes about 36,000 of Doom's HP (four
-  blows near the 9,999 cap: "actor=2's skill took 35908 off the
-  monsters ... [exec cmd $0A atk $64]"), more than half of it, but the
-  bank reaches three for SABIN in only 4-5 of 12 fights before the fight
-  ends, so it shortens Doom rather than trivialising it. GOGO's Mimic
-  copied a Cleave twice (four more shields, free).
-- **Inferno** (four shields) is short, and the divines rarely fire there
-  (Cleave in 2 of 10, Bum Rush in 1-2): the gain there (8 to 10 won) is
-  mostly the hold itself, the turns SABIN and CYAN spend banking instead
-  of boosting into Inferno's counter-heavy arms. A real effect of the
-  policy, but not the divines' damage, so the line keeps Inferno's stock
-  fight and routes the divines at Doom only.
+- **No arm's win count is outside chance at these sizes** (every p above
+  0.2). What the grid does show at Doom: with both divines the fights end
+  sooner (median 10,671 ticks against 13,331) and with fewer deaths (52
+  against 78 over the same 31 keys).
+- **Bum Rush** landed in 20 runs of the Doom arms (`br`, `both`), took
+  9,328 to 37,429 off Doom (median 36,182: four blows near the 9,999
+  cap, more than half of Doom's 63,000), and every one of those 20 runs
+  was won ("d_both_t46_s10: key be74 WON ... bumrush_dmg=36934"). It
+  lands in about a third of the fights: the hold's three turns often run
+  past the fight's end or into the spend-before-dying rule.
+- **Cleave pays nowhere measured.** All six of `cl`'s gains at Doom came
+  in fights where no Cleave went off (`doomw_pair.txt`: each GAIN row has
+  `cl_hold` and no `cleave=1`): the gain is CYAN's hold, banking with
+  unboosted Fights, not the strip. Where it fired it was a 9,999 cut and
+  four shields, and at Doom CYAN's keyed 3-BP Fight does more of both
+  (Doom keys slash, which his katana carries: "actor=0's fight took 27883
+  off the monsters (13090 shielded-equivalent over 6 hit(s) ...)", eight
+  chips, `doomH/d_clH_t46_s2`). At Inferno, whose body his katana does not
+  key, it fired on 5 of 28 keys and moved nothing (26 of 28 either way).
+  Two variants measured the same: Cleave taking every shield (a variant
+  ROM, `scripts/mutants.py` `cleave_break`, arms `clB`/`bothB` in
+  `doomB/`: "SUMMARY clB vs wo: keys 31; won wo 23, clB 27; gains 5,
+  losses 1"), and a hold that banks through Doom's Broken windows
+  (`opts.divines.cleaveHold`, `doomH/`, reverted: it played `cl`'s fights
+  to the tick, since the spend-before-dying and press rules take CYAN's
+  bank first). **Open: what would make Cleave pay** -- the cut ignoring
+  the 9,999 cap against a death-immune body (not measured; the damage
+  numerals hold four digits), or a boss CYAN meets whose shields his
+  katana cannot key in a fight long enough for his bank. Neither is
+  shipped here; the ROM's four-shield strip stays as built, and the
+  release notes claim nothing for it beyond what it does.
+- **Inferno** is not where the divines pay: the line keeps its stock
+  fight. (This section first said routing them there reshuffled the
+  tower past the Kefka leg's Fenix floor; `land3/` disproved that, the
+  floor failing with Inferno's stock fight too: below.)
+- **Not essential**: the stock fight wins 23 of 31 at Doom and 26 of 28 at
+  Inferno, and the leg retries a wipe from its save.
+- *The first grids*, 12 keys at Doom (`KT_TRAIN` 46-48 by shifts 0, 2,
+  6, 10) and 10 at Inferno (shifts 0-11), read as gains (Doom `both` 11
+  of 12 against 9; Inferno `br` and `both` 10 of 10 against 8) that the
+  wider grids above do not bear out. Their Inferno column also over-read
+  the divines: Bum Rush landed in 2 of `br`'s runs and in none of `both`'s.
+
+*Bum Rush at x4, measured and not shipped.* A variant ROM with Bum Rush's
+blows at x4 (the 2-BP multiplier; `scripts/mutants.py` `bumrush_x4`,
+`x4/`, the first 12-key grid's jobs) halved the hit ("bumrush 4 landed,
+median 18090"). With Bum Rush alone it did no better than the stock
+fight and was slower ("POOLED d_br4: 12 runs; distinct keys 12: won 9,
+lost 3; deaths over keys 30; ... (median 17127)"); with both divines it
+won as x8's `both` did ("POOLED d_both4: 12 runs; distinct keys 12: won
+11, lost 1; deaths over keys 28"), so the rejection rests on the Bum
+Rush-only arm.
+
+*The suites' red*: `battle_divines` and `battle_bumrush` on main's ROM
+fail at load (their symbols, `Ot6TakeShields` and `Ot6BlitzTake`, are
+not in main's `ff6-en.dbg`); each mutant fails at run time on the
+assertion it moves (`divines/mx/`, `bumrush/mx/`, `bumrushmimic/mx/`).
+
 - **The tower's Fenix Downs.** The line with the divines routed (`land2/`
   at `1a06b6c2` with Inferno's too, `land3/` at `3eb65922` with Doom's
   only) stopped at `gen_wor_kefka`'s floor both times: "the bag for
   Kefka: 9 Fenix Downs (floor 10) and 70 Potions (floor 40), stocked at
   Kohlingen by gen_wor_kt_factory". Doom itself spent none in `land3`
-  (29 before and after, won in 10,719 ticks); the reshuffled draws after
-  it did: the Goddess leg's laps (party 1, which has neither CYAN nor
-  SABIN) spent 15 (24 to 9, 16 deaths, nearly all in random battles),
-  where `land1` spent about 5 there. The Kohlingen stop before the tower now
-  stocks 50 rather than 40 (`gen_wor_kt_factory`'s `TOWER_FENIX`), and
-  the line replayed on it (`land4/` at `a67f60b1`) reached Kefka with 19
-  and played to the end ("wor_kefka: fenix=19 -> fenix=19", PASS). In
-  that play Doom was won in 17,715 ticks with neither divine fired (the
-  bank held but the fight ended first): the divines change the odds over
-  many fights, not every one. Fenix Downs spent in the Goddess and
-  Guardian legs' random battles (14 at Guardian in `land4/`) are a lab
-  candidate of their own.
-- **Not essential**: the stock fight still wins 9 of 12 at Doom and 8 of
-  10 at Inferno, and the leg retries a wipe from its save.
-- **Cleave alone** is a modest gain (10 of 12 at Doom, the same 8 of 10 at
-  Inferno): the strip comes once a fight at most, where the bank reaches
-  three. Its value is beside SABIN's.
-
-*Bum Rush at x4, measured and not shipped.* The worry was that four x8
-blows trivialise Doom. A variant ROM with Bum Rush's blows at x4 (the
-2-BP multiplier; `scripts/mutants.py` `bumrush_x4`, `x4/`, the same jobs)
-halved the hit ("bumrush 4 landed, median 18090") and took the payoff
-with it: "POOLED d_br4: 12 runs; distinct keys 12: won 9, lost 3; deaths
-over keys 30; won ticks 10419-19455 (median 17127)", no better than the
-stock fight and slower. At x8 it pays once the bank is spent on it; at x4
-the three held turns cost more than the hit returns.
+  (29 before and after, won in 10,719 ticks); the tower's lap battles
+  did: the whole tower spent 29 of 38, the Goddess leg's laps 15 of them
+  (party 1, which has neither CYAN nor SABIN; 16 deaths, nearly all in
+  random battles), where `land1` spent about 5 there. The Kohlingen stop
+  now stocks 50 rather than 40 (`gen_wor_kt_factory`'s `TOWER_FENIX`): a
+  **stopgap**, 2.5x the supply band, until the lap battles stop spending
+  Fenix Downs a player would not (#521). With it the line (`land4/` at
+  `a67f60b1`) reached Kefka with 19 and played to the end ("wor_kefka:
+  fenix=19 -> fenix=19", PASS); in that play Doom was won in 17,715 ticks
+  with neither divine fired.

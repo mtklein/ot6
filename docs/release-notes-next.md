@@ -15,7 +15,7 @@ and its effect. Cite evidence in the commit message.
   strong when he is hurt. Monsters that cast Pearl Wind still heal by their current HP, as before. It also passes through Reflect, which makes it the party heal for a group wearing Wall
   Rings, such as the one that faces the Poltergeist in Kefka's Tower. Strago can learn it from the Sprinters in the
   wood just west of the plain north-west of Jidoor.
-- Cyan's Cleave is now worth using on bosses: against an enemy it cannot kill outright, it first removes four of
-  its shields, then cuts. Sabin's Bum Rush is now his three-point move: with three boost points it lands four blows, each
-  as strong as a fully boosted attack; with fewer it is greyed out in the Blitz list. Together they make Doom in
-  Kefka's Tower a safer and quicker fight for the party that brings Cyan and Sabin.
+- Sabin's Bum Rush now needs three boost points: with fewer it is greyed out in the Blitz list, and with three it
+  lands four blows, each as strong as a fully boosted attack. Against Doom in Kefka's Tower one Bum Rush can take
+  more than half of his HP. When Cyan's Cleave strikes an enemy it cannot kill outright, it now also removes four of
+  that enemy's shields before the cut.
