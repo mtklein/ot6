@@ -4086,12 +4086,12 @@ end
 local CARE_EYEDROP, CARE_REVIVIFY = 0xF3, 0xF1
 local CARE_STATUS_CURES = {
   { bit = 0x40, items = { CARE_SOFT, CARE_REMEDY }, what = "petrify" },
-  { bit = 0x04, items = { CARE_ANTIDOTE, CARE_REMEDY }, what = "poison" },
+  { bit = 0x04, items = { CARE_ANTIDOTE, CARE_REMEDY }, what = "poison", borrow = true },
   -- Dark (blind) persists out of battle and halves a fighter's hits; the
   -- FC descent delivered LOCKE to the alcove blind with three Remedies in
   -- the bag and nothing reaching for them
   { bit = 0x01, items = { CARE_EYEDROP, CARE_REMEDY }, what = "dark" },
-  { bit = 0x20, items = { 0xF8, CARE_REMEDY }, what = "imp" },   -- Green Cherry, else Remedy
+  { bit = 0x20, items = { 0xF8, CARE_REMEDY }, what = "imp", borrow = true },   -- Green Cherry, else Remedy
   -- Zombie persists too, and Remedy's mask ($65, item.asm @8bb2) leaves it,
   -- so Revivify is the one field cure.  A zombied member walks into the
   -- next fight attacking the party, and the fight driver's raise rule spent
@@ -4971,11 +4971,12 @@ local function careKernel(opts)
                       why = "cure " .. cure.what }
           if avail(item) > 0 and not failed[key(w)] then return w end
         end
-        -- Every cure the reserve keeps (another party's share of a split bag, #330) is still in the bag: a status
-        -- left on costs more than the item (#521: EDGAR walked on Poison and Imp from 334 to 352 with party 1's
-        -- six Remedies spent and twelve in the bag, "status1=24 ... antidote=0 ... remedy=12", and fell to the
-        -- poison's drain twice -- two Fenix Downs).  So the cure borrows one past the reserve
-        for _, item in ipairs(cure.items) do
+        -- Poison and Imp (cure.borrow): every cure the reserve keeps (another party's share of a split bag,
+        -- #330) is still in the bag, and walking on with them costs more than the item (#521: EDGAR walked on
+        -- Poison and Imp from 334 to 352 with party 1's six Remedies spent and twelve in the bag, "status1=24 ...
+        -- antidote=0 ... remedy=12", and fell to the poison's drain twice -- two Fenix Downs).  So that cure
+        -- borrows one past the reserve; the other rows keep the caller's reserve (field_zombiecure's B)
+        for _, item in ipairs(cure.borrow and cure.items or {}) do
           local w = { kind = "item", char = target, item = item,
                       why = "cure " .. cure.what .. " (past the reserve)" }
           if M.invCountOf(item) > 0 and not failed[key(w)] then return w end

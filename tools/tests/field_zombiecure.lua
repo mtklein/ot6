@@ -43,11 +43,14 @@
 --      build/attempts/wt/wor-edgar/leg1/var1/k5_s0.log): the visit cures it
 --      with a Revivify and plans no revive.  Two more staged bytes, the HP
 --      word, in the same quarantine.
+--   E. Poison, every Antidote and Remedy reserved away (opts.reserve, the shape a split bag's other parties' shares
+--      take, #521): the visit cures it past the reserve ("cure poison (past the reserve)"), the bit clears and one
+--      of them is spent, where the care before #521 planned nothing and the member walked on draining.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local LOCKE = 0x01
-local REVIVIFY, SOFT, FENIX = 0xF1, 0xF4, 0xF0
-local ZOMBIE, PETRIFY = 0x02, 0x40
+local REVIVIFY, SOFT, FENIX, ANTIDOTE, REMEDY = 0xF1, 0xF4, 0xF0, 0xF2, 0xF5
+local ZOMBIE, PETRIFY, POISON = 0x02, 0x40, 0x04
 
 -- every line the lib logs, for assertions on what the visit said
 local lines = {}
@@ -93,6 +96,7 @@ local function reload(what)
   })
 end
 local RESERVE_B = {}   -- filled once the bag is read: every Revivify held back
+local RESERVE_E = {}   -- every Antidote and Remedy held back
 
 H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/thamasa_night.mss.lua"),
@@ -108,6 +112,8 @@ H.run({ maxFrames = 60000 }, {
         string.format("char %d carries neither bit at boot", c))
     end
     RESERVE_B[REVIVIFY] = H.invCountOf(REVIVIFY)
+    H.assertEq(H.invCountOf(ANTIDOTE) + H.invCountOf(REMEDY) >= 1, true, "an Antidote or a Remedy in the bag")
+    RESERVE_E[ANTIDOTE], RESERVE_E[REMEDY] = H.invCountOf(ANTIDOTE), H.invCountOf(REMEDY)
     H.log(string.format("[boot] revivify=%d soft=%d fenix=%d", H.invCountOf(REVIVIFY),
       H.invCountOf(SOFT), H.invCountOf(FENIX)))
     req = H.requestSaveState()
@@ -180,5 +186,19 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.charStatus1(LOCKE) & ZOMBIE, 0, "D: the Zombie bit is cleared")
     H.assertEq(H.invCountOf(FENIX), before.fenix, "D: no Fenix Down spent")
     H.log(string.format("[D] LOCKE 0 -> %d hp across the cure", H.charHp(LOCKE)))
+  end),
+
+  -- E
+  reload("boot snapshot reload for E"),
+  stage(POISON, "E"),
+  remember(),
+  H.call(function() before.cures = H.invCountOf(ANTIDOTE) + H.invCountOf(REMEDY) end),
+  H.fieldCare({ tag = "E", reserve = RESERVE_E }),
+  H.call(function()
+    H.assertEq(said("[E] plan: cure poison (past the reserve) char 1"), true,
+      "E: the visit cures the poison past the reserve")
+    H.assertEq(H.charStatus1(LOCKE) & POISON, 0, "E: the Poison bit is cleared")
+    H.assertEq(H.invCountOf(ANTIDOTE) + H.invCountOf(REMEDY), before.cures - 1, "E: one Antidote or Remedy spent")
+    H.assertEq(H.invCountOf(FENIX), before.fenix, "E: no Fenix Down spent")
   end),
 })
