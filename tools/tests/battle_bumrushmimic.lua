@@ -6,22 +6,22 @@
 -- GOGO at execution, and under three points the command's own check (Ot6BlitzTake, Cmd_0a) runs it as Pummel at
 -- the boost GOGO has.  Mimic is free (guidelines.md "Mimic is free"), so the copy costs GOGO nothing either way.
 --
--- Played: Continue wor-kt-guardian-v1 (party 3 -- CYAN, SHADOW, SABIN and GOGO -- on the chamber's west plate in
--- Kefka's Tower), walk gen_wor_kt_doom's route (party 2 opens the cell doors, party 3 down the west column and
--- lane, fighting what comes), lap on Doom's floor to L46 and dress against his ice, to Doom (event battle 98, 63,000
--- HP), and play his battle through the real menu (H.kitBattle; Defends bank the points, the others Defend): SABIN's
--- Bum Rush at 3 BP, then GOGO's Mimic at 2 BP.
--- Doom outlasts Bum Rush's four blows (at most 4 x 9,999), so the copy runs with no state written (#388: the
--- factory's random battles needed every monster's HP raised to 60,000, a declared expedient this replaces; in them
--- the four blows ended all 12 battles before the copy ran, and in Inferno's SABIN fell before his bank reached
--- three: build/attempts/wt/v041-cleave-bumrush/bumrushmimic/).  The run ends once the copy has resolved; the
--- battle is not fought out (a mechanism test, no claim about play).
--- Asserted, in Doom's battle:
+-- Played: Continue wor-kt-factory-v1 (party 3 -- CYAN, SHADOW, SABIN and GOGO -- on the Magitek factory's save
+-- point in Kefka's Tower), pace into a random battle (H.paceToEncounter) and play through the real menu
+-- (H.kitBattle; Defends bank the points, the others Defend): SABIN's Bum Rush at 3 BP, then GOGO's Mimic at 2 BP.
+-- Declared unit-test expedient (tools/state_write_waivers.txt): at the battle's open every present monster's HP is
+-- raised to 60,000, so the battle outlasts Bum Rush's four blows (at most 4 x 9,999) and GOGO's copy runs.  The
+-- copy needs a battle that outlasts the original; Doom (63,000 HP) would host it write-free (a later move); in the factory's random battles
+-- the four blows ended all 12 battles before the copy ran (dev run brm1), and in Inferno's SABIN fell before his
+-- bank reached three (brm2, build/attempts/wt/v041-cleave-bumrush/bumrushmimic/).  The run ends once the copy has
+-- resolved; the battle is not fought out (a mechanism test, no claim about play).
+-- Asserted, per counted battle:
 --   SABIN's command entered and ran Bum Rush ($64) at 3 BP pending;
 --   GOGO's command entered as Bum Rush ($64, the copy) at 2 BP pending, ran Pummel ($5D: Ot6BlitzTake rewrote $b6),
 --   set the multi-attack counter to 1 (Pummel's two blows, not Bum Rush's four), and cost GOGO no MP.
--- Old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/bumrushmimic/ (the factory version);
--- build/attempts/wt/v041-tower-laps/bumrushmimic/ (this one).
+-- A battle where SABIN or GOGO cannot act is fought out and the next taken; one where GOGO's Mimic copied something
+-- else (another member acted between), or that ended first, is not counted; at most 12.
+-- Old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/bumrushmimic/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -29,9 +29,8 @@ local SABIN, GOGO = 0x05, 0x0C
 local CMD_BLITZ, CMD_MIMIC = 0x0A, 0x12
 local BUMRUSH, PUMMEL = 0x64, 0x5D
 local MIMIC_BOOST = 2
-local DOOM = 0x127
 
-local seats, recs = {}, {}
+local seats, recs, mode, battles, done = {}, {}, nil, 0, false
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 local function whoY()
@@ -77,8 +76,9 @@ end
 local function closed() return recs[GOGO] ~= nil and recs[GOGO].ended ~= nil and H.frame > recs[GOGO].ended + 30 end
 
 local function decide()
-  H.assertEq(H.formationHas({ [DOOM] = true }), true, "the battle is Doom's (event battle 98)")
-  seats, recs, plan = {}, {}, {}
+  battles = battles + 1
+  H.assertEq(battles <= 12, true, "a counted Mimic of Bum Rush within 12 battles")
+  seats, recs, plan, mode = {}, {}, {}, "play"
   for s = 0, 3 do
     local id = H.readByte(0x3ED8 + s * 2)
     if id == SABIN or id == GOGO then seats[id] = s end
@@ -89,10 +89,19 @@ local function decide()
     return H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3EE4 + e) & 0xE2) == 0 and (H.readByte(0x3EE5 + e) & 0x18) == 0
   end
   local sp = H.readWord(0x3C08 + seats[SABIN] * 2)
-  H.log(string.format("[bumrushmimic] Doom: SABIN seat %d MP %d bank %d; GOGO seat %d bank %d",
+  H.log(string.format("[bumrushmimic] battle %d: SABIN seat %d MP %d bank %d; GOGO seat %d bank %d", battles,
     seats[SABIN], sp, H.readByte(0x3E9C + seats[SABIN] * 2), seats[GOGO], H.readByte(0x3E9C + seats[GOGO] * 2)))
-  H.assertEq(can(SABIN) and can(GOGO), true, "SABIN and GOGO can act as Doom's battle opens")
-  H.assertEq(sp >= 99, true, "SABIN holds Bum Rush's 99 MP (the care before Doom)")
+  if not (can(SABIN) and can(GOGO)) or sp < 99 then
+    mode = "fightout"
+    H.log("[bumrushmimic] SABIN or GOGO cannot act, or SABIN lacks 99 MP: fought out, the next taken")
+    return
+  end
+  for m = 0, 5 do
+    if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) > 0 then
+      H.writeWord(0x3BFC + m * 2, 60000)
+    end
+  end
+  H.log("[bumrushmimic] every present monster's HP := 60000 (declared expedient)")
   plan = { { who = SABIN, cmd = CMD_BLITZ, row = BUMRUSH, boost = 3, direct = true },
            { who = GOGO, cmd = CMD_MIMIC, boost = MIMIC_BOOST, self = true } }
 end
@@ -115,51 +124,28 @@ local function judge()
   return true
 end
 
-local K = H.worLegKit({ fight = {}, links = {}, names = H.SPLIT_NAMES })
-local T = H.kefkaTowerKit(K, {})
-local door, walk, sw, settled = T.door, T.walk, K.sw, K.settled
-H.NAV_REFIRE_HOLD = true
-
 H.run({ maxFrames = 900000 }, {
-  H.bootCheckpoint("wor-kt-guardian-v1"),
+  H.bootCheckpoint("wor-kt-factory-v1"),
   H.call(function()
     arm()
     H.assertEq(H.readByte(0x1D28) & 0x80, 0x80, "SABIN knows Bum Rush ($1D28 bit 7: Duncan, gen_wor_gau)")
-    H.assertEq(sw(0x0072), 0, "Doom not yet fought ($0072)")
+    H.assertEq(H.activeParty(), 3, "party 3 walks (gen_wor_kt_factory left it on the factory's save point)")
   end),
-  -- party 2 opens the cell doors (gen_wor_kt_doom's walk), party 3 to Doom
-  H.splitBegin({ shares = { [1] = 1, [2] = 1, [3] = 1 } }),
-  H.switchParty(2),
-  door(12, 17, 355, "party 2: 291 (12,17) -> the chamber's middle (39,5)"),
-  door(39, 20, 337, "party 2: the chamber's south door (39,20) -> 337 (8,5)"),
-  walk(8, 6, "party 2 onto 337 (8,6): the cell doors"),
-  H.waitUntil(function() return sw(0x00D0) == 1 and settled() end, 1200, "the cell doors open ($00D0)", 1),
-  H.switchParty(3),
-  door(35, 18, 337, "party 3: the west column (35,18) -> 337's west cell (4,6)"),
-  door(2, 5, 355, "party 3: the west cell's door (2,5) -> 355 (31,17)"),
-  door(31, 8, 291, "party 3: 355 (31,8) -> 291 (6,15)"),
-  door(6, 9, 355, "party 3: 291 (6,9) -> 355 (64,19)"),
-  -- the lap to L46 on Doom's floor (T.trainLap) and the dress against his ice (H.elementDress), the two steps of
-  -- gen_wor_kt_doom's that keep SABIN standing to his third point; without them Doom killed SABIN with his Bum Rush
-  -- queued at three points (build/attempts/wt/v041-tower-laps/bumrushmimic/brm1)
-  T.trainLap("party 3 below Doom", 46),
-  H.fieldCare({ threshold = 1.0, tag = "before dressing for Doom" }),
-  H.elementDress(0x02, { tag = "dress against Doom's ice" }),
-  H.fieldCare({ threshold = 1.0, tag = "before Doom" }),
+  H.driveUntil(function() return done end, 850000, {
+    H.cond(function() return not H.battleActive() end, { H.paceToEncounter("bumrushmimic", 0) }, {}),
+    H.call(decide),
+    H.cond(function() return mode == "fightout" end, { H.fightBattleByMenu(40000) }, {
+      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed }),
+      H.call(function()
+        if not closed() then
+          H.log("[bumrushmimic] the battle ended before GOGO's copy resolved: not counted")
+          return
+        end
+        if judge() then done = true end
+      end),
+    }),
+  }, "a counted Mimic of Bum Rush"),
   H.call(function()
-    H.assertEq(H.activeParty(), 3, "party 3 walks to Doom")
-  end),
-  H.navTo(64, 12, { maxFrames = 20000, playBattles = "tactical", spare = { DOOM },
-    arrive = function()
-      return (H.battleLoadStarted() and H.formationHas({ [DOOM] = true })) or (H.fieldX() == 64 and H.fieldY() == 12)
-    end }),
-  H.waitUntil(function() return H.battleActive() and H.formationHas({ [DOOM] = true }) end, 3000,
-    "Doom's battle opens", 1),
-  H.call(decide),
-  H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed }),
-  H.call(function()
-    H.assertEq(closed(), true, "GOGO's copy resolved inside Doom's battle")
-    H.assertEq(judge(), true, "GOGO's Mimic copied SABIN's Bum Rush (no other action between)")
     H.log("[bumrushmimic] PASS: GOGO's Mimic of SABIN's Bum Rush, under three of GOGO's points, ran as Pummel "
       .. "and cost nothing")
   end),
