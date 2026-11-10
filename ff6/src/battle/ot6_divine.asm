@@ -53,14 +53,19 @@ OT6_PUMMEL        = $5d         ; blitz 1, the fallback under three points
 ;                              power of 70 after CalcDmg had run, so it
 ;                              landed nothing at all.
 ;
-; The patch and the kill read the primary target; Cleave's record strikes
-; the enemy group (targeting $7a), and the other bodies take the record as
-; it stands on this pass: its own Death roll beside a killable primary, the
-; heavy cut beside a boss.
+; Since #388's second call (the TLM's, 2026-11-10) Cleave strikes every enemy:
+; aimed at the monsters, its mask becomes every living monster (Ot6CleaveWide,
+; $3a75), each killable one takes the Death mark, and each death-immune one
+; loses four shields (Ot6CleaveStrip) and takes the cut, unsplit ($11a2 bit 6:
+; each body takes the whole cut, not the half vanilla gives a spread).  The
+; record is patched to the cut when any struck body is death-immune; a
+; killable body beside it dies by its mark whatever the cut does.  A Cleave
+; aimed at the party (a copy under Muddle or Charm) keeps its one target.
 ;
 ; entry: jsl from CalcAttackEffect just after ChooseTarget. a16/i8, db=$7e;
 ; x = attacker entity offset, $b8/$b9 = target mask, $3a7d = attack id. preserves
-; x (the caller indexes it right after) and y; may edit $11a6/$11aa/$11a2/$11a7.
+; x (the caller indexes it right after) and y; may edit $b9 and
+; $11a6/$11aa/$11a2/$11a7.
 
 OT6_CLEAVE_BOSS_POWER = 255
 OT6_CLEAVE_SHIELDS    = 4       ; Break's 3-BP ceiling (Ot6BreakChips)
@@ -73,45 +78,16 @@ OT6_CLEAVE_SHIELDS    = 4       ; Break's 3-BP ceiling (Ot6BreakChips)
         lda     $3a7d
         cmp     #$5c            ; cleave's attack id?
         bne     done            ; no: this attack is untouched
+        jsr     Ot6CleaveWide   ; every living enemy
         jsr     Ot6CleaveStrip  ; each death-immune body struck: four shields
-        phx                     ; save the attacker entity offset (i8, 1 byte)
-        ; --- primary target -> entity offset. The mask is split: $b8 low byte
-        ;     is characters (bit c -> offset c*2), $b9 high byte is monsters
-        ;     (bit m -> offset 8 + m*2), not one flat 16-bit field. A swdtech
-        ;     lands on an enemy, so try the monster half first. ---
-        ldx     #$08
-        lda     $b9             ; monster mask (slots 0-5)
-@mon:   lsr
-        bcs     @have
-        inx
-        inx
-        cpx     #$14            ; 8 + 6*2
-        bcc     @mon
-        ldx     #$00
-        lda     $b8             ; character mask (slots 0-3)
-@chr:   lsr
-        bcs     @have
-        inx
-        inx
-        cpx     #$08
-        bcc     @chr
-        plx                     ; no target bit: restore attacker, bail
-        bra     done
-@have:  ; x = target entity offset
-        lda     $3aa1,x
-        bit     #$04            ; death-immune (a boss)?
-        bne     @cut            ; ... Death cannot kill it: the heavy cut
-        lda     $3dd4,x
-        ora     #$80            ; Death (status to set): a guaranteed kill
-        sta     $3dd4,x
-        plx                     ; x = attacker entity offset
-        bra     done
-@cut:   plx
+        jsr     Ot6CleaveMark   ; each killable body struck: Death; carry set
+        bcc     done            ;   if a death-immune one was struck
         lda     #OT6_CLEAVE_BOSS_POWER
         sta     $11a6
         stz     $11aa           ; clear Status-1 to inflict, so no Death $80
         lda     $11a2
         and     #$fd            ; clear the instant-death-spell flag (bit 1)
+        ora     #$40            ; no split: each body takes the whole cut
         sta     $11a2
         lda     $11a7
         and     #$fe            ; clear auto-miss-if-status-immune (bit 0)
@@ -122,6 +98,80 @@ done:   plp
         rtl
 .endproc
 
+; [ Cleave strikes every enemy ]
+;
+; A Cleave aimed at the monsters ($b9 nonzero) strikes every living one
+; ($3a75: present, targetable and not wounded, petrified or zombied, the
+; mask UpdateDead keeps).  Aimed at the party, it keeps its target.
+; a8/i8, db=$7e.  Clobbers A.
+.proc Ot6CleaveWide
+        .a8
+        lda     $b9
+        beq     @out            ; aimed at the party: untouched
+        lda     $3a75
+        and     #$3f
+        beq     @out            ; (defensive: nothing alive to widen to)
+        sta     $b9
+@out:   rts
+.endproc
+
+; [ Cleave's Death: each killable body struck dies ]
+;
+; Walks the struck mask (monsters $b9, then the party $b8) and marks Death
+; in each killable body's "status to set" ($3dd4, applied by UpdateStatus
+; for every present entity independent of the hit roll): a guaranteed kill.
+; A death-immune body ($3aa1 bit 2) is left to the strip and the cut.
+; a8/i8, db=$7e.  out: carry set iff a death-immune body was struck.
+; Preserves x and y; clobbers A.
+.proc Ot6CleaveMark
+        .a8
+        .i8
+        phy
+        lda     #$00
+        pha                     ; [$02,s] a death-immune body was struck
+        lda     $b9
+        pha                     ; [$01,s] the monster mask, walked
+        ldy     #$08            ; entity offset of monster slot 0
+@mon:   lda     $01,s
+        lsr
+        sta     $01,s
+        bcc     @mnext
+        jsr     @one
+@mnext: iny
+        iny
+        cpy     #$14            ; 8 + 6*2
+        bcc     @mon
+        lda     $b8
+        and     #$0f
+        sta     $01,s           ; the party mask, walked
+        ldy     #$00
+@chr:   lda     $01,s
+        lsr
+        sta     $01,s
+        bcc     @cnext
+        jsr     @one
+@cnext: iny
+        iny
+        cpy     #$08
+        bcc     @chr
+        pla
+        pla                     ; the death-immune flag
+        ply
+        cmp     #$01            ; carry set iff it was set
+        rts
+@one:   lda     $3aa1,y
+        bit     #$04            ; death-immune (a boss)?
+        bne     @immune
+        lda     $3dd4,y
+        ora     #$80            ; Death (status to set): a guaranteed kill
+        sta     $3dd4,y
+        rts
+@immune:
+        lda     #$01
+        sta     $04,s           ; the flag ([$02,s] above, past the return)
+        rts
+.endproc
+
 ; [ Cleave strips four shields off each death-immune body it strikes ]
 ;
 ; #388 (the TLM's call, 2026-11-09): against a boss Cleave was one power-255
@@ -129,7 +179,7 @@ done:   plp
 ; Now each death-immune body in the record's target mask also loses four
 ; shields, Break's 3-BP ceiling (Ot6BreakChips), whatever its keys, the
 ; way Shadow's Assassinate makes a full boost pay against what it cannot
-; kill.  Killable bodies are unchanged: Death (Ot6Oblivion).  The take comes
+; kill.  Killable bodies are unchanged: Death (Ot6CleaveMark).  The take comes
 ; before the hit rolls, so a body it breaks takes the cut Broken
 ; (Ot6BrokenDmg), and the cut chips nothing more off it.
 ; a8/i8 (Ot6Oblivion's shortai), db=$7e.  Preserves x and y; clobbers A.
@@ -371,6 +421,50 @@ done:   ply
         bra     @go
 @keep:  pla
 @go:    jml     Ot6HitCount
+.endproc
+
+; [ Bum Rush: each blow takes a shield, whatever the body's keys ]
+;
+; #388's second call (the TLM's, 2026-11-10): as built, Bum Rush's four blows
+; chipped only a body that keys bludgeon, so at a boss whose shields take no
+; blow (Doom) the keyed 3-BP Fight out-earned it.  Now each landed blow takes
+; one shield, keyless like OT6's Break: one Bum Rush strips four, so it breaks
+; a body at four or fewer shields, and the blows after the break land Broken
+; (Ot6BrokenDmg doubles them, the breaking blow included).  A body that keys
+; bludgeon loses its shield to the class chip instead (Ot6ClassChip, which
+; also reveals the key), so a blow never takes two.  The gates are the class
+; chip's: a monster target, not Broken (Ot6TakeShields), not wounded or
+; petrified, not a resolved heal; and the attack is Bum Rush ($3410, set at
+; execution by Cmd_0a's InitCmdTarget, so a Gogo's Pummel fallback reads $5d)
+; from a character.
+; jsr from Ot6HitJoin before Ot6ClassChip.  a8/i16, x = attacker, y = target,
+; db=$7e.  Preserves x and y; clobbers A.
+.proc Ot6BumRushTake
+        .a8
+        .i16
+        txa                     ; width-neutral: a character's blow?
+        cmp     #$08
+        bcs     done
+        lda     $3410
+        cmp     #OT6_BUMRUSH
+        bne     done
+        tya
+        cmp     #$08
+        bcc     done            ; a character target: no shields
+        lda     $3ee4,y
+        bit     #$c0
+        bne     done            ; wound/petrify: the hit was theater
+        lda     $f2
+        lsr
+        bcs     done            ; a resolved heal
+        lda     f:$7e0000+OT6_ATKCLASS
+        beq     @take           ; (classless: nothing keys it)
+        bmi     @take           ; (a null-break property: the class chips nothing)
+        and     OT6_BP_CLASS,y
+        bne     done            ; keyed: the class chip takes this blow's shield
+@take:  lda     #$01
+        jsr     Ot6TakeShields
+done:   rts
 .endproc
 
 ; [ a Blitz picked at random: never Bum Rush ]

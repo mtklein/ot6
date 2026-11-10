@@ -33,6 +33,8 @@ end
 -- and sooner, though most flipped fights had no divine land; a landed Bum Rush takes over half his HP).  KT_BOSS_FIGHT, a lab's global, overrides it ({} is the
 -- stock fight)
 local BOSS_FIGHT = KT_BOSS_FIGHT or { divines = true }
+-- the lap's (and the walk's) random battles: KT_LAP_DIVINES, a lab's global, sets Driver:divineLine's options there
+if KT_LAP_DIVINES ~= nil then FIGHT.divines = KT_LAP_DIVINES end
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 H.careMagic, H.careCastFirst = true, true

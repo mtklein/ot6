@@ -28,6 +28,8 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local SABIN, CMD_BLITZ = 0x05, 0x0A
 local BUMRUSH, PUMMEL = 0x64, 0x5D
 local BUMRUSH_MP = 99
+local SH_CUR, BRK_TICKS, BP_CLASS = 0x3E38, 0x3E88, 0x3E9C   -- OT6_SHIELD_CUR, OT6_BROKEN_TICKS, OT6_BP_CLASS
+local BLUDGEON = 0x04                                         -- Bum Rush's class (Ot6SkillClass)
 
 local seat, rec, recs, stage, battles, mode = nil, nil, {}, 1, 0, nil
 local plan = {}
@@ -43,7 +45,7 @@ local function arm()
     if seat == nil or rec ~= nil or not sabinX() or H.readByte(0x3A7A) ~= CMD_BLITZ then return end
     local e = seat * 2
     rec = { row = H.readByte(0x3A7B), mp0 = H.readWord(0x3C08 + e), bank0 = H.readByte(0x3E9C + e),
-      f = H.frame, sets = {}, hits = 0 }
+      f = H.frame, sets = {}, hits = 0, blows = {} }
   end, emu.callbackType.exec, ac, ac)
   -- the command: Ot6BlitzTake's entry (A = the blitz's id, y = the attacker), what it leaves in $b6 at
   -- Ot6HitCount's entry, and the pending boost the gate reads
@@ -61,15 +63,26 @@ local function arm()
     if rec == nil or rec.ran == nil or rec.ended then return end
     if v ~= 0xFF then rec.sets[#rec.sets + 1] = v end
   end, emu.callbackType.write, 0x7E3A70, 0x7E3A70)
+  -- each landed blow (Ot6HitJoin, y = the body it lands on): the body's shields, Broken timer and whether it keys
+  -- bludgeon, read as the blow enters the join (before any take)
   local join = H.sym("Ot6HitJoin")
   emu.addMemoryCallback(function()
     if rec == nil or rec.ran == nil or rec.ended then return end
     rec.hits = rec.hits + 1
+    local e = emu.getState()["cpu.y"] & 0xFF
+    if e >= 8 and e < 0x14 then
+      rec.blows[#rec.blows + 1] = { e = e, sh = H.readByte(SH_CUR + e), br = H.readByte(BRK_TICKS + e) ~= 0,
+        keyed = (H.readByte(BP_CLASS + e) & BLUDGEON) ~= 0 }
+    end
   end, emu.callbackType.exec, join, join)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if rec == nil or rec.ended or seat == nil or not sabinX() or rec.ran == nil then return end
     rec.ended = H.frame
+    rec.after = {}
+    for _, b in ipairs(rec.blows) do
+      rec.after[b.e] = { sh = H.readByte(SH_CUR + b.e), br = H.readByte(BRK_TICKS + b.e) ~= 0 }
+    end
   end, emu.callbackType.exec, ae, ae)
 end
 local function closed()
@@ -97,6 +110,31 @@ local function judge()
   H.assertEq(#r.sets >= 1 and r.sets[1] == 3, true, "the multi-attack counter was set to 3: four blows "
     .. "(Ot6HitCountTbl)")
   H.assertEq(r.hits >= 1, true, "the blows landed (Ot6HitJoin)")
+  -- the take (#388): each landed blow on an unbroken body with a shield left takes one, keyed or not; the blow
+  -- that takes the last breaks it, and the blows after land on a Broken body
+  local want, first = {}, {}
+  for _, b in ipairs(r.blows) do
+    local w = want[b.e]
+    if w == nil then
+      w = { sh = b.sh, br = b.br, keyed = b.keyed, n = 0 }
+      want[b.e], first[#first + 1] = w, b.e
+    end
+    w.n = w.n + 1
+    if not w.br and w.sh > 0 then
+      w.sh = w.sh - 1
+      if w.sh == 0 then w.br = true end
+    end
+  end
+  for _, e in ipairs(first) do
+    local w, b0, got = want[e], nil, r.after[e]
+    for _, b in ipairs(r.blows) do if b.e == e then b0 = b; break end end
+    H.log(string.format("[bumrush] stage %d: slot %d (%s bludgeon): %d blow(s) landed on %d shield(s)%s -> %d "
+      .. "shield(s)%s (want %d%s)", stage, (e - 8) // 2, w.keyed and "keys" or "does not key", w.n, b0.sh,
+      b0.br and " Broken" or "", got.sh, got.br and " Broken" or "", w.sh, w.br and " Broken" or ""))
+    H.assertEq(got.sh, w.sh, string.format("slot %d: each landed blow took one shield, whatever its keys (%s)",
+      (e - 8) // 2, w.keyed and "it keys bludgeon" or "it does not key bludgeon"))
+    H.assertEq(got.br, w.br, string.format("slot %d: Broken exactly when the blows took its last shield", (e - 8) // 2))
+  end
   H.assertEq(r.mp0 - r.mp1, BUMRUSH_MP, "Bum Rush cost 99 MP")
   H.assertEq(r.bank1, r.bank0 - 3, "the bank paid the full boost")
   return true
