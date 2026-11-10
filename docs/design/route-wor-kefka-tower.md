@@ -789,9 +789,12 @@ not met in this grid.
   of the split bag) were spent, and the care would not touch the other
   parties' twelve: "status1=24 ... antidote=0 ... remedy=12", and EDGAR
   walked on Poison to 1 HP and died twice before 352 (2 of the Guardian
-  leg's 8 Fenix Downs at c601661e). A status cure now borrows past the
-  reserve when the party's own share is gone, and Imp takes a Green
-  Cherry before a Remedy. At the same boot and draw the care cures him
+  leg's 8 Fenix Downs at c601661e). The Poison and Imp cures now borrow
+  past the reserve when the party's own share is gone (the other rows keep
+  a caller's reserve), and Imp takes a Green Cherry before a Remedy;
+  `field_zombiecure`'s branch E checks it (green, and red on the care
+  before it: "E: the visit cures the poison past the reserve: got false",
+  `zc/`). At the same boot and draw the care cures him
   (`b4/gZ_s0`: "plan: cure poison (past the reserve) char 4 with $F5
   (3173/3233 hp, 508/516 mp, status1 25)").
 - *The Goddess lost key `be80` every time* (`b3/gd_s0`-`s2`): her
