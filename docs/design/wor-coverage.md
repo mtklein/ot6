@@ -1962,9 +1962,9 @@ CYAN Cleaves a death-immune target holding two or more shields; SABIN
 Bum Rushes a target holding 6,000 HP or more; each banks with unboosted
 Fights until three points (the hold; without it the keyed Fight spent
 every pip, 13.8). `M.boostPlan` offers Bum Rush at three or not at all,
-so no other line queues the greyed row. `gen_wor_kt_doom` and
-`gen_wor_kt_inferno` set `{ divines = true }` (it is the line's play from
-this branch on).
+so no other line queues the greyed row. `gen_wor_kt_doom` sets
+`{ divines = true }` (the line's play at Doom from this branch on);
+`gen_wor_kt_inferno` keeps the stock fight (below).
 
 *The labs*, from the replayed line's captures on this ROM (`land1/`, the
 line from power-on at `53118d96`: `wor-kt-guardian-v1`,
@@ -2008,7 +2008,14 @@ over keys 4; won ticks 4187-13277 (median 8081.5)", "ARM i_br: ... won
   (Cleave in 2 of 10, Bum Rush in 1-2): the gain there (8 to 10 won) is
   mostly the hold itself, the turns SABIN and CYAN spend banking instead
   of boosting into Inferno's counter-heavy arms. A real effect of the
-  policy, but not the divines' damage.
+  policy, but not the divines' damage. Routed at Inferno too, the line
+  (`land2/`, from power-on at `1a06b6c2`) reshuffled the tower's later
+  draws: Guardian's leg spent 11 Fenix Downs (34 to 23; at `53118d96`,
+  with Inferno's stock fight, the capture after it differs) and
+  `gen_wor_kefka` stopped at its floor, "the bag for Kefka: 9 Fenix Downs
+  (floor 10) and 70 Potions (floor 40), stocked at Kohlingen by
+  gen_wor_kt_factory". So the line keeps Inferno's stock fight and routes
+  the divines at Doom only.
 - **Not essential**: the stock fight still wins 9 of 12 at Doom and 8 of
   10 at Inferno, and the leg retries a wipe from its save.
 - **Cleave alone** is a modest gain (10 of 12 at Doom, the same 8 of 10 at

@@ -12,12 +12,13 @@ local FACTORY_SAVE = { 37, 17 }
 local INFERNO_TILE = { 31, 18 }
 local INFERNO, STRIKER, ROUGH = 0x10C, 0x142, 0x141
 local FIGHT = {}
--- The boss policy: CYAN's Cleave and SABIN's Bum Rush where they pay (#388, Driver:divineLine; wor-coverage.md
--- 13.9: with both, Inferno won 10 of 10 distinct fights against the stock fight's 8); KT_BOSS_FIGHT, a lab's
--- global, overrides it ({} is the stock tactical fight).  Inferno takes bolt and its arms do not (Striker absorbs
--- ice, Rough absorbs bolt), but the arms are slashable, unlike the machines, and absorbSafeArms keeps the weapons
--- off what they absorb
-local BOSS_FIGHT = KT_BOSS_FIGHT or { divines = true }
+-- No boss policy: the fight is the stock tactical one (KT_BOSS_FIGHT, a lab's global, overrides it).  The divines
+-- (#388, { divines = true }) won 10 of 10 distinct fights here against the stock fight's 8, but fired in only 2 of
+-- the 10 (the gain was their banking turns), and routed here they reshuffled the tower's later draws past the
+-- Kefka leg's Fenix Down floor (wor-coverage.md 13.9); Doom is where they are routed.  Inferno takes bolt and its
+-- arms do not (Striker absorbs ice, Rough absorbs bolt), but the arms are slashable, unlike the machines, and
+-- absorbSafeArms keeps the weapons off what they absorb
+local BOSS_FIGHT = KT_BOSS_FIGHT or {}
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 H.careMagic, H.careCastFirst = true, true
