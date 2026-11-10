@@ -91,28 +91,6 @@ FIGHT.nuke = function()
   if H.formationHas({ [VECTAUR] = true, [BRONTAUR] = true }) then return { ICE } end
   return nil
 end
--- The Sky Base (352's formation 413, with four IronHitmen) casts L.5 Doom, which kills every member whose level is a
--- multiple of five; the training below stops at L40, and TERRA stood at L65, so it took both in each of the line's
--- two meetings at 62a8b621 (7 deaths in 2 battles, the leg's 9; #521).  A player who reads the script kills the
--- caster first while a standing member's level is a multiple of five (the kill order, focusList)
-local SKY_BASE = 0x0FC
-if KT_SKYBASE ~= false then
-  FIGHT.focus = function(_, memo)
-    if not (H.battleLoadStarted() and H.formationHas({ [SKY_BASE] = true })) then return nil end
-    for s = 0, 3 do
-      local id = H.readByte(0x3ED8 + s * 2)
-      if id < 14 and H.readWord(0x3BF4 + s * 2) > 0 and H.readByte(0x1600 + 37 * id + 8) % 5 == 0 then
-        if not memo.said then
-          memo.said = true
-          H.log(string.format("[focus] the Sky Base first: %s stands at L%d, a multiple of five (L.5 Doom)",
-            NAMES[id] or tostring(id), H.readByte(0x1600 + 37 * id + 8)))
-        end
-        return { { species = SKY_BASE } }
-      end
-    end
-    return nil
-  end
-end
 local BOSS_FIGHT = KT_BOSS_FIGHT or {}
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
@@ -125,14 +103,31 @@ local walk, door, chest = T.walk, T.door, T.chest
 
 -- party 1's training: a two-tile lap by its landing (334 (9,16)-(9,19); lab_tower_split's lap, where plan M's party 1
 -- won 60 of 60 under the rows: section 7.1), the walker fighting what comes and the care after each battle, until
--- every member of party 1 stands at TRAIN_LEVEL, at most TRAIN_BATTLES battles
-local TRAIN_LEVEL, TRAIN_BATTLES = KT_TRAIN1 or 40, KT_TRAIN1_CAP or 40
+-- every member of party 1 stands at TRAIN_LEVEL and none at a multiple of five, at most TRAIN_BATTLES battles.
+-- TRAIN_LEVEL is the Goddess leg's bench level (gen_wor_kt_goddess's TRAIN_LEVEL), so party 1 does its training
+-- here and none in 355's east lane, whose Scullion (half that pool) opens with Condemned and outlasts party 1's
+-- kill: there party 1 lost a member in 6 of 10 Scullion battles in the line at 62a8b621 (6 of its leg's 7 Fenix
+-- Downs; 11 of 15 at 3eb65922), here 9 deaths in 235 battles where training to L40 had 63 in 275 (#521,
+-- route-wor-kefka-tower.md 7.6).  The five: the Sky Base in 352 (formation 413) opens with L.5 Doom, which kills
+-- every member whose level is a multiple of five, and at L40 the training left EDGAR there (TERRA at L65): 30 deaths
+-- in 13 meetings over 8 runs, every one of them won.  Killing the Sky Base first did not help (29 in 11): its L.5
+-- Doom comes before the party's first turn.  A player who reads its script levels past the five
+local TRAIN_LEVEL, TRAIN_BATTLES = KT_TRAIN1 or 46, KT_TRAIN1_CAP or 60
 local function trainParty1()
   local lap, wp, n0 = { { 9, 16 }, { 9, 19 } }, 1, 0
   local function low()
     local t = {}
     for _, ch in ipairs(H.partyRoster(1)) do
       if H.readByte(0x1600 + 37 * ch + 8) < TRAIN_LEVEL then t[#t + 1] = NAMES[ch] end
+    end
+    return t
+  end
+  -- the members at a multiple of five (L.5 Doom's), when KT_LEVEL5 is not false (a lab's lever)
+  local function fives()
+    local t = {}
+    if KT_LEVEL5 == false then return t end
+    for _, ch in ipairs(H.partyRoster(1)) do
+      if H.readByte(0x1600 + 37 * ch + 8) % 5 == 0 then t[#t + 1] = NAMES[ch] end
     end
     return t
   end
@@ -150,7 +145,7 @@ local function trainParty1()
     end),
     H.driveUntil(function()
       local calm = not H.battleLoadStarted() and H.hasControl() and H.tileAligned()
-      return calm and (#low() == 0 or #H.outcomes - n0 >= TRAIN_BATTLES)
+      return calm and ((#low() == 0 and #fives() == 0) or #H.outcomes - n0 >= TRAIN_BATTLES)
     end, 2900000, {
       H.navTo(function() return lap[wp][1] end, function() return lap[wp][2] end,
         { maxFrames = 20000, playBattles = "tactical", fight = FIGHT }),
@@ -158,7 +153,8 @@ local function trainParty1()
       H.cond(function() return not H.battleLoadStarted() end, { H.fieldCare({ tag = "care on party 1's lap" }) }, {}),
     }, "party 1's training by its landing"),
     H.call(function()
-      say("train", string.format("party 1 after %d battles by its landing: %s", #H.outcomes - n0, levels()))
+      say("train", string.format("party 1 after %d battles by its landing: %s%s", #H.outcomes - n0, levels(),
+        #fives() > 0 and (" (at a multiple of five, the cap reached: " .. table.concat(fives(), ", ") .. ")") or ""))
       H.assertEq(#low(), 0, string.format("party 1 stands at L%d within %d battles by its landing", TRAIN_LEVEL,
         TRAIN_BATTLES))
     end),
