@@ -21,8 +21,8 @@
 -- keys (#388's second call: Ot6BumRushTake, keyless; a body that keys bludgeon loses it to the class chip
 -- instead), and the body is Broken exactly when the blows took its last.  The monsters by Duncan's house all key
 -- bludgeon, so main's ROM passes here (the class chip takes the same one); the bumrush_double mutant (two a blow)
--- is red: build/attempts/wt/v041-divines-2/mx/mx3/.  The keyless take's behavioural red needs a body that does
--- not key bludgeon and outlasts a blow: Doom (battle_bumrushmimic's battle), not yet asserted there.
+-- is red: build/attempts/wt/v041-divines-2/mx/mx3/.  The keyless take's behavioural red, a body that does not
+-- key bludgeon losing one shield a landed blow, is battle_bumrushmimic's (a staged body in the factory's battles).
 -- MP is a soft precondition, topped up the way a player would (field care between battles), and asserted at each
 -- battle's start.  A battle SABIN cannot act in, or one that ends before the action resolves, is fought out and
 -- not counted.

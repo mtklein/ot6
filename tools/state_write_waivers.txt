@@ -61,6 +61,7 @@ tools/tests/battle_counterboost.lua	.writeWord(	2
 tools/tests/battle_counterfold.lua	.writeByte(	5
 tools/tests/battle_dancemp.lua	.writeWord(	3
 tools/tests/battle_dlgmenu.lua	.writeByte(	2	quarantine: #292 review, synthetic step -- one monster slot's shield-count upload planted pending mid-dialogue (OT6_SHWANT/OT6_SHPEND), because a count change landing while a battle dialogue is up is not a thing a fixture produces on cue; the property is that the nmi holds the upload until the dialogue and its re-lay are done
+tools/tests/battle_bumrushmimic.lua	.writeByte(	3
 tools/tests/battle_bumrushmimic.lua	.writeWord(	1
 tools/tests/battle_divines.lua	.writeByte(	7
 tools/tests/battle_divines.lua	.writeWord(	6
