@@ -761,31 +761,53 @@ won 545; deaths 131", "ARM gT: 16 runs, 16 PASS; random battles 945
   eleven ahead of it.
 
 **The change** (`gen_wor_kt_guardian`): party 1 trains by its landing to
-L46, at most 60 battles, and on past any member at a multiple of five
-(L.5 Doom), as a player who reads the Sky Base's script does. The Goddess
-leg's lap stays as a fallback. The Kohlingen stop
-(`gen_wor_kt_factory`) buys the tower 30 Fenix Downs rather than 50:
-`gen_wor_kefka` wants 10 at Kefka, and the tower's random battles still
-spend some (formation 329's Meteor, above).
+L46, at most 60 battles; the Goddess leg's lap stays as a fallback. The
+`gT` arm above is that change alone (it ran at 8615b87b, before any check
+of the fives). The fives are checked where they matter: at 352's door,
+after the battles from the landing, party 1 laps on 292's floor while a
+member who wears no death guard (the Memento Ring, the Safety Bit) stands
+at a multiple of five (`T.trainLap`'s `opts.also`). In the first replay
+RELM had entered 352 at L60, past a check made at the landing's end. The
+Kohlingen stop (`gen_wor_kt_factory`) buys the tower 35 Fenix Downs rather
+than 50: `gen_wor_kefka` wants 10 at Kefka, and the tower's random battles
+still spend some (formation 329's Meteor, above). A replay stocked with 30
+(`land1/`, ee52d864) spent 21 in the tower, six of them in Doom's battle,
+and stopped at Kefka's boot: "the bag for Kefka: 9 Fenix Downs (floor 10)".
 
-**The line replayed** from `wor_kt_factory` at c601661e (px13,
-`land2/`). A first replay stocked 30 (`land1/`, ee52d864): the tower spent
-21, six of them in Doom's battle, and Kefka's boot stopped at "the bag for
-Kefka: 9 Fenix Downs (floor 10)", so the stop buys 35. The
-bag's Fenix Downs by leg, from each leg's first and last care line:
-factory 25 -> 32 (bought to 35, 3 spent), Atma 32 -> 30, Guardian
-30 -> 22 (8: "party 1 after 45 battles by its landing: TERRA L67, RELM
-L59, EDGAR L46, SETZER L52"), Doom 22 -> 17 (3 of them in Doom's own
-battle), the Poltergeist 17 -> 15, the Goddess 15 -> 15 ("party 1 in
-355's east lane: after 0 battles"), and Kefka reached with 15: "the bag
-for Kefka: 15 Fenix Downs (floor 10)", then "PASS (frame 174240)
-attempts=1/3". The Goddess leg passed on its second attempt: her battle
-on key `be80` wiped party 1 ("attempt 1/3 FAILED class=wipe"), as in
-`land1/`. From this capture over shifts 0-11 (`b3/`) she was won on 4 of
-5 distinct keys, `be80` the loss (6.3's grid at L46 won 9 of 9): a coin
-flip on one draw that the leg's retry absorbs, and nothing on the lap.
-`ninja`'s one red is `test_registration` (two probes from #519 with no
-`@suite`/`@manual` header, on main as well).
+**At the final code** (b8e9bca3, from the replay's `wor-kt-atma-v1` at
+c601661e, shifts 0-15, `b4/gZ_*`, `gZtally.txt`): "ARM gZ: 16 runs, 16
+PASS; random battles 944 (distinct keys 256), won 944; deaths 74", of
+them "gZ 334:0149: battles 352 deaths 40". The check at the door ran in
+every run and fought no battle there: RELM stood at L60 and wears the
+Memento Ring ("party 1 past L.5 Doom's multiples of five before 352: after
+0 battles: TERRA L68, RELM L60, EDGAR L46, SETZER L53"); formation 413 was
+not met in this grid.
+
+**Two fixes the replay showed** (#521 review):
+
+- *Field care left Poison and Imp on.* Party 1's six Remedies (its share
+  of the split bag) were spent, and the care would not touch the other
+  parties' twelve: "status1=24 ... antidote=0 ... remedy=12", and EDGAR
+  walked on Poison to 1 HP and died twice before 352 (2 of the Guardian
+  leg's 8 Fenix Downs at c601661e). A status cure now borrows past the
+  reserve when the party's own share is gone, and Imp takes a Green
+  Cherry before a Remedy. At the same boot and draw the care cures him
+  (`b4/gZ_s0`: "plan: cure poison (past the reserve) char 4 with $F5
+  (3173/3233 hp, 508/516 mp, status1 25)").
+- *The Goddess lost key `be80` every time* (`b3/gd_s0`-`s2`): her
+  Overcast left three members fallen or Zombied with the Goddess at 925
+  HP, and RELM, the last standing, spent five turns curing Zombies with
+  Revivify while she stood at 104-482 HP, until a Zombied ally killed
+  her: "died holding 5 BP" on each. The Zombie cure now gives way when the
+  last monster is inside the actor's own measured hit
+  (`Driver:finishInReach`: "actor=1 no Zombie cure on entity 2: the last
+  monster is inside this actor's own hit -- the kill first"). From the
+  replay's `wor-kt-poltergeist-v1`, shifts 0-11 (`b4/gdF_*`, `gdW_*`):
+  with it the Goddess is won on all 5 distinct keys, `be80` 3 of 3; with
+  the old rule (`OT6_FINISH_ZOMBIE = false`) `be80` is lost 3 of 3 and
+  the other four keys won, as before.
+
+The line replayed with both: below.
 
 ## 8. Not done
 - **Kefka** (#274) boots `wor-kt-plates-v1`: party 2 on 412's save point

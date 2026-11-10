@@ -21,5 +21,4 @@ and its effect. Cite evidence in the commit message.
   that enemy's shields before the cut.
 - The included saves for Kefka's Tower were played again. The group of Terra, Relm, Edgar and Setzer now gains its
   levels near where it lands in the tower, rather than in the long hall below the Goddess, where the Scullions'
-  Condemned kept costing it members. It also levels past the multiples of five before the machine hall, whose Sky
-  Base casts L.5 Doom. The party enters the tower with 35 Fenix Downs instead of 50 and reaches Kefka with 15.
+  Condemned kept costing it members. The party enters the tower with 35 Fenix Downs instead of 50.

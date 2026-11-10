@@ -2115,11 +2115,13 @@ assertion it moves (`divines/mx/`, `bumrush/mx/`, `bumrushmimic/mx/`).
 Evidence under `build/attempts/wt/v041-tower-laps/`. The tower's Fenix
 Downs (13.9's last item) are route-wor-kefka-tower.md 7.6.
 
-**Cleave in the lap battles, measured and not shipped.** Cleave's other
+**Cleave in the lap battles, measured and not shipped** (the lab lever,
+`Driver:lapCleave` and `KT_LAP_DIVINES`, is removed again; the history
+holds it at c78db863). Cleave's other
 half is instant death on a killable body, so the TLM's call was to try it
 where party 3 trains: the Doom leg's lap in 355's west lane (the Scullion,
 death-immune, and three Innocs, killable, whose Muddle is the lap's only
-killer). `Driver:lapCleave` (`opts.divines.laps`): CYAN banks with
+killer). The lever (`opts.divines.laps`): CYAN banks with
 unboosted Fights while a killable body of 3,000 HP or more stands and, at
 three points, Cleaves the most dangerous one (a status inflicter first,
 then the most HP); GOGO's Mimic line copies it where it can. `laps =
@@ -2209,6 +2211,8 @@ $64 at 3 BP, ran $64 | GOGO: entered $64 at 2 BP, ran $5D, $3a70 {1,0}, MP
 fallback mutant (`brm_nofall`, `bumrush_nofall` from 13.9's
 `scripts/mutants.py`): "assertEq failed: GOGO's copy of Bum Rush under
 three points ran as Pummel ($5D, Ot6BlitzTake): got 100 ($64), want 93
-($5D)". In the line's replay at c601661e it passed on the re-cut
-`wor-kt-guardian-v1` too ("PASS (frame 82484) attempts=1/1",
-`land2/land.ninja.log`'s suite edge).
+($5D)". From the replay's `wor-kt-guardian-v1` (c601661e) at b8e9bca3,
+shifts 0-3 (`b4/brm_*`): all four PASS, two distinct plays ("PASS (frame
+82484) attempts=1/1" at shifts 0 and 1, "PASS (frame 106893)
+attempts=1/1" at 2 and 3; the suite's own edge in that replay logged the
+first, `land2/suite_battle_bumrushmimic.log.gz`).
