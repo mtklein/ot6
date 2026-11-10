@@ -2144,13 +2144,13 @@ on 0 (sign test p=1.000); deaths lw 2, lc 2", "FORMATION 0190: shared keys
 - Party 3's lap already loses nobody to the Scullion (140 meetings an arm,
   0 deaths), and the strip never fired on it: no Scullion stood unbroken
   with two shields when CYAN's bank reached three.
-- On the Innocs, Cleave kills one on CYAN's third turn; by then their
-  Muddle has landed, and the fallen member is a muddled ally's hit, so the
-  deaths did not move. Of the three keys it fired on, one ended 2,808 ticks
-  sooner (`be34`), one 448 sooner, one 8 later.
-- GOGO never copied it: the Cleave kills its target, and the Mimic line
-  will not copy an action whose targets have fallen ("GOGO no Mimic: the
-  last SwdTech's targets have fallen").
+- On the Innocs, Cleave kills one on CYAN's third turn at the earliest
+  (his bank starts at one), and the deaths did not move. Of the three
+  shared keys it fired on, one ended 2,808 ticks sooner (`be34`), one 448
+  sooner, one 8 later.
+- GOGO never copied it (no "GOGO Mimic of SwdTech" plan in any run): a
+  Cleave kills its target, and the Mimic line does not copy an action whose
+  targets have fallen.
 
 **Proposed instead (a data change, not made):** Cleave at three points
 strikes every enemy, not one: each killable body dies and each death-immune
