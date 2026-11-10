@@ -12,10 +12,12 @@ local FACTORY_SAVE = { 37, 17 }
 local INFERNO_TILE = { 31, 18 }
 local INFERNO, STRIKER, ROUGH = 0x10C, 0x142, 0x141
 local FIGHT = {}
--- No boss policy: the fight is the stock tactical one (KT_BOSS_FIGHT, a lab's global, overrides it).  Inferno takes
--- bolt and its arms do not (Striker absorbs ice, Rough absorbs bolt), but the arms are slashable, unlike the
--- machines, and absorbSafeArms keeps the weapons off what they absorb
-local BOSS_FIGHT = KT_BOSS_FIGHT or {}
+-- The boss policy: CYAN's Cleave and SABIN's Bum Rush where they pay (#388, Driver:divineLine; wor-coverage.md
+-- 13.9: with both, Inferno won 10 of 10 distinct fights against the stock fight's 8); KT_BOSS_FIGHT, a lab's
+-- global, overrides it ({} is the stock tactical fight).  Inferno takes bolt and its arms do not (Striker absorbs
+-- ice, Rough absorbs bolt), but the arms are slashable, unlike the machines, and absorbSafeArms keeps the weapons
+-- off what they absorb
+local BOSS_FIGHT = KT_BOSS_FIGHT or { divines = true }
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 H.careMagic, H.careCastFirst = true, true

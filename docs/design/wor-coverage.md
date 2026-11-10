@@ -1716,8 +1716,10 @@ clock and so the next fight's key.
 - **Lores off the line.** Pearl Wind is routed and used at the Poltergeist (13.8). Rippler and
   Blow Fish are learned on the line (the saves from `wor-tower-v1` and
   `wor-phoenix-v1` hold them, by sight).
-- **SABIN's Spiraler and Bum Rush, CYAN's Cleave**: learned on the line by
-  level and story; measured at party 3's two bosses and dropped (13.8).
+- **SABIN's Spiraler**: learned on the line by level; never cast.
+  **Bum Rush and Cleave**: learned on the line by story; measured at party
+  3's two bosses and dropped (13.8), then remade as divines that pay
+  against a boss and measured again (13.9).
   Fire Dance is never cast; `opts.blitz` is one Blitz per leg. An
   all-body Blitz by body count was not as good as Pummel (13.5).
 - **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`. The rages he
@@ -1909,14 +1911,16 @@ keyed Fight had nothing to chip. With its shape (bludgeon x4,
 `Ot6HitCountTbl` +3) at Inferno (`inf2/`, shifts 0-11, new ROM): "ARM
 inf2_br: 12 runs; distinct keys 10: won 9, lost 1; deaths over keys 5; won
 ticks 9176-17215 (median 11122)" against "ARM inf2_ln: ... won 10, lost 0;
-deaths over keys 3; ... (median 7629.5)". Four blows for 99 MP at no boost
-(its price escalates 2.5x a point, so a boosted one is out of reach) do not
-beat a boosted Pummel or Fight. Bum Rush is the one divine kits.md lists
-as not built (a 3-BP gate and what three points buy); making it pay is
-that design, not a data tweak. Cleave is built, but at a boss it is a
-single power-255 cut and one slash chip for a full bank, which the keyed
-Fight's three points out-earn (above). Both are left for a design decision
-(the report on #388 lays out the options).
+deaths over keys 3; ... (median 7629.5)". Four blows for 99 MP did not
+beat a boosted Pummel or Fight. (This section first said they ran at no
+boost, their price escalating 2.5x a point out of reach; that was wrong:
+Bum Rush's base is already the 99 cap, so it cost 99 at every boost and
+the chip model offered it at whatever the bank paid, `M.kitBoost`.) Bum
+Rush was then the one divine kits.md listed as not built (a 3-BP gate and
+what three points buy); making it pay was that design, not a data tweak.
+Cleave was built, but at a boss it was a single power-255 cut and one
+slash chip for a full bank, which the keyed Fight's three points
+out-earn (above). Both went to a design decision, taken in 13.9.
 
 **MagiMaster's stall is a lost fight.** On the hunt's entry the line's
 `wor_tower` stopped at "no new low under 7569 HP in 120001 battle ticks
@@ -1940,3 +1944,82 @@ timeout that was retryable, so `gen_wor_tower` now raises it as a lost
 fight ("LOST: ", class `lost`): retried from the boot and counted like a
 wipe; the replay showed it ("attempt 1/3 FAILED class=lost ... LOST:
 MagiMaster's fight stalled", then "this PASS followed a failed attempt").
+
+### 13.9 Cleave and Bum Rush as divines (#388, v0.41)
+
+Evidence under `build/attempts/wt/v041-cleave-bumrush/`.
+
+The owner's direction (2026-11-09): reward learning Cleave and Bum Rush,
+each making at least one specific fight easier, quicker or more reliable
+without becoming essential. The TLM's calls, built in `581d7e45`
+(kits.md "Divines"): Cleave on a death-immune body also takes four
+shields before its cut, and Bum Rush is SABIN's 3-BP divine (refused
+under three points; at three, four bludgeon blows each at the boost's x8,
+99 MP).
+
+*The driver.* `opts.divines` (`Driver:divineLine`), event battles only:
+CYAN Cleaves a death-immune target holding two or more shields; SABIN
+Bum Rushes a target holding 6,000 HP or more; each banks with unboosted
+Fights until three points (the hold; without it the keyed Fight spent
+every pip, 13.8). `M.boostPlan` offers Bum Rush at three or not at all,
+so no other line queues the greyed row. `gen_wor_kt_doom` and
+`gen_wor_kt_inferno` set `{ divines = true }` (it is the line's play from
+this branch on).
+
+*The labs*, from the replayed line's captures on this ROM (`land1/`, the
+line from power-on at `53118d96`: `wor-kt-guardian-v1`,
+`wor-kt-factory-v1`), one attempt a run, four arms by `KT_BOSS_FIGHT`
+(`wo` the stock fight `{}`, `cl` Cleave only, `br` Bum Rush only, `both`),
+paired by battle key: Doom over `KT_TRAIN` 46, 47, 48 by shifts 0, 2, 6,
+10 (`doom/`, `doom_tally.txt`), Inferno over shifts 0-11 (`inf/`,
+`inf_tally.txt`), `scripts/btally.py`:
+
+| boss | arm | distinct fights | won | deaths | won ticks (median) | the divine landed |
+|---|---|---|---|---|---|---|
+| Doom | without | 12 | 9 | 35 | 13,859 | — |
+| Doom | Cleave | 12 | 10 | 28 | 14,249 | in 3 fights |
+| Doom | Bum Rush | 12 | 10 | 27 | 14,527.5 | in 4, about 36,000 each |
+| Doom | both | 12 | **11** | 28 | **11,431** | Bum Rush in 5 |
+| Inferno | without | 10 | 8 | 8 | 6,747.5 | — |
+| Inferno | Cleave | 10 | 8 | 8 | 8,053.5 | in 2 |
+| Inferno | Bum Rush | 10 | **10** | 5 | 7,972 | in 1 |
+| Inferno | both | 10 | **10** | **4** | 8,081.5 | in 2 |
+
+Quoted: "POOLED d_wo: 12 runs; distinct keys 12: won 9, lost 3; deaths
+over keys 35; won ticks 9136-20015 (median 13859)", "POOLED d_both: 12
+runs; distinct keys 12: won 11, lost 1; deaths over keys 28; won ticks
+8427-40647 (median 11431); bumrush 5 landed, median 36182, max 36934",
+"POOLED d_br: ... won 10, lost 2; deaths over keys 27; ... bumrush 4
+landed, median 36181", "POOLED d_cl: ... won 10, lost 2; deaths over keys
+28", "ARM i_wo: 12 runs; distinct keys 10: won 8, lost 2; deaths over
+keys 8", "ARM i_both: 12 runs; distinct keys 10: won 10, lost 0; deaths
+over keys 4; won ticks 4187-13277 (median 8081.5)", "ARM i_br: ... won
+10, lost 0; deaths over keys 5".
+
+- **Doom** is the fight they pay at. The stock fight now loses 3 of 12
+  (four or more deaths each); with both divines it loses one and wins
+  quicker. A Bum Rush that lands takes about 36,000 of Doom's HP (four
+  blows near the 9,999 cap: "actor=2's skill took 35908 off the
+  monsters ... [exec cmd $0A atk $64]"), more than half of it, but the
+  bank reaches three for SABIN in only 4-5 of 12 fights before the fight
+  ends, so it shortens Doom rather than trivialising it. GOGO's Mimic
+  copied a Cleave twice (four more shields, free).
+- **Inferno** (four shields) is short, and the divines rarely fire there
+  (Cleave in 2 of 10, Bum Rush in 1-2): the gain there (8 to 10 won) is
+  mostly the hold itself, the turns SABIN and CYAN spend banking instead
+  of boosting into Inferno's counter-heavy arms. A real effect of the
+  policy, but not the divines' damage.
+- **Not essential**: the stock fight still wins 9 of 12 at Doom and 8 of
+  10 at Inferno, and the leg retries a wipe from its save.
+- **Cleave alone** is a modest gain (10 of 12 at Doom, the same 8 of 10 at
+  Inferno): the strip comes once a fight at most, where the bank reaches
+  three. Its value is beside SABIN's.
+
+*Bum Rush at x4, measured and not shipped.* The worry was that four x8
+blows trivialise Doom. A variant ROM with Bum Rush's blows at x4 (the
+2-BP multiplier; `scripts/mutants.py` `bumrush_x4`, `x4/`, the same jobs)
+halved the hit ("bumrush 4 landed, median 18090") and took the payoff
+with it: "POOLED d_br4: 12 runs; distinct keys 12: won 9, lost 3; deaths
+over keys 30; won ticks 10419-19455 (median 17127)", no better than the
+stock fight and slower. At x8 it pays once the bank is spent on it; at x4
+the three held turns cost more than the hit returns.

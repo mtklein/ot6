@@ -28,7 +28,10 @@ FIGHT.nuke = function()
   if H.formationHas(MACHINES) then return { BOLT } end
   return nil
 end
-local BOSS_FIGHT = KT_BOSS_FIGHT or {}
+-- CYAN's Cleave and SABIN's Bum Rush, the divines, where they pay (#388, Driver:divineLine; wor-coverage.md 13.9:
+-- with both, Doom won 11 of 12 distinct fights against the stock fight's 9).  KT_BOSS_FIGHT, a lab's global,
+-- overrides it ({} is the stock fight)
+local BOSS_FIGHT = KT_BOSS_FIGHT or { divines = true }
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 H.careMagic, H.careCastFirst = true, true
