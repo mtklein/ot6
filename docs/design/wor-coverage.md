@@ -2105,7 +2105,7 @@ assertion it moves (`divines/mx/`, `bumrush/mx/`, `bumrushmimic/mx/`).
   random battles), where `land1` spent about 5 there. The Kohlingen stop
   now stocks 50 rather than 40 (`gen_wor_kt_factory`'s `TOWER_FENIX`): a
   **stopgap**, 2.5x the supply band, until the lap battles stop spending
-  Fenix Downs a player would not (#521). With it the line (`land4/` at
+  Fenix Downs a player would not (#521; now 35, route-wor-kefka-tower.md 7.6). With it the line (`land4/` at
   `a67f60b1`) reached Kefka with 19 and played to the end ("wor_kefka:
   fenix=19 -> fenix=19", PASS); in that play Doom was won in 17,715 ticks
   with neither divine fired.
@@ -2209,4 +2209,6 @@ $64 at 3 BP, ran $64 | GOGO: entered $64 at 2 BP, ran $5D, $3a70 {1,0}, MP
 fallback mutant (`brm_nofall`, `bumrush_nofall` from 13.9's
 `scripts/mutants.py`): "assertEq failed: GOGO's copy of Bum Rush under
 three points ran as Pummel ($5D, Ot6BlitzTake): got 100 ($64), want 93
-($5D)".
+($5D)". In the line's replay at c601661e it passed on the re-cut
+`wor-kt-guardian-v1` too ("PASS (frame 82484) attempts=1/1",
+`land2/land.ninja.log`'s suite edge).
