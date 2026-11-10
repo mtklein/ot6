@@ -106,3 +106,7 @@
 
 ; Strago's blue Bserk, appended for the same reason.
         .include "ot6_blue.asm"
+
+; a reflected spell with nowhere to land shows no bounce (#520), appended for
+; the same reason.
+        .include "ot6_reflect.asm"
