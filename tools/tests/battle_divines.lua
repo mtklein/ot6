@@ -186,6 +186,7 @@ local function cleave(n, onList)
   for _ = 1, n do plan[#plan + 1] = { who = CYAN, cmd = CMD_SWDTECH, row = CLEAVE, boost = 3, direct = true } end
   return plan
 end
+local plan1, plan3 = cleave(1), cleave(1)
 
 local steps = {}
 local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
@@ -213,7 +214,13 @@ add({
     H.writeWord(LOADOUT, 0)
     H.log("[battle 1] loadout word := 0 (AUTO) again")
   end),
-  H.kitBattle(cleave(1), { untilPlanDone = true, idle = "defend",
+  H.call(function()
+    -- aimed at one soldier: the strike on every enemy is the ROM's, not the cursor's (the cursor's default for
+    -- Cleave's targeting, $7a, is the whole enemy side)
+    plan1[1].slot = msPresent[1]
+    H.log(string.format("[battle 1] the Cleave aimed at soldier %d alone", msPresent[1]))
+  end),
+  H.kitBattle(plan1, { untilPlanDone = true, idle = "defend",
     onList = function() rowsSeen.auto = readRows() end,
     planDone = function() return #divineKills >= 1 and H.readByte(0x3E9D + cyanSlot * 2) == 0 end }),
   H.call(function()
@@ -294,10 +301,11 @@ add({
     H.writeByte(SH_CUR + ent(boss), 6)
     H.writeByte(BRK_TICKS + ent(boss), 0)
     hp3 = mhp(boss)
+    plan3[1].slot = boss              -- aimed at the boss alone: the add is struck by the ROM's widening
     H.log(string.format("[battle 3] soldier m%d as the boss: $3aa1.2 SET, HP := %d, shields := 6 (declared "
       .. "expedient); the other soldier(s) killable", boss, hp3))
   end),
-  H.kitBattle(cleave(1), { untilPlanDone = true, idle = "defend",
+  H.kitBattle(plan3, { untilPlanDone = true, idle = "defend",
     planDone = function() return #struck >= 1 and H.readByte(0x3E9D + cyanSlot * 2) == 0 end }),
   H.waitFrames(120),
   H.call(function()
