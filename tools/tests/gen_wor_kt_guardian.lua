@@ -107,11 +107,12 @@ local walk, door, chest = T.walk, T.door, T.chest
 -- TRAIN_LEVEL is the Goddess leg's bench level (gen_wor_kt_goddess's TRAIN_LEVEL), so party 1 does its training
 -- here and none in 355's east lane, whose Scullion (half that pool) opens with Condemned and outlasts party 1's
 -- kill: there party 1 lost a member in 6 of 10 Scullion battles in the line at 62a8b621 (6 of its leg's 7 Fenix
--- Downs; 11 of 15 at 3eb65922), here 9 deaths in 235 battles where training to L40 had 63 in 275 (#521,
--- route-wor-kefka-tower.md 7.6).  The five: the Sky Base in 352 (formation 413) opens with L.5 Doom, which kills
--- every member whose level is a multiple of five, and at L40 the training left EDGAR there (TERRA at L65): 30 deaths
--- in 13 meetings over 8 runs, every one of them won.  Killing the Sky Base first did not help (29 in 11): its L.5
--- Doom comes before the party's first turn.  A player who reads its script levels past the five
+-- Downs; 11 of 15 at 3eb65922).  This leg over 15-16 runs a grid (route-wor-kefka-tower.md 7.6, #521): trained to
+-- L40, 131 deaths in 547 random battles, 8.2 a run, before the Goddess leg's lap; trained to L46, 73 in 886, 4.9 a
+-- run, with that lap's levels already in hand.  The five: the Sky Base in 352 (formation 413) opens with L.5 Doom,
+-- which kills every member whose level is a multiple of five, and at L40 the training left EDGAR there (TERRA at
+-- L65): 68 deaths in its 29 meetings over 16 runs, every one of them won.  Killing the Sky Base first did not help
+-- (71 in 29): its L.5 Doom comes before the party's first turn.  A player who reads its script levels past the five
 local TRAIN_LEVEL, TRAIN_BATTLES = KT_TRAIN1 or 46, KT_TRAIN1_CAP or 60
 local function trainParty1()
   local lap, wp, n0 = { { 9, 16 }, { 9, 19 } }, 1, 0

@@ -15,7 +15,8 @@ local GODDESS = 0x128
 local GODDESS_SAVE = { 12, 31 }
 local BOLT_ELEMENT = 0x04
 local RIBBON = 0xCA
--- party 1's bench levels to TRAIN_LEVEL before the Goddess (route-wor-kefka-tower.md 6.1 and 6.3)
+-- party 1's bench levels to TRAIN_LEVEL before the Goddess (route-wor-kefka-tower.md 6.1 and 6.3); gen_wor_kt_guardian
+-- trains it to the same level by party 1's landing (#521), so the lap below is fought only when a level is missing
 local TRAIN_LEVEL = KT_TRAIN or 46
 -- where it laps: 355's east lane (pool group 220: the Scullion, three Innocs) or 354 below her (group 226: the
 -- Madam and her Outsiders among four) (section 6.3)
