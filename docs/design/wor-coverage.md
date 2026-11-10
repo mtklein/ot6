@@ -2109,3 +2109,104 @@ assertion it moves (`divines/mx/`, `bumrush/mx/`, `bumrushmimic/mx/`).
   `a67f60b1`) reached Kefka with 19 and played to the end ("wor_kefka:
   fenix=19 -> fenix=19", PASS); in that play Doom was won in 17,715 ticks
   with neither divine fired.
+
+### 13.10 Cleave in the lap battles; Bum Rush against the hold (#388, #521, v0.41)
+
+Evidence under `build/attempts/wt/v041-tower-laps/`. The tower's Fenix
+Downs (13.9's last item) are route-wor-kefka-tower.md 7.6.
+
+**Cleave in the lap battles, measured and not shipped.** Cleave's other
+half is instant death on a killable body, so the TLM's call was to try it
+where party 3 trains: the Doom leg's lap in 355's west lane (the Scullion,
+death-immune, and three Innocs, killable, whose Muddle is the lap's only
+killer). `Driver:lapCleave` (`opts.divines.laps`): CYAN banks with
+unboosted Fights while a killable body of 3,000 HP or more stands and, at
+three points, Cleaves the most dangerous one (a status inflicter first,
+then the most HP); GOGO's Mimic line copies it where it can. `laps =
+"strip"` also takes the event battles' strip on a death-immune body. From
+the line's `wor-kt-guardian-v1` (62a8b621), the Doom leg at shifts 0-11,
+one attempt a run (`b1/lw_*`, `lc_*`, `lcs_*`; `laptally.txt`,
+`lappair_lc.txt`, `lappair_lcs.txt`, `sh/lappair.py`): the twelve shifts
+hold only four lap histories (shifts 2-5, 6-9 and 10-11 play alike), 44
+distinct battle keys an arm.
+
+| arm | lap battles (keys) | lap deaths | Cleaves on the lap | Innoc keys shared with `lw`, Cleaved | their deaths | their median won ticks |
+|---|---|---|---|---|---|---|
+| `lw` stock | 176 (44) | 10 | 0 | — | 2 | 6,114 |
+| `lc` | 176 (44) | 10 | 14 | 7, 3 | 2 | 6,122 |
+| `lcs` | 180 (49) | 14 | 18 | 7, 2 | 2 | 6,794 (`lw` 7,103 on its 7) |
+
+Quoted: "SUMMARY lc vs lw: shared keys 27 of 44/44; fewer deaths on 0, more
+on 0 (sign test p=1.000); deaths lw 2, lc 2", "FORMATION 0190: shared keys
+7 (lc Cleaved on 3); deaths lw 2, lc 2; median won ticks lw 6114, lc
+6122". Doom was won in all 36.
+
+- Party 3's lap already loses nobody to the Scullion (140 meetings an arm,
+  0 deaths), and the strip never fired on it: no Scullion stood unbroken
+  with two shields when CYAN's bank reached three.
+- On the Innocs, Cleave kills one on CYAN's third turn; by then their
+  Muddle has landed, and the fallen member is a muddled ally's hit, so the
+  deaths did not move. Of the three keys it fired on, one ended 2,808 ticks
+  sooner (`be34`), one 448 sooner, one 8 later.
+- GOGO never copied it: the Cleave kills its target, and the Mimic line
+  will not copy an action whose targets have fallen ("GOGO no Mimic: the
+  last SwdTech's targets have fallen").
+
+**Proposed instead (a data change, not made):** Cleave at three points
+strikes every enemy, not one: each killable body dies and each death-immune
+one loses four shields. Against the lane's three Innocs that ends the
+battle on CYAN's third turn, before most of their Muddles; against a boss
+it is the strip it already is. Vanilla's Cleave is single-target, so this
+is a design call for the TLM.
+
+**Bum Rush against the banking hold.** 13.9's Doom grid could not tell
+the divines from the hold. The control arms hold the same way on the same
+targets and, at three points, cast nothing (`opts.divines.cast = false`,
+`Driver:divineWithheld`: "Bum Rush withheld on slot 0 at 3 BP (control:
+the hold, no divine) -- the bank goes to the lines below"): `hS` SABIN's
+hold alone (against `br`), `hB` both members' (against `both`). Run on
+the grid's own tree, ROM (sha256 ad650337) and capture (37f0fa7c), the
+library at 651f8d82 plus the lever (`sh/control.patch`), the Air
+(`b2/`, `ctl/`); two `wo` runs replayed to the tick ("wo_t46_s14: key
+be3C WON ticks=8919 deaths=1", as 13.9's "d_wo_t46_s14").
+
+| arm | keys | won | gains / losses | p | deaths | won ticks (median) |
+|---|---|---|---|---|---|---|
+| `hS` vs `wo` | 31 | 24 vs 23 | 7 / 6 | 1.0 | 77 vs 78 | 13,185 vs 13,331 |
+| `br` vs `hS` | 31 | 26 vs 24 | 2 / 0 | 0.5 | 61 vs 77 | 13,292 vs 13,185 |
+| `hB` vs `wo` | 31 | 28 vs 23 | 8 / 3 | 0.23 | 52 vs 78 | 10,523 vs 13,331 |
+| `both` vs `hB` | 31 | 28 vs 28 | 0 / 0 | 1.0 | 52 vs 52 | 10,671 vs 10,523 |
+
+Quoted: "SUMMARY both vs hB: keys 31; won hB 28, both 28; gains 0, losses
+0, sign test p=1.000; deaths hB 52, both 52", "SUMMARY br vs hS: keys 31;
+won hS 24, br 26; gains 2, losses 0, sign test p=0.500; deaths hS 77, br
+61", "SUMMARY hB vs wo: keys 31; won wo 23, hB 28; gains 8, losses 3, sign
+test p=0.227; deaths wo 78, hB 52".
+
+- **With CYAN holding too, Bum Rush adds nothing at Doom**: `hB` wins the
+  same 28 keys as `both`, with the same 52 deaths. What helped `both` was
+  the two members banking with unboosted Fights (CYAN's keyed Fight at
+  three points), not the divines. On the 11 keys where Bum Rush landed,
+  `both` was sooner on 5 and later on 6 (median 9,632 against 10,384
+  ticks), 7 deaths each.
+- **Alone, it may help a little**: on the 10 keys where SABIN's landed,
+  `br` lost 14 members where `hS` lost 30, and finished sooner on 7; it won
+  two keys `hS` lost and lost none it won. Not outside chance (p = 0.5).
+- **Proposed (a data change, not made):** Bum Rush's four blows take a
+  shield each, whatever the body's classes, as Cleave's strip does, so the
+  turn that spends three points and 99 MP also breaks: the party's next
+  hits land on a Broken body at double damage instead of on Doom's
+  bludgeon-proof shields, which is where the keyed 3-BP Fight out-earns it
+  now.
+
+**battle_bumrushmimic in Doom's battle.** The suite now Continues
+`wor-kt-guardian-v1` and plays `gen_wor_kt_doom`'s walk, training and
+dress to Doom (63,000 HP), so the copy runs with no state written; its
+waiver line is gone. Untrained, Doom killed SABIN with Bum Rush queued
+(`bumrushmimic/brm1`, a wipe). As shipped: "[bumrushmimic] SABIN: entered
+$64 at 3 BP, ran $64 | GOGO: entered $64 at 2 BP, ran $5D, $3a70 {1,0}, MP
+605 -> 605", "PASS (frame 98685) attempts=1/1" (`brm2`); red on the
+fallback mutant (`brm_nofall`, `bumrush_nofall` from 13.9's
+`scripts/mutants.py`): "assertEq failed: GOGO's copy of Bum Rush under
+three points ran as Pummel ($5D, Ot6BlitzTake): got 100 ($64), want 93
+($5D)".
