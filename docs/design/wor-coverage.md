@@ -1719,8 +1719,9 @@ clock and so the next fight's key.
 - **SABIN's Spiraler**: learned on the line by level; never cast.
   **Bum Rush and Cleave**: learned on the line by story; measured at party
   3's two bosses and dropped (13.8), then remade as divines and measured
-  again (13.9): Bum Rush pays at Doom; Cleave's strip does not yet pay at
-  either boss (open).
+  again (13.9): a landed Bum Rush takes over half of Doom, but no arm's
+  gain is outside chance and the banking hold may account for it; Cleave's
+  strip pays at neither boss (open).
   Fire Dance is never cast; `opts.blitz` is one Blitz per leg. An
   all-body Blitz by body count was not as good as Pummel (13.5).
 - **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`. The rages he
@@ -1985,8 +1986,11 @@ without becoming essential. The TLM's calls, built in `581d7e45`
 (kits.md "Divines"): Cleave on a death-immune body also takes four
 shields before its cut, and Bum Rush is SABIN's 3-BP divine (refused
 under three points; at three, four bludgeon blows each at the boost's x8,
-99 MP). Measured below: **Bum Rush pays at Doom; Cleave, as built or with
-every shield stripped, pays at neither of party 3's bosses** -- the open
+99 MP). Measured below: **a landed Bum Rush takes more than half of Doom's HP and
+the Bum Rush arms die less (61 and 52 deaths against 78), but no arm's win
+gain is outside chance and most of `both`'s flipped fights had no divine
+land, so the banking hold may be what helps; Cleave, as built or with every
+shield stripped, pays at neither of party 3's bosses** -- the open
 question at the end.
 
 *The driver.* `opts.divines` (`Driver:divineLine`), event battles only:
@@ -2041,7 +2045,7 @@ br 61", "SUMMARY both vs wo: keys 28; won wo 26, both 27; gains 2, losses
   was won ("d_both_t46_s10: key be74 WON ... bumrush_dmg=36934"). It
   lands in about a third of the fights: the hold's three turns often run
   past the fight's end or into the spend-before-dying rule.
-- **Cleave pays nowhere measured.** All six of `cl`'s gains at Doom came
+- **Cleave pays nowhere measured.** All five of `cl`'s gains at Doom came
   in fights where no Cleave went off (`doomw_pair.txt`: each GAIN row has
   `cl_hold` and no `cleave=1`): the gain is CYAN's hold, banking with
   unboosted Fights, not the strip. Where it fired it was a 9,999 cut and

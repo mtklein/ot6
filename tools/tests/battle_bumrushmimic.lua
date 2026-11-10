@@ -11,7 +11,7 @@
 -- (H.kitBattle; Defends bank the points, the others Defend): SABIN's Bum Rush at 3 BP, then GOGO's Mimic at 2 BP.
 -- Declared unit-test expedient (tools/state_write_waivers.txt): at the battle's open every present monster's HP is
 -- raised to 60,000, so the battle outlasts Bum Rush's four blows (at most 4 x 9,999) and GOGO's copy runs.  The
--- copy needs a battle that outlasts the original, and none the party meets does: in the factory's random battles
+-- copy needs a battle that outlasts the original; Doom (63,000 HP) would host it write-free (a later move); in the factory's random battles
 -- the four blows ended all 12 battles before the copy ran (dev run brm1), and in Inferno's SABIN fell before his
 -- bank reached three (brm2, build/attempts/wt/v041-cleave-bumrush/bumrushmimic/).  The run ends once the copy has
 -- resolved; the battle is not fought out (a mechanism test, no claim about play).
