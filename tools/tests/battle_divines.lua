@@ -288,7 +288,7 @@ add(bootBattle(17, "battle 3"))
 add({
   H.call(function()
     H.assertEq(#msPresent >= 2, true, "battle 3 fields two or more soldiers")
-    boss = msPresent[1]
+    boss = msPresent[#msPresent]     -- the highest slot: the record's primary target (the lowest) is an add
     H.writeByte(0x3AA1 + ent(boss), H.readByte(0x3AA1 + ent(boss)) | 0x04)
     H.writeWord(0x3BFC + boss * 2, 30000)
     H.writeByte(SH_CUR + ent(boss), 6)

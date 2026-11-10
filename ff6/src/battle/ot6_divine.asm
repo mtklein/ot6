@@ -53,19 +53,22 @@ OT6_PUMMEL        = $5d         ; blitz 1, the fallback under three points
 ;                              power of 70 after CalcDmg had run, so it
 ;                              landed nothing at all.
 ;
-; Since #388's second call (the TLM's, 2026-11-10) Cleave strikes every enemy:
-; aimed at the monsters, its mask becomes every living monster (Ot6CleaveWide,
-; $3a75), each killable one takes the Death mark, and each death-immune one
+; Cleave's record strikes the whole enemy side: SwdTech has no target select
+; (it is in RetargetCmdTbl), and ChooseTarget's pick for its targeting ($7a)
+; is every monster.  Before #388's second call only the primary target (the
+; lowest slot) was read: a killable primary died and the bodies beside it
+; took the record's own Death roll; a death-immune primary turned the record
+; into the cut, and a killable body beside it took the cut instead of Death.
+; Since that call (the TLM's, 2026-11-10) each body struck is read: each
+; killable one takes the Death mark (Ot6CleaveMark), and each death-immune one
 ; loses four shields (Ot6CleaveStrip) and takes the cut, unsplit ($11a2 bit 6:
 ; each body takes the whole cut, not the half vanilla gives a spread).  The
-; record is patched to the cut when any struck body is death-immune; a
-; killable body beside it dies by its mark whatever the cut does.  A Cleave
-; aimed at the party (a copy under Muddle or Charm) keeps its one target.
+; record is patched to the cut when any struck body is death-immune; a killable
+; body beside it dies by its mark whatever the cut does.
 ;
 ; entry: jsl from CalcAttackEffect just after ChooseTarget. a16/i8, db=$7e;
 ; x = attacker entity offset, $b8/$b9 = target mask, $3a7d = attack id. preserves
-; x (the caller indexes it right after) and y; may edit $b9 and
-; $11a6/$11aa/$11a2/$11a7.
+; x (the caller indexes it right after) and y; may edit $11a6/$11aa/$11a2/$11a7.
 
 OT6_CLEAVE_BOSS_POWER = 255
 OT6_CLEAVE_SHIELDS    = 4       ; Break's 3-BP ceiling (Ot6BreakChips)
@@ -78,7 +81,6 @@ OT6_CLEAVE_SHIELDS    = 4       ; Break's 3-BP ceiling (Ot6BreakChips)
         lda     $3a7d
         cmp     #$5c            ; cleave's attack id?
         bne     done            ; no: this attack is untouched
-        jsr     Ot6CleaveWide   ; every living enemy
         jsr     Ot6CleaveStrip  ; each death-immune body struck: four shields
         jsr     Ot6CleaveMark   ; each killable body struck: Death; carry set
         bcc     done            ;   if a death-immune one was struck
@@ -98,24 +100,7 @@ done:   plp
         rtl
 .endproc
 
-; [ Cleave strikes every enemy ]
-;
-; A Cleave aimed at the monsters ($b9 nonzero) strikes every living one
-; ($3a75: present, targetable and not wounded, petrified or zombied, the
-; mask UpdateDead keeps).  Aimed at the party, it keeps its target.
-; a8/i8, db=$7e.  Clobbers A.
-.proc Ot6CleaveWide
-        .a8
-        lda     $b9
-        beq     @out            ; aimed at the party: untouched
-        lda     $3a75
-        and     #$3f
-        beq     @out            ; (defensive: nothing alive to widen to)
-        sta     $b9
-@out:   rts
-.endproc
-
-; [ Cleave's Death: each killable body struck dies ]
+; [ Cleave's Death: each killable body it strikes dies ]
 ;
 ; Walks the struck mask (monsters $b9, then the party $b8) and marks Death
 ; in each killable body's "status to set" ($3dd4, applied by UpdateStatus
