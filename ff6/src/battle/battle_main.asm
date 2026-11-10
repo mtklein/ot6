@@ -8828,8 +8828,10 @@ CalcReflectDmg:
         bpl     @34c2
         pla
         plx
-        lda     #$0010
-        bit     $ba
+        jsl     Ot6ReflectNowhere ; ot6 #520: was `lda #$0010 / bit $ba`
+        nop                     ;   (repeated there): a bounce that found no
+                                ;   body shows no bounce, which hung the
+                                ;   battle script (vanilla's; ot6_reflect.asm)
         bne     @3525
         lda     $3018,x
         sta     $ae
