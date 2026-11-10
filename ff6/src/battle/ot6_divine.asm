@@ -13,9 +13,9 @@
 ;   Ot6Assassinate  Shadow's divine, on a hit of a 3-BP action
 ; BP is spent through Ot6ActionEnd like any boosted action.
 ;
-; Sabin's Bum Rush (#388) is built here too: its gate sits in three places
+; Sabin's Bum Rush (#388) is built here too: its gate sits in two places
 ; (the Blitz list's grey and confirm, Ot6BushidoRowGrey's blitz arm; the
-; queue's price, Ot6AbilityCost; the command, Ot6BlitzTake), and what the
+; command, Ot6BlitzTake), and what the
 ; full boost buys is the Blitz row's own: Ot6BoostDmg's x8 on each of its
 ; four blows (Ot6HitCountTbl).
 ; ------------------------------------------------------------------------------
@@ -339,12 +339,16 @@ done:   ply
 ; boost: four bludgeon blows (Ot6HitCountTbl +3), each at Ot6BoostDmg's x8,
 ; for 99 MP (Ot6BoostPriceFor's cap; the row's base is the 99 ceiling).
 ;
-; Picked at three and taken back to fewer (L at target select), the action
-; is Pummel at the boost that is left, priced as Pummel at that boost: the
-; queue rewrites the row (Ot6AbilityCost, which runs after the take-back)
-; and this proc is the command's own check, which also covers a copy whose
-; boost is read at execution (a Gogo's Mimic: kits.md "Divines").  So
-; nothing is charged that was not delivered, and the turn is not lost.
+; A Blitz commits from the list with no target select, so SABIN's own pick
+; is never taken back to fewer points: the list's grey and confirm are his
+; gate, and the queue prices the row at the three it was picked at.  This
+; proc is the command's own check, for a copy whose boost is read at
+; execution: a Gogo's Mimic, which skips the list and the queue's price
+; (mimicreplace copies the queued word without CreateAction).  Under three of
+; Gogo's points the copy is Pummel at the boost he has, and free, as every
+; Mimic is (kits.md "Divines"; battle_bumrushmimic).  A queue-side rewrite
+; for a take-back (Ot6BumRushQueue, #388's first build) is gone: no path
+; reaches the queue with Bum Rush under three points (review of 7b94f5f9).
 ;
 ; jsl from Cmd_0a in place of `jsl Ot6HitCount`, with A = $b6, the blitz's
 ; attack id, and y = the attacker's entity offset (ExecCmd's txy).  a8,
@@ -367,26 +371,6 @@ done:   ply
         bra     @go
 @keep:  pla
 @go:    jml     Ot6HitCount
-.endproc
-
-; [ the queue's half: a Bum Rush queued under three points is Pummel ]
-;
-; jsr from Ot6AbilityCost's Blitz arm (ot6_boost.asm), before the price is
-; looked up, so the row queued and the row priced are the same one.  a8,
-; i16, x = the attacker's entity offset, db=$7e.  Rewrites $3a7b (the
-; queued attack, stored to $3420 a few instructions on, as Ot6QueueFold's
-; rewrites are).  Preserves x and y; clobbers A.
-.proc Ot6BumRushQueue
-        .a8
-        lda     $3a7b
-        cmp     #OT6_BUMRUSH
-        bne     @out
-        lda     OT6_BOOST_REVEALED,x
-        cmp     #OT6_BUMRUSH_BOOST
-        bcs     @out            ; three points pending: Bum Rush, 99 MP
-        lda     #OT6_PUMMEL
-        sta     $3a7b
-@out:   rts
 .endproc
 
 ; [ a Blitz picked at random: never Bum Rush ]

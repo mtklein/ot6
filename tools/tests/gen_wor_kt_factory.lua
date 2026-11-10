@@ -193,8 +193,9 @@ H.run({ maxFrames = 2400000 }, {
   board(),
   -- no shop past this stop: the bag is stocked for the whole tower and Kefka (#274: the line's first play of the
   -- tower spent 14 of 20 Fenix Downs before Kefka, and reached him with 6; route-wor-the-end.md section 6; #388:
-  -- stocked with 40, a reshuffled draw spent 29 of 38 and stopped at gen_wor_kefka's floor of 10, the Goddess leg's
-  -- laps 15 of them: wor-coverage.md 13.9)
+  -- stocked with 40, the whole tower (Inferno to the plates) spent 29 of 38 on a reshuffled draw and stopped at
+  -- gen_wor_kefka's floor of 10, the Goddess leg's laps 15 of them: wor-coverage.md 13.9.  The 50 is a stopgap:
+  -- the legs' lap battles spend Fenix Downs a player would not, #521)
   H.cond(function()
     return H.invCountOf(POTION) < TOWER_POTIONS or H.invCountOf(FENIX) < TOWER_FENIX
   end, { K.kohlingenStop("the top-up before Kefka's Tower", { fenix = TOWER_FENIX, potions = TOWER_POTIONS }) }, {}),

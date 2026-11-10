@@ -49,7 +49,8 @@
 --     takes exactly four shields (6 -> 2, one in-proc write each), and the
 --     second takes what is left, the last one breaking him (an in-proc
 --     OT6_BROKEN_TICKS write).
--- #388's old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/.
+-- #388's old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/divines/mx/ (main's ROM fails at load,
+-- its symbols lacking Ot6TakeShields; the cleave_nostrip mutant is main's behaviour at run time).
 -- A kill is checked against the mechanism with pc-gated write watches
 -- (Death marks and the power write from inside Ot6Oblivion), so a cut that
 -- damage-kills cannot be mistaken for the divine.  Old-ROM red (main's ROM

@@ -107,7 +107,7 @@ kept, #461, and a copy on a boss strips its four shields too).
 Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
 (Fire at 3 BP, after her World of Ruin return; see Terra below).  `$3ecb`,
 the once-a-battle flag (`OT6_DIVINE_USED`), is retired.
-Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_bumrush`, `battle_jackpot`,
+Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_bumrush` and `battle_bumrushmimic`, `battle_jackpot`,
 `battle_assassinate`, `battle_trance` and `battle_morphrandom`, `battle_runicblade`,
 `battle_overclock`, `battle_umaro`, `battle_mastersmark`, each with its gate
 (under 3 BP no divine), and an old-ROM red; the menu divines also with a
@@ -208,12 +208,14 @@ The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
   arm, Master's Mark's grey).  At three it is the row at the full boost:
   four bludgeon blows (`Ot6HitCountTbl`), each at `Ot6BoostDmg`'s x8, for
   99 MP.  A Blitz commits from the list with no target select, so a pick is
-  never taken back; a copy whose boost is read at execution under three (a
-  Gogo's Mimic) runs as Pummel at that boost and is priced as Pummel
-  (`Ot6BlitzTake` at the command, `Ot6BumRushQueue` at the queue).  *Reason:
-  as a row at any boost it was four blows for 99 MP that a boosted Pummel
-  or Fight out-earned (wor-coverage.md 13.8); at the full boost its four
-  blows each carry the x8.*  `battle_bumrush`.
+  never taken back, and no queue-side rewrite is needed (#388's first
+  build had one, `Ot6BumRushQueue`, which nothing could reach; removed).  A
+  copy whose boost is read at execution under three (a Gogo's Mimic) runs as
+  Pummel at that boost, and is free as every Mimic is (`Ot6BlitzTake` at the
+  command).  *Reason: as a row at any boost it was four blows for 99 MP that
+  a boosted Pummel or Fight out-earned (wor-coverage.md 13.8); at the full
+  boost its four blows each carry the x8.*  `battle_bumrush` (the list's
+  gate and the four blows), `battle_bumrushmimic` (the Mimic's Pummel).
 Bum Rush is Sabin's ultimate and is
 fixed at **99**, which is 13.0% of his L70 pool of 760 and the same fraction
 Cleave is of Cyan's pool; both are pinned there so the fractions match. Mantra

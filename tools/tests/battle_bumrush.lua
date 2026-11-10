@@ -20,7 +20,8 @@
 -- MP is a soft precondition, topped up the way a player would (field care between battles), and asserted at each
 -- battle's start.  A battle SABIN cannot act in, or one that ends before the action resolves, is fought out and
 -- not counted.
--- Old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/bumrush/.
+-- Old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/bumrush/mx/ (main's ROM fails at load, its symbols
+-- lacking Ot6BlitzTake; each mutant fails at run time on the assertion it moves).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
