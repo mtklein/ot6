@@ -91,6 +91,28 @@ FIGHT.nuke = function()
   if H.formationHas({ [VECTAUR] = true, [BRONTAUR] = true }) then return { ICE } end
   return nil
 end
+-- The Sky Base (352's formation 413, with four IronHitmen) casts L.5 Doom, which kills every member whose level is a
+-- multiple of five; the training below stops at L40, and TERRA stood at L65, so it took both in each of the line's
+-- two meetings at 62a8b621 (7 deaths in 2 battles, the leg's 9; #521).  A player who reads the script kills the
+-- caster first while a standing member's level is a multiple of five (the kill order, focusList)
+local SKY_BASE = 0x0FC
+if KT_SKYBASE ~= false then
+  FIGHT.focus = function(_, memo)
+    if not (H.battleLoadStarted() and H.formationHas({ [SKY_BASE] = true })) then return nil end
+    for s = 0, 3 do
+      local id = H.readByte(0x3ED8 + s * 2)
+      if id < 14 and H.readWord(0x3BF4 + s * 2) > 0 and H.readByte(0x1600 + 37 * id + 8) % 5 == 0 then
+        if not memo.said then
+          memo.said = true
+          H.log(string.format("[focus] the Sky Base first: %s stands at L%d, a multiple of five (L.5 Doom)",
+            NAMES[id] or tostring(id), H.readByte(0x1600 + 37 * id + 8)))
+        end
+        return { { species = SKY_BASE } }
+      end
+    end
+    return nil
+  end
+end
 local BOSS_FIGHT = KT_BOSS_FIGHT or {}
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
@@ -104,7 +126,7 @@ local walk, door, chest = T.walk, T.door, T.chest
 -- party 1's training: a two-tile lap by its landing (334 (9,16)-(9,19); lab_tower_split's lap, where plan M's party 1
 -- won 60 of 60 under the rows: section 7.1), the walker fighting what comes and the care after each battle, until
 -- every member of party 1 stands at TRAIN_LEVEL, at most TRAIN_BATTLES battles
-local TRAIN_LEVEL, TRAIN_BATTLES = 40, 40
+local TRAIN_LEVEL, TRAIN_BATTLES = KT_TRAIN1 or 40, KT_TRAIN1_CAP or 40
 local function trainParty1()
   local lap, wp, n0 = { { 9, 16 }, { 9, 19 } }, 1, 0
   local function low()

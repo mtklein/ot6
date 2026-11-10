@@ -8765,11 +8765,19 @@ end
 --   Bum Rush (SABIN, the Blitz list's eighth row): on a target holding bumRushHp HP or more, with the 99 MP
 --     the event battle's budget pays: at three points, Bum Rush (four bludgeon blows at x8); under three, the
 --     hold.  M.boostPlan refuses it under three, so no other line queues the greyed row.
+-- opts.divines.cast = false (#388 control): the same holds on the same targets, and at three points no divine: the
+-- lines below spend the bank (the banking hold without the divine, the control the Doom grid lacked).
+-- opts.divines.laps (#388/#521): random battles too, CYAN's Cleave only (Driver:lapCleave); laps = "strip" also
+-- takes the event battles' strip rule on a death-immune body there.
 function Driver:divineLine(actor, have)
   local o = self.opts.divines
-  if not o or M.readByte(M.RANDBTL) ~= 0 then return nil end
+  if not o then return nil end
   o = type(o) == "table" and o or {}
   local id = M.readByte(BATTLE.BCHID + actor * 2)
+  if M.readByte(M.RANDBTL) ~= 0 then
+    if id == 2 and o.laps then return self:lapCleave(actor, have, o) end
+    return nil
+  end
   if id ~= 2 and id ~= 5 then return nil end
   local slot = self:pressTarget()
   if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
@@ -8798,6 +8806,7 @@ function Driver:divineLine(actor, have)
     if (M.readByte(0x3AA1 + 8 + slot * 2) & 0x04) == 0 or broken or sh < (o.cleaveShields or 2) then return nil end
     if have < 3 then return hold(string.format("CYAN holds for Cleave on slot %d (%d shield(s), death-immune)",
       slot, sh)) end
+    if o.cast == false then return self:divineWithheld(actor, "Cleave", slot) end
     M.log(string.format("[%s] actor=%d CYAN Cleave on slot %d (%d HP, %d shield(s), death-immune) at 3 BP, %d MP "
       .. "of %d", tag, actor, slot, hp, sh, cost, mp))
     return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true, tier = 3, row = row, boostLeft = 0,
@@ -8809,10 +8818,74 @@ function Driver:divineLine(actor, have)
   local b, price, why = M.kitBoost(actor, M.BUMRUSH, 3)
   if b ~= 3 then return nil end
   if have < 3 then return hold(string.format("SABIN holds for Bum Rush on slot %d (%d HP)", slot, hp)) end
+  if o.cast == false then return self:divineWithheld(actor, "Bum Rush", slot) end
   M.log(string.format("[%s] actor=%d SABIN Bum Rush on slot %d (%d HP, %d shield(s)%s) at 3 BP, %d MP of %d -- %s",
     tag, actor, slot, hp, sh, broken and ", Broken" or "", price or 99, mp, why or ""))
   return { kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = M.BUMRUSH, row = row, boostLeft = 3,
            reason = "divine_bumrush" }
+end
+
+-- The control's three points (opts.divines.cast = false): said once a battle per member, and nil, so the lines
+-- below spend the bank the hold built.
+function Driver:divineWithheld(actor, what, slot)
+  local key = "divine_withheld:" .. actor
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d %s withheld on slot %d at 3 BP (control: the hold, no divine) -- the bank "
+      .. "goes to the lines below", self.tag or "fight", actor, what, slot))
+  end
+  return nil
+end
+
+-- CYAN's Cleave in a random battle (opts.divines.laps; #388, #521): the SwdTech window's 3-BP row is instant death
+-- on a killable body, so it goes on the most dangerous killable monster standing: one whose script puts a status on
+-- the party (statusInflicter: the Innocs' Muddle), else the one with the most HP; only a body holding at least
+-- o.lapHp HP (3000), so a Fight's work is not paid 99 MP.  Under three points the hold banks (an unboosted Fight);
+-- at three, Cleave aimed at that body.  laps = "strip" also takes the event battles' rule where no killable body
+-- qualifies: a death-immune one holding o.cleaveShields (2) shields or more, not Broken (the four-shield strip).
+-- Reads: each monster's HP, shields, Broken timer, death immunity ($3AA1 bit 2) and script; CYAN's bank, MP and
+-- known techs.
+function Driver:lapCleave(actor, have, o)
+  local row = cmdRow(actor, BATTLE.CMD_SWDTECH)
+  local cost = M.abilityCost(M.CLEAVE) or 99
+  local mp = M.readWord(BATTLE.CURMP + actor * 2)
+  if o.cleave == false or row == nil or self.skillDead[BATTLE.CMD_SWDTECH]
+     or (M.readByte(0x1CF7) & 0x80) == 0 or mp < cost then return nil end
+  local best, bestHp, bestInf, strip = nil, -1, false, nil
+  for s = 0, 5 do
+    if monAlive(s) then
+      local hp = M.readWord(BATTLE.MON_HP + s * 2)
+      local immune = (M.readByte(0x3AA1 + 8 + s * 2) & 0x04) ~= 0
+      if not immune and hp >= (o.lapHp or 3000) then
+        local inf = statusInflicter(s) ~= nil
+        if (inf and not bestInf) or (inf == bestInf and hp > bestHp) then best, bestHp, bestInf = s, hp, inf end
+      elseif immune and o.laps == "strip" and strip == nil and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0
+             and M.readByte(BATTLE.SH_CUR + s * 2) >= (o.cleaveShields or 2) then
+        strip = s
+      end
+    end
+  end
+  local what = "killable"
+  if best == nil then best, what = strip, "death-immune: the strip" end
+  if best == nil then return nil end
+  local tag = self.tag or "fight"
+  local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
+  if have < 3 then
+    if o.hold == false or fight == nil then return nil end
+    local key = "divine_hold:" .. actor .. ":" .. have
+    if not self.statusSaid[key] then
+      self.statusSaid[key] = true
+      M.log(string.format("[%s] actor=%d CYAN holds for Cleave on slot %d (%d HP, %s): bank %d of 3 -- an "
+        .. "unboosted Fight banks the point", tag, actor, best, M.readWord(BATTLE.MON_HP + best * 2), what, have))
+    end
+    return { kind = "fight", row = fight, boostLeft = 0, aim = self:chipAim(actor, 0), reason = "divine_bank" }
+  end
+  if o.cast == false then return self:divineWithheld(actor, "Cleave", best) end
+  M.log(string.format("[%s] actor=%d CYAN Cleave on slot %d (%d HP, %d shield(s), %s) at 3 BP in a random battle, %d "
+    .. "MP of %d", tag, actor, best, M.readWord(BATTLE.MON_HP + best * 2), M.readByte(BATTLE.SH_CUR + best * 2), what,
+    cost, mp))
+  return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true, tier = 3, row = row, boostLeft = 0,
+           aimHard = best, reason = "divine_cleave" }
 end
 
 -- Which of SETZER's lines pays this turn, or nil (the lines below it: the
