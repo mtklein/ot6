@@ -9,7 +9,7 @@
 ; GfxCmd_09 (btlgfx_main.asm; $15 jumps into its tail) never returns: the
 ; battle-script interpreter sits in ExecBtlGfx command 4 and the battle never
 ; reaches BattleLoop again.  That is vanilla's: the retail ROM hangs the same
-; way (build/attempts/wt/v041-battle-hang/vanilla/: a monster's Imp at a
+; way (build/attempts/wt/v041-battle-hang/vanilla/vr_rd: a monster's Imp at a
 ; reflecting member with every monster down; with a monster standing, or
 ; without the Reflect, the script returns).
 ;
