@@ -2008,14 +2008,20 @@ over keys 4; won ticks 4187-13277 (median 8081.5)", "ARM i_br: ... won
   (Cleave in 2 of 10, Bum Rush in 1-2): the gain there (8 to 10 won) is
   mostly the hold itself, the turns SABIN and CYAN spend banking instead
   of boosting into Inferno's counter-heavy arms. A real effect of the
-  policy, but not the divines' damage. Routed at Inferno too, the line
-  (`land2/`, from power-on at `1a06b6c2`) reshuffled the tower's later
-  draws: Guardian's leg spent 11 Fenix Downs (34 to 23; at `53118d96`,
-  with Inferno's stock fight, the capture after it differs) and
-  `gen_wor_kefka` stopped at its floor, "the bag for Kefka: 9 Fenix Downs
-  (floor 10) and 70 Potions (floor 40), stocked at Kohlingen by
-  gen_wor_kt_factory". So the line keeps Inferno's stock fight and routes
-  the divines at Doom only.
+  policy, but not the divines' damage, so the line keeps Inferno's stock
+  fight and routes the divines at Doom only.
+- **The tower's Fenix Downs.** The line with the divines routed (`land2/`
+  at `1a06b6c2` with Inferno's too, `land3/` at `3eb65922` with Doom's
+  only) stopped at `gen_wor_kefka`'s floor both times: "the bag for
+  Kefka: 9 Fenix Downs (floor 10) and 70 Potions (floor 40), stocked at
+  Kohlingen by gen_wor_kt_factory". Doom itself spent none in `land3`
+  (29 before and after, won in 10,719 ticks); the reshuffled draws after
+  it did: the Goddess leg's laps (party 1, which has neither CYAN nor
+  SABIN) spent 15 (24 to 9, 16 deaths, nearly all in random battles),
+  where `land1` spent about 5 there. The Kohlingen stop before the tower now
+  stocks 50 rather than 40 (`gen_wor_kt_factory`'s `TOWER_FENIX`). Fenix
+  Downs spent in the Goddess leg's random battles are a lab candidate of
+  their own.
 - **Not essential**: the stock fight still wins 9 of 12 at Doom and 8 of
   10 at Inferno, and the leg retries a wipe from its save.
 - **Cleave alone** is a modest gain (10 of 12 at Doom, the same 8 of 10 at
