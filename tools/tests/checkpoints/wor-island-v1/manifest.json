@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "d546ddecdc8689cb22a8ff91639dc0052a741d431080d9aef7ea8afe27b15120",
+  "sha256": "abe858d8bce166128f6b1701cd647ccdd1ccbdbb5f7e236c157fc43a881d175d",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "d546ddecdc8689cb22a8ff91639dc0052a741d431080d9aef7ea8afe27b15120",
-    "generator_sig": "29eb19f6b6fa213029067a26498ef17d1040ec6051e97adcd7b84f45d1772b28 gen_wor_island",
+    "payload_sha256": "abe858d8bce166128f6b1701cd647ccdd1ccbdbb5f7e236c157fc43a881d175d",
+    "generator_sig": "b05bdb5464a4df626cba6dfd1674dbb6141862282727ce8a10b4077703253c31 gen_wor_island",
     "ancestors": [
       {
         "path": "build/states/wor_landing.stamp",
-        "sha256": "2e1ad60f764ad55b4a6ca80fd78eee6768bad93cd7d2283def4e5c31d795c84f"
+        "sha256": "36a9adca3e172b7b66a2c26210c32dc1ef23a9973e485d3360c0c4383804ea0c"
       }
     ]
   }

@@ -243,7 +243,7 @@ H.run({ maxFrames = 1500000 }, {
     local n = 0
     for _, p in ipairs({ 1, 2, 3 }) do n = n + #H.partyRoster(p) end
     H.assertEq(n, 12, "twelve members in the three parties (gen_wor_kt_factory's seating)")
-    -- the bag (no shop past Kohlingen: gen_wor_kt_factory's stop stocks 40 Fenix Downs and 99 Potions for the tower
+    -- the bag (no shop past Kohlingen: gen_wor_kt_factory's stop stocks 50 Fenix Downs and 99 Potions for the tower
     -- and Kefka; the first play, which stocked 20, reached here with 6)
     H.assertEq(H.invCountOf(0xF0) >= FENIX_FLOOR and H.invCountOf(0xE9) >= 40, true, string.format(
       "the bag for Kefka: %d Fenix Downs (floor %d) and %d Potions (floor 40), stocked at Kohlingen by "

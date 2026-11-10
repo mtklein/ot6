@@ -83,7 +83,7 @@ rule.
 
 | kit | top row | 99? | why |
 |---|---|---|---|
-| Blitz | **Bum Rush** `$64` | **yes** | divine, L70, the top row of the kit |
+| Blitz | **Bum Rush** `$64` | **yes** | divine (three points pending, #388), from Duncan in the World of Ruin, the top row of the kit |
 | SwdTech | **Cleave** `$5c` | **yes** | divine, the window's conditional top tier |
 | Tools | **Overclock** | **yes** | Edgar's divine: a Tool at the full 3-BP boost fires twice and costs the two firings, each at the 3-BP price, capped at 99 (`Ot6ToolPrice`; kits.md "Edgar") |
 | Steal / Slot / Rage / Dance | — | **no** | flat verbs, no ladder |

@@ -549,6 +549,14 @@ TEST_ENV = {
     # play makes by Maranda with TERRA wearing it
     "battle_economizer": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-colosseum-v1",
+    # #388: SABIN's divine, Bum Rush, from the save by Duncan's house where he
+    # learns it; the Continue, a walk and two or more battles (9k frames)
+    "battle_bumrush": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gau-v1",
+    # #388 review: GOGO's Mimic of it under three points runs Pummel, from the
+    # factory's save in Kefka's Tower (party 3: SABIN and GOGO together)
+    "battle_bumrushmimic": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
     "battle_breakspell": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_breakmonster": "OT6_TIMEOUT=1800 "

@@ -40,7 +40,9 @@ local function present(s) return (H.readByte(0x3AA8 + s * 2) & 1) == 1 end
 
 local seat, procs, cur, lastEnd = nil, {}, nil, -1
 local BS = H.sym("Ot6BreakSpell")
-local BS_END = H.sym("Ot6BreakChips")   -- the next proc in the segment
+-- the window runs from Ot6BreakSpell through Ot6TakeShields, the shield-taking leaf it calls (#388), which sits
+-- between it and Ot6BreakChips in the segment
+local BS_END = H.sym("Ot6BreakChips")
 local function arm()
   local function close()
     if cur == nil then return end

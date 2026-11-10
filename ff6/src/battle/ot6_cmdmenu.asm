@@ -549,7 +549,8 @@
 ; greys all three rows: the list still shows what the bank would buy (the
 ; teaching surface) and refuses every row, the same presentation an
 ; unaffordable spell gets, rather than a list that changes length with the
-; wallet.  Blitz mode (w7e6168 = 1) passes the MP grey through untouched.
+; wallet.  Blitz mode (w7e6168 = 1) passes the MP grey through untouched,
+; but for Bum Rush, the divine, greyed under three points pending (#388).
 ;
 ; Thief mode (w7e6168 = 3) is a second consumer, for the same kind of
 ; reason: Bestow cannot do anything at 0 BP, because there is no pip to hand
@@ -578,6 +579,8 @@
         beq     @setzer         ; Setzer's table: the purse and the divine
         cmp     #$03
         beq     @thief          ; the thief submenu's own BP reason
+        cmp     #$01
+        beq     @blitz          ; the Blitz list: Bum Rush, the divine
         cmp     #$02
         bne     @pass           ; not bushido: return the MP grey unchanged
         phx                     ; [S+2] save caller X (Ot6BlitzRowDecorate's)
@@ -611,6 +614,12 @@
 @afford:
         pla                     ; drop bp
         plx                     ; restore caller X
+        bra     @pass
+; In blitz mode only Bum Rush has a BP precondition, the divine's one gate
+; (#388, ot6_divine.asm): Master's Mark's test, below.
+@blitz: lda     $4005,y         ; this cell's id
+        cmp     #OT6_BUMRUSH
+        beq     @mark
         bra     @pass
 ; In thief mode only Bestow has a BP precondition, and it is "hold one".
 @thief: lda     $4005,y         ; this row's id (column 1; Qty at +1, Flags +2)
