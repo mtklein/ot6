@@ -8754,16 +8754,17 @@ end
 
 -- The 3-BP divines of CYAN and SABIN, where one pays (#388; kits.md "Divines"), else nil (the lines below).
 -- opts.divines = true, or a table: { cleave = false / bumRush = false drop one, cleaveShields = n (2),
--- cleaveHp = n (6000), bumRushHp = n (6000), hold = false (no banking), laps = true (random battles too: CYAN's
--- Cleave only), cast = false (the control) }.  Event battles only unless laps: a random battle is not worth
--- 99 MP and three turns where the keyed Fights clear it.  An informed policy, and what it reads: every
--- standing monster's HP, shields and Broken timer, whether it is death-immune ($3AA1 bit 2, the bit
--- Ot6CleaveMark and Ot6CleaveStrip read), the member's bank, MP and known skills.
+-- cleaveHp = n (6000), bumRushHp = n (6000), hold = false (no banking), cast = false (the control) }.  Event
+-- battles only (OT6_RANDBTL clear): a random battle is not worth 99 MP and three turns where the keyed Fights
+-- clear it (wor-coverage.md 13.10-13.11: Cleave on the tower's lap battles fired on 3 of 84 and moved nothing).
+-- An informed policy, and what it reads: every standing monster's HP, shields and Broken timer, whether it is
+-- death-immune ($3AA1 bit 2, the bit Ot6CleaveMark and Ot6CleaveStrip read), the member's bank, MP and known
+-- skills.
 --   Cleave (CYAN, the SwdTech window's 3-BP row) strikes every enemy: each killable body dies, each death-immune
 --     one loses four shields and takes the cut.  It pays when the killable bodies standing hold cleaveHp HP or
---     more between them (a group, or one big body, that Fights would take turns over), or, in an event battle,
---     when a death-immune body holds cleaveShields shields or more, not Broken (the strip).  With the 99 MP: at
---     three points, Cleave; under three, an unboosted Fight that banks the point (the hold).
+--     more between them (a group, or one big body, that Fights would take turns over), or when a death-immune
+--     body holds cleaveShields shields or more, not Broken (the strip).  With the 99 MP: at three points,
+--     Cleave; under three, an unboosted Fight that banks the point (the hold).
 --   Bum Rush (SABIN, the Blitz list's eighth row): on a target holding bumRushHp HP or more, with the 99 MP
 --     the event battle's budget pays: at three points, Bum Rush (four blows at x8, each taking a shield whatever
 --     the body's keys); under three, the hold.  M.boostPlan refuses it under three, so no other line queues the
@@ -8772,12 +8773,10 @@ end
 -- lines below spend the bank (the banking hold without the divine, the control the Doom grid lacked).
 function Driver:divineLine(actor, have)
   local o = self.opts.divines
-  if not o then return nil end
+  if not o or M.readByte(M.RANDBTL) ~= 0 then return nil end
   o = type(o) == "table" and o or {}
-  local random = M.readByte(M.RANDBTL) ~= 0
   local id = M.readByte(BATTLE.BCHID + actor * 2)
   if id ~= 2 and id ~= 5 then return nil end
-  if random and not (o.laps and id == 2) then return nil end
   local slot = self:pressTarget()
   if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
   if slot == nil then return nil end
@@ -8809,7 +8808,7 @@ function Driver:divineLine(actor, have)
         if (M.readByte(0x3AA1 + 8 + s * 2) & 0x04) == 0 then
           nk, hk = nk + 1, hk + M.readWord(BATTLE.MON_HP + s * 2)
           aim = aim or s
-        elseif not random and strip == nil and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0
+        elseif strip == nil and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0
                and M.readByte(BATTLE.SH_CUR + s * 2) >= (o.cleaveShields or 2) then
           strip = s
         end
@@ -8821,8 +8820,8 @@ function Driver:divineLine(actor, have)
         M.readByte(BATTLE.SH_CUR + strip * 2)) or "")
     if have < 3 then return hold("CYAN holds for Cleave on every enemy: " .. what) end
     if o.cast == false then return self:divineWithheld(actor, "Cleave", strip or aim) end
-    M.log(string.format("[%s] actor=%d CYAN Cleave on every enemy: %s, at 3 BP%s, %d MP of %d", tag, actor, what,
-      random and " in a random battle" or "", cost, mp))
+    M.log(string.format("[%s] actor=%d CYAN Cleave on every enemy: %s, at 3 BP, %d MP of %d", tag, actor, what,
+      cost, mp))
     return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true, tier = 3, row = row, boostLeft = 0,
              aimHard = strip or aim, reason = "divine_cleave" }
   end
