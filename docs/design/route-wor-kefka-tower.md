@@ -763,7 +763,7 @@ won 545; deaths 131", "ARM gT: 16 runs, 16 PASS; random battles 945
 **The change** (`gen_wor_kt_guardian`): party 1 trains by its landing to
 L46, at most 60 battles; the Goddess leg's lap stays as a fallback. The
 `gT` arm above is that change alone (it ran at 8615b87b, before any check
-of the fives). The fives are checked where they matter: at 352's door,
+of the fives). The fives are checked on arrival at 292, one random battle short of 352's door (a level can still change in that battle),
 after the battles from the landing, party 1 laps on 292's floor while a
 member who wears no death guard (the Memento Ring, the Safety Bit) stands
 at a multiple of five (`T.trainLap`'s `opts.also`). In the first replay
@@ -815,7 +815,7 @@ not met in this grid.
 tower saves from Guardian's on moved): the bag's Fenix Downs by leg,
 factory 25 -> 32 (bought to 35), Atma 32 -> 30, Guardian 30 -> 25 (the
 care cured EDGAR's Poison past the reserve, "plan: cure poison (past the
-reserve) char 4 with $F5"; the check at 352's door fought nothing), Doom
+reserve) char 4 with $F5"; the check on arrival at 292 fought nothing), Doom
 25 -> 21, the Poltergeist 21 -> 20, the Goddess 20 -> 20, won on the
 leg's first attempt ("PASS (frame 11683) attempts=1/3"), and Kefka "the
 bag for Kefka: 20 Fenix Downs (floor 10)", "PASS (frame 165938)
