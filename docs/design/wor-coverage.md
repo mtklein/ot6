@@ -1960,13 +1960,13 @@ Break and Relm's Drain, both already submitted at that ghost, were
 target list was all `$FF` (nothing to hit), looping in the graphics
 thread scheduler and never returning to the main battle loop: `BattleLoop`,
 `CheckBattleEnd` and `WinBattle` executed zero times over 660 frames
-(`probe_hung.lua`: "key C20019 x0 ... key C247ED x0"), while
+(`build/attempts/wt/v041-nav-hang/probe/probe_hung.lua`: "key C20019 x0 ... key C247ED x0"), while
 `$3A77` (monsters alive) read 0 and `$3A74` 0F, so the end check would
 have won the battle had it run. With watchdogs on the run is not lost for
 50,000 frames: it trips at f391072 ("no-progress: nothing has moved for
 1808 frames"), 2,300 frames after the last kill, and is now named
 "battle-won-never-ended:" (class `wonhang`, retryable like `noprogress`;
-the real hung state reproduces it, `probe_wonhang.lua`: "attempt 1/1
+the real hung state reproduces it, `build/attempts/wt/v041-nav-hang/probe/probe_wonhang.lua`: "attempt 1/1
 FAILED class=wonhang frame=1952"). The fault is in the battle-script
 side of the ROM or vanilla's handling of a queued action whose targets all
 died before it ran; the fix belongs with the Cleave/Bum Rush work in the
