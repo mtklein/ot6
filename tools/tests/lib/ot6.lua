@@ -3664,6 +3664,19 @@ function M.treadmillLine(o)
   return nil
 end
 
+-- Why the care lines weigh no item for this actor, or nil when they do (#388's lockekit wipe:
+-- "no heal saves it (the bag holds no heal)" with 81 Potions and 28 Fenix Downs in it, from a driver
+-- built with item care off).  o.items (the driver's opts.items), o.mayHeal (opts.healer's gate),
+-- o.kept (a kept plan), o.row (the item row the care lines got), o.hasRow (the actor has an Item row).
+function M.itemCareOff(o)
+  if o.row ~= nil then return nil end
+  if not o.hasRow then return "no Item command in this actor's list" end
+  if not o.items then return "this driver weighs no item: its item care is off (opts.items)" end
+  if not o.mayHeal then return "the bag is the healer's (opts.healer)" end
+  if o.kept then return "a kept plan" end
+  return nil
+end
+
 -- Spend it before you die (#175): a member inside one round of death who
 -- holds banked BP, and whom no heal in hand lifts clear of that round,
 -- spends the pips now on their strongest line rather than take a heal
@@ -13300,6 +13313,11 @@ function Driver:makePlanRules(actor)
         whyNot = "the care lines took none"
       end
     end
+    -- an empty heal list is not an empty bag when this driver weighs no item at all (M.itemCareOff)
+    if whyNot == nil and #heals == 0 and #refused == 0 then
+      whyNot = M.itemCareOff({ items = self.opts.items, mayHeal = mayHeal, kept = kept, row = row,
+        hasRow = cmdRow(actor, BATTLE.CMD_ITEM) ~= nil })
+    end
     local verdict, why = M.spendDecision({ hp = hp, maxhp = maxhp, roundCost = cost,
                                            bp = have, heals = heals, refused = refused, why = whyNot })
     if verdict ~= "spend" then
@@ -20463,10 +20481,17 @@ end
 
 -- The command-table-aware counterpart to fightBattle().  Prefer this for a
 -- mixed party or any route where command row 0 is not proven to be Fight.
+-- Its driver's options: item care on (Potions and the like by the heal policy, Fenix Downs for the fallen),
+-- as the suites that fight out with it say it heals "as a player does" (battle_lockekit, battle_study).  It was
+-- built with none, so the bag was never weighed: battle_lockekit's fight-out wiped on #388's fire-out-v1
+-- holding 81 Potions and 28 Fenix Downs.
+function M.fightByMenuOpts()
+  return { items = true }
+end
 function M.fightBattleByMenu(maxFrames, spare)
   local spareSet = {}
   for _, w in ipairs(spare or {}) do spareSet[w] = true end
-  local F = M.newFightDriver("fightBattleByMenu")
+  local F = M.newFightDriver("fightBattleByMenu", M.fightByMenuOpts())
   return M.driveUntil(function()
     return not M.battleLoadStarted()
   end, maxFrames or 30000, {
