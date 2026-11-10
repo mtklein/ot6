@@ -211,8 +211,13 @@ The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
   (`Ot6BumRushTake`, keyless like OT6's Break; a body that keys bludgeon
   loses it to the class chip instead, so a blow never takes two), so one
   Bum Rush breaks a body at four or fewer shields and the blows after the
-  break land Broken (#388's second call, the TLM's, 2026-11-10; measured in
-  wor-coverage.md 13.11).  A Blitz commits from the list with no target select, so a pick is
+  break land Broken.  *Reason (#388's second call, the TLM's on the owner's
+  direction, 2026-11-10; shipped by design): at a boss whose shields take no
+  blow (Doom) the keyed 3-BP Fight out-earned it.  The owner's call is that it
+  ships without a measured win in the line's play, where the harness already
+  wins without the extra power; measured in wor-coverage.md 13.11: at Doom
+  `br` won 26 of 30 distinct fights to the banking hold's 24 (2 gains, 0
+  losses, p = 0.5), and it landed on 12 of the 30.*  A Blitz commits from the list with no target select, so a pick is
   never taken back, and no queue-side rewrite is needed (#388's first
   build had one, `Ot6BumRushQueue`, which nothing could reach; removed).  A
   copy whose boost is read at execution under three (a Gogo's Mimic) runs as
@@ -220,7 +225,9 @@ The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
   command).  *Reason: as a row at any boost it was four blows for 99 MP that
   a boosted Pummel or Fight out-earned (wor-coverage.md 13.8); at the full
   boost its four blows each carry the x8.*  `battle_bumrush` (the list's
-  gate and the four blows), `battle_bumrushmimic` (the Mimic's Pummel).
+  gate, the four blows and a shield a blow), `battle_bumrushmimic` (the
+  Mimic's Pummel, and the keyless take on a staged body that does not key
+  bludgeon: six shields to two).
 Bum Rush is Sabin's ultimate and is
 fixed at **99**, which is 13.0% of his L70 pool of 760 and the same fraction
 Cleave is of Cyan's pool; both are pinned there so the fractions match. Mantra
@@ -386,10 +393,14 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   buys OT6's Break.*  Measured since (wor-coverage.md 13.9): the strip
   does not yet pay at Doom or Inferno, nor did a strip of every shield;
   what would is open.  It can be used again
-  in the same battle.  *The second call (the TLM's, 2026-11-10): every
-  body read, so a group of killable monsters ends on CYAN's turn and a boss
-  with adds loses its guard; measured in wor-coverage.md 13.11, where it
-  went off too rarely to pay.*  `battle_divines` checks the rows, the
+  in the same battle.  *The second call (the TLM's on the owner's
+  direction, 2026-11-10; shipped by design): every body read, so a group of
+  killable monsters ends on CYAN's turn and a boss with adds loses its
+  guard.  The owner's call is that it ships without a measured win in the
+  line's play; measured in wor-coverage.md 13.11, it went off on 9 of 28
+  distinct Inferno fights and 3 of 84 lap fights, and wins did not move (26
+  of 28 at Inferno with or without it, 84 of 84 on the laps).*
+  `battle_divines` checks the rows, the
   loadout, one Cleave killing every unbroken soldier with no shield taken,
   two boss cuts in one battle, the first taking exactly four shields and
   the second the rest, breaking him, and a boss beside a killable add (the

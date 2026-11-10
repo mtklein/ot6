@@ -2215,23 +2215,30 @@ battle wipe x1"). A mechanism suite that a boss's draw can fail is the
 fragility TESTING.md warns of, so it stays in the factory's random battles
 with its declared HP write, as on main.
 
-### 13.11 Cleave on every body, Bum Rush's keyless take: measured, not shipped (#388, v0.41)
+### 13.11 Cleave on every body, Bum Rush's keyless take: shipped by design (#388, v0.41)
 
-Evidence under `build/attempts/wt/v041-divines-2/` (branch `wt/v041-divines-2`, not merged).
+Evidence under `build/attempts/wt/v041-divines-2/` (the measurements, on that branch) and
+`build/attempts/wt/v041-divines-3/` (the landing: the keyless take's red, the replay and the re-cut).
 
 The TLM's calls on the owner's direction (2026-11-10), built on the branch: **Cleave** reads every body its record
 strikes (the record already strikes the whole enemy side: SwdTech has no target select), so each killable one dies
 and each death-immune one loses four shields and takes the cut, whole rather than split; **Bum Rush**'s four blows
 each take a shield whatever the body's keys, so one Bum Rush breaks a body at four or fewer shields. The driver:
 `Driver:divineLine` Cleaves when the killable bodies standing hold 6,000 HP or more between them, or, in an event
-battle, a death-immune body holds two shields or more (`opts.divines.laps` adds random battles, CYAN only); its
-Bum Rush line is 13.9's; `cast = false` is the control (the hold, no divine).
+battle, a death-immune body holds two shields or more; its Bum Rush line is 13.9's; `cast = false` is the control
+(the hold, no divine). The grids' lap arm used a lab lever, `opts.divines.laps` (random battles too, CYAN only),
+removed at landing since no leg sets it; the history holds it at d00db797.
 
 *The suites* (`mx/mx3/verdicts.txt`): `battle_divines` passes on the branch's ROM and is red on main's at run time
 ("Cleave struck every enemy: one Death mark from inside Ot6Oblivion on each soldier standing: got 2, want 2,3") and on
 both mutants ("... got , want 2,3" with no mark; "the cut beside an add is whole, not split: 1590 against the lone
 cut's 3270" with the split). `battle_bumrush` passes, red on the two-a-blow mutant ("got 1 ($1), want 2 ($2)"); main's
-ROM passes it, since every monster by Duncan's house keys bludgeon and dies to a blow or two.
+ROM passes it, since every monster by Duncan's house keys bludgeon and dies to a blow or two. The keyless take's
+behavioural red is `battle_bumrushmimic`'s (landing, `v041-divines-3/dev/`): the factory's monsters key bludgeon
+too ("m0 as fielded: 4 shield(s) of 4, class $06 (keys bludgeon)"), so the suite stages each with its bludgeon key
+cleared and six shields, beside its HP write. On the branch's ROM: "m0 (does not key bludgeon): 4 blow(s) landed on
+6 shield(s) -> 2 shield(s) (want 2)", PASS; on main's ROM: "... -> 6 shield(s) (want 2)", red ("each landed Bum Rush
+blow took one shield, though it does not key bludgeon (Ot6BumRushTake): got 6 ($6), want 2 ($2)").
 
 *The grids*, one attempt a run from wt/v041-tower-laps's replayed captures (`wor-kt-guardian-v1`,
 `wor-kt-factory-v1`), paired by distinct battle key (`scripts/grid.py`): the Doom leg over `KT_TRAIN` 46-49 by
@@ -2263,9 +2270,14 @@ keys 84; won lh 84, lc 84; ... deaths lh 11, lc 11" and "FORMATION 0190: shared 
   (15,026-25,531 off the monsters), sooner on 3 of those keys and later on 4; every arm already wins 26 of 28 there.
 - **Neither trivialises a fight**: no Cleave or Bum Rush ended a boss; the stock fight wins 22 of 30 at Doom and 26
   of 28 at Inferno.
-- **Not shipped.** Neither call measurably pays over the hold that builds its bank. What limits both is how
-  often the bank reaches three while the divine still has work: 12 of 30 at Doom, 9 of 28 at Inferno, 3 of 84 on the
-  laps. Proposed instead: (1) a driver change before any ROM change, measured the same way: keep the hold's bank
-  from the other spending rules once the divine is one point away (in 5 of the 19 Doom runs where it never went off, the bank
-  was spent to nothing); (2) for Cleave, a fight it fits: long, with killable adds that matter, where CYAN starts banking
-  at the fight's first turn. Party 3 in the tower has none (Inferno is already won; its lap fights end too soon).
+- **Shipped by design** (the owner, 2026-11-10: the harness is good enough at the game now that it does not need
+  the extra power, so neither move has to show a measured win in the line's play). Neither call measurably pays over
+  the hold that builds its bank, as above. What limits both is how often the bank reaches three while the divine
+  still has work: 12 of 30 at Doom, 9 of 28 at Inferno, 3 of 84 on the laps. Open, if a measured win is wanted
+  later: (1) a driver change, measured the same way: keep the hold's bank from the other spending rules once the
+  divine is one point away (in 5 of the 19 Doom runs where it never went off, the bank was spent to nothing); (2)
+  for Cleave, a fight it fits: long, with killable adds that matter, where CYAN starts banking at the fight's first
+  turn. Party 3 in the tower has none (Inferno is already won; its lap fights end too soon).
+- **The driver** keeps main's boss use: `{ divines = true }` at Doom only (`gen_wor_kt_doom`). Doom stands alone,
+  so the Cleave rule that reads every body acts there as before on the one target; the killable-HP rule
+  (`cleaveHp`) has no leg to act in, and Inferno's stock fight already wins 26 of 28.
