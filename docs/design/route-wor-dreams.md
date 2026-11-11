@@ -282,8 +282,11 @@ shifts 0 and 3, 7 and 11, 13 and 19 open the same battle key there.)
 `$33F8` holds a monster and `$33F9` a living member, an actor other than the
 host turns an attack plan, or a heal aimed at the host, into a Fight on the
 host (the ally-Fight the Muddle rule presses), at the plan's boost when it
-was a Fight; care for the other members stands.  `ZINGER_OFF` (a global) is
-the control.  A person who saw where the Zinger went does the same: the
+was a Fight; care for the other members stands.  The host does not heal
+itself either: its own heal on itself becomes the same Fight on itself at 0
+BP (v0.42, #521's landing: on a snapshot a level lower, CELES as host drank
+X-Potions on herself and was not felled inside 20,000 frames).  `ZINGER_OFF`
+(a global) is the control.  A person who saw where the Zinger went does the same: the
 host's fall is the only way to the boss, and the party revives the host
 once Wrexsoul is out.
 

@@ -11,7 +11,8 @@
 -- back (_c207c8); the Soul Savers restore themselves when they fall.  The
 -- real driver fights it.  Asserted, reading the engine:
 --   1. once Wrexsoul hides, a Zinger plan is made, aimed at the member
---      $33F9 names, by another member;
+--      $33F9 names, by another member (the host's own, which turns its heal
+--      on itself into the same Fight, is not the one read);
 --   2. that member falls within 20000 frames of the first Zinger plan (the
 --      lab, eight battle keys with the line: 3,544 to 10,682 frames from the
 --      hide to the fall, and 13,921 on the leg's own snapshot with a TERRA
@@ -81,8 +82,10 @@ H.run({ maxFrames = 400000 }, {
       H.log(string.format("[zinger] Wrexsoul hides at fight frame %d in entity %s", H.frame - (f0 or H.frame),
         tostring(host)))
     end
-    if planAt == nil and #H.zingers > z0 then
-      planAt, plan = H.frame, H.zingers[z0 + 1]
+    local first = nil
+    for i = z0 + 1, #H.zingers do if first == nil and not H.zingers[i].own then first = H.zingers[i] end end
+    if planAt == nil and first ~= nil then
+      planAt, plan = H.frame, first
       H.log(string.format("[zinger] the plan: actor %d on entity %d (the host read %d) at fight frame %d, in place "
         .. "of its %s", plan.actor, plan.target, plan.host, plan.frame - (f0 or plan.frame), plan.over))
     end

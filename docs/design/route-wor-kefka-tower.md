@@ -823,6 +823,52 @@ attempts=1/3". The tower spent 15 of 35 (#388's replays spent 21-29);
 its random battles still spend some on every leg but the Goddess's
 (#521 stays open for them: formation 329's Meteor first).
 
+### 7.7 Formation 329: the Evil Oscar's counter, not the Meteor (#521)
+
+The deaths 7.6 put on the GtBehemoth's Meteor were the Evil Oscar's.
+Formations 329 (GtBehemoth, Evil Oscar, Vectaur) and 272 (Brontaur, Evil
+Oscar) seat the Oscar in slot 1, and the deaths read "by slot 1 cmd $00
+atk $EF", its Special: Demon Kiss (MonsterProp +$1F = $47, no damage,
+Death). Its counter (`AIScript::_183`) is `if_self_dead / end_if / if_cmd
+MAGIC / attack SPECIAL, NOTHING, NOTHING`: a spell that leaves it standing
+draws Death on the caster one time in three. LOCKE cast his boosted Fire
+at it, its weakness, and died from full HP at any level ("actor=2 nuke $00
+... [death] f+1332 entity 2 char 1 from 3352/3352 by slot 1 cmd $00 atk
+$EF", v0.41's replay); party 1's TERRA did the same on the Guardian leg's
+lap (7.6's final grid: "29 g0149 char 0 by slot 1 cmd $00 atk $EF", the
+Meteor, `$13`, 5). LOCKE wears no Death guard and cannot wear the bag's
+Memento Ring.
+
+The counter models price no Special, so #372's veto and #503's re-aim
+missed it. `Driver:counterMagicPlan` (lib/ot6.lua): a spell aimed at a body
+whose answer to Magic, walked for a hit it survives, is a Death Special
+goes to another standing body, or becomes a Fight when none stands (the
+Oscar answers a Fight with nothing); a caster with a Death guard casts as
+planned. Only the Evil Oscar answers Magic so (a scan of every species'
+retaliation; the Retainer's and Sleep's Death Specials answer only a
+killing blow), and it is met only here, so no play upstream moves.
+`counter_selftest` checks the walk and the Special.
+
+Measured from the v0.41 replay's captures, one attempt a run
+(`build/attempts/wt/v042-tower-deaths/b1_tally.txt`; `COUNTER_MAGIC_OFF`
+is the old driver):
+
+| leg (boot, shifts) | arm | runs PASS | battles (distinct keys) | deaths | Fenix | in 329 |
+|---|---|---|---|---|---|---|
+| Poltergeist (`wor-kt-doom-v1`, 0-15) | old | 16 of 16 | 741 (185) | 78 | 78 | 61 in 336 (59 keys) |
+| | new | 16 of 16 | 753 (180) | 2 | 2 | 2 in 336 (59 keys) |
+| Guardian (`wor-kt-atma-v1`, 0-11) | old | 12 of 12 | 744 (259) | 73 | 73 | 37 in 264 (60 keys) |
+| | new | 12 of 12 | 750 (259) | 43 | 43 | 7 in 270 (58 keys) |
+
+Quoted: "ARM pkA: 16 runs, 16 PASS; battles 741 (distinct keys 185), lost
+0; deaths 78 (61 one action); fenix left the bag 78", "ARM pkN: 16 runs,
+16 PASS; battles 753 (distinct keys 180), lost 0; deaths 2 (1 one action);
+fenix left the bag 2", "ARM gkA: 12 runs, 12 PASS; ... deaths 73 (30 one
+action); fenix left the bag 73", "ARM gkN: 12 runs, 12 PASS; ... deaths 43
+(5 one action); fenix left the bag 43". No battle was lost in either arm.
+The Guardian leg's other deaths are party 1's formations 399 ($18F, the
+Scullion's Condemned) and 370, and the Innocs in the chamber (`$1AB`).
+
 ## 8. Not done
 - **Kefka** (#274) boots `wor-kt-plates-v1`: party 2 on 412's save point
   with parties 1 and 3 on 411's plates. The plate bits stay set once stepped
@@ -830,10 +876,13 @@ its random battles still spend some on every leg but the Goddess's
   step from 412 (82,45) to 411's middle plate (109,40) starts FinalBattle.
 - **Party 1's lap deaths** (6.3): done in 7.6 (#521): party 1 trains by
   its landing to L46 and the Goddess leg's lap is a fallback.
-- **The GtBehemoth's Meteor** (formation 329 on 334) is now where party 1's
-  training spends Fenix Downs: 53 deaths in 353 battles of the 7.6 grid,
-  about one in seven. A vanilla mechanic, met at the bench's L34-46; not
-  labbed further.
+- **Formation 329's deaths** (334): done in 7.7. They were the Evil
+  Oscar's Death counter to a spell, not the GtBehemoth's Meteor, which
+  took 5 of the 40 in 7.6's final grid.
+- **The Retainers' dying Death** (Atma's walk, formation 426): the
+  Retainer ($007) answers the hit that kills it with Tradeoff, a Death
+  Special, on whoever struck it (CELES twice from 5691/5691 in v0.41's
+  replay). The finish rules price no Special; not labbed.
 - **An older lever, worse** (`swap1`, kept): SETZER and GOGO swapped
   (party 1 TERRA, RELM, EDGAR, GOGO; party 3 CYAN, SHADOW, SABIN, SETZER),
   the chamber in the other order (party 1 west to Doom, party 2 east to the

@@ -8184,6 +8184,106 @@ function Driver:counterAimPlan(actor, plan)
   return plan
 end
 
+-- A spell cast at a body whose answer to Magic is a Death Special (#521).
+-- The Evil Oscar's retaliation (AIScript::_183) runs `if_self_dead / end_if
+-- / if_cmd MAGIC / attack SPECIAL, NOTHING, NOTHING`, and its Special is
+-- Demon Kiss (MonsterProp +$1F = $47: no damage, Death), aimed back at the
+-- caster: a member without a Death guard who casts at it and leaves it
+-- standing dies from full HP one time in three.  In Kefka's Tower that was
+-- nearly every Fenix Down formation 329 cost: LOCKE's Fire at it on the
+-- Poltergeist leg's lap ("[death] f+1250 entity 2 char 1 from 3509/3727 by
+-- slot 1 cmd $00 atk $EF", v0.41's replay), and TERRA's on the Guardian
+-- leg's (29 of formation 329's 40 deaths in #521's gZ grid, "char 0 by slot
+-- 1 cmd $00 atk $EF"), where the GtBehemoth's Meteor ($13) took 5.  The
+-- counter models price no Special (monHitOn), so neither #372's veto nor
+-- #503's re-aim saw it.  A person who has watched it once aims the spell at
+-- another body, and swings at the Oscar instead (it answers nothing else).
+-- So a cast aimed at such a body (the plan's aim, else the kill order's
+-- first standing body, else the engine's default, any standing body) goes
+-- to the standing body whose answer to it is no Death, the kill order's
+-- first such where there is one, else the one with the least HP; with no
+-- such body it becomes a Fight when the bodies answer a Fight with no Death
+-- (the Oscar answers a Fight with nothing).  The walk is for a hit that
+-- leaves the body standing (retalAnswer's use.dies = false): a dying body's
+-- Death answer (the Retainer's Tradeoff) is left to the finish rules.  Only
+-- Specials are read (M.specialClass on the body's live $322D byte): the
+-- Death spells some bodies answer Magic with (Allo Ver's Doom, the
+-- Veteran's Roulette, the Sky Base's Blaster, the Apokryphos's L.5 Doom)
+-- are not.  A member with a Death guard ($3AA1 bit 2, FixImmuneStatus) casts
+-- as planned.  COUNTER_MAGIC_OFF (a global) turns it off, the control arm.
+function Driver:counterMagicPlan(actor, plan)
+  if COUNTER_MAGIC_OFF or plan == nil or plan.kind ~= "magic" or plan.spell == nil then return plan end
+  if plan.ally or plan.bounce or plan.target ~= nil or plan.all then return plan end
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local spell = plan.executionSpell or plan.spell
+  if spell > 0xFF or (M.readRomByte(MP + spell * 14 + 4) & 0x01) ~= 0 then return plan end
+  if M.readWord(0x3BF4 + actor * 2) == 0 or (M.readByte(0x3AA1 + actor * 2) & 0x04) ~= 0 then return plan end
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local function deathAnswer(s, use)
+    local species = M.readWord(M.FORMATION + s * 2)
+    if species == 0xFFFF or species >= 0x180 then return false end
+    local off = M.readRomWord(ptrs + species * 2)
+    local atks = M.retalAnswer(function(i) return M.readRomByte(base + off + i) end, use)
+    for _, a in ipairs(atks) do
+      if a == 0xEF and M.specialClass(M.readByte(0x322D + 8 + s * 2)) == "wound" then return true end
+    end
+    return false
+  end
+  local use = { cmd = BATTLE.CMD_MAGIC, atk = spell, elem = M.spellElement(spell), dies = false }
+  local kills, safe = {}, {}
+  for s = 0, 5 do
+    if monAlive(s) then
+      if deathAnswer(s, use) then kills[s] = true else safe[#safe + 1] = s end
+    end
+  end
+  if next(kills) == nil then return plan end
+  local aim = plan.aimHard
+  local tc = plan.targetContract
+  if aim == nil and tc and not tc.all and tc.monsters ~= 0 then
+    for s = 0, 5 do if tc.monsters == 1 << s then aim = s end end
+  end
+  aim = aim or plan.aim
+  if aim == nil then
+    for _, e in ipairs(M.focusSlots(self:focusList() or {})) do
+      if aim == nil and monAlive(e.slot) and self:focusReachable(e.slot) then aim = e.slot end
+    end
+  end
+  if aim ~= nil and monAlive(aim) and not kills[aim] then return plan end
+  local ks = {}
+  for s in pairs(kills) do ks[#ks + 1] = string.format("slot %d ($%03X)", s, M.readWord(M.FORMATION + s * 2)) end
+  table.sort(ks)
+  local best = nil
+  for _, e in ipairs(M.focusSlots(self:focusList() or {})) do
+    if best == nil and monAlive(e.slot) and not kills[e.slot] and self:focusReachable(e.slot) then best = e.slot end
+  end
+  if best == nil then
+    for _, s in ipairs(safe) do
+      if self:focusReachable(s) and (best == nil
+          or M.readWord(BATTLE.MON_HP + s * 2) < M.readWord(BATTLE.MON_HP + best * 2)) then
+        best = s
+      end
+    end
+  end
+  if best ~= nil then
+    M.log(string.format("[%s] actor=%d cast $%02X re-aimed: %s answer%s Magic with a Death Special and the caster "
+      .. "wears no Death guard; slot %d instead (#521)", self.tag or "fight", actor, spell, table.concat(ks, ", "),
+      #ks == 1 and "s" or "", best))
+    plan.aim, plan.aimHard = best, best
+    return plan
+  end
+  local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
+  local fightSafe = fight ~= nil
+  for s in pairs(kills) do
+    if fightSafe and deathAnswer(s, { cmd = BATTLE.CMD_FIGHT, dies = false }) then fightSafe = false end
+  end
+  if not fightSafe then return plan end
+  M.log(string.format("[%s] actor=%d cast $%02X withheld: %s answer%s Magic with a Death Special, no other body "
+    .. "stands, and the caster wears no Death guard; a Fight instead (#521)", self.tag or "fight", actor, spell,
+    table.concat(ks, ", "), #ks == 1 and "s" or ""))
+  return { kind = "fight", row = fight, boostLeft = plan.boostLeft or 0, aim = self:chipAim(actor, plan.boostLeft or 0),
+           reason = "counter_magic" }
+end
+
 -- The monsters standing now, for a verb the engine aims itself.
 local function standingSlots()
   local t = {}
@@ -9739,7 +9839,19 @@ function Driver:magicOnlyLine(actor, boost)
                boostLeft = 3, aim = aim, reason = "magic_only_ultima" }
     end
   end
-  if bounce ~= nil and (best == nil or bestScore < 100 or (bounce.all and bounce.mirrors >= 3)) then
+  -- opts.directFirst = { [species] = true }: a magicFirst body a direct cast
+  -- reaches goes before any rebound, even the four-mirror spread.  The
+  -- tower's L.20 Magic wears Reflect and casts X-Zone (MagicProp +3 bit 1:
+  -- no Reflect turns it), and a rebound lands on a body the engine picks:
+  -- the four-mirror spreads left both L.20s standing for 7,000 ticks while
+  -- their X-Zones took two members at a time (v0.41's replay: "[death]
+  -- f+8813 entity 1 char 6 from 3595/3595 by slot 2 cmd $02 atk $12"),
+  -- where Drain, which no Reflect turns, reaches it (#521's sibling)
+  local df = self.opts.directFirst
+  local directFirst = df and bestSlot ~= nil and monAlive(bestSlot) and bestScore >= 10000
+    and df[M.readWord(0x57C0 + bestSlot * 2)]
+  if bounce ~= nil and not directFirst
+     and (best == nil or bestScore < 100 or (bounce.all and bounce.mirrors >= 3)) then
     local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, wantFor(nil), self:nukeFloor(actor)) or 0
     -- a rebound must stay reflectable: TERRA's Fire at three points is
     -- Ultima, which no mirror turns, and spread over the party it fell on
@@ -10040,7 +10152,7 @@ function Driver:magicOnlyLine(actor, boost)
       best.id, bestSlot, b, table.concat(said, "; ")))
   end
   return { kind = "magic", spell = best.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b, aim = bestSlot,
-           reason = "magic_only" }
+           aimHard = directFirst and bestSlot or nil, reason = "magic_only" }
 end
 
 -- Monster slot `slot` is Berserk (status 2 bit 4, $3EE5 + 8 + slot * 2)
@@ -11921,6 +12033,7 @@ function Driver:makePlan(actor)
   plan = self:lockeMug(actor, plan)
   plan = self:dodgePlan(actor, plan)
   plan = self:counterAimPlan(actor, plan)
+  plan = self:counterMagicPlan(actor, plan)
   plan = self:healWeaponPlan(actor, plan)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
@@ -12348,24 +12461,31 @@ end
 -- Zinger went fells that member: while one hides, an actor other than the
 -- host turns an attack plan, or a heal aimed at the host, into a Fight on
 -- the host (the ally-Fight the Muddle rule presses), at the plan's boost
--- when it was a Fight.  Care for the other members stands.  ZINGER_OFF (a
--- global) turns it off, the control arm.
+-- when it was a Fight.  Care for the other members stands.  The host itself
+-- does not heal itself either: its own heal on itself becomes the same Fight
+-- on itself at 0 BP (#521's landing: on a snapshot a level lower, CELES as
+-- host drank X-Potions on herself at 1,067 and 815 HP, "actor=0 heal entity
+-- 0 (1067/4251) with $EA", and was never felled inside 20,000 frames); its
+-- other plans stand.  ZINGER_OFF (a global) turns it off, the control arm.
 M.zingers = {}           -- every Zinger plan this run, oldest first (battle_zinger reads them)
 function Driver:zingerPlan(actor, plan)
   if ZINGER_OFF or plan == nil then return plan end
   local za, zt = M.readByte(0x33F8), M.readByte(0x33F9)
   if za == 0xFF or za < 8 or zt >= 8 or zt % 2 ~= 0 then return plan end
   local host = zt // 2
-  if actor == host or M.readWord(0x3BF4 + host * 2) == 0 then return plan end
+  if M.readWord(0x3BF4 + host * 2) == 0 then return plan end
   local care = plan.kind == "item" or plan.kind == "defer" or plan.kind == "switch"
     or (plan.ally and plan.reason ~= "zinger")
   if care and plan.target ~= host then return plan end
+  if actor == host and not (care and plan.kind ~= "defer" and plan.kind ~= "switch" and not plan.all) then
+    return plan
+  end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   if fight == nil then return plan end
-  local boost = plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
+  local boost = actor ~= host and plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
   local target = host
   M.zingers[#M.zingers + 1] = { actor = actor, host = host, target = target, slot = (za - 8) // 2,
-    frame = M.frame, over = plan.kind, boost = boost }
+    frame = M.frame, over = plan.kind, boost = boost, own = actor == host }
   M.log(string.format("[%s] actor=%d zinger: slot %d hides in entity %d (%d/%d HP): a Fight on the host at %d BP "
     .. "in place of its %s", self.tag or "fight", actor, (za - 8) // 2, host, M.readWord(0x3BF4 + host * 2),
     M.readWord(0x3C1C + host * 2), boost, plan.kind))

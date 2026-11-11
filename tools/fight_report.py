@@ -127,6 +127,7 @@ class Fight:
         self.turns, self.plans, self.deaths, self.policy_lines = 0, 0, 0, 0
         self.kills = ""
         self.scripted = False
+        self.wiped = False         # a [wipe] line, read as the loss unless an outcome follows
         self.lines = []            # raw evidence: key, worst turn, outcome
 
     def sample(self, party, mons):
@@ -153,6 +154,13 @@ class Fight:
                 "lead_min": min(lead)}
 
 
+def wiped_loss(f, out):
+    """a fight whose [wipe] no outcome followed: the loss"""
+    f.result, f.ticks = "SCRIPTED" if f.scripted else "LOST", None
+    if f.form is not None:
+        out.append(f)
+
+
 def parse(path, policy, out):
     arc = arc_of(path)
     f = None
@@ -166,6 +174,8 @@ def parse(path, policy, out):
             if m:
                 if f is not None and f.key == m.group(1) and not f.samples:
                     continue           # the [seed] and [key] lines name one battle
+                if f is not None and f.wiped:
+                    wiped_loss(f, out)
                 f = Fight(m.group(1), arc, path, policy)
                 f.scripted, scripted_next = scripted_next, False
                 f.lines.append(line.rstrip())
@@ -230,18 +240,21 @@ def parse(path, policy, out):
                 # fires before the driver's [wipe] line can; any other
                 # class leaves the fight unfinished (not a loss, not a win)
                 if f.form is not None:
-                    f.result = (("SCRIPTED" if f.scripted else "LOST") if m.group(1) == "wipe" else "ABORT")
+                    f.result = (("SCRIPTED" if f.scripted else "LOST") if m.group(1) == "wipe" or f.wiped else "ABORT")
                     f.lines.append(line.rstrip()[:300])
                     out.append(f)
                 f = None
                 continue
             m = WIPE.match(line)
             if m:
-                f.result, f.ticks = "SCRIPTED" if f.scripted else "LOST", None
+                # every member down, but the fight's end is its [outcome]
+                # line: MagiMaster's dying Ultima fells the four as he dies
+                # and the battle is won ("[wipe] f+25352 ..." then "battle
+                # $162 WON after 26153 ticks", wor_tower, v0.41).  A wipe
+                # with no outcome after it (the next battle's key, the
+                # runner's FAILED, the log's end) is the loss.
+                f.wiped = True
                 f.lines.append(line.rstrip())
-                if f.form is not None:
-                    out.append(f)
-                f = None
                 continue
             m = OUTCOME.match(line)
             if m:
@@ -260,6 +273,8 @@ def parse(path, policy, out):
                     f.turns = f.plans
                 out.append(f)
                 f = None
+    if f is not None and f.wiped:
+        wiped_loss(f, out)
 
 
 def files_of(path):

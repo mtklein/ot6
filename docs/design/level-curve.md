@@ -744,7 +744,9 @@ Goddess and the plates 25.  So 10 of 35, against the 15 of #521's replay
 at 3e6e8cea (route-wor-kefka-tower.md 7.6) and the 21-29 before it: the
 tower's spend moves by draw, and its biggest single cause here is LOCKE,
 party 2's bench, in the GtBehemoth's formation 329, which #521's grid
-already named (40 of 74 deaths over 16 runs).
+already named (40 of 74 deaths over 16 runs).  (The killer in 329 turned
+out to be the Evil Oscar's Death counter to Magic, not the GtBehemoth:
+move 1 below.)
 
 **Where it over-levels.**  Through the World of Balance and the World of
 Ruin to Owzer the seated party meets its key fights within a few levels
@@ -789,11 +791,17 @@ re-measure then includes every later one's.
    grind but the place the tower's training meets its limit: LOCKE dies
    from full HP to one blow at L42 and at about L50 alike (2,766 to 3,727
    max HP), so levels alone do not
-   answer it.  A lab on `wor-kt-doom-v1` (the Poltergeist leg's training)
-   over row, his armour and relic, and whether the lap stays on 334's north
-   or moves to a floor without 329.  Moves: the Poltergeist leg and the
-   Goddess leg's bag.  Re-measure: the 7.6 grid's deaths in 329 by distinct
-   key, the bag by leg, Kefka's grid.  Replays from `wor-kt-doom-v1`.
+   answer it.  **Done (wt/v042-tower-deaths, route-wor-kefka-tower.md
+   7.7).**  The blow is not the GtBehemoth's Meteor but the Evil Oscar's
+   counter to Magic: Demon Kiss, a Death Special, aimed at whoever cast
+   at it (slot 1 in 329 and in 272, "by slot 1 cmd $00 atk $EF").  LOCKE
+   cast his boosted Fire at it, its weakness; TERRA's casts did the same
+   in party 1's lap.  The driver now casts at another body, or swings at
+   the Oscar, when the caster wears no Death guard: the Poltergeist leg
+   from `wor-kt-doom-v1`, 16 shifts a side, went from 78 deaths and 78
+   Fenix Downs to 2 and 2, every run passed, and the Guardian leg (12 a
+   side) from 73 to 43.  The same branch fixed the Fanatics' Tower's
+   X-Zone deaths (move 3's "separate finding").
 2. **The dinosaur forest seats the bench the tower pays for**
    (`gen_wor_dino`).  Today TERRA and CELES ride it from 58 to 63.  Give
    one or both carrier seats to the bench members the tower's laps raise at

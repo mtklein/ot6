@@ -66,6 +66,10 @@ DEATH = re.compile(
 WIPE = re.compile(
     r"\[(?P<tag>[^\]]+)\] \[wipe\] f\+(?P<tick>\d+) party_bp=(?P<pbp>[\d,]+) "
     r"deaths=(?P<deaths>\S+) class=(?P<cls>.*)$")
+# the driver's end of a battle: a [wipe] a WON outcome follows is no wipe
+# (MagiMaster's dying Ultima fells the four as he dies: "[wipe] f+25352 ...",
+# then "battle $162 WON after 26153 ticks", wor_tower at v0.41)
+OUTCOME = re.compile(r"\] \[outcome\] battle \$[0-9A-F]+ (?P<how>WON|LOST|PARTY LEFT)")
 # the labs' own ledgers: bp only (the driver's line, when the lab runs the
 # driver, is in the same log and carries the rest)
 LAB_DEATH = re.compile(r"\[death\] (?:t=|f)(?P<t>\d+) entity (?P<e>\d).*?\bbp=(?P<bp>\d+)")
@@ -129,10 +133,20 @@ def scan(path):
     # Rizopas control is gen_sabin_falls' own fighter).
     has_driver = any(DRIVER_UP.search(l) for l in lines if not l.startswith("[ot6note]"))
     up = DRIVER_UP if has_driver else LAB_UP
+    held = None            # the driver's [wipe], until the battle's outcome says it was one
     for line in lines:
         if line.startswith("[ot6note]"):
             continue
+        m = OUTCOME.search(line)
+        if m and held is not None:
+            if m["how"] != "WON":
+                yield "wipe", held
+            held = None
+            continue
         if up.search(line):
+            if held is not None:
+                yield "wipe", held
+                held = None
             fight += 1
             deaths, seen_driver = [], set()
             continue
@@ -149,9 +163,9 @@ def scan(path):
             continue
         m = WIPE.search(line)
         if m:
-            yield "wipe", dict(worker=worker, fight=fight, tag=m["tag"], tick=int(m["tick"]),
-                               party_bp=m["pbp"], deaths=list(deaths), cls=m["cls"],
-                               source="driver")
+            held = dict(worker=worker, fight=fight, tag=m["tag"], tick=int(m["tick"]),
+                        party_bp=m["pbp"], deaths=list(deaths), cls=m["cls"],
+                        source="driver")
             deaths = []
             continue
         m = FIZZLE.search(line)
@@ -179,6 +193,8 @@ def scan(path):
                                party_bp="?", deaths=list(deaths), cls=classify(deaths),
                                source="lab")
             deaths = []
+    if held is not None:
+        yield "wipe", held
 
 
 def fizzle_report(fizzles, nlogs):
@@ -282,6 +298,21 @@ def selftest():
         "[ot6] [death] t=6500 entity 0 rizo=553/sh1 bp=1 party_bp=1,0",
         "[ot6] [falls] LOST -- x: PARTY WIPED at f9000 (tier 1) [0/363 0/358]",
     ])
+    # a won battle whose four fell (MagiMaster's dying Ultima) is no wipe;
+    # the same line before a lost outcome is
+    def ending(how):
+        return "\n".join([
+            "[ot6] [advanceStory] battle f+1 menu=00 state=00 actor=0 cursor=0 cmds=02 partyhp=1,1 roundcost=0,0 monhp=s0:9/sh0 monsters=1",
+            "[ot6] [advanceStory] [death] f+25352 entity 0 char 0 from 3591/3591 by slot 0 cmd $02 atk $05 (ONE ACTION from >= 80%) bp=0 party_bp=0,4,5,0",
+            "[ot6] [advanceStory] [wipe] f+25352 party_bp=0,4,5,0 deaths=e0@f+25352:3591/3591:bp0:one_action class=one-shot early",
+            "[ot6] [advanceStory] [outcome] battle $162 %s after 26153 ticks: killed s0:$166; escaped none" % how])
+    with tempfile.TemporaryDirectory() as d:
+        for how, n in (("WON", 0), ("LOST", 1)):
+            r = os.path.join(d, "states", "mm_%s.log" % how)
+            os.makedirs(os.path.dirname(r), exist_ok=True)
+            open(r, "w").write(ending(how) + "\n")
+            got = [k for k, _ in scan(r) if k == "wipe"]
+            assert len(got) == n, (how, got)
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "states", "x.log")
         os.makedirs(os.path.dirname(p))

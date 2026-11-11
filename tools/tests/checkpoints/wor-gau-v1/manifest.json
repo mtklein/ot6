@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "f56099726f71e1963544ffa595b39080490b7ba248f7242b715cb00a6170fb56",
+  "sha256": "8952b317f18d42a9b037a31843de8fe300385c54f356d7a845781bdd30548c8e",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "f56099726f71e1963544ffa595b39080490b7ba248f7242b715cb00a6170fb56",
-    "generator_sig": "f21a6e23bd9301ce3c84d717f12bd9db2ccb4746490e2881c1067546f4f02930 gen_wor_gau build/checkpoints/wor-veldt-cave-v1/manifest.json build/checkpoints/wor-veldt-cave-v1/wor-veldt-cave.sram",
+    "payload_sha256": "8952b317f18d42a9b037a31843de8fe300385c54f356d7a845781bdd30548c8e",
+    "generator_sig": "d8bd7ce2106e84a21991c700c1a9b637dd2afa6e667c75c4e76956f8791f61b3 gen_wor_gau build/checkpoints/wor-veldt-cave-v1/manifest.json build/checkpoints/wor-veldt-cave-v1/wor-veldt-cave.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-veldt-cave-v1/manifest.json",
-        "sha256": "8ec38eefc51944870d7768564f8cd6efc093ba10e423744a2e6fc98a7f13f05a"
+        "sha256": "228e6dc7b1d318ccadc0233f1c1ded72bdfd4da230f8e0f33e1b6b419015e6bb"
       }
     ]
   }

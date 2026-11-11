@@ -1065,3 +1065,43 @@ and further on the line runs about a level behind v0.40's for some members
 against L52), with the spells learned downstream moving with it: at the Opera's
 catwalk switch no seated member knows Shell any more (CELES knows Safe and
 Haste), which battle_wardline now allows for.
+
+### 12.7 The L.20 Magic's X-Zone and the Death guards (v0.42, #521)
+
+The climb's randoms pay nothing and cost the most Fenix Downs of any World
+of Ruin leg outside Kefka's Tower: in v0.41's replay 9 deaths and 6 Fenix
+Downs in 18 battles, each from one action at full HP ("[death] f+8813
+entity 1 char 6 from 3595/3595 by slot 2 cmd $02 atk $12"). The spell is
+X-Zone, the L.20 Magic's ($130), in the first floor's formation 362 (an
+L.40 and two L.20s). X-Zone ignores Reflect (MagicProp +3 = $2A, finding
+4) and sets Death, so the Wall Rings do nothing against it; a Death guard
+blocks it. RELM came in wearing the Memento Ring, in the relic slot the
+Wall Ring took.
+
+So the Wall Ring now takes a member's other relic when the one it would
+take is a Death guard (RELM gives up her Ribbon), and the first floor's
+Safety Bit goes on CELES over her Genji Glove, which does nothing in a
+magic-only fight, and back off out of the tower (`gen_wor_tower`'s
+`TOWER_GUARD`). Killing the L.20s first with Drain, which no Reflect turns
+(`TOWER_L20_FIRST`, the driver's `opts.directFirst`), measured worse and
+stays off.
+
+From the v0.41 replay's `wor-tower-v1`, shifts 0-9, one attempt a run
+(`build/attempts/wt/v042-tower-deaths/b1_tally.txt`):
+
+| arm | runs PASS | deaths | Fenix that left the bag | in formation 362 |
+|---|---|---|---|---|
+| as v0.41 | 9 of 10 | 91 | 57 | 39 deaths, 29 keys |
+| Safety Bit | 9 of 10 | 86 | 44 | 28 |
+| L.20 first | 10 of 10 | 122 | 86 | 51 |
+| Safety Bit, L.20 first | 9 of 10 | 69 | 31 | 18 |
+| **Safety Bit and Memento Ring** | **10 of 10** | **59** | **21** | **13, 26 keys** |
+
+Quoted: "ARM tA: 10 runs, 9 PASS; battles 180 (distinct keys 161), lost 0;
+deaths 91 (61 one action); fenix left the bag 57", "ARM tGM: 10 runs, 10
+PASS; battles 200 (distinct keys 163), lost 0; deaths 59 (36 one action);
+fenix left the bag 21". The failures: `tA_s8` lost a battle ("GAME OVER
+fired ... battle wipe x1"), `tG_s0` and `tGK_s6` timed out in a walk
+("timeout after 92000 frames driving toward navTo"). Most of the deaths
+left are MagiMaster's (his dying Ultima, `$14`, about 3 a fight in every
+arm), raised by the fight's own Life 3, not the bag.
