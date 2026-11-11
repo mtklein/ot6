@@ -8463,12 +8463,18 @@ function M.relicPlan(members, opts)
   -- learned (then the order of `members`) who can: never left in the bag
   -- (ties on the threatened statuses go to the guard covering more of all
   -- of them: a Ribbon over a Jewel Ring when the threat is Petrify alone)
-  local wide, wcover, wall = nil, 0, 0
+  -- (a tie on both covers goes to a guard a member wears now, so the plan reads the same after it is put on: the
+  -- gear baseline's check, #524, met wor-sabin-v1's Amulet giving way to a guard of the same cover that only stood
+  -- first in the pool because the Amulet, worn, joined it last)
+  local wide, wcover, wall, wworn = nil, 0, 0, false
   for _, id in ipairs(ids) do
     local cl = M.relicClass(id, opts.threats)
     local all = cl and M.relicClass(id).cover or 0
-    if count[id] > 0 and cl.rank == 1 and (cl.cover > wcover or (cl.cover == wcover and cl.cover > 0 and all > wall)) then
-      wide, wcover, wall = id, cl.cover, all
+    local worn = false
+    for _, m in ipairs(ms) do if m.cur[4] == id or m.cur[5] == id then worn = true end end
+    if count[id] > 0 and cl.rank == 1 and (cl.cover > wcover or (cl.cover == wcover and cl.cover > 0 and all > wall)
+        or (cl.cover == wcover and cl.cover > 0 and all == wall and worn and not wworn)) then
+      wide, wcover, wall, wworn = id, cl.cover, all, worn
     end
   end
   -- opts.guardTo (a character id) names the widest guard's wearer instead:
