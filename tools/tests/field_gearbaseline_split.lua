@@ -81,7 +81,7 @@ H.run({ maxFrames = 120000 }, {
   end),
   -- 2. declared open while it is worn there
   H.call(function() H.gearOverlaysOpen = {} end),
-  H.overlayOn(OVERLAY[item], "field_gearbaseline_split case 2"),
+  H.lazy(function() return H.overlayOn(OVERLAY[item], "field_gearbaseline_split case 2") end),
   H.call(function()
     H.assertEq(H.gearOverlayWorn(OVERLAY[item]), true, "2: the overlay's relic is worn (on party " .. other .. ")")
   end),
