@@ -8529,19 +8529,14 @@ function M.relicPlan(members, opts)
   -- 3. the rest, by rank
   local order = {}
   for _, id in ipairs(ids) do order[#order + 1] = id end
-  -- the slots wearing it (not the members: CYAN's two Hyper Wrists count two, or the plan read after them puts
-  -- MOG's Atlas Armlet first and moves both, #524's check at wor-narshe-cliffs-v1)
-  local function wornBy(id)
-    local n = 0
-    for _, m in ipairs(ms) do for s = 4, 5 do if m.cur[s] == id then n = n + 1 end end end
-    return n
-  end
+  -- (relics tied on rank and cover go in id order, not by how many are worn: the order must read the same after
+  -- the plan is put on, and a count of wearers moves with it -- the gear baseline's check, #524, met CYAN's Atlas
+  -- Armlet planned first, then both Hyper Wrists first once they were worn, at wor-narshe-cliffs-v1; the members
+  -- each relic goes to still prefer its wearer)
   table.sort(order, function(a, b)
     local ca, cb = M.relicClass(a, opts.threats), M.relicClass(b, opts.threats)
     if ca.rank ~= cb.rank then return ca.rank > cb.rank end
     if ca.cover ~= cb.cover then return ca.cover > cb.cover end
-    local wa, wb = wornBy(a), wornBy(b)
-    if wa ~= wb then return wa > wb end
     return a < b
   end)
   -- the threatened statuses a guard adds to what the member is planned to wear
