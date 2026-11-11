@@ -71,6 +71,11 @@ local function CURMP(s) return 0x3C08 + s * 2 end
 
 local gauSlot, msPresent = nil, {}
 local classWrites, cmd10Hits, gauDispatches, gauMenus = {}, 0, 0, 0
+-- the swinging entity (+1 for a left hand) Ot6WeaponClass was entered with, and Gau's own swings' class writes:
+-- a bench member's turn can come before the X defers it (#524's replay: CYAN's slash, class $01, landed first on
+-- the regenerated gau_joined's key be04-g0035, and the arm read his damage as Gau's), so the class arm reads the
+-- writes Gau's own swings made
+local swingEntity, gauClassWrites = nil, {}
 local rideN = 0                       -- trance-ride iterations
 local RIDE_TURNS = 3                  -- the possessed turns the ride needs
 local saveRecA = nil                  -- battle A's read of the save record
@@ -630,7 +635,12 @@ add({
     -- blanking, no ATB hurry, no bench wounds.  The class byte watch:
     emu.addMemoryCallback(function(_, v)
       classWrites[#classWrites + 1] = v
+      if swingEntity ~= nil and (swingEntity >> 1) == gauSlot then gauClassWrites[#gauClassWrites + 1] = v end
+      swingEntity = nil
     end, emu.callbackType.write, 0x7E0000 + ATKCLASS, 0x7E0000 + ATKCLASS)
+    emu.addMemoryCallback(function()
+      swingEntity = emu.getState()["cpu.x"] & 0xFF
+    end, emu.callbackType.exec, H.sym("Ot6WeaponClass"), H.sym("Ot6WeaponClass"))
   end),
 })
 
@@ -643,7 +653,7 @@ add({
       hpPre[m] = H.readWord(MHP(m))
       shieldPre[m] = H.readByte(SHIELD(e))
     end
-    classWrites = {}
+    classWrites, gauClassWrites = {}, {}
     -- battle B is a single natural draw with no formation criterion, so
     -- nothing guarantees a bludgeon-weak body, and Gau's swing goes where
     -- the target cursor's own default lands.  So every present body that
@@ -670,6 +680,7 @@ add({
   -- then the target cursor steered onto the monster side before confirming
   -- ($7b7e is the monster-side target mask the cursor state exposes).
   H.driveUntil(function()
+    if #gauClassWrites == 0 then return false end
     for _, m in ipairs(msPresent) do
       if H.readWord(MHP(m)) < hpPre[m] then return true end
     end
@@ -695,7 +706,7 @@ add({
   H.waitFrames(60),                 -- let the chip/reveal frame settle
   H.call(function()
     local seen = {}
-    for _, v in ipairs(classWrites) do seen[v] = true end
+    for _, v in ipairs(gauClassWrites) do seen[v] = true end
     local hit = {}
     for _, m in ipairs(msPresent) do
       local e = 8 + m * 2
@@ -705,7 +716,11 @@ add({
         .. "clsweak=%02X", m, dmg, shieldPre[m], sh, H.readByte(CLSWEAK(e))))
       if dmg > 0 then hit[#hit + 1] = m end
     end
-    H.log(string.format("[post-fight] atkclass writes=%d", #classWrites))
+    local vals, gvals = {}, {}
+    for _, v in ipairs(classWrites) do vals[#vals + 1] = string.format("%02X", v) end
+    for _, v in ipairs(gauClassWrites) do gvals[#gvals + 1] = string.format("%02X", v) end
+    H.log(string.format("[post-fight] atkclass writes=%d: %s; Gau's swings' writes: %s", #classWrites,
+      table.concat(vals, " "), table.concat(gvals, " ")))
 
     H.assertEq(#hit > 0, true,
       "Gau's Fight actually dealt damage -- an out-of-MP Gau now has a turn, "
@@ -714,7 +729,7 @@ add({
       "the swing resolved a REAL weapon class: OT6_ATKCLASS took OT6_BLUDG "
       .. "($04) off the empty-hand row of Ot6WeapClassTbl -- bare fists are "
       .. "his probe")
-    H.assertEq(#classWrites > 0 and seen[OT6_BLUDG]
+    H.assertEq(#gauClassWrites > 0 and seen[OT6_BLUDG]
                and not seen[0x01] and not seen[0x02] and not seen[0x08], true,
       "and it resolved ONLY bludgeoning: with the bench deferred, nothing "
       .. "else was loading an attack class into the window")
