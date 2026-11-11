@@ -10,7 +10,12 @@
 -- ($3dd4) and turns the cut on a death-immune one into the heaviest single
 -- cut (power 255, Death and the auto-miss cleared); since #388 a death-immune
 -- body it strikes also loses four shields before the hit (Ot6CleaveStrip,
--- through Ot6TakeShields, the leaf OT6's Break takes shields with).
+-- through Ot6TakeShields, the leaf OT6's Break takes shields with).  The
+-- record strikes the whole enemy side (SwdTech has no target select;
+-- ChooseTarget's pick for its targeting is every monster), and since #388's
+-- second call each body struck is read, not only the primary: every killable
+-- one takes the Death mark (Ot6CleaveMark), every death-immune one the strip
+-- and the cut, unsplit ($11a2 bit 6).
 --
 -- Boots cyan_defence: a real solo Cyan (L11, katana) on map 120 beside the
 -- map's own battle-43 grinding soldiers (2x species $001, 100 hp) and the
@@ -38,17 +43,25 @@
 -- Asserted:
 --   battle 1 (the soldiers): the window's rows 0 and 1 (1 and 2 BP) are not
 --     Cleave and row 2 (3 BP) is; with Cleave stored in the 1-BP slot of a
---     manual loadout, row 0 still is not (Ot6CleaveSlot); Cleave at 3 BP
---     kills an unbroken soldier (one in-proc Death mark, the body dead),
---     and, after three Defends bank the points again, a second Cleave in the
---     same battle kills the second soldier; no shield is taken off a
---     killable body (no in-proc OT6_SHIELD_CUR write);
+--     manual loadout, row 0 still is not (Ot6CleaveSlot); one Cleave at 3 BP
+--     kills every unbroken soldier standing (one in-proc Death mark on each,
+--     the bodies dead); no shield is taken off a killable body (no in-proc
+--     OT6_SHIELD_CUR write);
 --   battle 2 (the commander, the boss bit set): two Cleaves in the same
 --     battle, each marking no Death, cutting at power 255 (an in-proc $11a6
 --     write) and landing (the commander's HP falls at each); the first
 --     takes exactly four shields (6 -> 2, one in-proc write each), and the
 --     second takes what is left, the last one breaking him (an in-proc
---     OT6_BROKEN_TICKS write).
+--     OT6_BROKEN_TICKS write);
+--   battle 3 (the soldiers, the highest slot staged as the boss: the bit, HP
+--     30,000, six shields; the primary target is the add): one Cleave marks
+--     Death on every add and none on the boss, takes exactly four of the
+--     boss's shields, cuts at power 255, and the cut on the boss is whole
+--     (at least 3/4 of battle 2's lone first cut through the same shields;
+--     a split halves it).
+-- #388's second call: build/attempts/wt/v041-divines-2/mx/mx3/ (main's ROM red at run time, battle 1: "Death mark
+-- ... on each soldier standing: got 2, want 2,3"; mutants cleave_nomark and cleave_split red; mx1/ is the first
+-- build, whose widening of the mask was a no-op: the mask is already the whole side).
 -- #388's old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/divines/mx/ (main's ROM fails at load,
 -- its symbols lacking Ot6TakeShields; the cleave_nostrip mutant is main's behaviour at run time).
 -- A kill is checked against the mechanism with pc-gated write watches
@@ -76,7 +89,7 @@ local cyanSlot, msPresent = nil, {}
 local OBLIV = H.sym("Ot6Oblivion")
 local TAKE = H.sym("Ot6TakeShields")
 local SH_CUR, BRK_TICKS = 0x3E38, 0x3E88      -- OT6_SHIELD_CUR, OT6_BROKEN_TICKS (by entity offset)
-local divineKills, cuts, takes, breaks = {}, {}, {}, {}
+local divineKills, cuts, takes, breaks, struck = {}, {}, {}, {}, {}
 local watching = false
 local function pcNow()
   local s = emu.getState()
@@ -100,6 +113,15 @@ emu.addMemoryCallback(function(_, v)
   if not watching then return end
   pcall(function() if inProc() then cuts[#cuts + 1] = v end end)
 end, emu.callbackType.write, 0x7E11A6, 0x7E11A6)
+-- each Cleave as Ot6Oblivion enters: the living monsters ($3a75, UpdateDead's mask) and each one's HP then
+emu.addMemoryCallback(function()
+  if not watching or H.readByte(0x3A7D) ~= CLEAVE then return end
+  local t = { alive = {}, hp = {} }
+  for m = 0, 5 do
+    if (H.readByte(0x3A75) >> m) & 1 == 1 then t.alive[#t.alive + 1] = m; t.hp[m] = mhp(m) end
+  end
+  struck[#struck + 1] = t
+end, emu.callbackType.exec, OBLIV, OBLIV)
 -- the shields Cleave takes (before its $11a6 write: t.cut counts the cuts before it): every OT6_SHIELD_CUR / OT6_BROKEN_TICKS write a
 -- monster's byte takes from inside Ot6TakeShields (nothing else casts Break here)
 emu.addMemoryCallback(function(addr, v)
@@ -166,7 +188,7 @@ local function bootBattle(obj, what)
       H.log(string.format("[%s] cyan slot %d bp=%d | %s", what, cyanSlot,
         H.readByte(0x3E9C + cyanSlot * 2), table.concat(parts, " | ")))
       stageCeiling(what)
-      divineKills, cuts, takes, breaks = {}, {}, {}, {}
+      divineKills, cuts, takes, breaks, struck = {}, {}, {}, {}, {}
       watching = true
     end),
   }
@@ -212,19 +234,27 @@ add({
     H.log(string.format("[battle 1] auto window rows: %02X %02X %02X", r[0], r[1], r[2]))
     H.assertEq(r[0] ~= CLEAVE and r[1] ~= CLEAVE, true, "rows 0 and 1 (1 and 2 BP) are not Cleave")
     H.assertEq(r[2], CLEAVE, "row 2 (3 BP) is Cleave ($5c)")
-    H.assertEq(#divineKills, 1, "the first Cleave marked one Death from inside Ot6Oblivion")
+    H.assertEq(#struck, 1, "one Cleave")
+    local alive = struck[1].alive
+    H.log(string.format("[battle 1] at the Cleave %d soldier(s) stood (%s); Death marked in-proc on %s", #alive,
+      table.concat(alive, ","), table.concat(divineKills, ",")))
+    H.assertEq(#alive >= 2, true, "two or more soldiers stood at the Cleave (Cyan only Defended before it)")
+    table.sort(divineKills)
+    H.assertEq(table.concat(divineKills, ","), table.concat(alive, ","),
+      "Cleave struck every enemy: one Death mark from inside Ot6Oblivion on each soldier standing")
   end),
   H.waitFrames(120),
   H.call(function()
-    local m = divineKills[1]
-    H.assertEq(dead(m) or not present(m), true, string.format("soldier %d, unbroken, is dead", m))
+    for _, m in ipairs(divineKills) do
+      H.assertEq(dead(m) or not present(m), true, string.format("soldier %d, unbroken, is dead", m))
+    end
     H.assertEq(#takes + #breaks, 0, "no shield was taken off a killable body (Ot6CleaveStrip skips it)")
     watching = false
   end),
 })
 
 -- ============ battle 2: the commander as a boss -- the heavy cut ==========
-local hp0 = nil
+local hp0, cut1 = nil, nil
 add(bootBattle(16, "battle 2"))
 add({
   H.call(function()
@@ -248,6 +278,9 @@ add({
     H.assertEq(#cuts, 2, "two Cleaves in the same battle, each cut by Ot6Oblivion")
     H.assertEq(cuts[1] == 255 and cuts[2] == 255, true, "Ot6Oblivion set each cut's power to 255")
     H.assertEq(mhp(m) < hp0, true, "and the cuts landed")
+    H.assertEq(#struck, 2, "two Cleaves")
+    cut1 = struck[1].hp[m] - struck[2].hp[m]
+    H.log(string.format("[battle 2] the first cut, alone on him and through his shields: %d", cut1))
     local t1, t2 = {}, {}
     for _, t in ipairs(takes) do
       H.assertEq(t.m, m, "Ot6TakeShields wrote only the commander's shields")
@@ -262,4 +295,52 @@ add({
   end),
 })
 
-H.run({ maxFrames = 300000 }, steps)
+-- ============ battle 3: a boss with an add -- one Cleave strikes both =====
+local boss, hp3 = nil, nil
+add(bootBattle(17, "battle 3"))
+add({
+  H.call(function()
+    H.assertEq(#msPresent >= 2, true, "battle 3 fields two or more soldiers")
+    boss = msPresent[#msPresent]     -- the highest slot: the record's primary target (the lowest) is an add
+    H.writeByte(0x3AA1 + ent(boss), H.readByte(0x3AA1 + ent(boss)) | 0x04)
+    H.writeWord(0x3BFC + boss * 2, 30000)
+    H.writeByte(SH_CUR + ent(boss), 6)
+    H.writeByte(BRK_TICKS + ent(boss), 0)
+    hp3 = mhp(boss)
+    H.log(string.format("[battle 3] soldier m%d as the boss: $3aa1.2 SET, HP := %d, shields := 6 (declared "
+      .. "expedient); the other soldier(s) killable", boss, hp3))
+  end),
+  H.kitBattle(cleave(1), { untilPlanDone = true, idle = "defend",
+    planDone = function() return #struck >= 1 and H.readByte(0x3E9D + cyanSlot * 2) == 0 end }),
+  H.waitFrames(120),
+  H.call(function()
+    H.assertEq(#struck, 1, "one Cleave")
+    local alive, adds = struck[1].alive, {}
+    for _, m in ipairs(alive) do if m ~= boss then adds[#adds + 1] = m end end
+    local dmg = struck[1].hp[boss] and (struck[1].hp[boss] - mhp(boss)) or nil
+    local t1 = {}
+    for _, t in ipairs(takes) do
+      H.assertEq(t.m, boss, "Ot6TakeShields wrote only the boss's shields")
+      t1[#t1 + 1] = tostring(t.v)
+    end
+    table.sort(divineKills)
+    H.log(string.format("[battle 3] at the Cleave: alive %s; Death marked on %s; the boss's strip %s; cut power %s; "
+      .. "the boss's HP %d -> %d (%s), battle 2's lone cut %s", table.concat(alive, ","),
+      table.concat(divineKills, ","), table.concat(t1, ","), tostring(cuts[1]), hp3, mhp(boss), tostring(dmg),
+      tostring(cut1)))
+    H.assertEq(struck[1].hp[boss] ~= nil and #adds >= 1, true, "the boss and an add stood at the Cleave")
+    H.assertEq(table.concat(divineKills, ","), table.concat(adds, ","),
+      "every killable add took the Death mark, and the boss none")
+    for _, m in ipairs(adds) do
+      H.assertEq(dead(m) or not present(m), true, string.format("add %d is dead", m))
+    end
+    H.assertEq(table.concat(t1, ","), "5,4,3,2", "the boss lost exactly four shields, 6 -> 2")
+    H.assertEq(cuts[1], 255, "and took the cut at power 255")
+    H.assertEq(dmg ~= nil and dmg > 0, true, "the cut landed on the boss")
+    H.assertEq(dmg * 4 >= cut1 * 3, true, string.format("the cut beside an add is whole, not split: %d against "
+      .. "the lone cut's %d (a split halves it)", dmg, cut1))
+    watching = false
+  end),
+})
+
+H.run({ maxFrames = 400000 }, steps)

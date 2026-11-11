@@ -683,6 +683,7 @@ done:   rtl
         .a8
         php
         longi
+        jsr     Ot6BumRushTake  ; ot6 #388: each Bum Rush blow takes a shield
         jsr     Ot6ClassChip
         jsr     Ot6AssassinateGate      ; ot6: shadow's break is his divine
         jsr     Ot6ShieldedDmg  ; ot6: sturdiness while shields hold

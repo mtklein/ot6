@@ -15,10 +15,11 @@ and its effect. Cite evidence in the commit message.
   strong when he is hurt. Monsters that cast Pearl Wind still heal by their current HP, as before. It also passes through Reflect, which makes it the party heal for a group wearing Wall
   Rings, such as the one that faces the Poltergeist in Kefka's Tower. Strago can learn it from the Sprinters in the
   wood just west of the plain north-west of Jidoor.
-- Sabin's Bum Rush now needs three boost points: with fewer it is greyed out in the Blitz list, and with three it
-  lands four blows, each as strong as a fully boosted attack. Against Doom in Kefka's Tower one Bum Rush can take
-  more than half of his HP. When Cyan's Cleave strikes an enemy it cannot kill outright, it now also removes four of
-  that enemy's shields before the cut.
+- Sabin's Bum Rush now needs three boost points: with fewer it is greyed out in the Blitz list. With three it lands
+  four blows, each as strong as a fully boosted attack, and each blow that lands removes one of the enemy's shields,
+  whatever the enemy is weak to.
+- Cyan's Cleave now strikes every enemy. Each enemy it can kill outright dies, and each one it cannot, such as a
+  boss, loses four shields and takes a heavy cut.
 - A battle no longer freezes when a monster's spell bounces off a party member's Reflect after every monster has
   fallen, as when the last L.30 Magic in the Fanatics' Tower dies to Poison with its counterattack still coming. The
   spell now bounces off and lands nowhere, and the battle ends in victory. The original game freezes the same way.
