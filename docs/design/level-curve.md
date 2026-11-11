@@ -868,7 +868,7 @@ trip ("[watch] 2098 samples, pad down 3528 frames, 0 trip(s)", "PASS
   to what its fights need.
 - *The strong six to eight* is ours to pick (owner: favourites in the end
   game are preference).  Call: TERRA, CELES, RELM, STRAGO, SHADOW, CYAN,
-  EDGAR and LOCKE; SETZER carried (his Exp. Egg catches him up).
+  EDGAR and LOCKE; SETZER carried (the Exp. Egg goes to whoever is furthest behind, which in the tower is often him).
 - *The dinosaur forest:* no preference, so long as the line stops there and
   proves its fights doable.  Call: seat the bench there (move 2).
 - *Holding the carriers back:* ours to choose; a human player picks
