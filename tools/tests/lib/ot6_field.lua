@@ -7658,11 +7658,20 @@ end
 -- M.gearDress(opts): put on whatever in the bag beats what each seated
 -- member wears (the slots opts.keep names, and the relics, left alone).
 -- One Equip session per member who changes.
-function M.gearDress(opts)
+-- M.gearDressPlan(opts) is the plan alone (reads only): { [c] = { {slot, id}, ... } } for the members who change,
+-- empty when every slot already holds the best the bag offers by the rule (the gear baseline's check, #524).
+-- opts.members (default the seated party) names whom to plan; a member the Equip menu refuses is left out:
+-- UMARO and the guests (field_menu.asm: Equip is not valid for characters $0D and higher) and a member who is
+-- down (M.relicMenuRefuses: the character select takes no A for him).
+function M.gearDressPlan(opts)
   opts = opts or {}
   local tag = opts.tag or "gear dress"
-  return M.lazy(function()
-    local members = seated()
+    -- the keys are read off every seated member (UMARO's club included); the plan dresses those the menu takes
+    local all = opts.members or seated()
+    local members = {}
+    for _, c in ipairs(all) do
+      if c <= 12 and not M.relicMenuRefuses(c) then members[#members + 1] = c end
+    end
     local keep = opts.keep or {}
     local bag = bagCounts()
     local planned = {}
@@ -7685,7 +7694,7 @@ function M.gearDress(opts)
       -- shields and armor first, the weapons last (their keys read the others)
       for _, slot in ipairs({ 3, 2, 1, 0 }) do
         if not (keep[c] and keep[c][slot]) and not kitHand(c, slot) then
-          local others = keysElsewhere(members, wornOf, c, slot)
+          local others = keysElsewhere(all, wornOf, c, slot)
           local cur = gearWorn(c, slot)
           local curScore = (cur == 0xFF or fits(c, slot, cur)) and score(c, slot, cur, others) or 0
           local best, bestScore = nil, curScore
@@ -7702,12 +7711,21 @@ function M.gearDress(opts)
             planned[c][slot] = best
             kits[c] = kits[c] or {}
             table.insert(kits[c], 1, { slot, best })
-            M.log(string.format("[%s] %s slot %d: %s (score %d) -> %s (score %d)", tag,
-              GEAR_NAMES[c] or tostring(c), slot, gearName(cur), curScore, gearName(best), bestScore))
+            if not opts.quiet then
+              M.log(string.format("[%s] %s slot %d: %s (score %d) -> %s (score %d)", tag,
+                GEAR_NAMES[c] or tostring(c), slot, gearName(cur), curScore, gearName(best), bestScore))
+            end
           end
         end
       end
     end
+    return kits, members
+end
+function M.gearDress(opts)
+  opts = opts or {}
+  local tag = opts.tag or "gear dress"
+  return M.lazy(function()
+    local kits, members = M.gearDressPlan(opts)
     local steps = {}
     for _, c in ipairs(members) do
       if kits[c] then
@@ -8346,7 +8364,9 @@ function M.relicPlan(members, opts)
       for s = 4, 5 do
         local cl = M.relicClass(cur[s], opts.threats)
         if cl and cl.hands then m.twoWeapons = true end
-        if cur[s] ~= 0xFF and (cl == nil or cl.hands) then m.want[s] = cur[s] else m.free[#m.free + 1] = s end
+        -- opts.pin[ch][s]: the slot is decided already and stays as it is (the gear baseline's prizes, #524)
+        local pinned = opts.pin and opts.pin[ch] and opts.pin[ch][s]
+        if pinned or (cur[s] ~= 0xFF and (cl == nil or cl.hands)) then m.want[s] = cur[s] else m.free[#m.free + 1] = s end
       end
       ms[#ms + 1] = m
     end
@@ -8354,7 +8374,9 @@ function M.relicPlan(members, opts)
   -- the pool: the bag's ranked relics and every worn one not kept in place;
   -- a spare two-weapon relic in the bag is planned apart (step 1)
   local count, ids, spareHands = {}, {}, {}
+  -- opts.exclude[id]: a relic the plan never moves or puts on (the gear baseline's prizes, placed before it)
   local function add(id, n)
+    if opts.exclude and opts.exclude[id] then return end
     if not count[id] then count[id] = 0; ids[#ids + 1] = id end
     count[id] = count[id] + n
   end
@@ -8756,7 +8778,7 @@ function M.relicPlan(members, opts)
       if w ~= 0xFF then demand[w] = (demand[w] or 0) + 1 end
     end
   end
-  for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end
+  if not opts.quiet then for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end end
   lines = {}
   for id, n in pairs(demand) do
     M.assertEq(n <= (supply[id] or 0), true, string.format("%s: the plan puts %s on %d slot(s) and the party owns %d "
@@ -8773,7 +8795,7 @@ function M.relicPlan(members, opts)
     plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, cur = m.cur, real = m.real, changes = changes,
       handCome = m.handCome, filler = m.filler or {} }
   end
-  for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end
+  if not opts.quiet then for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end end
   return plan
 end
 
@@ -9904,6 +9926,350 @@ function M.ribbonsOnSeated(opts)
   })
 end
 
+-- ------------------------------------------------------ the gear baseline --
+-- Every save holds the party in its baseline gear (#524, the owner's design): a route leg returns everyone to it
+-- before it saves (M.saveGame runs M.gearBaseline first) and asserts it (M.assertGearBaseline).  Gear falls into
+-- three layers:
+--   1. Assigned prizes ("someone should wear this"): party-wide relics that are always on a seated member, never
+--      in the bag and never on someone waiting aboard (M.GEAR_PRIZES: the Ribbon, the Economizer).  The first
+--      Ribbon goes on the party's healer (M.gearHealer: a seated member who can cast a Cure, the highest magic
+--      first), so status cannot stop the one who fixes everyone else: a genre guideline, not an FF6 law, which a
+--      measured reason may override (owner, 2026-11-11).  Further Ribbons go to whoever status hurts most
+--      (M.gearStatusOrder: the most spells learned, since Mute and Imp take a caster's Magic while every member
+--      loses turns alike to Sleep and Muddle; then magic).  The Economizer goes on the heaviest MP spender
+--      (M.gearMpOrder: a member with a spell, the largest MP pool, then magic).  A prize takes the slot that
+--      holds it already, else an empty one, else the slot whose relic ranks lowest (never a two-weapon relic or
+--      another prize).
+--   2. Each member's default loadout: the best of what is owned fills the slots left over, by the rules the
+--      route already plays: the relics by M.relicPlan (the prize slots pinned, the prizes out of its pool), the
+--      weapon, shield, helmet and armor by M.gearDressPlan (each slot the best-scoring piece the bag offers,
+--      planned again until nothing changes).
+--   3. Area overlays: gear a leg puts on for a stretch (M.GEAR_OVERLAYS: the Wall Rings, the Safety Bit, the
+--      Guardian's Barrier Rings, an element dress) is declared with M.overlayOn and comes off at the area's exit
+--      (M.overlayOff).  The baseline takes off whatever is still on: every overlay relic comes off (the relic
+--      rule may put a ranked one back where it is the best left, as for any relic), and an element dress comes
+--      off by the gear rule.
+-- The assert holds the party to all three, read from the live state: no overlay open and no overlay relic the
+-- relic rule does not rank (or ranks a spare) worn by a seated member; every owned prize on the seated member the
+-- rule names (a prize stays in the bag only when no seated member can wear it, logged); nobody waiting aboard
+-- (available, in no party) wearing a prize; and the relic and gear rules planning no change.  A violation fails
+-- the leg.  A member the Equip and Relic menus refuse (down, petrified, a zombie) is left out of the dress and the
+-- check, and logged; so are the guests, and UMARO from the Equip menu (field_menu.asm: Equip is not valid for
+-- characters $0D and higher, Relic for $0E and higher).  Only the active party is dressed: in a split dungeon the
+-- other parties keep what they wear.
+M.GEAR_PRIZES = { 0xCA, 0xCE }                  -- placement order
+M.GEAR_PRIZE_NAMES = { [0xCA] = "Ribbon", [0xCE] = "Economizer" }
+-- name -> { items = the relic ids it puts on (off at the baseline), gear = true for an overlay of the weapon and
+-- armor slots (the gear rule takes it off), where = the legs, why = the reason }
+M.GEAR_OVERLAYS = {
+  ["Wall Rings"] = { items = { 0xBB }, where = "gen_wor_dream (the dream's Barb-e groups), gen_wor_ancient, "
+    .. "gen_wor_tower (the Fanatics' Tower), gen_wor_kt_poltergeist",
+    why = "Reflect on the party where the enemies cast what Reflect turns back" },
+  ["Safety Bit"] = { items = { 0xDC }, where = "gen_wor_tower",
+    why = "the L.20 Magic's X-Zone and the L.50's Doom (#521's Death guards)" },
+  ["Barrier Rings"] = { items = { 0xB7 }, where = "gen_wor_kt_guardian",
+    why = "Shell near death on the Guardian's lane (route-wor-kefka-tower)" },
+  ["element dress"] = { items = {}, gear = true, where = "M.elementDress (Kefka's Tower's Doom, Poltergeist, "
+    .. "Goddess)", why = "armor that covers the boss's element" },
+}
+M.gearOverlaysOpen = {}                         -- name -> why, this run
+function M.overlayOn(name, why)
+  return M.call(function()
+    M.assertEq(M.GEAR_OVERLAYS[name] ~= nil, true, string.format("the overlay %q is declared in M.GEAR_OVERLAYS", name))
+    M.gearOverlaysOpen[name] = why or M.GEAR_OVERLAYS[name].why
+    M.log(string.format("[baseline] overlay on: %s (%s)", name, M.gearOverlaysOpen[name]))
+  end)
+end
+function M.overlayOff(name)
+  return M.call(function()
+    if M.gearOverlaysOpen[name] then M.log(string.format("[baseline] overlay off: %s", name)) end
+    M.gearOverlaysOpen[name] = nil
+  end)
+end
+function M.gearIsPrize(id)
+  for _, p in ipairs(M.GEAR_PRIZES) do if p == id then return true end end
+  return false
+end
+-- the overlay relics: every declared overlay's items
+function M.gearOverlayItem(id)
+  for _, o in pairs(M.GEAR_OVERLAYS) do
+    for _, x in ipairs(o.items) do if x == id then return true end end
+  end
+  return false
+end
+-- the members the baseline dresses: the active party's characters the Relic menu takes ({ ch=, name=, order= })
+function M.gearBaselineMembers(quiet)
+  local out = {}
+  for i, ch in ipairs(M.partyRoster(M.readByte(0x1A6D) & 0x07)) do
+    if ch <= 13 and not M.relicMenuRefuses(ch) then
+      out[#out + 1] = { ch = ch, name = M.SPLIT_NAMES[ch], order = i }
+    elseif ch <= 13 and not quiet then
+      M.log(string.format("[baseline] %s is down (HP %d, status1 $%02X): the menus refuse him; left out",
+        M.SPLIT_NAMES[ch], M.charHp(ch), M.charStatus1(ch)))
+    end
+  end
+  return out
+end
+-- the party's healer: a member who can cast a Cure now (M.knowsSpell: learned, or granted by the Esper or gear
+-- worn), the highest magic first; nil when nobody can
+function M.gearHealer(ms)
+  local best
+  for _, m in ipairs(ms) do
+    if m.ch <= 11 then
+      local cures = false
+      for _, sp in ipairs(CARE_CURES) do if M.knowsSpell(m.ch, sp) then cures = true end end
+      if cures and (best == nil or charByte(m.ch, 0x1D) > charByte(best.ch, 0x1D)) then best = m end
+    end
+  end
+  return best
+end
+function M.gearSorted(ms, key)
+  local out = {}
+  for _, m in ipairs(ms) do out[#out + 1] = m end
+  table.sort(out, function(a, b)
+    local ka, kb = key(a), key(b)
+    for i = 1, #ka do if ka[i] ~= kb[i] then return ka[i] > kb[i] end end
+    return a.order < b.order
+  end)
+  return out
+end
+-- whoever status hurts most, first: the most spells learned, then magic
+function M.gearStatusOrder(ms)
+  return M.gearSorted(ms, function(m) return { spellsLearned(m.ch), charByte(m.ch, 0x1D) } end)
+end
+-- the heaviest MP spender first: a member with a spell, the largest MP pool, then magic
+function M.gearMpOrder(ms)
+  return M.gearSorted(ms, function(m)
+    local sp = spellsLearned(m.ch)
+    return { sp > 0 and 1 or 0, sp > 0 and M.charMaxMp(m.ch) or 0, charByte(m.ch, 0x1D) }
+  end)
+end
+-- The prize plan for the members `ms` (M.gearBaselineMembers): { targets = { { m=, slot=, id=, why= } },
+-- moves = { { ch=, slot=, id= } } (every slot of theirs wearing a prize that is not that slot's target: off into
+-- the bag first, so every target is equipped from the bag), owned = { [id] = n }, left = { [id] = n } }.  The
+-- prizes counted are the bag's and those these members wear.  Reads only.
+function M.gearPrizePlan(ms)
+  local plan = { targets = {}, moves = {}, owned = {}, left = {} }
+  local reserved = {}                           -- ch * 8 + slot -> prize id
+  local healer = M.gearHealer(ms)
+  for _, id in ipairs(M.GEAR_PRIZES) do
+    local n = M.invCountOf(id)
+    for _, m in ipairs(ms) do for s = 4, 5 do if charByte(m.ch, 0x1F + s) == id then n = n + 1 end end end
+    plan.owned[id] = n
+    local order, roles = {}, {}
+    if id == RIBBON_ID then
+      if healer then order[1] = healer; roles[healer] = "the party's healer: casts a Cure, the highest magic" end
+      for _, m in ipairs(M.gearStatusOrder(ms)) do
+        if m ~= healer then order[#order + 1] = m; roles[m] = "whom status hurts most: spells learned, then magic" end
+      end
+    else
+      for _, m in ipairs(M.gearMpOrder(ms)) do order[#order + 1] = m; roles[m] = "the heaviest MP spender: MP pool" end
+    end
+    local placed = 0
+    for _, m in ipairs(order) do
+      if placed >= n then break end
+      if wearsItem(m.ch, id) then
+        local slot, key = nil, nil
+        for s = 4, 5 do
+          local cur = charByte(m.ch, 0x1F + s)
+          local cl = cur ~= 0xFF and M.relicClass(cur) or nil
+          if not reserved[m.ch * 8 + s] and not (cl and cl.hands) then
+            -- the slot holding it already, then an empty one, then the lowest-ranked relic (one the rule does
+            -- not rank between a guard and an acting relic), another prize last
+            local k = cur == id and -3 or cur == 0xFF and -2 or M.gearIsPrize(cur) and 100
+              or (cl and cl.rank or 1.5)
+            if key == nil or k < key then slot, key = s, k end
+          end
+        end
+        if slot then
+          reserved[m.ch * 8 + slot] = id
+          placed = placed + 1
+          plan.targets[#plan.targets + 1] = { m = m, slot = slot, id = id, why = roles[m] }
+        end
+      end
+    end
+    plan.left[id] = n - placed
+  end
+  for _, m in ipairs(ms) do
+    for s = 4, 5 do
+      local cur = charByte(m.ch, 0x1F + s)
+      if M.gearIsPrize(cur) and reserved[m.ch * 8 + s] ~= cur then
+        plan.moves[#plan.moves + 1] = { ch = m.ch, slot = s, id = cur }
+      end
+    end
+  end
+  return plan
+end
+function M.gearPrizeLine(t)
+  return string.format("%s $%02X on %s's slot %d (%s)", M.GEAR_PRIZE_NAMES[t.id], t.id, t.m.name, t.slot, t.why)
+end
+-- The violations of the baseline in the live state, as lines (empty: the party is at its baseline), and the
+-- prize plan.  opts.threats as M.gearBaseline's; opts.aboard(ch, slot) reads a relic slot of a member waiting
+-- aboard (a selftest's reader; default the record).
+function M.gearBaselineViolations(opts)
+  opts = opts or {}
+  local out = {}
+  local function bad(fmt, ...) out[#out + 1] = string.format(fmt, ...) end
+  local ms = M.gearBaselineMembers(true)
+  for name in pairs(M.gearOverlaysOpen) do bad("the overlay %s is still on", name) end
+  for _, m in ipairs(ms) do
+    for s = 4, 5 do
+      local cur = charByte(m.ch, 0x1F + s)
+      local cl = cur ~= 0xFF and M.relicClass(cur, opts.threats) or nil
+      if M.gearOverlayItem(cur) and (cl == nil or cl.aff == "spare") then
+        bad("%s wears the overlay relic $%02X in slot %d", m.name, cur, s)
+      end
+    end
+  end
+  local pp = M.gearPrizePlan(ms)
+  local pin = {}
+  for _, t in ipairs(pp.targets) do
+    pin[t.m.ch] = pin[t.m.ch] or {}
+    pin[t.m.ch][t.slot] = true
+    if charByte(t.m.ch, 0x1F + t.slot) ~= t.id then bad("the rule puts the %s", M.gearPrizeLine(t)) end
+  end
+  for _, mv in ipairs(pp.moves) do
+    if charByte(mv.ch, 0x1F + mv.slot) == mv.id and not (pin[mv.ch] and pin[mv.ch][mv.slot]) then
+      bad("%s wears the %s in slot %d, which the rule gives to another member", M.SPLIT_NAMES[mv.ch],
+        M.GEAR_PRIZE_NAMES[mv.id], mv.slot)
+    end
+  end
+  local aboard = opts.aboard or function(ch, s) return charByte(ch, 0x1F + s) end
+  for ch = 0, 13 do
+    local sw = 0x02F0 + ch
+    if (M.readByte(0x1E80 + (sw >> 3)) >> (sw & 7)) & 1 == 1 and (M.readByte(0x1850 + ch) & 0x07) == 0 then
+      for s = 4, 5 do
+        if M.gearIsPrize(aboard(ch, s)) then
+          bad("%s, waiting aboard in no party, wears the %s", M.SPLIT_NAMES[ch], M.GEAR_PRIZE_NAMES[aboard(ch, s)])
+        end
+      end
+    end
+  end
+  local members, exclude = {}, {}
+  for _, m in ipairs(ms) do members[#members + 1] = { m.ch, m.name } end
+  for _, id in ipairs(M.GEAR_PRIZES) do exclude[id] = true end
+  for _, p in ipairs(M.relicPlan(members, { tag = "baseline check", threats = opts.threats, pin = pin,
+      exclude = exclude, quiet = true })) do
+    for _, c in ipairs(p.changes) do
+      bad("the relic rule puts $%02X in %s's slot %d (wears $%02X)", c[2], p.name, c[1], p.cur[c[1]])
+    end
+  end
+  local cs = {}
+  for _, m in ipairs(ms) do cs[#cs + 1] = m.ch end
+  local kits = M.gearDressPlan({ members = cs, quiet = true })
+  for c, kit in pairs(kits) do
+    for _, e in ipairs(kit) do
+      bad("the gear rule puts $%02X in %s's slot %d (wears $%02X)", e[2], M.SPLIT_NAMES[c], e[1],
+        charByte(c, 0x1F + e[1]))
+    end
+  end
+  return out, pp
+end
+function M.gearBaselineLine()
+  local parts = {}
+  for _, m in ipairs(M.gearBaselineMembers(true)) do
+    parts[#parts + 1] = string.format("%s %02X %02X %02X %02X %02X %02X", m.name, charByte(m.ch, 0x1F),
+      charByte(m.ch, 0x20), charByte(m.ch, 0x21), charByte(m.ch, 0x22), charByte(m.ch, 0x23), charByte(m.ch, 0x24))
+  end
+  return table.concat(parts, "; ")
+end
+function M.assertGearBaseline(tag, opts)
+  local v, pp = M.gearBaselineViolations(opts)
+  for _, t in ipairs(pp.targets) do M.log(string.format("[baseline] %s: %s", tag, M.gearPrizeLine(t))) end
+  for _, id in ipairs(M.GEAR_PRIZES) do
+    if pp.left[id] > 0 and M.invCountOf(id) > 0 then
+      M.log(string.format("[baseline] %s: %d %s(s) stay in the bag: no seated member can wear one", tag,
+        pp.left[id], M.GEAR_PRIZE_NAMES[id]))
+    end
+  end
+  for _, l in ipairs(v) do M.log(string.format("[baseline] %s: VIOLATION %s", tag, l)) end
+  M.assertEq(#v, 0, string.format("%s: the party is at its gear baseline (%s)", tag,
+    #v > 0 and table.concat(v, "; ") or "no violation"))
+  M.log(string.format("[baseline] %s: at the baseline: %s", tag, M.gearBaselineLine()))
+end
+-- M.gearBaseline(opts): return the active party to its baseline and assert it.  opts.tag; opts.threats (the
+-- statuses the arc ahead inflicts, M.relicPlan's; default every status).
+function M.gearBaseline(opts)
+  opts = opts or {}
+  local tag = opts.tag or "gear baseline"
+  local pin, exclude = {}, {}
+  for _, id in ipairs(M.GEAR_PRIZES) do exclude[id] = true end
+  local function gearPass(i)
+    return M.lazy(function()
+      local cs = {}
+      for _, m in ipairs(M.gearBaselineMembers(true)) do cs[#cs + 1] = m.ch end
+      if next(M.gearDressPlan({ members = cs, quiet = true })) == nil then return M.call(function() end) end
+      return M.gearDress({ members = cs, tag = string.format("%s: gear (pass %d)", tag, i) })
+    end)
+  end
+  return M.seqStep({
+    M.call(function() M.log(string.format("[baseline] %s: before: %s", tag, M.gearBaselineLine())) end),
+    -- the overlay relics and every prize that moves come off into the bag, one Relic session a member
+    M.lazy(function()
+      local ms = M.gearBaselineMembers()
+      local pp = M.gearPrizePlan(ms)
+      local off = {}
+      for _, mv in ipairs(pp.moves) do
+        off[mv.ch] = off[mv.ch] or {}
+        off[mv.ch][mv.slot] = true
+        M.log(string.format("[baseline] %s: the %s off %s's slot %d (it goes elsewhere)", tag,
+          M.GEAR_PRIZE_NAMES[mv.id], M.SPLIT_NAMES[mv.ch], mv.slot))
+      end
+      for _, m in ipairs(ms) do
+        for s = 4, 5 do
+          local cur = charByte(m.ch, 0x1F + s)
+          if M.gearOverlayItem(cur) then
+            off[m.ch] = off[m.ch] or {}
+            off[m.ch][s] = true
+            M.log(string.format("[baseline] %s: the overlay relic $%02X off %s's slot %d", tag, cur, m.name, s))
+          end
+        end
+      end
+      local steps = {}
+      for _, m in ipairs(ms) do
+        if off[m.ch] then
+          local slots = {}
+          for s = 4, 5 do if off[m.ch][s] then slots[#slots + 1] = s end end
+          local label = string.format("%s: %s's relics off", tag, m.name)
+          steps[#steps + 1] = M.keepGear(m.ch, label, M.unequipRelics(m.ch, slots, { tag = label }))
+        end
+      end
+      return M.seqStep(steps)
+    end),
+    -- the prizes onto their members
+    M.lazy(function()
+      local pp = M.gearPrizePlan(M.gearBaselineMembers(true))
+      local steps = {}
+      for k in pairs(pin) do pin[k] = nil end
+      for _, t in ipairs(pp.targets) do
+        pin[t.m.ch] = pin[t.m.ch] or {}
+        pin[t.m.ch][t.slot] = true
+        if charByte(t.m.ch, 0x1F + t.slot) ~= t.id then
+          M.log(string.format("[baseline] %s: the %s", tag, M.gearPrizeLine(t)))
+          local label = string.format("%s: %s's %s", tag, t.m.name, M.GEAR_PRIZE_NAMES[t.id])
+          steps[#steps + 1] = M.keepGear(t.m.ch, label, M.equipKit(t.m.ch, { { t.slot, t.id } }, { tag = label }))
+        end
+      end
+      return M.seqStep(steps)
+    end),
+    -- the relics left over, by the relic rule
+    M.lazy(function()
+      local members = {}
+      for _, m in ipairs(M.gearBaselineMembers(true)) do members[#members + 1] = { m.ch, m.name } end
+      return M.dressRelics(members, { tag = tag .. ": relics", threats = opts.threats, pin = pin, exclude = exclude })
+    end),
+    -- the weapon and armor slots, by the gear rule, until it plans nothing
+    gearPass(1), gearPass(2), gearPass(3),
+    M.call(function()
+      for name in pairs(M.gearOverlaysOpen) do
+        M.log(string.format("[baseline] %s: the overlay %s comes off at the save", tag, name))
+        M.gearOverlaysOpen[name] = nil
+      end
+      M.assertGearBaseline(tag, { threats = opts.threats })
+    end),
+  })
+end
+
 -- ------------------------------------------------- split parties --
 -- A split-party dungeon (the Phoenix Cave: `party_menu 2`, Kefka's Tower:
 -- `party_menu 3`) keeps two or three parties on the field at once.  What
@@ -10713,6 +11079,9 @@ end
 -- here, with no replay and no navigation in the cutter.
 --
 -- opts: slot (1-3, default 3), tag, maxFrames (whole drive, default 4000).
+-- Every save holds the party at its gear baseline (#524): M.gearBaseline runs
+-- first and asserts it (opts.baseline = false: the caller ran it already, or
+-- the save is a suite's, not the route's; opts.threats is passed on).
 function M.saveGame(opts)
   opts = opts or {}
   local slot = opts.slot or 3
@@ -10721,6 +11090,8 @@ function M.saveGame(opts)
   local saveArg, hooked = nil, false
   local function menuOpen() return M.readByte(0x59) ~= 0 end
   return M.seqStep({
+    opts.baseline ~= false and M.gearBaseline({ tag = tag .. ": gear baseline", threats = opts.threats })
+      or M.call(function() end),
     -- open the menu; on the world map $59 rides the same flow
     (function() local calm, ph = 0, 0
       return M.driveUntil(function()

@@ -750,6 +750,8 @@ H.run({ maxFrames = 600000 }, {
        and H.worldX() == 84 and H.worldY() == 34
   end, 2400, "back on the world at (84,34), the checkpoint-G tile", 5),
   H.waitFrames(45),
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "narshe-mission-v1 save: gear baseline" }),
   H.call(function()
     H.assertEq(H.worldX(), 84, "checkpoint-G tile x")
     H.assertEq(H.worldY(), 34, "checkpoint-G tile y")

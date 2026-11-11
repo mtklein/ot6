@@ -1519,6 +1519,8 @@ local steps = {
   end),
 
   -- ---- 9. the world battery save -- checkpoint M -------------------------
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "fire-out-v1 save: gear baseline" }),
   H.call(function()
     H.assertExitContractPreSave("fire-out-v1")
   end),

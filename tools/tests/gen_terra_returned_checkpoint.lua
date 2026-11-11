@@ -363,6 +363,8 @@ H.run({ maxFrames = 160000 }, {
       H.readWord(0x1f64), H.worldX(), H.worldY(), shipX(), shipY()))
     H.screenshot("checkpoint_f_grounded")
   end),
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "terra-returned-v1 save: gear baseline" }),
 
   (function() local calm, ph = 0, 0
     return H.driveUntil(function()

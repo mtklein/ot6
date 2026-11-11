@@ -71,6 +71,9 @@ H.run({ maxFrames = 5000 }, {
   }, "leave Vector to its west entry point"),
   H.release(),
   H.waitFrames(180),
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "post-opera-v1 save: gear baseline" }),
+  H.waitFrames(60),
   H.repeatN(3, { H.pressButtons({ "x" }, 6), H.waitFrames(50) }),
   H.waitUntil(function() return H.readByte(0x59) ~= 0 end,
     500, "field menu open", 5),

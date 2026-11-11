@@ -839,6 +839,8 @@ local steps = {
   end),
 
   -- ---- 9. the world battery save -- boundary J ------------------------------
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "banquet-done-v1 save: gear baseline" }),
   H.call(function()
     H.assertExitContractPreSave("banquet-done-v1")
   end),

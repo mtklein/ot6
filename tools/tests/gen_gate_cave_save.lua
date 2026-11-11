@@ -570,6 +570,8 @@ H.run({ maxFrames = 480000 }, {
     }, "tap UP onto the save point (74,53) -> $01BF")
   end)(),
   H.waitFrames(45),
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "gate-cave-save-v1 save: gear baseline" }),
   H.call(function()
     H.assertEq(sw(0x01BF), 1, "$01BF SET -- the SavePoint script ran")
     H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch")

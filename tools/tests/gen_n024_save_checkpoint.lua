@@ -95,6 +95,8 @@ H.run({ maxFrames = 20000 }, {
   tapInto("down", onSaveTile(26, 53), 9000,
     "onto the NEW save tile 273 (26,53)", tileCalm),
   H.waitFrames(45),
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "n024-entry-save-v1 save: gear baseline" }),
   H.call(function()
     H.assertEq(sw(0x01BF), 1,
       "$01BF SET -- the NEW 273 save point runs the shared SavePoint script")

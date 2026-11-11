@@ -80,6 +80,8 @@ H.run({ maxFrames = 20000 }, {
   tapInto("left", onSaveTile(3, 55), 9000,
     "onto the save tile 272 (3,55)", tileCalm),
   H.waitFrames(45),
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "minecart-platform-v1 save: gear baseline" }),
   H.call(function()
     H.assertEq(sw(0x01BF), 1, "$01BF SET -- the SavePoint script enabled saving")
     H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch took")
