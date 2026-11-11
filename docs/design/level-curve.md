@@ -860,7 +860,23 @@ it.  In this replay the leg passed on its first attempt with no watchdog
 trip ("[watch] 2098 samples, pad down 3528 frames, 0 trip(s)", "PASS
 (frame 33577) attempts=1/3"); it stays its own lab.
 
-**Questions for the owner.**
+**The owner's answers (2026-11-11) and the calls taken.**
+
+- *Grind budget:* about 690 random battles is fine overall, but Kefka's
+  Tower may need fewer than its 125 (102 of them training laps).  Call:
+  move the bench's catching up earlier (move 2) and trim the tower's laps
+  to what its fights need.
+- *The strong six to eight* is ours to pick (owner: favourites in the end
+  game are preference).  Call: TERRA, CELES, RELM, STRAGO, SHADOW, CYAN,
+  EDGAR and LOCKE; SETZER carried (his Exp. Egg catches him up).
+- *The dinosaur forest:* no preference, so long as the line stops there and
+  proves its fights doable.  Call: seat the bench there (move 2).
+- *Holding the carriers back:* ours to choose; a human player picks
+  favourites and lets them grow well past the rest.  Call: don't cap them.
+  Move 3 (the Fanatics' Tower at the carriers' arrival levels) is dropped;
+  the favourites stay strong and the bench is raised to the tower's need.
+
+**Questions for the owner (as asked).**
 
 - *How grindy should the canon playthrough be?*  Today it fights about 690
   random battles from power-on to Kefka (177 in the World of Balance,
