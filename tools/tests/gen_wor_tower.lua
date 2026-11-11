@@ -711,10 +711,18 @@ local heldRelic = {}
 -- Safety Bit from the first floor's side room goes on the first member
 -- without a guard whose first relic does nothing in a magic-only fight
 -- (CELES's Genji Glove), back off out of the tower (TOWER_GUARD "bit" or
--- "bit+memento"; false, the control arm, leaves both as they were)
+-- "bit+memento"; false, the control arm, leaves both as they were).
+-- Measured from the graph's wor-tower-v1, shifts 0-9 an arm (build/attempts/
+-- wt/v042-tower-deaths/b1_tally.txt): "ARM tA: 10 runs, 9 PASS ... deaths 91
+-- (61 one action); fenix left the bag 57", formation 362 ($16A) "deaths 39,
+-- fenix 39"; "ARM tGM: 10 runs, 10 PASS ... deaths 59 (36 one action); fenix
+-- left the bag 21", $16A "deaths 13".  The Safety Bit alone (tG) left the bag
+-- at 44; the L.20s first by Drain (tK, TOWER_L20_FIRST) made it worse, 86
+-- (the default: both guards; the kill order off)
 local MEMENTO_RING, GENJI_GLOVE, ATLAS_ARMLET, HERO_RING = 0xDB, 0xD1, 0xC4, 0xC9
 local function deathGuard(id) return id == MEMENTO_RING or id == SAFETY_BIT end
 local guard = TOWER_GUARD
+if guard == nil then guard = "bit+memento" end
 local keepMemento = guard == "bit+memento"
 local ringSlot = {}
 local function wallRingsOn()
