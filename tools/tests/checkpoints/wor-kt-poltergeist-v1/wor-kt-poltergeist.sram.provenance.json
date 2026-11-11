@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "7b59284f4da520662617e6d9149307a2d21540d77ca34798f4e663a5667a3eac",
-  "generator_sig": "a90de2e46ef2cff1675b079b965c4f56eacea455da3cbdab19f58922a1eba721 gen_wor_kt_poltergeist build/checkpoints/wor-kt-doom-v1/manifest.json build/checkpoints/wor-kt-doom-v1/wor-kt-doom.sram",
+  "payload_sha256": "36c751a713f55a2026fecf801b1422a54f10b6a64a807eae00806b92fab61112",
+  "generator_sig": "5ddc6be19d8fa0bc1ff2fc4fbef89d1328bd1d6a9cdcf833cda816a02793080d gen_wor_kt_poltergeist build/checkpoints/wor-kt-doom-v1/manifest.json build/checkpoints/wor-kt-doom-v1/wor-kt-doom.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-kt-doom-v1/manifest.json",
-      "sha256": "d1d1cd8dd6f8bf1ef088599604f0d8159dd983871188ed6dc8ea02556bffb9a8"
+      "sha256": "b2afadcfb70b813cf1406bfe9297e527555952fe18b0f4b294f5bcbd28039aef"
     }
   ]
 }

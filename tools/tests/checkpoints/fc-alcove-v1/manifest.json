@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "e80a7b6aa6a0f38e1f12d64ddc33caa25220831af191249003dce32ca6766acd",
+  "sha256": "4fb46c8b92b13202208e38e5604c7965fa8fbf9fd4826738f6615f874a48cede",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "e80a7b6aa6a0f38e1f12d64ddc33caa25220831af191249003dce32ca6766acd",
-    "generator_sig": "edbde805211280cb7911dc290aae8e860131013cb1e7b3c12193833513d33982 gen_fc_alcove build/checkpoints/fc-landing-v1/manifest.json build/checkpoints/fc-landing-v1/fc-landing.sram",
+    "payload_sha256": "4fb46c8b92b13202208e38e5604c7965fa8fbf9fd4826738f6615f874a48cede",
+    "generator_sig": "a66579c6b09b190ac568b4f11c8419813a80592036786f3bf9f777199ec59612 gen_fc_alcove build/checkpoints/fc-landing-v1/manifest.json build/checkpoints/fc-landing-v1/fc-landing.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/fc-landing-v1/manifest.json",
-        "sha256": "740c6512b57d300c8da1f4c977895ed11d1e3285775e9ea61830b6666d1db58a"
+        "sha256": "a5c11c957f59fa9cbac0424c66c4595523a4e331ef6ca55eaf5281458669481c"
       }
     ]
   }
