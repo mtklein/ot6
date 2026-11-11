@@ -145,6 +145,7 @@ H.run({ maxFrames = 3000000 }, {
   H.fieldCare({ threshold = 1.0, tag = "before dressing for the Poltergeist" }),
   H.elementDress(FIRE_ELEMENT, { tag = "dress against the Poltergeist's fire" }),
   wallRings("Wall Rings for the Poltergeist"),
+  H.overlayOn("Wall Rings", "the Poltergeist (route-wor-kefka-tower.md)"),
   -- a key for the break (section 6.2): the statue keys the blow and the cards, and in party 2 only LOCKE's Wing Edge
   -- holds one, so STRAGO trades his Imp Halberd (pierce) for the strongest bludgeon in the bag: the Pearl Rod, the
   -- Gravity Rod, the Punisher, the Morning Star.  Asserted: one of them goes on (the bag's rods are the factory's

@@ -7670,7 +7670,7 @@ function M.gearDressPlan(opts)
     local all = opts.members or seated()
     local members = {}
     for _, c in ipairs(all) do
-      if c <= 12 and not M.relicMenuRefuses(c) then members[#members + 1] = c end
+      if M.charActor(c) <= 12 and not M.relicMenuRefuses(c) then members[#members + 1] = c end
     end
     local keep = opts.keep or {}
     local bag = bagCounts()
@@ -7807,6 +7807,8 @@ function M.elementDress(mask, opts)
       end
     end
     if #steps == 0 then return M.logStep("[" .. tag .. "] nothing in the bag covers better") end
+    -- an area overlay (#524): the gear rule takes it off at the save's baseline
+    steps[#steps + 1] = M.overlayOn("element dress", tag)
     return M.seqStep(steps)
   end)
 end
@@ -9986,6 +9988,35 @@ function M.overlayOff(name)
     M.gearOverlaysOpen[name] = nil
   end)
 end
+-- M.wallRingsOn(chars, opts): the Wall Rings overlay on: each of `chars` who is seated, up and wears none takes
+-- one from the bag while the bag has one, in relic slot 5, else 4, whichever holds no prize (M.GEAR_PRIZES) and
+-- no two-weapon relic, the gear the Relic menu's re-equip moves put back (M.keepGear); opts.why names the reason
+function M.wallRingsOn(chars, opts)
+  opts = opts or {}
+  local RING = 0xBB
+  return M.seqStep({
+    M.lazy(function()
+      local steps, have = {}, M.invCountOf(RING)
+      local active = M.readByte(0x1A6D) & 0x07
+      for _, ch in ipairs(chars) do
+        local slot = nil
+        for _, s in ipairs({ 5, 4 }) do
+          local cur = charByte(ch, 0x1F + s)
+          local cl = cur ~= 0xFF and M.relicClass(cur) or nil
+          if slot == nil and not M.gearIsPrize(cur) and not (cl and cl.hands) then slot = s end
+        end
+        if have > 0 and slot and (M.readByte(0x1850 + ch) & 0x07) == active and not M.relicMenuRefuses(ch)
+           and charByte(ch, 0x23) ~= RING and charByte(ch, 0x24) ~= RING then
+          have = have - 1
+          local label = string.format("%s: a Wall Ring on %s", opts.tag or "Wall Rings", M.SPLIT_NAMES[ch])
+          steps[#steps + 1] = M.keepGear(ch, label, M.equipKit(ch, { { slot, RING } }, { tag = label }))
+        end
+      end
+      return M.seqStep(steps)
+    end),
+    M.overlayOn("Wall Rings", opts.why),
+  })
+end
 function M.gearIsPrize(id)
   for _, p in ipairs(M.GEAR_PRIZES) do if p == id then return true end end
   return false
@@ -10001,9 +10032,10 @@ end
 function M.gearBaselineMembers(quiet)
   local out = {}
   for i, ch in ipairs(M.partyRoster(M.readByte(0x1A6D) & 0x07)) do
-    if ch <= 13 and not M.relicMenuRefuses(ch) then
+    -- (the menus read the record's actor: a guest's record can sit in a roster slot, hub-v1's in 13)
+    if M.charActor(ch) <= 13 and not M.relicMenuRefuses(ch) then
       out[#out + 1] = { ch = ch, name = M.SPLIT_NAMES[ch], order = i }
-    elseif ch <= 13 and not quiet then
+    elseif M.charActor(ch) <= 13 and not quiet then
       M.log(string.format("[baseline] %s is down (HP %d, status1 $%02X): the menus refuse him; left out",
         M.SPLIT_NAMES[ch], M.charHp(ch), M.charStatus1(ch)))
     end
@@ -10134,8 +10166,11 @@ function M.gearBaselineViolations(opts)
         M.GEAR_PRIZE_NAMES[mv.id], mv.slot)
     end
   end
+  -- "aboard": once the Falcon has risen ($00CC, _ca4502) a member who is available and in no party waits on it;
+  -- before, a member in no party is out of the story's reach (the World of Balance's scenarios)
   local aboard = opts.aboard or function(ch, s) return charByte(ch, 0x1F + s) end
-  for ch = 0, 13 do
+  local falcon = (M.readByte(0x1E80 + (0x00CC >> 3)) >> (0x00CC & 7)) & 1 == 1
+  for ch = 0, (falcon or opts.aboard) and 13 or -1 do
     local sw = 0x02F0 + ch
     if (M.readByte(0x1E80 + (sw >> 3)) >> (sw & 7)) & 1 == 1 and (M.readByte(0x1850 + ch) & 0x07) == 0 then
       for s = 4, 5 do
@@ -10183,6 +10218,15 @@ function M.assertGearBaseline(tag, opts)
     end
   end
   for _, l in ipairs(v) do M.log(string.format("[baseline] %s: VIOLATION %s", tag, l)) end
+  if #v > 0 then
+    -- the relic rule's reasons, for the failure's reader
+    local members, pin, exclude = {}, {}, {}
+    for _, m in ipairs(M.gearBaselineMembers(true)) do members[#members + 1] = { m.ch, m.name } end
+    for _, t in ipairs(pp.targets) do pin[t.m.ch] = pin[t.m.ch] or {}; pin[t.m.ch][t.slot] = true end
+    for _, id in ipairs(M.GEAR_PRIZES) do exclude[id] = true end
+    M.relicPlan(members, { tag = tag .. ": the relic rule's check", threats = (opts or {}).threats, pin = pin,
+      exclude = exclude })
+  end
   M.assertEq(#v, 0, string.format("%s: the party is at its gear baseline (%s)", tag,
     #v > 0 and table.concat(v, "; ") or "no violation"))
   M.log(string.format("[baseline] %s: at the baseline: %s", tag, M.gearBaselineLine()))

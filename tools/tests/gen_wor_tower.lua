@@ -747,6 +747,7 @@ local function wallRingsOn()
     H.assertEq(n, 4, "each of the four wears a Wall Ring")
     say("wor", "Wall Rings on: " .. kitLine())
   end)
+  steps[#steps + 1] = H.overlayOn("Wall Rings", "the Fanatics' Tower: Reflect on the four")
   return H.seqStep(steps)
 end
 local function wallRingsOff(tag, keep)
@@ -762,6 +763,7 @@ local function wallRingsOff(tag, keep)
     end)
   end
   steps[#steps + 1] = H.call(function() say("wor", "Wall Rings off for " .. tag .. ": " .. kitLine()) end)
+  if keep == nil then steps[#steps + 1] = H.overlayOff("Wall Rings") end
   return H.seqStep(steps)
 end
 -- the Safety Bit on, and off out of the tower (TOWER_GUARD, above)
@@ -774,7 +776,10 @@ local function safetyBitOn()
       if not deathGuard(r4) and not deathGuard(r5)
          and (r4 == GENJI_GLOVE or r4 == ATLAS_ARMLET or r4 == HERO_RING or r4 == 0xFF) then
         bitOn = { ch = ch, old = r4 }
-        return H.equipKit(ch, { { 4, SAFETY_BIT } }, { tag = string.format("char %d: the Safety Bit (X-Zone)", ch) })
+        return H.seqStep({
+          H.equipKit(ch, { { 4, SAFETY_BIT } }, { tag = string.format("char %d: the Safety Bit (X-Zone)", ch) }),
+          H.overlayOn("Safety Bit"),
+        })
       end
     end
     return H.logStep("[wor] the Safety Bit stays in the bag: every member guards Death or wears a relic it needs")
@@ -783,7 +788,10 @@ end
 local function safetyBitOff()
   return lazy(function()
     if bitOn == nil or H.readByte(c(bitOn.ch, 0x23)) ~= SAFETY_BIT or bitOn.old == 0xFF then return H.call(function() end) end
-    return H.equipKit(bitOn.ch, { { 4, bitOn.old } }, { tag = string.format("char %d: the Safety Bit off", bitOn.ch) })
+    return H.seqStep({
+      H.equipKit(bitOn.ch, { { 4, bitOn.old } }, { tag = string.format("char %d: the Safety Bit off", bitOn.ch) }),
+      H.overlayOff("Safety Bit"),
+    })
   end)
 end
 -- the climb's spend (route-wor-thamasa.md 10.1: the randoms are fought, the

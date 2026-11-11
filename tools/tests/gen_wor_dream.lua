@@ -183,6 +183,8 @@ H.run({ maxFrames = 2400000 }, {
     end)
     return H.seqStep(steps)
   end),
+  -- an area overlay (#524): off at the save's gear baseline, back on for Doma after it (gen_wor_doma)
+  H.overlayOn("Wall Rings", "the dream's Barb-e groups: their Imp and other spells rebound"),
   H.call(function() H.log("[kit] " .. kitLine(DREAM)) end),
   H.fieldCare({ threshold = 1.0, tag = "before Doma" }),
   liftOff(),
