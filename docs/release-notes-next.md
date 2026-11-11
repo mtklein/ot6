@@ -18,8 +18,8 @@ and its effect. Cite evidence in the commit message.
 - Sabin's Bum Rush now needs three boost points: with fewer it is greyed out in the Blitz list. With three it lands
   four blows, each as strong as a fully boosted attack, and each blow that lands removes one of the enemy's shields,
   whatever the enemy is weak to.
-- Cyan's Cleave now strikes every enemy. Each enemy it can kill outright dies, and each one it cannot, such as a
-  boss, loses four shields and takes a heavy cut.
+- Cyan's Cleave now kills every enemy it can kill outright, not just the first one it strikes, and each one it
+  cannot, such as a boss, loses four shields and takes its full cut.
 - A battle no longer freezes when a monster's spell bounces off a party member's Reflect after every monster has
   fallen, as when the last L.30 Magic in the Fanatics' Tower dies to Poison with its counterattack still coming. The
   spell now bounces off and lands nowhere, and the battle ends in victory. The original game freezes the same way.
