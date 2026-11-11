@@ -8463,9 +8463,9 @@ function M.relicPlan(members, opts)
   -- learned (then the order of `members`) who can: never left in the bag
   -- (ties on the threatened statuses go to the guard covering more of all
   -- of them: a Ribbon over a Jewel Ring when the threat is Petrify alone)
-  -- (a tie on both covers goes to a guard a member wears now, so the plan reads the same after it is put on: the
-  -- gear baseline's check, #524, met wor-sabin-v1's Amulet giving way to a guard of the same cover that only stood
-  -- first in the pool because the Amulet, worn, joined it last)
+  -- (a tie on both covers goes to a guard a member wears now, then to the lower id, so the plan reads the same
+  -- after it is put on: the gear baseline's check, #524, met wor-sabin-v1's Amulet giving way to a guard of the
+  -- same cover that only stood first in the pool because the Amulet, worn, joined it last)
   local wide, wcover, wall, wworn = nil, 0, 0, false
   for _, id in ipairs(ids) do
     local cl = M.relicClass(id, opts.threats)
@@ -8473,7 +8473,8 @@ function M.relicPlan(members, opts)
     local worn = false
     for _, m in ipairs(ms) do if m.cur[4] == id or m.cur[5] == id then worn = true end end
     if count[id] > 0 and cl.rank == 1 and (cl.cover > wcover or (cl.cover == wcover and cl.cover > 0 and all > wall)
-        or (cl.cover == wcover and cl.cover > 0 and all == wall and worn and not wworn)) then
+        or (cl.cover == wcover and cl.cover > 0 and all == wall and worn and not wworn)
+        or (cl.cover == wcover and cl.cover > 0 and all == wall and worn == wworn and id < wide)) then
       wide, wcover, wall, wworn = id, cl.cover, all, worn
     end
   end
@@ -8513,9 +8514,11 @@ function M.relicPlan(members, opts)
   -- 3. the rest, by rank
   local order = {}
   for _, id in ipairs(ids) do order[#order + 1] = id end
+  -- the slots wearing it (not the members: CYAN's two Hyper Wrists count two, or the plan read after them puts
+  -- MOG's Atlas Armlet first and moves both, #524's check at wor-narshe-cliffs-v1)
   local function wornBy(id)
     local n = 0
-    for _, m in ipairs(ms) do if wearing(m, id) then n = n + 1 end end
+    for _, m in ipairs(ms) do for s = 4, 5 do if m.cur[s] == id then n = n + 1 end end end
     return n
   end
   table.sort(order, function(a, b)

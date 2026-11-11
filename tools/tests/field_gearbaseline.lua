@@ -133,7 +133,7 @@ H.run({ maxFrames = 120000 }, {
     local label = "3: the healer's Ribbon off"
     return H.keepGear(healer.ch, label, H.unequipRelics(healer.ch, { ribbonSlot }, { tag = label }))
   end),
-  red("3: a Ribbon in the bag", "the rule puts the Ribbon $CA on " .. healer.name),
+  H.lazy(function() return red("3: a Ribbon in the bag", "the rule puts the Ribbon $CA on " .. healer.name) end),
   H.gearBaseline({ tag = "3: the dress" }),
   green("3: the Ribbon back on the healer"),
   -- 4. a prize on a member waiting aboard
