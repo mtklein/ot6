@@ -16,10 +16,16 @@
 --   6. the healer rule's mutant (H.gearHealer naming nobody): the dress under it puts the first Ribbon elsewhere,
 --      and the real rule's assert goes red; the dress under the real rule, green;
 --   7. the Economizer rule's mutant (H.gearMpOrder reversed): the dress under it moves the Economizer to the
---      smallest MP pool, and the real rule's assert goes red; the dress, green.
+--      smallest MP pool, and the real rule's assert goes red; the dress, green;
+--   8. the Exp. Egg, a prize (#524 review): on the seated member furthest behind on levels after the dress; taken off
+--      into the bag, red; the dress, green; and on a member waiting aboard (the reader, as 4), red;
+--   9. a prize's slot (H.gearPrizeSlotKey): a Ribbon or the Economizer never takes a slot where the Egg stays, nor a
+--      two-weapon relic's; the mutant keyed on rank alone (the first landing's) would take the Egg's (rank 0);
+--  10. the contracts' items (H.contractDiffs): an item a seated member wears counts as held; one the party does not
+--      own does not (the negative control); and a named wearer stays the only one that counts.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/wor_dino.mss.lua"
-local RIBBON, ECONOMIZER, WALL_RING = 0xCA, 0xCE, 0xBB
+local RIBBON, ECONOMIZER, WALL_RING, EGG = 0xCA, 0xCE, 0xBB, 0xE4
 local function rec(ch, off) return H.readByte(0x1600 + 37 * ch + off) end
 local function violations(opts)
   local v = H.gearBaselineViolations(opts)
@@ -189,5 +195,86 @@ H.run({ maxFrames = 120000 }, {
   red("7: the Economizer mutant's dress, read by the real rule", "the rule puts the Economizer $CE"),
   H.gearBaseline({ tag = "7: the dress under the real rule" }),
   green("7: the real rule"),
+  -- 8. the Exp. Egg
+  H.call(function()
+    local pp = H.gearPrizePlan(members())
+    H.assertEq(pp.owned[EGG] >= 1, true, "precondition: the party owns the Exp. Egg (gen_wor_colosseum's chain)")
+    local low, wearer = 255, nil
+    for _, m in ipairs(members()) do
+      low = math.min(low, rec(m.ch, 8))
+      if rec(m.ch, 0x23) == EGG or rec(m.ch, 0x24) == EGG then wearer = m end
+    end
+    H.assertEq(wearer ~= nil and rec(wearer.ch, 8) == low, true, string.format("8: the Egg is on a seated member at the "
+      .. "lowest level, L%d (%s)", low, wearer and wearer.name or "nobody"))
+    H.vars.eggWearer = wearer
+  end),
+  H.lazy(function()
+    local w = H.vars.eggWearer
+    local slot = rec(w.ch, 0x23) == EGG and 4 or 5
+    local label = "8: the Egg off " .. w.name
+    return H.keepGear(w.ch, label, H.unequipRelics(w.ch, { slot }, { tag = label }))
+  end),
+  red("8: the Exp. Egg in the bag", "the rule puts the Exp. Egg $E4 on"),
+  H.gearBaseline({ tag = "8: the dress" }),
+  green("8: the Egg back on"),
+  H.lazy(function()
+    local who = nil
+    for ch = 0, 13 do
+      local sw = 0x02F0 + ch
+      if who == nil and (H.readByte(0x1E80 + (sw >> 3)) >> (sw & 7)) & 1 == 1 and (H.readByte(0x1850 + ch) & 7) == 0 then
+        who = ch
+      end
+    end
+    local reader = function(ch, s) if ch == who and s == 4 then return EGG end return rec(ch, 0x1F + s) end
+    return red("8: the Exp. Egg on " .. H.SPLIT_NAMES[who] .. " aboard", "waiting aboard in no party, wears the Exp. Egg",
+      { aboard = reader })
+  end),
+  -- 9. a prize's slot
+  H.call(function()
+    local GENJI = 0xD1
+    for _, id in ipairs({ RIBBON, ECONOMIZER }) do
+      H.assertEq(H.gearPrizeSlotKey(EGG, id, true), nil, string.format("9: $%02X never takes a slot where the Egg stays", id))
+      H.assertEq(H.gearPrizeSlotKey(GENJI, id, false), nil, string.format("9: $%02X never takes a Genji Glove's slot", id))
+      H.assertEq(H.gearPrizeSlotKey(EGG, id, false) ~= nil, true, string.format("9: $%02X may take a slot the Egg leaves", id))
+    end
+    -- the mutant: the first landing's key, the relic's rank (a prize last), with the Egg not counted a prize
+    local cl = H.relicClass(EGG)
+    local mutantKey = cl and cl.rank or 1.5
+    H.assertEq(mutantKey < 100, true, string.format("9: keyed on rank alone the Egg's slot ranks %s, below any acting "
+      .. "relic: the mutant would put a Ribbon over it", tostring(mutantKey)))
+    H.assertEq(H.ribbonMayDisplace(cl), false, "9: and ribbonMayDisplace forbids it, which the new key keeps")
+    H.log("[gbtest] 9: the prize slot rule holds")
+  end),
+  -- 10. the contracts' items
+  H.call(function()
+    local worn, wearer = nil, nil
+    for _, m in ipairs(members()) do
+      for s = 0, 3 do
+        local id = rec(m.ch, 0x1F + s)
+        if worn == nil and id ~= 0xFF and H.invCountOf(id) == 0 then worn, wearer = id, m end
+      end
+    end
+    H.assertEq(worn ~= nil, true, "precondition: a seated member wears a piece the bag holds none of")
+    local unowned = nil
+    for id = 0x00, 0x5F do
+      if unowned == nil and H.invCountOf(id) == 0 then
+        local anyone = false
+        for ch = 0, 13 do for s = 0, 5 do if rec(ch, 0x1F + s) == id then anyone = true end end end
+        if not anyone then unowned = id end
+      end
+    end
+    H.assertEq(unowned ~= nil, true, "precondition: a weapon id nobody owns")
+    local other = nil
+    for _, m in ipairs(members()) do if m.ch ~= wearer.ch then other = other or m.ch end end
+    local d1 = H.contractDiffs({ items = { { worn, 1, "worn by a seated member" } } })
+    local d2 = H.contractDiffs({ items = { { unowned, 1, "owned by nobody (the negative control)" } } })
+    local d3 = H.contractDiffs({ items = { { worn, 1, "worn, but another member named", other } } })
+    local d4 = H.contractDiffs({ items = { { worn, 1, "worn by the named member", wearer.ch } } })
+    H.assertEq(#d1, 0, string.format("10: $%02X on %s counts as held", worn, wearer.name))
+    H.assertEq(#d2, 1, string.format("10: $%02X, owned by nobody, does not", unowned))
+    H.assertEq(#d3, 1, string.format("10: $%02X with char %d named does not count on %s", worn, other, wearer.name))
+    H.assertEq(#d4, 0, string.format("10: $%02X with %s named counts", worn, wearer.name))
+    H.log("[gbtest] 10: the contracts' items read as they should")
+  end),
   H.call(function() H.log("[gbtest] PASSED: every case red where it should be, and the dress returns to the baseline") end),
 })

@@ -347,14 +347,15 @@ H.run({ maxFrames = 150000 }, {
     where("boot (sfigaro_passage)")
   end),
 
-  -- LOCKE's occupied-town kit: Dirk, Leather Hat, LeatherArmor, each where the
-  -- bag holds it (H.equipKit skips and logs a piece it does not: the gear
-  -- baseline at every save, #524, moves what the party carries)
-  H.equipKit(1, {
-    { 0, 0x00 }, -- Dirk
-    { 2, 0x69 }, -- Leather Hat
-    { 3, 0x84 }, -- LeatherArmor
-  }, { tag = "LOCKE passage kit" }),
+  -- LOCKE's gear by the rule (H.gearDress: each slot the best piece the bag
+  -- offers).  A fixed kit (Dirk, Leather Hat, LeatherArmor) stood here until
+  -- the gear baseline at every save (#524), which dresses the party by the
+  -- same rule; the review of its first landing found the kit skipping pieces
+  -- the baseline had put on others, so the rule now decides here too
+  H.gearDress({ tag = "LOCKE passage gear" }),
+  H.call(function()
+    H.assertEq(H.readByte(0x1600 + 37 * 1 + 0x1F) ~= 0xFF, true, "LOCKE holds a weapon in the passage")
+  end),
 
   -- ===================================================================== --
   -- PHASE 1: the passage -> the rich man's house -> town.  The passage
