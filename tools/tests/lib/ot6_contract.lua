@@ -3130,7 +3130,9 @@ end
 function M.saveAtCheckpoint(key)
   local c = lookup(key)
   local slot = c.slot or 3
-  local steps = {}
+  -- the gear baseline (#524) before the save point: on its tile the SavePoint script re-fires (and the first
+  -- save point's tutorial runs), so the dress is made beside it and the save asserts it
+  local steps = { M.gearBaseline({ tag = key .. " save: gear baseline" }) }
   if c.field then
     steps[#steps + 1] = M.stepOntoSavePoint(c.field.x, c.field.y)
   else
@@ -3142,7 +3144,7 @@ function M.saveAtCheckpoint(key)
         M.worldY()))
     end)
   end
-  steps[#steps + 1] = M.saveGame({ slot = slot, tag = key .. " save" })
+  steps[#steps + 1] = M.saveGame({ slot = slot, tag = key .. " save", baseline = "assert" })
   steps[#steps + 1] = M.call(function()
     if c.field then
       M.assertSavedSlot(c.field.map, c.field.x, c.field.y, key, slot)

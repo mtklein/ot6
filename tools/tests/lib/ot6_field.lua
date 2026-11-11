@@ -10270,7 +10270,20 @@ function M.gearBaseline(opts)
       return M.gearDress({ members = cs, tag = string.format("%s: gear (pass %d)", tag, i) })
     end)
   end
+  local ph = 0
   return M.seqStep({
+    -- settled first: a dialog paged (the first save point's tutorial, $0133, runs as the party steps on it) and the
+    -- field or world map lit and in hand (kolts-summit-v1 on the first replay: the Equip menu's wait for the field
+    -- ran out on the save tile)
+    M.withReset(M.driveUntil(function()
+      return not M.dialogWaiting() and menuHome() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+    end, 3000, {
+      M.call(function()
+        ph = (ph + 1) % 16
+        M.setPad((M.dialogWaiting() and ph < 4) and { "a" } or {})
+      end),
+    }, tag .. ": settled before the dress"), function() ph = 0 end),
+    M.release(),
     M.call(function() M.log(string.format("[baseline] %s: before: %s", tag, M.gearBaselineLine())) end),
     -- the overlay relics and every prize that moves come off into the bag, one Relic session a member
     M.lazy(function()
@@ -11149,7 +11162,9 @@ end
 -- opts: slot (1-3, default 3), tag, maxFrames (whole drive, default 4000).
 -- Every save holds the party at its gear baseline (#524): M.gearBaseline runs
 -- first and asserts it (opts.baseline = false: the caller ran it already, or
--- the save is a suite's, not the route's; opts.threats is passed on).
+-- the save is a suite's, not the route's; "assert": the caller dressed the
+-- party before walking onto the save point, and the save asserts it;
+-- opts.threats is passed on).
 function M.saveGame(opts)
   opts = opts or {}
   local slot = opts.slot or 3
@@ -11158,7 +11173,8 @@ function M.saveGame(opts)
   local saveArg, hooked = nil, false
   local function menuOpen() return M.readByte(0x59) ~= 0 end
   return M.seqStep({
-    opts.baseline ~= false and M.gearBaseline({ tag = tag .. ": gear baseline", threats = opts.threats })
+    (opts.baseline == "assert" and M.call(function() M.assertGearBaseline(tag .. ": gear baseline", opts) end))
+      or (opts.baseline ~= false and M.gearBaseline({ tag = tag .. ": gear baseline", threats = opts.threats }))
       or M.call(function() end),
     -- open the menu; on the world map $59 rides the same flow
     (function() local calm, ph = 0, 0
