@@ -841,6 +841,14 @@ check("audit_fenix_selftest",
 check("retain_evidence_selftest",
       "python3 tools/retain_evidence.py --selftest",
       ["tools/retain_evidence.py"])
+# The leveling plan's instrument (#497): the line's legs, levels and bench,
+# read from build/states; the selftest pins the log shapes it counts and
+# reads the twelve seated at the tower's boot from a tracked checkpoint.
+check("route_levels_selftest",
+      "python3 tools/route_levels.py --selftest",
+      ["tools/route_levels.py", "tools/roster.py", "tools/savestate_party.py",
+       "tools/tests/savestate_graph.py",
+       "tools/tests/checkpoints/wor-kt-factory-v1/wor-kt-factory.sram"])
 check("ninja_py_selftest", "python3 tools/tests/lib/savestate_ninja.py --selftest",
       ["tools/tests/lib/savestate_ninja.py"])
 check("ninja_sh_selftest", "sh tools/tests/lib/savestate_ninja_selftest.sh",
