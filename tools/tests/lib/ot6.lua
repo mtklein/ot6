@@ -12461,24 +12461,31 @@ end
 -- Zinger went fells that member: while one hides, an actor other than the
 -- host turns an attack plan, or a heal aimed at the host, into a Fight on
 -- the host (the ally-Fight the Muddle rule presses), at the plan's boost
--- when it was a Fight.  Care for the other members stands.  ZINGER_OFF (a
--- global) turns it off, the control arm.
+-- when it was a Fight.  Care for the other members stands.  The host itself
+-- does not heal itself either: its own heal on itself becomes the same Fight
+-- on itself at 0 BP (#521's landing: on a snapshot a level lower, CELES as
+-- host drank X-Potions on herself at 1,067 and 815 HP, "actor=0 heal entity
+-- 0 (1067/4251) with $EA", and was never felled inside 20,000 frames); its
+-- other plans stand.  ZINGER_OFF (a global) turns it off, the control arm.
 M.zingers = {}           -- every Zinger plan this run, oldest first (battle_zinger reads them)
 function Driver:zingerPlan(actor, plan)
   if ZINGER_OFF or plan == nil then return plan end
   local za, zt = M.readByte(0x33F8), M.readByte(0x33F9)
   if za == 0xFF or za < 8 or zt >= 8 or zt % 2 ~= 0 then return plan end
   local host = zt // 2
-  if actor == host or M.readWord(0x3BF4 + host * 2) == 0 then return plan end
+  if M.readWord(0x3BF4 + host * 2) == 0 then return plan end
   local care = plan.kind == "item" or plan.kind == "defer" or plan.kind == "switch"
     or (plan.ally and plan.reason ~= "zinger")
   if care and plan.target ~= host then return plan end
+  if actor == host and not (care and plan.kind ~= "defer" and plan.kind ~= "switch" and not plan.all) then
+    return plan
+  end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   if fight == nil then return plan end
-  local boost = plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
+  local boost = actor ~= host and plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
   local target = host
   M.zingers[#M.zingers + 1] = { actor = actor, host = host, target = target, slot = (za - 8) // 2,
-    frame = M.frame, over = plan.kind, boost = boost }
+    frame = M.frame, over = plan.kind, boost = boost, own = actor == host }
   M.log(string.format("[%s] actor=%d zinger: slot %d hides in entity %d (%d/%d HP): a Fight on the host at %d BP "
     .. "in place of its %s", self.tag or "fight", actor, (za - 8) // 2, host, M.readWord(0x3BF4 + host * 2),
     M.readWord(0x3C1C + host * 2), boost, plan.kind))
