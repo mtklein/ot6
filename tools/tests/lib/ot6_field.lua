@@ -10198,7 +10198,7 @@ function M.gearBaseline(opts)
     return M.lazy(function()
       local cs = {}
       for _, m in ipairs(M.gearBaselineMembers(true)) do cs[#cs + 1] = m.ch end
-      if next(M.gearDressPlan({ members = cs, quiet = true })) == nil then return M.call(function() end) end
+      if next((M.gearDressPlan({ members = cs, quiet = true }))) == nil then return M.call(function() end) end
       return M.gearDress({ members = cs, tag = string.format("%s: gear (pass %d)", tag, i) })
     end)
   end
