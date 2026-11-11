@@ -394,10 +394,25 @@ local function kitSteps(char, name, pairs_)
   for _, p in ipairs(pairs_) do
     local slot, item = p[1], p[2]
     local tag = string.format("%s FC kit slot %d", name, slot)
+    -- a weapon for the second hand needs a Genji Glove on the wearer (ItemProp +12 bit 4): the gear baseline at
+    -- the save (#524) can have put the bag's Genji Glove on another member, and the shield slot's list then
+    -- never offers the weapon ("SHADOW FC kit slot 1 ... item $01: 4 A presses on the target were not taken")
+    local ip = H.sym("ItemProp") & 0x3FFFFF
+    local function secondHand()
+      for r = 4, 5 do
+        local id = H.readByte(0x1600 + 37 * char + 0x1F + r)
+        if id ~= 0xFF and (H.readRomByte(ip + id * 30 + 12) & 0x10) ~= 0 then return true end
+      end
+      return false
+    end
     steps[#steps + 1] = H.cond(
-      function() return H.invSlotOf(item) ~= nil end,
+      function()
+        return H.invSlotOf(item) ~= nil
+          and (slot ~= 1 or (H.readRomByte(ip + item * 30) & 7) ~= 1 or secondHand())
+      end,
       { H.equipLoadout(char, { { slot, item } }, { tag = tag, optional = true }) },
-      { H.logStep(string.format("%s: $%02X not in this run's bag; keeping current gear", tag, item)) })
+      { H.logStep(string.format("%s: $%02X not in this run's bag (or a second-hand weapon with no Genji Glove "
+        .. "on); keeping current gear", tag, item)) })
   end
   return steps
 end
