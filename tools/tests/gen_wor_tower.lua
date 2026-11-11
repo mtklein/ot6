@@ -1225,6 +1225,9 @@ H.run({ maxFrames = 1500000 }, {
     for _, m in ipairs(PARTY) do
       H.assertEq(H.readByte(c(m[1], 0x24)) ~= WALL_RING and H.readByte(c(m[1], 0x23)) ~= WALL_RING, true,
         m[2] .. " wears no Wall Ring out of the tower")
+      -- the floor-1 Safety Bit (X-Zone) is the tower's: it comes off at the exit, whichever stage booted
+      H.assertEq(H.readByte(c(m[1], 0x24)) ~= SAFETY_BIT and H.readByte(c(m[1], 0x23)) ~= SAFETY_BIT, true,
+        m[2] .. " wears no Safety Bit out of the tower")
     end
   end),
   H.fieldCare({ threshold = 1.0, tag = "beside the Falcon" }),
