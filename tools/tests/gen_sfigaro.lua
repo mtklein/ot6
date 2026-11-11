@@ -436,18 +436,17 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
     H.assertEq(sw(0x001E), 0, "$001E clear -- the scenario is not done")
   end),
   -- STEP 0 (#244/#145): re-equip LOCKE.  The scenario strips his gear on
-  -- entry, but locke_scenario's bag still HOLDS his kit -- a MithrilBlade
-  -- ($0A), a MithrilShield ($5C, mdef 18, his best shield) and a PlumedHat
-  -- ($6B) -- so this puts it back on (all LOCKE-equippable per the item_prop
-  -- masks).  The whole leg is now two minor Steal fights (a trivialised
-  -- HeavyArmor is never fought), so this is about a clean, quick steal rather
-  -- than surviving the gate soldier.
-  H.equipLoadout(1, {
-    { 0, 0x0A }, -- MithrilBlade
-    { 1, 0x5C }, -- MithrilShield
-    { 2, 0x6B }, -- PlumedHat
-    { 3, 0x84 }, -- LeatherArmor (the only body armour he carries)
-  }, { tag = "LOCKE re-equipped from his bag" }),
+  -- entry and locke_scenario's bag holds it, so each slot takes the best
+  -- piece the bag offers by the gear rule (H.gearDress).  The kit was a fixed
+  -- list (MithrilBlade, MithrilShield, PlumedHat, LeatherArmor) until the gear
+  -- baseline at every save (#524) moved what the party carries into the
+  -- scenario: "item $5C for slot 1 is in the bag: got false".  The whole leg
+  -- is two minor Steal fights (a trivialised HeavyArmor is never fought), so
+  -- this is about a clean, quick steal rather than surviving the gate soldier.
+  H.gearDress({ tag = "LOCKE re-equipped from his bag" }),
+  H.call(function()
+    H.assertEq(H.readByte(0x1600 + 37 * 1 + 0x1F) ~= 0xFF, true, "LOCKE holds a weapon from his bag")
+  end),
   H.setRows({ [1] = true }, { tag = "locke solo rows" }),
   L.watch(),   -- the two Steal fights share this seed sweep (retry spread)
   H.call(function()

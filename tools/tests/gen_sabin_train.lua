@@ -1444,13 +1444,15 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     swDump("start")
   end),
 
-  H.equipLoadout(2, {
+  -- each piece where the bag holds it (H.equipKit skips and logs one it does
+  -- not: the gear baseline at the camp's save, #524, may have put it on)
+  H.equipKit(2, {
     { 1, HEAVY_SHLD },
   }, { tag = "CYAN Phantom Train kit" }),
-  H.equipLoadout(5, {
+  H.equipKit(5, {
     { 1, BUCKLER }, { 4, STAR_PENDANT }, { 5, JEWEL_RING },
   }, { tag = "SABIN Phantom Train kit" }),
-  H.equipLoadout(3, {
+  H.equipKit(3, {
     { 2, PLUMED_HAT },
   }, { tag = "SHADOW Phantom Train kit" }),
 

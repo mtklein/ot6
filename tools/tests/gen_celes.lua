@@ -347,8 +347,10 @@ H.run({ maxFrames = 150000 }, {
     where("boot (sfigaro_passage)")
   end),
 
-  -- LOCKE's occupied-town kit: Dirk, Leather Hat, LeatherArmor.
-  H.equipLoadout(1, {
+  -- LOCKE's occupied-town kit: Dirk, Leather Hat, LeatherArmor, each where the
+  -- bag holds it (H.equipKit skips and logs a piece it does not: the gear
+  -- baseline at every save, #524, moves what the party carries)
+  H.equipKit(1, {
     { 0, 0x00 }, -- Dirk
     { 2, 0x69 }, -- Leather Hat
     { 3, 0x84 }, -- LeatherArmor
