@@ -988,13 +988,24 @@ local function battleSetup()
   -- (the case the executing bytes misread); TERRA's Blizzard casts Ice
   local fold, base = {}, H.sym("Ot6FoldTbl") & 0x3FFFFF
   for i = 0, 23 do fold[H.readRomByte(base + i)] = true end
-  local s = slotOf[TERRA]
-  local item = H.readByte(HANDS + s * 2)
-  local sp = onHitSpell(item) or onHitSpell(H.readByte(HANDS + s * 2 + 1))
-  assert(sp and fold[sp], string.format("TERRA's weapon ($%02X) casts a fold-table spell on hit", item))
-  CASES[2].castSpell = sp
-  H.log(string.format("[procboost] TERRA slot %d holds $%02X, casts spell $%02X on hit "
-    .. "(in Ot6FoldTbl); LOCKE slot %d, SHADOW slot %d", s, item, sp, slotOf[LOCKE], slotOf[SHADOW]))
+  -- (the fighter is the first of TERRA, LOCKE and SHADOW whose hand holds one: the save's gear baseline, #524,
+  -- dresses the party by the gear rule, which on its first replay put TERRA in the Tempest ($11) and both of
+  -- the bag's Blizzards in LOCKE's hands)
+  local s, item, sp, who = nil, nil, nil, nil
+  for _, ch in ipairs({ TERRA, LOCKE, SHADOW }) do
+    for h = 0, 1 do
+      local it = H.readByte(HANDS + slotOf[ch] * 2 + h)
+      local x = onHitSpell(it)
+      if who == nil and x and fold[x] then s, item, sp, who = slotOf[ch], it, x, ch end
+    end
+  end
+  assert(who ~= nil, string.format("a seated fighter's weapon casts a fold-table spell on hit (TERRA holds $%02X, "
+    .. "LOCKE $%02X, SHADOW $%02X)", H.readByte(HANDS + slotOf[TERRA] * 2), H.readByte(HANDS + slotOf[LOCKE] * 2),
+    H.readByte(HANDS + slotOf[SHADOW] * 2)))
+  CASES[2].char, CASES[2].castSpell = who, sp
+  H.log(string.format("[procboost] the Fight case's fighter: char %d, slot %d, holds $%02X, casts spell $%02X on "
+    .. "hit (in Ot6FoldTbl); TERRA slot %d, LOCKE slot %d, SHADOW slot %d", who, s, item, sp, slotOf[TERRA],
+    slotOf[LOCKE], slotOf[SHADOW]))
   local w = {}
   for _, v in ipairs(H.formationWords()) do w[#w + 1] = string.format("%04X", v) end
   H.log(string.format("[procboost] battle %d for the measurement: group $%04X, formation %s; seats %s",
