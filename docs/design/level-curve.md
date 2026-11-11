@@ -12,8 +12,12 @@
 
 Read from the tracked checkpoints (`tools/tests/checkpoints/*-v1`) with
 `read_party_sram`, re-read for v0.31 after the v0.30 re-cut and the gear
-policy (#434): `build/attempts/wt/v031-cleanup/levels-421.log`.  The
-scenario rows show the one member saved in that slot.
+policy (#434): `build/attempts/wt/v031-cleanup/levels-421.log`; re-read
+for v0.42 from the v0.41 saves (#497,
+`build/attempts/wt/v042-leveling-plan/roster_checkpoints.txt`), where the
+Thamasa and Floating Continent rows moved by a level.  The scenario rows
+show the one member saved in that slot.  The whole roster, bench included,
+at every save is in "The leveling plan" below.
 
 | area / checkpoint | party (name L) | range |
 |---|---|---|
@@ -38,10 +42,10 @@ scenario rows show the one member saved in that slot.
 | Crescent landing (`crescent-landing-v1`) | TERRA 22 · LOCKE 25 · SHADOW 22 | L22–25 |
 | Thamasa, the night (`thamasa-night-v1`) | TERRA 22 · LOCKE 25 · SHADOW 22 | L22–25 |
 | Thamasa fire (`fire-out-v1`) | TERRA 23 · LOCKE 26 · STRAGO 25 | L23–26 |
-| Esper Mtn (`esper-mtn-save-v1`) | TERRA 24 · LOCKE 26 · STRAGO 26 | L24–26 |
-| Ultros③ (`ultros-won-v1`) | TERRA 24 · LOCKE 26 · STRAGO 26 · RELM 23 | L23–26 |
-| **FC entry (`thamasa-done-v1`)** | **TERRA 24 · LOCKE 26 · STRAGO 26 · RELM 23** | **L23–26** |
-| FC landing (`fc-landing-v1`) | TERRA 25 · LOCKE 26 · EDGAR 25 | L25–26 |
+| Esper Mtn (`esper-mtn-save-v1`) | TERRA 23 · LOCKE 26 · STRAGO 25 | L23–26 |
+| Ultros③ (`ultros-won-v1`) | TERRA 23 · LOCKE 26 · STRAGO 25 · RELM 22 | L22–26 |
+| **FC entry (`thamasa-done-v1`)** | **TERRA 23 · LOCKE 26 · STRAGO 25 · RELM 22** | **L22–26** |
+| FC landing (`fc-landing-v1`) | TERRA 24 · LOCKE 26 · EDGAR 25 | L24–26 |
 | FC alcove (`fc-alcove-v1`) | TERRA 26 · LOCKE 28 · SHADOW 25 · EDGAR 26 | L25–28 |
 
 The World of Ruin rows are in "The World of Ruin" below.
@@ -212,7 +216,7 @@ per-attempt table and the levers: [map269-random.md](map269-random.md).
 
 ## The Floating Continent gap
 
-The routed party reaches the **Floating Continent at L23–26**
+The routed party reaches the **Floating Continent at L22–26**
 (`thamasa-done-v1`). Rough vanilla FF6 expectation for the same content is
 **~L25–30** (AtmaWeapon is a ~L30 fight in vanilla), so OT6 arrives a few
 levels light, not the ten an earlier cut showed (L15–17, before the #158
@@ -232,7 +236,7 @@ What carries the remaining gap:
 
 Practical consequences of the route as it stands:
 - The IAF gauntlet is eight fights with **no save and a real Game Over on a
-  loss** (the `_ca5ea9` handler). At L23–26 that is a survivability test, not a
+  loss** (the `_ca5ea9` handler). At L22–26 that is a survivability test, not a
   damage race — budget for HP attrition across the chain and lean on break to
   end fights fast.
 - The FC's random pool (forms 177–188) includes **pincer-capable formations**
@@ -301,8 +305,9 @@ Read from `thamasa-done-v1` (`build/attempts/wt/v031-cleanup/thamasa-done-gear-4
 Evidence: `build/attempts/wt/v027-wor-plan/` (`checkpoints.log`, the
 tracked checkpoints read by `wordump.py`; `xp_by_map.txt`,
 `town_pools.txt`, `bosses.txt` and `shops*.txt` from `build/ot6.sfc` via
-`route_data.py`; `projection.log`).  Levels past the Falcon are
-**estimates** until each arc plays them.
+`route_data.py`; `projection.log`).  Levels past the Falcon were
+**estimates** until each arc played them; every arc plays now, and the
+measured levels of the whole line are in "The leveling plan" below.
 
 ### Measured: the landing to the Falcon
 
@@ -333,10 +338,12 @@ had kept the v0.27 plan's figures.
 - The bench gains nothing.  A recruit joins at the available characters'
   average (`norm_lvl`: TERRA `event_main.asm:88191`, CYAN `:86689`, MOG
   `:85197`, RELM `:48897`, STRAGO `:89448`, LOCKE `:83903`, SHADOW
-  `:93791`; Gogo and Umaro through `InitChar`'s average, Gogo +2).  From
-  the Phoenix Cave (two parties) and Kefka's Tower (three) the route levels
-  more than four, so rotation keeps the extra members within
-  `audit_levels.py`'s straggler gap of 3.
+  `:93791`; Gogo and Umaro through `InitChar`'s average, Gogo +2).  The
+  plan once had rotation keep the extra members within
+  `audit_levels.py`'s straggler gap of 3; the line does not (seven of
+  fourteen at L32-41 against the carriers' 64 at the tower's boot), and
+  the owner's shape is six to eight strong carrying the rest (#496; "The
+  leveling plan" below).
 
 Expected XP per random, x2, before the split (`xp_by_map.txt`,
 `town_pools.txt`):
@@ -375,19 +382,22 @@ Projected levels walk each arc with an assumed fight count (**estimate**;
 projected levels below were walked from the older 105,612 and not re-run).
 The target column is the healthy level for the stop's key fight; it is an
 estimate until a lab sets it, as the Tentacles' L30 (route-wor-edgar.md
-4.1) and Dullahan's were.
+4.1) and Dullahan's were.  The "met at" column is the seated party as the
+v0.41 line plays it (#497: `route_levels.txt` in
+`build/attempts/wt/v042-leveling-plan/`; "The leveling plan" below reads
+it).
 
-| milestone | key fights (ROM: L, HP) | what bites (AI script) | projected | target |
-|---|---|---|---|---|
-| v0.27 Terra | Phunbaba (L26 60,000; L31 28,000 / 26,000) | Blow Fish, Bolt 3; absorbs bolt | 33-34 | as reached: the boss is under the party |
-| v0.28 Cyan | Storm Drgn (L74 42,000) | Aero, Cyclonic (Near Fatal), Wind Slash; absorbs wind, weak bolt | 36 | 35 with the gear policy's kit (38 before; "Buying power" below) |
-| v0.29 Narshe | Umaro (L33 17,200), Tritoch (L62 30,000), Ice Dragon (L74 24,400) | Tritoch: Ice 3, Cold Dust (Frozen); nulls bolt and five more, weak fire | 39 | 40 |
-| v0.30 Jidoor & Thamasa | Chadarnook (L37 56,000; L41 30,000), MagiMaster (L68 50,000), Holy Drgn (`White Drgn`, L71 18,500) | MagiMaster: Fire/Ice/Bolt 3, Doom, and **Ultima as his death counter**; the tower is magic-only | 41 | 45 for MagiMaster |
-| v0.32 Locke | Red Dragon (L67 30,000) | -- | 44 | 44 |
-| v0.34 Gogo | Hidon (L43 25,000), Doom Gaze (L68 55,555), Dirt Drgn (L53 28,500) | -- | 46 | 46 |
-| v0.35 Dreams | Wrexsoul (L53 23,066), Blue Drgn (L65 26,900) | -- | 49 | 49 |
-| v0.38 Kefka's Tower | Guardian (L71 50,000; L67 60,000), Inferno (L67 30,800), the statues (Doom L73 63,000, Goddess L68 44,000, Poltrgeist L67 58,000), Gold and Skull Drgn (L62) | -- | 51 | 52, each of three parties |
-| v0.39 The End | Kefka (L71 62,000) | Goner, Meteor, Havoc Wing; Ultima as a counter | 51 | 55 |
+| milestone | key fights (ROM: L, HP) | what bites (AI script) | projected | target | met at (v0.41, seated) |
+|---|---|---|---|---|---|
+| v0.27 Terra | Phunbaba (L26 60,000; L31 28,000 / 26,000) | Blow Fish, Bolt 3; absorbs bolt | 33-34 | as reached: the boss is under the party | 32-33 |
+| v0.28 Cyan | Storm Drgn (L74 42,000) | Aero, Cyclonic (Near Fatal), Wind Slash; absorbs wind, weak bolt | 36 | 35 with the gear policy's kit (38 before; "Buying power" below) | 35-38 (CYAN 35, the grind's floor) |
+| v0.29 Narshe | Umaro (L33 17,200), Tritoch (L62 30,000), Ice Dragon (L74 24,400) | Tritoch: Ice 3, Cold Dust (Frozen); nulls bolt and five more, weak fire | 39 | 40 | 35-40 (MOG 35-36 to CELES 39-40) |
+| v0.30 Jidoor & Thamasa | Chadarnook (L37 56,000; L41 30,000), MagiMaster (L68 50,000), Holy Drgn (`White Drgn`, L71 18,500) | MagiMaster: Fire/Ice/Bolt 3, Doom, and **Ultima as his death counter**; the tower is magic-only | 41 | 45 for MagiMaster | 38-41 at Owzer; 46-49 at MagiMaster |
+| v0.32 Locke | Red Dragon (L67 30,000) | -- | 44 | 44 | 46-50 (party 1), 36-40 (party 2) |
+| v0.34 Gogo | Hidon (L43 25,000), Doom Gaze (L68 55,555), Dirt Drgn (L53 28,500) | -- | 46 | 46 | 47-55 (GOGO joins at 44) |
+| v0.35 Dreams | Wrexsoul (L53 23,066), Blue Drgn (L65 26,900) | -- | 49 | 49 | 53-57 (CYAN 40-42 for his own dream) |
+| v0.38 Kefka's Tower | Guardian (L71 50,000; L67 60,000), Inferno (L67 30,800), the statues (Doom L73 63,000, Goddess L68 44,000, Poltrgeist L67 58,000), Gold and Skull Drgn (L62) | -- | 51 | 52, each of three parties | at the boot 32-64 (party means 46, 49, 48); trained in the tower to 46-69 |
+| v0.39 The End | Kefka (L71 62,000) | Goner, Meteor, Havoc Wing; Ultima as a counter | 51 | 55 | the order's first four 59-69 (CELES, TERRA 69, RELM 61, STRAGO 59) |
 
 Notes on the targets:
 
@@ -500,6 +510,371 @@ Gungho's scene, `event_main.asm` ~:55109; Maranda 80/81 beside its town
 talk, ~:92006; Jidoor 76-79 beside the WoB rows 20-23).  Chests and steals
 are each arc's route plan.
 
+## The leveling plan (#497)
+
+The line now plays from power-on to The End, so this section reads the
+whole of it and says where it should grind, how long and with whom.  This
+is the plan's first phase: the measurements below and the moves they
+suggest.  Nothing here changes play; each move is its own branch, labbed
+and re-measured when it lands.
+
+Evidence: `build/attempts/wt/v042-leveling-plan/` (its `README.txt` lists
+every command).  The source is a fresh full replay of the line at ba5c7e68
+(px13, `~/work/v041-release`, v0.41's code): its `build/states/*.log` and
+`.mss`, and the v0.41 tracked saves.  The instrument is
+`tools/route_levels.py`: one row a leg in play order, the battles its last
+attempt fought, its deaths and Fenix Downs, the random XP each member was
+paid, and every recruited character's level at the leg's boot and its end,
+the bench marked.  The main line is the chain of `prev` links from
+`wor_kefka` back to power-on; every other leg is a branch nothing on the
+line boots.  Two limits: a few World of Balance legs whose drivers predate
+the `[outcome]` line count no battles (the legs before South Figaro, the
+Returners' hideout, the Lete River), though their levels read true; and a
+Fenix Down is counted when a `fenix=` field drops, as `audit_fenix` counts
+what left the bag, so a revive by spell is a death without one.
+
+### What the line does today
+
+**Totals.**  Main line, random battles / deaths / Fenix Downs that left the
+bag: the World of Balance at least 177 / 2 / 0; the World of Ruin to the desert
+389 / 27 / 14; Kefka's Tower and Kefka 125 / 13 / 10.  No main-line leg
+needed a second attempt in this replay (`retries.txt` lists only suites
+and the negative controls), and Kefka was reached with "the bag for Kefka:
+25 Fenix Downs (floor 10)" and won on the first attempt ("PASS (frame
+168241) attempts=1/3").
+
+**The grinds and training stops on the main line** (legs with eight or
+more random battles, or a named grind).  Levels are at the leg's boot and
+at the state the next leg boots.
+
+| leg | where | random battles | who | levels before -> after | what sets the stop |
+|---|---|---|---|---|---|
+| `south_figaro` | the plain by South Figaro, before Mt. Kolts | 25 | TERRA, LOCKE, EDGAR | 5, 6, 7 -> 10, 10, 10 | the climb |
+| `sfigaro_escape` | Locke's escape (the walk, not a grind) | 9 | LOCKE, CELES | 12, 12 -> 13, 13 | -- |
+| `zozo_arrival` | world column x=34 (group 10) by Zozo | 44 | LOCKE, EDGAR, SABIN, CELES | 13, 13, 14, 13 -> 18 each | the SlamDancer: every member L18 (#158, the lab) |
+| `n024_entry` | map 269 past the Ifrit and Shiva save | 11 | LOCKE, EDGAR, SABIN, CELES | 20 -> 21 each | the L16 parity trap (#171) |
+| `narshe_mission` | the plains on the Narshe mission | 17 | LOCKE, EDGAR, SABIN, SETZER | 21, 21, 22, 18 -> 22, 22, 23, 19 | the mission's supplies |
+| `wor_tzen_door` | the plain north of Albrook | 13 | CELES | 25 -> 27 | L27 (`TARGET_LEVEL`) |
+| `wor_edgar` | the South Figaro continent, the cave | 26 | CELES, SABIN (EDGAR joins) | 29, 28 -> 31, 31, 31 | the Tentacles: L30 (the lab) |
+| `wor_cyan` | Mt. Zozo's east face | 47 | TERRA, CYAN, SABIN, CELES (EDGAR 32 -> 34 on the climb, then benched) | 32, --, 32, 33 -> 36, 35, 37, 37 | the Storm Dragon: the lowest L35 |
+| `wor_narshe` | Narshe's arc | 18 | TERRA, CYAN, CELES, MOG | 37, 35, 38, -- -> 38, 37, 39, 35 | -- |
+| `wor_relm` | the plain north-west of Jidoor (group 48) | 54 | TERRA, CELES, STRAGO, RELM | 40, 41, --, -- -> 49, 49, 46, 46 | the Fanatics' Tower: the lowest L46 |
+| `wor_belly` | the Zone Eater's belly | 27 | TERRA, CELES, STRAGO, RELM | 50, 51, 47, 48 -> 53, 53, 50, 50 | the dungeon |
+| `wor_gogo` | map 278, to Gogo | 25 | TERRA, CELES, STRAGO, RELM | 53, 53, 50, 50 -> 55, 55, 52, 52 | the dungeon |
+| `wor_colosseum` | the grind plains (#483) | 15 | TERRA, CYAN, CELES, SHADOW | 57, 42, 57, -- -> 58, 45, 58, 45 | the plains' coverage |
+| `wor_dino` | the dinosaur forest | 29 | TERRA, CYAN, SHADOW, CELES | 58, 45, 45, 58 -> 63, 52, 52, 63 | the tower: the lowest L52 |
+| `wor_kt_guardian` | party 1 by its landing on 334 | 59 | TERRA, RELM, EDGAR, SETZER | 64, 54, 34, 32 -> 69, 61, 47, 54 | the bench L46, at most 60 battles (#521) |
+| `wor_kt_doom` | party 3 below Doom on 355 | 15 | CYAN, SHADOW, SABIN, GOGO | 53, 54, 42, 46 -> 56, 57, 46, 49 | the bench L46 |
+| `wor_kt_poltergeist` | party 2 on 334's north | 45 | CELES, STRAGO, LOCKE, MOG | 64, 53, 42, 40 -> 69, 59, 51, 50 | the bench L50 |
+
+Raw lines: "[grind] f362034 done after 51 battles ... TERRA(p1) L49 ...
+CELES(p1) L49 ... STRAGO(p1) L46 ... RELM(p1) L46" (`wor_relm`); "[grind]
+the forest until the lowest of the four stands at L52 (now L45)"
+(`wor_dino`: the plain before it fought nothing, CYAN and SHADOW were
+already L45); "[train] f300919 party 1 after 45 battles by its landing:
+TERRA L68, RELM L60, EDGAR L46, SETZER L52"; "[train] f71562 party 3 below
+Doom: after 13 battles: CYAN L56, SHADOW L57, SABIN L46, GOGO L49";
+"[train] f242263 party 2 on 334's north: after 44 battles: CELES L69,
+STRAGO L59, LOCKE L51, MOG L50".  SETZER wears the Exp. Egg: the Guardian
+leg paid him 350,900 against 175,450 each for the other three.
+
+**The hunts, all on branch legs** (nothing on the line boots them, so none
+moves a save): the World of Ruin's coverage hunts from #485 and #488 and
+the ones before them.
+
+| branch | boots | random battles | who | levels before -> after |
+|---|---|---|---|---|
+| `kolts_cave` | `kolts_pool` | 5 | TERRA, LOCKE, EDGAR | 10, 10, 10 -> 10, 11, 11 |
+| `wor_island_plain` | `wor-island-v1` | 4 | CELES | 25 -> 25 |
+| `wor_tzen_plain` | `wor-sabin-v1` | 4 | SABIN, CELES | 28, 28 -> 28, 29 |
+| `wor_tzen_boxes` | `wor-tzen-door-v1` | 3 | CELES | 27 -> 28 |
+| `wor_nikeah_plain` | `wor-nikeah-v1` | 8 | SABIN, CELES | 28, 29 -> 30, 30 |
+| `wor_passage_hunt` | `wor_figaro_sweep_town` | 8 | EDGAR, SABIN, CELES | 31, 31, 31 -> 31, 31, 32 |
+| `wor_figaro_desert` | `wor-edgar-v1` | 3 | EDGAR, SABIN, CELES | 31, 31, 31 -> 31, 31, 32 |
+| `wor_kohlingen_plain` | `wor-kohlingen-v1` | 10 | EDGAR, SABIN, CELES, SETZER | 32 -> 32, 32, 33, 32 |
+| `wor_tomb_b1_hunt` | `wor-kohlingen-v1` | 8 (7 deaths) | the same | 32 -> 32, 32, 33, 32 |
+| `wor_tomb_hunt` | `wor-tomb-v1` | 10 | the same | 32, 32, 33, 32 -> 33 each |
+| `wor_zozo_hunt` | `wor_cyan_rustrid` | 20 | TERRA, EDGAR, SABIN, CELES | 32, 32, 32, 33 -> 32, 33, 33, 33 |
+| `wor_zozo_north` | `wor_cyan_rustrid` | 5 | the same | no change |
+| `wor_mtzozo_hunt` | `wor-mtzozo-v1` | 10 | TERRA, CYAN, SABIN, CELES | 36, 35, 37, 37 -> 37, 36, 38, 38 |
+| `wor_umaro_hunt` | `wor_tritoch_cave` | 25 | TERRA, CYAN, CELES, MOG | 38, 37, 39, 36 -> 41, 39, 42, 38 |
+| `wor_ebot_hunt` | `wor_ebot_hub` | 15 | TERRA, STRAGO, RELM, GOGO | 55, 52, 52, 44 -> 56, 53, 53, 45 |
+| `wor_ebot_rooms_hunt` | `wor_ebot_rooms` | 15 | the same | 55, 52, 52, 44 -> 55, 53, 53, 45 |
+| `wor_thamasa_plain` | `wor-gogo-v1` | 5 | the same | no change |
+| `wor_dream_hunt` | `wor_dream_scape` | 35 | TERRA, CELES, RELM | 55, 55, 53 -> 58, 57, 55 |
+| `wor_dream_cave_hunt` | `wor_dream_cave` | 5 | the same | 56, 55, 53 -> 56, 56, 53 |
+| `wor_doma_hunt` | `wor-dream-v1` | 9 | the same | 56, 55, 53 -> 56, 56, 54 |
+| `wor_ancient_hunt` | `wor_ancient_yard` | 40 | TERRA, CYAN, CELES, RELM | 57, 41, 56, 54 -> 60, 47, 59, 57 |
+| `wor_ancient_boxes` | `wor_ancient_yard` | 3 | the same | 57, 41, 56, 54 -> 57, 42, 56, 54 |
+| `wor_kt_gauntlet` | `wor-kt-inferno-v1` | 2 | CYAN, SHADOW, SABIN, GOGO | 53, 54, 41, 45 -> 54, 54, 41, 46 |
+
+The rule holds: the hunts ride branches, and the levels they add reach
+nothing downstream.  They seat whoever the arc seats, so they too feed the
+two carriers.
+
+**Who sits on the bench, and for how long** (the main line, World of Ruin;
+a span is the run of legs a recruit spends in no party, with its level).
+In the World of Balance the bench is the story's: the scenarios, and CYAN
+and GAU at L14 from the Battle for Narshe to Thamasa (38 legs), raised to
+L24 by the party's average when they rejoin there.
+
+| character | benched | legs | level |
+|---|---|---|---|
+| SETZER | `wor_terra` .. `wor_desert` | 23 | 32 |
+| EDGAR | `wor_cyan` .. `wor_desert` | 22 | 34 |
+| UMARO | `wor_locke` .. `wor_kt_plates` (sits out the tower) | 22 | 37 |
+| GAU | `wor_belly` .. `wor_kefka` (sits out the tower) | 19 | 33 |
+| MOG | `wor_locke` .. `wor_desert` (and 3 at Owzer and the Fanatics' Tower) | 14 | 38 (36) |
+| LOCKE | `wor_veldt` .. `wor_desert` (joins at `wor_locke` L41) | 12 | 41 |
+| SABIN | `wor_belly` .. `wor_desert` (and 2, 2 and 3 legs before) | 10 | 40 (37-40) |
+| CYAN | `wor_locke` .. `wor_dream` | 9 | 40 |
+| GOGO | `wor_dream` .. `wor_desert` | 6 | 44 |
+| STRAGO | `wor_dream` .. `wor_desert` (and `wor_locke` .. `wor_gau`, 4) | 6 | 52 (47) |
+| RELM | `wor_colosseum` .. `wor_desert` | 3 | 54 |
+| CELES | `wor_gogo` .. `wor_ebot` | 2 | 55 |
+| TERRA | `wor_opera` | 1 | 55 |
+
+TERRA and CELES are seated in every arc from Terra's on but one leg each,
+and take a quarter of every random battle: 144,062 each on the Jidoor
+plain, 148,665 each in the dinosaur forest, then 175,450 (TERRA, party 1)
+and 158,033 (CELES, party 2) in the tower's training.
+
+**Levels at every save** (the v0.41 tracked saves, `roster.py`; bold is
+seated, plain is recruited and on the bench; a scenario's save shows the
+slot's own members):
+
+| save | Ter | Loc | Cya | Sha | Edg | Sab | Cel | Str | Rel | Set | Mog | Gau | Gog | Uma |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `world-narshe-v1` | **4** | **6** |  |  |  |  |  |  |  |  |  |  |  |  |
+| `world-figaro-v1` | **5** | **6** |  |  | **7** |  |  |  |  |  |  |  |  |  |
+| `kolts-summit-v1` | **10** | **11** |  |  | **11** |  |  |  |  |  |  |  |  |  |
+| `hub-v1` | 12 | 12 |  |  | 12 | 13 |  |  |  |  |  |  |  | **17** |
+| `locke-done-v1` | 12 | 13 |  |  | 12 | 13 | 13 |  |  |  |  |  |  | **17** |
+| `camp-escaped-v1` | 12 | 13 | **14** | **12** | 12 | **14** | 13 |  |  |  |  |  |  |  |
+| `falls-done-v1` | 12 | 13 | **14** |  | 12 | **14** | 13 |  |  |  |  |  |  |  |
+| `sabin-done-v1` | 12 | 13 |  |  | 12 | 14 | 13 |  |  |  |  | 14 |  | **18** |
+| `kefka-won-v1` |  | **13** | 14 |  | **13** | **14** | **13** |  |  |  |  | 14 |  |  |
+| `zozo-outside-v1` |  | **18** | 14 |  | **18** | **18** | **18** |  |  |  |  | 14 |  |  |
+| `post-opera-v1` |  | **19** | 14 |  | **19** | **19** | **19** |  |  |  |  | 14 |  |  |
+| `mrf-save-room-v1` |  | **20** | 14 |  | **20** | **20** | **20** |  |  |  |  | 14 |  |  |
+| `n024-entry-save-v1` |  | **21** | 14 |  | **21** | **21** | **21** |  |  |  |  | 14 |  |  |
+| `minecart-platform-v1` |  | **21** | 14 |  | **21** | **21** |  |  |  |  |  | 14 |  |  |
+| `terra-returned-v1` | 19 | **21** | 19 |  | **21** | **22** |  |  |  | **18** |  | 18 |  |  |
+| `narshe-mission-v1` | 19 | **22** | 19 |  | **22** | **23** |  |  |  | **19** |  | 18 |  |  |
+| `water-rondo-v1` | 19 | **22** | 19 |  | **22** | **23** |  |  |  | 19 | **25** | 18 |  |  |
+| `gate-cave-save-v1` | **20** | **24** | 19 |  | **24** | **24** |  |  |  | 19 | 25 | 18 |  |  |
+| `vector-crash-v1` | **22** | **25** | 19 |  | **25** | **25** |  |  |  | 19 | 25 | 18 |  |  |
+| `banquet-done-v1` | **22** | **25** | 19 |  | 25 | 26 |  |  |  | 19 | 25 | 18 |  |  |
+| `crescent-landing-v1` | **22** | **25** | 19 | **22** | 25 | 26 |  |  |  | 19 | 25 | 18 |  |  |
+| `thamasa-night-v1` | **22** | **25** | 19 | **22** | 25 | 26 |  |  |  | 19 | 25 | 18 |  |  |
+| `fire-out-v1` | **23** | **26** | 19 |  | 25 | 26 |  | **25** |  | 19 | 25 | 18 |  |  |
+| `esper-mtn-save-v1` | **23** | **26** | 19 |  | 25 | 26 |  | **25** |  | 19 | 25 | 18 |  |  |
+| `ultros-won-v1` | **23** | **26** | 19 |  | 25 | 26 |  | **25** | **22** | 19 | 25 | 18 |  |  |
+| `thamasa-done-v1` | **23** | **26** | 24 |  | 25 | 26 | 24 | **25** | **22** | 24 | 25 | 24 |  |  |
+| `fc-landing-v1` | **24** | **26** | 24 |  | **25** | 26 | 24 | 25 | 22 | 24 | 25 | 24 |  |  |
+| `fc-alcove-v1` | **26** | **28** | 24 | **25** | **27** | 26 | 24 | 25 | 22 | 24 | 25 | 24 |  |  |
+| `wor-island-v1` |  |  |  |  |  |  | **25** |  |  |  |  |  |  |  |
+| `wor-start-v1` |  |  |  |  |  |  | **25** |  |  |  |  |  |  |  |
+| `wor-tzen-door-v1` |  |  |  |  |  |  | **27** |  |  |  |  |  |  |  |
+| `wor-sabin-v1` |  |  |  |  |  | **28** | **28** |  |  |  |  |  |  |  |
+| `wor-nikeah-v1` |  |  |  |  |  | **28** | **29** |  |  |  |  |  |  |  |
+| `wor-south-figaro-v1` |  |  |  |  |  | **28** | **29** |  |  |  |  |  |  |  |
+| `wor-edgar-v1` |  |  |  |  | **31** | **31** | **31** |  |  |  |  |  |  |  |
+| `wor-figaro-sweep-v1` |  |  |  |  | **31** | **31** | **32** |  |  |  |  |  |  |  |
+| `wor-kohlingen-v1` |  |  |  |  | **32** | **32** | **32** |  |  | **32** |  |  |  |  |
+| `wor-tomb-v1` |  |  |  |  | **32** | **32** | **33** |  |  | **32** |  |  |  |  |
+| `wor-falcon-v1` |  |  |  |  | **32** | **32** | **33** |  |  | **32** |  |  |  |  |
+| `wor-terra-v1` | **32** |  |  |  | **32** | **32** | **33** |  |  | 32 |  |  |  |  |
+| `wor-mtzozo-v1` | **36** |  | **35** |  | 34 | **37** | **37** |  |  | 32 |  |  |  |  |
+| `wor-cyan-v1` | **37** |  | **35** |  | 34 | **37** | **38** |  |  | 32 |  |  |  |  |
+| `wor-narshe-cliffs-v1` | **38** |  | **37** |  | 34 | 37 | **39** |  |  | 32 | **35** |  |  |  |
+| `wor-narshe-v1` | **39** |  | 38 |  | 34 | 37 | **40** |  |  | 32 | **36** |  |  | **36** |
+| `wor-owzer-v1` | **40** |  | **38** |  | 34 | **38** | **41** |  |  | 32 | 36 |  |  | 36 |
+| `wor-tower-v1` | **49** |  | 38 |  | 34 | 38 | **49** | **46** | **46** | 32 | 36 |  |  | 36 |
+| `wor-thamasa-v1` | **49** |  | 38 |  | 34 | 38 | **49** | **46** | **46** | 32 | 36 |  |  | 36 |
+| `wor-phoenix-v1` | **49** |  | **40** |  | 34 | **39** | **50** | **47** | **47** | 32 | **38** |  |  | **37** |
+| `wor-locke-v1` | **50** | **41** | 40 |  | 34 | 40 | **50** | 47 | **47** | 32 | 38 |  |  | 37 |
+| `wor-ragnarok-v1` | **50** | **41** | 40 |  | 34 | 40 | **50** | 47 | **47** | 32 | 38 |  |  | 37 |
+| `wor-veldt-cave-v1` | **50** | 41 | 40 |  | 34 | 40 | **51** | 47 | **48** | 32 | 38 | **32** |  | 37 |
+| `wor-gau-v1` | **50** | 41 | 40 |  | 34 | **40** | **51** | 47 | 48 | 32 | 38 | **33** |  | 37 |
+| `wor-belly-v1` | **53** | 41 | 40 |  | 34 | 40 | **53** | **50** | **50** | 32 | 38 | 33 |  | 37 |
+| `wor-gogo-v1` | **55** | 41 | 40 |  | 34 | 40 | 55 | **52** | **52** | 32 | 38 | 33 | **44** | 37 |
+| `wor-ebot-v1` | **55** | 41 | 40 |  | 34 | 40 | 55 | **52** | **53** | 32 | 38 | 33 | **44** | 37 |
+| `wor-opera-v1` | 55 | 41 | 40 |  | 34 | 40 | **55** | **52** | **53** | 32 | 38 | 33 | **44** | 37 |
+| `wor-dream-v1` | **56** | 41 | 40 |  | 34 | 40 | **55** | 52 | **53** | 32 | 38 | 33 | 44 | 37 |
+| `wor-doma-v1` | **56** | 41 | **40** |  | 34 | 40 | **56** | 52 | **53** | 32 | 38 | 33 | 44 | 37 |
+| `wor-ancient-v1` | **57** | 41 | **42** |  | 34 | 40 | **57** | 52 | **54** | 32 | 38 | 33 | 44 | 37 |
+| `wor-colosseum-v1` | **58** | 41 | **45** | **45** | 34 | 40 | **58** | 52 | 54 | 32 | 38 | 33 | 44 | 37 |
+| `wor-dino-v1` | **63** | 41 | **52** | **52** | 34 | 40 | **63** | 52 | 54 | 32 | 38 | 33 | 44 | 37 |
+| `wor-desert-v1` | **64** | 41 | **53** | **53** | 34 | 40 | **64** | 52 | 54 | 32 | 38 | 33 | 44 | 37 |
+| `wor-kt-factory-v1` | **64** | **41** | **53** | **54** | **34** | **41** | **64** | **52** | **54** | **32** | **38** | 33 | **45** | 37 |
+| `wor-kt-inferno-v1` | **64** | **41** | **53** | **54** | **34** | **41** | **64** | **52** | **54** | **32** | **38** | 33 | **45** | 37 |
+| `wor-kt-atma-v1` | **64** | **41** | **53** | **54** | **34** | **41** | **64** | **52** | **54** | **32** | **39** | 33 | **45** | 37 |
+| `wor-kt-guardian-v1` | **69** | **42** | **53** | **54** | **47** | **42** | **64** | **53** | **61** | **54** | **40** | 33 | **46** | 37 |
+| `wor-kt-doom-v1` | **69** | **42** | **56** | **57** | **47** | **46** | **64** | **53** | **61** | **54** | **40** | 33 | **49** | 37 |
+| `wor-kt-poltergeist-v1` | **69** | **51** | **56** | **57** | **47** | **46** | **69** | **59** | **61** | **54** | **50** | 33 | **49** | 37 |
+| `wor-kt-goddess-v1` | **69** | **51** | **56** | **57** | **47** | **46** | **69** | **59** | **61** | **54** | **50** | 33 | **49** | 37 |
+| `wor-kt-plates-v1` | **69** | **51** | **56** | **57** | **47** | **46** | **69** | **59** | **61** | **54** | **50** | 33 | **49** | 37 |
+
+**Where the line pays for levels.**  The World of Balance spends no Fenix
+Down on the line and loses two members (the Moogle defence and one random
+on Esper Mountain); its grinds are the ones the labs set.  Every leg of the
+World of Ruin that lost a member:
+
+| leg | seated (L) | random battles | deaths | Fenix | what |
+|---|---|---|---|---|---|
+| `wor_storm` | 35-38 | 7 | 1 | 1 | |
+| `wor_owzer` | 38-41 | 2 | 1 | 1 | |
+| `wor_relm` | 40-49 | 54 | 2 | 2 | the grind |
+| `wor_tower` | 46-49 | 18, no XP | 9 | 6 | one action from full HP: "[navTo] [death] f+8813 entity 1 char 6 from 3595/3595 by slot 2 cmd $02 atk $12 (ONE ACTION from >= 80%)"; MagiMaster's death counter fells all four in a battle the leg wins ("class=died with 5 BP banked", then "battle $162 WON after 26153 ticks") |
+| `wor_phoenix` | 46-50 and 36-40 | 9 | 3 | 2 | party 2 is the bench (CYAN, SABIN, MOG, UMARO), six under the Red Dragon's 44 |
+| `wor_gogo` | 50-55, GOGO 44 | 25 | 7 | 0 | CELES (L53-55) felled by one Fight in map 278's formations $15A and $15B, six times: "[death] f+1222 entity 1 char 6 from 3801/4117 by slot 1 cmd $00 atk $EF (ONE ACTION from >= 80%)" |
+| `wor_doma` | 40-56 | 3 | 1 | 1 | |
+| `wor_dino` | 45-63 | 29 | 1 | 1 | |
+| `wor_kt_factory` | tower boot | 4 | 1 | 1 | SABIN L41 in formation $18E |
+| `wor_kt_atma` | | 2 | 2 | 2 | CELES twice on Atma's walk ($1AA) |
+| `wor_kt_guardian` | | 59 | 2 | 2 | CYAN ($1AB); LOCKE in formation 329 ($149) |
+| `wor_kt_poltergeist` | | 45 | 5 | 5 | LOCKE, L43-51, from full HP in 329 four times and 272 once: "[death] f+1250 entity 2 char 1 from 3509/3727 by slot 1 cmd $00 atk $EF (ONE ACTION from >= 80%)" |
+| `wor_kefka` | | 0 | 3 | 0 | |
+
+The tower's bag in this replay, leg by leg (first and last `fenix=` of
+each log): the factory 35 after Kohlingen's buy, 34 at its end; Atma 34 ->
+32; Guardian 32 -> 30; Doom 30 -> 30; the Poltergeist 30 -> 25; the
+Goddess and the plates 25.  So 10 of 35, against the 15 of #521's replay
+at 3e6e8cea (route-wor-kefka-tower.md 7.6) and the 21-29 before it: the
+tower's spend moves by draw, and its biggest single cause here is LOCKE,
+party 2's bench, in the GtBehemoth's formation 329, which #521's grid
+already named (40 of 74 deaths over 16 runs).
+
+**Where it over-levels.**  Through the World of Balance and the World of
+Ruin to Owzer the seated party meets its key fights within a few levels
+of the targets (the plan table above).  From the Jidoor grind on, the two
+carriers run ahead: L49 at MagiMaster (target 45), 53-55 for the Gogo arc
+(46), 55-57 in the Dreams (49), 64 at the tower's boot (52 a party), 69 at
+Kefka (55).  The arc recruits meet their fights on target (CYAN and
+SHADOW L52-53, RELM 54 and STRAGO 52 at the boot), and the bench is far
+under: seven of the fourteen at L32-41 at the tower's boot.
+
+**The bench's shape** (#496: about six to eight strong carrying the rest).
+At the tower's boot: six at L52-64 (TERRA and CELES 64, RELM 54, CYAN and
+SHADOW 53, STRAGO 52), GOGO at 44, and seven at L32-41.  At Kefka's boot,
+after the tower's training: seven at L54-69 (TERRA and CELES 69, RELM 61,
+STRAGO 59, SHADOW 57, CYAN 56, SETZER 54), five at L46-51 (LOCKE 51, MOG
+50, GOGO 49, EDGAR 47, SABIN 46), GAU 33 and UMARO 37 out.  Kefka's order
+put CELES, TERRA, RELM and STRAGO first.  So the line already ends in the
+owner's shape; what is off is its top, eleven to fourteen over the targets,
+and the price the tower pays to raise the bench from L32-41 (102 of its
+125 random battles are the three training laps, and their deaths are
+the bench's).
+
+### The plan
+
+**The aim, by level.**  A key fight is met near its target when its seated
+party is within about three levels of it.  A carrier may stand up to about
+five over; a member being carried, up to about ten under.  The World of
+Balance meets this now and the plan leaves it alone.  In the World of Ruin
+the lever is seats, not grinds: the carriers take a quarter of every
+battle in grinds whose targets the labs set for someone else (the Jidoor
+plain for STRAGO and RELM, the forest for CYAN and SHADOW), so moving those
+seats to the bench lowers the top and raises the bottom for the same
+battles.  The tower stays the bench's training ground in mixed parties, as
+the owner plays it; the moves shrink what it has to raise.
+
+**The moves, in landing order.**  Each is one branch, labbed from the
+graph's own captures and replayed from the earliest leg it reaches.
+Cheapest and latest first: an early move re-cuts more of the line, and its
+re-measure then includes every later one's.
+
+1. **Formation 329 against party 2's bench (#521).**  Not a seat or a
+   grind but the place the tower's training meets its limit: LOCKE dies
+   from full HP to one blow at L42 and at about L50 alike (2,766 to 3,727
+   max HP), so levels alone do not
+   answer it.  A lab on `wor-kt-doom-v1` (the Poltergeist leg's training)
+   over row, his armour and relic, and whether the lap stays on 334's north
+   or moves to a floor without 329.  Moves: the Poltergeist leg and the
+   Goddess leg's bag.  Re-measure: the 7.6 grid's deaths in 329 by distinct
+   key, the bag by leg, Kefka's grid.  Replays from `wor-kt-doom-v1`.
+2. **The dinosaur forest seats the bench the tower pays for**
+   (`gen_wor_dino`).  Today TERRA and CELES ride it from 58 to 63.  Give
+   one or both carrier seats to the bench members the tower's laps raise at
+   the most cost (party 1's EDGAR and SETZER in #521's earlier replays,
+   party 2's LOCKE in this one), keeping one carrier with a cure.  The
+   leg's own rule (the plain by the Falcon until the lowest of the four is
+   L45, then the forest to L52) does the catching up: about 150,000 XP
+   takes EDGAR from 34 to 45, near fifty battles of group 49 at the 3,168 a
+   member this doc's table gives it (an estimate), and the forest's 148,665
+   a seat then puts him near 52.  Moves: the forest and the desert, every
+   tower leg (party 1's landing training, which fought 45 battles to lift
+   EDGAR to 46 and SETZER to 52, should shrink to a handful; the L.5 Doom check
+   at 352; the laps' exposure to 329), Kefka's order.  Re-measure: the
+   forest's wins and deaths by distinct key against `dn3`/`dn4` (1 lost of
+   41), the levels at `wor-desert-v1`, the 7.6 grid on the new
+   `wor-kt-atma-v1`, the tower's bag by leg, Kefka's grid.  The tower's
+   floors (46, 46, 50 and the 60-battle cap) stay; what changes is how much
+   they fight.  The line's random battles go up by the plain's and down by
+   the training's.
+3. **The Fanatics' Tower's grind** (`gen_wor_relm`).  The plain is ground
+   until STRAGO and RELM, who join at the party's average, stand at L46;
+   TERRA and CELES climb 40 -> 49 beside them.  The generator's own lab
+   found the tower's fourth floor lost at L46 (TERRA and CELES 49) and at
+   L50 (52 and 53) alike, so levels are not its answer.  First a lab: the
+   tower and MagiMaster with TERRA and CELES at their arrival levels (about
+   41) against 49.  If they hold, the plain seats STRAGO and RELM with two
+   of the bench and the carriers rejoin for the tower: about 290,000 XP
+   moves from the two carriers to two bench members.  Moves: every arc from
+   Thamasa to the tower, about forty states.  Re-measure: the tower's floors
+   and MagiMaster, then each later arc's key fight.  The tower's nine
+   deaths and six Fenix Downs in its no-XP battles are a separate finding
+   (a one-action kill from full HP), not this move's.
+4. **The free seats of the late arcs** (the Zone Eater and Gogo, Ebot's
+   Rock, the Dreams, the Ancient Castle, the Colosseum).  Where an arc's
+   story needs neither carrier, a seat goes to one of the strong six to
+   eight the owner names; the carriers stop at their arcs' targets.  One
+   branch an arc, upstream first, each re-measuring its key fight and the
+   levels at every later save.  This is the biggest replay and the one
+   that most needs the owner's answer on who the strong ones are.
+
+The canon line stays the middle path: no move adds a hunt to it, and each
+changes only who sits in a grind or an arc the line already plays, the
+way a player rotates the party.  The hunts stay on their branches (#496
+had offered a pre-tower training stretch as their main-line home; it was
+withdrawn).
+
+**#521** (the tower's Fenix Downs): moves 1 and 2 are its leveling half.
+Move 1 is the lab its own write-up left open (formation 329); move 2
+lowers the training the tower's random battles feed.  The stock (35 at
+Kohlingen, Kefka's floor 10) is re-read after each.
+
+**#522** (`crescent_landing`'s no-effect retry): not a leveling matter.
+It is a press the game does not answer in `gen_voyage`, in the World of
+Balance, which no move here reaches, so none of these replays re-measures
+it.  In this replay the leg passed on its first attempt with no watchdog
+trip ("[watch] 2098 samples, pad down 3528 frames, 0 trip(s)", "PASS
+(frame 33577) attempts=1/3"); it stays its own lab.
+
+**Questions for the owner.**
+
+- *How grindy should the canon playthrough be?*  Today it fights about 690
+  random battles from power-on to Kefka (177 in the World of Balance,
+  389 in the World of Ruin before the tower, 125 in it).  My
+  recommendation is to hold that number about where it is and move
+  battles rather than add them: move 2 adds the plain's and takes about as
+  many from the tower's training.
+- *Who are the strong six to eight?*  The line's own answer at Kefka is
+  TERRA, CELES, RELM, STRAGO, SHADOW, CYAN and SETZER.  I would name those
+  six without SETZER, plus EDGAR and LOCKE: the two whose tower deaths have
+  cost the most Fenix Downs (party 1's lane in #521's replays, LOCKE in
+  this one).  SETZER's Exp. Egg already raises him faster than anyone in
+  the tower, so he can stay carried.
+- *Is seating the bench in the dinosaur forest the pre-tower training
+  stretch you ruled out?*  I read it as a seat in a grind the line already
+  makes (you placed the forest late so its XP feeds the tower), but it
+  does move training out of the tower, where you said the bench levels.
+- *Should the carriers be held down?*  #496 asks to raise the average
+  while keeping the max down; the carriers are eleven to fourteen over at
+  the tower and Kefka.  I would hold them to about five over by moving
+  seats, and never by cutting a grind a lab set.
+
 ## How to regenerate
 
 ```py
@@ -514,3 +889,10 @@ for d in sorted(glob.glob("tools/tests/checkpoints/*-v1")):
 Each member dict carries `name`, `level`, `hp`/`maxhp`, `mp`/`maxmp`, `weapon`,
 `gear`, and the `active`/`party` flags — so this same read backs a gear/HP
 audit at any checkpoint, not just levels.
+
+The bench, which that read leaves out: `python3 tools/roster.py
+tools/tests/checkpoints/*-v1` (every recruited character in each save).
+The line leg by leg, from a replay's `build/states` (the leveling plan's
+tables): `python3 tools/route_levels.py --branches` (`--csv` for the long
+form); run it in the replay's tree, or with `--repo` and `--dir` pointed
+at one.
