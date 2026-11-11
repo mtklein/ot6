@@ -7675,6 +7675,15 @@ function M.gearDressPlan(opts)
     local keep = opts.keep or {}
     local bag = bagCounts()
     local planned = {}
+    -- opts.absorbs (#524): the species the arc ahead fights (ids); a weapon whose element one of them absorbs does
+    -- not fit, and a hand holding one is planned even under a two-weapon relic (Kefka's tiers: the lady and the
+    -- sleeper absorb holy, and the plates' save dressed two members in holy blades)
+    local absorbMask = 0
+    for _, sp in ipairs(opts.absorbs or {}) do absorbMask = absorbMask | M.monsterAbsorb(sp) end
+    local function absorbed(id)
+      return absorbMask ~= 0 and id ~= nil and id ~= 0xFF and gearType(id) == 1 and (M.weaponElement(id) & absorbMask) ~= 0
+    end
+    local function fitsHere(c, slot, id) return fits(c, slot, id) and not absorbed(id) end
     -- opts.mdefWeight: each point of an armor piece's magic defence counts
     -- this much more, on top of gearValue's one (mdefWeight 2 counts it
     -- three times): a fight of spells, the Fanatics' Tower
@@ -7693,13 +7702,14 @@ function M.gearDressPlan(opts)
     for _, c in ipairs(members) do
       -- shields and armor first, the weapons last (their keys read the others)
       for _, slot in ipairs({ 3, 2, 1, 0 }) do
-        if not (keep[c] and keep[c][slot]) and not kitHand(c, slot) then
+        if not (keep[c] and keep[c][slot]) and (not kitHand(c, slot) or absorbed(gearWorn(c, slot))) then
           local others = keysElsewhere(all, wornOf, c, slot)
           local cur = gearWorn(c, slot)
-          local curScore = (cur == 0xFF or fits(c, slot, cur)) and score(c, slot, cur, others) or 0
+          local curScore = (cur == 0xFF or fitsHere(c, slot, cur)) and score(c, slot, cur, others) or (absorbed(cur) and -1000 or 0)
           local best, bestScore = nil, curScore
           for id, n in pairs(bag) do
-            if n > 0 and fits(c, slot, id) then
+            if n > 0 and (fitsHere(c, slot, id) or (kitHand(c, slot) and slot == 1 and wearable(c, id)
+                and gearType(id) == 1 and not absorbed(id))) then
               local s = score(c, slot, id, others)
               if s > bestScore then best, bestScore = id, s end
             end
@@ -10222,7 +10232,7 @@ function M.gearBaselineViolations(opts)
   end
   local cs = {}
   for _, m in ipairs(ms) do cs[#cs + 1] = m.ch end
-  local kits = M.gearDressPlan({ members = cs, quiet = true })
+  local kits = M.gearDressPlan({ members = cs, quiet = true, absorbs = opts.absorbs })
   for c, kit in pairs(kits) do
     for _, e in ipairs(kit) do
       bad("the gear rule puts $%02X in %s's slot %d (wears $%02X)", e[2], M.SPLIT_NAMES[c], e[1],
@@ -10263,7 +10273,8 @@ function M.assertGearBaseline(tag, opts)
   M.log(string.format("[baseline] %s: at the baseline: %s", tag, M.gearBaselineLine()))
 end
 -- M.gearBaseline(opts): return the active party to its baseline and assert it.  opts.tag; opts.threats (the
--- statuses the arc ahead inflicts, M.relicPlan's; default every status).
+-- statuses the arc ahead inflicts, M.relicPlan's; default every status); opts.absorbs (the species the arc ahead
+-- fights: no weapon one of them absorbs, M.gearDressPlan's).
 function M.gearBaseline(opts)
   opts = opts or {}
   local tag = opts.tag or "gear baseline"
@@ -10273,8 +10284,10 @@ function M.gearBaseline(opts)
     return M.lazy(function()
       local cs = {}
       for _, m in ipairs(M.gearBaselineMembers(true)) do cs[#cs + 1] = m.ch end
-      if next((M.gearDressPlan({ members = cs, quiet = true }))) == nil then return M.call(function() end) end
-      return M.gearDress({ members = cs, tag = string.format("%s: gear (pass %d)", tag, i) })
+      if next((M.gearDressPlan({ members = cs, quiet = true, absorbs = opts.absorbs }))) == nil then
+        return M.call(function() end)
+      end
+      return M.gearDress({ members = cs, absorbs = opts.absorbs, tag = string.format("%s: gear (pass %d)", tag, i) })
     end)
   end
   local ph = 0
@@ -10353,7 +10366,7 @@ function M.gearBaseline(opts)
         M.log(string.format("[baseline] %s: the overlay %s comes off at the save", tag, name))
         M.gearOverlaysOpen[name] = nil
       end
-      M.assertGearBaseline(tag, { threats = opts.threats })
+      M.assertGearBaseline(tag, { threats = opts.threats, absorbs = opts.absorbs })
     end),
   })
 end
@@ -11181,7 +11194,8 @@ function M.saveGame(opts)
   local function menuOpen() return M.readByte(0x59) ~= 0 end
   return M.seqStep({
     (opts.baseline == "assert" and M.call(function() M.assertGearBaseline(tag .. ": gear baseline", opts) end))
-      or (opts.baseline ~= false and M.gearBaseline({ tag = tag .. ": gear baseline", threats = opts.threats }))
+      or (opts.baseline ~= false and M.gearBaseline({ tag = tag .. ": gear baseline", threats = opts.threats,
+        absorbs = opts.absorbs }))
       or M.call(function() end),
     -- open the menu; on the world map $59 rides the same flow
     (function() local calm, ph = 0, 0

@@ -3135,12 +3135,13 @@ end
 -- contract walks onto its save point first; a world contract saves where
 -- the leg stands, which must be its tile), check the battery holds that
 -- save, and assert the whole contract as the exit.
-function M.saveAtCheckpoint(key)
+function M.saveAtCheckpoint(key, opts)
+  opts = opts or {}
   local c = lookup(key)
   local slot = c.slot or 3
   -- the gear baseline (#524) before the save point: on its tile the SavePoint script re-fires (and the first
   -- save point's tutorial runs), so the dress is made beside it and the save asserts it
-  local steps = { M.gearBaseline({ tag = key .. " save: gear baseline" }) }
+  local steps = { M.gearBaseline({ tag = key .. " save: gear baseline", threats = opts.threats, absorbs = opts.absorbs }) }
   if c.field then
     steps[#steps + 1] = M.stepOntoSavePoint(c.field.x, c.field.y)
   else
@@ -3152,7 +3153,8 @@ function M.saveAtCheckpoint(key)
         M.worldY()))
     end)
   end
-  steps[#steps + 1] = M.saveGame({ slot = slot, tag = key .. " save", baseline = "assert" })
+  steps[#steps + 1] = M.saveGame({ slot = slot, tag = key .. " save", baseline = "assert", threats = opts.threats,
+    absorbs = opts.absorbs })
   steps[#steps + 1] = M.call(function()
     if c.field then
       M.assertSavedSlot(c.field.map, c.field.x, c.field.y, key, slot)

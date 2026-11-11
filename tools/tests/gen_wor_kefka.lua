@@ -23,6 +23,16 @@ local KEFKA = 0x12A
 local TIERS = { [0x01D7] = "the arms and the face", [0x0200] = "the four figures", [0x0201] = "the lady and the "
   .. "sleeper", [0x0202] = "Kefka" }
 local GIRL = 0x15E
+-- every species of the four tiers' formations (BattleMonsters, 15 bytes a formation)
+local function tierSpecies()
+  local bm = H.sym("BattleMonsters") & 0x3FFFFF
+  local out = {}
+  for f in pairs(TIERS) do
+    local rec = H.formationRecord(function(i) return H.readRomByte(bm + f * 15 + i) end)
+    for _, sp in pairs(rec.species) do out[#out + 1] = sp end
+  end
+  return out
+end
 local FENIX_FLOOR = 10
 local FIGHT = {}
 -- the fight's options (a lab's KEFKA_FIGHT overrides them): in the third tier the Girl is killed first, as a player
@@ -297,6 +307,19 @@ H.run({ maxFrames = 1500000 }, {
       steps[#steps + 1] = H.switchParty(u[3], { tag = "unring: party " .. u[3] })
       steps[#steps + 1] = H.unequipRelics(u[1], { u[2] }, { tag = "unring " .. NAMES[u[1]] })
     end
+    return H.seqStep(steps)
+  end),
+  -- each party's arms: no tier absorbs what a hand swings, since the tiers come one after another with no menu
+  -- between (the plates' save dresses the walking party by the gear rule, whose best blades can be holy, and the
+  -- lady and the sleeper absorb holy: "char 0's R-hand item $18 (holy) is ABSORBED by slot 2 species $015E" on
+  -- #524's replay); an arms choice for this fight, after the last save
+  H.lazy(function()
+    local steps, back = {}, H.activeParty()
+    for _, p in ipairs(H.partyNumbers()) do
+      steps[#steps + 1] = H.switchParty(p, { tag = "arms for Kefka's tiers, party " .. p .. ": walk it" })
+      steps[#steps + 1] = H.absorbSafeArms(nil, tierSpecies(), { tag = "arms for Kefka's tiers, party " .. p })
+    end
+    steps[#steps + 1] = H.switchParty(back, { tag = "arms for Kefka's tiers: back" })
     return H.seqStep(steps)
   end),
   -- each party's care before the last step, party 2 walking again after
