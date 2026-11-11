@@ -9994,6 +9994,17 @@ M.GEAR_OVERLAYS = {
     .. "Goddess)", why = "armor that covers the boss's element" },
 }
 M.gearOverlaysOpen = {}                         -- name -> why, this run
+-- A prize a split dungeon hands to another party through the bag (Kefka's Tower: a party's Ribbon off into the bag
+-- for a party that is not seated) stays in the bag for it: M.reservePrize(id, n, why) holds n of them out of the
+-- seated party's prizes until M.reservePrize(id, 0) (this run; the leg that hands it on puts it on).
+M.gearPrizeReserved = {}                        -- id -> { n =, why = }
+function M.reservePrize(id, n, why)
+  return M.call(function()
+    M.gearPrizeReserved[id] = n > 0 and { n = n, why = why } or nil
+    M.log(string.format("[baseline] %d %s(s) held in the bag for another party%s", n, M.GEAR_PRIZE_NAMES[id] or "",
+      why and (": " .. why) or ""))
+  end)
+end
 function M.overlayOn(name, why)
   return M.call(function()
     M.assertEq(M.GEAR_OVERLAYS[name] ~= nil, true, string.format("the overlay %q is declared in M.GEAR_OVERLAYS", name))
@@ -10104,7 +10115,8 @@ function M.gearPrizePlan(ms)
   local reserved = {}                           -- ch * 8 + slot -> prize id
   local healer = M.gearHealer(ms)
   for _, id in ipairs(M.GEAR_PRIZES) do
-    local n = M.invCountOf(id)
+    local held = M.gearPrizeReserved[id] and M.gearPrizeReserved[id].n or 0
+    local n = math.max(0, M.invCountOf(id) - held)
     for _, m in ipairs(ms) do for s = 4, 5 do if charByte(m.ch, 0x1F + s) == id then n = n + 1 end end end
     plan.owned[id] = n
     local order, roles = {}, {}

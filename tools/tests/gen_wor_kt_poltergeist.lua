@@ -182,6 +182,9 @@ H.run({ maxFrames = 3000000 }, {
     local label = "the 334 Ribbon off " .. NAMES[handed] .. " for party 1"
     return H.keepGear(handed, label, H.unequipRelics(handed, { slot }, { tag = label }))
   end),
+  -- held in the bag through the save's gear baseline (#524), which otherwise puts a Ribbon in the bag back on the
+  -- seated party: the split tower hands it to party 1 this way
+  H.reservePrize(RIBBON, 1, "party 1's, handed on through the bag (gen_wor_kt_goddess puts it on)"),
   H.call(function()
     H.assertEq(H.invCountOf(RIBBON) >= 1, true, "a Ribbon in the bag for party 1")
     say("tower", string.format("the 334 Ribbon off %s into the bag for party 1", NAMES[handed]))
