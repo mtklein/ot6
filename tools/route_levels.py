@@ -91,9 +91,17 @@ def scan_log(lines):
     r = {"random": 0, "event": 0, "other": 0, "lost": 0, "deaths": 0, "wipes": 0,
          "fenix": 0, "xp": {}, "attempts": None}
     last_fenix = None
+    # a [wipe] is the loss only when no won [outcome] follows it before the
+    # next battle: MagiMaster's dying Ultima fells all four as the battle is
+    # won ("[wipe] f+25352 ...", then "battle $162 WON after 26153 ticks",
+    # wor_tower at v0.41)
+    wiped = False
     for ln in lines[start:]:
         m = OUTCOME.match(ln)
         if m:
+            if wiped and m.group(2) != "WON":
+                r["wipes"] += 1
+            wiped = False
             w = REWARD.search(ln)
             kind = w.group(1) if w else "other"
             r[kind] += 1
@@ -105,13 +113,17 @@ def scan_log(lines):
         if DEATH.match(ln):
             r["deaths"] += 1
         if WIPE.match(ln):
-            r["wipes"] += 1
+            if wiped:
+                r["wipes"] += 1     # a wipe no outcome closed (the runner's own end)
+            wiped = True
         if ln.startswith("[ot6] "):
             for f in FENIX.findall(ln):
                 f = int(f)
                 if last_fenix is not None and f < last_fenix:
                     r["fenix"] += last_fenix - f
                 last_fenix = f
+    if wiped:
+        r["wipes"] += 1
     for ln in lines:
         m = PASS.match(ln)
         if m:
@@ -289,6 +301,17 @@ def selftest(repo):
     for k, v in want.items():
         if r[k] != v:
             bad.append(f"scan_log {k}: got {r[k]!r}, want {v!r} (the first attempt's lines must not count)")
+    # a wipe in a won battle is no wipe; one before a lost outcome, or that no
+    # outcome closes, is
+    won = ["[ot6] [advanceStory] [wipe] f+25352 party_bp=0,4,5,0 deaths=x",
+           "[ot6] [advanceStory] [outcome] battle $162 WON after 26153 ticks: killed s0:$166; escaped none"]
+    lost = ["[ot6] [navTo] [wipe] f+9 party_bp=0,0,0,0 deaths=x",
+            "[ot6] [navTo] [outcome] battle $0AD LOST after 9 ticks: killed none; escaped none"]
+    for lines, n, what in ((won, 0, "won"), (lost, 1, "lost"), (lost[:1], 1, "with no outcome"),
+                           (won + lost, 1, "won, then lost")):
+        got = scan_log(lines)["wipes"]
+        if got != n:
+            bad.append(f"scan_log wipes, a wipe {what}: got {got}, want {n}")
     # the line: power-on to the end state, every leg reached by prev links
     states = [
         {"state": "a", "prev": None, "also": ["a2"], "end": None},
