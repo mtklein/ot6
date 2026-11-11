@@ -8463,31 +8463,45 @@ function M.relicPlan(members, opts)
   -- learned (then the order of `members`) who can: never left in the bag
   -- (ties on the threatened statuses go to the guard covering more of all
   -- of them: a Ribbon over a Jewel Ring when the threat is Petrify alone)
-  -- (a tie on both covers goes to a guard a member wears now, then to the lower id, so the plan reads the same
-  -- after it is put on: the gear baseline's check, #524, met wor-sabin-v1's Amulet giving way to a guard of the
-  -- same cover that only stood first in the pool because the Amulet, worn, joined it last)
-  local wide, wcover, wall, wworn = nil, 0, 0, false
+  -- (guards tied on both covers are all the widest: the member the rule reaches first takes the one of them he
+  -- wears, else the lowest id he can wear, so the plan reads the same after it is put on -- the gear baseline's
+  -- check, #524, met the pool's order deciding the tie: wor-sabin-v1's Amulet gave way to a guard SABIN could not
+  -- wear that stood first only because the Amulet, worn, joined the pool last; at wor-veldt-cave-v1 RELM's Memento
+  -- Ring won the tie worn and the Amulet, worn after, won it back)
+  local wcover, wall = 0, 0
   for _, id in ipairs(ids) do
     local cl = M.relicClass(id, opts.threats)
     local all = cl and M.relicClass(id).cover or 0
-    local worn = false
-    for _, m in ipairs(ms) do if m.cur[4] == id or m.cur[5] == id then worn = true end end
-    if count[id] > 0 and cl.rank == 1 and (cl.cover > wcover or (cl.cover == wcover and cl.cover > 0 and all > wall)
-        or (cl.cover == wcover and cl.cover > 0 and all == wall and worn and not wworn)
-        or (cl.cover == wcover and cl.cover > 0 and all == wall and worn == wworn and id < wide)) then
-      wide, wcover, wall, wworn = id, cl.cover, all, worn
+    if count[id] > 0 and cl.rank == 1 and (cl.cover > wcover or (cl.cover == wcover and all > wall)) then
+      wcover, wall = cl.cover, all
     end
+  end
+  local tied = {}
+  for _, id in ipairs(ids) do
+    local cl = M.relicClass(id, opts.threats)
+    if count[id] > 0 and cl.rank == 1 and wcover > 0 and cl.cover == wcover and M.relicClass(id).cover == wall then
+      tied[#tied + 1] = id
+    end
+  end
+  table.sort(tied)
+  local function widestFor(m)
+    local pick = nil
+    for _, id in ipairs(tied) do
+      if wearsItem(m.ch, id) and (pick == nil or (wearing(m, id) and not wearing(m, pick))) then pick = id end
+    end
+    return pick
   end
   -- opts.guardTo (a character id) names the widest guard's wearer instead:
   -- a lever for a lab comparing wearers, not the rule
   if opts.guardTo then
     local to = nil
     for _, m in ipairs(ms) do if m.ch == opts.guardTo then to = m end end
-    if to and wide and hasFree(to) and wearsItem(to.ch, wide) then
+    local wide = to and widestFor(to)
+    if wide and hasFree(to) then
       take(to, wide, string.format("the widest guard (%d of the threatened statuses) to %s: opts.guardTo, a lab's lever",
         wcover, to.name))
     end
-  elseif wide then
+  elseif #tied > 0 then
     local byspells = {}
     for _, m in ipairs(ms) do byspells[#byspells + 1] = m end
     table.sort(byspells, function(a, b)
@@ -8498,7 +8512,8 @@ function M.relicPlan(members, opts)
     for _, m in ipairs(byspells) do others[#others + 1] = string.format("%s %d", m.name, m.spells) end
     local first = byspells[1]
     for _, m in ipairs(byspells) do
-      if hasFree(m) and wearsItem(m.ch, wide) then
+      local wide = widestFor(m)
+      if hasFree(m) and wide then
         if m == first and m.spells > 0 then
           take(m, wide, string.format("the widest guard (%d of the threatened statuses) to the party's caster "
             .. "(spells learned: %s): Mute and Imp take her Magic and Runic, Sleep, Muddle and Zombie every member's turns",
