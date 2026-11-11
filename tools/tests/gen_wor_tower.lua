@@ -37,6 +37,12 @@ local BOSS_SPECIES = { [WHITE_DRGN] = true, [MAGIMASTER] = true }
 -- Shell goes up while an L.90 Magic stands (its Bolt 3, Merton, Meteor and
 -- Flare) on a member out of Reflect (route-wor-thamasa.md 5.3)
 local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x164] = true } }
+-- the L.20 Magic first, by a cast no Reflect turns (Driver opts.directFirst):
+-- its X-Zone is the climb's killer (the Death guards below, #521's sibling)
+if TOWER_L20_FIRST then
+  FIGHT.magicFirst[0x130] = true
+  FIGHT.directFirst = { [0x130] = true }
+end
 -- MagiMaster: Shell on all four, Life 3 from 40% of his HP, and below 15%
 -- no attack while a living member lacks Life 3 (his Ultima as he dies
 -- ignores Shell; the revive Life 3 queues lands: build/attempts/wt/
@@ -692,13 +698,36 @@ end
 -- and every "off" after it then had nothing to put back (#460: the rings
 -- stayed on from the fourth floor for the rest of the World of Ruin)
 local heldRelic = {}
+-- The Death guards (#521's sibling).  The L.20 Magic's X-Zone ($12: MagicProp
+-- +3 bit 1, no Reflect turns it; +$0A Death) took the four from full HP in
+-- the first floor's L.40-and-two-L.20 battles, two at a time, 9 deaths and
+-- 6 Fenix Downs in battles that pay nothing (v0.41's replay: "[death] f+8813
+-- entity 1 char 6 from 3595/3595 by slot 2 cmd $02 atk $12"), and RELM's
+-- Memento Ring was in the bag for them: her second relic was the one the
+-- Wall Ring took.  A Death guard (the Memento Ring, the Safety Bit) blocks
+-- X-Zone and the L.50 Magic's Doom (FixImmuneStatus: Death immunity is
+-- instant-death protection).  So a member whose second relic is a guard
+-- gives up the first for the ring (TOWER_GUARD "bit+memento"), and the
+-- Safety Bit from the first floor's side room goes on the first member
+-- without a guard whose first relic does nothing in a magic-only fight
+-- (CELES's Genji Glove), back off out of the tower (TOWER_GUARD "bit" or
+-- "bit+memento"; false, the control arm, leaves both as they were)
+local MEMENTO_RING, GENJI_GLOVE, ATLAS_ARMLET, HERO_RING = 0xDB, 0xD1, 0xC4, 0xC9
+local function deathGuard(id) return id == MEMENTO_RING or id == SAFETY_BIT end
+local guard = TOWER_GUARD
+local keepMemento = guard == "bit+memento"
+local ringSlot = {}
 local function wallRingsOn()
   local steps = {}
   for _, m in ipairs(PARTY) do
     steps[#steps + 1] = lazy(function()
       local cur = H.readByte(c(m[1], 0x24))
-      if cur ~= WALL_RING then heldRelic[m[1]] = cur end
       if cur == WALL_RING or H.readByte(c(m[1], 0x23)) == WALL_RING then return H.call(function() end) end
+      if keepMemento and deathGuard(cur) and not deathGuard(H.readByte(c(m[1], 0x23))) then
+        heldRelic[m[1]], ringSlot[m[1]] = H.readByte(c(m[1], 0x23)), 4
+        return H.equipKit(m[1], { { 4, WALL_RING } }, { tag = m[2] .. ": a Wall Ring (the Death guard kept)" })
+      end
+      heldRelic[m[1]], ringSlot[m[1]] = cur, 5
       return H.equipKit(m[1], { { 5, WALL_RING } }, { tag = m[2] .. ": a Wall Ring" })
     end)
   end
@@ -717,13 +746,37 @@ local function wallRingsOff(tag, keep)
   for _, m in ipairs(PARTY) do
     steps[#steps + 1] = lazy(function()
       if keep == m[1] then return H.call(function() end) end
-      local old = heldRelic[m[1]]
-      if H.readByte(c(m[1], 0x24)) ~= WALL_RING or old == nil or old == WALL_RING then return H.call(function() end) end
-      return H.equipKit(m[1], { { 5, old } }, { tag = m[2] .. ": the Wall Ring off for " .. tag })
+      local old, slot = heldRelic[m[1]], ringSlot[m[1]] or 5
+      if H.readByte(c(m[1], 0x1F + slot)) ~= WALL_RING or old == nil or old == WALL_RING then
+        return H.call(function() end)
+      end
+      return H.equipKit(m[1], { { slot, old } }, { tag = m[2] .. ": the Wall Ring off for " .. tag })
     end)
   end
   steps[#steps + 1] = H.call(function() say("wor", "Wall Rings off for " .. tag .. ": " .. kitLine()) end)
   return H.seqStep(steps)
+end
+-- the Safety Bit on, and off out of the tower (TOWER_GUARD, above)
+local bitOn = nil
+local function safetyBitOn()
+  return lazy(function()
+    if not guard or H.invCountOf(SAFETY_BIT) < 1 then return H.call(function() end) end
+    for _, ch in ipairs({ CELES, STRAGO, TERRA, RELM }) do
+      local r4, r5 = H.readByte(c(ch, 0x23)), H.readByte(c(ch, 0x24))
+      if not deathGuard(r4) and not deathGuard(r5)
+         and (r4 == GENJI_GLOVE or r4 == ATLAS_ARMLET or r4 == HERO_RING or r4 == 0xFF) then
+        bitOn = { ch = ch, old = r4 }
+        return H.equipKit(ch, { { 4, SAFETY_BIT } }, { tag = string.format("char %d: the Safety Bit (X-Zone)", ch) })
+      end
+    end
+    return H.logStep("[wor] the Safety Bit stays in the bag: every member guards Death or wears a relic it needs")
+  end)
+end
+local function safetyBitOff()
+  return lazy(function()
+    if bitOn == nil or H.readByte(c(bitOn.ch, 0x23)) ~= SAFETY_BIT or bitOn.old == 0xFF then return H.call(function() end) end
+    return H.equipKit(bitOn.ch, { { 4, bitOn.old } }, { tag = string.format("char %d: the Safety Bit off", bitOn.ch) })
+  end)
 end
 -- the climb's spend (route-wor-thamasa.md 10.1: the randoms are fought, the
 -- MP drain answered with supplies), logged floor by floor
@@ -965,6 +1018,7 @@ H.run({ maxFrames = 1500000 }, {
   sideRoom(MAP_F1, MAP_SAFETY, 0x0B4, SAFETY_BIT, "Safety Bit (365 (7,6))", {
     examineUp(8, 6, function() return sw(0x02DC) == 1 end, "365's switch (8,6): face up, A"),
   }),
+  safetyBitOn(),
   door(10, 13, MAP_ANCHOR, "the first floor -> the Air Anchor's room (370)"),
   chestAt(7, 6, 0x0B9, "Air Anchor (370 (7,6))", AIR_ANCHOR),
   door(7, 13, MAP_F1, "the Air Anchor's room -> the first floor (363 (10,14))"),
@@ -1157,10 +1211,12 @@ H.run({ maxFrames = 1500000 }, {
   -- out of the tower the Wall Rings come off: Reflect turns the party's own Cure and Shell away from its
   -- wearers, and nothing past the tower is fought magic-only (#460; route-wor-gogo.md section 4: the Dirt
   -- Dragon's sweeps won 20 keys of 20 with them off)
+  safetyBitOff(),
   wallRingsOff("the World of Ruin"),
   H.call(function()
     for _, m in ipairs(PARTY) do
-      H.assertEq(H.readByte(c(m[1], 0x24)) ~= WALL_RING, true, m[2] .. " wears no Wall Ring out of the tower")
+      H.assertEq(H.readByte(c(m[1], 0x24)) ~= WALL_RING and H.readByte(c(m[1], 0x23)) ~= WALL_RING, true,
+        m[2] .. " wears no Wall Ring out of the tower")
     end
   end),
   H.fieldCare({ threshold = 1.0, tag = "beside the Falcon" }),

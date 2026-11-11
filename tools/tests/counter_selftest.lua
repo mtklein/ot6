@@ -266,5 +266,27 @@ check("Phase ($0BC) answers a killing Fight with nothing (if_self_dead / end_if)
     return ids(dead) == "" and ids(alive) == "90"
   end)
 
+-- ---- Kefka's Tower's Evil Oscar (#521) ------------------------------------
+-- $0B7: `if_self_dead / end_if / if_cmd MAGIC / attack SPECIAL, NOTHING,
+-- NOTHING` (ai_script.asm _183); its Special, MonsterProp +$1F = $47, is
+-- Demon Kiss, Death (Driver:counterMagicPlan reads the two together)
+local MAGIC_CMD = 0x02
+local MONPROP = symbol("MonsterProp")
+assert(rom:byte(MONPROP + 0x0B7 * 32 + 0x1F + 1) == 0x47, "the Evil Oscar's Special in MonsterProp (+$1F): $47")
+check("$0B7 answers a spell it survives with its Special ($EF)",
+  "retalAnswer", "if c == 0x01 then holds = either(use.cmd, a, b)", "if c == 0x01 then holds = false",
+  function()
+    return ids(H.retalAnswer(scriptOf(0x0B7), { cmd = MAGIC_CMD, atk = 0x05, elem = 0x01, dies = false })) == "EF"
+  end)
+check("$0B7 answers a Fight, and a spell that kills it, with nothing",
+  "retalAnswer", "use.dies ~= nil then holds = use.dies", "use.dies ~= nil then holds = not use.dies",
+  function()
+    return ids(H.retalAnswer(scriptOf(0x0B7), { cmd = FIGHT, dies = false })) == ""
+      and ids(H.retalAnswer(scriptOf(0x0B7), { cmd = MAGIC_CMD, atk = 0x05, elem = 0x01, dies = true })) == ""
+  end)
+check("Demon Kiss ($47) is a Death Special",
+  "specialClass", "return ((b or 0) & 0x3F) == 0x07", "return ((b or 0) & 0x3F) == 0x08",
+  function() return H.specialClass(rom:byte(MONPROP + 0x0B7 * 32 + 0x1F + 1)) == "wound" end)
+
 print(string.format("counter_selftest: PASS -- %d assertions, each failed by its own mutant: %s",
   n, table.concat(checks, "; ")))
