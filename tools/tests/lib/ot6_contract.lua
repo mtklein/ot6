@@ -2868,8 +2868,16 @@ function M.contractDiffs(c)
       -- six equip slots ($1600+37*charId+$1F..$24: w/sh/he/ar/r1/r2).
       -- A table of charIds allows any of them (a weapon the route's
       -- kit ladders hand to whoever the draw left it with).
-      if have == 0 and it[4] then
-        for _, who in ipairs(type(it[4]) == "table" and it[4] or { it[4] }) do
+      -- An item the contract expects held counts on any member's equip slots too: the gear baseline every
+      -- save holds (#524) dresses the party from the bag, so a pickup the rule ranks is worn by whoever it
+      -- suits ("item $35 (Fire Rod ...) in inventory: expected 1, read 0" at fire-out-v1 on its first replay)
+      local wearers = it[4]
+      if it[2] == 1 then
+        wearers = {}
+        for ch = 0, 13 do wearers[#wearers + 1] = ch end
+      end
+      if have == 0 and wearers then
+        for _, who in ipairs(type(wearers) == "table" and wearers or { wearers }) do
           local base = 0x1600 + 37 * who
           for slot = 0x1F, 0x24 do
             if M.readByte(base + slot) == it[1] then have = 1; break end
