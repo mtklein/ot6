@@ -1444,15 +1444,14 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     swDump("start")
   end),
 
-  H.equipLoadout(2, {
-    { 1, HEAVY_SHLD },
-  }, { tag = "CYAN Phantom Train kit" }),
-  H.equipLoadout(5, {
-    { 1, BUCKLER }, { 4, STAR_PENDANT }, { 5, JEWEL_RING },
-  }, { tag = "SABIN Phantom Train kit" }),
-  H.equipLoadout(3, {
-    { 2, PLUMED_HAT },
-  }, { tag = "SHADOW Phantom Train kit" }),
+  -- the train's gear by the rule: the camp's save left the three at their gear
+  -- baseline (#524: the best of the bag by the gear and relic rules), and
+  -- what the bag gained since goes on by the same gear rule.  A fixed kit
+  -- (CYAN's Heavy Shld, SABIN's Buckler, Star Pendant and Jewel Ring, SHADOW's
+  -- Plumed Hat) stood here before; under the baseline it skipped the pieces
+  -- another member wore (the review of #524's first landing: the Jewel Ring on
+  -- SHADOW, SABIN's Black Belt kept), so the rule decides here too
+  H.gearDress({ tag = "the Phantom Train's gear" }),
 
 
 

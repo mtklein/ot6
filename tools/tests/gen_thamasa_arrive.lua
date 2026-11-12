@@ -477,6 +477,8 @@ local steps = {
   end),
 
   -- ---- 7. the world battery save -- checkpoint L --------------------------
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "thamasa-night-v1 save: gear baseline" }),
   H.call(function()
     H.assertExitContractPreSave("thamasa-night-v1")
   end),

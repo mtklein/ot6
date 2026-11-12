@@ -282,6 +282,7 @@ H.run({ maxFrames = 3000000 }, {
   H.fieldCare({ threshold = 1.0, tag = "party 1 after its training" }),
   ward(EDGAR, BARRIER_RING, "a Barrier Ring on EDGAR"),
   ward(SETZER, BARRIER_RING, "a Barrier Ring on SETZER"),
+  H.overlayOn("Barrier Rings"),
   ward(RELM, MEMENTO_RING, "the Memento Ring on RELM"),
   door(18, 20, 303, "party 1: 334 (18,20) -> 303 (14,14)"),
   door(21, 19, 304, "party 1: 303 (21,19) -> 304 (40,45)"),

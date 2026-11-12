@@ -360,6 +360,8 @@ H.run({ maxFrames = 260000 }, {
   end),
 
   -- ---- 7. the world battery save at the crash site, boundary I ------------
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "vector-crash-v1 save: gear baseline" }),
   H.call(function()
     H.assertExitContractPreSave("vector-crash-v1")
     H.assertEq(H.chestOpen(125), true, "Genji Glove bit 125 open (384 (47,11))")

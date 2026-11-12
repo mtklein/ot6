@@ -563,6 +563,8 @@ local steps = {
   end),
 
   -- ---- 11. the world battery save -- boundary K -----------------------------
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "crescent-landing-v1 save: gear baseline" }),
   H.call(function()
     H.assertExitContractPreSave("crescent-landing-v1")
   end),

@@ -183,6 +183,8 @@ H.run({ maxFrames = 2400000 }, {
     end)
     return H.seqStep(steps)
   end),
+  -- an area overlay (#524): off at the save's gear baseline, back on for Doma after it (gen_wor_doma)
+  H.overlayOn("Wall Rings", "the dream's Barb-e groups: their Imp and other spells rebound"),
   H.call(function() H.log("[kit] " .. kitLine(DREAM)) end),
   H.fieldCare({ threshold = 1.0, tag = "before Doma" }),
   liftOff(),
@@ -198,6 +200,10 @@ H.run({ maxFrames = 2400000 }, {
   -- (42,7) -> (4,13); the bed's trigger (4,12) is entered facing up (_cb827d: $01B0)
   walkInto(28, 31, MAP_KING, "285 (28,31) -> 123"),
   walk(4, 13, "below the King's room's bed (4,13)"),
+  -- the dream takes CYAN out of every party until Doma's end, so a Ribbon on him would wait aboard through the
+  -- save (#524: wor-dream-v1 read "CYAN, waiting aboard in no party, wears the Ribbon"): off him, and onto the three
+  H.ribbonsOffLeavers({ CELES, RELM, TERRA }, { noNote = true, tag = "CYAN's Ribbon off before the dream" }),
+  H.ribbonsOnSeated({ only = { CELES, RELM, TERRA }, noRegroup = true, tag = "CYAN's Ribbon onto the three" }),
   H.fieldCare({ threshold = 1.0, tag = "before the bed" }),
   H.driveUntil(function() return H.dialogWaiting() end, 600, { H.hold({ "up" }) }, "up onto the bed (4,12)"),
   H.release(),

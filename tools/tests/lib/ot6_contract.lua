@@ -2868,8 +2868,21 @@ function M.contractDiffs(c)
       -- six equip slots ($1600+37*charId+$1F..$24: w/sh/he/ar/r1/r2).
       -- A table of charIds allows any of them (a weapon the route's
       -- kit ladders hand to whoever the draw left it with).
-      if have == 0 and it[4] then
-        for _, who in ipairs(type(it[4]) == "table" and it[4] or { it[4] }) do
+      -- With no wearer named, an item the contract expects held counts on the equip slots of any member who
+      -- has joined (event switch $02F0 + c, the party menu's roster): the gear baseline every save holds (#524)
+      -- dresses the party from the bag, so a pickup the rule ranks is worn by whoever it suits ("item $35 (Fire
+      -- Rod ...) in inventory: expected 1, read 0" at fire-out-v1 on its first replay).  A named wearer (it[4])
+      -- stays the only one that counts.
+      local wearers = it[4]
+      if wearers == nil and it[2] == 1 then
+        wearers = {}
+        for ch = 0, 13 do
+          local sw = 0x02F0 + ch
+          if (M.readByte(0x1E80 + (sw >> 3)) >> (sw & 7)) & 1 == 1 then wearers[#wearers + 1] = ch end
+        end
+      end
+      if have == 0 and wearers then
+        for _, who in ipairs(type(wearers) == "table" and wearers or { wearers }) do
           local base = 0x1600 + 37 * who
           for slot = 0x1F, 0x24 do
             if M.readByte(base + slot) == it[1] then have = 1; break end
@@ -3127,10 +3140,13 @@ end
 -- contract walks onto its save point first; a world contract saves where
 -- the leg stands, which must be its tile), check the battery holds that
 -- save, and assert the whole contract as the exit.
-function M.saveAtCheckpoint(key)
+function M.saveAtCheckpoint(key, opts)
+  opts = opts or {}
   local c = lookup(key)
   local slot = c.slot or 3
-  local steps = {}
+  -- the gear baseline (#524) before the save point: on its tile the SavePoint script re-fires (and the first
+  -- save point's tutorial runs), so the dress is made beside it and the save asserts it
+  local steps = { M.gearBaseline({ tag = key .. " save: gear baseline", threats = opts.threats, absorbs = opts.absorbs }) }
   if c.field then
     steps[#steps + 1] = M.stepOntoSavePoint(c.field.x, c.field.y)
   else
@@ -3142,7 +3158,8 @@ function M.saveAtCheckpoint(key)
         M.worldY()))
     end)
   end
-  steps[#steps + 1] = M.saveGame({ slot = slot, tag = key .. " save" })
+  steps[#steps + 1] = M.saveGame({ slot = slot, tag = key .. " save", baseline = "assert", threats = opts.threats,
+    absorbs = opts.absorbs })
   steps[#steps + 1] = M.call(function()
     if c.field then
       M.assertSavedSlot(c.field.map, c.field.x, c.field.y, key, slot)

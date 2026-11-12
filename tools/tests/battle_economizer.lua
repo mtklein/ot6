@@ -8,8 +8,8 @@
 -- pending point on top of that 1, so a boosted Drain cost 3, 6 or 16.  The Economizer now answers first:
 -- 1 MP whatever the boost (ot6_boost.asm, Ot6MagicPrice).
 --
--- Played: Continue wor-colosseum-v1 (TERRA wears the Colosseum's Economizer, route-wor-colosseum.md section
--- 5), pace on the plain by Maranda's Falcon into a random battle, and cast through the real menu (H.kitBattle;
+-- Played: Continue wor-colosseum-v1 (the Colosseum's Economizer, route-wor-colosseum.md section 5, put on TERRA
+-- through the Relic menu when the save seated it elsewhere), pace on the plain by Maranda's Falcon into a random battle, and cast through the real menu (H.kitBattle;
 -- Defends bank the points, everyone else Defends):
 --   1. Drain ($04, in no fold family: a multiplied cast) at 1 BP     -> 1 MP (main: 3)
 --   2. Drain at 3 BP                                                 -> 1 MP (main: 16)
@@ -99,6 +99,31 @@ end
 
 H.run({ maxFrames = 600000 }, {
   H.bootCheckpoint("wor-colosseum-v1"),
+  -- TERRA wears the Economizer: staged here through the Relic menu when the save's gear baseline seated it on
+  -- someone else (#524: it goes to whoever spent the most MP in the play before the save, so its wearer is the
+  -- play's, not this suite's precondition)
+  H.lazy(function()
+    local function rec(ch, s) return H.readByte(0x1600 + 37 * ch + 0x1F + s) end
+    if rec(TERRA, 4) == ECONOMIZER or rec(TERRA, 5) == ECONOMIZER then return H.logStep("[econ] TERRA wears it") end
+    local steps = {}
+    for ch = 0, 13 do
+      for s = 4, 5 do
+        if ch ~= TERRA and rec(ch, s) == ECONOMIZER and (H.readByte(0x1850 + ch) & 7) == 1 then
+          local label = "the Economizer off " .. H.SPLIT_NAMES[ch] .. " for TERRA"
+          steps[#steps + 1] = H.keepGear(ch, label, H.unequipRelics(ch, { s }, { tag = label }))
+        end
+      end
+    end
+    local slot = nil
+    for _, s in ipairs({ 5, 4 }) do
+      local cl = rec(TERRA, s) ~= 0xFF and H.relicClass(rec(TERRA, s)) or nil
+      if slot == nil and not H.gearIsPrize(rec(TERRA, s)) and not (cl and cl.hands) then slot = s end
+    end
+    H.assertEq(slot ~= nil, true, "TERRA has a relic slot free of a prize and a two-weapon relic for the Economizer")
+    steps[#steps + 1] = H.keepGear(TERRA, "the Economizer on TERRA",
+      H.equipKit(TERRA, { { slot, ECONOMIZER } }, { tag = "the Economizer on TERRA" }))
+    return H.seqStep(steps)
+  end),
   H.call(function()
     arm()
     H.assertEq(H.readByte(0x1850 + TERRA) & 7, 1, "TERRA is seated")

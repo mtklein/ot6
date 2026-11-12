@@ -737,6 +737,20 @@ local steps = {
   end, 900, "fade-in", 10),
   H.waitFrames(60),
   H.call(function() H.assertEntryContract("terra-returned-v1") end),
+  -- the injection needs a SETZER Sleep can take: a relic guarding Sleep (ItemProp +7 bit 7) comes off through
+  -- the Relic menu first.  The save's gear baseline (#524) dresses him from the bag, and its relic rule put a
+  -- Sleep guard on him ("precondition: Sleep can be set on SETZER ($331c allows it): got false")
+  H.lazy(function()
+    local ip = H.sym("ItemProp") & 0x3FFFFF
+    local slots = {}
+    for s = 4, 5 do
+      local id = H.readByte(0x1600 + 37 * SETZER + 0x1F + s)
+      if id ~= 0xFF and (H.readRomByte(ip + id * 30 + 7) & 0x80) ~= 0 then slots[#slots + 1] = s end
+    end
+    if #slots == 0 then return H.logStep("[cancel] SETZER wears no Sleep guard") end
+    local label = "SETZER's Sleep guard off"
+    return H.keepGear(SETZER, label, H.unequipRelics(SETZER, slots, { tag = label }))
+  end),
   (function()
     local ph2 = 0
     return H.driveUntil(function()

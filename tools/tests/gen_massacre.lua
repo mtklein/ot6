@@ -302,6 +302,8 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
 
   -- ---- 6. full-heal, then the real world Save UI, slot 3 ----------------
   H.fieldCare({ tag = "full-heal before the thamasa-done save", threshold = 1.0 }),
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "thamasa-done-v1 save: gear baseline" }),
   H.call(function()
     H.assertExitContractPreSave("thamasa-done-v1")
     H.assertPartyStanding("thamasa-done-v1 exit")

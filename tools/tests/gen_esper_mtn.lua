@@ -165,6 +165,8 @@ H.run({ maxFrames = 500000 }, {
   H.fieldCare({ tag = "care before the esper-mtn save", threshold = 1.0 }),
   tapToSave(8, 44, 9000, "tap onto the Esper Mountain save point 375 (8,44)"),
   H.waitFrames(45),
+  -- every save holds the party at its gear baseline (#524, H.gearBaseline)
+  H.gearBaseline({ tag = "esper-mtn-save-v1 save: gear baseline" }),
   H.call(function()
     H.assertEq(map(), 375, "on the Esper Mountain exterior (map 375)")
     H.assertEq(sw(0x01BF), 1, "$01BF SET -- the SavePoint script ran")

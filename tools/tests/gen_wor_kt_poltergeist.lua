@@ -145,6 +145,7 @@ H.run({ maxFrames = 3000000 }, {
   H.fieldCare({ threshold = 1.0, tag = "before dressing for the Poltergeist" }),
   H.elementDress(FIRE_ELEMENT, { tag = "dress against the Poltergeist's fire" }),
   wallRings("Wall Rings for the Poltergeist"),
+  H.overlayOn("Wall Rings", "the Poltergeist (route-wor-kefka-tower.md)"),
   -- a key for the break (section 6.2): the statue keys the blow and the cards, and in party 2 only LOCKE's Wing Edge
   -- holds one, so STRAGO trades his Imp Halberd (pierce) for the strongest bludgeon in the bag: the Pearl Rod, the
   -- Gravity Rod, the Punisher, the Morning Star.  Asserted: one of them goes on (the bag's rods are the factory's
@@ -181,6 +182,9 @@ H.run({ maxFrames = 3000000 }, {
     local label = "the 334 Ribbon off " .. NAMES[handed] .. " for party 1"
     return H.keepGear(handed, label, H.unequipRelics(handed, { slot }, { tag = label }))
   end),
+  -- held in the bag through the save's gear baseline (#524), which otherwise puts a Ribbon in the bag back on the
+  -- seated party: the split tower hands it to party 1 this way
+  H.reservePrize(RIBBON, 1, "party 1's, handed on through the bag (gen_wor_kt_goddess puts it on)"),
   H.call(function()
     H.assertEq(H.invCountOf(RIBBON) >= 1, true, "a Ribbon in the bag for party 1")
     say("tower", string.format("the 334 Ribbon off %s into the bag for party 1", NAMES[handed]))

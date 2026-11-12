@@ -70,6 +70,10 @@ end
 H.run({ maxFrames = 1800000 }, {
   H.bootCheckpoint("wor-dream-v1"),
   watches(),
+  -- the Wall Rings gen_wor_dream measured for the dream and Doma (the Barb-e groups' Imp and other spells
+  -- rebound), back on after the save's gear baseline took them off (#524); off again at this leg's save
+  H.wallRingsOn({ CELES, RELM, TERRA }, { tag = "Wall Rings for Doma",
+    why = "the dream's Doma: the Barb-e groups' Imp and other spells rebound (gen_wor_dream)" }),
   H.call(function()
     say("story", "boot")
     H.log("[kit] " .. kitLine({ CELES, RELM, TERRA }))

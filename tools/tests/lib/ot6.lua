@@ -499,6 +499,7 @@ function M.requestLoadState(blob)
   if M.traceOnLoad then M.traceOnLoad(M.loadedFrame == nil) end
   M.loadedFrame = M.frame
   if M.forgetBattleEnd then M.forgetBattleEnd() end
+  M.mpSpent = {}                     -- (the Economizer's proxy: this timeline's casts, #524)
   local req = {}
   local ref
   M.pendingStateReqs = M.pendingStateReqs + 1
@@ -6603,6 +6604,13 @@ local EXEC_CMD_NAME = {
 -- tools/audit_boost.py off the `[fizzle]` lines, and by a lab off either.
 M.fizzles = { n = 0, bp = 0, rows = {}, by = {}, order = {} }
 local execCost = {}                   -- $3A4C and the pool, parked at ExecCmd
+-- The MP each character's spells cost this run (#524: the Economizer goes on whoever will spend the most MP, and
+-- the MP spent in recent play is the checkable proxy, M.gearMpOrder): char id -> the MagicProp price of every
+-- Magic, X-Magic or Lore the pool paid for (SaveForMimic saw it drop).  The list price, not the charge: the
+-- Economizer's wearer pays 1 a cast, and counting the charge would move the relic off the member it helps most.
+-- A restored snapshot or a retry starts it again (the old timeline's casts are not this one's).
+M.mpSpent = {}
+M.MP_SPEND_CMDS = { [0x02] = true, [0x0C] = true, [0x17] = true }
 -- p.rev is the boost pending when ExecCmd began (what the player asked for);
 -- spent is what is still pending when the action's body is over, at
 -- SaveForMimic, which is what Ot6ActionEnd goes on to charge.  A refusal
@@ -6734,6 +6742,10 @@ local function execActivate()
       execCost[x] = nil
       if p ~= nil then
         local mp = M.readWord(0x3C08 + x)
+        if M.MP_SPEND_CMDS[p.cmd] and mp < p.mp and M.spellMpCost then
+          local char = M.readByte(0x3ED8 + x)
+          M.mpSpent[char] = (M.mpSpent[char] or 0) + M.spellMpCost(p.atk)
+        end
         if p.cost > 0 and p.cost > p.mp and mp == p.mp then
           -- an X-Magic's first spell with its second still to come keeps
           -- the pending boost for the second (Ot6FizzleDropBoost): none of
@@ -21877,6 +21889,7 @@ local function resetLibState()
   execParty, execSkipped = nil, {}
   execCost = {}
   execHooks = false
+  M.mpSpent = {}
   -- M.fizzles is NOT reset: a costed action the pool could not pay is a
   -- finding whichever attempt made it, and the retry sweep's whole point
   -- is that a lost attempt still happened (#230).
