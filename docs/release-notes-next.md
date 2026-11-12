@@ -11,6 +11,7 @@ rather than to characters waiting aboard, and gear worn only for one area, such
 as Wall Rings, is taken off before each save.
 
 Edgar now joins the dinosaur forest grind in Celes's place, so he reaches
-Kefka's Tower near the rest of the party instead of far behind it. The tower
-asks for less training on its first floor as a result, and the party levels
-in the included saves from the forest onward have shifted.
+Kefka's Tower near the rest of the party instead of far behind it, and Celes
+and Setzer arrive there a few levels lower than before. The tower's early
+training stretch is shorter as a result. Party levels throughout the second
+half of the game's included saves have shifted by a level or two.
