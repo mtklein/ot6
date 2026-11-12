@@ -220,12 +220,21 @@ H.run({ maxFrames = 120000 }, {
       if rec(m.ch, 0x23) == ECONOMIZER or rec(m.ch, 0x24) == ECONOMIZER then wearer = m end
     end
     H.assertEq(wearer ~= nil, true, "7: a seated member wears the Economizer after the dress")
-    -- the spender: a seated member with a spell, not the wearer, the smallest MP pool (the old rule's last pick)
+    -- the spender: a seated member, not the wearer and not the old rule's pick (the largest pool among members with
+    -- a learned spell), the smallest MP pool.  A granted spell counts as a cast (the stones grant spells while worn:
+    -- wor_dino's EDGAR paid 765 MP for his), so the spender need not have learned one; with EDGAR seated the only
+    -- learner is TERRA, the old rule's pick, and a learner-only spender was TERRA too, so the mutant matched the rule
+    local oldPick = nil
     for _, m in ipairs(members()) do
-      if m.ch ~= wearer.ch and m.ch <= 11 and H.gearSpellsLearned(m.ch) > 0
+      if m.ch <= 11 and H.gearSpellsLearned(m.ch) > 0
+         and (oldPick == nil or H.charMaxMp(m.ch) > H.charMaxMp(oldPick.ch)) then oldPick = m end
+    end
+    for _, m in ipairs(members()) do
+      if m.ch ~= wearer.ch and m.ch <= 11 and (oldPick == nil or m.ch ~= oldPick.ch) and H.charMaxMp(m.ch) > 0
          and (spender == nil or H.charMaxMp(m.ch) < H.charMaxMp(spender.ch)) then spender = m end
     end
-    H.assertEq(spender ~= nil, true, "precondition: a seated caster other than the Economizer's wearer")
+    H.assertEq(spender ~= nil, true, "precondition: a seated member other than the Economizer's wearer and the old "
+      .. "rule's pick")
     H.log(string.format("[gbtest] 7: wearer %s (MP %d), spender %s (MP %d)", wearer.name, H.charMaxMp(wearer.ch),
       spender.name, H.charMaxMp(spender.ch)))
     -- recent play: the spender cast 3 x 20 MP of spells, the wearer one 5 MP spell (the observers' tally, set as
