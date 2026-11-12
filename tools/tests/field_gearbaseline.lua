@@ -15,8 +15,11 @@
 --   5. a member below the bag's best: a worse armor or helmet from the bag put on: red; the dress, green;
 --   6. the healer rule's mutant (H.gearHealer naming nobody): the dress under it puts the first Ribbon elsewhere,
 --      and the real rule's assert goes red; the dress under the real rule, green;
---   7. the Economizer rule's mutant (H.gearMpOrder reversed): the dress under it moves the Economizer to the
---      smallest MP pool, and the real rule's assert goes red; the dress, green;
+--   7. the Economizer by expected MP spent (owner, 2026-11-11): a history (H.mpSpent, the run's tally of spells
+--      cast, set as the battle observers would leave it) naming a caster with a small pool: red, the rule names
+--      him; the old largest-pool rule's dress (the mutant) stays red; the dress, green, the relic on him; the history
+--      gone, the wearer keeps it, green; the relic off into the bag, the rule names the main caster (the highest
+--      magic with a spell), red; the dress, green;
 --   8. the Exp. Egg, a prize (#524 review): on the seated member furthest behind on levels after the dress; taken off
 --      into the bag, red; the dress, green; and on a member waiting aboard (the reader, as 4), red;
 --   9. a prize's slot (H.gearPrizeSlotKey): a Ribbon or the Economizer never takes a slot where the Egg stays, nor a
@@ -180,21 +183,85 @@ H.run({ maxFrames = 120000 }, {
   red("6: the healer mutant's dress, read by the real rule", "the rule puts the Ribbon $CA on"),
   H.gearBaseline({ tag = "6: the dress under the real rule" }),
   green("6: the real rule"),
-  -- 7. the Economizer rule's mutant
+  -- 7. the Economizer: by MP spent this run, else its wearer, else the main caster
+  H.call(function()
+    -- the fixture's history is empty (the load starts it again); its wearer keeps the relic
+    H.assertEq(next(H.mpSpent) == nil, true, "7: no casts this run after the load")
+    local wearer, spender = nil, nil
+    for _, m in ipairs(members()) do
+      if rec(m.ch, 0x23) == ECONOMIZER or rec(m.ch, 0x24) == ECONOMIZER then wearer = m end
+    end
+    H.assertEq(wearer ~= nil, true, "7: a seated member wears the Economizer after the dress")
+    -- the spender: a seated member with a spell, not the wearer, the smallest MP pool (the old rule's last pick)
+    for _, m in ipairs(members()) do
+      if m.ch ~= wearer.ch and m.ch <= 11 and H.gearSpellsLearned(m.ch) > 0
+         and (spender == nil or H.charMaxMp(m.ch) < H.charMaxMp(spender.ch)) then spender = m end
+    end
+    H.assertEq(spender ~= nil, true, "precondition: a seated caster other than the Economizer's wearer")
+    H.log(string.format("[gbtest] 7: wearer %s (MP %d), spender %s (MP %d)", wearer.name, H.charMaxMp(wearer.ch),
+      spender.name, H.charMaxMp(spender.ch)))
+    -- recent play: the spender cast 3 x 20 MP of spells, the wearer one 5 MP spell (the observers' tally, set as
+    -- the battle hooks would have left it)
+    H.mpSpent = { [H.charActor(spender.ch)] = 60, [H.charActor(wearer.ch)] = 5 }
+    H.vars.econ = { wearer = wearer, spender = spender }
+  end),
+  H.lazy(function()
+    return red("7: the spender's history", "the rule puts the Economizer $CE on " .. H.vars.econ.spender.name .. "'s")
+  end),
+  -- the mutant: the old rule, the largest MP pool; its dress leaves the relic off the spender
   H.call(function()
     H.realMp = H.gearMpOrder
-    H.gearMpOrder = function(m)
-      local o = H.realMp(m)
-      local r = {}
-      for i = #o, 1, -1 do r[#r + 1] = o[i] end
-      return r
+    H.gearMpOrder = function(ms2)
+      local o = {}
+      for _, m in ipairs(ms2) do o[#o + 1] = m end
+      table.sort(o, function(a, b)
+        local ka = H.gearSpellsLearned(a.ch) > 0 and H.charMaxMp(a.ch) or -1
+        local kb = H.gearSpellsLearned(b.ch) > 0 and H.charMaxMp(b.ch) or -1
+        if ka ~= kb then return ka > kb end
+        return a.order < b.order
+      end)
+      return o
     end
   end),
-  H.gearBaseline({ tag = "7: the dress under the Economizer mutant" }),
+  H.gearBaseline({ tag = "7: the dress under the largest-pool mutant" }),
   H.call(function() H.gearMpOrder = H.realMp end),
-  red("7: the Economizer mutant's dress, read by the real rule", "the rule puts the Economizer $CE"),
+  H.lazy(function()
+    return red("7: the mutant's dress, read by the real rule",
+      "the rule puts the Economizer $CE on " .. H.vars.econ.spender.name .. "'s")
+  end),
   H.gearBaseline({ tag = "7: the dress under the real rule" }),
   green("7: the real rule"),
+  H.call(function()
+    local sp = H.vars.econ.spender
+    H.assertEq(rec(sp.ch, 0x23) == ECONOMIZER or rec(sp.ch, 0x24) == ECONOMIZER, true,
+      "7: the Economizer is on the spender " .. sp.name)
+    -- the history gone (a new leg's boot): the wearer keeps it
+    H.mpSpent = {}
+  end),
+  green("7: no history, the wearer kept"),
+  -- and no wearer: off into the bag, the main caster takes it (a member with a spell, the highest magic)
+  H.lazy(function()
+    local sp = H.vars.econ.spender
+    local slot = rec(sp.ch, 0x23) == ECONOMIZER and 4 or 5
+    local label = "7: the Economizer off " .. sp.name
+    return H.keepGear(sp.ch, label, H.unequipRelics(sp.ch, { slot }, { tag = label }))
+  end),
+  H.lazy(function()
+    local main = nil
+    for _, m in ipairs(members()) do
+      if H.gearSpellsLearned(m.ch) > 0 and (main == nil or rec(m.ch, 0x1D) > rec(main.ch, 0x1D)) then main = m end
+    end
+    H.vars.econ.main = main
+    H.log(string.format("[gbtest] 7: the main caster %s (magic %d)", main.name, rec(main.ch, 0x1D)))
+    return red("7: the Economizer in the bag", "the rule puts the Economizer $CE on " .. main.name .. "'s")
+  end),
+  H.gearBaseline({ tag = "7: the dress, no history" }),
+  green("7: the main caster"),
+  H.call(function()
+    local mc = H.vars.econ.main
+    H.assertEq(rec(mc.ch, 0x23) == ECONOMIZER or rec(mc.ch, 0x24) == ECONOMIZER, true,
+      "7: the Economizer is on the main caster " .. mc.name)
+  end),
   -- 8. the Exp. Egg
   H.call(function()
     local pp = H.gearPrizePlan(members())

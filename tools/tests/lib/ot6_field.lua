@@ -9969,7 +9969,7 @@ end
 --      measured reason may override (owner, 2026-11-11).  Further Ribbons go to whoever status hurts most
 --      (M.gearStatusOrder: the larger of vigor and magic, since Muddle turns a member's own verb on the party and
 --      Mute and Imp take a caster's Magic; then spells learned).  The Economizer goes on the heaviest MP spender
---      (M.gearMpOrder: a member with a spell, the largest MP pool, then magic), the Exp. Egg on the member
+--      (M.gearMpOrder: the most MP of spells cast this run, else its wearer, else the main caster), the Exp. Egg on the member
 --      furthest behind on levels (M.gearEggOrder, relicPlan step 3b's rule).  A prize takes the slot that holds
 --      it already, else an empty one, else the slot whose relic ranks lowest, never a two-weapon relic or another
 --      prize that stays (M.gearPrizeSlotKey).  A member leaving at a regroup takes every prize off
@@ -10000,8 +10000,8 @@ M.GEAR_OVERLAYS = {
   ["Wall Rings"] = { items = { 0xBB }, where = "gen_wor_dream (the dream's Barb-e groups), gen_wor_ancient, "
     .. "gen_wor_tower (the Fanatics' Tower), gen_wor_kt_poltergeist",
     why = "Reflect on the party where the enemies cast what Reflect turns back" },
-  ["Safety Bit"] = { items = { 0xDC }, where = "gen_wor_tower",
-    why = "the L.20 Magic's X-Zone and the L.50's Doom (#521's Death guards)" },
+  ["Safety Bit"] = { items = { 0xDC }, where = "gen_wor_tower, gen_wor_kt_factory (party 3's death guards)",
+    why = "the L.20 Magic's X-Zone and the L.50's Doom (#521's Death guards); L.5 Doom in Kefka's Tower's factory" },
   ["Barrier Rings"] = { items = { 0xB7 }, where = "gen_wor_kt_guardian",
     why = "Shell near death on the Guardian's lane (route-wor-kefka-tower)" },
   ["element dress"] = { items = {}, gear = true, where = "M.elementDress (Kefka's Tower's Doom, Poltergeist, "
@@ -10149,12 +10149,27 @@ function M.gearStatusOrder(ms)
     return { math.max(charByte(m.ch, 0x1A), charByte(m.ch, 0x1D)), spellsLearned(m.ch), wearsPrize(m, RIBBON_ID) and 1 or 0 }
   end)
 end
--- the heaviest MP spender first: a member with a spell, the largest MP pool, then magic
+-- the heaviest MP spender first (owner, 2026-11-11: the Economizer makes every spell cost 1 MP, so it belongs on
+-- whoever will spend the most -- casts most often and most expensively; a small pool may gain most -- not on the
+-- largest pool).  Expected MP spent is read from recent play: the list price of the spells each member's pool
+-- paid for this run (M.mpSpent, the ExecCmd/SaveForMimic observers: the price, not the charge, so the wearer's
+-- own 1-MP casts count at full).  A run with no casts by a seated member (a leg booted from a save that has not
+-- fought yet) keeps the relic on the seated member who wears it, the choice the last measured play made; and
+-- with no wearer either (the relic just won, or its wearer gone at a regroup) it goes to the party's main
+-- caster: a member with a spell, the highest magic, then spells learned.
+M.gearSpellsLearned = spellsLearned
+function M.gearMpSpent(ch) return (M.mpSpent or {})[M.charActor(ch)] or 0 end
 function M.gearMpOrder(ms)
   return M.gearSorted(ms, function(m)
     local sp = spellsLearned(m.ch)
-    return { sp > 0 and 1 or 0, sp > 0 and M.charMaxMp(m.ch) or 0, charByte(m.ch, 0x1D), wearsPrize(m, 0xCE) and 1 or 0 }
+    return { M.gearMpSpent(m.ch), wearsPrize(m, 0xCE) and 1 or 0, sp > 0 and 1 or 0, charByte(m.ch, 0x1D), sp }
   end)
+end
+function M.gearMpWhy(m)
+  local n = M.gearMpSpent(m.ch)
+  if n > 0 then return string.format("the heaviest MP spender: %d MP of spells cast this run", n) end
+  if wearsPrize(m, 0xCE) then return "the heaviest MP spender: no casts this run, the wearer kept" end
+  return "the heaviest MP spender: no casts this run, the main caster (magic, spells)"
 end
 -- the Exp. Egg's wearer first: the member furthest behind on levels (relicPlan step 3b's rule)
 function M.gearEggOrder(ms)
@@ -10196,7 +10211,7 @@ local function prizePlanWith(ms, stays)
     elseif id == 0xE4 then
       for _, m in ipairs(M.gearEggOrder(ms)) do order[#order + 1] = m; roles[m] = "furthest behind on levels" end
     else
-      for _, m in ipairs(M.gearMpOrder(ms)) do order[#order + 1] = m; roles[m] = "the heaviest MP spender: MP pool" end
+      for _, m in ipairs(M.gearMpOrder(ms)) do order[#order + 1] = m; roles[m] = M.gearMpWhy(m) end
     end
     local placed = 0
     for _, m in ipairs(order) do

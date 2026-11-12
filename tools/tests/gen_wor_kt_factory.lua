@@ -136,6 +136,123 @@ local function ribbonsSpread(depth)
     })
   end)
 end
+-- The Exp. Egg across the split (#524 review item 7): the three parties are all seated, so the Egg goes to the member
+-- furthest behind on levels among all twelve (relicPlan step 3b's rule, the gear baseline's first layer), not to the
+-- furthest behind in whichever party its last wearer lands in.  The gear baseline's first replay left it on SABIN
+-- (party 3, L40) while SETZER (party 1, L32) trained by party 1's landing without it: SETZER met the Guardian's
+-- lane at L47 where v0.41's line, whose Egg rode with him, had him at L54 ("SETZER L32 1698/1698 ... Exp. Egg" at
+-- v0.41's wor_kt_factory; wor_kt_guardian's end "SETZER L54" against "L47"), and the Goddess felled him three times
+-- in the replay's wipe.  So before the parties dress, the Egg comes off a wearer in another party than the split's
+-- furthest behind (that party walks for its Relic session), and only that member's party may put it on
+-- (dressParty's exclude for the others).
+local EGG = 0xE4
+local eggParty = nil
+local function eggToTheSplit()
+  return H.lazy(function()
+    local low, wearer = nil, nil
+    for p = 1, 3 do
+      for _, ch in ipairs(H.partyRoster(p)) do
+        local lv = H.readByte(0x1600 + 37 * ch + 8)
+        if H.charActor(ch) <= 13 and (low == nil or lv < low.lv) then low = { ch = ch, p = p, lv = lv } end
+        for s = 4, 5 do
+          if H.readByte(0x1600 + 37 * ch + 0x1F + s) == EGG then wearer = { ch = ch, p = p, slot = s } end
+        end
+      end
+    end
+    H.assertEq(low ~= nil, true, "the split seats a member")
+    eggParty = low.p
+    local owned = H.invCountOf(EGG) + (wearer and 1 or 0)
+    H.log(string.format("[egg] the split's furthest behind: %s (party %d, L%d); the Egg %s", NAMES[low.ch], low.p,
+      low.lv, wearer and string.format("on %s (party %d)", NAMES[wearer.ch], wearer.p)
+        or (owned > 0 and "in the bag" or "not owned")))
+    if wearer == nil or wearer.p == low.p then return H.call(function() end) end
+    local label = string.format("the Egg off %s for party %d", NAMES[wearer.ch], low.p)
+    return H.seqStep({
+      H.switchParty(wearer.p, { tag = label }),
+      H.keepGear(wearer.ch, label, H.unequipRelics(wearer.ch, { wearer.slot }, { tag = label })),
+      H.call(function() H.assertEq(H.invCountOf(EGG) >= 1, true, label .. ": the Egg is in the bag") end),
+    })
+  end)
+end
+local function eggOnTheSplit()
+  return H.call(function()
+    local on = nil
+    for p = 1, 3 do
+      for _, ch in ipairs(H.partyRoster(p)) do
+        for s = 4, 5 do if H.readByte(0x1600 + 37 * ch + 0x1F + s) == EGG then on = { ch = ch, p = p } end end
+      end
+    end
+    if eggParty == nil or (on == nil and H.invCountOf(EGG) == 0) then return end
+    H.assertEq(on ~= nil and on.p == eggParty, true, string.format("the Exp. Egg is worn in party %d, the split's "
+      .. "furthest behind's (on %s)", eggParty, on and NAMES[on.ch] or "nobody"))
+    H.log(string.format("[egg] the Exp. Egg on %s (party %d)", NAMES[on.ch], on.p))
+  end)
+end
+-- L.5 Doom (the factory's and 339's Vectaur hordes, #524 review item 7): it kills a member whose level is a multiple of
+-- five and who wears no death guard (the Memento Ring $DB, the Safety Bit $DC).  The gear baseline's replay lost three
+-- of party 3 to it in the factory leg ("char 5 from 2552/2552 by slot 2 cmd $0C atk $94 (ONE ACTION ...)", SABIN L40,
+-- and GOGO L45 the same way), where v0.41's line lost one: its GOGO still wore the Fanatics' Tower's Safety Bit, which
+-- the baseline now takes off.  So party 3 walks with its death guards on the members at a multiple of five or one
+-- level short of one (a level the factory's battles can add), taken from the bag or from a member of party 3 at
+-- neither; the Safety Bit is the declared overlay, and the save's baseline returns the rest to the relic rule.
+local DEATH_GUARDS = { 0xDB, 0xDC }
+local function isGuard(id) return id == 0xDB or id == 0xDC end
+local function atRisk(ch)
+  local lv = H.readByte(0x1600 + 37 * ch + 8)
+  return lv % 5 == 0 or lv % 5 == 4
+end
+local function deathGuards(p)
+  return H.lazy(function()
+    local rec = function(ch, s) return H.readByte(0x1600 + 37 * ch + 0x1F + s) end
+    local function guarded(ch) return isGuard(rec(ch, 4)) or isGuard(rec(ch, 5)) end
+    local need, donors = {}, {}
+    for _, ch in ipairs(H.partyRoster(p)) do
+      if H.charActor(ch) <= 13 and not H.relicMenuRefuses(ch) then
+        if atRisk(ch) and not guarded(ch) then need[#need + 1] = ch end
+        if not atRisk(ch) then
+          for s = 4, 5 do if isGuard(rec(ch, s)) then donors[#donors + 1] = { ch = ch, slot = s, id = rec(ch, s) } end end
+        end
+      end
+    end
+    local bag = {}
+    for _, id in ipairs(DEATH_GUARDS) do for _ = 1, H.invCountOf(id) do bag[#bag + 1] = id end end
+    local lines = {}
+    for _, ch in ipairs(H.partyRoster(p)) do
+      lines[#lines + 1] = string.format("%s L%d%s", NAMES[ch], H.readByte(0x1600 + 37 * ch + 8),
+        guarded(ch) and " (guarded)" or "")
+    end
+    H.log(string.format("[deathguards] party %d: %s; at risk unguarded %d, guards in the bag %d, on members at no risk %d",
+      p, table.concat(lines, ", "), #need, #bag, #donors))
+    local steps, safety = {}, false
+    for _, ch in ipairs(need) do
+      local slot = nil
+      for _, s in ipairs({ 5, 4 }) do
+        local cur = rec(ch, s)
+        local cl = cur ~= 0xFF and H.relicClass(cur) or nil
+        if slot == nil and not H.gearIsPrize(cur) and not (cl and cl.hands) then slot = s end
+      end
+      local id = nil
+      if slot ~= nil and #bag > 0 then
+        id = table.remove(bag, 1)
+      elseif slot ~= nil and #donors > 0 then
+        local d = table.remove(donors, 1)
+        id = d.id
+        local label = string.format("the death guard $%02X off %s for %s", d.id, NAMES[d.ch], NAMES[ch])
+        steps[#steps + 1] = H.keepGear(d.ch, label, H.unequipRelics(d.ch, { d.slot }, { tag = label }))
+      end
+      if id ~= nil then
+        if id == 0xDC then safety = true end
+        local label = string.format("the death guard $%02X on %s (L.5 Doom)", id, NAMES[ch])
+        steps[#steps + 1] = H.keepGear(ch, label, H.equipKit(ch, { { slot, id } }, { tag = label }))
+      else
+        H.log(string.format("[deathguards] %s stays unguarded: %s", NAMES[ch],
+          slot == nil and "no slot free of a prize or a two-weapon relic" or "no guard left"))
+      end
+    end
+    if safety then steps[#steps + 1] = H.overlayOn("Safety Bit", "L.5 Doom in Kefka's Tower's factory (party 3)") end
+    return H.seqStep(steps)
+  end)
+end
 local function dressParty(p)
   local steps = { H.switchParty(p, { tag = "dress party " .. p }) }
   for i = 1, 4 do
@@ -153,7 +270,8 @@ local function dressParty(p)
   steps[#steps + 1] = H.lazy(function()
     local m = {}
     for _, ch in ipairs(H.partyRoster(p)) do m[#m + 1] = { ch, NAMES[ch] } end
-    return H.dressRelics(m, { tag = "relics, party " .. p })
+    return H.dressRelics(m, { tag = "relics, party " .. p,
+      exclude = (eggParty ~= nil and eggParty ~= p) and { [EGG] = true } or nil })
   end)
   steps[#steps + 1] = H.call(function() say("kit", "party " .. p .. " dressed") end)
   return H.seqStep(steps)
@@ -234,14 +352,17 @@ H.run({ maxFrames = 2400000 }, {
   -- one bag for three parties: party 3 walks first and furthest in this leg
   H.splitBegin({ shares = { [1] = 1, [2] = 1, [3] = 2 } }),
   ribbonsSpread(),
+  eggToTheSplit(),
   dressParty(1),
   dressParty(2),
   dressParty(3),
+  eggOnTheSplit(),
   H.saveState("wor_kt_split.mss"),
 
   -- ---- 2. party 3: the east ladder, 339 and the factory ----------------------------------------------------------
   -- @@stage factory
   H.switchParty(3),
+  deathGuards(3),
   chest(47, 40, 0x0DD, "Red Cap (334 (47,40))"),
   door(52, 47, MAP_339, "party 3: 334 (52,47) -> 339 (36,14)"),
   door(30, 12, MAP_FACTORY, "party 3: 339 (30,12) -> the factory, 410 (11,19)"),
