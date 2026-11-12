@@ -171,10 +171,15 @@ H.run({ maxFrames = 120000 }, {
   -- 6. the healer rule's mutant
   H.call(function()
     H.realHealer = H.gearHealer
-    -- the mutant's healer: the member status hurts least (the last the further Ribbons would reach)
+    -- the mutant's healer: a member the real plan gives no Ribbon (so the mutant's dress differs from the real one
+    -- whatever the fixture's count of Ribbons and members: wor_dino with EDGAR seated has three Ribbons on four, and
+    -- the member status hurts least was one of the real plan's wearers), the one status hurts least among them
+    local realPlan = H.gearPrizePlan(members())
+    local ribboned = {}
+    for _, t in ipairs(realPlan.targets) do if t.id == RIBBON then ribboned[t.m.ch] = true end end
     H.gearHealer = function(m)
       local real, o = H.realHealer(m), H.gearStatusOrder(m)
-      for i = #o, 1, -1 do if o[i] ~= real then return o[i] end end
+      for i = #o, 1, -1 do if o[i] ~= real and not ribboned[o[i].ch] then return o[i] end end
       return real
     end
   end),
