@@ -229,9 +229,16 @@ H.run({ maxFrames = 120000 }, {
       if m.ch <= 11 and H.gearSpellsLearned(m.ch) > 0
          and (oldPick == nil or H.charMaxMp(m.ch) > H.charMaxMp(oldPick.ch)) then oldPick = m end
     end
+    -- (and a relic slot the Economizer may take: not a two-weapon relic, not another prize that stays)
+    local function slotFor(ch)
+      for s = 4, 5 do
+        if H.gearPrizeSlotKey(rec(ch, 0x1F + s), ECONOMIZER, true) ~= nil then return true end
+      end
+      return false
+    end
     for _, m in ipairs(members()) do
       if m.ch ~= wearer.ch and m.ch <= 11 and (oldPick == nil or m.ch ~= oldPick.ch) and H.charMaxMp(m.ch) > 0
-         and (spender == nil or H.charMaxMp(m.ch) < H.charMaxMp(spender.ch)) then spender = m end
+         and slotFor(m.ch) and (spender == nil or H.charMaxMp(m.ch) < H.charMaxMp(spender.ch)) then spender = m end
     end
     H.assertEq(spender ~= nil, true, "precondition: a seated member other than the Economizer's wearer and the old "
       .. "rule's pick")
