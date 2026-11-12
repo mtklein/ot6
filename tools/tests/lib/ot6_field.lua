@@ -8305,6 +8305,7 @@ end
 local function wearsItem(ch, id)
   return (((itemProp(id, 1) | (itemProp(id, 2) << 8)) >> ch) & 1) == 1
 end
+M.wearsItem = wearsItem                         -- (ItemProp +1/+2: the character's bit; gen_wor_kt_factory's guards)
 
 -- members: { { charId, "NAME" }, ... }; those not in the active party are
 -- left out.  Returns { { ch=, name=, want={ [4]=id, [5]=id }, changes={

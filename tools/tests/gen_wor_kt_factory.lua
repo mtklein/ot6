@@ -231,14 +231,22 @@ local function deathGuards(p)
         local cl = cur ~= 0xFF and H.relicClass(cur) or nil
         if slot == nil and not H.gearIsPrize(cur) and not (cl and cl.hands) then slot = s end
       end
+      -- a guard the member can wear (the Memento Ring is RELM's and SHADOW's alone: "$DB is not in this character's
+      -- list (unequippable)" on SABIN, the first try)
       local id = nil
-      if slot ~= nil and #bag > 0 then
-        id = table.remove(bag, 1)
-      elseif slot ~= nil and #donors > 0 then
-        local d = table.remove(donors, 1)
-        id = d.id
-        local label = string.format("the death guard $%02X off %s for %s", d.id, NAMES[d.ch], NAMES[ch])
-        steps[#steps + 1] = H.keepGear(d.ch, label, H.unequipRelics(d.ch, { d.slot }, { tag = label }))
+      local function fits(g) return H.wearsItem(ch, g) end
+      for i, g in ipairs(bag) do
+        if id == nil and slot ~= nil and fits(g) then id = table.remove(bag, i) end
+      end
+      if id == nil and slot ~= nil then
+        for i, d in ipairs(donors) do
+          if id == nil and fits(d.id) then
+            table.remove(donors, i)
+            id = d.id
+            local label = string.format("the death guard $%02X off %s for %s", d.id, NAMES[d.ch], NAMES[ch])
+            steps[#steps + 1] = H.keepGear(d.ch, label, H.unequipRelics(d.ch, { d.slot }, { tag = label }))
+          end
+        end
       end
       if id ~= nil then
         if id == 0xDC then safety = true end
@@ -246,10 +254,16 @@ local function deathGuards(p)
         steps[#steps + 1] = H.keepGear(ch, label, H.equipKit(ch, { { slot, id } }, { tag = label }))
       else
         H.log(string.format("[deathguards] %s stays unguarded: %s", NAMES[ch],
-          slot == nil and "no slot free of a prize or a two-weapon relic" or "no guard left"))
+          slot == nil and "no slot free of a prize or a two-weapon relic" or "no guard left that he can wear"))
       end
     end
     if safety then steps[#steps + 1] = H.overlayOn("Safety Bit", "L.5 Doom in Kefka's Tower's factory (party 3)") end
+    steps[#steps + 1] = H.call(function()
+      for _, ch in ipairs(need) do
+        H.log(string.format("[deathguards] %s L%d: %s", NAMES[ch], H.readByte(0x1600 + 37 * ch + 8),
+          guarded(ch) and "guarded" or "unguarded"))
+      end
+    end)
     return H.seqStep(steps)
   end)
 end
