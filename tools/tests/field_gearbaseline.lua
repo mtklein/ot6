@@ -13,8 +13,9 @@
 --   4. a prize on a member waiting aboard: the check read through a reader that has an aboard member wear a Ribbon
 --      (the field menu cannot reach an aboard member, so no press can stage it): red;
 --   5. a member below the bag's best: a worse armor or helmet from the bag put on: red; the dress, green;
---   6. the healer rule's mutant (H.gearHealer naming nobody): the dress under it puts the first Ribbon elsewhere,
---      and the real rule's assert goes red; the dress under the real rule, green;
+--   6. the healer rule's mutant (H.gearHealer naming another member), with one Ribbon held in the bag so the Ribbons
+--      are fewer than the members who can wear one: the dress under it puts the first Ribbon elsewhere, and the real
+--      rule's assert goes red; the dress under the real rule, green; the Ribbon released, green;
 --   7. the Economizer by expected MP spent (owner, 2026-11-11): a history (H.mpSpent, the run's tally of spells
 --      cast, set as the battle observers would leave it) naming a caster with a small pool: red, the rule names
 --      him; the old largest-pool rule's dress (the mutant) stays red; the dress, green, the relic on him; the history
@@ -168,19 +169,38 @@ H.run({ maxFrames = 120000 }, {
   H.lazy(function() return red("5: a worse piece on " .. worse.m.name, "the gear rule puts") end),
   H.gearBaseline({ tag = "5: the dress" }),
   green("5: the best back on"),
-  -- 6. the healer rule's mutant
+  -- 6. the healer rule's mutant.  The rule shows only where the Ribbons are fewer than the members who can take one:
+  -- wor_dino with EDGAR seated has three Ribbons and three such members (EDGAR's two relic slots hold the Egg and the
+  -- Economizer, prizes that stay), so the healer's Ribbon goes into the bag through the Relic menu and is held there
+  -- (H.reservePrize), leaving two for three, and the mutant names one of those the real plan leaves without
+  H.lazy(function()
+    local label, slot = "6: the healer's Ribbon off, held in the bag", nil
+    for s = 4, 5 do if rec(healer.ch, 0x1F + s) == RIBBON then slot = s end end
+    H.assertEq(slot ~= nil, true, "6: the healer " .. healer.name .. " wears a Ribbon after case 5's dress")
+    return H.keepGear(healer.ch, label, H.unequipRelics(healer.ch, { slot }, { tag = label }))
+  end),
+  H.reservePrize(RIBBON, 1, "field_gearbaseline case 6: two Ribbons for three wearers"),
   H.call(function()
     H.realHealer = H.gearHealer
-    -- the mutant's healer: a member the real plan gives no Ribbon (so the mutant's dress differs from the real one
-    -- whatever the fixture's count of Ribbons and members: wor_dino with EDGAR seated has three Ribbons on four, and
-    -- the member status hurts least was one of the real plan's wearers), the one status hurts least among them
     local realPlan = H.gearPrizePlan(members())
     local ribboned = {}
     for _, t in ipairs(realPlan.targets) do if t.id == RIBBON then ribboned[t.m.ch] = true end end
+    local function canTake(ch)
+      for s = 4, 5 do
+        if H.gearPrizeSlotKey(rec(ch, 0x1F + s), RIBBON, true) ~= nil then return true end
+      end
+      return false
+    end
+    local pick = nil
+    local o = H.gearStatusOrder(members())
+    for i = #o, 1, -1 do
+      if pick == nil and o[i].ch ~= healer.ch and not ribboned[o[i].ch] and canTake(o[i].ch) then pick = o[i] end
+    end
+    H.assertEq(pick ~= nil, true, "precondition 6: a member who can take a Ribbon and gets none from the real plan")
+    H.log(string.format("[gbtest] 6: the mutant's healer: %s", pick.name))
     H.gearHealer = function(m)
-      local real, o = H.realHealer(m), H.gearStatusOrder(m)
-      for i = #o, 1, -1 do if o[i] ~= real and not ribboned[o[i].ch] then return o[i] end end
-      return real
+      for _, x in ipairs(m) do if x.ch == pick.ch then return x end end
+      return H.realHealer(m)
     end
   end),
   H.gearBaseline({ tag = "6: the dress under the healer mutant" }),
@@ -188,6 +208,9 @@ H.run({ maxFrames = 120000 }, {
   red("6: the healer mutant's dress, read by the real rule", "the rule puts the Ribbon $CA on"),
   H.gearBaseline({ tag = "6: the dress under the real rule" }),
   green("6: the real rule"),
+  H.reservePrize(RIBBON, 0),
+  H.gearBaseline({ tag = "6: the held Ribbon back" }),
+  green("6: the held Ribbon back on"),
   -- 7. the Economizer: by MP spent this run, else its wearer, else the main caster
   H.call(function()
     -- the fixture's history is empty (the load starts it again); its wearer keeps the relic
