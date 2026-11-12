@@ -820,7 +820,7 @@ re-measure then includes every later one's.
    `wor-kt-atma-v1`, the tower's bag by leg, Kefka's grid.  The tower's
    floors (46, 46, 50 and the 60-battle cap) stay; what changes is how much
    they fight.  The line's random battles go up by the plain's and down by
-   the training's.
+   the training's.  **Done (wt/v042-leveling-move2), measured below.**
 3. **The Fanatics' Tower's grind** (`gen_wor_relm`).  The plain is ground
    until STRAGO and RELM, who join at the party's average, stand at L46;
    TERRA and CELES climb 40 -> 49 beside them.  The generator's own lab
@@ -847,6 +847,68 @@ changes only who sits in a grind or an arc the line already plays, the
 way a player rotates the party.  The hunts stay on their branches (#496
 had offered a pre-tower training stretch as their main-line home; it was
 withdrawn).
+
+### Move 2, measured (2026-11-12)
+
+EDGAR takes CELES's seat in the dinosaur forest; TERRA stays as the carrier
+with a cure (her 1-MP Cure under the Economizer, and Ice), CYAN and SHADOW
+the arc's own.  One seat, not both: the forest's four need a Cure and Ice
+at the boot's levels (route-wor-side-trips.md section 4: Fight alone lost,
+Ice won 6 of 6), and among the bench only a stone moved off TERRA or CELES
+would bring them.  EDGAR rather than SETZER: he is one of the strong eight,
+and the tower's split hands the Exp. Egg to its furthest behind, which is
+then SETZER.  The seats are taken in the Falcon's cabin at the leg's start,
+and the dress moves the Egg to EDGAR there ("the Exp. Egg $E4 on EDGAR's
+slot 4 (furthest behind on levels)").  The tower's caps follow the bench's
+arrival: party 1's landing training at most 40 battles (was 60), the
+Goddess's lap at most 10.
+
+Evidence: `build/attempts/wt/v042-leveling-move2/` (its `README.txt`).
+The line is the replay from power-on at 8bfc3e1a against main's at
+849db981 (#524 round 2, the line at 9d0374c8).
+
+| leg | random battles before -> after | levels after (before) |
+|---|---|---|
+| `wor_dino` | 20 -> 38 (the plain 0 -> 27, the forest 20 -> 11) | TERRA 63 (61), CYAN 53 (52), SHADOW 54 (56), EDGAR 52 (34, benched), CELES 57 benched (60) |
+| `wor_desert` | 8 -> 8 | TERRA 64, CYAN 54, SHADOW 55, CELES 57 |
+| `wor_kt_factory` | 4 -> 4 | |
+| `wor_kt_atma` | 2 -> 2 | |
+| `wor_kt_guardian` | 59 -> 40 (the landing lap 45 -> 25) | TERRA 67, RELM 59, EDGAR 56, SETZER 48 (67, 62, 47, 54) |
+| `wor_kt_doom` | 18 -> 18 | CYAN 58, SHADOW 59, SABIN 46, GOGO 50 |
+| `wor_kt_poltergeist` | 46 -> 43 (the lap 45 -> 42) | CELES 63, STRAGO 60, LOCKE 51, MOG 50 (66, 60, 52, 50) |
+| `wor_kt_goddess` | 0 -> 1 | EDGAR 57, SETZER 49 |
+
+Raw lines: "[wor] f105995 the plain by Maranda: 27 battles (won 13F x22, won
+143 x5) ... SHADOW L51 ..., EDGAR L45 ..., CYAN L50 ..., TERRA L60"; "[wor]
+f163390 the forest: 11 battles (won 140 x6, won 141 x5) ... SHADOW L54 ...,
+EDGAR L52 ..., CYAN L53 ..., TERRA L63"; "[train] f198968 party 1 after 25
+battles by its landing: TERRA L66, RELM L59, EDGAR L56, SETZER L46" (at
+9d0374c8: "party 1 after 45 battles by its landing: TERRA L66, RELM L61,
+EDGAR L46, SETZER L52"); "[train] f189312 party 2 on 334's north: after 42
+battles: CELES L63, STRAGO L60, LOCKE L51, MOG L50".
+
+**Totals.**  From the forest's boot to Kefka: random battles 157 -> 154;
+Kefka's Tower's own 129 -> 108.  Deaths and Fenix Downs that left the bag
+(`supplies.py`, every attempt): 12 and 11 -> 9 and 8; the bag reached Kefka
+with 29 Fenix Downs (28 before).  Every leg passed on its first attempt,
+Doom and Kefka included ("PASS (frame 96805) attempts=1/3", "PASS (frame
+167821) attempts=1/3"): #525's retries did not recur.  The battle budget
+from power-on falls by three.
+
+**The forest's fights.**  The line and eight seed shifts of the leg from the
+same `wor-colosseum-v1` capture: 86 forest battles over 60 distinct battle
+keys, one lost (`beC0-g0140`, the two Tyranosaurs, shift 3's fourth forest
+battle: "deaths=e2@f+1427 ... e3@f+5383:925/5237:bp0 class=worn down (no
+one-shot, no pips banked)"), against 1 of 41 at the old seats (`dn3`/`dn4`).
+The other seven shifts passed.
+
+**What it leaves.**  Party 2's lap on 334's north is bound by MOG (L41 ->
+50 for the Poltergeist), whom no forest seat reached, so it barely moved;
+a second seat for MOG would need a Cure and Ice in the forest without
+TERRA or CELES, or the Poltergeist's L50 relabbed.  SETZER, carried,
+now meets the Guardian's lane at L46-48 rather than 52-54 (the Egg works
+for the lap's level, not past it).  CELES rides the forest no longer, and
+stands at 57-63 through the tower instead of 60-66.
 
 **#521** (the tower's Fenix Downs): moves 1 and 2 are its leveling half.
 Move 1 is the lab its own write-up left open (formation 329); move 2
