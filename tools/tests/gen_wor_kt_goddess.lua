@@ -18,6 +18,10 @@ local RIBBON = 0xCA
 -- party 1's bench levels to TRAIN_LEVEL before the Goddess (route-wor-kefka-tower.md 6.1 and 6.3); gen_wor_kt_guardian
 -- trains it to the same level by party 1's landing (#521), so the lap below is fought only when a level is missing
 local TRAIN_LEVEL = KT_TRAIN or 46
+-- at most CAP battles: party 1 arrives at TRAIN_LEVEL from gen_wor_kt_guardian's training (it asserts it), so the lap
+-- here only tops up a level its walks lost, and a long one means that leg's training has moved (#497 move 2: 0
+-- battles in the replay at 4f550744; the lap's default bound was 60)
+local CAP = 10
 -- where it laps: 355's east lane (pool group 220: the Scullion, three Innocs) or 354 below her (group 226: the
 -- Madam and her Outsiders among four) (section 6.3)
 local LAP_355 = KT_LAP355 ~= false
@@ -43,7 +47,7 @@ local map, sw, settled, say, watches = K.map, K.sw, K.settled, K.say, K.watches
 local T = H.kefkaTowerKit(K, FIGHT)
 local door = T.door
 local function train() return T.trainLap("party 1 " .. (LAP_355 and "in 355's east lane" or "below the Goddess"),
-  TRAIN_LEVEL, { burn = KT_BURN, cap = KT_CAP }) end
+  TRAIN_LEVEL, { burn = KT_BURN, cap = KT_CAP or CAP }) end
 
 H.run({ maxFrames = 3000000 }, {
   H.bootCheckpoint("wor-kt-poltergeist-v1"),
