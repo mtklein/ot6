@@ -15,7 +15,8 @@
 --      d-pad steer went to in the live list ($257E);
 --   2. the price: GAU's MP (his record, $1600 + 37 * 11 + $0D) after the
 --      battle is his MP before it less 8, over the start and at least one
---      possessed turn: 8 once, nothing a turn;
+--      possessed turn: 8 once, nothing a turn (read over a battle GAU does not level up in: a
+--      level-up raises his MP at the battle's end);
 --   3. the tier: OT6_RAGETIER holds the plan's boost (Cmd_10
 --      stores the pending pips, capped 3), so the coin the plan bought is
 --      the coin the trance rolls;
@@ -41,6 +42,11 @@ local function gauSlot()
 end
 local function raging(s) return (H.readByte(0x3EF9 + s * 2) & 0x01) ~= 0 end
 local function recMp() return H.readWord(0x1600 + 37 * GAU + 0x0D) end
+local function recLevel() return H.readByte(0x1600 + 37 * GAU + 8) end
+-- a battle GAU levels up in is not a price reading: the level-up raises his MP with his max at the battle's end
+-- (#524 landing at 9d0374c8: "record MP 323 -> 353" over a battle that took his max MP up, and the price assert read
+-- "got 353 ($161), want 315 ($13B)").  RD_LEVELUPS = true is the mutant that measures such a battle anyway.
+RD_LEVELUPS = RD_LEVELUPS or false
 
 -- per battle: the Rage plans made in it, GAU's Cmd_10s (his seat in Y),
 -- and the tier and beast the first frame his RAGE status reads set
@@ -71,15 +77,18 @@ H.run({ maxFrames = 900000 }, {
     end
     if b and not inBattle then
       inBattle, cur, nr0 = true, fresh(), #H.rages
-      cur.mp0 = recMp()
+      cur.mp0, cur.lv0 = recMp(), recLevel()
     elseif not b and inBattle and H.hasControl() then
       inBattle = false
-      cur.mp1 = recMp()
+      cur.mp1, cur.lv1 = recMp(), recLevel()
       if #H.rages > nr0 then cur.rage = H.rages[nr0 + 1] end
-      H.log(string.format("[rage] battle %d: rage plans %d; Cmd_10 %d; tier %s; beast %s; record MP %d -> %d",
-        #H.outcomes - n0, #H.rages - nr0, cur.cmd10, tostring(cur.tier),
-        cur.beast and string.format("$%02X", cur.beast) or "-", cur.mp0, cur.mp1))
-      if cur.rage and cur.cmd10 >= 2 and done == nil then done = cur end
+      H.log(string.format("[rage] battle %d: rage plans %d; Cmd_10 %d; tier %s; beast %s; record MP %d -> %d; "
+        .. "GAU L%d -> L%d", #H.outcomes - n0, #H.rages - nr0, cur.cmd10, tostring(cur.tier),
+        cur.beast and string.format("$%02X", cur.beast) or "-", cur.mp0, cur.mp1, cur.lv0, cur.lv1))
+      if cur.rage and cur.cmd10 >= 2 and done == nil then
+        if cur.lv1 == cur.lv0 or RD_LEVELUPS then done = cur
+        else H.log("[rage] GAU levelled up in this battle: his record MP is not the Rage's price; the next one") end
+      end
     end
     -- read the moment the plan is made (a log, not an assert): the chosen
     -- beast's special (MonsterRage +1) and its element, against every
