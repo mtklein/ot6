@@ -1,6 +1,7 @@
 -- gen_wor_dino.lua -- the dinosaur forest, the grind before Kefka's Tower (docs/design/route-wor-side-trips.md):
 -- Continue the `wor-colosseum-v1` battery (SHADOW, CELES, CYAN and TERRA beside the Falcon by Maranda), check what
--- the plan depends on, Kohlingen's counter for the grind's supplies, the Falcon down beside the forest north of
+-- the plan depends on, the cabin (EDGAR takes CELES's seat: the leveling plan's move 2, level-curve.md), the plain
+-- by Maranda, Kohlingen's counter for the grind's supplies, the Falcon down beside the forest north of
 -- Gau's father's house (world group 54: Tyranosaur, two Tyranosaurs, Brachosaur), the forest fought until every
 -- seated member stands at GOAL_LEVEL (Kefka's Tower's target, level-curve.md), with a trip back to Kohlingen
 -- when the bag runs short, and the save on the Falcon's tile: the `wor-dino-v1` battery, the desert's boot.
@@ -38,7 +39,13 @@ local say, kitLine, board, watches = K.say, K.kitLine, K.board, K.watches
 local regroup, liftOff, landNear, partyOf = K.regroup, K.liftOff, K.landNear, K.partyOf
 local kohlingenStop = K.kohlingenStop
 
-local FOUR = { SHADOW, CELES, CYAN, TERRA }
+-- The forest seats the bench Kefka's Tower would otherwise raise (level-curve.md "The leveling plan", move 2): EDGAR,
+-- party 1's lowest, whom the tower's landing training fought 59 battles to lift from L34 (the line at 9d0374c8:
+-- "levels: ... EDGAR 34->47"), takes CELES's seat; TERRA stays as the carrier with a cure (her Cure at 1 MP under
+-- the Economizer, and Ice: the dinosaurs' weakness), CYAN and SHADOW the arc's own.  The plain and the forest below
+-- raise the lowest of the four, so the catching up is EDGAR's.  The desert seats its own four again.
+local FOUR = { SHADOW, EDGAR, CYAN, TERRA }
+local MARANDA_TILE = { 69, 183 }                     -- the Falcon's tile by Maranda (wor-colosseum-v1's)
 local FOREST = 54                                    -- WorldBattleGroup: Tyranosaur (321), x2 (320), Brachosaur (322)
 local FOREST_NEAR = { 195, 47 }                      -- one step south of the landing tile (195,46)
 local TYRANOSAUR, BRACHOSAUR = 0x027, 0x026
@@ -144,8 +151,24 @@ H.run({ maxFrames = 3000000 }, {
   end),
   -- @@setup-end
 
-  -- ---- 1. the plain by Maranda, until the four are ready for the forest ------------------------------------
+  -- ---- 1. the cabin, and the plain by Maranda, until the four are ready for the forest ----------------------
   -- @@stage plain
+  -- the four seated in the cabin and the Falcon back down on its tile; the prizes dressed for them as the save's
+  -- baseline would (the Exp. Egg to the furthest behind, owner 2026-11-11), so the catching up starts at once
+  H.cond(function() return not seated() end, {
+    regroup(FOUR),
+    H.gearBaseline({ tag = "the forest's four seated" }),
+    liftOff(),
+    H.waitUntil(function() return H.airshipControl() end, 3000, "the pilot's controls", 5),
+    H.lazy(function() return H.flyTo(MARANDA_TILE[1], MARANDA_TILE[2], { what = "the Falcon back by Maranda",
+      fight = FIGHT }) end),
+  }, {}),
+  H.call(function()
+    for _, ch in ipairs(FOUR) do H.assertEq(partyOf(ch), 1, NAMES[ch] .. " is seated") end
+    H.log("[kit] " .. kitLine(FOUR))
+    H.log(string.format("[grind] the plain until the lowest of the four stands at L%d (now L%d)", READY_LEVEL,
+      lowest()))
+  end),
   H.cond(function() return lowest() < READY_LEVEL end, {
     H.lazy(function()
       local t = groupTile(PLAIN, H.worldX(), H.worldY(), "the plain by Maranda")
@@ -209,7 +232,7 @@ H.run({ maxFrames = 3000000 }, {
   H.saveAtCheckpoint("wor-dino-v1"),
   H.saveState("wor_dino.mss"),
   H.logStep(function()
-    return string.format("wor_dino generated: SHADOW L%d, CELES L%d, CYAN L%d and TERRA L%d beside the Falcon, "
-      .. "world (%d,%d), saved in slot 3", lv(SHADOW), lv(CELES), lv(CYAN), lv(TERRA), H.worldX(), H.worldY())
+    return string.format("wor_dino generated: SHADOW L%d, EDGAR L%d, CYAN L%d and TERRA L%d beside the Falcon, "
+      .. "world (%d,%d), saved in slot 3", lv(SHADOW), lv(EDGAR), lv(CYAN), lv(TERRA), H.worldX(), H.worldY())
   end),
 })
