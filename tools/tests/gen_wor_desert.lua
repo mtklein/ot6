@@ -1,5 +1,5 @@
 -- gen_wor_desert.lua -- the Cactrot desert, the second of the two grinds before Kefka's Tower
--- (docs/design/route-wor-side-trips.md): Continue the `wor-dino-v1` battery (SHADOW, CELES, CYAN and TERRA on foot
+-- (docs/design/route-wor-side-trips.md): Continue the `wor-dino-v1` battery (SHADOW, EDGAR, CYAN and TERRA on foot
 -- beside the Falcon by the dinosaur forest), check what the plan depends on, fly back to the Falcon's tile by
 -- Maranda (69,183), where the line left it, walk the seven steps south onto the desert (world group 111: Hoover,
 -- Cactrot), fight there for DESERT_FIGHTS battles, walk back to the Falcon, and save on its tile: the
