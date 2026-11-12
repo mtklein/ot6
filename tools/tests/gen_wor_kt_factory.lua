@@ -392,6 +392,11 @@ H.run({ maxFrames = 2400000 }, {
   -- @@stage save
   H.stepOntoSavePoint(FACTORY_SAVE[1], FACTORY_SAVE[2]),
   H.splitCare({ parties = { 3, 1, 2 }, threshold = 1.0, tag = "care at the factory's save point" }),
+  -- L.5 Doom's stretch ends here, so the Safety Bit overlay deathGuards opened closes before the save (#526, as
+  -- gen_wor_tower closes its own): the save's baseline still takes the Bit off as an overlay relic, and the relic rule
+  -- may put it back as a guard where it ranks; left open, the close rule (an overlay closes only once its relics are
+  -- on no member) would read that re-placed Bit as the overlay still on and fail the save
+  H.overlayOff("Safety Bit"),
   H.call(function()
     say("tower", "at the factory's save point")
     for _, l in ipairs(H.splitReport()) do H.log(l) end

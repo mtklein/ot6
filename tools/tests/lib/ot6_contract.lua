@@ -2729,7 +2729,8 @@ M.contracts["wor-kt-plates-v1"] = {
 -- wor-dino-v1: the World of Ruin map, on foot on the Falcon's tile by the
 -- dinosaur forest north of Gau's father's house (195,46), after the grind
 -- there (world group 54) until the four stood at Kefka's Tower's target
--- level: SHADOW, CELES, CYAN and TERRA seated.  The first grind before
+-- level: SHADOW, EDGAR, CYAN and TERRA seated (EDGAR in CELES's seat: the
+-- leveling plan's move 2, docs/design/level-curve.md).  The first grind before
 -- Kefka's Tower, and the desert's boot (docs/design/route-wor-side-trips.md).
 -- No timer.
 M.contracts["wor-dino-v1"] = {
@@ -2740,10 +2741,10 @@ M.contracts["wor-dino-v1"] = {
     { 0x02F3, 1, "SHADOW recruited at the Colosseum (_cb78d9)" },
   },
   party = {
-    size = 4,                     -- SHADOW, CELES, CYAN and TERRA
+    size = 4,                     -- SHADOW, EDGAR, CYAN and TERRA
     members = {
       { 0x03, "SHADOW" },
-      { 0x06, "CELES" },
+      { 0x04, "EDGAR" },
       { 0x02, "CYAN" },
       { 0x00, "TERRA" },
     },

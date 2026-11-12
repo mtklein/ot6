@@ -9,7 +9,11 @@
 --      red, "in party N, wears the overlay relic"; the walking party's dress takes it off that party's member
 --      (switching to it and back), green, and the same party walks after;
 --   2. an overlay declared open while its relic is still worn on that other party: the dress closes it only once the
---      relic is off (the registry reads empty after, and the relic is in no party's slot).
+--      relic is off (the registry reads empty after, and the relic is in no party's slot);
+--   3. the Safety Bit a party wears where the relic rule ranks it (gen_wor_kt_factory's death guard, #526): with its
+--      overlay left open, the dress takes the Bit off and the rule puts it back, so the overlay reads still on and the
+--      save's assert fails (red: the factory before #526); closed first with H.overlayOff, as the factory now does
+--      before its save, the same dress is green and the Bit stays where the rule put it.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/wor_kt_guardian.mss.lua"
 local OVERLAY = { [0xBB] = "Wall Rings", [0xB7] = "Barrier Rings", [0xDC] = "Safety Bit" }
@@ -93,6 +97,55 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(#violations(), 0, "1: no violation after the dress")
     H.assertEq(H.gearOverlaysOpen[OVERLAY[item]], nil, "2: the overlay closed once its relic came off")
     H.assertEq(H.gearOverlayWorn(OVERLAY[item]), false, "2: its relic is on no party's member")
-    H.log("[gbsplit] PASSED: another party's overlay relic is red, and the dress takes it off that party")
+    H.log("[gbsplit] 1-2: another party's overlay relic is red, and the dress takes it off that party")
+  end),
+  -- 3. the Safety Bit's overlay over a Bit the relic rule puts back (#526)
+  H.lazy(function()
+    local SAFETY = 0xDC
+    local bit = nil
+    for ch = 0, 13 do
+      local p = H.readByte(0x1850 + ch) & 7
+      for s = 4, 5 do
+        if bit == nil and p ~= 0 and rec(ch, 0x1F + s) == SAFETY then bit = { ch = ch, p = p, s = s } end
+      end
+    end
+    H.assertEq(bit ~= nil, true, "precondition 3: a member of a party wears the Safety Bit (the line's death guard)")
+    H.log(string.format("[gbsplit] 3: %s (party %d) wears the Safety Bit in slot %d", H.SPLIT_NAMES[bit.ch], bit.p,
+      bit.s))
+    local real, got = H.assertGearBaseline, nil
+    local function worn() return rec(bit.ch, 0x23) == SAFETY or rec(bit.ch, 0x24) == SAFETY end
+    return H.seqStep({
+      H.switchParty(bit.p, { tag = "3: party " .. bit.p .. " walks" }),
+      -- (a) the overlay left open, as the factory's deathGuards left it: the dress's own assert is recorded
+      H.call(function()
+        H.gearOverlaysOpen = {}
+        H.assertGearBaseline = function(...)
+          local ok, err = pcall(real, ...)
+          got = { ok = ok, err = tostring(err) }
+        end
+      end),
+      H.overlayOn("Safety Bit", "field_gearbaseline_split case 3a"),
+      H.gearBaseline({ tag = "3a: the dress, the overlay open" }),
+      H.call(function()
+        H.assertGearBaseline = real
+        H.assertEq(worn(), true, "3a: the relic rule put the Safety Bit back on " .. H.SPLIT_NAMES[bit.ch])
+        H.assertEq(H.gearOverlaysOpen["Safety Bit"] ~= nil, true, "3a: the overlay reads still on")
+        H.assertEq(got ~= nil and got.ok == false and got.err:find("the overlay Safety Bit is still on", 1, true) ~= nil,
+          true, "3a: the dress's assert failed on the open overlay (" .. (got and got.err or "not called") .. ")")
+        H.log("[gbsplit] 3a: RED as it should be: " .. got.err)
+        H.gearOverlaysOpen = {}
+      end),
+      -- (b) the factory's fix: the overlay closed before the save's dress
+      H.overlayOn("Safety Bit", "field_gearbaseline_split case 3b"),
+      H.overlayOff("Safety Bit"),
+      H.gearBaseline({ tag = "3b: the dress, the overlay closed first" }),
+      H.call(function()
+        H.assertEq(worn(), true, "3b: the Safety Bit stays where the relic rule puts it")
+        H.assertEq(#violations(), 0, "3b: no violation")
+        H.log("[gbsplit] 3b: green")
+        H.log("[gbsplit] PASSED: another party's overlay relic is red, and the dress takes it off that party; the "
+          .. "Safety Bit's overlay closed before the dress is green where left open it is red")
+      end),
+    })
   end),
 })

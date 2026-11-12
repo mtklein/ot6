@@ -118,8 +118,12 @@ local walk, door, chest = T.walk, T.door, T.chest
 -- whose Scullion (half that pool) opens with Condemned and outlasts party 1's kill: there party 1 lost a member in 6
 -- of 10 Scullion battles in the line at 62a8b621 (6 of its leg's 7 Fenix Downs; 11 of 15 at 3eb65922).  This leg
 -- over 16 runs a grid (route-wor-kefka-tower.md 7.6, #521): trained to L40, 131 deaths in 547 random battles, 8.2 a
--- run, before the Goddess leg's lap; trained to L46, 80 in 945, 5.0 a run, with that lap's levels already in hand
-local TRAIN_LEVEL, TRAIN_BATTLES = 46, 60
+-- run, before the Goddess leg's lap; trained to L46, 80 in 945, 5.0 a run, with that lap's levels already in hand.
+-- TRAIN_BATTLES bounds the lap at what it needs now that the dinosaur forest seats EDGAR (level-curve.md, the
+-- leveling plan's move 2): he arrives at L52 and the lap is SETZER's alone, from L32 under the Exp. Egg, 25 battles in
+-- the replay at 4f550744 ("party 1 after 25 battles by its landing: TERRA L66, RELM L59, EDGAR L56, SETZER L46"), where
+-- it was 45 with EDGAR at L34; 60 before
+local TRAIN_LEVEL, TRAIN_BATTLES = 46, 40
 local function trainParty1()
   local lap, wp, n0 = { { 9, 16 }, { 9, 19 } }, 1, 0
   local function low()
