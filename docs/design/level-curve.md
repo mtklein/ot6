@@ -864,7 +864,8 @@ arrival: party 1's landing training at most 40 battles (was 60), the
 Goddess's lap at most 10.
 
 Evidence: `build/attempts/wt/v042-leveling-move2/` (its `README.txt`).
-The line is the replay from power-on at 8bfc3e1a against main's at
+The line is the replay from power-on at 8bfc3e1a (gate green; the scoped
+replay at 4f550744 read the same, leg for leg) against main's at
 849db981 (#524 round 2, the line at 9d0374c8).
 
 | leg | random battles before -> after | levels after (before) |
