@@ -266,13 +266,20 @@ H.run({ maxFrames = 120000 }, {
   H.call(function()
     local pp = H.gearPrizePlan(members())
     H.assertEq(pp.owned[EGG] >= 1, true, "precondition: the party owns the Exp. Egg (gen_wor_colosseum's chain)")
+    -- the lowest level among the members with a slot the Egg may take (a Ribbon that stays and a two-weapon relic
+    -- keep theirs: H.gearPrizeSlotKey; wor_dino's CYAN wears both)
     local low, wearer = 255, nil
     for _, m in ipairs(members()) do
-      low = math.min(low, rec(m.ch, 8))
+      local can = false
+      for s = 4, 5 do
+        local cur = rec(m.ch, 0x1F + s)
+        if cur == EGG or H.gearPrizeSlotKey(cur, EGG, H.gearIsPrize(cur)) ~= nil then can = true end
+      end
+      if can then low = math.min(low, rec(m.ch, 8)) end
       if rec(m.ch, 0x23) == EGG or rec(m.ch, 0x24) == EGG then wearer = m end
     end
     H.assertEq(wearer ~= nil and rec(wearer.ch, 8) == low, true, string.format("8: the Egg is on a seated member at the "
-      .. "lowest level, L%d (%s)", low, wearer and wearer.name or "nobody"))
+      .. "lowest level of those with a slot it may take, L%d (%s)", low, wearer and wearer.name or "nobody"))
     H.vars.eggWearer = wearer
   end),
   H.lazy(function()
