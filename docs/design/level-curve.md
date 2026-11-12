@@ -818,7 +818,7 @@ re-measure then includes every later one's.
    forest's wins and deaths by distinct key against `dn3`/`dn4` (1 lost of
    41), the levels at `wor-desert-v1`, the 7.6 grid on the new
    `wor-kt-atma-v1`, the tower's bag by leg, Kefka's grid.  The tower's
-   floors (46, 46, 50 and the 60-battle cap) stay; what changes is how much
+   floors (46, 46, 50) stay and the caps are bounded (40 at the landing, 10 for the Goddess); what changes is how much
    they fight.  The line's random battles go up by the plain's and down by
    the training's.  **Done (wt/v042-leveling-move2), measured below.**
 3. **The Fanatics' Tower's grind** (`gen_wor_relm`).  The plain is ground
