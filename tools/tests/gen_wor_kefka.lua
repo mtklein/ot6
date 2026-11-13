@@ -64,9 +64,11 @@ if KEFKA_MEGALIXIR ~= nil then BOSS_FIGHT.megalixir = KEFKA_MEGALIXIR or nil
 elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 3, below = 0.3, vs = KEFKA } end
 -- The curers keep their last point through Kefka's break (opts.reserveBank): the break's burst emptied every bank,
 -- and when it ended no boosted Cure or Life 2 answered his Goner, HyperDrive and Ultima.  The members who cast Cure
--- or Life (TERRA, CELES, SHADOW; LOCKE and STRAGO by the stones) attack at a boost that leaves one point.  With the
--- Megalixir, 48 of 48 runs of both grids (route-wor-the-end.md 5.3, lab mrb); the Megalixir alone 47 of 48 (m)
-local CURERS = { [0] = true, [6] = true, [3] = true, [1] = true, [7] = true }
+-- or Life attack at a boost that leaves one point.  With the Megalixir, 48 of 48 runs of both grids
+-- (route-wor-the-end.md 5.3, lab mrb); the Megalixir alone 47 of 48 (m).  The curers are read from the party once
+-- the stones are on (curersStep below: whoever's Magic holds Cure or Life), not listed here
+local CURE, LIFE = 0x2D, 0x30
+local CURERS = {}
 if KEFKA_RESERVE ~= nil then BOSS_FIGHT.reserveBank = KEFKA_RESERVE or nil
 elseif not KEFKA_FIGHT and not KEFKA_STOCK then BOSS_FIGHT.reserveBank = { chars = CURERS, n = 1, vs = KEFKA } end
 -- Two stones the line carries unworn go on party 2 before the climb: Phoenix (Life) on STRAGO, in Palidor's place
@@ -87,11 +89,10 @@ local walk, door = T.walk, T.door
 local function lv(ch) return H.readByte(0x1600 + 37 * ch + 8) end
 local function hpMax(ch) return H.charMaxHp(ch) end
 
--- The order (KEFKA_ORDER, a lab's, overrides it): the twelve members of the three parties, the highest level first
--- (the most HP first among equals), as a player puts the strongest in front: the first four start the fight, and
--- the rest come in, in this order, for the members who fall
--- A lab's KEFKA_ORDER is a list of ids, or "weak" (the same sort, weakest first) or "mix" (strongest, weakest,
--- second strongest, second weakest, ...: the strong carrying the bench, as the tower's parties)
+-- The order (KEFKA_ORDER, a lab's list of ids, overrides it): the twelve members of the three parties, the highest
+-- level first (the most HP first among equals), as a player puts the strongest in front: the first four start the
+-- fight, and the rest come in, in this order, for the members who fall.  The strongest first won the most of the
+-- six orders measured (route-wor-the-end.md 5.1)
 local function orderFor()
   if type(KEFKA_ORDER) == "table" then return KEFKA_ORDER end
   local all = {}
@@ -103,20 +104,33 @@ local function orderFor()
     if hpMax(a) ~= hpMax(b) then return hpMax(a) > hpMax(b) end
     return a < b
   end)
-  if KEFKA_ORDER == "weak" then
-    local r = {}
-    for i = #all, 1, -1 do r[#r + 1] = all[i] end
-    return r
-  elseif KEFKA_ORDER == "mix" then
-    local r, i, j = {}, 1, #all
-    while i <= j do
-      r[#r + 1] = all[i]
-      if j > i then r[#r + 1] = all[j] end
-      i, j = i + 1, j - 1
-    end
-    return r
-  end
   return all
+end
+
+-- The curers (opts.reserveBank's chars), read once the stones are on: each member of the three parties whose Magic
+-- holds Cure or Life (H.knowsSpell: learned, or granted by the stone worn, as the battle list is built).  The raises
+-- and boosted Cures for Fallen One (lifeRaise, boostCure) need a Life caster and a Cure caster among the twelve:
+-- asserted here, so they cannot silently stop
+local function curersStep()
+  return H.call(function()
+    for k in pairs(CURERS) do CURERS[k] = nil end
+    local cure, life, said = {}, {}, {}
+    for _, p in ipairs({ 1, 2, 3 }) do
+      for _, ch in ipairs(H.partyRoster(p)) do
+        local c, l = H.knowsSpell(ch, CURE), H.knowsSpell(ch, LIFE)
+        if c then cure[#cure + 1] = NAMES[ch] end
+        if l then life[#life + 1] = NAMES[ch] end
+        if c or l then
+          CURERS[ch] = true
+          said[#said + 1] = string.format("%s (%s)", NAMES[ch], (c and l) and "Cure, Life" or c and "Cure" or "Life")
+        end
+      end
+    end
+    H.log("[curers] " .. (#said > 0 and table.concat(said, ", ") or "none"))
+    H.assertEq(#cure > 0 and #life > 0, true, string.format("a Cure caster (%s) and a Life caster (%s) among the "
+      .. "three parties for Kefka's Fallen One (their own spells, the stones, or an esper worn)",
+      table.concat(cure, ", "), table.concat(life, ", ")))
+  end)
 end
 
 -- what the run watches by the code it runs: the order menu's frame handler, each formation the battle loads after
@@ -299,16 +313,8 @@ H.run({ maxFrames = 1500000 }, {
   H.cond(function() return KEFKA_BAG ~= false end, {
     H.bagArrange({ 0xE9, 0xF0, 0xF5, 0xEB, 0xEC, H.MEGALIXIR }, { tag = "bag: the Megalixir on top for Kefka" }),
   }, {}),
-  -- KEFKA_UNRING (a lab's): { { char, relic slot, party }, ... } to take off (the Wall Rings); splitCare walks
-  -- party 2 again after
-  H.lazy(function()
-    local steps = { H.call(function() end) }
-    for _, u in ipairs(KEFKA_UNRING or {}) do
-      steps[#steps + 1] = H.switchParty(u[3], { tag = "unring: party " .. u[3] })
-      steps[#steps + 1] = H.unequipRelics(u[1], { u[2] }, { tag = "unring " .. NAMES[u[1]] })
-    end
-    return H.seqStep(steps)
-  end),
+  -- the curers, with the stones on
+  curersStep(),
   -- each party's arms: no tier absorbs what a hand swings, since the tiers come one after another with no menu
   -- between (the plates' save dresses the walking party by the gear rule, whose best blades can be holy, and the
   -- lady and the sleeper absorb holy: "char 0's R-hand item $18 (holy) is ABSORBED by slot 2 species $015E" on

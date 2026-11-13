@@ -12828,6 +12828,12 @@ function Driver:megalixirPlan(actor, plan)
   -- no action trace falls back to the fixed window o.flight (2400 frames); a traced one holds until the event, with
   -- o.maxFlight (6000) as the backstop for an event that never comes
   if row == nil or idx == nil or self:megalixirInFlight() then return plan end
+  -- never with a Zombie seated: the Megalixir reaches every seat and its HP is damage on a Zombie (the care lines'
+  -- party item and party cure skip it the same way, #515)
+  for e = 0, 3 do
+    local mx = M.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx ~= 0xFFFF and status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) then return plan end
+  end
   local low, first = 0, nil
   for e = 0, 3 do
     local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
