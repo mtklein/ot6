@@ -2183,8 +2183,12 @@ Ot6ShieldTbl:
         .word   $00eb
         .byte   2, OT6_SLASH|OT6_PIERCE ; abolisher: no element
         .word   $00d6
-        .byte   3, OT6_PIERCE|OT6_BLUDG ; adamanchyt: the shelled tank;
-                                ;   the blades turn.  no element
+        .byte   5, OT6_PIERCE|OT6_BLUDG ; adamanchyt: the mountain's wall,
+                                ;   five shields above the house curve:
+                                ;   terra learns break here (l24), and a
+                                ;   3-bp break takes four of the five
+                                ;   (battle_breakfour).  the blades turn.
+                                ;   no element
         .word   $00b8
         .byte   2, OT6_BLUDG|OT6_SPECIAL ; slurm: an ooze, not cut.  fire
                                 ;   vanilla

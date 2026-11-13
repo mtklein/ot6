@@ -7,7 +7,7 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the insect, the shell and the ooze turn the blades and take STRAGO's rod (bludgeon); the ooze takes RELM's brush (special); the Adamanchyt is the three-shield tank.
+--   3. the lessons: the insect, the shell and the ooze turn the blades and take STRAGO's rod (bludgeon); the ooze takes RELM's brush (special); the Adamanchyt holds five, the wall TERRA's new Break is measured on.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -19,7 +19,7 @@ local WANT = {
   [0x0EE] = { "Mandrake", 2, SLASH | BLUDG, FIRE, WATER, 0 },
   [0x0D0] = { "Insecare", 2, PIERCE | BLUDG, FIRE | WIND, 0, 0 },
   [0x0EB] = { "Abolisher", 2, SLASH | PIERCE, 0, 0, 0 },
-  [0x0D6] = { "Adamanchyt", 3, PIERCE | BLUDG, 0, 0, 0 },
+  [0x0D6] = { "Adamanchyt", 5, PIERCE | BLUDG, 0, 0, 0 },
   [0x0B8] = { "Slurm", 2, BLUDG | SPECIAL, FIRE, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
@@ -148,8 +148,8 @@ H.run({ maxFrames = 600 }, {
       if (classOf(sp) & BLUDG) == 0 then problem("$%03X %s: STRAGO's rod (bludgeon) holds no key", sp, WANT[sp][1]) end
     end
     if (classOf(0x0B8) & SPECIAL) == 0 then problem("$0B8 Slurm: RELM's brush (special) holds no key") end
-    if shield[0x0D6] == nil or shield[0x0D6][1] ~= 3 then problem("$0D6 Adamanchyt: not the three-shield shell") end
-    H.log("the lessons: the shells and the ooze turn the blades and take STRAGO's rod; the ooze takes RELM's brush")
+    if shield[0x0D6] == nil or shield[0x0D6][1] < 5 then problem("$0D6 Adamanchyt: under five shields, so TERRA's 3-BP Break (four) cannot be told on it") end
+    H.log("the lessons: the shells and the ooze turn the blades and take STRAGO's rod; the ooze takes RELM's brush; the shell holds five")
     H.assertEq(#problems, 0, "WoB espermtn break row mismatches")
     H.log("WoB espermtn break rows verified against the built ROM")
   end),
