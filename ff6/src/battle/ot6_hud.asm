@@ -2041,7 +2041,7 @@ Ot6ShieldTbl:
                                 ;   sabin's blitzes (bludgeon).  ice|water
                                 ;   vanilla; absorbs fire
         .word   $00a3
-        .byte   3, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; intangir:
+        .byte   2, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; intangir:
                                 ;   absorbs every element, so every hand
                                 ;   but magic breaks it, setzer's among
                                 ;   them.  its meteo after a hit and its
