@@ -455,6 +455,10 @@ local function jwalk(x, y, lk, what, tries, done)
           H.call(function() say("route", "276: the plate (46,17)") end),
         }, {}),
         H.cond(function() return not there() end, {
+          -- each try after a drop waits a different while at the shaft's foot before it walks: the conductors
+          -- run on the frame, so a try that sets out on the same frame of their cycle meets the same touch (the
+          -- #328 line at f51cf3ac dropped 30 times in 30 tries, every try from (37,17))
+          H.lazy(function() return H.waitFrames(n > 1 and 37 * (n - 1) % 240 or 0) end),
           H.lazy(function()
             local f0 = fallCount()
             return carefulWalk(x, y, lk, { 0x10, 0x11, 0x12, 0x13, 0x14 }, what, 3000,
