@@ -4525,7 +4525,7 @@ function M.ot6FontCells()
   local glyphs = M.sym("Ot6ShieldGlyphs") & 0x3FFFFF
   for s = 0, 5 do
     local n = M.readByte(have + s)
-    if n >= 1 and n <= 99 then
+    if n >= 1 and n <= 100 then        -- 100: the broken shield (#397)
       cells[emu.read(slotCells + s, rom)] = { rom = glyphs + (n - 1) * 16,
         tag = string.format("slot %d shield count %d", s, n) }
     end
@@ -4547,14 +4547,18 @@ function M.glyphCanary()
 end
 
 -- true if any OT6 shield/broken glyph word sits in the bg3 field-area map
--- (the under-monster hud). formation-agnostic presence check.
+-- (the under-monster hud). formation-agnostic presence check.  The shield
+-- gauge (the emblem $71 and the count cells) draws under attribute $29, text
+-- palette 2 (#397); the broken shield, a count cell's tile, under $21.
+M.HUD_GAUGE_ATTR = 0x29
 function M.fieldHudPresent()
   local vr = emu.memType.snesVideoRam
   local reg = M.readByte(0x897b)
   local base = ((reg - (reg % 4)) * 256) * 2
   local set = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1}
   for off = 0, 0x7FE, 2 do
-    if emu.read(base+off+1, vr) == 0x21 and set[emu.read(base+off, vr)] then
+    local attr = emu.read(base+off+1, vr)
+    if (attr == 0x21 or attr == M.HUD_GAUGE_ATTR) and set[emu.read(base+off, vr)] then
       return true
     end
   end

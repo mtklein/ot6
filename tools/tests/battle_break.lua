@@ -36,6 +36,18 @@
 --   4. the broken timer expires -> shields restore to max, and the revealed
 --      mask survives recovery
 --
+-- And how the shield gauge looks (#397), read from VRAM and WRAM:
+--   1h. under the head, the gauge: the emblem (cell $71) one cell left of
+--      the line's anchor and the head's count cell at the anchor, both under
+--      the gauge attribute $29 (text palette 2), the count cell holding the
+--      ROM's tile for 4;
+--   3h. broken, the lead cell holds the head's broken-shield tile (tile 100)
+--      under $21 and the count cell is empty; and the head's sprite is moved
+--      onto a spare monster palette (one the formation left unloaded) that
+--      holds the grey of its own palette, colour for colour, while the shell
+--      stays on its own;
+--   4h. recovered, the head is back on its own palette.
+--
 -- Addresses, all +slot*2 off the monster slot the head lands in (found by
 -- species scan, never hardcoded): shields $3E40, broken timer $3E90,
 -- revealed elements $3E91, weak elements $3BE8, class-weak $3EA4, HP $3BFC,
@@ -56,6 +68,81 @@ local MFLAGS, MGAUGE = 0x3AA8, 0x3221 -- monster $3AA0/$3219 rows, +slot*2
 
 local hs, terra                       -- head monster slot, Terra's char slot
 local shell                           -- the shell's monster slot
+
+-- the shield gauge and the grey (#397)
+local HUDSHADOW = 0xECF1              -- OT6_SHADOW: 6 lines x 14, +0 anchor
+local SPRDATA = 0x80DB                -- w7e80db: bits 1-3 the obj palette
+local LOADED = 0x8123                 -- w7e8123: the formation's palettes
+local MONPAL = 0x8117                 -- w7e8117: each slot's palette id
+local GAUGE, PLAIN = H.HUD_GAUGE_ATTR, 0x21
+local vram = emu.memType.snesVideoRam
+local function vword(w) return emu.readWord(w * 2, vram) end
+local function palBits(s) return H.readByte(SPRDATA + s * 2) & 0x0E end
+local function palsLoaded()
+  local k = 0
+  while k < 3 and H.readWord(LOADED + k * 2) ~= 0xFFFF do k = k + 1 end
+  return k
+end
+local function color(bits, i) return H.readWord(0x7F00 + bits * 16 + i * 2) end
+local function luma(c)
+  local l = (2 * (c & 31) + 5 * ((c >> 5) & 31) + ((c >> 10) & 31)) >> 3
+  return l | (l << 5) | (l << 10)
+end
+local function slotCell(s)
+  return H.readRomByte((H.sym("Ot6ShieldSlotCellTbl") & 0x3FFFFF) + s)
+end
+local function tileIs(cell, n)
+  local base = (H.sym("Ot6ShieldGlyphs") & 0x3FFFFF) + (n - 1) * 16
+  for i = 0, 15 do
+    if emu.read(0xB000 + cell * 16 + i, vram) ~= H.readRomByte(base + i) then return false end
+  end
+  return true
+end
+-- the head's hud line as drawn: anchor, lead word, count word (nil if off)
+local function headLine()
+  local a = H.readWord(HUDSHADOW + hs * 14)
+  if a == 0 then return nil end
+  return a, vword(a - 1), vword(a)
+end
+local function gaugeShown()
+  local a, lead, count = headLine()
+  return a ~= nil and lead == (GAUGE << 8) | 0x71
+    and count == (GAUGE << 8) | slotCell(hs) and tileIs(slotCell(hs), H.readByte(0x3E40 + hs * 2))
+end
+local function brokenShown()
+  local a, lead, count = headLine()
+  return a ~= nil and lead == (PLAIN << 8) | slotCell(hs) and count == 0x21FF
+    and tileIs(slotCell(hs), 100)
+end
+-- a slot's own palette bits, assigned the way LoadMonsterPal does: twice
+-- the index of its palette id in the loaded list (0 when not among the three)
+local function ownBits(s)
+  local id = H.readWord(MONPAL + s * 2)
+  for k = 0, 2 do
+    if H.readWord(LOADED + k * 2) == id then return k * 2 end
+  end
+  return 0
+end
+-- s stands on a spare palette holding the grey of its own palette
+local function grey(s)
+  local bits, k = palBits(s), palsLoaded()
+  if bits >= 6 or bits // 2 < k then return false end
+  local own = ownBits(s)
+  for i = 0, 15 do
+    if color(bits, i) ~= luma(color(own, i)) then return false end
+  end
+  return true
+end
+local function greyReport(tag)
+  local t = {}
+  for s = 0, 5 do
+    t[#t + 1] = string.format("s%d=%02X/%02X", s, palBits(s), ownBits(s))
+  end
+  local a, lead, count = headLine()
+  H.log(string.format("[grey] %s: palettes loaded %d; bits/own %s; head line @%s lead %04X count %04X",
+    tag, palsLoaded(), table.concat(t, " "), a and string.format("%04X", a) or "off",
+    lead or 0, count or 0))
+end
 
 local function shields()  return H.readByte(SHLD + hs * 2) end
 local function maxShield() return H.readByte(SHLD + hs * 2 + 1) end
@@ -310,6 +397,16 @@ H.run({ maxFrames = 60000 }, {
       "the head carries the headroom this measurement needs (1600 authored)")
   end),
   report("seeded"),
+  -- 1h. the gauge under the head
+  H.waitUntil(function() return gaugeShown() end, 600,
+    "the head's shield gauge drawn: emblem, then its count tile, palette 2", 1),
+  H.call(function()
+    greyReport("seeded")
+    H.assertEq(palsLoaded() < 3, true,
+      "precondition: the formation left a monster palette unloaded (a spare for the grey)")
+    H.assertEq(palBits(hs), ownBits(hs), "the head starts on its own palette")
+    H.screenshot("break_gauge")
+  end),
 
   -- 2+3. Terra beams the head until it breaks (watcher rides the pred)
   H.driveUntil(function()
@@ -376,6 +473,18 @@ H.run({ maxFrames = 60000 }, {
       "and < 6x (weak x2 * broken x2, not something wilder)")
     H.screenshot("break_broken")
   end),
+  -- 3h. broken: the broken shield in the gauge, the head in grey, the shell
+  -- in colour.  The head may be retracted into its shell for a while.
+  H.waitUntil(function() return grey(hs) and brokenShown() end, 3000,
+    "the broken head drawn in grey under the broken shield", 1),
+  H.call(function()
+    greyReport("broken")
+    H.assertEq(timer() > 0, true, "the head is still broken")
+    H.assertEq(grey(hs), true, "the broken head's sprite is on a grey copy of its own palette")
+    H.assertEq(palBits(shell), ownBits(shell), "the shell, not broken, keeps its own palette")
+    H.assertEq(brokenShown(), true, "the gauge shows the broken shield and no count")
+    H.screenshot("break_grey")
+  end),
 
   -- 4. recovery: timer expires, shields restore, reveal persists.  Nothing
   -- is pressed from here on, so the head takes no further damage; the shell
@@ -411,6 +520,15 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(headHp() > 0, true, "the head is alive at its recovery")
     H.assertEq(shields(), 4, "shields restored to max")
     H.assertEq(revealed() & 0x01, 0x01, "revealed weakness survives recovery")
+  end),
+  -- 4h. back in colour, at the recovery: the head recovers inside its shell
+  -- as often as not (the report above reads alive=false), and its sprite
+  -- palette goes back on the first quiet frame all the same
+  H.waitUntil(function() return palBits(hs) == ownBits(hs) end, 600,
+    "the recovered head back on its own palette", 1),
+  H.call(function()
+    greyReport("recovered")
+    H.assertEq(palBits(hs), ownBits(hs), "the recovered head draws from its own palette")
     H.screenshot("break_recovered")
   end),
 })

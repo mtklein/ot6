@@ -29,3 +29,10 @@ item no longer take a boost, since boosting them did nothing. A Sketch that
 draws an attack with no damage or healing number for a boost to raise (a
 status spell such as Slow or Imp, or Break) no longer uses up the boost
 raised for it.
+
+The shield count under each enemy is easier to read: it is drawn in the same
+numerals as your HP, yellow on a dark plate beside a shield, and it no longer
+looks like one of the weakness icons next to it. A broken enemy now turns
+grey until it recovers, and its shield is drawn cracked. In a fight with
+several kinds of enemies, a broken enemy may keep its colours; the
+cracked shield still marks it.

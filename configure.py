@@ -813,11 +813,12 @@ check("spell_grants",
        "ff6/src/text/magic_name_en.json", "docs/design/kits.md",
        "docs/design/magicite.md", "docs/design/magicite-tube-six.md",
        copy_if_changed_from("build/ot6.sfc")])
-# #292: the HUD's shield-count tiles are generated; the checked-in .inc must
-# be what the generator writes (counts 1-6 byte-identical to the old art is
-# asserted inside the generator).
+# #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
+# battle font's numerals); the checked-in .inc must be what the generator
+# writes.
 check("shield_glyphs", "python3 ff6/tools/gen_shield_glyphs.py --check",
-      ["ff6/tools/gen_shield_glyphs.py", "ff6/src/battle/ot6_shield_glyphs.inc"])
+      ["ff6/tools/gen_shield_glyphs.py", "ff6/src/battle/ot6_shield_glyphs.inc",
+       "ff6/src/gfx/small_font_en.2bpp"])
 check("encounters_selftest", "python3 tools/audit_encounters.py --selftest",
       ["tools/audit_encounters.py"])
 check("chestvis_selftest", "python3 tools/chest_visibility.py --selftest",
