@@ -226,7 +226,12 @@ makes:
 
 > **A verb's price escalates exactly when `Ot6BoostDmg` multiplies it.**
 
-There is nothing else to check. `Ot6BoostDmg`'s command gate names
+There is one exception since #469: where the boost buys more of the same
+application rather than a bigger number -- a reach spell's bodies,
+Debilitator's weaknesses, Filch's shields -- the price is per body or per
+step (below), whatever the command gate says, and NoiseBlaster, which takes
+no boost, stays flat though Tools escalate. Otherwise there is nothing
+else to check. `Ot6BoostDmg`'s command gate names
 fight `$00`, capture `$06`, bushido `$07`, steal `$05`, slot `$0f` and
 rage `$10`, plus every tier-family spell through `Ot6FoldTbl`. That
 list is the exemption list, read straight across. One scan, one gate,
@@ -543,7 +548,8 @@ gate). The boost buys swings.
 
 Base prices are `Ot6AbilityCostTbl`'s, `Ot6StealCost`'s and
 `Ot6DanceCost`'s; the boosted columns are the formula above, for the
-rows the one test says escalate. `battle_costtable` prints this whole
+rows the one test says escalate, and the per-body arm (#469) for the rows
+whose boost buys more of the same application. `battle_costtable` prints this whole
 table out of the built ROM, flat rows marked.
 
 | row | base | boost 1 | boost 2 | boost 3 |
@@ -553,11 +559,13 @@ table out of the built ROM, flat rows marked.
 | **Slot** (chance verb, unpriced) | 0 | 0 | 0 | 0 |
 | **Jackpot** (divine: offered at 3 BP only) | -- | -- | -- | 99 |
 | Pummel / AutoCrossbow | 4 | 10 | 25 | 63 |
-| Bestow (flat, buys nothing) | 5 | 5 | 5 | 5 |
-| NoiseBlaster / Flash | 6 | 15 | 38 | 94 |
-| Filch (flat, buys nothing) | 6 | 6 | 6 | 6 |
+| Bestow (flat: its boost buys pips, #469) | 5 | 5 | 5 | 5 |
+| NoiseBlaster (flat: takes no boost, #469) | 6 | 6 | 6 | 6 |
+| Flash | 6 | 15 | 38 | 94 |
+| Filch (per shield, #469) | 6 | 12 | 18 | 24 |
 | Bio Blaster / **Dance** | 8 | 20 | 50 | 99 |
-| AuraBolt / Debilitator | 10 | 25 | 63 | 99 |
+| AuraBolt | 10 | 25 | 63 | 99 |
+| Debilitator (per weakness, #469; 80 overclocked) | 10 | 20 | 30 | 40 |
 | Suplex | 13 | 33 | 81 | 99 |
 | Air Anchor | 14 | 35 | 88 | 99 |
 | Mantra / Drill | 16 | 40 | 99 | 99 |

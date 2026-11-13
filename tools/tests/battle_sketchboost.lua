@@ -26,7 +26,19 @@
 -- others Defending, waiting a different number of frames at the target
 -- select each try so the roll varies.  Every try is judged by the attack it
 -- drew (read where Cmd_0d hands the attack on, _c21554), and at least one
--- try must draw an attack with no number.  Nothing is written.
+-- try must draw an attack with no number.
+--
+-- A reach spell drawn by the brush buys nothing either (#469 review): reach
+-- serves Magic and X-Magic only (Ot6SpellReach), and a sketch keeps command
+-- $0D, so Ot6SketchNoBoost drops the boost for it too.  No monster within
+-- reach of a RELM checkpoint sketches one (MonsterSketch read off the ROM:
+-- the Lizard's Imp and Remedy, the Drop's Muddle, NeckHunter's Imp, live
+-- elsewhere), so two more tries are a DECLARED EXPEDIENT
+-- (tools/state_write_waivers.txt): at Cmd_0d's `lda $3400` (Cmd_0d + 39, the
+-- brush's drawn attack, byte-identical on the old ROM) the drawn attack is
+-- replaced by Imp ($23), and everything after is the engine's own.  A
+-- mechanism test of the drop, not a claim about play.  Nothing else is
+-- written.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -36,6 +48,7 @@ local BANK, PEND = 0x3E9C, 0x3E9D
 local CMD_SKETCH = 0x0D
 local RELM = 8
 local TRIES = 8
+local INJECT = { 0x23, 0x23 }   -- Imp, a reach spell, on two more tries
 
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function pend(s) return H.readByte(PEND + s * 2) end
@@ -49,6 +62,7 @@ end
 local MPB, MSK
 local function noNumber(a)
   if a >= 0xEE then return false end           -- Battle, Special: Fight
+  if H.isReachSpell(a) then return true end    -- reach serves Magic only (#469 review)
   local r = MPB + a * 14
   return (H.readRomByte(r + 4) & 0x80) ~= 0 or H.readRomByte(r + 6) == 0
 end
@@ -134,8 +148,8 @@ local function runTry(t)
     H.call(function()
       armed = nil
       H.setPad({})
-      H.log(string.format("[sketch] try %d (delay %d): pending at the confirm %s; drew %s%s; bank %s -> %s", t.n,
-        t.delay, tostring(t.pendAtConfirm), t.drawn and string.format("$%02X", t.drawn) or "nothing (missed)",
+      H.log(string.format("[sketch] try %d (delay %d%s): pending at the confirm %s; drew %s%s; bank %s -> %s", t.n,
+        t.delay, t.inject and string.format(", Imp injected") or "", tostring(t.pendAtConfirm), t.drawn and string.format("$%02X", t.drawn) or "nothing (missed)",
         t.drawn and (noNumber(t.drawn) and " (no number)" or " (a number)") or "", tostring(t.bank0),
         tostring(t.bankEnd)))
     end),
@@ -163,6 +177,15 @@ local steps = {
     H.assertEntryContract("wor-locke-v1")
     MPB = H.sym("MagicProp") & 0x3FFFFF
     MSK = H.sym("MonsterSketch") & 0x3FFFFF
+    -- the declared injection (see the header): Cmd_0d + 39 is `lda $3400`
+    local ld = H.sym("Cmd_0d") + 39
+    H.assertEq(H.readRomByte(ld & 0x3FFFFF), 0xAD, "Cmd_0d + 39 is an lda abs")
+    H.assertEq(H.readRomWord((ld & 0x3FFFFF) + 1), 0x3400, "...of $3400, the brush's drawn attack")
+    emu.addMemoryCallback(function()
+      local t = armed
+      if t == nil or t.inject == nil or not t.sent or t.endF then return end
+      H.writeByte(0x3400, t.inject)
+    end, emu.callbackType.exec, ld, ld)
     local sk = H.sym("_c21554")
     emu.addMemoryCallback(function()
       local t = armed
@@ -250,8 +273,8 @@ local steps = {
   H.waitFrames(2),
   H.call(function() H.checkReq(snap, "snapshot S") end),
 }
-for i = 1, TRIES do
-  local t = { n = i, delay = (i - 1) * 7 }
+for i = 1, TRIES + #INJECT do
+  local t = { n = i, delay = (i - 1) * 7, inject = INJECT[i - TRIES] }
   tries[i] = t
   for _, s in ipairs(runTry(t)) do steps[#steps + 1] = s end
 end
@@ -261,8 +284,13 @@ steps[#steps + 1] = H.call(function()
     H.log(string.format("[sketch] %s %s", ok and "ok:" or "FAIL:", msg))
     if not ok then bad[#bad + 1] = msg end
   end
+  local reach = 0
   for _, t in ipairs(tries) do
     H.assertEq(t.pendAtConfirm, 1, "try " .. t.n .. ": the Sketch was confirmed at 1 BP")
+    if t.inject then
+      H.assertEq(t.drawn, t.inject, "try " .. t.n .. ": the injected reach spell is the attack the sketch runs")
+      reach = reach + 1
+    end
     if t.drawn and noNumber(t.drawn) then
       quiet = quiet + 1
       check(t.bankEnd == math.min(5, t.bank0 + 1), string.format("try %d: drew $%02X (no number): the bank went "
@@ -273,7 +301,8 @@ steps[#steps + 1] = H.call(function()
         t.drawn and string.format("$%02X", t.drawn) or "nothing", t.bank0, t.bankEnd, t.bank0 - 1))
     end
   end
-  check(quiet >= 1, string.format("%d of %d tries drew an attack with no number", quiet, TRIES))
+  check(quiet - reach >= 1, string.format("%d of %d natural tries drew an attack with no number", quiet - reach,
+    TRIES))
   assert(#bad == 0, #bad .. " sketch-boost assertion(s) failed: " .. table.concat(bad, "; "))
   H.log("[sketch] VERDICT: a boosted Sketch that draws an attack with no number keeps its boost; one that draws a "
     .. "number spends it")

@@ -113,9 +113,16 @@ end
 -- ---- observers ---------------------------------------------------------------
 local armed, installed = nil, false
 local function ev(c, s) c.log[#c.log + 1] = string.format("f%d %s", H.frame, s) end
+local drawnT = {}      -- the thief list's drawn price per row id
 local function installObservers()
   if installed then return end
   installed = true
+  emu.addMemoryCallback(function(_, v)
+    if H.readByte(0x6168) == 3 then drawnT[H.readByte(0x4005 + (emu.getState()["cpu.y"] & 0xFFFF))] = v end
+  end, emu.callbackType.write, 0x7E575C, 0x7E575C)
+  emu.addMemoryCallback(function(_, v)
+    if H.readByte(0x6168) == 3 then drawnT[H.readByte(0x5761)] = v end
+  end, emu.callbackType.write, 0x7E5763, 0x7E5763)
   local function cx() return emu.getState()["cpu.x"] & 0xFF end
   local function onExec(a, fn)
     emu.addMemoryCallback(function() if armed and armed.sent and not armed.endF then fn(armed) end end,
@@ -234,6 +241,7 @@ local function actorPress(c, st)
     local cc, cr = H.readByte(KCOL + s), H.readByte(KROW + s)
     if cc ~= col then return cc < col and "right" or "left" end
     if cr ~= row then return cr < row and "down" or "up" end
+    c.listPrice = drawnT[ROWID[c.rowName]]   -- the price the row drew, pending boost and all
     return onRow(c, s)
   end
   if c.cmd == CMD_ITEM and st == ST_ITEM then
@@ -318,9 +326,27 @@ local function runCase(c)
       armed = c
       ev(c, "START " .. chars() .. " | " .. mons())
     end),
-    H.driveUntil(function() return c.endF ~= nil and H.frame >= c.endF + 120 end, 14000, {
+    H.driveUntil(function()
+      return c.endF ~= nil and H.frame >= c.endF + 120 and (c.snapAfter == nil or snaps[c.snapAfter] ~= nil)
+    end, 30000, {
       H.call(function()
         Tm.observe(); Tc.observe()
+        if c.after and c.snapAfter and snaps[c.snapAfter] == nil and H.frame >= c.endF + 30 then
+          -- on to the actor's next window that meets the snapshot's need
+          tick = tick + 1
+          if tick % 12 == 6 then H.setPad({}) return end
+          if tick % 12 ~= 0 or H.readByte(MENU) == 0 then return end
+          local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
+          if a == actS and st == ST_CMD and pend(actS) == 0 and c.snapCond() then
+            H.setPad({}); snaps[c.snapAfter] = H.requestSaveState()
+            H.log(string.format("[boostkeep] snapshot %s f%d (after %s): %s | %s", c.snapAfter, H.frame, c.name,
+              chars(), mons()))
+            return
+          end
+          local b = defendPress(st)
+          H.setPad(b and { [b] = true } or {})
+          return
+        end
         if c.endF and not c.after and H.frame >= c.endF + 6 then
           c.after = true
           c.bankEnd = bank(actS)
@@ -344,7 +370,9 @@ local function runCase(c)
         H.setPad((held and ph < 6) and { [held] = true } or {})
       end),
     }, "case " .. c.name .. " resolves"),
+    H.waitFrames(2),
     H.call(function()
+      if c.snapAfter then H.checkReq(snaps[c.snapAfter], "snapshot " .. c.snapAfter) end
       armed = nil
       H.setPad({})
       for _, l in ipairs(c.log) do H.log(string.format("[boostkeep] %s: %s", c.name, l)) end
@@ -555,12 +583,8 @@ steps[#steps + 1] = H.call(function()
     table.concat(names, " "), quiet and string.format("%02X", quiet) or "none",
     loud and string.format("%02X", loud) or "none"))
   -- #469: Shell, the spell fire-out-v1's TERRA held that bought nothing, buys
-  -- reach now; a list with no other leaves the quiet cases unplayed (said here)
+  -- reach now; the quiet spell's cases moved to battle_boostreach (CELES's)
   assert(loud, "TERRA knows a spell the boost multiplies")
-  if quiet == nil then
-    H.log("[boostkeep] NOTE: TERRA's list holds no spell the boost buys nothing on (Shell buys reach since #469): "
-      .. "the quiet cases are not played")
-  end
 end)
 
 -- snapshot L: LOCKE's window, four pips banked
@@ -598,10 +622,15 @@ add(snapAt("B", function() return bank(lockeS) >= 3 and bank(terraS) <= 1 end, t
 -- spend: the boosted case's bank ends `boost` below where it stood (no regen)
 local CASES = {
   { name = "filch-b0",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0 },
-  { name = "filch-b2",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 2 },
+  { name = "filch-b2",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 2, snapAfter = "F",
+    snapCond = function() return bank(lockeS) >= 2 and shield(tgtMon) >= 1 end },
+  -- fewer shields left than the points buy: Filch takes what is there and breaks the body
+  { name = "filch-few-b2", snap = "F", cmd = CMD_STEAL, rowName = "filch",    boost = 2 },
   { name = "filch-r",      snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0, rowR = 1 },
   { name = "bestow-b0", othersWait = true,    snap = "B", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true },
   { name = "bestow-b2", othersWait = true,    snap = "B", cmd = CMD_STEAL, rowName = "bestow",   boost = 2, ally = true },
+  -- capped by the ally's room: from L TERRA Defends before the row runs
+  { name = "bestow-cap-b2", snap = "L", cmd = CMD_STEAL, rowName = "bestow", boost = 2, ally = true, capped = true },
   { name = "bestow-r", othersWait = true,     snap = "B", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true, rowR = 1 },
   { name = "appraise2-b1", snap = "L", cmd = CMD_STEAL, rowName = "appraise", boost = 1, spend = true },
   { name = "tonic-b0",     snap = "L", cmd = CMD_ITEM, item = TONIC, boost = 0, ally = true },
@@ -614,11 +643,6 @@ local CASES = {
   { name = "fenix-b0",     snap = "L", cmd = CMD_ITEM, item = FENIX, boost = 0, ally = true },
   { name = "fenix-b1",     snap = "L", cmd = CMD_ITEM, item = FENIX, boost = 1, ally = true, keep = "fenix-b0" },
   { name = "fenix-r",      snap = "L", cmd = CMD_ITEM, item = FENIX, boost = 0, ally = true, rowR = 0 },
-  { name = "quiet-b0",     snap = "T", who = "T", cmd = CMD_MAGIC, spell = "quiet", boost = 0, ally = true },
-  { name = "quiet-b1",     snap = "T", who = "T", cmd = CMD_MAGIC, spell = "quiet", boost = 1, ally = true,
-    keep = "quiet-b0", sameMp = "quiet-b0" },
-  { name = "quiet-r",      snap = "T", who = "T", cmd = CMD_MAGIC, spell = "quiet", boost = 0, ally = true,
-    rowR = 0 },
   { name = "loud-b0",      snap = "T", who = "T", cmd = CMD_MAGIC, spell = "loud", boost = 0 },
   { name = "loud-b1",      snap = "T", who = "T", cmd = CMD_MAGIC, spell = "loud", boost = 1, spend = true,
     moreMp = "loud-b0" },
@@ -638,12 +662,7 @@ for _, c in ipairs(CASES) do
     if c.item == "cure" then c.item = cureItem end
     if c.spell == "quiet" then c.spell = quiet elseif c.spell == "loud" then c.spell = loud end
   end)
-  if c.spell == "quiet" then
-    steps[#steps + 1] = H.cond(function() return quiet ~= nil end, runCase(c),
-      { H.call(function() c.skipped = true end) })
-  else
-    add(runCase(c))
-  end
+  add(runCase(c))
 end
 
 steps[#steps + 1] = H.call(function()
@@ -653,7 +672,6 @@ steps[#steps + 1] = H.call(function()
     if not ok then bad[#bad + 1] = msg end
   end
   for _, c in ipairs(CASES) do
-    if c.skipped then goto continue end
     -- what the case played: the actor's action, at the case's boost; R on
     -- the row raised it (rowR = 1) or was refused (rowR = 0)
     if c.rowR then
@@ -684,6 +702,12 @@ steps[#steps + 1] = H.call(function()
     -- each shield is its own Filch's price.  Bestow hands the pips pending
     -- (one at 0), as many as the ally can hold, and charges exactly those.
     if c.rowName == "filch" then
+      if c.name == "filch-few-b2" then
+        H.assertEq(c.sh0 >= 1 and c.sh0 < c.boost + 1, true, c.name .. ": fewer shields left than the points buy")
+        check(c.shEnd == 0, string.format("%s: the last shield taken broke the body (shields %d)", c.name, c.shEnd))
+      end
+      check(c.listPrice == c.charged, string.format("%s: the thief list drew %s MP, the charge %d", c.name,
+        tostring(c.listPrice), c.charged))
       local want = math.min(c.boost + 1, c.sh0)
       check(c.sh0 - c.shEnd == want, string.format("%s: Filch at %d BP took %d shield(s) of %d (want %d)", c.name,
         c.boost, c.sh0 - c.shEnd, c.sh0, want))
@@ -702,6 +726,10 @@ steps[#steps + 1] = H.call(function()
       -- the ally's bank from the row's run to LOCKE's turn end (her own turns
       -- may move it before)
       local want = math.min(math.max(1, c.boost), 5 - c.allyAtExec, c.bank0)
+      if c.capped then
+        H.assertEq(5 - c.allyAtExec < c.boost, true, string.format("%s: the ally's room (%d) is under the points",
+          c.name, 5 - c.allyAtExec))
+      end
       check(c.allyAtEnd - c.allyAtExec == want, string.format("%s: Bestow at %d BP handed %d pip(s) (ally %d -> %d; "
         .. "want %d)", c.name, c.boost, c.allyAtEnd - c.allyAtExec, c.allyAtExec, c.allyAtEnd, want))
       check(c.bankEnd == c.bank0 - want, string.format("%s: LOCKE's bank went %d -> %d (want %d: the pips "
@@ -726,7 +754,6 @@ steps[#steps + 1] = H.call(function()
       check(c.bankEnd == c.bank0 - c.boost, string.format("%s: the bank went %d -> %d, "
         .. "%d spent and no regen (a boost spent, whatever it found)", c.name, c.bank0, c.bankEnd, c.boost))
     end
-    ::continue::
   end
   assert(#bad == 0, #bad .. " boost-keep assertion(s) failed: " .. table.concat(bad, "; "))
   H.log("[boostkeep] VERDICT: R refused on every row the boost buys nothing on, and a boost raised before such "

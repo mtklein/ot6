@@ -11,20 +11,27 @@ would a boost naturally buy, and which boost family does it join."
 The first tranche (#469, `wt/boost-rewards`): the four holes are closed and
 proposals 1, 3, 4 and 5 are built; proposal 2 is declined.
 
-- **The four holes.** NoiseBlaster and Air Anchor refuse the boost
-  (`Ot6ToolNoBoost`: R is refused on their Tools row, a boost raised on the
-  command window is dropped at the queue, `Ot6QueueFold`, and their price is
-  flat, `Ot6ToolPrice`). Certainty, proposal 4's reward for them, would buy
-  nothing: a tool's hit rate is ItemProp +21, `$FF` for both, and CheckHit
-  takes `$FF` as a certain hit, so their status already lands wherever an
-  immunity does not stop it. Debilitator has its reward (proposal 4). MagiTek
+- **The four holes.** NoiseBlaster refuses the boost (`Ot6ToolNoBoost`: R
+  is refused on its Tools row, a boost raised on the command window is
+  dropped at the queue, `Ot6QueueFold`, and its price is flat,
+  `Ot6ToolPrice`). Certainty, proposal 4's reward for it, would buy nothing:
+  a tool's hit rate is ItemProp +21, `$FF`, and CheckHit takes `$FF` as a
+  certain hit, so its Confuse already lands wherever an immunity does not
+  stop it. Air Anchor was never a hole: its ItemProp +20 power is 128, a
+  piercing hit the multiplier doubles (measured, `lab_anchor`, in the
+  commit that dropped it from the refusal), so it keeps the multiplier and
+  its escalating price. Debilitator has its reward (proposal 4). MagiTek
   Confuser and X-fer refuse it (`Ot6RowNoBoost`'s MagiTek arm, R on the cell;
   `Ot6QueueFold`'s, a boost raised before), and so does the Gravity Rod used
   from Item (`Ot6ItemNoBoost` reads an equipment's cast spell, ItemProp +18
   bit 7, through `Ot6SpellNoBoost`: Quartr is a fraction). A Sketch whose drawn
-  attack has no number drops its boost once the brush has drawn it
-  (`Ot6SketchNoBoost`, in Cmd_0d before `_c21554`); the menu cannot refuse R,
-  since the draw is a roll. Suites: `battle_boostreach` (NoiseBlaster, the
+  attack has no number, or is a reach spell (reach serves Magic and
+  X-Magic only, and a sketch keeps command `$0D`), drops its boost once the
+  brush has drawn it (`Ot6SketchNoBoost`, in Cmd_0d before `_c21554`); the
+  menu cannot refuse R, since the draw is a roll. **This is a deliberate
+  exception to #463's rule** that a boost only the resolve shows was useless
+  is spent (a Steal on a robbed body): the TLM's call in #469's review, since
+  a Sketch cannot know its draw when it is chosen. Suites: `battle_boostreach` (NoiseBlaster, the
   Gravity Rod), `battle_magitekboost`, `battle_sketchboost`.
 - **Proposal 1, reach**, as written below, for the fourteen spells
   (`Ot6ReachTbl`, `ot6_reach.asm`). `Ot6SpellReach` runs in CalcAttackEffect
@@ -32,7 +39,11 @@ proposals 1, 3, 4 and 5 are built; proposal 2 is declined.
   `Ot6ReachWalk`, which passes over a body that is not standing, a vanished
   one for a physical attack, a reflecting one for a reflectable spell, and one
   on which none of the attack's statuses would change (`Ot6ReachLands`: set
-  mode, a status it lacks and may take; lift mode, one it holds). Vanish at a
+  mode, a status it lacks and may take; lift mode, one it holds). Imp and
+  Vanish toggle (MagicProp +4 bit 3): their reach follows the body aimed at,
+  lifting the status from the others that hold it when that body holds it,
+  setting it otherwise. The price is per point, not per body reached: a
+  point that finds nobody is still paid for, as a Scan's is. Vanish at a
   monster reaches nobody and its boost is dropped at the queue. The price is
   per body, base x (1 + boost) capped at 99 (`Ot6PerPointPrice`, through
   `Ot6MagicPrice`). Suite: `battle_boostreach` (Safe at 0, 1 and 2 points,
@@ -123,7 +134,8 @@ guidelines, a bug.
 | SwdTech | the tech (the cursor row is the boost); Cleave at 3 (Cyan) |
 | Blitz | the multiplier; Bum Rush at 3 (Sabin) |
 | Tools with a number: AutoCrossbow, Bio Blaster, Flash, Drill, Chain Saw | the multiplier; Overclock at 3 (Edgar) |
-| Tools without one: NoiseBlaster, Air Anchor | refused (#469) |
+| Tools without one: NoiseBlaster | refused (#469) |
+| Air Anchor (power 128, pierce) | the multiplier |
 | Debilitator | a weakness a point (#469) |
 | Throw, a damaging item | the multiplier |
 | Throw, the smoke and the exit | reach |

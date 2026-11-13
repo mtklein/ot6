@@ -1025,11 +1025,11 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         and     f:$7e0000+OT6_SPELLNONE
         sta     f:$7e0000+OT6_SPELLNONE
 @spcmd: lda     $3a7a
-        cmp     #$09            ; #469: NoiseBlaster and Air Anchor buy
-        bne     @nottool        ;   nothing with a boost (Ot6ToolNoBoost:
-        txa                     ;   their status lands at hit rate 255
-        cmp     #$08            ;   wherever it can land), and are priced
-        jcs     @keep           ;   flat (Ot6ToolPrice) for it
+        cmp     #$09            ; #469: NoiseBlaster buys nothing with a
+        bne     @nottool        ;   boost (Ot6ToolNoBoost: its status lands
+        txa                     ;   at hit rate 255 wherever it can land),
+        cmp     #$08            ;   and is priced flat (Ot6ToolPrice) for it
+        jcs     @keep
         lda     $3a7b
         jsl     Ot6ToolNoBoost
         jcc     @keep
@@ -1250,8 +1250,8 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;     #469), a Magic, Lore or X-Magic turn none of whose spells moves one,
 ;     Scan aimed at the party and Vanish at a monster included (Ot6ActionEnd,
 ;     on Ot6QueueFold's OT6_SPELLNONE verdict), a summon or MagiTek beam that
-;     moves none (Ot6QueueFold; both Ot6SpellNoBoost), NoiseBlaster and Air
-;     Anchor (Ot6QueueFold, Ot6ToolNoBoost), Revert (Ot6RevertTake), and
+;     moves none (Ot6QueueFold; both Ot6SpellNoBoost), NoiseBlaster
+;     (Ot6QueueFold, Ot6ToolNoBoost), Revert (Ot6RevertTake), and
 ;     Row, Def., Leap, Control and Possess (Ot6CmdNoBoost);
 ;   * a Sketch whose drawn attack moves no number (Ot6SketchNoBoost, #469:
 ;     only the draw can tell);
@@ -1433,7 +1433,8 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;     ($2686, five bytes a row);
 ;   * Edgar's Tools ($30 with $6168 = 0, the tools shell's real-tools mode):
 ;     Ot6ToolNoBoost on the tool under the cursor (#469: NoiseBlaster, Air
-;     Anchor), the shell's own row arithmetic (_c18470: scroll + cursor row,
+;     Anchor is not: it hits), the shell's own row arithmetic (_c18470:
+;     scroll + cursor row,
 ;     two columns, wItemList's three bytes a row at $4005);
 ;   * the MagiTek list ($2a): Ot6SpellNoBoost on the beam under the cursor
 ;     (#469: Confuser, X-fer), the attack id the confirm queues: the cursor
@@ -1541,20 +1542,19 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;
 ; A Tool's boost buys Ot6BoostDmg's multiplier (cmd $09 is outside its gate),
 ; Debilitator's weaknesses (Ot6DebilSteps) and, at three points, Edgar's
-; Overclock.  NoiseBlaster (Confuse) and Air Anchor (its death mark) move no
-; number, and their status already lands wherever it can: a tool's hit rate
-; is ItemProp +21, $ff for both, and CheckHit takes $ff as a certain hit, so
-; nothing is left for certainty to buy; immunity, which stops them, no boost
-; overrides.  A second firing (Overclock) puts the same status on the same
-; body.  So they buy nothing at any boost.
+; Overclock.  NoiseBlaster (Confuse, power 0) moves no number, and its status
+; already lands wherever it can: a tool's hit rate is ItemProp +21, $ff, and
+; CheckHit takes $ff as a certain hit, so nothing is left for certainty to
+; buy; immunity, which stops it, no boost overrides.  A second firing
+; (Overclock) puts the same status on the same body.  So it buys nothing at
+; any boost.  Air Anchor is not here: its ItemProp +20 power is 128, a
+; piercing hit the multiplier doubles (boost-rewards.md, #469 review).
 ;
 ; in: A = the tool's item id.  out: carry set = no boost reward.  a8, either
 ; index width; preserves A, X and Y.
 .proc Ot6ToolNoBoost
         .a8
         cmp     #ITEM::NOISEBLASTER
-        beq     @none
-        cmp     #ITEM::AIR_ANCHOR
         beq     @none
         clc
         rtl
@@ -1614,7 +1614,7 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         beq     @spell
         cmp     #$1d            ; #469: a MagiTek beam, as a summon
         beq     @spell
-        cmp     #$09            ; #469: NoiseBlaster, Air Anchor
+        cmp     #$09            ; #469: NoiseBlaster
         beq     @tool
         cmp     #$0f
         bne     @out

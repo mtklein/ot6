@@ -2992,6 +2992,30 @@ end
 -- This is the only place in the library the 2.5x arithmetic appears.
 -- Every caller that wants to know what a boost will cost reaches here,
 -- the way every ROM surface that states a price reaches Ot6BoostPriceFor.
+-- #469's per-point arm (Ot6PerPointPrice): a boost that buys more bodies or
+-- steps (a reach spell, Debilitator, Filch) pays each as its own use, base x
+-- (1 + boost), capped at 99 and never below the base.
+function M.perPointPrice(base, boost)
+  base, boost = base or 0, math.max(0, math.min(boost or 0, 3))
+  return math.max(base, math.min(99, base * (1 + boost)))
+end
+-- Ot6ReachTbl, read once off the ROM (empty on a ROM without it); on M, not a
+-- file-scope local (the main chunk's 200-local limit)
+function M.isReachSpell(id)
+  if M.reachIds == nil then
+    local REACH = {}
+    M.reachIds = REACH
+    local ok, at = pcall(function() return M.sym("Ot6ReachTbl") end)
+    if ok then
+      for i = 0, 15 do
+        local v = M.readRomByte((at & 0x3FFFFF) + i)
+        if v == 0xFF then break end
+        REACH[v] = true
+      end
+    end
+  end
+  return M.reachIds[id] == true
+end
 function M.boostPrice(base, boost)
   base, boost = base or 0, boost or 0
   if boost <= 0 then return base end
@@ -3324,6 +3348,7 @@ function M.spellPrice(id, base, boost, actor)
     return M.spellMpCost(to), to
   end
   if econ then return 1, id end
+  if M.isReachSpell(id) then return M.perPointPrice(base, boost), id end
   return M.boostPrice(base, boost), id
 end
 
@@ -3509,8 +3534,11 @@ function M.overclocks(actor, boost)
   return boost >= 3 and actor ~= nil and M.readByte(0x3ED8 + actor * 2) == 4
     and (M.readByte(0x1E80 + (0x68 >> 3)) & (1 << (0x68 & 7))) ~= 0
 end
-function M.toolPrice(actor, base, boost)
-  local p = M.boostPrice(base, boost)
+function M.toolPrice(actor, base, boost, id)
+  -- #469 (Ot6ToolPrice): NoiseBlaster is flat at every boost, overclock or
+  -- not; Debilitator pays a firing a weakness
+  if id == 0xA3 then return base end
+  local p = id == 0xA7 and M.perPointPrice(base, boost) or M.boostPrice(base, boost)
   if p > 0 and M.overclocks(actor, boost) then p = math.min(99, p * 2) end
   return p
 end
@@ -3556,7 +3584,7 @@ function M.boostPlan(o)
   if o.spell then
     priceAt = function(b) return (M.spellPrice(o.id, base, b, o.slot)) end
   elseif o.slot ~= nil and o.id ~= nil and o.id >= 0xA3 and o.id <= 0xAA then
-    priceAt = function(b) return M.toolPrice(o.slot, base, b) end
+    priceAt = function(b) return M.toolPrice(o.slot, base, b, o.id) end
   end
   -- The ration is applied by handing affordBoost a SMALLER pool, not a
   -- smaller want: it then steps the boost down to the deepest level the

@@ -19,7 +19,9 @@
 --   2. R on the command window raises one pip, then Confuser is picked and
 --      confirmed at the default target: at the pick the pending is 1, and six
 --      frames after her Ot6ActionEnd the bank stands where an unboosted turn
---      leaves it (the pip she held plus the regen pip), not spent.
+--      leaves it (the pip she held plus the regen pip), not spent;
+--   3. the same at her next window for X-fer.  Each turn is asserted to have
+--      run the beam it names (MagiTek $1D, attack $83 + the cell).
 -- Nothing is written.  Old ROM: R raises on both rows and the boosted
 -- Confuser spends the pip (the bank ends at 0).
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -40,9 +42,11 @@ local plan = {
   { cell = "xfer", r = true },
   { cell = "fire", r = true, control = true },
   { cell = "confuser", commit = true },
+  { cell = "xfer", commit = true },
 }
-local k, res, triedR, endF, done = 1, {}, false, nil, false
-local bank0
+local k, res, triedR, done = 1, {}, false, false
+local cm = nil       -- the commit in play: { cell, bank0, committed, pendAtConfirm, endF, bankEnd, cmd, atk }
+local commits = {}
 
 H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
@@ -55,8 +59,8 @@ H.run({ maxFrames = 40000 }, {
     end
     assert(terra, "TERRA is in the battle (battle_entry)")
     emu.addMemoryCallback(function()
-      if (emu.getState()["cpu.x"] & 0xFF) == terra * 2 and res.committed and endF == nil then
-        endF = H.frame
+      if (emu.getState()["cpu.x"] & 0xFF) == terra * 2 and cm and cm.committed and cm.endF == nil then
+        cm.endF, cm.cmd, cm.atk = H.frame, H.readByte(0x3A7C), H.readByte(0x3A7D)
         H.log(string.format("[magitek] f%d TERRA's Ot6ActionEnd: queued $%02X $%02X, bank %d pending %d",
           H.frame, H.readByte(0x3A7C), H.readByte(0x3A7D), bank(terra), pend(terra)))
       end
@@ -66,9 +70,10 @@ H.run({ maxFrames = 40000 }, {
     local mf = 0
     return H.driveUntil(function() return done end, 30000, {
       H.call(function()
-        if endF and H.frame >= endF + 6 and res.bankEnd == nil then
-          res.bankEnd = bank(terra)
-          done = true
+        if cm and cm.endF and H.frame >= cm.endF + 6 and cm.bankEnd == nil then
+          cm.bankEnd = bank(terra)
+          k = k + 1
+          done = k > #plan
           H.setPad({})
           return
         end
@@ -79,15 +84,19 @@ H.run({ maxFrames = 40000 }, {
         local btn = "b"
         if act ~= terra then
           btn = st == ST_CMD and "x" or "b"
-        elseif res.committed then
+        elseif cm and cm.committed and cm.bankEnd == nil then
           btn = st == ST_TGT and "a" or nil   -- until the confirm lands
         else
           local p = plan[k]
+          if p.commit and (cm == nil or cm.p ~= p) then
+            cm = { p = p, cell = p.cell }
+            commits[#commits + 1] = cm
+          end
           if st == ST_CMD then
             if p.commit then
               if pend(terra) < 1 then btn = "r"
               else
-                bank0 = bank0 or bank(terra)
+                cm.bank0 = cm.bank0 or bank(terra)
                 btn = "a"
               end
             elseif pend(terra) > 0 then btn = "l"
@@ -115,13 +124,12 @@ H.run({ maxFrames = 40000 }, {
             elseif pend(terra) < 1 then
               btn = "b"                  -- back to the command window to raise it
             else
-              res.pendAtPick = pend(terra)
               btn = "a"
             end
-          elseif st == ST_TGT then
-            res.committed = true
-            res.pendAtConfirm = pend(terra)
-            H.log(string.format("[magitek] Confuser confirmed at pending %d, bank %d", pend(terra), bank(terra)))
+          elseif st == ST_TGT and p.commit then
+            cm.committed = true
+            cm.pendAtConfirm = pend(terra)
+            H.log(string.format("[magitek] %s confirmed at pending %d, bank %d", p.cell, pend(terra), bank(terra)))
             btn = "a"
           elseif st == 0x01 then btn = nil
           end
@@ -144,13 +152,18 @@ H.run({ maxFrames = 40000 }, {
       check(r.after == want, string.format("R on %s left the pending at %d (want %d: %s)", p.cell, r.after, want,
         p.control and "the beam has a number" or "refused: it buys nothing"))
     end
-    H.assertEq(res.pendAtConfirm, 1, "the boosted Confuser was confirmed with one pip pending")
-    -- an unboosted turn: the pip held stays and the regen pip lands (capped at 5)
-    local want = math.min(5, bank0 + 1)
-    check(res.bankEnd == want, string.format("the boosted Confuser left the bank at %d (from %d; want %d: the boost "
-      .. "dropped, never charged, and the regen pip earned)", res.bankEnd, bank0, want))
+    H.assertEq(#commits, 2, "both boosted beams were played")
+    for _, c in ipairs(commits) do
+      H.assertEq(c.pendAtConfirm, 1, "the boosted " .. c.cell .. " was confirmed with one pip pending")
+      H.assertEq(c.cmd == 0x1D and c.atk == 0x83 + CELL[c.cell], true, string.format("the turn ran MagiTek's %s "
+        .. "($%02X $%02X)", c.cell, c.cmd or 0, c.atk or 0))
+      -- an unboosted turn: the pip held stays and the regen pip lands (capped at 5)
+      local want = math.min(5, c.bank0 + 1)
+      check(c.bankEnd == want, string.format("the boosted %s left the bank at %d (from %d; want %d: the boost "
+        .. "dropped, never charged, and the regen pip earned)", c.cell, c.bankEnd, c.bank0, want))
+    end
     assert(#bad == 0, #bad .. " MagiTek assertion(s) failed: " .. table.concat(bad, "; "))
     H.log("[magitek] VERDICT: R refused on Confuser and X-fer, raised on Fire Beam; a boost raised before Confuser "
-      .. "is dropped, not charged")
+      .. "or X-fer is dropped, not charged")
   end),
 })

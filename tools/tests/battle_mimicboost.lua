@@ -437,11 +437,9 @@ local steps = {
     quiet = quietSpell(terraS)
     H.log(string.format("[mimicboost] TERRA's spell the boost buys nothing on: %s",
       quiet and string.format("$%02X", quiet) or "none"))
-    if quiet == nil then
-      -- #469: Shell, the one fire-out-v1's TERRA held, buys reach now
-      H.log("[mimicboost] NOTE: TERRA's list holds no spell the boost buys nothing on (Shell buys reach since "
-        .. "#469): the quiet cases are not played")
-    end
+    -- #469: Shell, the one fire-out-v1's TERRA held, buys reach now, so no
+    -- copied quiet spell is played here (battle_boostreach plays the quiet
+    -- spell itself; a Mimic's copy of one is not covered)
     assert(bagIdx(TONIC) and bagIdx(ANTIDOTE), "the bag holds a Tonic and an Antidote")
   end),
 }
@@ -493,18 +491,11 @@ local CASES = {
   { name = "tonic-b1",   snap = "T", cmd = CMD_ITEM, item = TONIC, srcBoost = 0, boost = 1, spend = true },
   { name = "cure-b0",    snap = "T", cmd = CMD_ITEM, item = ANTIDOTE, srcBoost = 0, boost = 0 },
   { name = "cure-b1",    snap = "T", cmd = CMD_ITEM, item = ANTIDOTE, srcBoost = 0, boost = 1, keep = "cure-b0" },
-  { name = "quiet-b0",   snap = "T", cmd = CMD_MAGIC, srcBoost = 0, boost = 0 },
-  { name = "quiet-b1",   snap = "T", cmd = CMD_MAGIC, srcBoost = 0, boost = 1, keep = "quiet-b0" },
 }
 local byName = {}
 for _, c in ipairs(CASES) do
   byName[c.name] = c
-  if c.name:match("^quiet") then
-    steps[#steps + 1] = H.cond(function() return quiet ~= nil end, runCase(c),
-      { H.call(function() c.skipped = true end) })
-  else
-    for _, s in ipairs(runCase(c)) do steps[#steps + 1] = s end
-  end
+  for _, s in ipairs(runCase(c)) do steps[#steps + 1] = s end
 end
 
 steps[#steps + 1] = H.call(function()
@@ -514,7 +505,6 @@ steps[#steps + 1] = H.call(function()
     if not ok then bad[#bad + 1] = msg end
   end
   for _, c in ipairs(CASES) do
-    if c.skipped then goto continue end
     -- what the case played: the copy is the source's action, at the case's boost
     H.assertEq(c.copyCmd, c.cmd, c.name .. ": the copied command")
     if c.row then H.assertEq(c.standRow, ROWID[c.row], c.name .. ": the copier ran the source's row") end
@@ -535,7 +525,6 @@ steps[#steps + 1] = H.call(function()
       check(c.bankEnd == c.bank0 - c.boost, string.format("%s: the copier's bank went %d -> %d, "
         .. "%d spent and no regen (a boost the copy uses is spent)", c.name, c.bank0, c.bankEnd, c.boost))
     end
-    ::continue::
   end
   assert(#bad == 0, #bad .. " mimic-boost assertion(s) failed: " .. table.concat(bad, "; "))
   H.log("[mimicboost] VERDICT: every copy free of MP; every boost a copy cannot use kept; the copied Trickshot's "

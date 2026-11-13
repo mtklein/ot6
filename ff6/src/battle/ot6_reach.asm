@@ -26,7 +26,10 @@
 ; change: for a spell that sets them, a body that already holds each one or
 ; is immune to it (the allowed masks $331c/$331d/$3330/$3331 UpdateStatus
 ; reads); for one that lifts them ($11a4.2: Antdot, Remedy, Dispel), a body
-; holding none of them.  A point beyond the bodies left finds nobody and is
+; holding none of them.  Imp and Vanish toggle (MagicProp +4 bit 3,
+; StatusMod_02: lifted from a body that holds it, set on one that does not);
+; their reach follows the first body's direction: aimed at a body holding
+; the status it lifts it from the others that hold it, else it sets it.  A point beyond the bodies left finds nobody and is
 ; spent, as a Scan's boost is with one body standing.
 ; ------------------------------------------------------------------------------
 
@@ -94,8 +97,23 @@ Ot6ReachTbl:
         lda     $3ef8,y         ;   ...bounces off a Rflect body
         bmi     @no
 :       lda     $11a4
-        and     #$04            ; lift (Antdot, Remedy, Dispel) or set
+        bit     #$04            ; lift (Antdot, Remedy, Dispel) or set
         bne     @lift
+        bit     #$08            ; a toggle (Imp, Vanish): the first body's
+        beq     @set            ;   direction
+        phy
+        longa
+        lda     $05,s           ; the first body (Ot6ReachWalk's phy, past
+        and     #$00ff          ;   this jsr's return and the phy above)
+        tay
+        shorta
+        jsr     Ot6ReachHolds   ; does the first body hold the status?
+        bne     @holds
+        ply
+        bra     @set
+@holds: ply
+        bra     @lift           ;   yes: the toggle lifts it
+@set:
         lda     $3ee4,y         ; set: a status it does not hold and may take
         eor     #$ff
         and     $331c,y
@@ -136,6 +154,25 @@ Ot6ReachTbl:
         beq     @no
 @yes:   sec
         rts
+.endproc
+
+; [ does body y hold any of the attack's statuses? ]
+; a8, y = the body (i16).  out: Z clear = yes.  Clobbers A; preserves X, Y.
+.proc Ot6ReachHolds
+        .a8
+        .i16
+        lda     $3ee4,y
+        and     $11aa
+        bne     @out
+        lda     $3ee5,y
+        and     $11ab
+        bne     @out
+        lda     $3ef8,y
+        and     $11ac
+        bne     @out
+        lda     $3ef9,y
+        and     $11ad
+@out:   rts
 .endproc
 
 ; [ walk the target's side for the bodies a boost's points reach ]
@@ -252,9 +289,13 @@ Ot6ReachTbl:
 ; A sketched attack runs under its own command (_c21554: GetCmdForAI), so no
 ; spell queue ever judged it, and a boost raised for the Sketch bought the
 ; multiplier only when the attack the brush drew has a number.  One without
-; (Ot6SpellNoBoost: no power, or a fraction) bought nothing: the pending boost
-; is dropped here (Ot6KeepBoost), before Ot6ActionEnd charges it, the way a
-; Mimic's copy that cannot use its boost keeps it.  The menu cannot refuse R
+; (Ot6SpellNoBoost: no power, or a fraction) bought nothing, and neither did a
+; reach spell (Ot6InReachTbl: reach serves Magic and X-Magic only, and a sketch
+; keeps command $0d): the pending boost is dropped here (Ot6KeepBoost), before
+; Ot6ActionEnd charges it, the way a Mimic's copy that cannot use its boost
+; keeps it.  This is a deliberate exception to #463's rule that a boost only
+; the resolve shows was useless is spent (the TLM's call, #469 review): a
+; Sketch cannot know its draw when it is chosen.  The menu cannot refuse R
 ; for it: which of the monster's two sketches the brush draws is a roll.  The
 ; monster's plain attack and its physical Special ($ee, $ef) run as Fight and
 ; buy swings, so they keep the boost.
@@ -269,9 +310,11 @@ Ot6ReachTbl:
         bcs     @out            ; a monster's (Control's) sketch
         cmp     #$ee
         bcs     @out            ; Battle, Special: Fight's swings
-        jsl     Ot6SpellNoBoost
+        jsl     Ot6InReachTbl   ; a reach spell's boost buys bodies only
+        bcs     @drop           ;   through Magic (Ot6SpellReach): a
+        jsl     Ot6SpellNoBoost ;   sketched one buys nothing
         bcc     @out
-        jsl     Ot6KeepBoost
+@drop:  jsl     Ot6KeepBoost
 @out:   pla
         rtl
 .endproc

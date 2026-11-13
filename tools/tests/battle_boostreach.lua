@@ -20,6 +20,15 @@
 --     buy nothing with a boost: R on the row is refused, and a boost raised
 --     on the command window before the row was picked is dropped, never
 --     charged, the price flat.
+-- Toggles (Imp, Vanish: MagicProp +4 bit 3) reach in the direction of the
+-- body aimed at: aimed at one holding the status they lift it from the others
+-- that hold it, else they set it.  A spell the boost buys nothing on (a
+-- power of 0 or a fraction, not a reach spell, a tier or Scan: CELES's list,
+-- read off the ROM) refuses R, and one raised before it is dropped; so is
+-- Vanish's at a monster (Vanish reaches allies only), priced as itself.
+-- Every case asserts it played the action it names (the command and attack
+-- Ot6ActionEnd's entry meets), so a turn that resolved as something else
+-- (a Defend) cannot pass vacuously.
 -- Cases (each one action, from a snapshot; everyone else Defends):
 --   safe-b0/b1/b2  CELES's Safe on an ally: the target mask (read where
 --                  CalcAttackEffect hands on after ChooseTarget, at
@@ -32,7 +41,19 @@
 --                  elements it lacks) weaknesses; charged debil-b0's x (1 + b);
 --   noise-r/b1     R on NoiseBlaster refused; raised before it, the bank ends
 --                  where noise-b0's does and the price is noise-b0's;
---   grav-r/b1      the same for the Gravity Rod in the Item list.
+--   grav-r/b1      the same for the Gravity Rod in the Item list;
+--   safe-pass-b2   from snapshot S (two allies under Safe, after safe-b1),
+--                  Safe at an ally without it: the walk passes over the two;
+--   impa-b1/impl-b1  Imp at an ally (snapshot I after it: two allies imped),
+--                  then Imp at the imped ally reaches the other imped one and
+--                  lifts it from both;
+--   quiet-b0/b1/r  CELES's spell the boost buys nothing on: R refused, a
+--                  boost raised before it never charged, its price its own;
+--   vanmon-b0/b1   Vanish at a monster: the boost dropped, its price its own;
+--   debil-oc-b3    from snapshot D (after debil-b2), EDGAR's overclocked
+--                  Debilitator: eight firings at most, stopping when the
+--                  body has no element left; 80 MP.  The Tools list's drawn
+--                  price (the decorator's cost cell) is the charge.
 -- The run: Continue wor-kohlingen-v1 (EDGAR SABIN CELES SETZER outside
 -- Kohlingen), pace to an encounter with two or more bodies standing, one with
 -- a shield (the target); everyone Defends until EDGAR's window opens with
@@ -47,7 +68,7 @@ local KCOL, KROW, KSCROLL = 0x8963, 0x8967, 0x895F
 local BANK, PEND, CURMP, BATTINV = 0x3E9C, 0x3E9D, 0x3C08, 0x2686
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_TOOLS = 0x00, 0x01, 0x02, 0x09
 local EDGAR, SABIN, CELES, SETZER = 4, 5, 6, 9
-local SAFE, IMP = 0x1C, 0x23
+local SAFE, IMP, VANISH = 0x1C, 0x23, 0x26
 local NOISE, DEBIL, GRAVITY = 0xA3, 0xA7, 0x3A
 local BURN = type(BOOSTREACH_BURN) == "number" and BOOSTREACH_BURN or 0
 local DRAWS = 12 + BURN
@@ -79,6 +100,7 @@ local function members()
   return t
 end
 local edgarS, celesS, sabinS, setzerS
+local quiet
 local actS
 local tgtMon, allyS
 local function chars()
@@ -98,13 +120,22 @@ end
 -- the reach predicate, Ot6ReachLands' as the design states it, read off RAM
 -- and the spell's MagicProp record: can the spell land on entity e?
 local MPB
-local function lands(e, spell)
+local function holds(e, spell)
+  local r = MPB + spell * 14
+  local cur = { 0x3EE4, 0x3EE5, 0x3EF8, 0x3EF9 }
+  for k = 1, 4 do
+    if (H.readRomByte(r + 9 + k) & H.readByte(cur[k] + e)) ~= 0 then return true end
+  end
+  return false
+end
+local function lands(e, spell, first)
   local r = MPB + spell * 14
   local standing = H.readWord(0x3A74) & H.readWord(0x3018 + e)
   if standing == 0 then return false end
   if (H.readRomByte(r + 2) & 1) ~= 0 and (H.readByte(0x3EE4 + e) & 0x10) ~= 0 then return false end
   if (H.readRomByte(r + 3) & 2) == 0 and (H.readByte(0x3EF8 + e) & 0x80) ~= 0 then return false end
   local lift = (H.readRomByte(r + 4) & 4) ~= 0
+  if not lift and (H.readRomByte(r + 4) & 8) ~= 0 then lift = holds(first, spell) end   -- a toggle
   local cur = { 0x3EE4, 0x3EE5, 0x3EF8, 0x3EF9 }
   local ok = { 0x331C, 0x331D, 0x3330, 0x3331 }
   for k = 1, 4 do
@@ -119,9 +150,16 @@ end
 -- ---- observers ---------------------------------------------------------------
 local armed, installed = nil, false
 local function ev(c, s) c.log[#c.log + 1] = string.format("f%d %s", H.frame, s) end
+local drawn = {}       -- the Tools list's drawn price per tool id (Ot6ToolRowDecorate's cost cells)
 local function installObservers()
   if installed then return end
   installed = true
+  emu.addMemoryCallback(function(_, v)
+    if H.readByte(0x6168) == 0 then drawn[H.readByte(0x575A)] = v end
+  end, emu.callbackType.write, 0x7E5758, 0x7E5758)
+  emu.addMemoryCallback(function(_, v)
+    if H.readByte(0x6168) == 0 then drawn[H.readByte(0x5760)] = v end
+  end, emu.callbackType.write, 0x7E575E, 0x7E575E)
   local function cx() return emu.getState()["cpu.x"] & 0xFF end
   local function onExec(a, fn)
     emu.addMemoryCallback(function() if armed and armed.sent and not armed.endF then fn(armed) end end,
@@ -136,10 +174,15 @@ local function installObservers()
       local spell = H.readByte(0xB6)
       c.eligible = 0
       local landsOn = {}
+      local first
+      for _, e in ipairs(side) do
+        if c.aimBit ~= nil and (c.aimBit & H.readWord(0x3018 + e)) ~= 0 then first = e end
+      end
+      c.first = first
       for _, e in ipairs(side) do
         local b = H.readWord(0x3018 + e)
         if c.aimBit == nil or (c.aimBit & b) == 0 then
-          if lands(e, spell) then c.eligible = c.eligible + 1; landsOn[#landsOn + 1] = e end
+          if lands(e, spell, first) then c.eligible = c.eligible + 1; landsOn[#landsOn + 1] = e end
         end
       end
       ev(c, string.format("after ChooseTarget: spell $%02X mask $%04X (aimed $%04X); the others it can land on: %s",
@@ -150,6 +193,7 @@ local function installObservers()
     if cx() == actS * 2 then
       c.endF = H.frame
       c.mpEnd = mp(actS)
+      c.cmdEnd, c.atkEnd = H.readByte(0x3A7C), H.readByte(0x3A7D)
       ev(c, string.format("Ot6ActionEnd entry: 3a7c=$%02X 3a7d=$%02X %s | %s", H.readByte(0x3A7C),
         H.readByte(0x3A7D), chars(), mons()))
     end
@@ -220,6 +264,7 @@ local function actorPress(c, st)
     local cc, cr = H.readByte(KCOL + s), H.readByte(KROW + s)
     if cc ~= col then return cc < col and "right" or "left" end
     if cr ~= row then return cr < row and "down" or "up" end
+    c.listPrice = drawn[c.item]        -- the price the row drew, pending boost and all
     return onRow(c, s)
   end
   if c.cmd == CMD_ITEM and st == ST_ITEM then
@@ -255,7 +300,24 @@ local function actorAim(c)
     mf = mf + 1
     btn = (mf > 8 and (mf - 1) % 8 < 4) and { a = true } or {}   -- a fresh press: the list's A released
   else
-    btn = c.ally and aim(Tc, allyS) or aim(Tm, tgtMon)
+    if c.here then
+      -- confirm where the cursor opens (a spell whose side this case does
+      -- not choose: the quiet spell)
+      mf = mf + 1
+      btn = (mf > 8 and (mf - 1) % 8 < 4) and { a = true } or {}
+    elseif not c.ally and Tm.mask == nil and Tc.mask ~= nil then
+      -- a spell that opens on the party (Vanish), aimed at a monster: cross
+      -- over to the monsters' side, on the left
+      mf = mf + 1
+      btn = ((mf - 1) % 8 < 4) and { left = true } or {}
+    elseif not c.ally and Tm.mask == nil and Tc.mask ~= nil then
+      -- a spell that opens on the party (Vanish), aimed at a monster: cross
+      -- over to the monsters' side, on the left
+      mf = mf + 1
+      btn = ((mf - 1) % 8 < 4) and { left = true } or {}
+    else
+      btn = c.ally and aim(Tc, c.allyT or allyS) or aim(Tm, tgtMon)
+    end
   end
   if next(btn) == "a" then
     c.sent = true
@@ -266,6 +328,7 @@ local function actorAim(c)
 end
 
 local snaps = {}
+local snapDone = false
 local function runCase(c)
   local req
   return {
@@ -280,21 +343,59 @@ local function runCase(c)
       actS = c.who == "C" and celesS or edgarS
       c.sent, c.after, c.endF, c.mask = false, false, nil, nil
       c.triedR, c.pendAfterR = false, nil
-      c.aimBit = c.ally and H.readWord(0x3018 + allyS * 2) or H.readWord(0x3018 + 8 + tgtMon * 2)
+      c.allyT = allyS
+      if c.aimFree then
+        -- an ally the spell has not landed on yet (no Safe), after CELES
+        c.allyT = nil
+        for k = 1, 3 do
+          local e = ((celesS + k) % 4) * 2
+          if c.allyT == nil and H.readByte(0x3ED8 + e) ~= 0xFF and (H.readWord(0x3A74) & (1 << (e // 2))) ~= 0
+             and (H.readByte(0x3EF8 + e) & 0x40) == 0 then c.allyT = e // 2 end
+        end
+        H.assertEq(c.allyT ~= nil, true, c.name .. ": an ally without Safe stands")
+      end
+      c.aimBit = c.ally and H.readWord(0x3018 + c.allyT * 2) or H.readWord(0x3018 + 8 + tgtMon * 2)
+      c.safe0, c.imp0 = {}, {}
+      for e = 0, 6, 2 do
+        c.safe0[e] = (H.readByte(0x3EF8 + e) & 0x40) ~= 0
+        c.imp0[e] = (H.readByte(0x3EE4 + e) & 0x20) ~= 0
+      end
+      snapDone = false
       c.weak0 = weak(tgtMon)
       c.room = popc((~(weak(tgtMon) | H.readByte(0x3EC8))) & 0xFF)
       armed = c
       ev(c, "START " .. chars() .. " | " .. mons())
     end),
-    H.driveUntil(function() return c.endF ~= nil and H.frame >= c.endF + 120 end, 14000, {
+    H.driveUntil(function()
+      return c.endF ~= nil and H.frame >= c.endF + 120 and (c.snapAfter == nil or snapDone)
+    end, 30000, {
       H.call(function()
         Tm.observe(); Tc.observe()
+        if c.after and c.snapAfter and not snapDone and H.frame >= c.endF + 30 then
+          -- on to the actor's next window that meets the snapshot's need
+          tick = tick + 1
+          if tick % 12 == 6 then H.setPad({}) return end
+          if tick % 12 ~= 0 or H.readByte(MENU) == 0 then return end
+          local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
+          if a == actS and st == ST_CMD and pend(actS) == 0 and c.snapCond() then
+            H.setPad({}); snaps[c.snapAfter] = H.requestSaveState(); snapDone = true
+            H.log(string.format("[boostreach] snapshot %s f%d (after %s): %s | %s", c.snapAfter, H.frame, c.name,
+              chars(), mons()))
+            return
+          end
+          local b = defendPress(st)
+          H.setPad(b and { [b] = true } or {})
+          return
+        end
         if c.endF and not c.after and H.frame >= c.endF + 6 then
           c.after = true
           c.bankEnd = bank(actS)
           c.weakEnd = weak(tgtMon)
-          c.safeAfter = {}
-          for e = 0, 6, 2 do c.safeAfter[e] = (H.readByte(0x3EF8 + e) & 0x40) ~= 0 end
+          c.safeAfter, c.impAfter = {}, {}
+          for e = 0, 6, 2 do
+            c.safeAfter[e] = (H.readByte(0x3EF8 + e) & 0x40) ~= 0
+            c.impAfter[e] = (H.readByte(0x3EE4 + e) & 0x20) ~= 0
+          end
           ev(c, "six frames after the actor's Ot6ActionEnd: " .. chars() .. " | " .. mons())
         end
         local ac = actorAim(c)
@@ -313,7 +414,9 @@ local function runCase(c)
         H.setPad((held and ph < 6) and { [held] = true } or {})
       end),
     }, "case " .. c.name .. " resolves"),
+    H.waitFrames(2),
     H.call(function()
+      if c.snapAfter then H.checkReq(snaps[c.snapAfter], "snapshot " .. c.snapAfter) end
       armed = nil
       H.setPad({})
       for _, l in ipairs(c.log) do H.log(string.format("[boostreach] %s: %s", c.name, l)) end
@@ -447,6 +550,26 @@ local steps = {
       tostring(allyS), tgtMon, chars(), mons()))
     assert(allyS, "an ally standing beside CELES")
     assert(spellIdx(celesS, SAFE) and spellIdx(celesS, IMP), "CELES knows Safe and Imp (wor-kohlingen-v1)")
+    -- CELES's spell the boost buys nothing on, as Ot6SpellNoBoost reads the
+    -- ROM: not a tier family (Ot6FoldTbl, Break), not Scan, not a reach spell,
+    -- and a power of 0 or a fraction
+    local fold = H.sym("Ot6FoldTbl") & 0x3FFFFF
+    local inFold = { [0x0C] = true, [0x18] = true }
+    for i = 0, 0x17 do inFold[H.readRomByte(fold + i)] = true end
+    local list = {}
+    for i = 0, 53 do
+      local id = H.readByte(0x2092 + celesS * 0x13C + i * 4)
+      if id ~= 0xFF then
+        list[#list + 1] = string.format("$%02X", id)
+        local r = MPB + id * 14
+        if quiet == nil and id < 0x36 and not inFold[id] and not H.isReachSpell(id)
+           and ((H.readRomByte(r + 4) & 0x80) ~= 0 or H.readRomByte(r + 6) == 0) then quiet = id end
+      end
+    end
+    H.log(string.format("[boostreach] CELES's list: %s; the quiet spell %s", table.concat(list, " "),
+      quiet and string.format("$%02X", quiet) or "none"))
+    assert(quiet, "CELES's list holds a spell the boost buys nothing on (Float, Demi, Quartr...)")
+    assert(spellIdx(celesS, VANISH), "CELES's list holds Vanish")
     assert(bagIdx(GRAVITY), "the bag holds the Gravity Rod")
     assert(cmdRow(edgarS, CMD_TOOLS) and cmdRow(edgarS, CMD_ITEM), "EDGAR's list has Tools and Item")
   end),
@@ -469,10 +592,32 @@ local CASES = {
   { name = "grav-b0",  snap = "E", cmd = CMD_ITEM, item = GRAVITY, boost = 0 },
   { name = "grav-b1",  snap = "E", cmd = CMD_ITEM, item = GRAVITY, boost = 1, keep = "grav-b0" },
   { name = "grav-r",   snap = "E", cmd = CMD_ITEM, item = GRAVITY, boost = 0, rowR = 0 },
+  -- the walk passes over: from S (after safe-b1 put Safe on two allies)
+  { name = "safe-s1",  snap = "C", who = "C", cmd = CMD_MAGIC, spell = SAFE, boost = 1, ally = true, snapAfter = "S",
+    snapCond = function() return bank(celesS) >= 2 end },
+  { name = "safe-pass-b2", snap = "S", who = "C", cmd = CMD_MAGIC, spell = SAFE, boost = 2, ally = true,
+    aimFree = true },
+  -- the toggle: Imp on two allies, then Imp at the imped one lifts it from both
+  { name = "impa-b1",  snap = "C", who = "C", cmd = CMD_MAGIC, spell = IMP, boost = 1, ally = true, snapAfter = "I",
+    snapCond = function() return bank(celesS) >= 1 end },
+  { name = "impl-b1",  snap = "I", who = "C", cmd = CMD_MAGIC, spell = IMP, boost = 1, ally = true },
+  -- a spell the boost buys nothing on; Vanish at a monster
+  { name = "quiet-b0", snap = "C", who = "C", cmd = CMD_MAGIC, spell = "quiet", boost = 0, here = true },
+  { name = "quiet-b1", snap = "C", who = "C", cmd = CMD_MAGIC, spell = "quiet", boost = 1, here = true,
+    keep = "quiet-b0", sameMp = "quiet-b0" },
+  { name = "quiet-r",  snap = "C", who = "C", cmd = CMD_MAGIC, spell = "quiet", boost = 0, here = true, rowR = 0 },
+  { name = "vanmon-b0", snap = "C", who = "C", cmd = CMD_MAGIC, spell = VANISH, boost = 0 },
+  { name = "vanmon-b1", snap = "C", who = "C", cmd = CMD_MAGIC, spell = VANISH, boost = 1, keep = "vanmon-b0",
+    sameMp = "vanmon-b0", vanmon = true },
+  -- Debilitator overclocked on a body with fewer elements left than firings
+  { name = "debil-d2", snap = "E", cmd = CMD_TOOLS, item = DEBIL, boost = 2, snapAfter = "D",
+    snapCond = function() return bank(edgarS) >= 3 end },
+  { name = "debil-oc-b3", snap = "D", cmd = CMD_TOOLS, item = DEBIL, boost = 3, overclock = true },
 }
 local byName = {}
 for _, c in ipairs(CASES) do
   byName[c.name] = c
+  if c.spell == "quiet" then add({ H.call(function() c.spell = quiet end) }) end
   add(runCase(c))
 end
 
@@ -483,6 +628,10 @@ steps[#steps + 1] = H.call(function()
     if not ok then bad[#bad + 1] = msg end
   end
   for _, c in ipairs(CASES) do
+    -- the case played the action it names
+    local wantAtk = c.spell or c.item
+    check(c.cmdEnd == c.cmd and c.atkEnd == wantAtk, string.format("%s: the turn ran command $%02X attack $%02X "
+      .. "(want $%02X $%02X)", c.name, c.cmdEnd or 0, c.atkEnd or 0, c.cmd, wantAtk))
     if c.rowR then
       H.assertEq(c.pendBeforeR, 0, c.name .. ": nothing pending when R was pressed on the row")
       check(c.pendAfterR == c.rowR, string.format("%s: R on the row left the pending at %s (%s)", c.name,
@@ -494,10 +643,32 @@ steps[#steps + 1] = H.call(function()
     if c.spell then
       H.assertEq(c.mask ~= nil, true, c.name .. ": the cast reached CalcAttackEffect")
       check((c.mask & c.aimBit) ~= 0, string.format("%s: the mask $%04X holds the body aimed at", c.name, c.mask))
-      local want = 1 + math.min(c.boost, c.eligible)
+      local want = c.vanmon and 1 or 1 + math.min(c.boost, c.eligible)
       check(popc(c.mask) == want, string.format("%s: at %d BP the mask $%04X holds %d bodies (want %d: the target "
         .. "and %d of the %d others it can land on)", c.name, c.boost, c.mask, popc(c.mask), want,
         math.min(c.boost, c.eligible), c.eligible))
+      if c.aimFree then
+        local held = 0
+        for e = 0, 6, 2 do
+          if c.safe0[e] and e // 2 ~= celesS then held = held + 1 end
+          if c.safe0[e] then
+            check((c.mask & (1 << (e // 2))) == 0, string.format("%s: the walk passed over entity %d, already under "
+              .. "Safe (mask $%04X)", c.name, e, c.mask))
+          end
+        end
+        H.assertEq(held >= 1, true, c.name .. ": an ally already under Safe stands for the walk to pass over")
+      end
+      if c.name == "impl-b1" then
+        local imped = 0
+        for e = 0, 6, 2 do if c.imp0[e] then imped = imped + 1 end end
+        H.assertEq(c.imp0[c.first] and imped >= 2, true, c.name .. ": the target and another ally are imped "
+          .. "(snapshot I)")
+        for e = 0, 6, 2 do
+          if (c.mask & (1 << (e // 2))) ~= 0 then
+            check(c.imp0[e], string.format("%s: entity %d in the mask was imped (the toggle lifts)", c.name, e))
+          end
+        end
+      end
       if c.spell == SAFE then
         for e = 0, 6, 2 do
           if (c.mask & (1 << (e // 2))) ~= 0 then
@@ -513,15 +684,26 @@ steps[#steps + 1] = H.call(function()
     end
     if c.item == DEBIL then
       local added = popc(c.weakEnd & ~c.weak0 & 0xFF)
-      local want = math.min(c.boost + 1, c.room)
+      local want = math.min((c.boost + 1) * (c.overclock and 2 or 1), c.room)
+      if c.overclock then
+        H.assertEq(c.room < 8, true, c.name .. ": the body has fewer elements left than the eight firings")
+      end
       check(added == want, string.format("%s: Debilitator at %d BP added %d weakness(es) ($%02X -> $%02X; want %d "
         .. "of the %d it lacked)", c.name, c.boost, added, c.weak0, c.weakEnd, want, c.room))
       local b0 = byName["debil-b0"].charged
-      check(c.charged == math.min(99, b0 * (c.boost + 1)), string.format("%s: charged %d MP, debil-b0 %d (one "
-        .. "firing a weakness)", c.name, c.charged, b0))
+      local wantMp = math.min(99, b0 * (c.boost + 1) * (c.overclock and 2 or 1))
+      check(c.charged == wantMp, string.format("%s: charged %d MP, debil-b0 %d (one firing a weakness; want %d)",
+        c.name, c.charged, b0, wantMp))
+      check(c.listPrice == c.charged, string.format("%s: the Tools list drew %s MP, the charge %d", c.name,
+        tostring(c.listPrice), c.charged))
       local wantBank = math.min(5, c.bank0 - c.boost + (c.boost == 0 and 1 or 0))
       check(c.bankEnd == wantBank, string.format("%s: bank %d -> %d (want %d)", c.name, c.bank0, c.bankEnd,
         wantBank))
+    end
+    if c.sameMp then
+      check(c.listPrice == byName[c.sameMp].listPrice, string.format("%s: the list drew %s MP with the boost "
+        .. "pending, %s %s (its own price)", c.name, tostring(c.listPrice), c.sameMp,
+        tostring(byName[c.sameMp].listPrice)))
     end
     if c.keep then
       local base = byName[c.keep]

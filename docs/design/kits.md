@@ -46,9 +46,9 @@ Vanish on the party, Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle,
 Stop, Imp, Dispel) reaches one more body per point, each body paying its own
 cast; Debilitator's weaknesses, Filch's shields and Bestow's pips (below).
 **Def. stays unboostable** (owner, 2026-11-13): a boost raised for it is
-dropped, never charged, as before. NoiseBlaster, Air Anchor, MagiTek Confuser
-and X-fer and the Gravity Rod used from Item refuse a boost, and a Sketch
-that draws an attack with no number drops it.
+dropped, never charged, as before. NoiseBlaster, MagiTek Confuser and X-fer
+and the Gravity Rod used from Item refuse a boost, and a Sketch that draws an
+attack with no number, or a reach spell, drops it.
 
 Boost-tier folding means kits list **base spells only**: Fire is a
 kit entry, and Fire 2/3 are what boosting does to it. Terra's and
@@ -186,10 +186,11 @@ no single price; its cost is the **sum (Σ)** of the two it fires.
   **A boost adds one more weakness a point** (#469, the steps family), each
   revealed as the first, until the body has none left to take, and each is
   its own firing's price: 10 / 20 / 30 / 40, 80 overclocked
-  (`Ot6DebilSteps`, `Ot6ToolPrice`; `battle_boostreach`).  NoiseBlaster and
-  Air Anchor take no boost: their status lands at a tool's hit rate of 255
-  wherever an immunity does not stop it, so there is no certainty left to buy,
-  and R is refused on their rows (`Ot6ToolNoBoost`).
+  (`Ot6DebilSteps`, `Ot6ToolPrice`; `battle_boostreach`).  NoiseBlaster
+  takes no boost: its Confuse lands at a tool's hit rate of 255 wherever an
+  immunity does not stop it, so there is no certainty left to buy, and R is
+  refused on its row (`Ot6ToolNoBoost`).  Air Anchor's hit (power 128,
+  pierce) takes the multiplier as the other damaging Tools do.
 - AutoCrossbow's piercing clears waves: one chip per body across a
   whole side, and exactly one chip against a solo boss. Drill answers armored
   bosses. Chain Saw covers slashing, so Edgar alone spans two physical
