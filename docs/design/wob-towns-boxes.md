@@ -89,7 +89,21 @@ leaves the castle the way gen_zozo2_arrival does, and walks in.
 
 ### 3.1 SHADOW's hire
 
-(filled in from the leg's measurement)
+**He refuses.** The party arrives with 5,794 GP, so the 3,000 GP price is in
+reach, but the talk never names it: "We meet again..." (dlg $03E3) is
+followed by "Leave me alone..." (dlg $03E5), in every run (labs `kohl6`,
+`kohl7`; sweeps `kohlingen/s0`, `s4`). The talk (`_cc6f84`, `$000B` set since
+the first meeting) runs `_cac5c1`'s party check before the price, and the
+check (`set_case PARTY_CHARS`, EventCmd_de: object party bytes at `$0867`
+against the active party `$1A6D`, into `$1EB4`) reads SHADOW in the party:
+`$1EB4` is `$72` as the talk opens (LOCKE, EDGAR, SABIN, CELES: objects 1,
+4, 5, 6) and `$78` after the check (objects 3-6: SHADOW's bit set, LOCKE's
+clear), where the objects' party bytes read SHADOW out of the party just
+before the talk (object 3's byte `$00`, his record's `$1850+3` `$00`). So a
+player cannot hire him here on this route; why the check reads object 3 is
+open (it may be vanilla's own behaviour with SHADOW gone at the falls, or a
+leftover of the scenario's party juggling). The leg asserts that no gil is
+spent when he refuses, and would take the hire if the price were offered.
 
 ### 3.2 The auction
 
@@ -105,7 +119,16 @@ behind coin flips, so **both magicite are offered in the World of Balance**
 while Golem is unbought. `$01F0`, the sitting held, clears with the next map
 load, so a player sits again by stepping out to the street and back in.
 
-(the leg's sittings, filled in from the measurement)
+The leg (`narshe-mission-v1`, 72,709 GP) bought Golem at the fifth sitting
+and ZoneSeek at the thirteenth, 30,000 GP between them; the other eleven lots
+were Cherub Down and the lot first asked with dlg $0A5B, passed (sweeps
+`auction/s0`, `s4`: the same thirteen lots in the same order both times; the
+draw is the field's own RNG, which an in-battle seed shift does not move).
+
+**The main line.** Golem's Bulwark and ZoneSeek's Ward are party-wide
+passives a player who knows the auction buys with the Narshe purse. It stays
+a branch: a sitting costs a walk in and out and the draw is a coin, and the
+line's party already spends its gil at Jidoor's shops on this leg.
 
 ## 4. The monster boxes (#285)
 
@@ -140,4 +163,27 @@ load, so a player sits again by stepping out to the street and back in.
 
 ## 5. Results
 
-(filled in from the sweeps)
+Each fight leg ran once per in-battle seed shift (0, 4, 8, ... ; distinct
+draws counted by battle key, `$be` at the open plus the formation), on the
+replayed line's states (the ROM with these rows), under
+`build/attempts/wt/v043-wob-towns/sweeps/`.
+
+| fight | runs | distinct keys | won | lost |
+|---|---|---|---|---|
+| 417 Mega Armor + ProtoArmor | 6 | 6 (be88 beDC beAC be78 be8C be2C) | 6 | 0 |
+| 416 Commando x4 | 6 | 5 (be90 be30 be80 beF0 beD4) | 5 | 0 |
+| 61 Telstar | 4 | 4 (beA4 be04 be84 beF0) | 4 | 0 |
+| 170 Gigantos | 6 | 5 (be90 be64 beB4 be40 beE4) | 4 | 1 (be90) |
+
+- Every guards run passed on its first attempt; both formations fell within
+  2,231-4,394 ticks.
+- Gigantos: the one lost key (`gigantos/s0` attempt 1) wiped over two rounds,
+  each member losing 800-860 HP a round to its counters, LOCKE dying with 3
+  BP banked; the reload drew be64 and won. Four keys in five is a box a
+  player beats, and a lab candidate: the driver opens with SHADOW's Fight and
+  EDGAR's AutoCrossbow (pierce, not a Gigantos key), and every action draws a
+  counter, so fewer, boosted slash Fights are the lever to measure.
+- Telstar is won by SABIN and SHADOW at L12-14 with the camp's bag (one to
+  seven Potions); each run ended above half HP.
+- The treasure room (`treasure/s0`, `s4`) and Kohlingen fought only the
+  world's own random battles on the walk, all won.
