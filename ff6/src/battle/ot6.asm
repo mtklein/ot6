@@ -114,3 +114,6 @@
 ; reach for the single-target statuses, and the boost's last refusals (#469),
 ; appended for the same reason.
         .include "ot6_reach.asm"
+
+; the esper ladder (#328), appended for the same reason.
+        .include "ot6_esper.asm"

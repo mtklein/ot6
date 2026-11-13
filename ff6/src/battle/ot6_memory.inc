@@ -34,6 +34,33 @@ OT6_CODEX_USED       := $0310
 .assert OT6_CODEX_USED <= OT6_CODEX_STRIDE, error, "OT6 codex page exceeds stride"
 .assert OT6_CODEX_ROOT + OT6_CODEX_TEMP + OT6_CODEX_USED <= $317000, error, "OT6 codex exceeds expanded SRAM"
 
+; Per-save esper progress (#328, plan A).  Magic Points earned per character
+; per esper, in expanded SRAM past the codex: the 32 KiB battery maps banks
+; $30-$33's $6000-$7fff windows, so $317000-$317fff is battery offset
+; $3000-$3fff, which no earlier build wrote (every tracked battery holds
+; zeroes there).  Four $400-byte pages: one per save slot plus the LIVE page
+; that play reads and writes.  A load copies its slot's page into LIVE, a save
+; copies LIVE into the slot it writes, and New Game clears LIVE, so progress
+; earned after the last save goes back with the rest of the game on a reload.
+; Each page: a magic word, then one word per character (actors 0..11) per
+; esper slot (26: Odin and Raiden share one), actor-major.  The live page
+; also holds the victory screen's pending messages past the copied range.
+OT6_ESPER_ROOT       := $317000
+OT6_ESPER_STRIDE     := $0400
+OT6_ESPER_LIVE       := OT6_ESPER_ROOT+$0c00
+OT6_ESPER_MAGIC      := $0000   ; page offset of the magic word
+OT6_ESPER_CTR        := $0010   ; page offset of the counters
+OT6_ESPER_CHARS      = 12
+OT6_ESPER_SLOTS      = 26
+OT6_ESPER_COPY       := OT6_ESPER_CTR + OT6_ESPER_CHARS * OT6_ESPER_SLOTS * 2
+OT6_ESPER_PEND       := $0300   ; live page only: rank reached, per party slot (4)
+OT6_ESPER_SHOWN      := $0304   ; live page only: Magic Points to announce (word, 0 = none)
+
+.assert OT6_ESPER_ROOT >= OT6_CODEX_ROOT + 4 * OT6_CODEX_STRIDE, error, "esper progress overlaps the codex"
+.assert OT6_ESPER_COPY <= OT6_ESPER_PEND, error, "esper counters run into the pending messages"
+.assert OT6_ESPER_SHOWN + 2 <= OT6_ESPER_STRIDE, error, "esper page exceeds stride"
+.assert OT6_ESPER_LIVE + OT6_ESPER_STRIDE <= $318000, error, "esper progress exceeds bank $31's SRAM window"
+
 ; Per-save working-data word, copied and checksummed by vanilla save code.
 OT6_LOADOUT          := $7e1e1d
 .assert (OT6_LOADOUT & $ffff) >= $1600, error, "loadout must sit inside the save block"
