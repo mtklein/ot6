@@ -3014,157 +3014,122 @@ DrawEsperDetailMenu:
         bne     @59f4
         shorta
 .if LANG_EN
-; OT6: the level-up bonus byte is $ff for every esper (vanilla per-level
-; growth is deleted, genju_prop.asm), so the vanilla line below this loop
-; could only draw blanks.  The mod the stone does carry -- the while-equipped
-; bump Ot6EsperStatMod applies out of Ot6EsperStatTbl (ot6_progression.asm) --
-; is drawn instead, as a right-hand column, since a stone can carry up to
-; four signed deltas and they do not fit on one line:
+; OT6 #328: the esper ladder.  The level-up bonus byte is gone (the ladder is
+; the only stat growth), so the right-hand column shows the selected
+; character's progress on this esper: rank and Magic Points on the title row
+; (with the next rung's cost), and the five rungs under it, each white once
+; reached and grey until then:
 ;
-;   row 15   <esper name>          While worn...     <- caption on the title row
-;   row 17     Fire             Vigor   + 6
-;   row 19     Drain            Stamina + 4
-;   row 21                      Mag.Pwr - 3
-;   row 23
-;   row 25
-;   row 27
+;   row 15   <esper name>          Rank 2   38/ 75
+;   row 17     Ice              Mag.Pwr +1
+;   row 19     Osmose           Speed   +1
+;   row 21     Shell            No Seizure       (grey)
+;   row 23                      Mag.Pwr +2       (grey)
+;   row 25                      Gold Hairpin     (grey)
 ;
-; Why that shape and not a second line under row 27:
-;  * chrome sits on the title row, the one row where a second chrome word
-;    cannot be misread as a slot's data, with the data in columns beneath it,
-;    which is also where vanilla put its own Learn.Rate/Skill columns;
-;  * every cell it uses was already blank: the dead learn-rate / percent
-;    columns are empty.  The window's last row is 27 (GenjuDetailCursorPos
-;    below: seven rows, 12px pitch), so nothing here needs a row that has
-;    never been drawn to;
-;  * the term geometry keeps the sign and digit columns (25, 26-27) and moves
-;    the stat name one cell left to 17-23 so col 24 can be a spacer; see
-;    Ot6GenjuTermPos for why that cell has to exist.
-;
-; Terms pack upward from row 17: a stat with a zero delta costs no line.  Every
-; row the terms do not reach is blanked to the same 10-cell width, and the old
-; row-27 line is blanked outright, so a revisit always overwrites (the case the
-; no-mod control asserts; no shipped row is $0000 since #418, so that test
-; zeroes Terrato's row in the emulator's ROM image for the one visit).
-;
-; State.  The walk needs two counters that survive DrawPosTextBuf.  $f5/$f6 is
-; the one 16-bit scratch cell this proc has already proven safe across
-; DrawGenjuMagicName / _c35a84 / DrawPosTextBuf (the spell loop above holds its
-; row there and inc2s it after those calls), so $f5 = stat index 0-3 and $f6 =
-; the next tilemap row.  Nothing else is cached: Ot6GenjuNibble re-reads the
-; table from ROM off z99 each time it is asked, which costs a few cycles once
-; per page and removes every question about which DP cell a draw helper eats.
-        lda     #$00
-        sta     $f5                     ; stat index: 0 vig, 1 spd, 2 stm, 3 mag
-        lda     #17
-        sta     $f6                     ; next tilemap row for a term
+; The rung labels are Ot6RungLabelTbl's (bank $f0, tools/esper_ladder.py);
+; the counts come from Ot6EsperProgress.  $f5 = the rung (0-4) and $f6 = its
+; tilemap row, the two cells the old stat column held across the draw
+; helpers (HexToDec5 uses $e0/$eb/$ed and $f3-$fb, never $f5/$f6).
 
-; ---- the caption, right-aligned in the 16 cells vanilla blanked at {13,15} ----
-        jsr     Ot6GenjuAnyStatMod      ; Z set <=> this stone has no mod at all
-        php
+; ---- the caption, in the 16 cells vanilla blanked at {13,15} ----
         ldy_pos BG1B, {13, 15}
         jsr     InitTextBuf
-        plp
-        beq     @capblank
-        lda     #$ff                    ; 2 pad + 13 caption + 1 pad = cols 15-27,
-        sta     hWMDATA                 ;   flush with the term column's right edge
-        sta     hWMDATA
         ldx     z0
-@cap:   lda     f:Ot6GenjuWhileWornText,x
+@cap:   lda     f:Ot6GenjuRankText,x
         sta     hWMDATA
         inx
-        cpx     #sizeof_Ot6GenjuWhileWornText
+        cpx     #sizeof_Ot6GenjuRankText
         bne     @cap
+        jsr     Ot6GenjuRank            ; A = rank 0-5, $f3 = the points
+        pha
+        clc
+        adc     #ZERO_CHAR
+        sta     hWMDATA
         lda     #$ff
         sta     hWMDATA
-        bra     @capend
-@capblank:
-        ldy     #16
-        lda     #$ff
-@capb:  sta     hWMDATA
-        dey
-        bne     @capb
-@capend:
-        stz     hWMDATA
-        jsr     DrawPosTextBuf
-
-; ---- one term per nonzero delta, packed upward from row 17 -------------------
-; NB the shorta: DrawPosTextBuf leaves the accumulator width UNKNOWN (it tail-
-; calls DrawPosKanaFar), which is why the spell loop above re-establishes a8 at
-; the head of every iteration.  Ot6GenjuNibble's clr_a is `tdc`, which does not
-; touch the m flag, so entering it a16 would read z99 as a 16-bit word.
-@term:  shorta
-        jsr     Ot6GenjuNibble
-        beq     @termnext               ; zero delta: this stat costs no line
-        jsr     Ot6GenjuTermPos         ; Y := {18, $f6}
-        jsr     InitTextBuf
-        lda     $f5
-        asl3                            ; * 8 = Ot6GenjuStatNameTbl stride
-        tax
-@lbl:   lda     f:Ot6GenjuStatNameTbl,x ; 7 tiles, space-padded, null-terminated
-        beq     @sign
-        sta     hWMDATA
-        inx
-        bra     @lbl
-@sign:  lda     #$ff                    ; the col-24 spacer (see Ot6GenjuTermPos)
-        sta     hWMDATA
-        jsr     Ot6GenjuNibble
-        pha                             ; bit #imm leaves A alone, but the sign
-        bit     #OT6_SM_NEG             ;   write below does not
-        beq     @signpos
-        lda     #OT6_MINUS_CHAR
-        sta     hWMDATA
-        pla
-        and     #<~OT6_SM_NEG           ; strip the sign flag -> magnitude 1-7
-        bra     @mag
-@signpos:
-        lda     #OT6_PLUS_CHAR
-        sta     hWMDATA
-        pla
-@mag:   jsr     HexToDec3               ; magnitude 1-7; leading zeroes blanked
+        jsr     HexToDec5               ; the points, four digits
         lda     $f8
         sta     hWMDATA
         lda     $f9
         sta     hWMDATA
+        lda     $fa
+        sta     hWMDATA
+        lda     $fb
+        sta     hWMDATA
+        pla
+        cmp     #5
+        bcs     @capmax
+        asl
+        tax
+        lda     f:Ot6RungCostTbl,x      ; the next rung's cost
+        sta     $f3
+        lda     f:Ot6RungCostTbl+1,x
+        sta     $f4
+        jsr     HexToDec5
+        lda     #OT6_SLASH_CHAR
+        sta     hWMDATA
+        lda     $f9
+        sta     hWMDATA
+        lda     $fa
+        sta     hWMDATA
+        lda     $fb
+        sta     hWMDATA
+        bra     @capend
+@capmax:
+        lda     #$ff                    ; mastered: no next cost
+        sta     hWMDATA
+        sta     hWMDATA
+        sta     hWMDATA
+        sta     hWMDATA
+@capend:
+        lda     #$ff
+        sta     hWMDATA
         stz     hWMDATA
         jsr     DrawPosTextBuf
-        shorta
-        lda     $f6                     ; this term consumed a row
-        inc
-        inc                             ;   one window row = two tilemap rows
-        sta     $f6
-@termnext:
-        shorta
-        lda     $f5
-        inc
-        sta     $f5
-        cmp     #4
-        bne     @term
 
-; ---- blank every term row the walk did not reach, then #27's old row 27 ------
-@blank: lda     $f6
-        cmp     #17 + 2 * 5             ; the five spell rows are 17,19,21,23,25
-        bcs     @blankold
-        jsr     Ot6GenjuTermPos
+; ---- the five rungs, rows 17-25 ----
+        shorta
+        stz     $f5
+        lda     #17
+        sta     $f6
+@rung:  shorta
+        jsr     Ot6GenjuRank
+        cmp     $f5
+        beq     @grey                   ; rank <= rung: not reached
+        bcc     @grey
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        bra     @col
+@grey:  lda     #BG1_TEXT_COLOR::GRAY
+@col:   sta     zTextColor
+        jsr     Ot6GenjuRungPos         ; Y := {16, $f6}
         jsr     InitTextBuf
-        ldy     #11                     ; name 7 + spacer 1 + sign 1 + digits 2
-        lda     #$ff
-@blankb:
+        jsr     Ot6GenjuLabelOff        ; X := this rung's label
+        ldy     #12
+@lab:   lda     f:Ot6RungLabelTbl,x
         sta     hWMDATA
+        inx
         dey
-        bne     @blankb
+        bne     @lab
         stz     hWMDATA
         jsr     DrawPosTextBuf
         shorta
         lda     $f6
         inc
-        inc
+        inc                             ; one window row = two tilemap rows
         sta     $f6
-        bra     @blank
-@blankold:
-        ldy_pos BG1B, {5, 27}           ; vanilla drew its single line here; nothing
-        jsr     InitTextBuf             ;   does now, so it must be cleared or a
-        ldy     #23                     ;   revisit would leave the old text
+        lda     $f5
+        inc
+        sta     $f5
+        cmp     #5
+        bne     @rung
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+
+; ---- vanilla's old row-27 line: nothing draws there, so clear it ----
+        ldy_pos BG1B, {5, 27}
+        jsr     InitTextBuf
+        ldy     #23
         lda     #$ff
 @oldb:  sta     hWMDATA
         dey
@@ -3549,91 +3514,91 @@ GenjuAtLevelUpText:
 
 .if LANG_EN
 
-; OT6: the esper detail page's while-worn stat-mod line (drawn by
-; DrawEsperDetailMenu's tail in place of the dead vanilla bonus line).
+; OT6 #328: the esper detail page's ladder column (DrawEsperDetailMenu's
+; tail).  a8 in, a8 out; each helper re-reads what it needs, so nothing has
+; to survive a draw helper but $f5/$f6.
 
-OT6_PLUS_CHAR  = $ca                    ; '+' (text_en 0xca)
-OT6_MINUS_CHAR = $c4                    ; '-' (text_en 0xc4).  A delta can
-                                        ;   be negative, so the sign is drawn
-
-; ------------------------------------------------------------------------------
-
-; [ OT6: the esper detail page's while-worn stat block, three helpers ]
-;
-; Ot6EsperStatTbl is two bytes per esper in vanilla's ItemProp+16/+17 layout:
-; byte 0 = [speed:4][vigor:4], byte 1 = [magpwr:4][stamina:4], each nibble
-; [sign:1][magnitude:3] (ot6_progression.asm has the derivation and the decoder
-; it mirrors, CalcEquipEffect at battle_main.asm:2521-2539).  These read it for
-; the menu; the battle side reads the same bytes through Ot6EsperStatMod, so a
-; row authored once shows up in both places.
-;
-; All three take the displayed esper from z99 and the stat index from $f5, and
-; keep no state of their own, so DrawEsperDetailMenu's tail needs no scratch that
-; has to survive a draw helper.  a8 in, a8 out; A/X clobbered, Y set by
-; Ot6GenjuTermPos only.
-
-; A := the packed nibble for stat $f5 (0 vigor, 1 speed, 2 stamina, 3 mag.pwr)
-; of esper z99.  Z set <=> that stat's delta is zero.
-Ot6GenjuNibble:
+; $f3 := the selected character's Magic Points on esper z99.  Clobbers A/X/Y.
+Ot6GenjuPoints:
+        jsr     _c34edd                 ; Y = the character's record
+        lda     0,y                     ; the actor
+        pha
         clr_a
         lda     z99
-        asl                             ; two bytes per esper
-        tax
-        lda     $f5
-        lsr                             ; A = which byte, C = the odd nibble?
-        php                             ; (lsr's Z is still live for the beq)
-        beq     :+
-        inx                             ; stats 2/3 live in the second byte
-:       lda     f:Ot6EsperStatTbl,x
-        plp
-        bcc     :+
-        lsr4                            ; odd stat -> high nibble down
-:       and     #$0f
+        tax                             ; X = the esper
+        pla
+        jsl     Ot6EsperProgress        ; A (16) = the points
+        longa
+        sta     $f3
+        shorta
         rts
 
-; Z set <=> esper z99 has no delta on any of the four stats ($0000 row).
-Ot6GenjuAnyStatMod:
-        clr_a
+; A := the selected character's rank on esper z99 (0-5), $f3 := the points.
+Ot6GenjuRank:
+        jsr     Ot6GenjuPoints
+        ldx     z0
+@r:     longa
+        lda     $f3
+        cmp     f:Ot6RungCostTbl,x
+        shorta
+        bcc     @done
+        inx
+        inx
+        cpx     #10
+        bne     @r
+@done:  txa
+        lsr
+        rts
+
+; X := the offset in Ot6RungLabelTbl of rung $f5 of esper z99 (Raiden reads
+; Odin's ladder: they share one).
+Ot6GenjuLabelOff:
         lda     z99
-        asl
-        tax
-        lda     f:Ot6EsperStatTbl,x
-        ora     f:Ot6EsperStatTbl+1,x
+        cmp     #12
+        bcc     @slot
+        beq     @odin
+        dec
+        bra     @slot
+@odin:  lda     #11
+@slot:  sta     hWRMPYA
+        lda     #5
+        sta     hWRMPYB
+        nop
+        nop
+        nop
+        longa
+        lda     hRDMPYL
+        clc
+        adc     $f5
+        and     #$00ff
+        shorta
+        sta     hWRMPYA
+        lda     #12
+        sta     hWRMPYB
+        nop
+        nop
+        nop
+        ldx     hRDMPYL
         rts
 
-; Y := the BG1 screen-B tilemap cell for column 17 of tilemap row $f6, which is
-; where a term's stat name starts.  The field is 11 cells: name 17-23, a spacer
-; at 24, sign 25, magnitude 26-27.  The spacer is not decoration: "Stamina"
-; and "Mag.Pwr" fill all seven name cells, so without it the sign sits flush
-; against the label and the column reads "Mag.Pwr- 3" while "Vigor" (padded to
-; seven) reads "Vigor   + 6".
-Ot6GenjuTermPos:
+; Y := the BG1 screen-B tilemap cell for column 16 of tilemap row $f6: a rung
+; label's 12 cells, 16-27.
+Ot6GenjuRungPos:
         longa
         lda     $f6
         and     #$00ff
         asl6                            ; 64 bytes per tilemap row
         clc
-        adc_pos BG1B, {17, 0}
+        adc_pos BG1B, {16, 0}
         tay
         shorta
         rts
 
 ; ------------------------------------------------------------------------------
 
-Ot6GenjuWhileWornText:
-        raw_text OT6_GENJU_WHILE_WORN
-        calc_size Ot6GenjuWhileWornText
-
-; stat names in Ot6EsperStatTbl selector order (ot6_progression.asm OT6_SM_*:
-; vigor, speed, stamina, mag.pwr), each null-terminated and space-padded to a
-; fixed 8-byte stride so the selector indexes with (sel-1)*8.
-Ot6GenjuStatNameTbl:
-        raw_text OT6_GENJU_STAT_VIGOR
-        raw_text OT6_GENJU_STAT_SPEED
-        raw_text OT6_GENJU_STAT_STAMINA
-        raw_text OT6_GENJU_STAT_MAGPWR
-        calc_size Ot6GenjuStatNameTbl
-.assert sizeof_Ot6GenjuStatNameTbl = 32, error, "Ot6GenjuStatNameTbl entries must be 8 bytes each (7 tiles + terminator)"
+Ot6GenjuRankText:
+        raw_text OT6_GENJU_RANK
+        calc_size Ot6GenjuRankText
 
 .endif
 
