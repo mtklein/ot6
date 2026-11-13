@@ -52,7 +52,7 @@ local function lowest()
 end
 
 -- aboard the Blackjack and into the air: A on the parked ship takes the party into its hold (map 7), the hold's
--- stair (40,10) up to the deck (map 6), and the wheel (_caf532, beside (15,6)) lifts off -- straight away the
+-- stair (40,10) up to the deck (map 6), and the wheel (_caf532: on (14,6), facing left, A held) lifts off -- straight away the
 -- first time ($0170 clear), by its (Lift-off) choice after
 local MAP_HOLD, MAP_DECK = 7, 6
 local function board()
@@ -80,7 +80,7 @@ local function board()
     H.driveUntil(function() return map() == MAP_DECK end, 600, { H.hold({ "up" }) }, "up the hold's stair (40,10)"),
     H.release(),
     H.waitUntil(function() return map() == MAP_DECK and settled() end, 2400, "the Blackjack's deck (map 6)", 5),
-    H.navTo(15, 6, { maxFrames = 3000 }),
+    H.navTo(14, 6, { maxFrames = 3000 }),
     H.faceAndHoldA("left", function() return H.dialogWaiting() or H.aboardAirship() end, 1200,
       "the Blackjack's wheel (6 (14,6)): face left, A"),
     H.release(),
