@@ -8093,38 +8093,45 @@ end
 -- unpriced (a Special), and the member a Death answer kills (#523,
 -- Driver:deathAnswer: e, or with L.5 Doom anyone it reaches), else nil.
 -- The walk decides if_num_monsters on the bodies standing (one fewer when
--- use.dies says the hit kills this one).  `mayKill` false says the hit
--- leaves this body standing (Driver:mayKill): a Death answer only its
--- dying walk gives (the Retainer's and the Sleep's `if_self_dead /
--- attack SPECIAL`) is then no answer; the damage answers are walked both
--- ways as before.
+-- use.dies says the hit kills this one).  A Death answer only the dying
+-- walk gives (the Retainer's and the Sleep's `if_self_dead / attack
+-- SPECIAL`) answers whoever kills the body, and the body has to die: it
+-- costs a life whoever lands that blow, unless the one who does wears a
+-- Death guard.  So it is priced only when another standing member wears
+-- one (who can take the kill instead, Driver:guardStands), and only when
+-- the hit may kill the body (use.dies true, or `mayKill` not false:
+-- Driver:mayKill); else it is no answer.  The damage answers are walked
+-- both ways as before.  (#523: the first cut priced it on every Fight and
+-- sent atn_s0's whole party at the third body of formation 426 while the
+-- two Retainers swung, "battle $1AA LOST after 16250 ticks", where main's
+-- library won it.)
 function Driver:counterWorst(slot, e, use, hp, mayKill)
   local species = M.readWord(M.FORMATION + slot * 2)
   if species == 0xFFFF or species >= 0x180 then return 0, nil, {}, false, nil end
   local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
   local off = M.readRomWord(ptrs + species * 2)
   local function script(i) return M.readRomByte(base + off + i) end
+  local n = 0
+  for s = 0, 5 do if monAlive(s) then n = n + 1 end end
   local u = {}
   for k, v in pairs(use) do u[k] = v end
-  if u.monsters == nil then
-    local n = 0
-    for s = 0, 5 do if monAlive(s) then n = n + 1 end end
-    u.monsters = n - (u.dies == true and 1 or 0)
-  end
+  if u.monsters == nil then u.monsters = n - (u.dies == true and 1 or 0) end
   local atks = M.retalAnswer(script, u)
-  local living = nil
-  if u.dies == nil and mayKill == false then
-    living = {}
-    local alive = { }
-    for k, v in pairs(u) do alive[k] = v end
+  local living = {}
+  if u.dies ~= false then
+    local alive = {}
+    for k, v in pairs(use) do alive[k] = v end
     alive.dies = false
+    if alive.monsters == nil then alive.monsters = n end
     for _, a in ipairs(M.retalAnswer(script, alive)) do living[a] = true end
   end
   local top, which, unknown, killed = 0, nil, false, nil
   for _, a in ipairs(atks) do
     local dk = self:deathAnswer(slot, e, a)
-    if dk ~= nil and living ~= nil and not living[a] then
-      -- a dying-only Death answer, and this hit leaves the body standing
+    if dk ~= nil and u.dies ~= false and not living[a]
+       and (mayKill == false or (u.dies ~= true and mayKill == nil) or not self:guardStands(e)) then
+      -- a dying-only Death answer: this hit leaves the body standing, or
+      -- nobody else can take the kill
     else
       if dk ~= nil and killed == nil then killed = dk end
       local hi = self:counterHit(slot, e, a, hp)
@@ -8135,13 +8142,33 @@ function Driver:counterWorst(slot, e, use, hp, mayKill)
   return top, which, atks, unknown, killed
 end
 
+-- Whether a standing party member other than `e` wears a Death guard
+-- ($3AA1 bit 2): one who can land a killing blow a dying body answers
+-- with Death (#523).
+function Driver:guardStands(e)
+  local left = M.leftMask()
+  for m = 0, 3 do
+    if m ~= e and M.readWord(0x3BF4 + m * 2) > 0 and (left >> m) & 1 == 0
+       and (M.readByte(0x3AA1 + m * 2) & 0x04) ~= 0 then
+      return true
+    end
+  end
+  return false
+end
+
 -- Whether party entity `actor`'s hit can take what stands of monster slot
 -- `s` (#523): its own last measured action (dmgSeen, shielded-equivalent,
--- x4 on a Broken body, as finishInReach and partyWindow read it) against
--- the body's HP.  Nothing measured yet is a hit that may kill.
+-- x4 on a Broken body, as finishInReach and partyWindow read it), else the
+-- party's largest, against the body's HP; nil when nobody has landed one.
 function Driver:mayKill(actor, s)
   local seen = self.dmgSeen and self.dmgSeen[actor]
-  if seen == nil then return true end
+  if seen == nil then
+    for e = 0, 3 do
+      local v = self.dmgSeen and self.dmgSeen[e]
+      if v ~= nil and (seen == nil or v > seen) then seen = v end
+    end
+  end
+  if seen == nil then return nil end
   local mult = M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 and 4 or 1
   return seen * mult >= M.readWord(BATTLE.MON_HP + s * 2)
 end

@@ -152,30 +152,50 @@ check("a lone Apokryphos's L.5 Doom kills the actor at level 40, a partner at 40
     return top < 3000 and k == nil
   end)
 check("the Apokryphos beside another body answers nothing (if_num_monsters 1, on the bodies standing)",
-  { { "if u.monsters == nil then", "if false then" } },
+  { { "if u.monsters == nil then", "if false then" },
+    { "if alive.monsters == nil then alive.monsters = n end", "" } },
   function(H)
     battle({ [0] = { APOK, 9000 }, [1] = { QUIET, 5000 } }, { party = { [0] = 40 } })
     local _, _, _, _, k = driver(H):counterWorst(0, 0, { cmd = 0x00 }, 3000)
     return k == nil
   end)
-check("a finishing Fight on a Retainer (its dying Tradeoff) goes to the body beside it",
+-- a partner (entity 1) who wears a Death guard can take the Retainer's kill
+local function guardedPartner() w16(0x3BF4 + 2, 3000); w8(0x3B18 + 2, 41); w8(0x3AA1 + 2, 0x04) end
+check("a finishing Fight on a Retainer (its dying Tradeoff) goes to the body beside it while a guarded partner stands",
   { { "if not unknown and top < hp and killed == nil then return plan end", "if true then return plan end" } },
   function(H)
-    battle({ [0] = { RETAINER, 400 }, [2] = { QUIET, 5000 } })
+    battle({ [0] = { RETAINER, 400 }, [2] = { QUIET, 5000 } }); guardedPartner()
     local d = driver(H); d.dmgSeen[0] = 900
     local p = d:counterAimPlan(0, { kind = "fight", row = 0, aim = 0, reason = "finish" })
     return p.aimHard == 2
   end)
-check("a Fight that leaves a Retainer standing (measured 100 against 5000) stays on it; unmeasured, it moves",
-  { { "if dk ~= nil and living ~= nil and not living[a] then", "if false then" } },
+check("with no guarded partner the Retainer's kill costs a life whoever lands it: the finish stays",
+  { { "or not self:guardStands(e)) then", ") then" } },
   function(H)
-    battle({ [0] = { RETAINER, 5000 }, [2] = { QUIET, 5000 } })
+    battle({ [0] = { RETAINER, 400 }, [2] = { QUIET, 5000 } })
+    local d = driver(H); d.dmgSeen[0] = 900
+    local p = d:counterAimPlan(0, { kind = "fight", row = 0, aim = 0, reason = "finish" })
+    return p.aimHard == nil and p.aim == 0
+  end)
+check("a Fight that leaves a Retainer standing (100 against 5000) stays on it; one that may kill it (6000) moves",
+  { { "and (mayKill == false or (u.dies ~= true and mayKill == nil) or not self:guardStands(e)) then",
+      "and (u.dies ~= true and mayKill == nil or not self:guardStands(e)) then" } },
+  function(H)
+    battle({ [0] = { RETAINER, 5000 }, [2] = { QUIET, 5000 } }); guardedPartner()
     local d = driver(H); d.dmgSeen[0] = 100
     local p = d:counterAimPlan(0, { kind = "fight", row = 0, aim = 0 })
     if p.aimHard ~= nil or p.aim ~= 0 then return false end
-    d = driver(H)
+    d = driver(H); d.dmgSeen[0] = 6000
     p = d:counterAimPlan(0, { kind = "fight", row = 0, aim = 0 })
     return p.aimHard == 2
+  end)
+check("nothing measured yet, a Fight on a Retainer at full HP stays on it",
+  { { "and (mayKill == false or (u.dies ~= true and mayKill == nil) or not self:guardStands(e)) then",
+      "and (mayKill == false or not self:guardStands(e)) then" } },
+  function(H)
+    battle({ [0] = { RETAINER, 5000 }, [2] = { QUIET, 5000 } }); guardedPartner()
+    local p = driver(H):counterAimPlan(0, { kind = "fight", row = 0, aim = 0 })
+    return p.aimHard == nil and p.aim == 0
   end)
 check("a re-aim skips the body a queued Fight takes first (pkN_s6), else goes to the least HP",
   { { "local function landsOn(s) return monAlive(s) and not self:mayFallFirst(actor, s) end",
