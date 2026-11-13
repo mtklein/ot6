@@ -156,7 +156,7 @@ Lesson: the flier falls to the point and not the edge (weapon-classes.md's
 "pierce-weak fliers" for this stretch); the moth takes SETZER's cards, the
 first trash his hand is made for; the Over-Grunk is the tank.
 
-## 9. The south continent round Albrook (world groups 14, 21)
+## 9. The south continent round Albrook (world groups 14, 21, 15)
 
 TERRA (Break Blade: slash; Fire, Ice), LOCKE (ThunderBlade: slash, bolt),
 from `banquet-done-v1` and `crescent-landing-v1` (SHADOW joins the second:
@@ -167,10 +167,15 @@ pierce). EDGAR and SABIN fight the same formation before the banquet.
 | `$07B` Ralph | a beast | 17 | 620 | (+poison) | — | 4 · slash | **2** · slash\|pierce |
 | `$081` Wyvern | a dragon | 18 | 892 | ice | — | 4 · pierce | **3** · slash\|pierce |
 | `$08D` WeedFeeder | a grazer | 17 | 480 | fire\|wind | — | 4 · slash | **2** · slash\|bludg |
+| `$06B` Joker | a conjurer, in threes | 17 | 467 | bolt\|poison | — | 4 · slash | **2** · slash\|special |
 
 Lesson: the blades key every body (the floor's pierce-only Wyvern did not
 key the two blades that walk here); the Wyvern is the three-shield dragon,
-like the Floating Continent's, and Ice its element.
+like the Floating Continent's, and Ice its element. The Joker (world group
+15, which the banquet's grind fights: formation 148, three Jokers) takes the
+blades and, as a conjurer, special; LOCKE's ThunderBlade reaches its bolt.
+Group 15 also deals the ChickenLip, whose row is the side-zones branch's
+(wt/v043-wob-zones).
 
 ## 10. The plains and forest round Thamasa (world groups 22, 23, 24)
 
@@ -205,11 +210,12 @@ TERRA, LOCKE and STRAGO as above, and RELM (Chocobo Brush: special) from
 Lesson: the insect, the shell and the ooze turn the blades the party
 carries and take STRAGO's rod; the ooze takes RELM's brush too, the
 mountain she joins on. The floor's Insecare row (pierce) was a key no hand
-here held; its Fire weakness was the only answer. The Adamanchyt stays at five,
-above the house curve: TERRA learns Break on this mountain (level 24), and
-the shell is the body her boosted Break is read on (a 3-BP Break takes four
-of its five; `battle_breakfour` measures it here, and went red when this
-doc's first draft gave the shell three:
+here held; its Fire weakness was the only answer. The Adamanchyt keeps the floor's
+five, above the house curve, for `battle_breakfour`'s measurement: TERRA's
+3-BP Break takes four shields, which is told from three and five only on a
+body holding five, and this is the pool the suite plays (TERRA learns Break
+here, at level 24). The suite went red when this doc's first draft gave the
+shell three:
 `build/attempts/wt/v043-wob-rows/gate/suite_battle_breakfour.red.log`, "the
 counted cast within 12 tries: got false"). (#283 covers the
 mountain's full pool and map 374; these five rows are this doc's.)
@@ -235,5 +241,7 @@ it heals it.
 the authored ROM (`green/verdicts.txt`), FAIL on main's ROM (`red-main/`,
 every row missing) and on one mutant ROM with a mutation per suite
 (`mutate.py`, `mutant/`: each suite red with the line its mutant names);
-`audit.before.txt` / `audit.after.txt`: no claimed area lists an
-unauthored species after.
+`audit.before.txt` / `audit.after.txt`: no area claimed by the play
+before this landing lists an unauthored species after. The landing's own
+replay claims world group 15 (`gate/audit.final.txt`), which added the
+Joker (section 9) and the ChickenLip (the side-zones branch's row).

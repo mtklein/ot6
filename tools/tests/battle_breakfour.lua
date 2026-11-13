@@ -15,7 +15,8 @@
 -- points) at an unbroken body holding five; everyone else Defends.  This map's
 -- pool (route_data.py pool field 375, group 90) fields an Adamanchyt
 -- (five) in formations 164 and 165, 176/256 of its battles; 166 is five
--- Slurms (four).  A battle without a five-shield body, or where TERRA
+-- Slurms (two each since #254's rows; the Adamanchyt keeps the floor's five
+-- for this measurement, break-coverage-wob.md section 11).  A battle without a five-shield body, or where TERRA
 -- cannot cast, is fought out and the next taken; a cast the battle's end
 -- cuts off, or one that charged no MP, is not counted.  Nothing is
 -- written.

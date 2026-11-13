@@ -1,5 +1,5 @@
 -- @suite
--- battle_breakwob_south.lua -- the World of Balance break rows for the south continent round Albrook (world groups 14 and 21), re-verified from the built ROM
+-- battle_breakwob_south.lua -- the World of Balance break rows for the south continent round Albrook (world groups 14, 21 and 15), re-verified from the built ROM
 -- (battle_breakwor_sidetrips's shape: pure ROM bytes, no savestate).  docs/design/break-coverage-wob.md section 9
 -- is the design; the tables below are its, and the only place the expectations live.
 --
@@ -7,7 +7,7 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the blades (slash) key every body; the Wyvern is the three-shield dragon, ice its element.
+--   3. the lessons: the blades (slash) key every body; the Wyvern is the three-shield dragon, ice its element; the Joker takes special and bolt.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -19,12 +19,14 @@ local WANT = {
   [0x07B] = { "Ralph", 2, SLASH | PIERCE, 0, 0, POISON },
   [0x081] = { "Wyvern", 3, SLASH | PIERCE, ICE, 0, 0 },
   [0x08D] = { "WeedFeeder", 2, SLASH | BLUDG, FIRE | WIND, 0, 0 },
+  [0x06B] = { "Joker", 2, SLASH | SPECIAL, BOLT | POISON, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
 local POOLS = {
   { "world", 14, "the south continent", { 0x07B, 0x081, 0x08D } },
   { "world", 21, "the south continent", { 0x07B, 0x081, 0x08D } },
+  { "world", 15, "the plains by the banquet", { 0x06B, 0x07B, 0x081 } },
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 9); the pools
@@ -145,7 +147,10 @@ H.run({ maxFrames = 600 }, {
     end
     if (weakOf(0x081) & ICE) == 0 then problem("$081 Wyvern: ice holds no key") end
     if shield[0x081] == nil or shield[0x081][1] ~= 3 then problem("$081 Wyvern: not three shields") end
-    H.log("the lessons: the blades key every body; the Wyvern is the three-shield dragon, ice its element")
+    if (classOf(0x06B) & SPECIAL) == 0 then problem("$06B Joker: the conjurer should take special") end
+    if (weakOf(0x06B) & BOLT) == 0 then problem("$06B Joker: LOCKE's ThunderBlade (bolt) holds no key") end
+    H.log("the lessons: the blades key every body; the Wyvern is the three-shield dragon, ice its element; the Joker "
+      .. "takes special and bolt")
     H.assertEq(#problems, 0, "WoB south break row mismatches")
     H.log("WoB south break rows verified against the built ROM")
   end),

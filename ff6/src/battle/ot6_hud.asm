@@ -2107,8 +2107,8 @@ Ot6ShieldTbl:
         ; two, the bear only the blade --
         .word   $0011
         .byte   2, OT6_PIERCE|OT6_SLASH ; commander: imperial rank, the
-                                ;   imperial answer (pierce).  poison
-                                ;   vanilla
+                                ;   imperial answer (pierce), and celes's
+                                ;   blade (slash).  poison vanilla
         .word   $0071
         .byte   2, OT6_SLASH|OT6_PIERCE ; vector pup: a hound.  fire
                                 ;   vanilla
@@ -2161,6 +2161,11 @@ Ot6ShieldTbl:
                                 ;   vanilla
         .word   $008d
         .byte   2, OT6_SLASH|OT6_BLUDG ; weedfeeder: fire|wind vanilla
+        .word   $006b
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; joker: a conjurer (world group
+                                ;   15, three to a formation: the grind
+                                ;   by the banquet); setzer's cards.
+                                ;   bolt|poison vanilla
         ; -- the plains round thamasa (world groups 22, 23) --
         .word   $0096
         .byte   2, OT6_SLASH|OT6_PIERCE ; cephaler: bolt vanilla (locke's
@@ -2184,10 +2189,10 @@ Ot6ShieldTbl:
         .byte   2, OT6_SLASH|OT6_PIERCE ; abolisher: no element
         .word   $00d6
         .byte   5, OT6_PIERCE|OT6_BLUDG ; adamanchyt: the mountain's wall,
-                                ;   five shields above the house curve:
-                                ;   terra learns break here (l24), and a
-                                ;   3-bp break takes four of the five
-                                ;   (battle_breakfour).  the blades turn.
+                                ;   five shields, the floor's, kept above
+                                ;   the house curve for battle_breakfour's
+                                ;   measurement (a 3-bp break takes four of
+                                ;   the five).  the blades turn.
                                 ;   no element
         .word   $00b8
         .byte   2, OT6_BLUDG|OT6_SPECIAL ; slurm: an ooze, not cut.  fire
