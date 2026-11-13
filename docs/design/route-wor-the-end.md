@@ -54,10 +54,11 @@ Evidence is under `build/attempts/wt/v040-the-end/`. Line numbers are into
    twice the member reaching for it fell first; moved up before the climb,
    with one Megalixir in flight at a time, the leg wins 48 of 48 again
    (27 distinct opening keys, 30 distinct Kefka keys: 5.4).
-8. **Kefka at 16 shields, the most of any boss.** On v0.42's line he wins
-   every one of the 44 runs of both grids that reach him at 16, as at 12
-   (30 distinct Kefka keys); the four runs lost are the third tier's, the
-   same at both counts (5.5).
+8. **Kefka at 16 shields, the most of any boss, with the Megalixir at two
+   members under 35%.** On the line replayed for it he lost one key of both
+   grids at 16 (be20, twice) where 12 lost none; drinking the Megalixir when
+   two members stand under 35% of their HP, not three under 30%, wins all 48
+   runs (24 distinct opening keys, 26 distinct Kefka keys: 5.6).
 
 ## 1. The climb
 
@@ -566,13 +567,11 @@ keys won 30, lost 1; deaths in the tier 105; ticks 10000-24494", "4 Kefka:
 won 45, lost 2; distinct keys won 30, lost 1; deaths in the tier 55",
 "Kefka's battle: 48 runs; won 45, lost 3" (`px13/tally_or16.txt`).
 
-- **Kefka at 16 holds wherever he is met.** At 16 he lost none of the 44
-  runs that reached him, on 30 distinct Kefka keys, as at 12; the first
-  three tiers play byte for byte as at 12 (the same four runs lost, the same
-  keys), so the battle's outcome is the same on every one of the 48 draws.
-  He costs more at 16: 20 deaths in his tier across the grids against 9.
-  His row is 16, the most of any boss (Storm Drgn 14), and
-  `battle_breakwor_end` holds it above every other row.
+- **On this boot Kefka at 16 held wherever he was met.** At 16 he lost none
+  of the 44 runs that reached him, on 30 distinct Kefka keys, as at 12; the
+  first three tiers play byte for byte as at 12 (the same four runs lost,
+  the same keys). He costs more at 16: 20 deaths in his tier across the
+  grids against 9. The line replayed since moved the boot (5.6).
 - **What loses is the third tier, at 12 and at 16 alike**: four runs on
   three tier-3 keys (be2C twice, beA8, be34), the four members killed by
   the Sleep's Meteo two at a time ("[death] f+14458 entity 1 char 6 from
@@ -582,7 +581,8 @@ won 45, lost 2; distinct keys won 30, lost 1; deaths in the tier 55",
   as at v0.40 (16,181-38,741 ticks against 7,945-22,065, `tally_r6_*`) with
   188 deaths against 109. That is a regression of the line upstream (the
   front four's levels and HP: CELES L63 5,539 against L68 6,313, RELM 4,942
-  against 6,358), not of Kefka's row; it is #514's open end, below.
+  against 6,358), not of Kefka's row. On the line replayed for this
+  change the order puts RELM third and the tier is no longer lost (5.6).
 - **Not kept**: the Megalixir in the third tier (`m16`): the crises there
   come as Meteo's double kills, faster than the 30% trigger; it turned one
   losing key's run into a win (`m16B_k0_s6`, by the care lines' party item:
@@ -599,15 +599,59 @@ won 45, lost 2; distinct keys won 30, lost 1; deaths in the tier 55",
   ("tier 4 Kefka WON after 21311 ticks, 6 deaths, key be78", `or12_k0_s8`,
   `or12B_k0_s7`; `or12_k2_s9` lost the same third tier as `or16_k2_s9`). So
   16 is thinner than 12 with Kefka, though on the line's own order it
-  decides no draw. Not kept: the order stays the strongest first.
+  decides no draw.
+
+### 5.6 The line replayed, and the Megalixir at two under 35% (#514)
+
+The line replayed from power-on at 7080ab2b (`land/land.out`: "gate: GREEN
+-- ninja -k 0 -j16 exited 0") moved from `wor-colosseum-v1` on (main's
+play, not this change: main's de4ee995 makes the same `wor-colosseum-v1`
+capture, sha256 f7e8fbaa, from the same boot, `land/attr.log`), and its
+`wor-kt-plates-v1` (sha256 0d979170) puts RELM third: "TERRA, CELES, RELM,
+STRAGO, SHADOW, CYAN, EDGAR, LOCKE, GOGO, MOG, SETZER, SABIN". From that
+capture, both grids, 48 runs an arm (`px13/tally_f16.txt`,
+`air/tally_f12.txt`, `px13/` `f15`, `mbp/tally_mxn2.txt`):
+
+| arm | ROM | the Megalixir | runs won | Kefka lost (keys) | deaths in Kefka's tier |
+|---|---|---|---|---|---|
+| `f12` | 12 shields | three under 30% | 48 of 48 | 0 | 23 |
+| `f16` | 16 | three under 30% | 46 of 48 | 2 (1: be20) | 60 |
+| `f15` | 15 | three under 30% | at least one lost (be28, `f15B_k0_s15`) | | |
+| **`mxn2`** | **16** | **two under 35%** | **48 of 48** | **0** | 47 |
+
+Quoted: "4 Kefka: won 48, lost 0; distinct keys won 26, lost 0; deaths in
+the tier 23", "Kefka's battle: 48 runs; won 48, lost 0" (`f12`); "4 Kefka:
+won 46, lost 2; distinct keys won 26, lost 1; deaths in the tier 60",
+"Kefka's battle: 48 runs; won 46, lost 2, other 0; distinct opening keys
+won 23, lost 1" (`f16`); "4 Kefka: won 48, lost 0; distinct keys won 26,
+lost 0; deaths in the tier 47", "Kefka's battle: 48 runs; won 48, lost 0,
+other 0; distinct opening keys won 24, lost 0" (`mxn2`). Every arm's third
+tier: "3 lady+sleeper: won 48, lost 0; distinct keys won 29, lost 0".
+
+- **What lost at 16** (`f16_k4_s4`, `f16B_k4_s3`, one fight): the first
+  Megalixir after Fallen One, then his Special on CELES from full ("ONE
+  ACTION from >= 80%"), and below 10,240 his Ultima answered the party's
+  hits on three members at about a fifth of their HP ("[death] f+14286
+  entity 0 char 0 from 1167/5995 by slot 0 cmd $02 atk $14", and entities 1
+  and 3 in the same frame) while the second Megalixir, planned at three
+  under 30%, was still on its way. At 12 the same draw was won with no death
+  ("tier 4 Kefka WON after 17579 ticks, 0 deaths, key be20", `f12_k4_s4`).
+- **Two under 35%** drinks before the third member is in Ultima's reach: 36
+  runs drink one Megalixir, 11 both, one a second by the care lines
+  (`mbp/megal_mxn2.txt`), and be20 is won with no death ("tier 4 Kefka WON
+  after 20116 ticks, 0 deaths, key be20", `mxn2_k4_s4`). The leg's trigger
+  is now that; the second Megalixir is still only ever drunk in Kefka's
+  tier.
 
 ## 6. Not done
 
-- **The third tier on every draw** (#514's open end): on v0.42's line the
-  lady and the sleeper take 4 of 48 runs at 12 shields and at 16 (5.5), so
-  the battle no longer wins every draw at either count. Kefka's row is 16
-  because he holds there wherever he is met; the third tier needs its own
-  lever (the order, levels or kit for the front four).
+- **The third tier with STRAGO third.** On v0.42's capture the strongest
+  first put STRAGO third and RELM fifth, and the lady and the sleeper took
+  4 of 48 runs at either shield count (5.5); the replayed line puts RELM
+  third and loses none. The order is decided by a level and HP tie-break,
+  so a later replay can bring the STRAGO order back; a rule that keeps a
+  bludgeon and a special for the Sleep in front was measured only as RELM
+  third (`or16`), not made.
 - **STRAGO's options** (#512): his nuke lore never reaches his turns
   (`v039-kefka-tower-2/pg0`: "actor=1 char=7 plan=fight" every turn, no lore
   line at all, so a rule ahead of the nuke repertoire decides first); Kefka's
