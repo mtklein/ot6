@@ -32,7 +32,11 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local GAU = 0x0B
 local RAGETIER = nil                  -- OT6_RAGETIER (ot6_memory.inc), read from the symbols
-local BUDGET = 16                     -- battles to see a measured Rage in
+-- battles to see a measured Rage in.  A battle the party ends before GAU's second turn shows no possessed turn: on
+-- the #328 line (f51cf3ac, the party's kept esper ranks) 15 of 16 cave battles ended at one Cmd_10 and the 16th
+-- carried a level-up ("no Rage planned and possessed past its start within 16 cave battles"), so the budget is
+-- the cave's, not one draw's
+local BUDGET = 40
 local A, B = { 57, 45 }, { 58, 45 }
 local FIGHT = { rage = true }      -- the line is opt-in (Driver:rageLine)
 
