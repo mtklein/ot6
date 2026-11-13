@@ -110,3 +110,6 @@
 ; a reflected spell with nowhere to land shows no bounce (#520), appended for
 ; the same reason.
         .include "ot6_reflect.asm"
+
+; the esper ladder (#328), appended for the same reason.
+        .include "ot6_esper.asm"

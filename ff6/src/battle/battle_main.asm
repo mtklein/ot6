@@ -2389,6 +2389,8 @@ UpdateEquip:
         dex
         dey
         bpl     @0ee6                   ; next item
+        jsl     Ot6EsperFold            ; ot6 #328: the esper ladder's kept
+                                        ;   rungs, as one more piece of gear
         lda     $15ed,x                 ; high byte of mp
         and     #$3f
         sta     $ff
@@ -6885,10 +6887,6 @@ UpdateEquipBattle:
 @286d:  phd
         pea     $1100       ; set direct page to $1100
         pld
-        jsl     Ot6EsperStatMod   ; M5: an equipped esper adds a live +stat to this
-                                  ;   character's $1100 stat buffer BEFORE the copy
-                                  ;   below reads it (ot6.asm) -- while-equipped,
-                                  ;   reversible, never written to the $16xx record
         lda     $c9         ; armor
         cmp     #$9f
         bne     @2883       ; branch if not $9f (moogle suit)
@@ -16008,22 +16006,13 @@ WinBattle:
         ldx     $3010,y
         phy
         jsr     LearnItemMagic
-        lda     $161e,x
-        bmi     @5e72       ; branch if no esper equipped
-        jsr     LearnGenjuMagic
-@5e72:  ply
+        jsl     Ot6EsperEarn    ; ot6 #328: Magic Points to the worn esper's
+                                ;   counter (replaces LearnGenjuMagic)
+        ply
 @5e73:  dey2                ; next character
         bpl     @5e13
-        lda     $f1         ;
-        and     $f0
-        beq     @5e8f
-        lda     $fb         ; magic points
-        beq     @5e8f       ; branch if no magic points gained
-        sta     $2f35       ; set variable 0
-        stz     $2f36
-        stz     $2f37
-        lda     #$35        ; battle message $35 "got <v0> magic point(s)"
-        jsr     ShowMsg
+        jsl     Ot6EsperMsg     ; ot6 #328: "got <v0> magic point(s)" whenever a
+                                ;   member wore a stone, then each new rank
 @5e8f:  ldy     #$0006
 @5e92:  lda     $3018,y     ; character mask
         bit     $3a74       ; skip if character is not alive
@@ -16268,26 +16257,8 @@ LearnItemMagic:
 
 ; ------------------------------------------------------------------------------
 
-; [ update spells taught by espers ]
-
-LearnGenjuMagic:
-@602a:  phx
-        jsr     GetGenjuPropPtr
-        ldy     #$0005
-@6031:  clr_a
-        lda     f:GenjuProp+1,x   ; spell taught by esper
-        cmp     #$ff
-        beq     @6044
-        phy
-        tay
-        lda     f:GenjuProp,x   ; spell learn rate
-        jsr     IncLearnMagic
-        ply
-@6044:  inx2
-        dey
-        bne     @6031
-        plx
-        rts
+; ot6 #328: LearnGenjuMagic (spells taught by espers) is retired; the
+; victory loop calls Ot6EsperEarn instead (ot6_esper.asm).
 
 ; ------------------------------------------------------------------------------
 
@@ -16384,20 +16355,8 @@ DoLevelUp:
         lda     f:LevelUpHP-2,x   ; character hp progression data
         sta     $fc
         plx
-        lda     $161e,x     ; equipped esper
-        bmi     @60f6       ; branch if no esper equipped
-        phy
-        phx
-        txy
-        jsr     GetGenjuPropPtr
-        clr_a
-        lda     f:GenjuProp+10,x   ; esper level up bonus
-        bmi     @60f4       ; branch if no bonus
-        asl
-        tax
-        jsr     (.loword(GenjuBonusTbl),x)
-@60f4:  plx
-        ply
+; ot6 #328: vanilla's esper level-up bonus is retired (the esper ladder,
+; ot6_esper.asm, is the only stat growth); GenjuBonusTbl went with it.
 @60f6:  longa_clc
         lda     $160b,x     ; hp boost
         pha
@@ -16448,118 +16407,6 @@ ShowLearnedMagicMsg:
         bpl     @6137
         ply
         rts
-
-; ------------------------------------------------------------------------------
-
-; jump table for esper level up bonus
-GenjuBonusTbl:
-@614e:  .addr   GenjuBonus_00
-        .addr   GenjuBonus_01
-        .addr   GenjuBonus_02
-        .addr   GenjuBonus_03
-        .addr   GenjuBonus_04
-        .addr   GenjuBonus_05
-        .addr   GenjuBonus_06
-        .addr   GenjuBonus_07
-        .addr   GenjuBonus_08
-        .addr   GenjuBonus_09
-        .addr   GenjuBonus_0a
-        .addr   GenjuBonus_0b
-        .addr   GenjuBonus_0c
-        .addr   GenjuBonus_0d
-        .addr   GenjuBonus_0e
-        .addr   GenjuBonus_0f
-        .addr   GenjuBonus_10
-
-; ------------------------------------------------------------------------------
-
-; [ esper bonus $00/$03: +10% hp/mp increase ]
-
-GenjuBonus_00:
-GenjuBonus_03:
-@6170:  lda     #$1a        ; 26/256 = 10.16%
-        bra     _617a
-
-; ------------------------------------------------------------------------------
-
-; [ esper bonus $01/$04: +30% hp/mp increase ]
-
-GenjuBonus_01:
-GenjuBonus_04:
-@6174:  lda     #$4e        ; 78/256 = 30.47%
-        bra     _617a
-
-; ------------------------------------------------------------------------------
-
-; [ esper bonus $02/$05: +50% hp/mp increase ]
-
-GenjuBonus_02:
-GenjuBonus_05:
-@6178:  lda     #$80        ; 128/256 = 50.00%
-_617a:  cpx     #$0006
-        ldx     #$0000
-        bcc     @6184       ; branch if hp increase
-        inx2                ; increment pointer for mp increase
-@6184:  xba
-        lda     $fc,x
-        jsr     MultAB
-        xba
-        bne     _618e       ; minimum increase is 1
-        inc
-_618e:  clc
-        adc     $fc,x       ; add to hp/mp increase
-        sta     $fc,x
-        bcc     _6197
-        inc     $fd,x
-; fallthrough
-
-; ------------------------------------------------------------------------------
-
-; [ esper bonus $07, $08: no effect ]
-
-GenjuBonus_07:
-GenjuBonus_08:
-_6197:  rts
-
-; ------------------------------------------------------------------------------
-
-; [ esper bonus $09-$10: stat bonuses ]
-
-GenjuBonus_0f:
-GenjuBonus_10:
-@6198:  iny                 ; mag.pwr ($161d)
-
-GenjuBonus_0d:
-GenjuBonus_0e:
-@6199:  iny                 ; stamina ($161c)
-
-GenjuBonus_0b:
-GenjuBonus_0c:
-@619a:  iny                 ; speed ($161b)
-
-GenjuBonus_09:
-GenjuBonus_0a:
-@619b:  txa                 ; strength ($161a)
-        lsr2                ; carry cleared if stat gets +2
-        tyx
-        lda     $161a,x     ; increment stat (max 128)
-        inc
-        bcs     @61a6       ; branch if not +2
-        inc
-@61a6:  cmp     #$81
-        bcc     @61ac
-        lda     #$80
-@61ac:  sta     $161a,x
-        rts
-
-; ------------------------------------------------------------------------------
-
-; [ esper bonus $06: +100% hp increase ]
-
-GenjuBonus_06:
-@61b0:  clr_ax
-        lda     $fc
-        bra     _618e
 
 ; ------------------------------------------------------------------------------
 

@@ -176,6 +176,7 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         longa
         lda     #OT6_CODEX_V2
         sta     f:OT6_CODEX_MAGIC+$0c00
+        jsr     Ot6EsperNewGame ; #328: and no esper progress
         plp
         rtl
 .endproc
@@ -197,6 +198,8 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         bra     @ensure
 @three: ldx     #$0800
 @ensure:
+        jsr     Ot6EsperLoaded  ; #328: the slot's esper progress goes live
+                                ;   (A = the slot; Ot6CodexEnsure clobbers A)
         jsr     Ot6CodexEnsure
         plp
         rtl
@@ -229,6 +232,7 @@ copy:   lda     f:OT6_CODEX+(src),x
         phy
         shorta
         pha                     ; preserve destination for vanilla's stores
+        jsr     Ot6EsperSaveAs  ; #328: live esper progress into the slot
         jsr     Ot6CodexActive  ; ensure source; X = source page
         lda     $01,s           ; destination slot
         cpx     #OT6_CODEX_TEMP
