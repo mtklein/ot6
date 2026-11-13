@@ -182,7 +182,10 @@ replayed line's states (the ROM with these rows), under
   BP banked; the reload drew be64 and won. Four keys in five is a box a
   player beats, and a lab candidate: the driver opens with SHADOW's Fight and
   EDGAR's AutoCrossbow (pierce, not a Gigantos key), and every action draws a
-  counter, so fewer, boosted slash Fights are the lever to measure.
+  counter, so fewer, boosted slash Fights are the lever to measure. A first
+  lab turned EDGAR's Tools line off (`tools = false`; sweep `giga-notools`):
+  5 of 6 distinct keys won (beE8 beE4 be60 be74 be2C; be78 lost), the same
+  band, so the leg keeps the default kit.
 - Telstar is won by SABIN and SHADOW at L12-14 with the camp's bag (one to
   seven Potions); each run ended above half HP.
 - The treasure room (`treasure/s0`, `s4`) and Kohlingen fought only the
