@@ -564,7 +564,8 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
 ;
 ; Four rung-5 effects have no vanilla bit (docs/design/esper-rework.md, the
 ; table's dagger rows): Conductor (Ramuh), Facet (Carbunkl), Rebirth
-; (Phoenix), and Fenrir's Stop and Slow immunity.  Each asks Ot6EsperSig
+; (Phoenix), and Fenrir's Stop and Slow immunity.  (The fifth, Sraphim's
+; Grace, has a vanilla stand-in: see Ot6LadderTbl.)  Each asks Ot6EsperSig
 ; whether the character holds it.
 
 OT6_SLOT_RAMUH    = 0
@@ -920,12 +921,16 @@ Ot6LadderTbl:
         eff     0,0,0,0,0,$02,0,0,0,0
         stat    0,2,0,0
         eff     0,0,0,0,0,0,0,0,0,$04
-; 20 Sraphim: Stm / Mag; immune to Doom's countdown; Grace (new code)
+; 20 Sraphim: Stm / Mag; immune to Doom's countdown; Regen (Cure Ring).  The
+;    design's Grace (keep the boost bank through KO and revive) would do
+;    nothing: no code clears a fallen character's bank (OT6_BP_CLASS), so the
+;    bank already survives a KO.  The healer's Regen stands in, the overlap
+;    with Kirin's on purpose (#328).
         stat    0,0,1,0
         stat    0,0,0,1
         eff     0,0,S2_DOOM,0,0,0,0,0,0,0
         stat    0,0,2,0
-        none
+        eff     0,0,0,$02,0,0,0,0,0,0
 ; 21 Golem: Stm / Vig; immune to Muddle; covers allies (True Knight)
         stat    0,0,1,0
         stat    1,0,0,0
