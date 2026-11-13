@@ -7898,14 +7898,19 @@ function M.deathLands(byteAt, guard, level)
   end
   return true
 end
--- Whom a monster's spell answer reaches, from its targeting byte (+0;
--- const.inc's TARGET flags): "roulette" (bit 7, the random cursor: any
--- entity, the one who struck it among them), "party" (no MANUAL bit and an
--- initial group, all or one side: L.5 Doom's $6E lands on every member),
--- else "attacker" (a counter's single target is the one who struck it).
+-- Whom a monster's spell reaches, from its targeting byte (+0; const.inc's
+-- TARGET flags) and whether it is a counter: "roulette" (bit 7, the random
+-- cursor: any member, the one who struck among them), else for a counter
+-- "attacker": CheckRetal presets the targets ($b8) to the one who struck,
+-- and ChooseTarget keeps a preset $b8 for any targeting with a $2C bit
+-- (`lda $bb / bit #$2c / bne @58f6`) and picks one of its bits for the
+-- rest, so a counter L.5 Doom lands on the attacker alone (#528).  A cast
+-- on the monster's own turn: "party" (no MANUAL bit and an initial group,
+-- all or one side: L.5 Doom's $6E lands on every member), else "attacker".
 -- (#523)
-function M.deathReach(t)
+function M.deathReach(t, counter)
   if (t & 0x80) ~= 0 then return "roulette" end
+  if counter then return "attacker" end
   if (t & 0x01) == 0 and (t & 0x0C) ~= 0 then return "party" end
   return "attacker"
 end
@@ -7983,11 +7988,11 @@ end
 -- Kiss, the Retainer's and the Sleep's dying Death are Specials.  A
 -- Special kills when its live byte ($322D, M.specialClass) is Death and
 -- the one who struck wears no Death guard ($3AA1 bit 2); a spell when
--- M.deathLands says it lands on a member it reaches (M.deathReach: the one
--- who struck, or with L.5 Doom every member standing) -- the guard, and
--- L.5 Doom's level that 5 does not divide, are its misses.  `onlyE` asks
--- about the one who struck alone.
-function Driver:deathAnswer(slot, e, a, onlyE)
+-- M.deathLands says it lands on a member it reaches (M.deathReach of a
+-- counter: the one who struck, L.5 Doom too, #528; Roulette's cursor any
+-- member, priced on the one who struck) -- the guard, and L.5 Doom's level
+-- that 5 does not divide, are its misses.
+function Driver:deathAnswer(slot, e, a)
   local function guarded(m) return (M.readByte(0x3AA1 + m * 2) & 0x04) ~= 0 end
   if a == 0xEF then
     if M.specialClass(M.readByte(0x322D + 8 + slot * 2)) == "wound" and not guarded(e) then return e end
@@ -7997,9 +8002,10 @@ function Driver:deathAnswer(slot, e, a, onlyE)
   local r = (M.sym("MagicProp") & 0x3FFFFF) + a * 14
   local function b(i) return M.readRomByte(r + i) end
   if M.attackClass(b) ~= "wound" then return nil end
+  -- an answer is a counter: it reaches the one who struck (M.deathReach),
+  -- where the same L.5 Doom cast on the monster's own turn reaches everyone
   local reach = { e }
-  if not onlyE and M.deathReach(b(0)) == "party" then
-    reach = { e }
+  if M.deathReach(b(0), true) == "party" then
     local left = M.leftMask()
     for m = 0, 3 do
       if m ~= e and M.readWord(0x3BF4 + m * 2) > 0 and (left >> m) & 1 == 0 then reach[#reach + 1] = m end
@@ -8012,7 +8018,7 @@ function Driver:deathAnswer(slot, e, a, onlyE)
 end
 
 function Driver:counterHit(slot, e, a, hp, noDeath)
-  if not noDeath and self:deathAnswer(slot, e, a, true) ~= nil then return hp end
+  if not noDeath and self:deathAnswer(slot, e, a) == e then return hp end
   if a ~= 0xEE and a ~= 0xEF then
     local r = (M.sym("MagicProp") & 0x3FFFFF) + a * 14
     local t = M.fixedTake(function(i) return M.readRomByte(r + i) end, hp, M.readWord(0x3C1C + e * 2))
@@ -8091,7 +8097,7 @@ end
 -- `hp` for the action `use` (M.retalAnswer, priced by Driver:counterHit):
 -- what it can take, the attack, the answers, whether one of them is
 -- unpriced (a Special), and the member a Death answer kills (#523,
--- Driver:deathAnswer: e, or with L.5 Doom anyone it reaches), else nil.
+-- Driver:deathAnswer: e, the one a counter reaches), else nil.
 -- The walk decides if_num_monsters on the bodies standing (one fewer when
 -- use.dies says the hit kills this one).  A Death answer only the dying
 -- walk gives (the Retainer's and the Sleep's `if_self_dead / attack
@@ -8403,11 +8409,15 @@ end
 -- took 5.  The same price holds for every Death answer (#523,
 -- Driver:deathAnswer): the Sky Base answers a spell with Blaster, the
 -- Veteran with Roulette, Allo Ver any hit with Doom, a lone Apokryphos
--- with L.5 Doom (on every member at a level 5 divides), the Retainer and
+-- with L.5 Doom (on the caster, at a level 5 divides), the Retainer and
 -- the Sleep the spell that kills them with a Death Special.  A body whose
 -- answer kills costs that member's life unless the member wears a Death
 -- guard ($3AA1 bit 2, FixImmuneStatus) or, for L.5 Doom, stands at a
--- level 5 does not divide.  A person who has watched it once aims the
+-- level 5 does not divide.  So does an answer to Magic whose damage
+-- takes all the caster's HP (Driver:counterWorst's top, #503's rule for
+-- a Fight, here for a cast, #528): the Phase answers any hit with Blow
+-- Fish, 1000, so a caster under 1000 HP casts at another body.  A
+-- person who has watched it once aims the
 -- spell at another body, and swings at the Oscar instead (it answers
 -- nothing else).  So a cast aimed at such a body (the plan's aim, else
 -- the one body a scored command's contract names, else the kill order's
@@ -8487,8 +8497,8 @@ function Driver:counterMagicPlan(actor, plan)
   end
   if best ~= nil then
     M.log(string.format("[%s] actor=%d cast $%02X re-aimed: %s answer%s Magic with a Death the caster's guard and "
-      .. "level do not stop; slot %d instead (#521, #523)", self.tag or "fight", actor, spell,
-      table.concat(ks, ", "), #ks == 1 and "s" or "", best))
+      .. "level do not stop, or %d or more; slot %d instead (#521, #523)", self.tag or "fight", actor, spell,
+      table.concat(ks, ", "), #ks == 1 and "s" or "", hp, best))
     plan.aim, plan.aimHard = best, best
     if tc ~= nil and not tc.all then plan.targetContract = { chars = 0, monsters = 1 << best, all = false } end
     return plan
@@ -8500,8 +8510,8 @@ function Driver:counterMagicPlan(actor, plan)
   end
   if not fightSafe then return plan end
   M.log(string.format("[%s] actor=%d cast $%02X withheld: %s answer%s Magic with a Death the caster's guard and "
-    .. "level do not stop, and %s; a Fight instead (#521, #523)", self.tag or "fight", actor, spell,
-    table.concat(ks, ", "), #ks == 1 and "s" or "",
+    .. "level do not stop, or %d or more, and %s; a Fight instead (#521, #523)", self.tag or "fight", actor, spell,
+    table.concat(ks, ", "), #ks == 1 and "s" or "", hp,
     spread and "the cast lands on every body" or "no other body stands when it lands"))
   return self:counterAimPlan(actor, { kind = "fight", row = fight, boostLeft = plan.boostLeft or 0,
     aim = self:chipAim(actor, plan.boostLeft or 0), reason = "counter_magic" })

@@ -353,14 +353,24 @@ check("a Death guard stops Doom, Blaster, Roulette and L.5 Doom",
 check("Fire is no Death answer",
   "deathLands", "if M.attackClass(byteAt) ~= \"wound\" then return false end", "",
   function() return not H.deathLands(rec(FIRE), false, 40) end)
-check("L.5 Doom reaches the whole party, Blaster and Doom the one who struck, Roulette anyone",
+-- M.deathReach: a cast on the monster's own turn by its targeting byte; a
+-- counter on the one who struck (CheckRetal's preset $b8, which
+-- ChooseTarget keeps for $2C targeting, #528); Roulette's cursor either way
+local function reach(a, counter) return H.deathReach(rom:byte(MAGIC + a * 14 + 1), counter) end
+check("L.5 Doom cast on its own turn reaches the whole party; Blaster and Doom the one who struck",
   "deathReach", "if (t & 0x01) == 0 and (t & 0x0C) ~= 0 then return \"party\" end", "",
   function()
-    return H.deathReach(rom:byte(MAGIC + L5_DOOM * 14 + 1)) == "party"
-      and H.deathReach(rom:byte(MAGIC + BLASTER * 14 + 1)) == "attacker"
-      and H.deathReach(rom:byte(MAGIC + DOOM * 14 + 1)) == "attacker"
-      and H.deathReach(rom:byte(MAGIC + ROULETTE * 14 + 1)) == "roulette"
+    return reach(L5_DOOM) == "party" and reach(BLASTER) == "attacker" and reach(DOOM) == "attacker"
   end)
+check("as a counter, L.5 Doom reaches the one who struck alone",
+  "deathReach", "if counter then return \"attacker\" end", "",
+  function()
+    return reach(L5_DOOM, true) == "attacker" and reach(BLASTER, true) == "attacker"
+      and reach(DOOM, true) == "attacker"
+  end)
+check("Roulette's cursor reaches any member, as a counter too",
+  "deathReach", "if (t & 0x80) ~= 0 then return \"roulette\" end", "",
+  function() return reach(ROULETTE) == "roulette" and reach(ROULETTE, true) == "roulette" end)
 
 print(string.format("counter_selftest: PASS -- %d assertions, each failed by its own mutant: %s",
   n, table.concat(checks, "; ")))

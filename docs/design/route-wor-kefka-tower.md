@@ -883,20 +883,27 @@ divide. The bodies on the line that answer so:
 | Sky Base `$0FC` | Blaster `$B1` (x4, one in three each) | anything but a Fight |
 | Veteran `$0FB` | Roulette `$8C` | Magic |
 | Allo Ver `$0BB` | Doom `$0D` | any hit, the killing one too |
-| Apokryphos `$00C` | L.5 Doom `$94` (every member at a multiple of 5) | any hit, alone (`if_num_monsters 1`) |
+| Apokryphos `$00C` | L.5 Doom `$94` (the one who struck, at a multiple of 5) | any hit, alone (`if_num_monsters 1`) |
 | Retainer `$007`, Sleep `$15F` | their Special, Death | the hit that kills them |
 | Evil Oscar `$0B7` | Demon Kiss, Death (7.7) | Magic it survives |
 
 `Driver:deathAnswer` (lib/ot6.lua) reads an answer the way CheckHit
 (@220d) lands it: `M.deathLands` on the spell's record (+2 bit 1, the
 guard's miss; +4 bit 6 with the divisor at +8, the level test), whom it
-reaches by its targeting byte (`M.deathReach`: the one who struck, or with
-L.5 Doom's no-cursor group every member), and the Special's live byte for
-a Special. `Driver:counterWorst` prices it at the member's whole HP and
+reaches (`M.deathReach`: a counter's target is the one who struck, since
+CheckRetal presets `$b8` to the attacker and ChooseTarget keeps a preset
+`$b8` for `$2C` targeting, so a counter L.5 Doom reaches the attacker
+alone where the same spell on the body's own turn reaches every member;
+Roulette's cursor any member, #528), and the Special's live byte for a
+Special. `Driver:counterWorst` prices it at the member's whole HP and
 names the member it kills; its walk now decides `if_num_monsters` on the
 bodies standing. The re-aims read it: a Fight goes off a body whose answer
 kills (`counterAimPlan`, #503's rule with the Death beside the damage), and
-a cast goes to a body whose answer does not (`counterMagicPlan`). Three
+a cast goes to a body whose answer does not (`counterMagicPlan`). The
+cast's rule also takes the damage answers, #503's rule for a Fight
+applied to a spell: a body whose answer to Magic can take all the
+caster's HP is a body that kills, so a caster under 1000 HP casts past
+the Phase, which answers any hit with Blow Fish, 1000 (#528). Three
 refinements came out of the grid and the review of 7.7:
 
 - **A dying-only Death** (the Retainer's, the Sleep's) answers whoever
@@ -966,9 +973,9 @@ a life there; a guard on the member who finishes them would (a kit
 question for `gen_wor_kt_atma` and `gen_wor_veldt`, not the driver's).
 The Veteran and the Apokryphos were not met on today's line (their
 formations, 196/205/206 and 178-183, came up on v0.39's Poltergeist lap);
-`counter_selftest` (the walks, the records) and `counter_death_selftest`
-(16 stubbed battles, each with a mutant of the library that fails it)
-cover them.
+`counter_selftest` (the walks, the records, the reach) and
+`counter_death_selftest` (20 stubbed battles, each with a mutant of the
+library that fails it) cover them.
 
 ## 8. Not done
 - **Kefka** (#274) boots `wor-kt-plates-v1`: party 2 on 412's save point
