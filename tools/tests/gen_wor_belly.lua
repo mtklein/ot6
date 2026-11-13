@@ -135,15 +135,24 @@ local function toRest(route, conds)
   return out
 end
 -- where the party stands, over time, along moves: { x, y, from, until }
+-- a step's frames at the party's own walking speed: the field sets the party object's speed ($0875 + its
+-- offset, $0803) to 3 under the Sprint Shoes' field bit (player.asm), a tile in 8 frames instead of 16.  The #328
+-- line (f51cf3ac) carried that bit from a kept esper rank (Palidor's rung 3), and the walk timed at 16 dropped
+-- down the shaft on all 30 tries ("the bridge to the FakeMustache (25,32): at (25,32) on map 276 within 30 tries")
+local function stepF()
+  local sp = H.readByte(0x0875 + H.readWord(0x0803))
+  return sp >= 3 and STEP_F // 2 or STEP_F
+end
 local function spansOf(moves)
   local spans, t = {}, 0
+  local sf = stepF()
   for _, m in ipairs(moves) do
-    local d = m.kind == "step" and STEP_F or m.kind == "jump" and JUMP_F or DOOR_F
+    local d = m.kind == "step" and sf or m.kind == "jump" and JUMP_F or DOOR_F
     spans[#spans + 1] = { m.from & 0xFF, m.from >> 8, t, t + d }
-    spans[#spans + 1] = { m.to & 0xFF, m.to >> 8, t + d, t + d + STEP_F }
+    spans[#spans + 1] = { m.to & 0xFF, m.to >> 8, t + d, t + d + sf }
     t = t + d
   end
-  return spans, t + STEP_F
+  return spans, t + sf
 end
 local seed = 12345
 local function rnd() seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 end
