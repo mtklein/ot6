@@ -973,6 +973,16 @@ activeCases = CASES
 -- The precondition every case starts from: every member alive at READY_PCT
 -- of max HP or better, and every case's actor free to play its verb.
 local function ready()
+  -- a monster still standing: a snapshot over the last one's death (alive
+  -- in $3A75 at 0 HP, the victory a few frames off) gave GAU's Rage no
+  -- body to strike, and the battle ended before his action ran (wt/polish-shield-hud-4's lab:
+  -- "timeout after 6000 frames driving toward rage entry 0 resolves")
+  local up = false
+  for s = 0, 5 do
+    if (H.readByte(0x3AA8 + s * 2) & 1) == 1 and ((H.readByte(0x3A75) >> s) & 1) == 1
+       and H.readWord(0x3BFC + s * 2) > 0 then up = true end
+  end
+  if not up then return false, "no monster standing" end
   if not standing() then
     return false, string.format("a member down or under %d%% of max HP", READY_PCT)
   end
