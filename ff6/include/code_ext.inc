@@ -115,7 +115,7 @@ CODE_EXT_INC = 1
                                  ;   espers' spells so the compacted list has slots
 .global Ot6EsperEarn, Ot6EsperMsg ; #328: the esper ladder -- Magic Points at
 .global Ot6EsperFold             ;   victory, its messages, the kept rungs folded
-.global Ot6EsperProgress         ;   into UpdateEquip, and a character's count
+.global Ot6EsperProgress, Ot6EsperContinue ; into UpdateEquip, a character's count
                                  ;   for the menu (ot6_esper.asm)
 .global Ot6LadderTbl, Ot6RungLabelTbl, Ot6RungCostTbl
 .global Ot6DanceRowDecorate      ; #34: DrawDanceListText's per-row MP cost
