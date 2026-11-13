@@ -1556,6 +1556,26 @@ function M.worldTileProp(x, y)
   return worldPropCache[t]
 end
 
+-- Is field map m's (x,y) a door: one of its short entrances, or a tile of a long one?  Read from the ROM's
+-- tables as tools/route_data.py decodes them (ShortEntrancePtrs at $DFBB00: 6-byte records x, y, map word, dest
+-- x, y; LongEntrancePtrs at $EDF480: 7-byte records x, y, length | $80 vertical, map word, dest x, y; each
+-- pointer table's words are offsets from its own base, one more word than maps).  File offsets, as
+-- WORLD_PROP_FILE: the symbols are vanilla data, and ShortEntrancePtrs is ambiguous in the debug file.
+function M.entranceAt(m, x, y)
+  local function walk(base, rec, hit)
+    local a, b = M.readRomWord(base + m * 2), M.readRomWord(base + m * 2 + 2)
+    for o = a, b - 1, rec do if hit(base + o) then return true end end
+    return false
+  end
+  if walk(0x1FBB00, 6, function(r) return M.readRomByte(r) == x and M.readRomByte(r + 1) == y end) then return true end
+  return walk(0x2DF480, 7, function(r)
+    local ex, ey, len = M.readRomByte(r), M.readRomByte(r + 1), M.readRomByte(r + 2)
+    local n = len & 0x7F
+    if len & 0x80 ~= 0 then return x == ex and y >= ey and y <= ey + n end
+    return y == ey and x >= ex and x <= ex + n
+  end)
+end
+
 -- A step onto (x,y) is legal on foot iff bit4 ($0010) of the destination
 -- tile's property word is clear.  The engine checks nothing else: no
 -- exit bits, no z-levels, no object map.  Other bits, informational: $20
@@ -12490,7 +12510,10 @@ function M.kefkaTowerKit(K, fight)
         local m, x, y = K.map(), M.fieldX(), M.fieldY()
         P, Q, n0, wp = { x, y, m = m }, nil, #M.outcomes, 2
         for _, d in ipairs({ { 0, -2 }, { 0, 2 }, { -2, 0 }, { 2, 0 }, { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } }) do
-          if Q == nil and M.bfsReach(nil, nil, nil, L(), x + d[1], y + d[2], A()) then Q = { x + d[1], y + d[2] } end
+          -- never a door: on 292 (81,7), the landing from 334, the one reachable neighbour (80,7) is the way back
+          -- out, and the lap left the map ("nav: no path (6,48)->(80,7)", the #328 line at 0bef9fb4)
+          if Q == nil and not M.entranceAt(m, x + d[1], y + d[2])
+              and M.bfsReach(nil, nil, nil, L(), x + d[1], y + d[2], A()) then Q = { x + d[1], y + d[2] } end
         end
         M.assertEq(Q ~= nil, true, string.format("%s: a lap tile the floor reaches from %d (%d,%d)", what, m, x, y))
         P.cap = opts.stepCap or K.worstSteps(m)

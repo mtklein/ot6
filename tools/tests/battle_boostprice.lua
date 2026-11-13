@@ -189,12 +189,21 @@ end
 -- $3C08 is battle RAM and reads $FFFF once a battle tears down, so a plain
 -- "has the pool moved?" condition can fire on the teardown instead of on the
 -- debit -- measured 2026-09-17: `LOCKE MP 69 -> 65535, spent -65466`.
+--
+-- A queued action is lost when its battle ends before the actor's turn comes
+-- (a bystander's swing, once the party is hurt, can end it): the charge is
+-- then measured in no battle at all.  Measured on the #328 line at 0bef9fb4:
+-- the boost-1 Steal was queued at pool 69, the battle ended, and the next
+-- battle's 3-MP debit read as its charge ("LOCKE MP 69 -> 66, spent 3").  A
+-- lost action ends this wait with rec.lost set, and the section re-queues it
+-- in the next battle (chargeUntilResolved).
 local function charged()
   if rec.spent == nil and H.battleActive() and rec.mp0 then
     local m = mp(rec.slot)
     if m < 0x8000 and m < rec.mp0 then rec.spent = rec.mp0 - m end
   end
-  return rec.spent ~= nil
+  if rec.spent == nil and rec.mp0 and not H.battleLoadStarted() then rec.lost = true end
+  return rec.spent ~= nil or rec.lost == true
 end
 
 local sabin, locke                       -- battle slots
@@ -740,15 +749,25 @@ H.run({ maxFrames = 300000 }, {
     want.slot, want.bank, want.pend = sabin, 1, 1
     want.mode, want.row = "blitz", rec.id
   end),
-  step("the boosted blitz is queued", function() return rec.queued end),
-  H.call(function()
-    H.log(string.format("[charge] queued cost %s (want %d)",
-      tostring(rec.qcost), rec.want))
-    H.assertEq(rec.qcost, rec.want, string.format(
-      "Ot6AbilityCost priced the boost-1 %s at %d, not its base %d (#219)",
-      nameText(rec.id), rec.want, costOf(rec.id)))
-  end),
-  step("the boosted blitz resolves and the pool moves", charged, 20000),
+  H.driveUntil(function() return rec.spent ~= nil end, 200000, {
+    H.call(function()
+      if rec.lost then
+        H.log("[charge] the battle ended before the blitz resolved: re-queued in the next battle")
+        rec.lost, rec.queued, rec.mp0, rec.qcost = nil, nil, nil, nil
+        rec.tries = (rec.tries or 1) + 1
+        H.assertEq(rec.tries <= 4, true, "a boost-1 blitz resolves within four battles")
+      end
+    end),
+    step("the boosted blitz is queued", function() return rec.queued end),
+    H.call(function()
+      H.log(string.format("[charge] queued cost %s (want %d)",
+        tostring(rec.qcost), rec.want))
+      H.assertEq(rec.qcost, rec.want, string.format(
+        "Ot6AbilityCost priced the boost-1 %s at %d, not its base %d (#219)",
+        nameText(rec.id), rec.want, costOf(rec.id)))
+    end),
+    step("the boosted blitz resolves and the pool moves", charged, 20000),
+  }, "a boost-1 blitz that resolves in the battle it was queued in"),
   H.call(function()
     local spent = rec.spent
     H.log(string.format("[charge] MP %d -> %d, spent %d",
@@ -803,15 +822,25 @@ H.run({ maxFrames = 300000 }, {
     want.slot, want.bank, want.pend = locke, 1, 1
     want.mode, want.row = "steal", THIEF_STEAL
   end),
-  step("the boosted steal is queued", function() return rec.queued end),
-  H.call(function()
-    H.log(string.format("[charge] steal queued cost %s (want %d)",
-      tostring(rec.qcost), rec.want))
-    H.assertEq(rec.qcost, rec.want, string.format(
-      "Ot6AbilityCost priced the boost-1 Steal at its flat %d, not the %d the "
-      .. "escalation would have charged", rec.want, boosted(STEAL_BASE, 1)))
-  end),
-  step("the boosted steal resolves and the pool moves", charged, 20000),
+  H.driveUntil(function() return rec.spent ~= nil end, 200000, {
+    H.call(function()
+      if rec.lost then
+        H.log("[charge] the battle ended before the steal resolved: re-queued in the next battle")
+        rec.lost, rec.queued, rec.mp0, rec.qcost = nil, nil, nil, nil
+        rec.tries = (rec.tries or 1) + 1
+        H.assertEq(rec.tries <= 4, true, "a boost-1 Steal resolves within four battles")
+      end
+    end),
+    step("the boosted steal is queued", function() return rec.queued end),
+    H.call(function()
+      H.log(string.format("[charge] steal queued cost %s (want %d)",
+        tostring(rec.qcost), rec.want))
+      H.assertEq(rec.qcost, rec.want, string.format(
+        "Ot6AbilityCost priced the boost-1 Steal at its flat %d, not the %d the "
+        .. "escalation would have charged", rec.want, boosted(STEAL_BASE, 1)))
+    end),
+    step("the boosted steal resolves and the pool moves", charged, 20000),
+  }, "a boost-1 Steal that resolves in the battle it was queued in"),
   H.call(function()
     local spent = rec.spent
     H.log(string.format("[charge] LOCKE MP %d -> %d, spent %d",
