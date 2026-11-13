@@ -248,7 +248,15 @@ local function actorAim(c)
     mf, tapNo = 0, -1
     return false
   end
-  local btn = c.ally and aim(Tc, allyS) or aim(Tm, tgtMon)
+  local btn
+  if c.multi then
+    -- a tool that aims at the whole side (NoiseBlaster's targeting $6A):
+    -- the cursor already covers it, so the confirm is the press
+    mf = mf + 1
+    btn = (mf - 1) % 8 < 4 and { a = true } or {}
+  else
+    btn = c.ally and aim(Tc, allyS) or aim(Tm, tgtMon)
+  end
   if next(btn) == "a" then
     c.sent = true
     c.pendAtConfirm = pend(actS)
@@ -453,9 +461,9 @@ local CASES = {
   { name = "imp-b1",   snap = "C", who = "C", cmd = CMD_MAGIC, spell = IMP,  boost = 1 },
   { name = "debil-b0", snap = "E", cmd = CMD_TOOLS, item = DEBIL, boost = 0 },
   { name = "debil-b2", snap = "E", cmd = CMD_TOOLS, item = DEBIL, boost = 2 },
-  { name = "noise-b0", snap = "E", cmd = CMD_TOOLS, item = NOISE, boost = 0 },
-  { name = "noise-b1", snap = "E", cmd = CMD_TOOLS, item = NOISE, boost = 1, keep = "noise-b0" },
-  { name = "noise-r",  snap = "E", cmd = CMD_TOOLS, item = NOISE, boost = 0, rowR = 0 },
+  { name = "noise-b0", multi = true, snap = "E", cmd = CMD_TOOLS, item = NOISE, boost = 0 },
+  { name = "noise-b1", multi = true, snap = "E", cmd = CMD_TOOLS, item = NOISE, boost = 1, keep = "noise-b0" },
+  { name = "noise-r", multi = true,  snap = "E", cmd = CMD_TOOLS, item = NOISE, boost = 0, rowR = 0 },
   { name = "grav-b0",  snap = "E", cmd = CMD_ITEM, item = GRAVITY, boost = 0 },
   { name = "grav-b1",  snap = "E", cmd = CMD_ITEM, item = GRAVITY, boost = 1, keep = "grav-b0" },
   { name = "grav-r",   snap = "E", cmd = CMD_ITEM, item = GRAVITY, boost = 0, rowR = 0 },

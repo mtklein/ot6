@@ -128,6 +128,7 @@ local function installObservers()
   onExec(H.sym("Ot6ThiefExec"), function(c)
     if cx() == actS * 2 then
       c.row = H.readByte(0xB6)
+      c.allyAtExec = bank(terraS)     -- the ally's bank as the row runs
       ev(c, string.format("Ot6ThiefExec b6=$%02X %s | %s", H.readByte(0xB6), chars(), mons()))
     end
   end)
@@ -145,6 +146,7 @@ local function installObservers()
     if cx() == actS * 2 then
       c.endF = H.frame
       c.mpEnd = mp(actS)
+      c.allyAtEnd = bank(terraS)
       ev(c, string.format("Ot6ActionEnd entry: 3a7c=$%02X %s | %s", H.readByte(0x3A7C), chars(), mons()))
     end
   end)
@@ -515,6 +517,17 @@ steps[#steps + 1] = H.call(function()
   local inFold = {}
   for i = 0, 0x17 do inFold[H.readRomByte(fold + i)] = true end
   inFold[0x0C] = true                     -- Break (Ot6InFoldTbl's own arm)
+  -- #469: a single-target status or cure buys reach (Ot6ReachTbl), so it is
+  -- neither quiet nor loud here (battle_boostreach plays it)
+  local okR, reach = pcall(H.sym, "Ot6ReachTbl")
+  if okR then
+    reach = reach & 0x3FFFFF
+    for i = 0, 15 do
+      local id = H.readRomByte(reach + i)
+      if id == 0xFF then break end
+      inFold[id] = true
+    end
+  end
   local names = {}
   for i = 0, 53 do
     local id = H.readByte(0x2092 + terraS * 0x13C + i * 4)
@@ -652,9 +665,11 @@ steps[#steps + 1] = H.call(function()
       end
     end
     if c.rowName == "bestow" then
-      local want = math.min(math.max(1, c.boost), 5 - c.ally0, c.bank0)
-      check(c.allyEnd - c.ally0 == want, string.format("%s: Bestow at %d BP handed %d pip(s) (ally %d -> %d; "
-        .. "want %d)", c.name, c.boost, c.allyEnd - c.ally0, c.ally0, c.allyEnd, want))
+      -- the ally's bank from the row's run to LOCKE's turn end (her own turns
+      -- may move it before)
+      local want = math.min(math.max(1, c.boost), 5 - c.allyAtExec, c.bank0)
+      check(c.allyAtEnd - c.allyAtExec == want, string.format("%s: Bestow at %d BP handed %d pip(s) (ally %d -> %d; "
+        .. "want %d)", c.name, c.boost, c.allyAtEnd - c.allyAtExec, c.allyAtExec, c.allyAtEnd, want))
       check(c.bankEnd == c.bank0 - want, string.format("%s: LOCKE's bank went %d -> %d (want %d: the pips "
         .. "handed, no regen)", c.name, c.bank0, c.bankEnd, c.bank0 - want))
       check(c.charged == byName["bestow-b0"].charged, string.format("%s: charged %d MP, bestow-b0 %d (flat)",
