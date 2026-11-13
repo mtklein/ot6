@@ -610,20 +610,22 @@ capture, sha256 f7e8fbaa, from the same boot, `land/attr.log`), and its
 `wor-kt-plates-v1` (sha256 0d979170) puts RELM third: "TERRA, CELES, RELM,
 STRAGO, SHADOW, CYAN, EDGAR, LOCKE, GOGO, MOG, SETZER, SABIN". From that
 capture, both grids, 48 runs an arm (`px13/tally_f16.txt`,
-`air/tally_f12.txt`, `px13/` `f15`, `mbp/tally_mxn2.txt`):
+`air/tally_f12.txt`, `px13/tally_f15.txt`, `mbp/tally_mxn2.txt`):
 
 | arm | ROM | the Megalixir | runs won | Kefka lost (keys) | deaths in Kefka's tier |
 |---|---|---|---|---|---|
 | `f12` | 12 shields | three under 30% | 48 of 48 | 0 | 23 |
 | `f16` | 16 | three under 30% | 46 of 48 | 2 (1: be20) | 60 |
-| `f15` | 15 | three under 30% | at least one lost (be28, `f15B_k0_s15`) | | |
+| `f15` | 15 | three under 30% | 47 of 48 | 1 (1: be28) | 43 |
 | **`mxn2`** | **16** | **two under 35%** | **48 of 48** | **0** | 47 |
 
 Quoted: "4 Kefka: won 48, lost 0; distinct keys won 26, lost 0; deaths in
 the tier 23", "Kefka's battle: 48 runs; won 48, lost 0" (`f12`); "4 Kefka:
 won 46, lost 2; distinct keys won 26, lost 1; deaths in the tier 60",
 "Kefka's battle: 48 runs; won 46, lost 2, other 0; distinct opening keys
-won 23, lost 1" (`f16`); "4 Kefka: won 48, lost 0; distinct keys won 26,
+won 23, lost 1" (`f16`); "4 Kefka: won 47, lost 1; distinct keys won 25, lost
+1; deaths in the tier 43" (`f15`, `px13/tally_f15.txt`: be28, a key 16 won,
+so 15 is no safer than 16); "4 Kefka: won 48, lost 0; distinct keys won 26,
 lost 0; deaths in the tier 47", "Kefka's battle: 48 runs; won 48, lost 0,
 other 0; distinct opening keys won 24, lost 0" (`mxn2`). Every arm's third
 tier: "3 lady+sleeper: won 48, lost 0; distinct keys won 29, lost 0".
