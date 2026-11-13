@@ -41,6 +41,10 @@ end
 
 local function zone(z)
   local steps = {}
+  -- onto the lap before the hunt starts, so the battles of the walk there (other groups) do not count against the
+  -- hunt's bound
+  steps[#steps + 1] = H.worldNavTo(z.lap[1][1], z.lap[1][2], { maxFrames = 40000, playBattles = "tactical",
+    fight = FIGHT, avoid = DOORS })
   steps[#steps + 1] = H.fieldCare({ threshold = 1.0, tag = "before " .. z.what })
   steps[#steps + 1] = H.call(function()
     say("hunt", string.format("%s: lowest L%d", z.what, lowest()))

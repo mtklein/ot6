@@ -128,7 +128,7 @@ H.run({ maxFrames = 600 }, {
 
     -- 3. the lessons
     if (classOf(GRENADE) & SLASH) ~= 0 then
-      problem("$0AA Grenade: the blade (slash, CELES's Fight only) keys it; its keys are the hands that are not Fight")
+      problem("$0AA Grenade: a blade (slash: a Fight only) keys it; its keys are the hands that are not Fight")
     end
     if (classOf(GRENADE) & PIERCE) == 0 then problem("$0AA Grenade: EDGAR's tools (pierce) hold no key") end
     if (classOf(GRENADE) & BLUDG) == 0 then problem("$0AA Grenade: SABIN's blitzes (bludgeon) hold no key") end
