@@ -2,7 +2,7 @@
 -- `ultros-won-v1` battery (TERRA, LOCKE, STRAGO and RELM at Esper Mountain's save point, map 375 (8,44), Ultros
 -- beaten and RELM joined) and walk the mountain's two pools until every formation of each has been won (K.hunt,
 -- lib/ot6_field.lua: the pool asserted against the ROM's, the hunt bounded by the worst draws): the slopes of
--- 375 (group 90: Adamanchyt and Slurm) by the save, then, past gen_massacre's shortcut, the side cave 374 (group 89:
+-- 375 (group 90: Adamanchyt and Slurm) by the save, then, past the save compartment's middle shortcut, the side cave 374 (group 89:
 -- Mandrake, Insecare, Abolisher), whose chest holds the Chocobo Suit.  No leg boots what it leaves (the state
 -- `wob_esper_mtn_hunt`); gen_massacre goes on from the same save.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -60,9 +60,10 @@ H.run({ maxFrames = 3000000 }, {
       won = won })
   end),
   H.fieldCare({ threshold = 1.0, tag = "after the slopes" }),
-  -- gen_massacre's shortcut: 375 (11,51) retiles and carries the party to (39,51), the compartment that holds the
-  -- doors of 372 and 374
-  hop(11, 51, function() return map() == 375 and H.fieldX() >= 30 end, "375 (11,51): the shortcut east"),
+  -- the save compartment's middle shortcut (_cbeebe, open once $0097 is set: 375 (12,46) retiles and drops the
+  -- party to (39,46)), the compartment that holds 374's door (gen_massacre takes the one beside it, (11,51), to
+  -- 372's)
+  hop(12, 46, function() return map() == 375 and H.fieldX() >= 30 end, "375 (12,46): the shortcut east"),
   hop(36, 41, function() return map() == 374 end, "375 (36,41) -> the side cave 374"),
   K.chestAt(18, 9, 108, "the side cave's chest (the Chocobo Suit)", CHOCOBO_SUIT),
   H.fieldCare({ threshold = 1.0, tag = "before the side cave (group 89)" }),
