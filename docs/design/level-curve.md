@@ -921,7 +921,13 @@ It is a press the game does not answer in `gen_voyage`, in the World of
 Balance, which no move here reaches, so none of these replays re-measures
 it.  In this replay the leg passed on its first attempt with no watchdog
 trip ("[watch] 2098 samples, pad down 3528 frames, 0 trip(s)", "PASS
-(frame 33577) attempts=1/3"); it stays its own lab.
+(frame 33577) attempts=1/3"); it stays its own lab. Found on
+wt/v043-death-counters: the J->K walk's own field care pitched a Tent
+after a battle that left the party low, the walk read the Tent's map as
+"left the world" and ended nine tiles short, and the held RIGHT onto
+Albrook pressed into the coast; the walk now ends on `H.offWorld`, and old
+and new from today's capture failed 4 and 0 of 24 seed shifts, the 4 the
+shifts that pitched the Tent.
 
 **The owner's answers (2026-11-11) and the calls taken.**
 

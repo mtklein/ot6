@@ -870,6 +870,106 @@ action); fenix left the bag 73", "ARM gkN: 12 runs, 12 PASS; ... deaths 43
 The Guardian leg's other deaths are party 1's formations 399 ($18F, the
 Scullion's Condemned) and 370, and the Innocs in the chamber (`$1AB`).
 
+### 7.8 Every Death answer, priced (#523)
+
+7.7 priced one shape, a Death Special answering Magic. The same price holds
+for every answer that kills from any HP. A body whose counter kills the
+member who struck it costs that member's life, unless the member wears a
+Death guard ($3AA1 bit 2) or, for L.5 Doom, stands at a level 5 does not
+divide. The bodies on the line that answer so:
+
+| body | its answer | to |
+|---|---|---|
+| Sky Base `$0FC` | Blaster `$B1` (x4, one in three each) | anything but a Fight |
+| Veteran `$0FB` | Roulette `$8C` | Magic |
+| Allo Ver `$0BB` | Doom `$0D` | any hit, the killing one too |
+| Apokryphos `$00C` | L.5 Doom `$94` (every member at a multiple of 5) | any hit, alone (`if_num_monsters 1`) |
+| Retainer `$007`, Sleep `$15F` | their Special, Death | the hit that kills them |
+| Evil Oscar `$0B7` | Demon Kiss, Death (7.7) | Magic it survives |
+
+`Driver:deathAnswer` (lib/ot6.lua) reads an answer the way CheckHit
+(@220d) lands it: `M.deathLands` on the spell's record (+2 bit 1, the
+guard's miss; +4 bit 6 with the divisor at +8, the level test), whom it
+reaches by its targeting byte (`M.deathReach`: the one who struck, or with
+L.5 Doom's no-cursor group every member), and the Special's live byte for
+a Special. `Driver:counterWorst` prices it at the member's whole HP and
+names the member it kills; its walk now decides `if_num_monsters` on the
+bodies standing. The re-aims read it: a Fight goes off a body whose answer
+kills (`counterAimPlan`, #503's rule with the Death beside the damage), and
+a cast goes to a body whose answer does not (`counterMagicPlan`). Three
+refinements came out of the grid and the review of 7.7:
+
+- **A dying-only Death** (the Retainer's, the Sleep's) answers whoever
+  lands the killing blow, and the body has to die, so it costs a life
+  whoever lands it unless that member wears a guard. It is priced only
+  when another standing member wears one, and only on a hit that may kill
+  the body (the actor's last measured action, `Driver:mayKill`). Priced on
+  every Fight, the first cut sent atn_s0's party at formation 426's third
+  body while both Retainers swung: "battle $1AA LOST after 16250 ticks",
+  where main's library won it (`smoke1/atn_s0`, `smoke1/ato_s0` beside
+  it).
+- **A cast whose body falls first** went to the Oscar: #521's pkN_s6 and
+  gkN_s9 re-aimed LOCKE's and TERRA's Fire at a body a Fight queued ahead
+  of it then killed, and the engine handed the cast to the Oscar. A re-aim
+  now skips a body the party's queued commands can take first
+  (`Driver:mayFallFirst`: each member's pending command at $32CC aimed at
+  it, at that member's last measured action), and a spread (the plan's or
+  its contract's `all`, or a spell whose own targeting covers every body,
+  Meteor or Quake) is a cast at every body, so it becomes a Fight. A
+  re-aim also names the new body in a scored command's contract, so the
+  trace expects it (the review's `race_submission_mismatch`).
+- **Not in the verb veto.** Priced in #372's veto too, the Death took
+  SABIN's Pummel off the table at every turn the factory's Sky Base stood
+  ("Pummel refused: ... slot 2 $0FC $B1 2442, a Fight's 0") and the leg
+  went from 16 of 16 PASS and 55 deaths to 14 of 16, a battle lost and 64
+  deaths, most to the bodies' own L.5 Doom over the longer fights; main's
+  Pummel drew no Blaster death in its 16 runs. The veto takes a verb away
+  for a counter that only may land; a re-aim keeps the verb.
+
+Measured on the legs that meet these bodies, one attempt a run, each arm
+from the v0.43-tip replay's captures (px13's `~/work/v042-release`), `old`
+main's library (8df9fcf6), `new` the branch's
+(`build/attempts/wt/v043-death-counters/b1_tally.txt`, `b2_tally.txt`,
+`b1air_tally.txt`; the factory and Kefka's `new` at 74724413, the rest at
+e24c7a08, whose only difference is the veto, and whose runs logged no
+refusal):
+
+| leg (boot, shifts) | arm | runs PASS | battles (distinct keys) | lost | deaths | Fenix | to these bodies |
+|---|---|---|---|---|---|---|---|
+| Guardian (`wor-kt-atma-v1`, 0-11) | old | 12 of 12 | 516 (244) | 0 | 38 | 38 | Oscar 3, Retainer 2 |
+| | new | 12 of 12 | 516 (242) | 0 | 31 | 31 | Oscar 0, Retainer 2 |
+| Kefka (`wor-kt-plates-v1`, 0-11) | old | 11 of 12 | 47 (37) | 1 | 68 | 9 | Sleep's Death 9, its Meteo 20 |
+| | new | 12 of 12 | 48 (37) | 0 | 46 | 8 | Sleep's Death 8, its Meteo 8 |
+| Factory (`wor-desert-v1`, 0-15) | old | 16 of 16 | 64 (48) | 0 | 55 | 55 | Sky Base 22 (its own L.5 Doom) |
+| | new | 16 of 16 | 64 (48) | 0 | 55 | 55 | the same runs, frame for frame |
+| Poltergeist (`wor-kt-doom-v1`, 0-15) | both | 16 of 16 | 705 (186) | 0 | 7 | 7 | none; the same runs |
+| Atma (`wor-kt-inferno-v1`, 0-15) | both | 16 of 16 | 48 (30) | 0 | 27 | 27 | Retainer 16; the same runs |
+| Veldt (`wor-ragnarok-v1`, 0-7) | both | 6 of 8 | 56 (44) | 0 | 11 | 5 | Allo Ver's Doom 3; the same runs |
+
+Quoted: "ARM guo: 12 runs, 12 PASS; battles 516 (distinct keys 244), lost
+0; deaths 38; fenix left the bag 38", "ARM gun: 12 runs, 12 PASS; battles
+516 (distinct keys 242), lost 0; deaths 31; fenix left the bag 31", "ARM
+keo: 12 runs, 11 PASS; battles 47 (distinct keys 37), lost 1; deaths 68;
+fenix left the bag 9", "ARM ken: 12 runs, 12 PASS; battles 48 (distinct
+keys 37), lost 0; deaths 46; fenix left the bag 8", "ARM fan: 16 runs, 16
+PASS; battles 64 (distinct keys 48), lost 0; deaths 55; fenix left the bag
+55; frames over the PASS runs 862869" (b2) against fao's identical line.
+In Kefka's first tier (formation 512) the change is the dying Special of
+`$15D`: a guarded member stands there, so the others' Fights go to slot 4
+while slot 0 is low ("slot 0 ($EE) answers a Fight ... or a Death; slot 4
+instead", 12 times in new), and old's 46 re-aims off slot 4's Quake answer ("slot 4 ($15) answers a Fight") are gone.
+
+What it does not move: the Retainers in Atma's walk (16 deaths in 16
+battles, both arms) and Allo Ver on the Veldt (3 in 6) kill whoever lands
+the blow, and nobody in those parties wears a Death guard, so no aim saves
+a life there; a guard on the member who finishes them would (a kit
+question for `gen_wor_kt_atma` and `gen_wor_veldt`, not the driver's).
+The Veteran and the Apokryphos were not met on today's line (their
+formations, 196/205/206 and 178-183, came up on v0.39's Poltergeist lap);
+`counter_selftest` (the walks, the records) and `counter_death_selftest`
+(16 stubbed battles, each with a mutant of the library that fails it)
+cover them.
+
 ## 8. Not done
 - **Kefka** (#274) boots `wor-kt-plates-v1`: party 2 on 412's save point
   with parties 1 and 3 on 411's plates. The plate bits stay set once stepped
@@ -883,7 +983,9 @@ Scullion's Condemned) and 370, and the Innocs in the chamber (`$1AB`).
 - **The Retainers' dying Death** (Atma's walk, formation 426): the
   Retainer ($007) answers the hit that kills it with Tradeoff, a Death
   Special, on whoever struck it (CELES twice from 5691/5691 in v0.41's
-  replay). The finish rules price no Special; not labbed.
+  replay). Priced in 7.8, but it costs a life whoever lands the blow
+  while nobody in party 2 wears a Death guard (16 deaths in 16 battles,
+  both arms): a guard on the member who finishes them is the lever left.
 - **An older lever, worse** (`swap1`, kept): SETZER and GOGO swapped
   (party 1 TERRA, RELM, EDGAR, GOGO; party 3 CYAN, SHADOW, SABIN, SETZER),
   the chamber in the other order (party 1 west to Doom, party 2 east to the
