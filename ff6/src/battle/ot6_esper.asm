@@ -640,6 +640,34 @@ OT6_SLOT_FENRIR   = 23
         rtl
 .endproc
 
+; Fenrir's signature: immune to Stop and Slow.  jsl from the end of
+; UpdateImmuneStatus in place of its `sta $3330,x` (the status-3/4 mask a
+; status must pass to land; a clear bit blocks it), so it runs at battle start
+; and whenever the mask is rebuilt, and after vanilla's "block both slow and
+; haste if immune to either" rule, which would otherwise block Haste too.
+; in: A (a8) = the mask, x = the entity (either index width), db = $7e.
+.proc Ot6EsperImmune
+        .a8
+        php
+        pha
+        txa
+        cmp     #$08
+        bcs     @store          ; a monster
+        lda     $3ed8,x
+        xba
+        lda     #OT6_SLOT_FENRIR
+        xba
+        jsr     Ot6EsperSig
+        bcc     @store
+        pla
+        and     #<~(STATUS3::SLOW | STATUS3::STOP)
+        pha
+@store: pla
+        sta     $3330,x
+        plp
+        rtl
+.endproc
+
 ; Conductor: A (a8) = the shields a lightning-weak monster has left after a
 ; hit's chip; x = the attacker.  One more goes when the attacker holds
 ; Ramuh's signature and the hit carried lightning ($11a1 bit $04).  rts from

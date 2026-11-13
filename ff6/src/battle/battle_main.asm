@@ -6584,8 +6584,8 @@ _initstatus2:
         bit     #STATUS3::HASTE
         bne     @26c5
 @26c3:  clrflg  STATUS3, {SLOW, HASTE}
-@26c5:  sta     $3330,x
-        rts
+@26c5:  jsl     Ot6EsperImmune  ; ot6 #328: stores $3330,x, less Stop and
+        rts                     ;   Slow for Fenrir's signature
 
 ; ------------------------------------------------------------------------------
 
