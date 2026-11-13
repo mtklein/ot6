@@ -73,15 +73,15 @@ stay.
 |---|---|---|---|---|---|---|
 | Bug `$0E8` | forest east of Albrook (20) | 16 / 310 | weak ice, water; alone, it answers a Fight with a petrifying spine | 2 | slash, pierce | a shell on wings: cut or spear it; trash in packs of three to six |
 | ChickenLip `$03D` | forests north-west of Albrook and by Maranda (17, 18) | 18 / 545 | weak ice; Quake when alone | 2 | slash, bludgeon | a heavy bird in packs of five: the blade or the fist |
-| Grenade `$0AA` | the bomb isle (27) | 17 / 3,000 | weak ice, water; absorbs fire; a Fight makes it explode (Exploder: its own HP) | 3 | pierce, bludgeon | its keys are the hands that are not Fight: EDGAR's tools (pierce) and SABIN's blitzes (bludgeon). A blade's Fight (slash) is the lesson's wrong answer, so slash stays off |
-| Intangir `$0A3` | Triangle Island (124, 28) | 26 / 32,000 | absorbs every element; starts Vanished, Hasted, Shelled, Safe, Floating; Meteo on its turn after a hit, Meteo as it dies, escapes under 1,280 HP | 2 | slash, pierce, bludgeon, special | absorbs every element, so every hand but magic breaks it, SETZER's among them (the trip his airship opens). Its Meteo and its escape run through its turns, and a broken body has none (`Ot6Gate`; nor counters, the CheckRetal hook): break it to kill it. Two shields, so one double strike (LOCKE's Genji pair) breaks it again as it recovers, before the turn that would answer the hit (section 3) |
+| Grenade `$0AA` | the bomb isle (27) | 17 / 3,000 | weak ice, water; absorbs fire; answers a Fight with Exploder (its own HP) | 3 | pierce, bludgeon | a broken body does not counter, so the Fight that breaks it draws no Exploder: break it in one swing (LOCKE's boosted knife did it in both of the replay's meetings, "KEYED: Fight at 1 BP lands 4 chip(s)"), or use what it does not answer, EDGAR's tools (pierce) and SABIN's blitzes (bludgeon). The blades stay off it, so a blade's Fight is the one that draws the explosion |
+| Intangir `$0A3` | Triangle Island (124, 28) | 26 / 32,000 | absorbs every element; starts Vanished, Hasted, Shelled, Safe, Floating; Meteo on its turn after a hit, Meteo as it dies, escapes under 1,280 HP | 2 | slash, pierce, bludgeon, special | absorbs every element, so every class keys it, SETZER's special among them (the trip his airship opens), but a blade that carries an element heals it (EDGAR's Blizzard, SABIN's Poison Claw): LOCKE's knife, EDGAR's tools, SABIN's blitzes and SETZER's cards break it. Its Meteo and its escape run through its turns, and a broken body has none (`Ot6Gate`; nor counters, the CheckRetal hook): break it to bring it down. Two shields, under the house curve's miniboss count, because its Meteo takes the whole L18-22 four that first meets it; with two, one double strike breaks it again as it recovers (section 3) |
 
 `battle_breakwob_sidetrips` checks the four rows in the built ROM, their
 vanilla weak and absorb bytes, that every species of world groups 20, 17,
-18, 27, 124 and 28 has a key in the hands of the four that first meets it,
-and the lessons (the Grenade takes pierce and bludgeon and not slash; the
-Intangir still absorbs every element and takes every hand the islands' four
-hold).
+18, 15, 26 (the other groups that deal the Bug and the ChickenLip), 27, 124
+and 28 has a key in the hands of the four that first meets it, and the
+lessons (the Grenade takes pierce and bludgeon and not slash; the Intangir
+still absorbs every element and takes every hand the islands' four hold).
 
 ## 3. The play
 
@@ -92,44 +92,62 @@ and the hunt fails at the worst case of the encounter counters' draws
 (`M.worstCaseEncounters`). The walker plays every battle with the fight
 driver; nothing is fled.
 
-Every battle every leg met was won, none fled, in the labs below (booted from
-the tracked saves on the branch's ROM, so they are strategy evidence; the
-qualified play is section 5's replay):
+The labs below booted the tracked saves on the branch's ROM, so they are
+strategy evidence; the qualified play is section 5's replay.
 
-| leg | battles | formations won | levels after |
-|---|---|---|---|
-| forest | 6, all won | 65, 66, 68, 69 | SABIN L14, CYAN L14, SHADOW L12 |
-| train | 11, all won | 72, 80, 90 | SABIN L14, CYAN L14, SHADOW L13 |
-| south | 15 (11 and 4), all won | 139-142 (group 20), 145, 149 (group 17) | CELES L21, LOCKE L20, EDGAR L21, SABIN L21 |
-| Esper Mountain | 11 (4 and 7), all won | 164-169 | TERRA L26, LOCKE L27, STRAGO L27, RELM L24 |
-| airship, Triangle Island only (the lowest levels, straight from the save) | 30 over three seed shifts, all won | 6, 7, 210 | LOCKE L21, EDGAR L21, SABIN L22, SETZER L18, unchanged (the Intangir pays no XP); Fenix Downs 20 to 17 or 18 |
+| leg | lab | battles | formations won | levels after |
+|---|---|---|---|---|
+| forest | `lab/forest_f1.log` | 6, all won | 65, 66, 68, 69 | SABIN L14, CYAN L14, SHADOW L12 |
+| train | `lab/train_t2.log` | 11, all won | 72, 80, 90 | SABIN L14, CYAN L14, SHADOW L13 |
+| Esper Mountain | `lab/espermtn_e3.log` | 11 (4 and 7), all won | 164-169 | TERRA L26, LOCKE L27, STRAGO L27, RELM L24 |
 
 What the labs taught:
 
 1. **The Adamanchyt pair sneezes a Fighting party out of the battle.**
-   Formation 165 (Adamanchyt x2, `AIScript::_214`: Sneeze for every Fight)
-   ended "PARTY LEFT ... 4 of 4 seated fled" in each of its meetings while
-   the four Fought (`lab/espermtn_e1_fight_sneezed.log`, 14 battles left that
-   way). The leg's driver casts instead of Fighting where a member can pay
-   (`nuke = { Bolt, Ice, Fire }`, gen_fc_landing's shape), and the pair fell
-   with two of four sneezed out (`lab/espermtn_e3.log`). The pair's row is
-   #254's; its lesson (magic, not steel) is worth keeping there.
+   Formations 165 (Adamanchyt x2) and 164 (Adamanchyt beside two Slurms;
+   `AIScript::_214`: Sneeze for every Fight) ended 7 battles "PARTY LEFT ...
+   4 of 4 seated fled" while the four Fought (`lab/espermtn_e1_fight_sneezed.log`:
+   5 in formation 165, 2 in 164). The leg's driver casts instead of Fighting
+   where a member can pay (`nuke = { Bolt, Ice, Fire }`, gen_fc_landing's
+   shape), and the pair fell with two of four sneezed out
+   (`lab/espermtn_e3.log`). The pair's row is #254's; its lesson (magic, not
+   steel) is worth keeping there.
 2. **The Intangir starts Vanished, and nothing the driver did could touch it.**
    Every Fight, Tool and Blitz missed, and the magic line found no spell
    (`magic-only: no line ... absorb $FF`): 100,000 frames at 32,000 HP
    (`lab/airship_a8.log`). A spell that lands ends Vanish, absorbed or not, so
    the fight driver now casts one when every standing body is Vanished and no
-   spell would hurt it (`Driver:dodgePlan`, `M.REVEAL_SPELLS`: SABIN's Ice
-   from SHIVA, EDGAR's Slow from BISMARK). Then the four broke it and killed
-   it twice.
-3. **On four shields the Intangir is a coin flip; on two, a sure thing.**
-   With four, the third meeting wiped the four: it recovered, the first hits
-   armed its Meteo before the second break, and the Meteo took all four from
-   80% (`lab/intangir_i2.log`: `[death] ... atk $DF (ONE ACTION from >= 80%)`).
-   With two, nine meetings over seed shifts 0, 8 and 16 (eight distinct battle
-   keys) were all won (`lab/intangir2_s0.log`, `_s8`, `_s16`). One member
-   falls in most of them, to the Meteo it casts as it dies (the death counter
-   is not a turn); the field care revives them.
+   spell would hurt it (`Driver:revealLine`, `M.REVEAL_SPELLS`: SABIN's Ice
+   from SHIVA, EDGAR's Slow from BISMARK). It does not cast while a standing
+   body is under Reflect or holds an enemy Runic, and it answers a Tool or a
+   Blitz only when it is a classed blow that misses (AutoCrossbow, Pummel),
+   not a classless one that lands (Bio Blaster, Flash) (`battle_vanish` part 4).
+3. **The party's elemental blades healed the Intangir.** EDGAR's Blizzard (ice)
+   and SABIN's Poison Claw (poison) Fought it 137 times for 0 in one meeting
+   (`lab/intangir2_s16.log`, key be74). The fight driver now counts a hand
+   whose element the target absorbs as no chip, and turns that Fight into the
+   member's other verb (EDGAR's tool, SABIN's Pummel), else the magic line,
+   else an item (`Driver:absorbWeaponPlan`; `battle_vanish` part 4c, red with
+   `M.ABSORB_WEAPON_GUARD = false`). It is inert where no standing body drinks
+   a weapon's element.
+4. **With that fixed, two shields hold and three and four do not.** The
+   Triangle Island hunt from `terra-returned-v1` (LOCKE L21, EDGAR L21, SABIN
+   L22, SETZER L18: the levels the island first sees) at seed shifts 0, 4, 8,
+   12, 16 and 20 (`lab2/`):
+
+   | shields | Intangir meetings (distinct battle keys) | won | wipes |
+   |---|---|---|---|
+   | 4 (`intangir4_k*.log`) | 15 (15) | 12 | 3 |
+   | 3 (`intangir3_m*.log`) | 16 (16) | 13 | 3 |
+   | 2 (`intangir2_n*.log`) | 18 (16) | 18 | 0 |
+
+   Every wipe is the same: the Intangir recovers, the first hits that re-chip
+   it arm its Meteo before the break lands, and the Meteo takes all four from
+   full (`intangir4_k0.log`: "[death] ... atk $DF (ONE ACTION from >= 80%)",
+   four times in one action). With two, one double strike re-breaks it. One
+   member falls in most meetings to the Meteo it casts as it dies (the death
+   counter is not a turn; 2 to 5 deaths a hunt of three meetings), and the
+   field care revives them.
 
 ## 4. What the other bodies here are
 

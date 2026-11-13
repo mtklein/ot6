@@ -12297,12 +12297,10 @@ function Driver:dodgePlan(actor, plan)
   -- a skill that is a steel blow (a Tool or Blitz the chip model prices by class: AutoCrossbow, Drill, Pummel,
   -- Suplex, Bum Rush) misses a Vanished body as a Fight does (the Intangir: AutoCrossbow and Pummel 'took 0 off',
   -- airship_a8.log); a classless one (Bio Blaster, Flash, Aura Bolt) is magic and lands, so it is left alone
+  -- (the class is read only once every standing body dodges: a pure-Lua selftest's stage has no ROM symbols)
   if plan == nil or DODGE_OFF then return plan end
-  if plan.kind == "skill" then
-    local cls = plan.cmd == BATTLE.CMD_TOOLS and M.weaponClass(plan.skill)
-      or (plan.cmd == BATTLE.CMD_BLITZ and (BATTLE.BLITZ_SHAPE[plan.skill] or {}).class) or 0
-    if (cls or 0) == 0 then return plan end
-  elseif plan.kind ~= "fight" then
+  if plan.kind ~= "fight" and not (plan.kind == "skill"
+      and (plan.cmd == BATTLE.CMD_TOOLS or (plan.cmd == BATTLE.CMD_BLITZ and BATTLE.BLITZ_SHAPE[plan.skill] ~= nil))) then
     return plan
   end
   local function dodger(s)
@@ -12320,6 +12318,10 @@ function Driver:dodgePlan(actor, plan)
       plan.aim = s
       return plan
     end
+  end
+  if plan.kind == "skill" then
+    local cls = plan.cmd == BATTLE.CMD_TOOLS and M.weaponClass(plan.skill) or BATTLE.BLITZ_SHAPE[plan.skill].class
+    if (cls or 0) == 0 then return plan end
   end
   if cmdRow(actor, BATTLE.CMD_MAGIC) then
     local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
@@ -12410,6 +12412,9 @@ end
 -- absorbs the party's weapons.  M.ABSORB_WEAPON_GUARD = false turns it off, the control arm.
 function Driver:absorbWeaponPlan(actor, plan)
   if plan == nil or plan.kind ~= "fight" or plan.ally or M.ABSORB_WEAPON_GUARD == false then return plan end
+  -- the hands and the absorb byte are ROM reads; a pure-Lua selftest's stage carries no symbols (race_target_
+  -- contract_selftest), and there is no element to weigh
+  if type(OT6_SYMS) ~= "table" or OT6_SYMS.ItemProp == nil then return plan end
   local aim = plan.aim
   if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
   if aim == nil then return plan end
