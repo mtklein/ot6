@@ -12515,6 +12515,17 @@ function M.kefkaTowerKit(K, fight)
           if Q == nil and not M.entranceAt(m, x + d[1], y + d[2])
               and M.bfsReach(nil, nil, nil, L(), x + d[1], y + d[2], A()) then Q = { x + d[1], y + d[2] } end
         end
+        -- ...and where none of those is a floor tile but a door (that same 292 (81,7): its only neighbour is the
+        -- door), the nearest such tile within four, a lap of a few steps (a rule only a lap that would have failed
+        -- here reaches, so no lap that played before moves)
+        for r = 2, 4 do
+          for dy = -r, r do
+            for dx = -r, r do
+              if Q == nil and math.max(math.abs(dx), math.abs(dy)) == r and not M.entranceAt(m, x + dx, y + dy)
+                  and M.bfsReach(nil, nil, nil, L(), x + dx, y + dy, A()) then Q = { x + dx, y + dy } end
+            end
+          end
+        end
         M.assertEq(Q ~= nil, true, string.format("%s: a lap tile the floor reaches from %d (%d,%d)", what, m, x, y))
         P.cap = opts.stepCap or K.worstSteps(m)
         M.assertEq(P.cap ~= nil, true, string.format("%s: map %d rolls random battles", what, m))
