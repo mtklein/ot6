@@ -17443,6 +17443,12 @@ end
 -- monster until the battle ends (opts.idle = "defend": everyone keeps
 -- Defending instead; opts.untilPlanDone ends the step once the plan is spent
 -- and opts.planDone(), when given, says its last action has resolved).
+-- While the plan has entries, a window the others' care has work for (a
+-- raise, a Potion under half HP, the plan character's lost control:
+-- M.newSpinnerCare) goes to care instead (opts.care = false: never); a
+-- fight-out Fight (the plan spent, or its character out) raises the
+-- pending boost to the bank first, up to 3 (#470).  Each battle starts the
+-- plan's entries afresh (M.freshKitEntries).
 -- Nothing is written.  M.vars.kit[k] records each entry:
 -- { who, actor, boost (pending at the confirm), refusedSeen, frame }.
 function M.kitBattle(plan, opts)
