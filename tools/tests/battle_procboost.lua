@@ -202,6 +202,9 @@ local function installObservers()
       armed.timers = (armed.timers or 0) + 1
       return
     end
+    -- the beast GAU became, read as its attack runs, for an action that
+    -- wins the battle before Ot6ActionEnd (below) can read it
+    if armed.verb == "rage" and armed.beast == nil then armed.beast = H.readByte(RAGEBEAST + x) end
     armed.calls[#armed.calls + 1] = {
       b5 = H.readByte(0xB5), b6 = H.readByte(0xB6), a7c = H.readByte(0x3A7C),
       a7d = H.readByte(0x3A7D), pend = H.readByte(PEND + x),
@@ -230,6 +233,7 @@ local function installObservers()
     if armed == nil or armed.endF then return end
     local x = emu.getState()["cpu.x"] & 0xFFFF
     if x ~= armed.slot * 2 then return end
+    if armed.verb == "rage" and armed.beast == nil then armed.beast = H.readByte(RAGEBEAST + x) end
     armed.fb[#armed.fb + 1] = {
       a7c = H.readByte(0x3A7C), a7d = H.readByte(0x3A7D), pend = H.readByte(PEND + x),
       before = H.readByte(0x3A70) }
@@ -659,7 +663,7 @@ local function tryCase(c, n)
       inbound = {}
       c.slot = slotOf[c.char]
       c.calls, c.fb, c.endF, c.beast, c.timers, c.swings = {}, {}, nil, nil, nil, {}
-      c.esper, c.cutF, c.cutSeats, c.drawn = nil, nil, nil, nil
+      c.esper, c.cutF, c.cutSeats, c.drawn, c.wonF = nil, nil, nil, nil, nil
       c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm, c.target = nil, nil, nil, nil
       c.spend = n - 1
       tick, phase, held, spent, deferring, shut = 0, "reach", nil, 0, nil, 0
@@ -718,9 +722,20 @@ local function tryCase(c, n)
       end),
     }, string.format("%s, try %d", c.name, n)),
     H.driveUntil(function()
-      return skip or c.cutF ~= nil or (c.endF ~= nil and H.frame >= c.endF + 30)
+      return skip or c.cutF ~= nil or c.wonF ~= nil or (c.endF ~= nil and H.frame >= c.endF + 30)
     end, 6000, {
       H.call(function()
+        -- the action felled the last monster: the battle is won, and the
+        -- engine goes to its victory without the actor's Ot6ActionEnd (a
+        -- boosted Rage's special on the Veldt's last body, wt/polish-shield-hud-4's
+        -- lab: "timeout after 6000 frames driving toward rage entry 0
+        -- resolves" over "Got Potion x1").  What the action did is recorded
+        -- by then; the next try restores the snapshot.
+        if armed == c and c.endF == nil and #c.calls + #c.fb > 0 and H.readByte(0x3A75) == 0 then
+          c.wonF = H.frame
+          H.setPad({})
+          return
+        end
         if c.cut and c.cut(c) then
           c.cutF, c.cutSeats = H.frame, seatsLine()
           H.setPad({})
@@ -756,6 +771,10 @@ local function tryCase(c, n)
         #fparts > 0 and table.concat(fparts, " | ") or "not reached",
         tostring(c.bankAtConfirm), bankAfter, pendAfter, tostring(c.mpAtConfirm), mpAfter,
         c.timers and string.format(" ; %d status-timer call(s) ($29) left out", c.timers) or ""))
+      if c.wonF then
+        H.log(string.format("[procboost] %s try %d: the action felled the last monster and won the battle at f%d "
+          .. "(no Ot6ActionEnd for it)", c.name, n, c.wonF))
+      end
       if c.verb == "fight" then
         local sw = {}
         for i, w in ipairs(c.swings) do
@@ -763,7 +782,7 @@ local function tryCase(c, n)
             w.roll and string.format("rolled RNGTbl[$%02X] = $%02X%s", w.idx, w.val, w.val < 0x40 and " (casts)" or "")
               or "no roll")
         end
-        H.log(string.format("[procboost] %s try %d swings (target slot %s, chosen at the most HP): %s", c.name, n,
+        H.log(string.format("[procboost] %s try %d passes (target slot %s, chosen at the most HP): %s", c.name, n,
           tostring(c.target), #sw > 0 and table.concat(sw, "; ") or "none observed"))
       end
       local measured = c.done == nil or c.done(c)
@@ -776,7 +795,7 @@ local function tryCase(c, n)
       if measured then
         c.hit = { calls = c.calls, fb = c.fb, n = n, pendAtConfirm = c.pendAtConfirm,
                   bankAtConfirm = c.bankAtConfirm, bankAfter = bankAfter, pendAfter = pendAfter,
-                  beast = c.beast, esper = c.esper, cutF = c.cutF, swings = c.swings }
+                  beast = c.beast, esper = c.esper, cutF = c.cutF, swings = c.swings, wonF = c.wonF }
       end
       if c.drawn then
         c.drawsByTry = c.drawsByTry or {}
@@ -905,8 +924,10 @@ local CASES = {
     done = function(c)
       for _, k in ipairs(c.calls) do if isCast(c, k) then return true end end
       for _, w in ipairs(c.swings) do if w.roll and w.val < 0x40 then return true end end
+      local rolled = false
+      for _, x in ipairs(c.swings) do if x.roll then rolled = true end end
       local w = c.swings[1]
-      if w and not w.roll and w.thp == 0 then
+      if w and not rolled and w.thp == 0 then
         c.unservable = string.format("its first swing felled the toughest body standing (slot %s) and made no roll",
           tostring(w.ts))
       end
@@ -1380,8 +1401,8 @@ steps[#steps + 1] = H.call(function()
   -- fight: every roll that came up under $40 cast its spell, one cast each
   local due = 0
   for _, w in ipairs(by.fight.hit.swings) do if w.roll and w.val < 0x40 then due = due + 1 end end
-  H.assertEq(casts, due, string.format("fight: a cast for every on-hit roll under $40 (%d of %d swings rolled)",
-    due, #by.fight.hit.swings))
+  H.assertEq(casts, due, string.format("fight: a cast for every on-hit roll under $40 (%d such roll(s) in %d "
+    .. "pass(es))", due, #by.fight.hit.swings))
   H.assertEq(casts > 0, true, "fight: the weapon cast its own spell")
 
   -- fight: the boost bought swings, seen by the observer the Rage row reads
@@ -1547,14 +1568,14 @@ for _, c in ipairs(RAGE) do
   for _, s in ipairs(tryCase(c, 1)) do steps[#steps + 1] = s end
 end
 steps[#steps + 1] = H.call(function()
-  local specials, dealt, covered, fights = 0, 0, 0, 0
+  local specials, dealt, covered, fights, charged = 0, 0, 0, 0, 0
   for _, c in ipairs(RAGE) do
     if c.entry < learned then
       H.assertEq(c.hit ~= nil, true, c.name .. ": the case happened")
       covered = covered + 1
       local h = c.hit
       H.assertEq(h.pendAtConfirm, BOOST, c.name .. ": pending boost at the confirm")
-      H.assertEq(h.beast ~= nil, true, c.name .. ": the action ended (Ot6ActionEnd)")
+      H.assertEq(h.beast ~= nil, true, c.name .. ": the action ran a beast (read at its attack or Ot6ActionEnd)")
       local special = specialOf(h.beast)
       H.assertEq(#h.calls + #h.fb > 0, true, c.name .. ": the start turn's attack was observed")
       for _, k in ipairs(h.calls) do
@@ -1577,19 +1598,28 @@ steps[#steps + 1] = H.call(function()
           "%s: beast $%02X's special $%02X gets no extra swings ($3a70 %d -> %s at pending %d)",
           c.name, h.beast, special, f.before, tostring(f.after), f.pend))
       end
-      -- ...and the pips are charged exactly as for any boosted action
-      H.assertEq(h.pendAfter, 0, c.name .. ": the pending boost is cleared at the action's end")
-      H.assertEq(h.bankAfter, h.bankAtConfirm - BOOST, string.format(
-        "%s: the %d pips are charged (bank %d -> %d)", c.name, BOOST, h.bankAtConfirm, h.bankAfter))
+      -- ...and the pips are charged exactly as for any boosted action, read
+      -- at its Ot6ActionEnd; an action that won the battle went to the
+      -- victory without one, and the banks end with the battle
+      if h.wonF then
+        H.log(string.format("[procboost] %s: the action won the battle at f%d, before Ot6ActionEnd; its charge "
+          .. "is not read", c.name, h.wonF))
+      else
+        charged = charged + 1
+        H.assertEq(h.pendAfter, 0, c.name .. ": the pending boost is cleared at the action's end")
+        H.assertEq(h.bankAfter, h.bankAtConfirm - BOOST, string.format(
+          "%s: the %d pips are charged (bank %d -> %d)", c.name, BOOST, h.bankAtConfirm, h.bankAfter))
+      end
     end
   end
   H.assertEq(covered, learned, "every learned rage was played")
+  H.assertEq(charged > 0, true, "a boosted Rage's charge was read at its Ot6ActionEnd")
   H.assertEq(specials > 0, true, "a boosted Rage's special ran under its own command and dealt damage")
   H.assertEq(fights > 0, true, "a boosted Rage's special ran through FightAttack (a physical Special)")
   H.log(string.format("[procboost] rage verdict: %d of %d rages played; %d damage call(s) "
     .. "unmultiplied, %d of them a special under its own command; %d FightAttack special(s) "
-    .. "with no extra swings; every start charged %d pips", covered, learned, dealt, specials,
-    fights, BOOST))
+    .. "with no extra swings; %d start(s) read at Ot6ActionEnd, each charged %d pips", covered, learned, dealt,
+    specials, fights, charged, BOOST))
 end)
 
 -- The run's cap is the sum of its steps' own bounds, so no step's budget is
