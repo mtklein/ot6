@@ -5,8 +5,12 @@ carries both.
 
 Every esper has five rungs at 10 / 30 / 75 / 200 / 500 Magic Points: +1 to
 its first stat, +1 to its second, a small effect, +2 to its first stat, and
-its signature.  SPEC below is the design doc's 26-row table (Odin and Raiden
-share a row), one entry per counter slot in GenjuProp order.  An effect is the
+its signature.  The bytes and points come from the design doc's 26-row table
+(docs/design/esper-rework.md, plan A; Odin and Raiden share a row), parsed by
+doc_spec: a status immunity and an HP or MP boost from the cell's words, any
+other effect from the ItemProp bytes of the relic it names.  SPEC below
+carries what the doc does not: each rung's menu label (its effect bytes are
+not read).  An effect is the
 ten bytes Ot6LadderTbl carries for it (ItemProp +5..+13 and +25, the bits a
 relic would set), or no bytes for the five signatures that are new code
 (Conductor, Facet, Rebirth, and Fenrir's Stop and Slow immunity; the doc's
@@ -100,10 +104,124 @@ def stat_rung(which, n):
     return ("%-8s+%d" % (STAT_NAME[which], n), (0,) * 10, tuple(pts))
 
 
+DOC = os.path.join(ROOT, "docs", "design", "esper-rework.md")
+ITEM_PROP = os.path.join(ROOT, "ff6", "src", "menu", "item_prop_en.dat")
+ITEM_NAMES = os.path.join(ROOT, "ff6", "src", "text", "item_name_en.json")
+STATUS = dict(S1, **{k: v << 8 for k, v in S2.items()})   # status 2 in the high byte
+STATUS_WORDS = {"dark": "dark", "zombie": "zombie", "poison": "poison", "imp": "imp", "petrify": "petrify",
+                "death": "death", "doom": "doom", "doom's countdown": "doom", "mute": "mute",
+                "berserk": "bserk", "muddle": "muddle", "seizure": "seize", "sleep": "sleep"}
+HPMP = {("hp", "12.5"): 0x10, ("hp", "25"): 0x04, ("hp", "50"): 0x08,
+        ("mp", "12.5"): 0x80, ("mp", "25"): 0x20, ("mp", "50"): 0x40}
+
+
+class DocError(Exception):
+    pass
+
+
+def relic_bytes():
+    """{lowercase item name: the ten effect bytes Ot6LadderTbl carries for it (ItemProp +5..+13, +25)}."""
+    import json
+    names = json.load(open(ITEM_NAMES))["text"]
+    d = open(ITEM_PROP, "rb").read()
+    out = {}
+    for i, n in enumerate(names):
+        r = d[i * 30:i * 30 + 30]
+        out[re.sub(r"\{[^}]*\}", "", n).strip().lower()] = tuple(r[5:14]) + (r[25],)
+    return out
+
+
+def parse_effect(cell, relics):
+    """A rung-3 or rung-5 cell -> (label hint, ten effect bytes, four stat points); a dagger cell (new code)
+    carries no bytes.  The words decide a status immunity and an HP or MP boost; any other part takes the
+    bytes of the relic it names in parentheses."""
+    cell = cell.strip()
+    b = [0] * 10
+    pts = [0, 0, 0, 0]
+    if cell.startswith("\u2020") or cell.startswith("†"):
+        return tuple(b), tuple(pts)
+    m = re.match(r"^\+(\d) (vigor|speed|stamina|mag\.pwr)$", cell)
+    if m:
+        pts[("vigor", "speed", "stamina", "mag.pwr").index(m.group(2))] = int(m.group(1))
+        return tuple(b), tuple(pts)
+    cell = cell.split(";")[0]                       # a note after the effect
+    parts = re.split(r", and |;", cell)
+    for part in parts:
+        part = part.strip()
+        im = re.match(r"^immune to (.+?)(?: \(([^)]*)\))?$", part)
+        hm = re.match(r"^max (HP|MP) \+([\d.]+)%", part)
+        if im:
+            words = re.split(r", | and ", im.group(1))
+            for w in words:
+                key = STATUS_WORDS.get(w.strip().lower())
+                if key is None:
+                    raise DocError("unknown status %r in %r" % (w, cell))
+                v = STATUS[key]
+                if v & 0xFF:
+                    b[1] |= v & 0xFF
+                else:
+                    b[2] |= v >> 8
+        elif hm:
+            k = (hm.group(1).lower(), hm.group(2))
+            if k not in HPMP:
+                raise DocError("no boost bit for %r" % part)
+            b[4] |= HPMP[k]
+        else:
+            names = re.findall(r"([A-Z][A-Za-z.' ]+?)(?: \([^)]*\))?(?= and |$| both)", part) \
+                if "both allowed" in part else re.findall(r"\(([^)]*)\)", part)
+            if not names:
+                raise DocError("no relic named in %r" % part)
+            for n in names:
+                key = n.strip().lower()
+                if key not in relics:
+                    key = re.sub(r"'s .*$", "", key)      # "Force Shld's bit", "Offering's X-Fight"
+                if key not in relics:
+                    raise DocError("no item %r (in %r)" % (n, cell))
+                for i, v in enumerate(relics[key]):
+                    b[i] |= v
+    return tuple(b), tuple(pts)
+
+
+def doc_spec():
+    """{esper name: (first stat, second stat, rung 3, rung 5)} from esper-rework.md's plan A table, each rung
+    (ten effect bytes, four stat points)."""
+    relics = relic_bytes()
+    text = open(DOC, encoding="utf-8").read()
+    a = text.index("| Esper | while worn (today's) |")
+    out = {}
+    for line in text[a:].splitlines()[2:]:
+        if not line.startswith("|"):
+            break
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        name = cells[0].split(" /")[0]
+        st = cells[2]
+        m = re.match(r"^(\w+) / (\w+)$", st)
+        if m:
+            s1, s2 = m.group(1), m.group(2)
+        elif st.startswith("all four +1"):
+            s1 = s2 = "All"
+        else:
+            raise DocError("%s: stats cell %r" % (name, st))
+        out[name] = (s1, s2, parse_effect(cells[3], relics), parse_effect(cells[4], relics))
+    if len(out) != SLOTS:
+        raise DocError("the table has %d rows, not %d" % (len(out), SLOTS))
+    return out
+
+
 def rungs():
-    """[(esper, rung 1..5, label, effect bytes, stat points)] in table order."""
+    """[(esper, rung 1..5, label, effect bytes, stat points)] in table order: the bytes and points from
+    esper-rework.md's table (doc_spec), the labels from SPEC (presentation the doc does not carry), with SPEC's
+    own stats and bytes held to the doc's."""
+    doc = doc_spec()
     out = []
     for name, s1, s2, r3, r5 in SPEC:
+        if name not in doc:
+            raise DocError("%s has no row in %s" % (name, DOC))
+        d1, d2, d3, d5 = doc[name]
+        if (s1, s2) != (d1, d2):
+            raise DocError("%s's stats are %s / %s in SPEC, %s / %s in the doc" % (name, s1, s2, d1, d2))
+        r3 = (r3[0],) + d3
+        r5 = (r5[0],) + d5
         row = [stat_rung(s1, 1), stat_rung(s2, 1), r3,
                stat_rung(s1, 1 if s1 == "All" else 2), r5]
         for i, (label, b, pts) in enumerate(row):
@@ -207,6 +325,27 @@ def main():
             m = bytearray(rom)
             m[off] = val
             got = check(bytes(m), dbg_text, c)
+            ok = any(needle in p for p in got)
+            print("mutant %-48s %s" % (what, "red" if ok else "MISSED"))
+            bad += not ok
+        # the doc is the table: a doc edit the ROM does not follow goes red
+        global DOC
+        import tempfile
+        real = DOC
+        text = open(real, encoding="utf-8").read()
+        for what, old, new, needle in [
+            ("the doc's Shiva signature names the Economizer", "spells cost half MP (Gold Hairpin)",
+             "spells cost half MP (Economizer)", "Shiva rung 5"),
+            ("the doc's Ramuh rung 3 is Mute, not Dark", "| Ramuh | Bolt, Rasp | Stm / Mag | immune to Dark",
+             "| Ramuh | Bolt, Rasp | Stm / Mag | immune to Mute", "Ramuh rung 3"),
+        ]:
+            assert text.count(old) == 1, old
+            with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+                f.write(text.replace(old, new))
+            DOC = f.name
+            got = check(rom, dbg_text, c)
+            DOC = real
+            os.unlink(f.name)
             ok = any(needle in p for p in got)
             print("mutant %-48s %s" % (what, "red" if ok else "MISSED"))
             bad += not ok
