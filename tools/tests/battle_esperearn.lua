@@ -54,8 +54,8 @@ local function arm()
     if not battle then return end
     earns = earns + 1
     local st = emu.getState()
-    H.log(string.format("[earn] Ot6EsperEarn: Y=%04X X=%04X $fb=%d actor=%d worn=%02X", st["cpu.y"], st["cpu.x"],
-      H.readByte(0xFB), H.readByte(0x3ED8 + (st["cpu.y"] & 0xFF)), H.readByte(0x161E + st["cpu.x"])))
+    H.log(string.format("[earn] Ot6EsperEarn: record +$%03X (actor %d) wears $%02X; $fb=%d", st["cpu.x"],
+      H.readByte(0x1600 + st["cpu.x"]), H.readByte(0x161E + st["cpu.x"]), H.readByte(0xFB)))
   end, emu.callbackType.exec, earn, earn)
   local show = H.sym("Ot6ShowMsg")
   emu.addMemoryCallback(function()

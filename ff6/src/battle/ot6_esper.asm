@@ -272,9 +272,12 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
 ; jsl from WinBattle's per-character loop, in place of vanilla's
 ; `lda $161e,x / bmi / jsr LearnGenjuMagic`: the loop has already skipped a
 ; member who is not alive (vanilla pays only the battle's living party; the
-; bench earns nothing).  in: Y = the member's battle slot * 2, X = the
-; character record offset ($3010,y), $fb = the formation's Magic Points.
-; a8, i16, db=$7e.  Preserves x/y.
+; bench earns nothing).  in: X = the character record offset ($3010,y), $fb
+; = the formation's Magic Points, and the member's battle slot * 2 on the
+; stack under the return address (the loop's `phy`: LearnItemMagic, called
+; just before, leaves Y clobbered).  a8, i16, db=$7e.  Preserves x/y.
+OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
+                                ;   the return address 6-8, the loop's Y 9-10
 .proc Ot6EsperEarn
         .a8
         .i16
@@ -284,7 +287,7 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
         lda     $161e,x         ; the worn esper
         bmi     @quit           ; none
         pha
-        lda     $3ed8,y         ; actor
+        lda     $1600,x         ; actor
         cmp     #OT6_ESPER_CHARS
         pla
         bcs     @quit           ; a guest: no counters
@@ -324,9 +327,9 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
         txa
         sta     f:OT6_ESPER_LIVE+OT6_ESPER_SHOWN
         ; the counter: (actor * 26 + slot) * 2
-        lda     1,s             ; Y on entry: the battle slot * 2
-        tay
-        lda     $3ed8,y
+        lda     3,s             ; X on entry: the character record
+        tax
+        lda     $1600,x         ; actor
         and     #$00ff
         jsr     Ot6EsperRowOff
         sta     OT6_SCR_BIT     ; the actor's row offset
@@ -351,7 +354,8 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
         jsr     Ot6EsperRankA
         cmp     OT6_SCR_BIT
         bcs     @nonew          ; no rung crossed
-        tya
+        lda     OT6_EARN_SEAT,s ; the loop's Y: the battle slot * 2
+        and     #$00ff
         lsr                     ; the party slot 0..3
         tax
         shorta
