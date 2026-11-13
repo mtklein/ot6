@@ -41,23 +41,7 @@ local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 -- OT6-claimed glyph chars from rom
 local claimed = nil
 local function claimedCharSet()
-  local function findSig(sig)
-    for base = 0x300000, 0x303FF0 do
-      local hit = true
-      for i = 1, 16 do
-        if emu.read(base + i - 1, ROM) ~= sig[i] then hit = false break end
-      end
-      if hit then return base end
-    end
-    return nil
-  end
-  local bg = findSig({0x7e,0x00,0x91,0x7e,0xb1,0x7e,0x91,0x7e,
-                      0x52,0x3c,0x3c,0x38,0x18,0x00,0x00,0x00})
-  H.assertEq(bg ~= nil, true, "OT6 bg glyph data found in rom")
-  local set = { [0xbf] = true }
-  for _, c in ipairs({0xeb,0xec,0xed,0x64,0xef,0xfb,0xfc,0xfd}) do set[c] = true end
-  for k = 1, 16 do set[emu.read(bg - 17 + k, ROM)] = true end
-  return set
+  return H.ot6ClaimedChars()     -- from the ROM's cell tables (#397)
 end
 
 -- ---------------------------------------------------------- the watcher --
@@ -124,7 +108,7 @@ local function watchFrame()
       for k = 0, 4 do
         local lo = emu.read((cur + k) * 2, VR)
         local hi = emu.read((cur + k) * 2 + 1, VR)
-        if hi == 0x21 and claimed[lo] then curViol = curViol + 1 end
+        if (hi & 0x21) == 0x21 and claimed[lo] then curViol = curViol + 1 end
         if not (hi == 0x01 and lo == 0xee) then veiled = false end
       end
       if veiled then veiled16 = veiled16 + 1 end

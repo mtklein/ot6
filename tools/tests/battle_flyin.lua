@@ -24,26 +24,11 @@ local ROM = emu.memType.snesPrgRom
 
 local function map() return H.mapId() & 0x1ff end
 
--- OT6-claimed field-map glyph chars, read from rom: 8 element icons, 16 hud
--- glyphs and '?', the whole set the hud may draw.
+-- OT6-claimed field-map glyph chars, read from the rom's cell tables: the
+-- element icons, the hud's fixed and per-slot shield cells and '?', the
+-- whole set the hud may draw.
 local function claimedCharSet()
-  local function findSig(sig)
-    for base = 0x300000, 0x303FF0 do
-      local hit = true
-      for i = 1, 16 do
-        if emu.read(base + i - 1, ROM) ~= sig[i] then hit = false break end
-      end
-      if hit then return base end
-    end
-    return nil
-  end
-  local bg = findSig({0x7e,0x00,0x91,0x7e,0xb1,0x7e,0x91,0x7e,
-                      0x52,0x3c,0x3c,0x38,0x18,0x00,0x00,0x00})
-  H.assertEq(bg ~= nil, true, "OT6 bg glyph data found in rom")
-  local set = { [0xbf] = true }
-  for _, c in ipairs({0xeb,0xec,0xed,0x64,0xef,0xfb,0xfc,0xfd}) do set[c] = true end
-  for k = 1, 16 do set[emu.read(bg - 17 + k, ROM)] = true end
-  return set
+  return H.ot6ClaimedChars()     -- from the ROM's cell tables (#397)
 end
 local claimed = nil
 

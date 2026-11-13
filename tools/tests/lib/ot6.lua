@@ -4533,6 +4533,26 @@ function M.ot6FontCells()
   return cells
 end
 
+-- Every battle-font char OT6 can put on the field map, as a set {[char] =
+-- true}, read from the ROM's own cell tables: the element icons
+-- (Ot6ElemGlyphTbl), the fixed hud cells (Ot6BgGlyphCellTbl, up to
+-- Ot6BgGlyphData), every slot's shield cell (Ot6ShieldSlotCellTbl), and $bf,
+-- the '?' the weakness slots borrow.  For the suites that assert no OT6 glyph
+-- is drawn while an animation owns bg3; it replaces their search for the
+-- pre-#397 shield tile's bytes.
+function M.ot6ClaimedChars()
+  local rom = emu.memType.snesPrgRom
+  local set = { [0xbf] = true }
+  local icons = M.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
+  for k = 0, 7 do set[emu.read(icons + k, rom)] = true end
+  local cells = M.sym("Ot6BgGlyphCellTbl") & 0x3FFFFF
+  local data = M.sym("Ot6BgGlyphData") & 0x3FFFFF
+  for a = cells, data - 1 do set[emu.read(a, rom)] = true end
+  local slots = M.sym("Ot6ShieldSlotCellTbl") & 0x3FFFFF
+  for k = 0, 5 do set[emu.read(slots + k, rom)] = true end
+  return set
+end
+
 -- Every OT6 font cell in VRAM must match its ROM source data, byte for
 -- byte.  Catches battle/effect art clobbering our claimed font cells.
 function M.glyphCanary()
