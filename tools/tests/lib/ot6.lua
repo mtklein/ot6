@@ -16782,6 +16782,7 @@ function M.setzerBattle(plan, opts)
       -- one that keeps its HP (kit-setzer round 5: a petrified Mad Oscar
       -- at 2,647 HP read alive by HP and held the victory text)
       t[s] = { hp = M.readWord(0x3BFC + s * 2), sh = M.readByte(0x3E40 + s * 2),
+        shmax = M.readByte(0x3E41 + s * 2),
         brk = M.readByte(0x3E90 + s * 2), cls = M.readByte(0x3EA4 + s * 2),
         present = (M.readByte(0x3AA8 + s * 2) & 1) == 1,
         alive = ((M.readByte(0x3A75) >> s) & 1) == 1 }
@@ -18436,7 +18437,25 @@ function M.setzerCheckCoins(r, i, rate, classOf, tag)
   for b = 0, 5 do
     if r.mon0[b].present then
       M.assertEq(r.mon1[b].hp, st[b].hp, string.format("%s %d: slot %d's HP after every pass", tag, i, b))
-      M.assertEq(r.mon1[b].sh, st[b].sh, string.format("%s %d: slot %d's shields after every pass", tag, i, b))
+      local want = st[b].sh
+      if st[b].brk and r.mon1[b].brk == 0 and (r.mon0[b].shmax or 0) > 0 then
+        -- the body stood broken through the passes and its break ran out
+        -- during the action (its own turn ticks the timer while the hires
+        -- animate), so the recovery put its shields back to its max (#397's
+        -- replay, wt/polish-shield-hud-3: slot 0 broken at 0, recovered to 3).
+        -- Only a body no pass hit can be judged this way: a hit after the
+        -- recovery would have met shields the replay cannot place in time.
+        local hit = false
+        for _, p in ipairs(passes) do
+          for _, h in ipairs(p.hits) do if h.slot == b then hit = true end end
+        end
+        M.assertEq(hit, false, string.format("%s %d: slot %d recovered from its break during the action and "
+          .. "was hit too, which the replay cannot order", tag, i, b))
+        want = r.mon0[b].shmax
+        M.log(string.format("[%s] %d: slot %d's break ran out during the action: shields back to its max %d",
+          tag, i, b, want))
+      end
+      M.assertEq(r.mon1[b].sh, want, string.format("%s %d: slot %d's shields after every pass", tag, i, b))
     end
   end
   return passes

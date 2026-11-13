@@ -825,7 +825,10 @@ local function magiciteCall(c, calls)
   end
 end
 
-local function isCast(c, k) return k.b5 == CMD_MAGIC and k.b6 == c.castSpell end
+-- a cast of a fold-table spell from either of the fighter's hands: a fighter
+-- with two such weapons (ThunderBlade's Bolt and Blizzard's Ice in LOCKE's
+-- hands on #397's replay) procs whichever hand's swing rolled it
+local function isCast(c, k) return k.b5 == CMD_MAGIC and c.castSpells ~= nil and c.castSpells[k.b6] == true end
 local CASES = {
   { name = "magic", char = TERRA, verb = "magic", spell = FIRE, tries = 1 },
   { name = "fight", char = TERRA, verb = "fight", tries = FIGHT_TRIES,
@@ -999,13 +1002,23 @@ local function battleSetup()
       if who == nil and x and fold[x] then s, item, sp, who = slotOf[ch], it, x, ch end
     end
   end
+  -- every fold-table spell the fighter's hands cast: either hand's swing can
+  -- proc, and the case is about any of them
+  local spells, names = {}, {}
+  if who ~= nil then
+    for h = 0, 1 do
+      local x = onHitSpell(H.readByte(HANDS + s * 2 + h))
+      if x and fold[x] then spells[x] = true; names[#names + 1] = string.format("$%02X", x) end
+    end
+  end
+  CASES[2].castSpells = spells
   assert(who ~= nil, string.format("a seated fighter's weapon casts a fold-table spell on hit (TERRA holds $%02X, "
     .. "LOCKE $%02X, SHADOW $%02X)", H.readByte(HANDS + slotOf[TERRA] * 2), H.readByte(HANDS + slotOf[LOCKE] * 2),
     H.readByte(HANDS + slotOf[SHADOW] * 2)))
   CASES[2].char, CASES[2].castSpell = who, sp
   H.log(string.format("[procboost] the Fight case's fighter: char %d, slot %d, holds $%02X, casts spell $%02X on "
-    .. "hit (in Ot6FoldTbl); TERRA slot %d, LOCKE slot %d, SHADOW slot %d", who, s, item, sp, slotOf[TERRA],
-    slotOf[LOCKE], slotOf[SHADOW]))
+    .. "hit (in Ot6FoldTbl); its hands' fold-table spells %s; TERRA slot %d, LOCKE slot %d, SHADOW slot %d", who, s,
+    item, sp, table.concat(names, " "), slotOf[TERRA], slotOf[LOCKE], slotOf[SHADOW]))
   local w = {}
   for _, v in ipairs(H.formationWords()) do w[#w + 1] = string.format("%04X", v) end
   H.log(string.format("[procboost] battle %d for the measurement: group $%04X, formation %s; seats %s",
