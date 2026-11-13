@@ -1,5 +1,5 @@
 -- @suite
--- battle_breakwob_thamasa.lua -- the World of Balance break rows for the plains round Thamasa (world groups 22 and 23), re-verified from the built ROM
+-- battle_breakwob_thamasa.lua -- the World of Balance break rows for the plains and forest round Thamasa (world groups 22, 23 and 24), re-verified from the built ROM
 -- (battle_breakwor_sidetrips's shape: pure ROM bytes, no savestate).  docs/design/break-coverage-wob.md section 10
 -- is the design; the tables below are its, and the only place the expectations live.
 --
@@ -18,12 +18,14 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 local WANT = {
   [0x096] = { "Cephaler", 2, SLASH | PIERCE, BOLT, 0, 0 },
   [0x01F] = { "Chimera", 4, SLASH | PIERCE, 0, 0, POISON },
+  [0x01D] = { "Baskervor", 2, SLASH | PIERCE, 0, 0, POISON },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
 local POOLS = {
   { "world", 22, "the plains round Thamasa", { 0x01F, 0x096 } },
   { "world", 23, "the plains round Thamasa", { 0x01F, 0x096 } },
+  { "world", 24, "the forest round Thamasa", { 0x01D, 0x096 } },
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 10); the pools

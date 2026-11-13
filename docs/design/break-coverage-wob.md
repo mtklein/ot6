@@ -1,7 +1,8 @@
 # Break coverage — the World of Balance species the route met on the floor (#254)
 
 Authored 2026-11-12. `python3 tools/audit_break_coverage.py` listed 35
-species, inside the World of Balance areas the route has fought (the tuning
+species (and the Baskervor below, which the line meets in world group 24
+while the audit still counts that group unclaimed), inside the World of Balance areas the route has fought (the tuning
 claim), that still rode the generated floor (`ot6_break_floor.inc` classes
 and `2 + level/8` shields): the issue's 67 less those authored since by the
 Veldt (#269) and other arcs. This doc designs them area by area in the shape
@@ -12,8 +13,8 @@ ROM; section numbers here are the suites' `section N`.
 ## Rules for every area
 
 - **Vanilla element bits stay untouched ✦**, and so do the poison adds
-  `Ot6ElemAddTbl` already gives six of these bodies (Sand Ray, Rhodox,
-  Rhinotaur, Chimera, Red Fang, Ralph). Each suite asserts the weak and
+  `Ot6ElemAddTbl` already gives seven of these bodies (Sand Ray, Rhodox,
+  Rhinotaur, Chimera, Baskervor, Red Fang, Ralph). Each suite asserts the weak and
   absorb bytes and the add.
 - **House curve**: 1 pests, 2 trash, 3 tanks, 4 miniboss-grade. The floor
   gave these bodies 2-5 shields by level; at 3 and up the break lands on a
@@ -171,7 +172,7 @@ Lesson: the blades key every body (the floor's pierce-only Wyvern did not
 key the two blades that walk here); the Wyvern is the three-shield dragon,
 like the Floating Continent's, and Ice its element.
 
-## 10. The plains round Thamasa (world groups 22, 23)
+## 10. The plains and forest round Thamasa (world groups 22, 23, 24)
 
 TERRA (Blizzard: slash, ice), LOCKE (ThunderBlade: slash, bolt), STRAGO
 (Fire Rod: bludg, fire), from `esper-mtn-save-v1`.
@@ -180,9 +181,12 @@ TERRA (Blizzard: slash, ice), LOCKE (ThunderBlade: slash, bolt), STRAGO
 |---|---|---|---|---|---|---|---|
 | `$096` Cephaler | a winged crawler | 21 | 420 | bolt | — | 4 · slash | **2** · slash\|pierce |
 | `$01F` Chimera | a many-headed beast | 22 | 2237 | (+poison) | — | 4 · slash | 4 · slash\|pierce |
+| `$01D` Baskervor | a hound | 22 | 750 | (+poison) | — | 4 · slash | **2** · slash\|pierce |
 
 Lesson: LOCKE's ThunderBlade keys the Cephaler twice (its blade and its
-bolt); the Chimera keeps the miniboss-grade four. (#279's side trip reaches
+bolt); the Chimera keeps the miniboss-grade four; the Baskervor, a hound
+like the Vector Pup, is trash at two (the line fights its formation 191 on
+the `esper_mtn_save` leg). (#279's side trip reaches
 world groups 25 and 22; these rows are this doc's.)
 
 ## 11. Esper Mountain (maps 372, 375)

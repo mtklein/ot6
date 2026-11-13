@@ -2168,6 +2168,10 @@ Ot6ShieldTbl:
         .word   $001f
         .byte   4, OT6_SLASH|OT6_PIERCE ; chimera: 2237 hp, miniboss-grade;
                                 ;   poison an ot6 add
+        .word   $001d
+        .byte   2, OT6_SLASH|OT6_PIERCE ; baskervor: a hound (world group
+                                ;   24, the forest by thamasa); poison an
+                                ;   ot6 add
         ; -- esper mountain (maps 372, 375): strago's rod is the key the
         ; blades lack (the shell, the ooze), relm's brush the ooze's --
         .word   $00ee
