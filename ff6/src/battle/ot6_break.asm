@@ -650,6 +650,7 @@ merge:  pla                     ; bank the matched weaknesses as pending:
         lda     OT6_SHIELD_CUR,y
         beq     done            ; shieldless monster
         dec     a
+        jsr     Ot6Conductor    ; #328: Ramuh's signature takes one more
         sta     OT6_SHIELD_CUR,y
         bne     done
         lda     #OT6_BREAK_TICKS
