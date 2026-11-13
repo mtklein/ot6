@@ -555,6 +555,12 @@ TEST_ENV = {
     # one battle of scripted turns (3-11k frames on the branch's runs)
     # the Economizer at every boost (owner, 2026-10-26), from the save the
     # play makes by Maranda with TERRA wearing it
+    # #328: the esper ladder -- Magic Points at a random battle by the opera
+    # house, and the ladder's page under Skills (twelve stones owned)
+    "battle_esperearn":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    "menu_esperdetail":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     "battle_economizer": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-colosseum-v1",
     # #388: SABIN's divine, Bum Rush, from the save by Duncan's house where he
