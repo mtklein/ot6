@@ -1059,6 +1059,25 @@ function M.turnDenied(o)
   if ((o.s2 or 0) & M.ST2_BERSERK) ~= 0 then return "Berserk" end
   return nil
 end
+-- The monster a plan was made for, when it has fallen by the confirm
+-- (#470): the body a plan names outright (aimHard: STRAGO's study,
+-- Dischord, #388), else the slot a plain Fight chose for its class key
+-- (aim, chipAim #161) when no kill order is in force (ordered: a focus
+-- list steers instead, and its next live entry is still a target it
+-- chose).  Only plans the focus steer aims are asked: not an item, summon
+-- or heal, not a lore without a named body, not a cast on the party, not
+-- a scored contract (its own mismatch check backs out).  Measured on
+-- battle_classtarget shift 13 (#468): TERRA's Fight aimed at the 4-HP
+-- Cirpius in slot 2, LOCKE's queued Fight killed it 17 frames before her
+-- confirm, and she confirmed on the Tusker the cursor fell to.  Pure:
+-- o.alive(slot) says whether a slot stands.  Returns the fallen slot, or nil.
+function M.namedBodyFell(o)
+  if o.kind == "item" or o.kind == "summon" or o.kind == "heal" or o.ally or o.contract then return nil end
+  local named = o.aimHard
+  if named == nil and o.kind ~= "lore" and not o.ordered then named = o.aim end
+  if named ~= nil and not o.alive(named) then return named end
+  return nil
+end
 -- Whether the engine keeps a denied actor's open command window (see
 -- above): true for Stop and Frozen, false for the rest and for nil.
 function M.windowKept(denial)
@@ -16370,6 +16389,7 @@ function Driver:button(actor)
     -- steer to it through the same focus graph, as a one-entry list.  An
     -- authored or multi-part focus wins here byte-identical, because chipAim
     -- yields nil while one is in force, so plan.aim is unset then.
+    local ordered = focus ~= nil
     if focus == nil and self.plan.aim ~= nil then
       focus = { { slot = self.plan.aim, mask = 1 << self.plan.aim } }
     end
@@ -16377,6 +16397,19 @@ function Driver:button(actor)
     -- steered to it over any kill order, a single-target lore included
     if self.plan.aimHard ~= nil then
       focus = { { slot = self.plan.aimHard, mask = 1 << self.plan.aimHard } }
+    end
+    -- the body the plan was made for fell on the way here (M.namedBodyFell,
+    -- #470): re-planned against the live stage, not confirmed on wherever
+    -- the cursor fell
+    local fell = M.namedBodyFell({ kind = self.plan.kind, ally = self.plan.ally,
+      contract = self.plan.targetContract ~= nil, ordered = ordered, aim = self.plan.aim,
+      aimHard = self.plan.aimHard, alive = monAlive })
+    if fell ~= nil then
+      M.log(string.format("[%s] actor=%d: the %s plan's monster (slot %d) fell before the confirm "
+        .. "(live monsters %02X): backing out to re-plan (#470)", self.tag or "fight", actor,
+        tostring(self.plan.kind), fell, M.readByte(0x3A75)))
+      self:dropPlan("aim_fell")
+      return { "b" }
     end
     if focus and self.plan.kind ~= "item" and self.plan.kind ~= "summon"
        and self.plan.kind ~= "heal" and (self.plan.kind ~= "lore" or self.plan.aimHard ~= nil)
@@ -16757,6 +16790,24 @@ end
 --   roll lands), dmg/b6/b7/class being the last roll's.
 -- The list as it was drawn, per opening: M.vars.setzerList = { { ids,
 -- qty, flags, mode } }; opts.onList(list, pend) runs at each opening.
+-- What a scripted driver learns about a plan entry while it plays one
+-- battle (#470): the window it opened, its presses, its aim, a greyed
+-- command (a Mute), its member gone, a refusal seen.  All of it belongs to
+-- that battle, so M.kitBattle and M.setzerBattle clear it as each battle
+-- starts: a plan table played again in a later battle starts as asked.
+-- Kept, one Mute locked a reused plan into fight-outs for every later
+-- battle (#468: battle_runicblade went 0/24 once EDGAR was muted in battle
+-- 3, "char $04's command $02 is greyed"; the suite cleared its entries by
+-- hand since, and battle_jackpot its own).  A caller reads these after the
+-- battle; nothing it asked for (who, cmd, boost, row, slot...) is touched.
+M.KIT_ENTRY_STATE = { "opened", "seat", "presses", "lPresses", "tookBack", "allyPresses", "greyed",
+  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt" }
+function M.freshKitEntries(plan)
+  for _, q in ipairs(plan) do
+    for _, f in ipairs(M.KIT_ENTRY_STATE) do q[f] = nil end
+  end
+end
+
 function M.setzerBattle(plan, opts)
   opts = opts or {}
   for _, p in ipairs(plan) do
@@ -17334,7 +17385,7 @@ function M.setzerBattle(plan, opts)
     end
   end
   return M.seqStep({
-    M.call(function() Z.inFlight = 0; M.logRomIdentity("[setzer]") end),
+    M.call(function() Z.inFlight = 0; M.freshKitEntries(plan); M.logRomIdentity("[setzer]") end),
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and Z.rec == nil then
@@ -17400,6 +17451,17 @@ function M.kitBattle(plan, opts)
   local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
   local k, cool = 1, 0
   local hb, downHold = nil, {}
+  -- the others' care (#470): lib/ot6_field.lua's M.newSpinnerCare, with the
+  -- plan's character as its spinner; opts.care = false leaves the others
+  -- to the script (Defend or Fight) alone
+  local care, careActor = nil, nil
+  if opts.care ~= false and M.newSpinnerCare ~= nil then
+    care = M.newSpinnerCare({ name = "the plan's character", spinner = function()
+      local p = plan[k]
+      if p == nil then return nil end
+      for s = 0, 3 do if M.readByte(0x3ED8 + s * 2) == p.who then return s end end
+    end })
+  end
   local function pulse(btn)
     if cool > 0 then cool = cool - 1; M.setPad({}); return end
     M.setPad({ [btn] = true }); cool = 10
@@ -17476,7 +17538,16 @@ function M.kitBattle(plan, opts)
     return false
   end
   local stoodDown = {}
-  local function fight(a, st)
+  -- The fight-out spends the bank (#470): a member Fighting the battle
+  -- out (the plan done, or its character out of the fight) raises the
+  -- pending boost to what it has banked, up to 3, before the Fight -- the
+  -- boost-Fight default (docs/guidelines.md), and the pips a member one
+  -- round from the end would otherwise carry out unspent.  A Fight while
+  -- the plan still plays (opts.others) stays bare: its job is to thin the
+  -- formation, not end it before the plan.  spendR caps the R presses a
+  -- window gives it (a pending boost that does not rise is left).
+  local spendR = {}
+  local function fight(a, st, spend)
     local want = fightWant(a)
     if want == false then
       if not stoodDown[a] then
@@ -17491,6 +17562,12 @@ function M.kitBattle(plan, opts)
     if st == 0x05 then
       local row = cmdRowOf(a, 0x00)
       if row == nil then pulse("right"); return end
+      if spend and (spendR[a] or 0) < 4
+         and M.readByte(0x3E9D + a * 2) < math.min(M.readByte(0x3E9C + a * 2), 3) then
+        if cool == 0 then spendR[a] = (spendR[a] or 0) + 1 end
+        pulse("r")
+        return
+      end
       local cur = M.readByte(0x890F + a) & 3
       if cur ~= row then pulse(cur < row and "down" or "up") else pulse("a") end
     elseif st == 0x38 then
@@ -17530,6 +17607,8 @@ function M.kitBattle(plan, opts)
     end
     if M.readByte(MENU) == 0 then
       downHold = {}   -- (a reopened window's hold starts afresh, with a fresh cap)
+      spendR = {}
+      if care ~= nil then care.reset(); careActor = nil end
       if M.readByte(0x3A77) == 0 then pulse("a") else M.setPad({}) end
       return
     end
@@ -17563,10 +17642,20 @@ function M.kitBattle(plan, opts)
       return
     end
     if p == nil then
-      if opts.idle == "defend" then defend(st) else fight(a, st) end
+      if opts.idle == "defend" then defend(st) else fight(a, st, true) end
       return
     end
     if M.readByte(0x3ED8 + a * 2) ~= p.who then
+      -- the others' care while the plan plays (#470, M.newSpinnerCare, the
+      -- care setzerBattle gives SETZER's party): a fallen member raised, a
+      -- member under half HP given a Potion (a Tonic without), the plan's
+      -- character's lost control answered; else the script below
+      if care ~= nil and (careActor == a or (careActor == nil and care.wants(a))) then
+        careActor = a
+        care.window()
+        return
+      end
+      if careActor ~= nil then care.reset(); careActor = nil end
       local live, m = 0, M.readByte(0x3A75)
       while m ~= 0 do live = live + (m & 1); m = m >> 1 end
       -- the planned character out of the fight (removed from it, dead,
@@ -17582,7 +17671,8 @@ function M.kitBattle(plan, opts)
         p.goneLogged = true
         M.log(string.format("[kit] f%d char $%02X is out of the fight: the others fight the battle out", M.frame, p.who))
       end
-      if gone or p.greyed or opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
+      if gone or p.greyed then fight(a, st, true)
+      elseif opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
       return
     end
     local e = a * 2
@@ -17599,7 +17689,7 @@ function M.kitBattle(plan, opts)
       end
       p.greyed = true
     end
-    if p.greyed then fight(a, st); return end
+    if p.greyed then fight(a, st, true); return end
     if p.defend then
       if st == 0x27 and cool == 0 then done(p, a) end
       defend(st)
@@ -17745,9 +17835,7 @@ function M.kitBattle(plan, opts)
         return
       end
       k, cool, aim = 1, 0, nil
-      for i = 1, #plan do
-        local q = plan[i]; q.opened, q.seat, q.presses, q.lPresses, q.tookBack, q.allyPresses = nil, nil, nil, nil, nil, nil
-      end
+      M.freshKitEntries(plan)
       M.vars.kit = {}
       M.logRomIdentity("[kit]")
     end),
@@ -19391,25 +19479,47 @@ function M.battleLiveAt(snapFrame, startFrame)
     and (startFrame or 0) - snapFrame >= 90)
 end
 
+-- The statuses the [status] line names, from one entity's four status
+-- bytes and its Doom count (M.doomCount): every status that takes a turn,
+-- greys a command, hands the member's turns to the engine or costs HP over
+-- time.  Audited against the four bytes for #471 (Barb-e's counter muted
+-- the caster and no line said so; #466): STATUS1 Blind, Zombie, Poison,
+-- Imp, Petrify (Wound and Magitek are not statuses a member is "under";
+-- Vanish is a guard); STATUS2 Condemned, Mute, Berserk, Muddle, Sap,
+-- Sleep (Near Fatal and Image are not afflictions); STATUS3 Slow and Stop
+-- (the rest are buffs); STATUS4 Frozen (the rest are buffs, Morph, or
+-- command state).  Pure: the selftest feeds it bytes.
+M.STATUS_LOGGED = { "Stop", "Frozen", "Petrify", "Sleep", "Berserk", "Imp", "Zombie", "Condemned",
+                    "Mute", "Muddle", "Blind", "Poison", "Sap", "Slow" }
+function M.statusNames(s1, s2, s3, s4, doom)
+  local names = {}
+  local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
+  if den then names[#names + 1] = den end
+  if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
+  if (s1 & M.ST1_ZOMBIE) ~= 0 and (s1 & 0x80) == 0 then names[#names + 1] = "Zombie" end
+  -- the statuses that take a command or the member's control without
+  -- taking the turn (#471): Mute greys Magic, Muddle hands the turns to
+  -- the engine
+  if (s2 & M.ST2_MUTE) ~= 0 then names[#names + 1] = "Mute" end
+  if (s2 & M.ST2_MUDDLE) ~= 0 then names[#names + 1] = "Muddle" end
+  -- the statuses that cost a solo fighter over time rather than a
+  -- turn (#255): planned around, each said with the engine's reading
+  if (s1 & M.ST1_BLIND) ~= 0 then names[#names + 1] = "Blind" end
+  if (s1 & M.ST1_POISON) ~= 0 then names[#names + 1] = "Poison" end
+  if (s2 & M.ST2_SAP) ~= 0 then names[#names + 1] = "Sap" end
+  if (s3 & M.ST3_SLOW) ~= 0 then names[#names + 1] = "Slow" end
+  -- once the count is running (M.doomCount's note), not on the bit
+  if doom ~= nil then names[#names + 1] = "Condemned" end
+  return names
+end
+
 function Driver:watchStatuses()
   if self.battleTick > 4 and M.battleLiveAt(endSnap and endSnap.frame, self.startFrame) then
     for e = 0, 3 do
       if M.readWord(0x3C1C + e * 2) > 0 then
         local s1, s2, s3, s4 = statusOf(e)
-        local names = {}
-        local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
-        if den then names[#names + 1] = den end
-        if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
-        if (s1 & M.ST1_ZOMBIE) ~= 0 and (s1 & 0x80) == 0 then names[#names + 1] = "Zombie" end
-        -- the statuses that cost a solo fighter over time rather than a
-        -- turn (#255): planned around, each said with the engine's reading
-        if (s1 & M.ST1_BLIND) ~= 0 then names[#names + 1] = "Blind" end
-        if (s1 & M.ST1_POISON) ~= 0 then names[#names + 1] = "Poison" end
-        if (s2 & M.ST2_SAP) ~= 0 then names[#names + 1] = "Sap" end
-        if (s3 & M.ST3_SLOW) ~= 0 then names[#names + 1] = "Slow" end
-        -- once the count is running (M.doomCount's note), not on the bit
         local doom = M.doomCount({ s2 = s2, count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
-        if doom ~= nil then names[#names + 1] = "Condemned" end
+        local names = M.statusNames(s1, s2, s3, s4, doom)
         local on = {}
         for _, name in ipairs(names) do
           on[name] = true
@@ -19475,6 +19585,17 @@ function Driver:watchStatuses()
                 .. "battle, where the field care cures it (%s); planned around here",
                 item and string.format("$%02X x%d in the bag", item, bagCount(item))
                 or "no Eye Drop or Remedy in the bag: the next town's shop or inn")
+            elseif name == "Mute" then
+              local item = M.statusCure({ byte = 2, bit = M.ST2_MUTE,
+                has = function(it) return bagCount(it) > 0 end })
+              what = string.format("its Magic row is greyed (UpdateCmd_05); its Fight and Item "
+                .. "still answer; %s",
+                item and string.format("cure: $%02X x%d (Driver:coverPlan, #466)", item, bagCount(item))
+                or "no Echo Screen or Remedy in the bag: it lasts the battle")
+            elseif name == "Muddle" then
+              what = "the engine takes its turns and aims them at either side (no window "
+                .. "for it); a physical hit on it clears the bit (CalcMaxDmg @0c45: the Muddle "
+                .. "rule's hit, #170); no item record carries the bit"
             elseif name == "Slow" then
               what = string.format("its ATB constant is recomputed at half rate (SetStatus_12 -> "
                 .. "$3AC8, now $%04X) and every gauge ETA the driver reads already carries it; no "
@@ -19513,8 +19634,7 @@ function Driver:watchStatuses()
               n > 1 and string.format(", landing %d this battle", n) or "", what))
           end
         end
-        for _, name in ipairs({ "Stop", "Frozen", "Petrify", "Sleep", "Berserk",
-                                "Imp", "Zombie", "Condemned", "Blind", "Poison", "Sap", "Slow" }) do
+        for _, name in ipairs(M.STATUS_LOGGED) do
           local key = e .. ":" .. name
           if self.statusSaid[key] == "on" and not on[name] then
             self.statusSaid[key] = "off"
