@@ -50,7 +50,13 @@ local function exp24(c) local r = 0x1600 + 37 * c; return H.readByte(r + 0x11) |
   | (H.readByte(r + 0x13) << 16) end
 local function arm()
   local earn = H.sym("Ot6EsperEarn")
-  emu.addMemoryCallback(function() if battle then earns = earns + 1 end end, emu.callbackType.exec, earn, earn)
+  emu.addMemoryCallback(function()
+    if not battle then return end
+    earns = earns + 1
+    local st = emu.getState()
+    H.log(string.format("[earn] Ot6EsperEarn: Y=%04X X=%04X $fb=%d actor=%d worn=%02X", st["cpu.y"], st["cpu.x"],
+      H.readByte(0xFB), H.readByte(0x3ED8 + (st["cpu.y"] & 0xFF)), H.readByte(0x161E + st["cpu.x"])))
+  end, emu.callbackType.exec, earn, earn)
   local show = H.sym("Ot6ShowMsg")
   emu.addMemoryCallback(function()
     if battle then msgs[#msgs + 1] = { id = emu.getState()["cpu.a"] & 0xFF, v0 = H.readWord(0x2F35),
@@ -96,6 +102,13 @@ local function judge()
   H.log(string.format("[earn] won=%s; Ot6EsperEarn ran %d time(s)", tostring(won), earns))
   if not won then return false end
   local after = snapshot()
+  for a = 0, 11 do for s = 0, 25 do
+    if after[a][s] ~= before[a][s] then H.log(string.format("[earn] moved: actor %d slot %d %d -> %d", a, s,
+      before[a][s], after[a][s])) end
+  end end
+  local nz = {}
+  for i = 0, 0x3FF, 2 do local w = sramW(LIVE + i); if w ~= 0 then nz[#nz + 1] = string.format("+%03X=%d", i, w) end end
+  H.log("[earn] live page nonzero words: " .. table.concat(nz, " "))
   local earners, crossed = {}, {}
   for s, a in pairs(battle.seats) do
     local e = worn(a)
