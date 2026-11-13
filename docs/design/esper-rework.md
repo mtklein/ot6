@@ -429,6 +429,31 @@ In rough order. S is a day's work, M a few days, L a week or more.
    grids are re-read for drift. The harness also needs a wearing policy (who
    wears what, and when to rotate), which is the same choice a player makes.
 
+### Still to build (after v0.44's first landing)
+
+The page under Skills > Espers shows the selected character's rank, Magic
+Points and next cost on the title row, and the five rungs as short labels,
+white once reached and grey until then. What it does not do yet, the
+remaining part of step 6:
+
+- **Say what a rung does.** The labels name a relic ("Gold Hairpin") or an
+  immunity ("No Sleep"); the four new signatures (Conductor, Facet,
+  Rebirth, No Stop/Slow) need a sentence. Proposed: a cursor on the rung
+  rows (today the cursor walks only the spell rows, `GenjuDetailCursorProp`
+  {1, 7}) and the help line at the top of the screen showing the rung's
+  description, from a 130-entry text table beside `Ot6RungLabelTbl`.
+- **Mark "have".** An effect the character already holds (from gear or
+  another stone's rung) is marked so a player tours toward new ones, as the
+  table's notes say. The fold already computes it (`Ot6EsperFold`'s bits
+  for that character minus this rung's).
+- **The status page's list of kept bonuses** (optional, as the doc says).
+- **Teaching.** One Narshe school line in plain words: "A stone teaches its
+  wearer bonuses that stay. Every battle won pays Magic Points to the stone
+  each member wears; see Skills > Espers." (step 7).
+- **A wearing policy for the harness** (step 8): today the route equips
+  stones for their spells only, so the ladder grows wherever the route's
+  wearers happen to fight.
+
 ## Plan B — abilities while worn, the same ladder for keeps
 
 The other reading of "spell families and/or abilities": a stone is worn
