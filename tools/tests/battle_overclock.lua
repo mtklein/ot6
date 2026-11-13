@@ -12,18 +12,19 @@
 -- Played: Continue fc-alcove-v1 (EDGAR L27 with his bag's Tools, the
 -- factory long behind him), walk onto the continent into a random battle,
 -- and play EDGAR through the real menu (H.kitBattle); everyone else
--- Defends.  Nothing is written.  The Tool is NoiseBlaster ($A3, 6 MP,
--- every body, no damage), so the battle stands for both uses (an
+-- Defends.  Nothing is written.  The Tool is Debilitator ($A7, 10 MP a
+-- weakness, no damage), so the battle stands for both uses (an
 -- AutoCrossbow at x8 twice fells this map's smaller draws first), and its
--- 3-BP price sits under the cap where the doubling shows: 3 BP = 94,
--- overclocked 99 (2 x 94, capped).  EDGAR rests at the save first, so his pool pays two
+-- 3-BP price sits under the cap where the doubling shows: 3 BP = 40 (four
+-- weaknesses, one firing's price each, #469), overclocked 80 (2 x 40).
+-- NoiseBlaster, the Tool here before #469, takes no boost now.  EDGAR rests at the save first, so his pool pays two
 -- overclocks and little more, so the one-firing control
 -- is the old ROM's run of this suite and the mutant without the passes arm
 -- (below), where the same 3-BP use fires once.  Asserted per use (the use
 -- opens at its Ot6ItemClass load, every pass of it calls Ot6PassTargeted
 -- after ChooseTarget with x = EDGAR, EDGAR's Ot6ActionEnd closes it):
---   1. NoiseBlaster at 3 BP: two firings, 99 MP;
---   2. again at 3 BP in the same battle: two firings, 99 MP.
+--   1. Debilitator at 3 BP: two firings, 80 MP;
+--   2. again at 3 BP in the same battle: two firings, 80 MP.
 -- Old-ROM red and mutants: build/attempts/wt/v027-kits/final-matrix/
 -- (<rom>__battle_overclock.out).
 --
@@ -49,7 +50,7 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local EDGAR, CMD_TOOLS, TOOL = 0x04, 0x09, 0xA3   -- NoiseBlaster: no damage, so the battle stands
+local EDGAR, CMD_TOOLS, TOOL = 0x04, 0x09, 0xA7   -- Debilitator: no damage, so the battle stands
 
 local seat, recs, rec = nil, {}, nil
 local MAX_ENCOUNTERS = 8
@@ -164,7 +165,7 @@ local function encounter(e)
     end),
     use(3),
     H.cond(function() return handed == nil end, {
-      H.call(function() check(1, 3, 2, 99) end),
+      H.call(function() check(1, 3, 2, 80) end),
       use(3),
     }, {}),
     H.cond(function() return handed ~= nil end, {
@@ -175,7 +176,7 @@ local function encounter(e)
       end),
       fightOut("overclock: encounter " .. e),
     }, {
-      H.call(function() check(2, 3, 2, 99) end),
+      H.call(function() check(2, 3, 2, 80) end),
     }),
   }, {})
 end
@@ -191,7 +192,7 @@ local body = {
 for e = 1, MAX_ENCOUNTERS do body[#body + 1] = encounter(e) end
 body[#body + 1] = H.call(function()
   H.assertEq(#recs, 2, string.format("a battle held both 3-BP uses within %d encounters", MAX_ENCOUNTERS))
-  H.log(string.format("[overclock] PASS: two firings at 3 BP, twice in the same battle (encounter %d), priced 99",
+  H.log(string.format("[overclock] PASS: two firings at 3 BP, twice in the same battle (encounter %d), priced 80",
     enc))
 end)
 H.run({ maxFrames = 400000 }, body)

@@ -791,9 +791,11 @@ H.run({ maxFrames = 300000 }, {
       .. "rare/guarantee ladder, which is certainty across a spread of "
       .. "outcomes rather than magnitude, and the BP already pays for it",
       price, wouldBe))
-    H.assertEq(q[THIEF_FILCH], 2 * thiefCostOf(THIEF_FILCH),
-      "Filch at boost 1 is stamped two Filches (#469): its boost buys one more "
-      .. "shield a point, each priced as its own Filch, not the 2.5x multiplier")
+    H.assertEq(q[THIEF_FILCH], thiefCostOf(THIEF_FILCH),
+      "Filch's row is stamped its base (Ot6ThiefListOpen stamps every thief "
+      .. "row flat, Trickshot's too); the live draw and the charge pay one "
+      .. "Filch a shield (#469, Ot6ThiefRowCost; battle_boostkeep's filch-b2 "
+      .. "measures the charge), never the 2.5x multiplier")
     H.assertEq(q[THIEF_BESTOW], thiefCostOf(THIEF_BESTOW),
       "Bestow stays flat: its boost buys pips, which are their own price")
     H.screenshot("boostprice_steal_boost1")
