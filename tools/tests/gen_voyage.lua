@@ -36,6 +36,14 @@ local function partyCount()
   return n
 end
 
+-- The walk ends at the tile, or off the world map for a field map (#522:
+-- not in the Tent's interior, map 3, H.offWorld).  The walk's own field
+-- care pitches a Tent after a battle that leaves the party low ("plan:
+-- pitch a Tent"), and read as "left the world" the Tent ended the walk
+-- wherever it stood (v041-cb-land's crescent_landing: "driveUntil 'the
+-- J->K world walk' satisfied" at (128,195), nine tiles short), so the held
+-- RIGHT onto Albrook pressed into the coast: "attempt 1/3 FAILED
+-- class=noeffect ... no-effect: right for 304 frames at W:129.195.0.0.0".
 local function worldGrind(tx, ty, what)
   local plan, idx, ph, hb = nil, 1, 0, -600
   local step = nil
@@ -43,7 +51,7 @@ local function worldGrind(tx, ty, what)
                left = { -1, 0 }, right = { 1, 0 } }
   local W = H.newWalkFighter(what or string.format("worldGrind (%d,%d)", tx, ty))
   return H.driveUntil(function()
-    return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
+    return H.offWorld() or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 60000, {
     H.call(function()
@@ -271,7 +279,13 @@ local steps = {
   H.waitUntil(function()
     return H.worldHasControl() and H.worldAligned()
   end, 2400, "at the Albrook approach", 5),
-  pressWalk("right", function() return not H.worldMode() end, 900,
+  H.call(function()
+    -- the held RIGHT below enters Albrook from this tile and no other (#522)
+    H.assertEq(H.worldMode() and H.worldX() == 137 and H.worldY() == 203, true,
+      string.format("the walk ends at (137,203), west of Albrook, on the world map (at (%d,%d), map %d)",
+        H.worldX(), H.worldY(), map()))
+  end),
+  pressWalk("right", function() return H.offWorld() end, 900,
     "held RIGHT onto (138,203) -> Albrook 323 (2,17)"),
   H.waitUntil(landed(323, 10), 2400, "Albrook", 1),
   H.waitFrames(30),
@@ -453,7 +467,7 @@ local steps = {
   -- it through careClose's world-mode predicate (gen_sabin_gau's overworld
   -- precedent).  Its log lines are the round-trip receipt.
   H.fieldCare({ tag = "mid-window care on the world map", threshold = 0.9 }),
-  pressWalk("right", function() return not H.worldMode() end, 900,
+  pressWalk("right", function() return H.offWorld() end, 900,
     "held RIGHT back into Albrook mid-window"),
   H.waitUntil(landed(323, 10), 2400, "Albrook again, window still open", 1),
   H.waitFrames(30),
