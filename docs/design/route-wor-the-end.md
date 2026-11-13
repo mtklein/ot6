@@ -617,6 +617,7 @@ capture, both grids, 48 runs an arm (`px13/tally_f16.txt`,
 | `f12` | 12 shields | three under 30% | 48 of 48 | 0 | 23 |
 | `f16` | 16 | three under 30% | 46 of 48 | 2 (1: be20) | 60 |
 | `f15` | 15 | three under 30% | 47 of 48 | 1 (1: be28) | 43 |
+| `mx45` | 16 | three under 45% | 46 of 48 | 2 (1: be20) | 61 |
 | **`mxn2`** | **16** | **two under 35%** | **48 of 48** | **0** | 47 |
 
 Quoted: "4 Kefka: won 48, lost 0; distinct keys won 26, lost 0; deaths in
@@ -643,7 +644,9 @@ tier: "3 lady+sleeper: won 48, lost 0; distinct keys won 29, lost 0".
   (`mbp/megal_mxn2.txt`), and be20 is won with no death ("tier 4 Kefka WON
   after 20116 ticks, 0 deaths, key be20", `mxn2_k4_s4`). The leg's trigger
   is now that; the second Megalixir is still only ever drunk in Kefka's
-  tier.
+  tier. Three under 45% (`mx45`, `air/tally_mx45.txt`: "4 Kefka: won 46,
+  lost 2; distinct keys won 26, lost 1") loses be20 as before: the third
+  member is the one Ultima finds.
 
 ## 6. Not done
 
