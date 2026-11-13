@@ -12306,9 +12306,28 @@ function Driver:dodgePlan(actor, plan)
         .. "Fight that would miss", self.tag or "fight", actor, line.kind))
       return line
     end
+    -- No spell the magic line would choose (the Intangir absorbs every element: '[fight] magic-only: no line ...
+    -- absorb $FF', and four Fights a round took 0 off it for 100,000 frames, build/attempts/wt/v043-wob-zones/lab/
+    -- airship_a8.log), but a spell that lands still ends Vanish, and then the Fights land: under Vanish, the
+    -- cheapest castable spell from M.REVEAL_SPELLS, the ones that hurt without an element first, an absorbed one
+    -- last (it heals the body a little).  Image is not answered this way: a hit ends it.
+    if why == "Vanish" then
+      for _, id in ipairs(M.REVEAL_SPELLS) do
+        local cell, cost = spellCell(actor, id, true)
+        if cell ~= nil then
+          M.log(string.format("[%s] actor=%d every standing monster is under Vanish and no spell would hurt it: "
+            .. "spell $%02X (%d MP) at slot %d to end the Vanish", self.tag or "fight", actor, id, cost or -1, aim))
+          return { kind = "magic", spell = id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0, aim = aim,
+                   vetoOk = true, reason = "reveal" }
+        end
+      end
+    end
   end
   return plan
 end
+-- The spells Driver:dodgePlan casts to end a Vanish when no spell would hurt the body: Drain, Rasp, Demi, Slow
+-- and Poison (no element, or poison), then Fire, Ice and Bolt (an absorbed hit still lands)
+M.REVEAL_SPELLS = { 0x04, 0x1A, 0x10, 0x19, 0x03, 0x00, 0x01, 0x02 }
 
 -- A Fight by a member whose hand holds a weapon whose blow heals what it hits (M.weaponHeals: the Heal Rod,
 -- ItemProp +27 high nibble $0C, battle_main.asm AttackerEffect_0c), or GOGO's Mimic of a Fight while his does
