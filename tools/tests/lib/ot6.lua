@@ -4549,8 +4549,10 @@ end
 -- true if any OT6 shield/broken glyph word sits in the bg3 field-area map
 -- (the under-monster hud). formation-agnostic presence check.  The shield
 -- gauge (the emblem $71 and the count cells) draws under attribute $29, text
--- palette 2 (#397); the broken shield, a count cell's tile, under $21.
+-- palette 2 (#397); the broken shield, a count cell's tile, under $3D,
+-- text palette 7.
 M.HUD_GAUGE_ATTR = 0x29
+M.HUD_BROKEN_ATTR = 0x3D
 function M.fieldHudPresent()
   local vr = emu.memType.snesVideoRam
   local reg = M.readByte(0x897b)
@@ -4558,7 +4560,7 @@ function M.fieldHudPresent()
   local set = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1}
   for off = 0, 0x7FE, 2 do
     local attr = emu.read(base+off+1, vr)
-    if (attr == 0x21 or attr == M.HUD_GAUGE_ATTR) and set[emu.read(base+off, vr)] then
+    if (attr == M.HUD_GAUGE_ATTR or attr == M.HUD_BROKEN_ATTR) and set[emu.read(base+off, vr)] then
       return true
     end
   end

@@ -291,7 +291,7 @@
         ; emblem (fixed cell $71) in the lead cell and the slot's count tile
         ; in cell 0, both in text palette 2, one gold-and-navy badge.
         ; broken: the broken shield (the slot's tile 100) in the lead cell,
-        ; palette 0, and cell 0 empty.  shieldless: both empty.
+        ; palette 7, and cell 0 empty.  shieldless: both empty.
         lda     $3e90,y
         beq     @count
         lda     #$01
@@ -325,11 +325,14 @@
         plx                     ; the shadow line base
         cmp     #100
         bne     @gauge
-        xba                     ; broken: the slot's cell in the lead cell,
-        sta     OT6_HUDLEAD,y   ;   palette 0 (the $21 attr of the blank
-        bra     @slots          ;   fill); cell 0 stays empty
-@gauge: lda     #OT6_GAUGE_ATTR ; whole-word stores: the nmi flush can
-        xba                     ;   fire between two byte stores
+        lda     #OT6_BROKEN_ATTR ; broken: the slot's cell in the lead cell,
+        xba                     ;   palette 7; cell 0 stays empty.  whole-
+        longa                   ;   word store: the nmi flush can fire
+        sta     OT6_HUDLEAD,y   ;   between two byte stores
+        shorta0
+        bra     @slots
+@gauge: lda     #OT6_GAUGE_ATTR ; whole-word stores, as above
+        xba
         longa                   ; a = attr << 8 | the slot's cell
         sta     f:$7e0000+OT6_SHADOW+4,x        ; cell 0: the count tile
         lda     #(OT6_GAUGE_ATTR << 8) | OT6_EMBLEM
@@ -3514,11 +3517,13 @@ Ot6ShieldSlotCellTbl:
 
 ; the shield gauge's emblem cell (#397; Ot6BgGlyphCellTbl's first entry,
 ; which held the broken shield before the broken art became a per-slot tile)
-; and the gauge's tilemap attribute: priority, char bit 8, text palette 2
-; (navy, grey, yellow; btlgfx BattleFontPal), where the weakness icons beside
-; it draw in palette 0 or their element's hue
-OT6_EMBLEM     = $71
-OT6_GAUGE_ATTR = $21 | (2 << 2)
+; and the gauge's tilemap attributes: priority, char bit 8, and text
+; palette 2 (navy, grey, yellow; btlgfx BattleFontPal) for the gauge, where
+; the weakness icons beside it draw in palette 0 or their element's hue, or
+; palette 7 (grey, red) for the broken shield
+OT6_EMBLEM      = $71
+OT6_GAUGE_ATTR  = $21 | (2 << 2)
+OT6_BROKEN_ATTR = $21 | (7 << 2)
 
 ; monster slot -> its OT6_SHPEND bit
 Ot6ShieldBitTbl:
@@ -3552,11 +3557,9 @@ Ot6BgGlyphCellTbl:
 
 Ot6BgGlyphData:
 ; the shield gauge's emblem (#397), in text palette 2: a grey shield with a
-; yellow rim and a navy outline.  The count tile beside it is per slot
-; (Ot6ShieldGlyphs); the broken shield is that slot's tile 100.
-;   13333331 / 13222231 x3 / .132231. / ..1321.. / ...11... / ........
-        .byte   $ff,$7e,$c3,$7e,$c3,$7e,$c3,$7e
-        .byte   $66,$3c,$34,$18,$18,$00,$00,$00
+; yellow rim and a navy outline (gen_shield_glyphs.py draws it, beside the
+; count tiles; the broken shield is each slot's tile 100, the emblem cracked)
+        .byte   OT6_EMBLEM_TILE
 ; pips-0
         .byte   $00,$00,$db,$00,$db,$00,$00,$00
         .byte   $6c,$00,$6c,$00,$00,$00,$00,$00

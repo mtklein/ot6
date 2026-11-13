@@ -42,7 +42,7 @@
 --      the gauge attribute $29 (text palette 2), the count cell holding the
 --      ROM's tile for 4;
 --   3h. broken, the lead cell holds the head's broken-shield tile (tile 100)
---      under $21 and the count cell is empty; and the head's sprite is moved
+--      under $3D (text palette 7) and the count cell is empty; and the head's sprite is moved
 --      onto a spare monster palette (one the formation left unloaded) that
 --      holds the grey of its own palette, colour for colour, while the shell
 --      stays on its own;
@@ -74,7 +74,7 @@ local HUDSHADOW = 0xECF1              -- OT6_SHADOW: 6 lines x 14, +0 anchor
 local SPRDATA = 0x80DB                -- w7e80db: bits 1-3 the obj palette
 local LOADED = 0x8123                 -- w7e8123: the formation's palettes
 local MONPAL = 0x8117                 -- w7e8117: each slot's palette id
-local GAUGE, PLAIN = H.HUD_GAUGE_ATTR, 0x21
+local GAUGE, BROKEN_ATTR = H.HUD_GAUGE_ATTR, H.HUD_BROKEN_ATTR
 local vram = emu.memType.snesVideoRam
 local function vword(w) return emu.readWord(w * 2, vram) end
 local function palBits(s) return H.readByte(SPRDATA + s * 2) & 0x0E end
@@ -111,7 +111,7 @@ local function gaugeShown()
 end
 local function brokenShown()
   local a, lead, count = headLine()
-  return a ~= nil and lead == (PLAIN << 8) | slotCell(hs) and count == 0x21FF
+  return a ~= nil and lead == (BROKEN_ATTR << 8) | slotCell(hs) and count == 0x21FF
     and tileIs(slotCell(hs), 100)
 end
 -- a slot's own palette bits, assigned the way LoadMonsterPal does: twice
@@ -483,8 +483,10 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(grey(hs), true, "the broken head's sprite is on a grey copy of its own palette")
     H.assertEq(palBits(shell), ownBits(shell), "the shell, not broken, keeps its own palette")
     H.assertEq(brokenShown(), true, "the gauge shows the broken shield and no count")
-    H.screenshot("break_grey")
   end),
+  -- the palette reaches CGRAM at the next vblank's DMA: photograph after it
+  H.waitFrames(4),
+  H.call(function() H.screenshot("break_grey") end),
 
   -- 4. recovery: timer expires, shields restore, reveal persists.  Nothing
   -- is pressed from here on, so the head takes no further damage; the shell

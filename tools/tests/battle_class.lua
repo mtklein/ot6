@@ -157,7 +157,7 @@ local function hudSlotWords()
     if addr ~= 0 then
       local lead = emu.readWord((addr - 1) * 2, vr)
       local attr = lead >> 8
-      if (attr == 0x21 or attr == H.HUD_GAUGE_ATTR) and SHIELDG[lead & 0xFF] then
+      if (attr == H.HUD_GAUGE_ATTR or attr == H.HUD_BROKEN_ATTR) and SHIELDG[lead & 0xFF] then
         t[#t + 1] = emu.readWord((addr + 1) * 2, vr)
       end
     end
