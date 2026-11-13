@@ -124,7 +124,22 @@ local route = {}
 for _, z in ipairs(ZONES) do route[#route + 1] = zone(z) end
 
 H.run({ maxFrames = 3000000 }, {
-  H.bootCheckpoint("terra-returned-v1"),
+  -- the cold Continue (gen_narshe_mission's: the terra-returned-v1 contract pins its tile through the save block's
+  -- cells, so H.bootCheckpoint has no tile to wait for)
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
+  H.waitFrames(300),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
+  H.waitUntil(function() return H.worldMode() end, 3000, "cold Continue to the terra-returned world entry point", 10),
+  H.waitUntil(function() return K.bright() >= 15 end, 900, "cold Continue fade-in", 10),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEntryContract("terra-returned-v1")
+    H.assertEq(H.worldX() == H.readByte(0x1F62) and H.worldY() == H.readByte(0x1F63), true,
+      "the party stands on the grounded Blackjack's tile")
+  end),
   watches(),
   H.call(function()
     say("wob", "boot")
