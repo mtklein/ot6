@@ -154,14 +154,19 @@ end
 -- 3 in battles 4-24, build/attempts/wt/v036-fragile/A/logs/
 -- battle_runicblade__s13__k0.log.gz)
 -- why the party can no longer Defend through the steps, or nil: a seated
--- member down, or under a third of max HP
+-- member down (Wound or Petrify, or 0 HP) or under a third of max HP; or
+-- CELES or EDGAR a Zombie, who then takes no command, so the steps cannot be
+-- played.  Another member's Zombie is no danger by itself: it is out of the
+-- menu, and what it does to the party shows in their HP (#469 review: a
+-- Zombie SETZER at full HP handed battle 2 over for nothing)
 local handed = nil
 local function danger()
   if not H.battleLoadStarted() then return nil end
   for s = 0, 3 do
     if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
       local hp, mx, st1 = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2), H.readByte(0x3EE4 + s * 2)
-      if hp == 0 or (st1 & 0xC2) ~= 0 or (mx > 0 and hp < mx / 3) then
+      local zombie = (st1 & 0x02) ~= 0 and (s == celes or s == edgar)
+      if hp == 0 or (st1 & 0xC0) ~= 0 or zombie or (mx > 0 and hp < mx / 3) then
         return string.format("seat %d at %d/%d HP, status1 $%02X", s, hp, mx, st1)
       end
     end

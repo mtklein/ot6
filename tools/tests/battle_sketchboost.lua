@@ -36,7 +36,12 @@
 -- elsewhere), so two more tries are a DECLARED EXPEDIENT
 -- (tools/state_write_waivers.txt): at Cmd_0d's `lda $3400` (Cmd_0d + 39, the
 -- brush's drawn attack, byte-identical on the old ROM) the drawn attack is
--- replaced by Imp ($23), and everything after is the engine's own.  A
+-- replaced by Imp ($23), Slow ($19), Slow 2 ($28), Break ($0C) or Scan
+-- ($18): each payoff of the first four is Magic-gated (reach, the tier
+-- fold, OT6's Break chips), so the boost is dropped; Ot6Analyze serves a
+-- boosted Scan whatever its command, so Scan's is spent.  Each is tried up to
+-- three times (the brush can miss), and one of each must land.  Everything
+-- after the write is the engine's own.  A
 -- mechanism test of the drop, not a claim about play.  Nothing else is
 -- written.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -48,7 +53,13 @@ local BANK, PEND = 0x3E9C, 0x3E9D
 local CMD_SKETCH = 0x0D
 local RELM = 8
 local TRIES = 8
-local INJECT = { 0x23, 0x23 }   -- Imp, a reach spell, on two more tries
+-- the injected draws (see the header): Imp (reach), Slow and Slow 2 (tier
+-- folds), Break (OT6's chips) -- every payoff Magic-gated, so none buys -- and
+-- Scan, which Ot6Analyze serves for any command, so it spends.  Each up to
+-- INJECT_TRIES times, until one lands (a sketch can miss: CheckSketchHit)
+local INJECT = { 0x23, 0x19, 0x28, 0x0C, 0x18 }
+local INJECT_TRIES = 3
+local SCAN = 0x18
 
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function pend(s) return H.readByte(PEND + s * 2) end
@@ -62,7 +73,9 @@ end
 local MPB, MSK
 local function noNumber(a)
   if a >= 0xEE then return false end           -- Battle, Special: Fight
-  if H.isReachSpell(a) then return true end    -- reach serves Magic only (#469 review)
+  if a == SCAN then return false end           -- Scan: Ot6Analyze reads every enemy, whatever the command
+  -- a power of 0 or a fraction: reach, folds and OT6's Break chips are
+  -- Magic's, and a sketch keeps command $0D (#469 review)
   local r = MPB + a * 14
   return (H.readRomByte(r + 4) & 0x80) ~= 0 or H.readRomByte(r + 6) == 0
 end
@@ -149,7 +162,7 @@ local function runTry(t)
       armed = nil
       H.setPad({})
       H.log(string.format("[sketch] try %d (delay %d%s): pending at the confirm %s; drew %s%s; bank %s -> %s", t.n,
-        t.delay, t.inject and string.format(", Imp injected") or "", tostring(t.pendAtConfirm), t.drawn and string.format("$%02X", t.drawn) or "nothing (missed)",
+        t.delay, t.inject and string.format(", $%02X injected", t.inject) or "", tostring(t.pendAtConfirm), t.drawn and string.format("$%02X", t.drawn) or "nothing (missed)",
         t.drawn and (noNumber(t.drawn) and " (no number)" or " (a number)") or "", tostring(t.bank0),
         tostring(t.bankEnd)))
     end),
@@ -273,10 +286,21 @@ local steps = {
   H.waitFrames(2),
   H.call(function() H.checkReq(snap, "snapshot S") end),
 }
-for i = 1, TRIES + #INJECT do
-  local t = { n = i, delay = (i - 1) * 7, inject = INJECT[i - TRIES] }
-  tries[i] = t
+for i = 1, TRIES do
+  local t = { n = i, delay = (i - 1) * 7 }
+  tries[#tries + 1] = t
   for _, s in ipairs(runTry(t)) do steps[#steps + 1] = s end
+end
+local landed = {}
+for j, id in ipairs(INJECT) do
+  for r = 1, INJECT_TRIES do
+    local t = { n = TRIES + (j - 1) * INJECT_TRIES + r, delay = (j * 3 + r) * 5, inject = id }
+    tries[#tries + 1] = t
+    steps[#steps + 1] = H.cond(function() return not landed[id] end, {
+      table.unpack(runTry(t)),
+    }, { H.call(function() t.skipped = true end) })
+    steps[#steps + 1] = H.call(function() if t.drawn == id then landed[id] = true end end)
+  end
 end
 steps[#steps + 1] = H.call(function()
   local bad, quiet = {}, 0
@@ -284,12 +308,17 @@ steps[#steps + 1] = H.call(function()
     H.log(string.format("[sketch] %s %s", ok and "ok:" or "FAIL:", msg))
     if not ok then bad[#bad + 1] = msg end
   end
-  local reach = 0
+  local injected = 0
   for _, t in ipairs(tries) do
+    if t.skipped then goto continue end
     H.assertEq(t.pendAtConfirm, 1, "try " .. t.n .. ": the Sketch was confirmed at 1 BP")
     if t.inject then
-      H.assertEq(t.drawn, t.inject, "try " .. t.n .. ": the injected reach spell is the attack the sketch runs")
-      reach = reach + 1
+      injected = injected + 1
+      if t.drawn == nil then
+        H.log(string.format("[sketch] try %d: the sketch missed ($%02X injected): spent, as any miss", t.n, t.inject))
+      else
+        H.assertEq(t.drawn, t.inject, "try " .. t.n .. ": the injected attack is the one the sketch runs")
+      end
     end
     if t.drawn and noNumber(t.drawn) then
       quiet = quiet + 1
@@ -300,9 +329,14 @@ steps[#steps + 1] = H.call(function()
       check(t.bankEnd == t.bank0 - 1, string.format("try %d: drew %s: the bank went %d -> %d (want %d: spent)", t.n,
         t.drawn and string.format("$%02X", t.drawn) or "nothing", t.bank0, t.bankEnd, t.bank0 - 1))
     end
+    ::continue::
   end
-  check(quiet - reach >= 1, string.format("%d of %d natural tries drew an attack with no number", quiet - reach,
-    TRIES))
+  local nat = 0
+  for i = 1, TRIES do if tries[i].drawn and noNumber(tries[i].drawn) then nat = nat + 1 end end
+  check(nat >= 1, string.format("%d of %d natural tries drew an attack with no number", nat, TRIES))
+  for _, id in ipairs(INJECT) do
+    check(landed[id] == true, string.format("an injected $%02X landed within %d tries", id, INJECT_TRIES))
+  end
   assert(#bad == 0, #bad .. " sketch-boost assertion(s) failed: " .. table.concat(bad, "; "))
   H.log("[sketch] VERDICT: a boosted Sketch that draws an attack with no number keeps its boost; one that draws a "
     .. "number spends it")

@@ -1330,6 +1330,32 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         bcs     @buys
         jsl     Ot6InReachTbl   ; #469: a single-target status or cure,
         bcs     @buys           ;   whose boost buys reach (A preserved)
+        plx
+        pla
+        plp
+        jml     Ot6SpellNoNumber ; the number itself
+@buys:  plx
+        pla
+        plp
+        clc
+        rtl
+.endproc
+
+; [ does this attack move no number?  (#469) ]
+;
+; Ot6SpellNoBoost's last question on its own, for a caller to whom the
+; Magic-gated rewards do not apply (Ot6SketchNoBoost: a sketch keeps command
+; $0d, so no fold, no OT6 Break chips and no reach): a fraction of HP/MP
+; (MagicProp +$04 bit 7) or a power of 0.
+; in: A = the attack id.  out: carry set = no number.  a8, either index
+; width; preserves A, X and Y.
+.proc Ot6SpellNoNumber
+        .a8
+        php
+        longi
+        .i16
+        pha
+        phx
         longa
         and     #$00ff
         pha

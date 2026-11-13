@@ -324,11 +324,6 @@ local function actorAim(c)
       -- over to the monsters' side, on the left
       mf = mf + 1
       btn = ((mf - 1) % 8 < 4) and { left = true } or {}
-    elseif not c.ally and Tm.mask == nil and Tc.mask ~= nil then
-      -- a spell that opens on the party (Vanish), aimed at a monster: cross
-      -- over to the monsters' side, on the left
-      mf = mf + 1
-      btn = ((mf - 1) % 8 < 4) and { left = true } or {}
     else
       btn = c.ally and aim(Tc, c.allyT or allyS) or aim(Tm, tgtMon)
     end
@@ -359,14 +354,25 @@ local function runCase(c)
       c.triedR, c.pendAfterR = false, nil
       c.allyT = allyS
       if c.aimFree then
-        -- an ally the spell has not landed on yet (no Safe), after CELES
+        -- a seat without Safe whose walk (battle order after it, wrapping)
+        -- meets a body under Safe before one it can reach: from S (Safe on
+        -- the two after CELES) that is CELES's own seat, and the walk goes
+        -- pass, pass, reach
+        local function stands(e) return H.readByte(0x3ED8 + e) ~= 0xFF and (H.readWord(0x3A74) & (1 << (e // 2))) ~= 0 end
+        local function safe(e) return (H.readByte(0x3EF8 + e) & 0x40) ~= 0 end
         c.allyT = nil
-        for k = 1, 3 do
-          local e = ((celesS + k) % 4) * 2
-          if c.allyT == nil and H.readByte(0x3ED8 + e) ~= 0xFF and (H.readWord(0x3A74) & (1 << (e // 2))) ~= 0
-             and (H.readByte(0x3EF8 + e) & 0x40) == 0 then c.allyT = e // 2 end
+        for t = 0, 6, 2 do
+          if c.allyT == nil and stands(t) and not safe(t) then
+            local passed = false
+            for k = 1, 3 do
+              local e = (t + 2 * k) % 8
+              if stands(e) and safe(e) then passed = true
+              elseif stands(e) and passed then c.allyT = t // 2; break
+              elseif stands(e) then break end
+            end
+          end
         end
-        H.assertEq(c.allyT ~= nil, true, c.name .. ": an ally without Safe stands")
+        H.assertEq(c.allyT ~= nil, true, c.name .. ": a seat whose walk passes a body under Safe before one it reaches")
       end
       c.aimBit = c.ally and H.readWord(0x3018 + c.allyT * 2) or H.readWord(0x3018 + 8 + tgtMon * 2)
       c.safe0, c.imp0 = {}, {}
@@ -382,7 +388,7 @@ local function runCase(c)
     end),
     H.driveUntil(function()
       return c.endF ~= nil and H.frame >= c.endF + 120 and (c.snapAfter == nil or snapDone)
-    end, 30000, {
+    end, c.snapAfter and 30000 or 14000, {
       H.call(function()
         Tm.observe(); Tc.observe()
         if c.after and c.snapAfter and not snapDone and H.frame >= c.endF + 30 then
@@ -659,7 +665,8 @@ steps[#steps + 1] = H.call(function()
     check(c.pendAtConfirm == c.boost, string.format("%s: the pending at the confirm %s (want %d)", c.name,
       tostring(c.pendAtConfirm), c.boost))
     if c.spell then
-      H.assertEq(c.mask ~= nil, true, c.name .. ": the cast reached CalcAttackEffect")
+      check(c.mask ~= nil, c.name .. ": the cast reached CalcAttackEffect")
+      c.mask = c.mask or 0
       if not c.here then
         check((c.mask & c.aimBit) ~= 0, string.format("%s: the mask $%04X holds the body aimed at", c.name, c.mask))
       end
@@ -670,24 +677,33 @@ steps[#steps + 1] = H.call(function()
         .. "and %d of the %d others it can land on)", c.name, c.boost, c.mask, popc(c.mask), want,
         math.min(c.boost, c.eligible), c.eligible))
       if c.aimFree then
-        local held = 0
-        for e = 0, 6, 2 do
-          if c.safe0[e] and e // 2 ~= celesS then held = held + 1 end
+        -- walk order from the target: every body under Safe is passed, and a
+        -- body reached beyond a passed one is in the mask
+        local t = c.allyT * 2
+        local passed, beyond = 0, nil
+        for k = 1, 3 do
+          local e = (t + 2 * k) % 8
           if c.safe0[e] then
+            passed = passed + 1
             check((c.mask & (1 << (e // 2))) == 0, string.format("%s: the walk passed over entity %d, already under "
               .. "Safe (mask $%04X)", c.name, e, c.mask))
+          elseif passed > 0 and beyond == nil and H.readByte(0x3ED8 + e) ~= 0xFF then
+            beyond = e
           end
         end
-        H.assertEq(held >= 1, true, c.name .. ": an ally already under Safe stands for the walk to pass over")
+        check(passed >= 1 and beyond ~= nil and (c.mask & (1 << (beyond // 2))) ~= 0, string.format("%s: entity %s, "
+          .. "beyond %d body(ies) under Safe in walk order from entity %d, is reached (mask $%04X)", c.name,
+          tostring(beyond), passed, t, c.mask))
       end
       if c.name == "impl-b1" then
         local imped = 0
         for e = 0, 6, 2 do if c.imp0[e] then imped = imped + 1 end end
-        H.assertEq(c.imp0[c.first] and imped >= 2, true, c.name .. ": the target and another ally are imped "
-          .. "(snapshot I)")
+        check(c.first ~= nil and c.imp0[c.first] and imped >= 2, c.name .. ": the target and another ally are "
+          .. "imped (snapshot I)")
         for e = 0, 6, 2 do
           if (c.mask & (1 << (e // 2))) ~= 0 then
             check(c.imp0[e], string.format("%s: entity %d in the mask was imped (the toggle lifts)", c.name, e))
+            check(c.impAfter[e] == false, string.format("%s: entity %d is no longer imped after the cast", c.name, e))
           end
         end
       end
@@ -708,7 +724,7 @@ steps[#steps + 1] = H.call(function()
       local added = popc(c.weakEnd & ~c.weak0 & 0xFF)
       local want = math.min((c.boost + 1) * (c.overclock and 2 or 1), c.room)
       if c.overclock then
-        H.assertEq(c.room < 8, true, c.name .. ": the body has fewer elements left than the eight firings")
+        check(c.room < 8, c.name .. ": the body has fewer elements left than the eight firings")
       end
       check(added == want, string.format("%s: Debilitator at %d BP added %d weakness(es) ($%02X -> $%02X; want %d "
         .. "of the %d it lacked)", c.name, c.boost, added, c.weak0, c.weakEnd, want, c.room))
@@ -731,7 +747,7 @@ steps[#steps + 1] = H.call(function()
     end
     if c.keep then
       local base = byName[c.keep]
-      H.assertEq(c.bank0, base.bank0, c.name .. ": the bank at the command, as in " .. c.keep)
+      check(c.bank0 == base.bank0, c.name .. ": the bank at the command, as in " .. c.keep)
       check(c.bankEnd == base.bankEnd, string.format("%s: the bank ended at %d, %s's at %d "
         .. "(a boost that buys nothing is never charged)", c.name, c.bankEnd, c.keep, base.bankEnd))
       check(c.charged == base.charged, string.format("%s: charged %d MP, %s %d (flat)", c.name, c.charged, c.keep,

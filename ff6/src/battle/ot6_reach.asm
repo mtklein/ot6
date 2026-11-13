@@ -289,9 +289,12 @@ Ot6ReachTbl:
 ; A sketched attack runs under its own command (_c21554: GetCmdForAI), so no
 ; spell queue ever judged it, and a boost raised for the Sketch bought the
 ; multiplier only when the attack the brush drew has a number.  One without
-; (Ot6SpellNoBoost: no power, or a fraction) bought nothing, and neither did a
-; reach spell (Ot6InReachTbl: reach serves Magic and X-Magic only, and a sketch
-; keeps command $0d): the pending boost is dropped here (Ot6KeepBoost), before
+; (Ot6SpellNoNumber: no power, or a fraction) bought nothing: reach
+; (Ot6SpellReach), a tier's fold (Ot6FoldCmdTbl) and OT6's Break chips
+; (Ot6BreakOurs) serve a queued Magic or X-Magic only, and a sketch keeps
+; command $0d, so a sketched Imp, Slow, Slow 2 or Break buys nothing either.
+; Scan is the exception: Ot6Analyze reads every enemy for any character's
+; boosted Scan, whatever the command.  The pending boost is dropped here (Ot6KeepBoost), before
 ; Ot6ActionEnd charges it, the way a Mimic's copy that cannot use its boost
 ; keeps it.  This is a deliberate exception to #463's rule that a boost only
 ; the resolve shows was useless is spent (the TLM's call, #469 review): a
@@ -310,11 +313,15 @@ Ot6ReachTbl:
         bcs     @out            ; a monster's (Control's) sketch
         cmp     #$ee
         bcs     @out            ; Battle, Special: Fight's swings
-        jsl     Ot6InReachTbl   ; a reach spell's boost buys bodies only
-        bcs     @drop           ;   through Magic (Ot6SpellReach): a
-        jsl     Ot6SpellNoBoost ;   sketched one buys nothing
-        bcc     @out
-@drop:  jsl     Ot6KeepBoost
+        cmp     #OT6_ANALYZE_SPELL
+        beq     @out            ; Scan: Ot6Analyze reads every enemy for
+                                ;   any character's boosted Scan, sketched
+                                ;   too (it gates on no command)
+        jsl     Ot6SpellNoNumber ; everything else buys only a number here:
+        bcc     @out            ;   reach (Ot6SpellReach), a fold
+@drop:  jsl     Ot6KeepBoost    ;   (Ot6FoldCmdTbl) and OT6's Break chips
+                                ;   (Ot6BreakOurs) are Magic's, and a sketch
+                                ;   keeps command $0d
 @out:   pla
         rtl
 .endproc

@@ -328,7 +328,7 @@ local function runCase(c)
     end),
     H.driveUntil(function()
       return c.endF ~= nil and H.frame >= c.endF + 120 and (c.snapAfter == nil or snaps[c.snapAfter] ~= nil)
-    end, 30000, {
+    end, c.snapAfter and 30000 or 14000, {
       H.call(function()
         Tm.observe(); Tc.observe()
         if c.after and c.snapAfter and snaps[c.snapAfter] == nil and H.frame >= c.endF + 30 then
@@ -703,7 +703,7 @@ steps[#steps + 1] = H.call(function()
     -- (one at 0), as many as the ally can hold, and charges exactly those.
     if c.rowName == "filch" then
       if c.name == "filch-few-b2" then
-        H.assertEq(c.sh0 >= 1 and c.sh0 < c.boost + 1, true, c.name .. ": fewer shields left than the points buy")
+        check(c.sh0 >= 1 and c.sh0 < c.boost + 1, c.name .. ": fewer shields left than the points buy")
         check(c.shEnd == 0, string.format("%s: the last shield taken broke the body (shields %d)", c.name, c.shEnd))
       end
       check(c.listPrice == c.charged, string.format("%s: the thief list drew %s MP, the charge %d", c.name,
@@ -727,7 +727,7 @@ steps[#steps + 1] = H.call(function()
       -- may move it before)
       local want = math.min(math.max(1, c.boost), 5 - c.allyAtExec, c.bank0)
       if c.capped then
-        H.assertEq(5 - c.allyAtExec < c.boost, true, string.format("%s: the ally's room (%d) is under the points",
+        check(5 - c.allyAtExec < c.boost, string.format("%s: the ally's room (%d) is under the points",
           c.name, 5 - c.allyAtExec))
       end
       check(c.allyAtEnd - c.allyAtExec == want, string.format("%s: Bestow at %d BP handed %d pip(s) (ally %d -> %d; "
