@@ -557,8 +557,8 @@ What differs from macOS:
 
 ## OT6's Mesen
 
-The harness runs OT6's build of MesenCE 2.2.1: tag `ot6-2.2.1-6` of OT6's fork,
-github.com/mtklein/mesen, which adds ten small commits to MesenCE's
+The harness runs OT6's build of MesenCE 2.2.1: tag `ot6-2.2.1-7` of OT6's fork,
+github.com/mtklein/mesen, which adds eleven small commits to MesenCE's
 `2.2.1` tag. `tools/mesen/EMULATOR` pins the commit and
 `tools/mesen/build.sh` builds it (README.md there). The script-only change
 stops Mesen's debugger keeping the per-access records only its windows
@@ -571,7 +571,11 @@ the harness asks for the few it reads; a frame not drawn still evaluates
 the lines that set the PPU's palette-lookup address) and make the
 debugger's hot paths test inline whether a script callback could run
 before calling into it (README.md there, "Render on demand" and "Script
-callbacks, paid per use"). On px13 and on the Air the first four played six
+callbacks, paid per use"); the eleventh (#396) advances the master clock a
+whole memory access at a time when its 2-clock steps would only count, and
+leaves the same machine state (README.md there, "Batched clock stepping":
+33 legs from power-on to the end made the same savestates on px13, and on
+the Air; about 1.4x as fast on px13, 1.1x on the Air). On px13 and on the Air the first four played six
 legs (the full gen_zozo2_arrival, battle_rage, a cold boot, an SRAM
 Continue, an in-game save, wipe_reclass) exactly as a stock 2.2.1 build
 did: every log line but `[CPU]`/`[emulator]`, every screenshot, every
@@ -614,7 +618,7 @@ differently from 2.1.1, because of MesenCE's DMA clock-counting fix
   deployed there (README.md, "Deploying"), else the main tree's
   `tools/Mesen-linux/Mesen` (`tools/Mesen.app` on a Mac), which still hold
   ot6-2.2.1-1 (px13 executable `b5a407c3...8c54`; the Macs the same
-  Air-built bundle, `e96f5fdf...7b37`). ot6-2.2.1-6 is deployed on all
+  Air-built bundle, `e96f5fdf...7b37`). ot6-2.2.1-7 is deployed on all
   three, each its own build (README.md lists the shas). The 2.1.1 builds
   are kept in `~/mesen-patched/` as `2.1.1-<sha8>-Mesen[.app]`, with their
   `.buildinfo`.

@@ -1,8 +1,8 @@
 # OT6's Mesen
 
 OT6's harness runs its own build of Mesen: MesenCE 2.2.1
-(github.com/nesdev-org/MesenCE, tag `2.2.1`, commit `20ba206c`) with four
-small changes, kept as commits (tag `ot6-2.2.1-6`) on OT6's fork,
+(github.com/nesdev-org/MesenCE, tag `2.2.1`, commit `20ba206c`) with five
+small changes, kept as commits (tag `ot6-2.2.1-7`) on OT6's fork,
 github.com/mtklein/mesen (GPL v3, in Mesen's fork network; its
 `OT6-CHANGES.md` is the change notice):
 
@@ -10,12 +10,13 @@ github.com/mtklein/mesen (GPL v3, in Mesen's fork network; its
 - **Screenshot sync** (below), for correct screenshots.
 - **Render on demand, and a debugger that pays only for the script's
   callbacks** (below), for speed (#394).
+- **Batched clock stepping** (below), for speed (#396).
 - **SDK roll-forward**: `UI/global.json` lets the .NET SDK roll forward to a
   newer major version, so the .NET 10 SDK on px13 builds it as dotnet@8
   does on the Macs. It changes no code.
 
 `EMULATOR` pins the build: one line, `<repository> <tag> <commit>`
-(today `https://github.com/mtklein/mesen ot6-2.2.1-6 03b19fc4...`).
+(today `https://github.com/mtklein/mesen ot6-2.2.1-7 c6a9dfa7...`).
 `build.sh` builds that commit and nothing else. The same file is an input of
 every generate, capture and suite edge (configure.py), like the ROM: a new
 pin replays the game once from power-on and re-runs every test, and through
@@ -181,6 +182,49 @@ the debugger and script bookkeeping went from 16.0% of samples to 1.7%
 `RewindManager::IsRewinding` is inline too, and the harness turns rewind
 off (`lib/pin_test_saves.py`; `OT6_REWIND=1` keeps it, to measure it).
 
+## Batched clock stepping
+
+The SNES core advances its master clock 2 clocks at a time
+(`SnesMemoryManager::Exec`): each step checks whether it reached the next
+scheduled event (HDMA, DRAM refresh, end of line), calls the PPU-cycle
+debugger hook or the IRQ counters, and syncs any coprocessor. A memory
+access or idle cycle is 2 to 6 such steps, and the spike's profile put 37%
+of a headless run in them (#396). Most steps do nothing but count, so
+`TryBatch` advances a whole call at once when none of its steps reaches
+the next event, the debugger wants no PPU cycles, no coprocessor needs
+syncing, and the IRQ counters would only count: every step is past hClock
+10 (where the H and V counters reset and NMI is raised), no IRQ is pending,
+and the IRQ level has no rising edge (`InternalRegisters::BatchIrqCounters`).
+It then sets the clocks, the H counter and the IRQ level the steps would
+have left; otherwise the steps run one by one as before. A call whose steps
+reach no IRQ tick leaves the IRQ level alone (the first cut set it anyway,
+which `-DOT6_VERIFY_BATCH` caught on its first leg:
+`MISMATCH clocks=2 hClock=700 hCounter=172/172 irqLevel=1/0`,
+build/attempts/wt/speed-exec-batch/px13/id1-aborted/).
+
+Built with `-DOT6_VERIFY_BATCH`, every batched call also runs its steps one
+by one and aborts on any difference in the clocks, the H counter, the IRQ
+level, the pending IRQ or the next event; it prints a running count to
+stderr (`[ot6-verify-batch] N batches verified`).
+
+Emulation is unchanged. Each leg below ran on the old build and the new one
+at the same moment, unpublished, and made the same `.mss` files, checkpoint
+captures, screenshots, frame counts and `[ot6*]` lines
+(build/attempts/wt/speed-exec-batch/, `px13/id2.out` and `air/av*.out`,
+with `*.table.txt` beside them). On px13, against the deployed ot6-2.2.1-6
+build, 33 legs from gen_whelk_poweron to gen_wor_kefka (2.16 million frames)
+with a measurement build of the change. On the Air, 18 legs with the verify
+build (no mismatch, 1 to 16 billion batches checked per leg) and 15 with the
+deployed ot6-2.2.1-7 build.
+
+On px13, gen_whelk_poweron confined to the fast cores, three interleaved
+rounds (`px13/mr1.out`): the best of each, ot6-2.2.1-6 built the same way
+109.5 s and 470G cycles, the change 79.0 s and 336G cycles (1.39x), with only
+4.6% fewer instructions (927.5G against 972.4G): the steps were few
+instructions but many cycles. The 33 paired legs took 5865 s of emulation
+against 8666 s (1.48x). On the Air the gain is smaller: 15 paired legs took
+2002 s against 2205 s (1.10x).
+
 ## Building (Linux x64)
 
 ```
@@ -286,6 +330,14 @@ is reverting `EMULATOR`, which finds the old pin's directory (or the
 fallback) again. `tools/Mesen.app` stays the bundle for playing by hand
 (`tools/gui.sh`); the 2.2.1 builds deployed there before per-pin
 directories are kept in `~/mesen-patched/` as `2.2.1-<sha8>-Mesen[.app]`.
+
+ot6-2.2.1-7 (c6a9dfa7) is deployed on all three (2026-11-13), each machine
+its own build of it: mbp executable `9868f2d2...5574` (core `ea7e80ea...0ec2`),
+the Air `1d2f9df8...c1ab` (core `8ef0a254...54f0`), px13 `cafaeee1...af62`
+(core `33ab2b1a...ece8`); every build passed the smoke test ("smoke test: OK --
+battle_banner's 30 [ot6] lines match the reference build's",
+build/attempts/wt/speed-exec-batch/pin7/build_*.txt). mini.local, off the
+worker pool since 2026-10-11, does not have it.
 
 ot6-2.2.1-6 (03b19fc4) is deployed on all three (2026-10-06), each machine
 its own build of it: mbp executable `d459b803...b479` (core `3d975cb0...0ea8`),
