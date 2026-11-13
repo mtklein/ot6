@@ -12283,7 +12283,9 @@ end
 -- (Driver:magicOnlyLine) when there is one.  Other plans are left alone.
 -- DODGE_OFF (a global) turns it off, the control arm.
 function Driver:dodgePlan(actor, plan)
-  if plan == nil or plan.kind ~= "fight" or DODGE_OFF then return plan end
+  -- a skill (a Tool, a Blitz) swung at a Vanished body misses as a Fight does (the Intangir: AutoCrossbow and
+  -- Pummel 'took 0 off', airship_a8.log); only the Vanish answer at the end is offered for one
+  if plan == nil or (plan.kind ~= "fight" and plan.kind ~= "skill") or DODGE_OFF then return plan end
   local function dodger(s)
     return M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
   end
@@ -12293,6 +12295,7 @@ function Driver:dodgePlan(actor, plan)
   local why = dodger(aim)
   for s = 0, 5 do
     if monAlive(s) and dodger(s) == nil then
+      if plan.kind ~= "fight" then return plan end
       M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under %s (every swing misses it); slot %d instead",
         self.tag or "fight", actor, aim, why, s))
       plan.aim = s
@@ -12300,7 +12303,7 @@ function Driver:dodgePlan(actor, plan)
     end
   end
   if cmdRow(actor, BATTLE.CMD_MAGIC) then
-    local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
+    local line = plan.kind == "fight" and self:magicOnlyLine(actor, plan.boostLeft or 0) or nil
     if line then
       M.log(string.format("[%s] actor=%d every standing monster is under Vanish or Image: a cast (%s) for the "
         .. "Fight that would miss", self.tag or "fight", actor, line.kind))
