@@ -21,7 +21,9 @@
 --   * Filch and Bestow buy with a boost since #469: Filch takes one shield
 --     and one more a point, banking only the first, priced one Filch a
 --     shield; Bestow hands the pips pending (one at 0 BP), as many as the
---     ally can hold, and Locke is charged exactly those;
+--     ally can hold, and Locke is charged exactly those (the others defer
+--     with X meanwhile, so TERRA, the ally, banks nothing of her own and the
+--     snapshot's room is what the pips land in);
 --   * <row>-b1/b2: raised on the command window, then the row: the bank ends
 --     where the unboosted case's does, and the spell's price (drawn and
 --     charged) is its own.
@@ -334,7 +336,9 @@ local function runCase(c)
           held = nil
           if H.readByte(MENU) ~= 0 then
             local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
-            if a == actS and not c.sent then held = actorPress(c, st) else held = defendPress(st) end
+            if a == actS and not c.sent then held = actorPress(c, st)
+            elseif c.othersWait and a ~= actS and st == ST_CMD then held = "x"   -- defer: bank nothing meanwhile
+            else held = defendPress(st) end
           end
         end
         H.setPad((held and ph < 6) and { [held] = true } or {})
@@ -358,7 +362,7 @@ end
 -- pending and `cond()`; snapshot it as `key`.  `fightOthers`: TERRA and
 -- STRAGO Fight every body but the target meanwhile.  `first`: LOCKE's
 -- first window takes this action (a case table) before anything else.
-local function snapAt(key, cond, fightOthers, first, who)
+local function snapAt(key, cond, fightOthers, first, who, burnTerra)
   return {
     H.call(function()
       actS = who and who() or lockeS
@@ -390,6 +394,14 @@ local function snapAt(key, cond, fightOthers, first, who)
         if a == actS and st == ST_CMD and pend(actS) == 0 and cond() then
           H.setPad({}); snaps[key] = H.requestSaveState()
           H.log(string.format("[boostkeep] snapshot %s f%d: %s | %s", key, H.frame, chars(), mons()))
+          return
+        end
+        if burnTerra and a == terraS and st == ST_CMD and bank(terraS) > 0 then
+          -- TERRA spends her bank on a boosted Fight, so an ally has room
+          -- for the pips a boosted Bestow hands (#469)
+          if pend(terraS) < math.min(3, bank(terraS)) then H.setPad({ r = true }) return end
+          local want, cur = cmdRow(terraS, CMD_FIGHT), H.readByte(CMDROW + terraS) & 3
+          H.setPad({ [cur ~= want and (cur < want and "down" or "up") or "a"] = true })
           return
         end
         local b = othersPress(a, st, fightOthers)
@@ -571,6 +583,16 @@ add(snapAt("R", function()
 end, false, rob))
 -- snapshot A: from R, every body but the target falls to TERRA and STRAGO
 add(snapAt("A", function() return bank(lockeS) >= 1 and live(tgtMon) and liveCount() == 1 end, true))
+-- snapshot B: from L, TERRA spends her bank on boosted Fights until LOCKE's
+-- window opens with three pips banked and TERRA at one or none, so a boosted
+-- Bestow's pips have room to land (#469)
+add({ H.call(function()
+  H.vars.bReq = H.requestLoadState(snaps.L.blob)
+end), H.waitFrames(2), H.call(function()
+  H.checkReq(H.vars.bReq, "snapshot load (B)")
+  H.rearmInputInjection()
+end) })
+add(snapAt("B", function() return bank(lockeS) >= 3 and bank(terraS) <= 1 end, true, nil, nil, true))
 
 -- keep: the boosted case's bank ends where the unboosted case's does.
 -- spend: the boosted case's bank ends `boost` below where it stood (no regen)
@@ -578,9 +600,9 @@ local CASES = {
   { name = "filch-b0",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0 },
   { name = "filch-b2",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 2 },
   { name = "filch-r",      snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0, rowR = 1 },
-  { name = "bestow-b0",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true },
-  { name = "bestow-b2",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 2, ally = true },
-  { name = "bestow-r",     snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true, rowR = 1 },
+  { name = "bestow-b0", othersWait = true,    snap = "B", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true },
+  { name = "bestow-b2", othersWait = true,    snap = "B", cmd = CMD_STEAL, rowName = "bestow",   boost = 2, ally = true },
+  { name = "bestow-r", othersWait = true,     snap = "B", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true, rowR = 1 },
   { name = "appraise2-b1", snap = "L", cmd = CMD_STEAL, rowName = "appraise", boost = 1, spend = true },
   { name = "tonic-b0",     snap = "L", cmd = CMD_ITEM, item = TONIC, boost = 0, ally = true },
   { name = "tonic-b1",     snap = "L", cmd = CMD_ITEM, item = TONIC, boost = 1, ally = true, spend = true },
