@@ -4,8 +4,9 @@
 -- walks past: its two chests (the Green Beret, 195 (37,53), and the Elixir, 197 (42,10); treasure bits 65 and 69,
 -- the same chests the World of Ruin's Kohlingen offers, so a player who opens them here finds them empty there),
 -- its general store's three counters (map 194; their stock is logged), and SHADOW at the inn (map 191 NPC_1 at
--- (25,15), _cc6f84): "Say, oh...3000 GP.  Buy SHADOW's help?"  He is hired when the bag holds 3000 GP.  No leg boots
--- what it leaves (the state `wob_kohlingen`); gen_zozo2_arrival goes on from figaro_submerged.
+-- (25,15), _cc6f84).  He names his price only to a party of three or fewer: with four (this party) vanilla's
+-- party-full gate answers "Leave me alone..." and the hire never runs.  No leg boots what it leaves (the state
+-- `wob_kohlingen`); gen_zozo2_arrival goes on from figaro_submerged.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local LOCKE, SHADOW, EDGAR, SABIN, CELES = 1, 3, 4, 5, 6
@@ -120,11 +121,11 @@ H.run({ maxFrames = 500000 }, {
     H.log(string.format("[inn] active party %d; objects' party bytes %s; SHADOW's record party byte $%02X",
       H.readByte(0x1A6D), table.concat(t, " "), H.readByte(0x1850 + SHADOW)))
   end),
-  -- His talk (_cc6f84, $000B set: "We meet again...") runs _cac5c1's party check before it names a price: SHADOW
-  -- already counted in the active party ($01A3, set_case PARTY_CHARS) answers "Leave me alone..." (dlg $03E5);
-  -- else "Say, oh...3000 GP. Buy SHADOW's help?" (dlg $03E7) and Yes.  The leg answers whichever comes, and says
-  -- which (labs kohl4-kohl6: the refusal, with $1EB4 reading $78 after the check, SHADOW's bit set, where the
-  -- objects' party bytes read him out of the party just before the talk).
+  -- His talk (_cc6f84, $000B set: "We meet again...") counts the party first: _cac5c1 tallies the active
+  -- party's members and sets exactly one of $01A0-$01A3 (_cac654), $01A3 for four.  With $01A3 set the talk goes
+  -- to "Leave me alone..." (dlg $03E5); with three or fewer, "Say, oh...3000 GP. Buy SHADOW's help?" (dlg $03E7).
+  -- This party is four, so the hire branch never runs: vanilla's party-full gate (labs kohl4-kohl6: $1EB4 $72 ->
+  -- $78, its bit 3 the four-member flag $01A3).  The leg answers whichever comes and says which.
   H.cond(function() return H.gil() >= HIRE end, {
     H.talkToObj(OBJ_SHADOW, "SHADOW at the inn (191 NPC_1)", 12000, function() return H.dialogWaiting() end),
     (function()

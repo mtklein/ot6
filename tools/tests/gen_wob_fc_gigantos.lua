@@ -121,6 +121,10 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- @@stage box
+  -- Against the box, no Steal: LOCKE's treasure-hunt line spends turns that take 0 off a 6000-HP, 5-shield body,
+  -- and every action draws its counter (key be90 was lost that way, gigantos/s0 attempt 1).  The blades lead.
+  -- Set here, not in FIGHT's table, so the walk to the box plays as before (FIGHT is read live).
+  H.call(function() FIGHT.locke = false end),
   K.monsterBox({ x = 48, y = 15, bit = 95, form = 170, species = 0x0AE, what = "the Gigantos box (394 (48,15))",
     avoid = AVOID, done = function(line) won = line end }),
   H.call(function()

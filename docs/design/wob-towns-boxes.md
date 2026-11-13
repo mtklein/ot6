@@ -31,7 +31,9 @@ loss is a game over (`_ca5ea9`).
 The southern continent is first reached on the Blackjack after the Opera, so
 the leg boots `blackjack`. The Blackjack does not fly from there: A on its tile
 walks aboard, but the wheel's `_caf532` returns while `$016F` is clear, and
-it is clear in both the `blackjack` and `n128_won` states. The leg walks east
+it is clear in both the `blackjack` and `n128_won` states (`probe2_blackjack.log`,
+`probe2_n128_won.log` under `lab/probes/`: `sw ... 016F=0`; the only event that
+sets it is `_caa773`, event_main.asm:25673). The leg walks east
 to the base on foot, as `wob_base_treasure` does from Vector.
 
 **Break rows.** Commando (2, pierce) and ProtoArmor (2, bludg) were already
@@ -41,6 +43,11 @@ ProtoArmor, with joints a pike or a dagger finds (EDGAR's Mithril Pike,
 LOCKE's daggers) and a shell SABIN's blitzes dent. Vanilla bolt|water stays.
 `battle_breakwobbase.lua` checks the three rows and both formations against
 the shipped ROM.
+
+Mega Armor has one more meeting, alone: formation 408 (event battle group 26,
+`battle 26` in `_cc873b`), the Vector soldier who picks a fight during the
+banquet's free window. The canon banquet talks rather than fights there
+(gen_banquet_done), so the line skips it; the row covers it.
 
 ## 2. The Imperial Base's treasure room (#281)
 
@@ -89,28 +96,27 @@ leaves the castle the way gen_zozo2_arrival does, and walks in.
 
 ### 3.1 SHADOW's hire
 
-**He refuses.** The party arrives with 5,794 GP, so the 3,000 GP price is in
-reach, but the talk never names it: "We meet again..." (dlg $03E3) is
-followed by "Leave me alone..." (dlg $03E5), in every run (labs `kohl6`,
-`kohl7`; sweeps `kohlingen/s0`, `s4`). The talk (`_cc6f84`, `$000B` set since
-the first meeting) runs `_cac5c1`'s party check before the price, and the
-check (`set_case PARTY_CHARS`, EventCmd_de: object party bytes at `$0867`
-against the active party `$1A6D`, into `$1EB4`) reads SHADOW in the party:
-`$1EB4` is `$72` as the talk opens (LOCKE, EDGAR, SABIN, CELES: objects 1,
-4, 5, 6) and `$78` after the check (objects 3-6: SHADOW's bit set, LOCKE's
-clear), where the objects' party bytes read SHADOW out of the party just
-before the talk (object 3's byte `$00`, his record's `$1850+3` `$00`). So a
-player cannot hire him here on this route; why the check reads object 3 is
-open (it may be vanilla's own behaviour with SHADOW gone at the falls, or a
-leftover of the scenario's party juggling). The leg asserts that no gil is
-spent when he refuses, and would take the hire if the price were offered.
+**He refuses a party of four: vanilla's party-full gate.** His talk
+(`_cc6f84`, `$000B` set since the first meeting: "We meet again...") runs
+`_cac5c1` before it names a price. That routine counts the active party and
+sets exactly one of `$01A0`-`$01A3` (`_cac654`), `$01A3` for four members;
+the talk branches `if_switch $01A3=1` to "Leave me alone..." (dlg $03E5).
+With three or fewer it asks "Say, oh...3000 GP. Buy SHADOW's help?" (dlg
+$03E7). The party here is LOCKE, CELES, EDGAR and SABIN, so the hire branch
+never runs, though the bag holds 5,925 GP on the replayed line (labs `kohl6`,
+`kohl7`; sweeps `kohlingen/s0`, `s4`: `$1EB4` reads `$72` as the talk opens and
+`$78` after the count, its bit 3 the four-member flag). A player who wants
+him leaves a member behind first (the castle's party select); the leg plays
+the canon four, asserts that no gil is spent on the refusal, and would take
+the hire if the price were asked.
 
 ### 3.2 The auction
 
 The clerk opens the auction only once `$006B` is set (the Blackjack's rejoin
 after the factory escape, event_main.asm:97000); before that he says "Today's
 auction is over." `$006B` reads 0 in the `blackjack` and `n128_won` states
-and 1 from `narshe-mission-v1` on, so the World of Balance auction runs from
+and 1 from `narshe-mission-v1` on (`lab/probes/probe_*.log`, read on the
+pre-change line's states: `blackjack` `sw 006B=0`, `narshe_mission` `sw 006B=1`), so the World of Balance auction runs from
 the factory escape to the end of the world. Each sitting draws one lot
 (`_cb4ecc`): the Golem lot (20,000 GP, `_cb5197`) only while `$016D` is clear
 and the ZoneSeek lot (10,000 GP, `_cb5312`) only while `$016C` is clear, each
@@ -119,7 +125,7 @@ behind coin flips, so **both magicite are offered in the World of Balance**
 while Golem is unbought. `$01F0`, the sitting held, clears with the next map
 load, so a player sits again by stepping out to the street and back in.
 
-The leg (`narshe-mission-v1`, 72,709 GP) bought Golem at the fifth sitting
+The leg (`narshe-mission-v1`, 70,700 GP on the replayed line) bought Golem at the fifth sitting
 and ZoneSeek at the thirteenth, 30,000 GP between them; the other eleven lots
 were Cherub Down and the lot first asked with dlg $0A5B, passed (sweeps
 `auction/s0`, `s4`: the same thirteen lots in the same order both times; the
@@ -173,20 +179,35 @@ replayed line's states (the ROM with these rows), under
 | 417 Mega Armor + ProtoArmor | 6 | 6 (be88 beDC beAC be78 be8C be2C) | 6 | 0 |
 | 416 Commando x4 | 6 | 5 (be90 be30 be80 beF0 beD4) | 5 | 0 |
 | 61 Telstar | 4 | 4 (beA4 be04 be84 beF0) | 4 | 0 |
-| 170 Gigantos | 6 | 5 (be90 be64 beB4 be40 beE4) | 4 | 1 (be90) |
+| 170 Gigantos (default kit) | 6 | 5 (be90 be64 beB4 be40 beE4) | 4 | 1 (be90) |
+| 170 Gigantos (no Steal at the box) | 6 | 7 (be90 beB4 be78 be40 beDC beE4 be64) | 6 | 1 (beB4) |
 
 - Every guards run passed on its first attempt; both formations fell within
   2,231-4,394 ticks.
 - Gigantos: the one lost key (`gigantos/s0` attempt 1) wiped over two rounds,
-  each member losing 800-860 HP a round to its counters, LOCKE dying with 3
-  BP banked; the reload drew be64 and won. Four keys in five is a box a
+  the driver's priced round costs reading `roundcost=858,824,947,971`
+  (TERRA, LOCKE, EDGAR, SHADOW), LOCKE dying with 3 BP banked; the reload drew be64 and won. Four keys in five is a box a
   player beats, and a lab candidate: the driver opens with SHADOW's Fight and
   EDGAR's AutoCrossbow (pierce, not a Gigantos key), and every action draws a
   counter, so fewer, boosted slash Fights are the lever to measure. A first
   lab turned EDGAR's Tools line off (`tools = false`; sweep `giga-notools`):
   5 of 6 distinct keys won (beE8 beE4 be60 be74 be2C; be78 lost), the same
-  band, so the leg keeps the default kit.
+  band. A second lab turned LOCKE's Steal off for the box fight alone (it
+  spent turns that took 0 off the body, "skill took 0 ... cmd $05"; sweep
+  `giga-boxnosteal`): be90 now wins on its first attempt, but beB4, won
+  before, is lost: 6 of 7 distinct keys (be90 beE4 be64 be40 be78 beDC won).
+  The leg keeps the no-Steal line (it is the better play and the gate's
+  shift 0 draws be90), and the remaining one-in-six loss is #527.
 - Telstar is won by SABIN and SHADOW at L12-14 with the camp's bag (one to
-  seven Potions); each run ended above half HP.
+  seven Potions), not always comfortably: in `telstar/s4` (be04) SABIN fell
+  twice and the fight ended at `partyhp=133,0,0,0`.
 - The treasure room (`treasure/s0`, `s4`) and Kohlingen fought only the
   world's own random battles on the walk, all won.
+
+The three suites' assertions each go red on a mutant
+(`build/attempts/wt/v043-wob-towns/negatives/`): a row's shield count off by
+one (`species $102 shields: got 2 ($2), want 3 ($3)`, and the same for $0AE
+and $156), its class mask changed (`species $102 class mask: got 4 ($4),
+want 6 ($6)`), and a suite whose party holds no class the formations key
+(`formation 416 is chippable by the party's classes: got false, want true`,
+and 170, 476).

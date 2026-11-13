@@ -11,8 +11,8 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local LOCKE, EDGAR, SABIN, CELES = 1, 4, 5, 6
-local NAMES = { [LOCKE] = "LOCKE", [EDGAR] = "EDGAR", [SABIN] = "SABIN", [CELES] = "CELES" }
+local LOCKE, EDGAR, SABIN, SETZER = 1, 4, 5, 9
+local NAMES = { [LOCKE] = "LOCKE", [EDGAR] = "EDGAR", [SABIN] = "SABIN", [SETZER] = "SETZER" }
 local MAP_JIDOOR, MAP_AUCTION = 198, 200
 local JIDOOR_DOOR = { 27, 130 }
 local GOLEM_SW, ZONESEEK_SW = 0x016D, 0x016C
