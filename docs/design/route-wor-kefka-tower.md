@@ -847,7 +847,8 @@ Oscar answers a Fight with nothing); a caster with a Death guard casts as
 planned. Only the Evil Oscar answers Magic so (a scan of every species'
 retaliation; the Retainer's and Sleep's Death Specials answer only a
 killing blow), and it is met only here, so no play upstream moves.
-`counter_selftest` checks the walk and the Special.
+`counter_selftest` checks the walk and the Special. 7.8 widens it to every
+Death answer.
 
 Measured from the v0.41 replay's captures, one attempt a run
 (`build/attempts/wt/v042-tower-deaths/b1_tally.txt`; `COUNTER_MAGIC_OFF`

@@ -130,7 +130,7 @@ check("a Fire at a lone Veteran (Roulette) becomes a Fight (it answers a Fight w
     return p.kind == "fight" and p.reason == "counter_magic"
   end)
 check("a Fight aimed at Allo Ver (Doom on any hit) goes to the body beside it",
-  { { "if self:deathAnswer(slot, e, a, true) ~= nil then return hp end\n", "" },
+  { { "if not noDeath and self:deathAnswer(slot, e, a, true) ~= nil then return hp end\n", "" },
     { "if dk ~= nil and killed == nil then killed = dk end", "" } },
   function(H)
     battle({ [0] = { ALLOVER, 8000 }, [1] = { QUIET, 5000 } })
@@ -240,6 +240,13 @@ check("a Meteor (every body) with the Oscar standing, and a Fire spread over it,
     if p.kind ~= "fight" then return false end
     p = driver(H):counterMagicPlan(0, { kind = "magic", spell = FIRE, all = true })
     return p.kind == "fight"
+  end)
+
+check("the verb veto (#372) does not price a Death: a Pummel beside the Sky Base is not refused",
+  { { "    u.noDeath = true\n", "" } },
+  function(H)
+    battle({ [0] = { QUIET, 5000 }, [2] = { SKYBASE, 9000 } })
+    return driver(H):counterVetoed(0, { cmd = 0x0A, atk = 0x5D }, { 0, 2 }, "Pummel", false) == false
   end)
 
 print(string.format("counter_death_selftest: PASS -- %d cases, each failed by its own mutant: %s", n,

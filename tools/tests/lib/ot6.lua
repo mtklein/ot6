@@ -8011,8 +8011,8 @@ function Driver:deathAnswer(slot, e, a, onlyE)
   return nil
 end
 
-function Driver:counterHit(slot, e, a, hp)
-  if self:deathAnswer(slot, e, a, true) ~= nil then return hp end
+function Driver:counterHit(slot, e, a, hp, noDeath)
+  if not noDeath and self:deathAnswer(slot, e, a, true) ~= nil then return hp end
   if a ~= 0xEE and a ~= 0xEF then
     local r = (M.sym("MagicProp") & 0x3FFFFF) + a * 14
     local t = M.fixedTake(function(i) return M.readRomByte(r + i) end, hp, M.readWord(0x3C1C + e * 2))
@@ -8127,14 +8127,14 @@ function Driver:counterWorst(slot, e, use, hp, mayKill)
   end
   local top, which, unknown, killed = 0, nil, false, nil
   for _, a in ipairs(atks) do
-    local dk = self:deathAnswer(slot, e, a)
+    local dk = not u.noDeath and self:deathAnswer(slot, e, a) or nil
     if dk ~= nil and u.dies ~= false and not living[a]
        and (mayKill == false or (u.dies ~= true and mayKill == nil) or not self:guardStands(e)) then
       -- a dying-only Death answer: this hit leaves the body standing, or
       -- nobody else can take the kill
     else
       if dk ~= nil and killed == nil then killed = dk end
-      local hi = self:counterHit(slot, e, a, hp)
+      local hi = self:counterHit(slot, e, a, hp, u.noDeath)
       if hi == nil then unknown = true
       elseif hi > top then top, which = hi, a end
     end
@@ -8212,7 +8212,23 @@ end
 -- that an answer which kills is weighed against the safest standing
 -- body's, since Driver:counterAimPlan steers a Fight off a body whose
 -- answer kills.  An unpriced Fight answer (a Special) refuses nothing.
+-- A Death answer (#523) is not priced here (use.noDeath): the re-aims take
+-- it (counterAimPlan, counterMagicPlan), where the price is a Fight or a
+-- cast at another body; here it would take a verb off the table every
+-- turn for a counter that only may land.  Measured at the factory's Sky
+-- Base (formation 398, wor-desert-v1, 16 seed shifts a side, b1's fao/fan
+-- arms): priced here, SABIN's Pummel was refused at every turn the Sky
+-- Base stood ("Pummel refused: ... slot 2 $0FC $B1 2442, a Fight's 0"),
+-- and the leg went from 16 of 16 PASS and 55 deaths to 14 of 16, one
+-- battle lost and 64 deaths, most to the bodies' own L.5 Doom over the
+-- longer fights, where main's Pummel drew no Blaster death in 16 runs.
 function Driver:counterVetoed(actor, use, slots, what, aoe)
+  do
+    local u = {}
+    for k, v in pairs(use) do u[k] = v end
+    u.noDeath = true
+    use = u
+  end
   local y = actor * 2
   local hp = M.readWord(0x3BF4 + y)
   if hp == 0 then return false end
@@ -8225,7 +8241,7 @@ function Driver:counterVetoed(actor, use, slots, what, aoe)
   end
   -- each body the verb can land on: its answer to the verb and to a Fight
   local function fightOn(s)
-    local ftop, _, _, funknown = self:counterWorst(s, actor, { cmd = BATTLE.CMD_FIGHT }, hp)
+    local ftop, _, _, funknown = self:counterWorst(s, actor, { cmd = BATTLE.CMD_FIGHT, noDeath = true }, hp)
     return ftop, funknown
   end
   -- the least a Fight draws from any standing body, where Driver:counterAimPlan
