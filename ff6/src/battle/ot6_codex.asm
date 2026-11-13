@@ -187,7 +187,10 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
 .proc Ot6CodexLoaded
         php
         longi
-        shorta0
+        shorta                  ; NOT shorta0: A is the slot.  Until #328's
+                                ;   review this cleared it, so every reload
+                                ;   after a game over ensured slot 1's codex
+                                ;   page and wiped the live esper page
         cmp     #$02
         beq     @two
         cmp     #$03

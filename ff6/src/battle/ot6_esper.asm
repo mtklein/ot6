@@ -673,16 +673,27 @@ OT6_SLOT_FENRIR   = 23
         rtl
 .endproc
 
-; Conductor: A (a8) = the shields a lightning-weak monster has left after a
-; hit's chip; x = the attacker.  One more goes when the attacker holds
-; Ramuh's signature and the hit carried lightning ($11a1 bit $04).  rts from
-; Ot6Chip (same bank).  Preserves x/y.
+; Conductor: A (a8) = the shields a monster has left after a weakness hit's
+; chip; x = the attacker, y = the target.  One more goes when the attacker
+; holds Ramuh's signature, the action is a spell (the command is Magic or
+; X-Magic: Bolt, Bolt 2, Bolt 3; not a weapon, a thrown blade, a summon or
+; a skill, as the design says "the wearer's lightning spells"), and lightning is one
+; of the weaknesses the hit matched ($3be0,y & $11a1 bit $04), so a mixed
+; element hit whose lightning the target does not fear takes none.  rts
+; from Ot6Chip (same bank).  Preserves x/y.
 .proc Ot6Conductor
         .a8
         beq     @out            ; none left to take
         pha
-        lda     $11a1
-        and     #$04            ; lightning
+        lda     $3a7c           ; the queued command (Ot6Life3Cast's read)
+        cmp     #$02            ; Magic (and a Mimic of it)
+        beq     :+
+        cmp     #$17            ; X-Magic
+        bne     @keep           ; not a spell
+:
+        lda     $3be0,y         ; the target's weak elements
+        and     $11a1           ; ...the hit carried
+        and     #$04            ; lightning among them
         beq     @keep
         txa
         cmp     #$08
@@ -758,8 +769,8 @@ Ot6RungCostTbl:
 ;           relic effects)
 ;   +9      ItemProp +25 (status 2 set)
 ;   +10..13 vigor, speed, stamina, mag.pwr points
-; docs/design/esper-rework.md's table; tools/check_esper_ladder.py holds the
-; ROM to it.
+; docs/design/esper-rework.md's table; tools/esper_ladder.py holds the ROM
+; to it.
 
 ; one rung: the effect bytes and the stat points, in the record's order
 .mac rung fld, p1, p2, s3, r9, r10, r11, r12, r13, s2, vig, spd, stm, mag
