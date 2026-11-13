@@ -681,8 +681,11 @@ add({
             .. "(the ROM's chip path wrote OT6_BROKEN_TICKS)", i))
           if b.atk == shadowSlot * 2 and b.pend == 3 and k.via == "Ot6HitJoin" and b.seq + 1 == k.seq then
             breaking = breaking + 1
-            H.assertEq(b.f == k.f, true, string.format("mark %d: the breaking hit's break write and Death mark "
-              .. "are one frame: break f%d, mark f%d", i, b.f, k.f))
+            -- one action: the mark is the ledger's next event after the break (b.seq + 1, gated above); the
+            -- frame counter can tick between the two inside that action (2026-11-12, camp_escaped on the
+            -- #254 ROM: break f5861 seq5, mark f5862 seq6), as the HP write and Death checks below allow
+            H.assertEq(k.f - b.f <= 1, true, string.format("mark %d: the breaking hit's break write and Death "
+              .. "mark are one action: break f%d, mark f%d", i, b.f, k.f))
             local hw, da = hpWrite[k.m], deathAt[k.m]
             H.assertEq(hw ~= nil and hw.seq == k.seq + 1 and hw.f - k.f <= 1, true, string.format("mark %d: "
               .. "the mark precedes the hit's HP write (ApplyDmg), the next ledger event after it", i))
