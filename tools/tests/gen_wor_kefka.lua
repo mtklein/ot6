@@ -58,10 +58,13 @@ if not KEFKA_FIGHT and not KEFKA_STOCK then
   BOSS_FIGHT.boostCure = { below = 0.4, notBroken = true }
 end
 -- The Megalixir is Kefka's (owner, 2026-11-07): the driver spends it in no other fight (H.MEGALIXIR), and here the
--- party drinks it when three members stand under 30% of their HP (Fallen One leaves all four at 1); the care lines
--- may reach for it too.  KEFKA_MEGALIXIR (a lab's) replaces the trigger, false turns it off
+-- party drinks it when two members stand under 35% of their HP (Fallen One leaves all four at 1); the care lines
+-- may reach for it too.  At 16 shields (#514) the trigger at three under 30% lost key be20 twice: the second
+-- Megalixir was still on its way when his Ultima took three members at about a fifth of their HP
+-- (route-wor-the-end.md 5.6, f16_k4_s4); two under 35% won all 48 runs of both grids (mxn2).  KEFKA_MEGALIXIR (a
+-- lab's) replaces the trigger, false turns it off
 if KEFKA_MEGALIXIR ~= nil then BOSS_FIGHT.megalixir = KEFKA_MEGALIXIR or nil
-elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 3, below = 0.3, vs = KEFKA } end
+elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 2, below = 0.35, vs = KEFKA } end
 -- The curers keep their last point through Kefka's break (opts.reserveBank): the break's burst emptied every bank,
 -- and when it ended no boosted Cure or Life 2 answered his Goner, HyperDrive and Ultima.  The members who cast Cure
 -- or Life attack at a boost that leaves one point.  With the Megalixir, 48 of 48 runs of both grids
