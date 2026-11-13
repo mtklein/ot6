@@ -147,7 +147,8 @@ Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
   of MP never happened and keeps its boost; a Mimic copy is free in every
   case.) Each such action is a design
   opportunity: what would a boost naturally buy, and which boost family
-  does it join (#469).
+  does it join (#469; the survey and proposals are
+  [design/boost-rewards.md](design/boost-rewards.md)).
 
 **Boost tiers replace spell tiers.** Terra learns *Fire*, once. Boosted once
 it casts as Fira; twice, Firaga. This keeps every spell list at 8 without

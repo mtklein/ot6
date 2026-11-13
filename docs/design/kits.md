@@ -39,6 +39,10 @@ relic pass, so Dragoon Boots cannot replace a Veldt Leap with Jump, and
 the `$11` it writes is picked up by Leap's own vanilla availability test
 without extra code.
 
+What a boost buys on every action, kit or not, and proposals for the
+actions where it buys nothing yet, are in [boost-rewards.md](boost-rewards.md)
+(#469).
+
 Boost-tier folding means kits list **base spells only**: Fire is a
 kit entry, and Fire 2/3 are what boosting does to it. Terra's and
 Celes's tables below are the natural magic the ROM ships ("join" is
