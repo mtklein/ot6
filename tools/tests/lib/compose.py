@@ -149,13 +149,159 @@ def _stamp_tool(root, *args, check=True, env=None):
     """Shell into savestate_stamp.sh, the single authority for every digest
     a stamp carries, pointed at `root` via OT6_ROOT.  Returns stdout, or
     None when check=False and the tool refused (e.g. romsig with no ROM).
-    `env` adds to (or overrides) the inherited environment."""
+    `env` adds to (or overrides) the inherited environment.
+
+    sig, gensig and romsig answers are cached (_stamp_cache_key): a run's
+    compose checks every ancestor of the state it boots, three shells each,
+    and their inputs rarely change between runs (#396)."""
+    full_env = {**os.environ, "OT6_ROOT": str(root), **(env or {})}
+    key = _stamp_cache_key(root, args, full_env)
+    cached = _stamp_cache_get(root, key)
+    if cached is not None:
+        return cached
     r = subprocess.run(
         ["sh", str(SAVESTATE_STAMP), *args],
-        env={**os.environ, "OT6_ROOT": str(root), **(env or {})},
-        capture_output=True, text=True, check=check,
+        env=full_env, capture_output=True, text=True, check=check,
     )
-    return r.stdout if r.returncode == 0 else None
+    if r.returncode != 0:
+        return None
+    _stamp_cache_put(root, key, r.stdout)
+    return r.stdout
+
+
+# The stamp tool's answer cache (#396).  A sig, gensig or romsig answer is a
+# function of its arguments and the bytes of the files it reads: the
+# generator, the lib halves (savestate_stamp.sh's LIB_HALVES) and the extras
+# (sig), the generator and extras (gensig), the ROM (romsig), and the code
+# that computes them (savestate_stamp.sh, lua_fingerprint.py,
+# rom_version.py).  The key is the sha256 of all of those, so an answer is
+# reused only for the same bytes; a missing input is never cached (the tool
+# runs and reports it).  Answers live in the process and on disk under the
+# tree's build/stamp-cache/ (one file per key, written atomically), so the
+# next run's compose reuses them.  A file's content hash is memoized in the
+# process by its stat (size, mtime, ctime, inode), which any write changes.
+_STAMP_CODE = (SAVESTATE_STAMP, HERE / "lua_fingerprint.py",
+               HERE.parent.parent / "build" / "rom_version.py")
+_stamp_memo = {}
+_file_hash_memo = {}
+
+
+def _file_sha(path):
+    """sha256 of a file's bytes, or None when it isn't a readable file."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    if not os.path.isfile(path):
+        return None
+    sig = (str(path), st.st_size, st.st_mtime_ns, st.st_ctime_ns, st.st_ino,
+           st.st_dev)
+    h = _file_hash_memo.get(sig)
+    if h is None:
+        try:
+            h = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        except OSError:
+            return None
+        _file_hash_memo[sig] = h
+    return h
+
+
+def _lib_halves():
+    """savestate_stamp.sh's LIB_HALVES, read from the script itself so the
+    list has one definition."""
+    m = re.search(r'^LIB_HALVES="([^"]*)"', SAVESTATE_STAMP.read_text(), re.M)
+    return m.group(1).split() if m else None
+
+
+def _stamp_cache_key(root, args, env):
+    """The cache key for one stamp-tool call, or None for a call that is not
+    cached (another command, an unsafe or missing input)."""
+    if not args or args[0] not in ("sig", "gensig", "romsig"):
+        return None
+    cmd, rest = args[0], list(args[1:])
+    root = Path(root)
+    if cmd == "romsig":
+        if rest:
+            return None
+        rom = env.get("OT6_ROM") or str(root / "build" / "ot6.sfc")
+        files = [rom]
+    else:
+        if not rest:
+            return None
+        gen, extras = rest[0], rest[1:]
+        if any(e.startswith("/") or ".." in e for e in extras):
+            return None
+        files = [root / "tools" / "tests" / f"{gen}.lua"]
+        if cmd == "sig":
+            halves = _lib_halves()
+            if halves is None:
+                return None
+            files += [root / h for h in halves]
+        files += [root / e for e in extras]
+    parts = ["ot6-stamp-cache/v1", *args]
+    for f in list(_STAMP_CODE) + files:
+        h = _file_sha(f)
+        if h is None:
+            return None
+        parts.append(h)
+    return hashlib.sha256("\0".join(map(str, parts)).encode()).hexdigest()
+
+
+def _lua_filehash(path, root):
+    """lua_fingerprint.filehash(path), cached like the stamp tool's answers:
+    keyed by the bytes of the file and of lua_fingerprint.py.  A state with
+    provenance drift names the lib halves that moved, and without the cache
+    every ancestor re-tokenized all three (#396: 50 of a suite's 51 s of
+    compose on a chain of 112 drifted states)."""
+    code = _file_sha(HERE / "lua_fingerprint.py")
+    data = _file_sha(path)
+    if code is None or data is None:
+        return lua_fingerprint.filehash(path)
+    key = hashlib.sha256(
+        f"ot6-lua-filehash/v1\0{code}\0{data}".encode()).hexdigest()
+    cached = _stamp_cache_get(root, key)
+    if cached is not None:
+        return cached
+    h = lua_fingerprint.filehash(path)
+    _stamp_cache_put(root, key, h)
+    return h
+
+
+def _stamp_cache_dir(root):
+    build = Path(root) / "build"
+    return build / "stamp-cache" if build.is_dir() else None
+
+
+def _stamp_cache_get(root, key):
+    if key is None:
+        return None
+    if key in _stamp_memo:
+        return _stamp_memo[key]
+    d = _stamp_cache_dir(root)
+    if d is None:
+        return None
+    try:
+        out = (d / key).read_text()
+    except OSError:
+        return None
+    _stamp_memo[key] = out
+    return out
+
+
+def _stamp_cache_put(root, key, out):
+    if key is None:
+        return
+    _stamp_memo[key] = out
+    d = _stamp_cache_dir(root)
+    if d is None:
+        return
+    try:
+        d.mkdir(exist_ok=True)
+        tmp = d / f".{key}.{os.getpid()}"
+        tmp.write_text(out)
+        os.replace(tmp, d / key)
+    except OSError:
+        pass
 
 
 def generator_sig(gen, root, extras=()):
@@ -434,7 +580,7 @@ def _own_stamp_status(base, root):
         if cur != recorded[:64]:
             moved = [p for p, h in libs
                      if (root / p).exists()
-                     and lua_fingerprint.filehash(root / p) != h]
+                     and _lua_filehash(root / p, root) != h]
             what = (", ".join(p.split("/")[-1] for p in moved)
                     if moved else "the shared lib halves")
             drift = (f"fixture {base} has provenance drift -- generated "
@@ -887,7 +1033,7 @@ def adoption_proof(base, root, records, rom_now, rom_copy_sha):
 
     own = generator_own_sig(gen, root, extras)
     new = [lines[0], f"rom {rom_now}", f"generator {own}"]
-    new += [f"lib {h} {lua_fingerprint.filehash(root / h)}" for h in LIB_HALVES]
+    new += [f"lib {h} {_lua_filehash(root / h, root)}" for h in LIB_HALVES]
     new += [l for l in lines[1:] if l.strip()]
     evidence = (f"rom {rom_now[:12]} (ninja: generate started "
                 f"{_when(g_at)}, ROM copy edge last ran {_when(l_at)}, "
