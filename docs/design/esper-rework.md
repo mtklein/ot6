@@ -1,8 +1,22 @@
 # Esper rework: spells while worn, bonuses for keeps
 
 Scope: what an equipped esper gives, and what a character keeps from
-having worn it. Tracks #328. Design research only: nothing here is built,
-and nothing in the game changes until the owner picks a plan.
+having worn it. Tracks #328. The owner approved plan A on 2026-11-12 with
+these calls: progress per character, the bench earns no Magic Points,
+random battles pay double, kept bonuses take no slots, and half-cost spells
+and permanent Haste are labbed before they ship.
+
+**Built (v0.44):** plan A, in `ot6_esper.asm`: the Magic Points hook
+(`Ot6EsperEarn`, `Ot6EsperMsg`), the progress store in expanded SRAM
+([save-layout.md](save-layout.md)), the ladder folded into `UpdateEquip`
+(`Ot6EsperFold`, `Ot6LadderTbl`, held to the table below by
+`tools/esper_ladder.py`), the four new-code signatures (`Ot6EsperBattleInit`
+for Facet and Rebirth, `Ot6EsperImmune` for Fenrir, `Ot6Conductor`), and the
+Skills > Espers page's ladder column. Two departures from the table: rung 4
+of Crusader is all four stats +1, like its rungs 1 and 2; and Sraphim's
+signature is the Cure Ring's Regen, because *Grace* would do nothing (no code
+clears a fallen character's boost bank, so it already survives a KO). The
+rest of this doc is the design as proposed.
 
 **Terms.** *Magic Points* are what a won battle awards toward the
 equipped espers (FF3 US calls them Magic Points; other releases call them
