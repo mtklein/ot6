@@ -43,9 +43,12 @@ end
 local function raging(s) return (H.readByte(0x3EF9 + s * 2) & 0x01) ~= 0 end
 local function recMp() return H.readWord(0x1600 + 37 * GAU + 0x0D) end
 local function recLevel() return H.readByte(0x1600 + 37 * GAU + 8) end
--- a battle GAU levels up in is not a price reading: the level-up raises his MP with his max at the battle's end
--- (#524 landing at 9d0374c8: "record MP 323 -> 353" over a battle that took his max MP up, and the price assert read
--- "got 353 ($161), want 315 ($13B)").  RD_LEVELUPS = true is the mutant that measures such a battle anyway.
+-- a battle GAU levels up in is not a price reading on his record: the level-up refills his MP to the new max at the
+-- battle's end (#524 landing at 9d0374c8: "record MP 323 -> 353"; 2026-11-13: "record MP 331 -> 353; GAU L34 -> L35;
+-- max MP 339 -> 353", build/attempts/wt/v043-wob-rows/gate/rage/).  Such a battle is read on his battle MP ($3C08,
+-- his seat), its lowest while the battle runs, before the refill: on the #254 replay the one long battle in sixteen
+-- was a level-up battle (gate/suite_battle_ragedriver.red.log).  RD_LEVELUPS = true is the mutant that reads the
+-- record anyway.
 RD_LEVELUPS = RD_LEVELUPS or false
 
 -- per battle: the Rage plans made in it, GAU's Cmd_10s (his seat in Y),
@@ -72,6 +75,10 @@ H.run({ maxFrames = 900000 }, {
     -- the beast and the tier, the first frame GAU's RAGE status reads set
     -- (Cmd_10 writes both before it sets the bit)
     local gs = gauSlot()
+    if b and inBattle and gs ~= nil and cur.rage == nil and #H.rages > nr0 then
+      local m = H.readWord(0x3C08 + gs * 2)
+      if cur.bmin == nil or m < cur.bmin then cur.bmin = m end
+    end
     if b and inBattle and cur.tier == nil and gs ~= nil and raging(gs) then
       cur.tier, cur.beast = H.readByte(RAGETIER), H.readByte(0x33A8 + gs * 2)
     end
@@ -86,8 +93,12 @@ H.run({ maxFrames = 900000 }, {
         .. "GAU L%d -> L%d", #H.outcomes - n0, #H.rages - nr0, cur.cmd10, tostring(cur.tier),
         cur.beast and string.format("$%02X", cur.beast) or "-", cur.mp0, cur.mp1, cur.lv0, cur.lv1))
       if cur.rage and cur.cmd10 >= 2 and done == nil then
-        if cur.lv1 == cur.lv0 or RD_LEVELUPS then done = cur
-        else H.log("[rage] GAU levelled up in this battle: his record MP is not the Rage's price; the next one") end
+        done = cur
+        done.after = (cur.lv1 == cur.lv0 or RD_LEVELUPS) and cur.mp1 or cur.bmin
+        if done.after ~= cur.mp1 then
+          H.log(string.format("[rage] GAU levelled up in this battle: the price is read on his battle MP, lowest %d",
+            cur.bmin))
+        end
       end
     end
     -- read the moment the plan is made (a log, not an assert): the chosen
@@ -124,7 +135,10 @@ H.run({ maxFrames = 900000 }, {
       done.tier, done.beast, done.mp0, done.mp1))
     H.assertEq(done.cmd10 >= 2, true, "1. Cmd_10 ran for GAU's seat at the start and a possessed turn")
     H.assertEq(done.beast, r.rage, "1. GAU's seat possessed by the planned beast ($33A8)")
-    H.assertEq(done.mp1, done.mp0 - 8, "2. 8 MP for the start and none for the possessed turns after it")
+    H.assertEq(done.after, done.mp0 - 8, "2. 8 MP for the start and none for the possessed turns after it")
+    if done.lv1 == done.lv0 then
+      H.assertEq(done.bmin, done.mp1, "2. his battle MP's lowest is the MP his record kept")
+    end
     H.assertEq(done.tier, math.min(r.boost, 3), "3. OT6_RAGETIER holds the plan's boost")
   end),
   -- the control: the same driver with the line off

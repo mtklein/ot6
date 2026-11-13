@@ -228,6 +228,11 @@ STATES = [
     # the party (camp-escaped-v1).
     S("forest_done", gen="gen_sabin_forest", prev="camp_escaped",
       checkpoint="camp-escaped-v1"),
+    # camp-escaped-v1 -> the Phantom Forest's two pools hunted until each
+    # formation is won (docs/design/wob-side-trips.md, #286): a branch beside
+    # forest_done.  Nothing boots it.
+    S("wob_forest_hunt", gen="gen_wob_forest_hunt", prev="camp_escaped",
+      checkpoint="camp-escaped-v1"),
     # gen_sabin_train: the Phantom Train, boarding to the Ghost Train's fall
     # -- the maze decoded and driven, and battle 68 fought with real Blitz
     # inputs: the authored OT6_BLUDG row (4 shields, #400) chip-proven at runtime.  Ends on the
@@ -239,6 +244,10 @@ STATES = [
     # battle 68 (battle_suplextrain, #410).
     S("train_done", gen="gen_sabin_train", prev="forest_done", timeout=1800,
       also=["train_b68_entry"]),
+    # train_b68_entry -> the passenger car's hallway (151), which the train
+    # leg never enters, hunted until each formation is won
+    # (docs/design/wob-side-trips.md, #286): a branch.  Nothing boots it.
+    S("wob_train_hunt", gen="gen_wob_train_hunt", prev="train_b68_entry"),
     # gen_sabin_falls: Baren Falls -- the jump, battle 18 mid-fall (RIZOPAS
     # surfaces in slot 5 off the piranhas' death script), SHADOW's exit, GAU
     # named on the Veldt shore.
@@ -379,6 +388,12 @@ STATES = [
     # state hung off the checkpoint.
     S("vector_entry", gen="gen_vector_entry", prev="blackjack",
       checkpoint="post-opera-v1", cutter="gen_post_opera_checkpoint"),
+    # post-opera-v1 -> the forests by Albrook no story leg walks, each hunted
+    # until every formation is won (docs/design/wob-side-trips.md, #282): a
+    # branch beside vector_entry.  Nothing boots it.
+    S("wob_south_hunt", gen="gen_wob_south_hunt", prev="blackjack",
+      checkpoint="post-opera-v1", cutter="gen_post_opera_checkpoint",
+      timeout=3600),
     # gen_vector_sneak: the Returner sympathizer's choice dialog ($01F0) and
     # the FACING-GATED ledge on {43,38} -> control at {57,34}.
     S("vector_sneak", gen="gen_vector_sneak", prev="vector_entry"),
@@ -471,6 +486,14 @@ STATES = [
     S("narshe_mission", gen="gen_narshe_mission", prev="n128_won",
       checkpoint="terra-returned-v1", cutter="gen_terra_returned_checkpoint",
       timeout=3600),
+    # terra-returned-v1 -> the islands only the airship reaches and no story
+    # leg walks (the bomb isle, the north isles, the plain north of Thamasa,
+    # Triangle Island), each hunted until every formation is won
+    # (docs/design/wob-side-trips.md, #279 #280 #282): a branch beside
+    # narshe_mission.  Nothing boots it.
+    S("wob_airship_hunt", gen="gen_wob_airship_hunt", prev="n128_won",
+      checkpoint="terra-returned-v1", cutter="gen_terra_returned_checkpoint",
+      timeout=7200),
     # ---- boundary G -> G' (#428) -------------------------------------------
     # The World of Balance detour that teaches MOG Water Rondo, the first
     # time the airship is the party's own (docs/design/route-water-rondo.md):
@@ -634,6 +657,12 @@ STATES = [
     # checkpoint_drift.py --recut.
     S("ultros_won", gen="gen_ultros", prev="esper_mtn_save",
       checkpoint="esper-mtn-save-v1", timeout=1800),
+    # ultros-won-v1 -> Esper Mountain's slopes (375) and its side cave (374,
+    # the Chocobo Suit) hunted until each formation is won
+    # (docs/design/wob-side-trips.md, #283): a branch beside thamasa_done.
+    # Nothing boots it.
+    S("wob_esper_mtn_hunt", gen="gen_wob_esper_mtn_hunt", prev="ultros_won",
+      checkpoint="ultros-won-v1", timeout=3600),
 
     # boundary O -> boundary P (issue #127, "the massacre block"), the v0.13
     # route TERMINAL: cold-Continue the tracked ultros-won-v1 SRAM checkpoint

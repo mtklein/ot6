@@ -2013,6 +2013,49 @@ Ot6ShieldTbl:
                                 ;   fire|holy vanilla is the elemental
                                 ;   reward for reading past the ninja's
                                 ;   absorb
+        ; ---- the world of balance off the story's path (wob-side-trips.md) --
+        ; What no story leg walks: the forests by Albrook (world groups 17,
+        ; 18, 20), on foot from the opera's landing, where the post-opera four
+        ; meet them: CELES (a blade), LOCKE (a knife: the point), EDGAR (a
+        ; pike and his tools: the point) and SABIN (fists and blitzes: the
+        ; blow); and the airship's islands, the bomb isle (27) and Triangle
+        ; Island (124, 28), first reached once Setzer hands over the wheel,
+        ; by LOCKE, EDGAR (a blade now), SABIN (claws: an edge, and his
+        ; blitzes) and SETZER (cards and dice: special).  Vanilla elements
+        ; stay.
+        .word   $00e8
+        .byte   2, OT6_SLASH|OT6_PIERCE ; bug: a shell on wings; cut or
+                                ;   spear it.  ice|water vanilla; alone, it
+                                ;   answers a Fight with a petrifying spine
+        .word   $003d
+        .byte   2, OT6_SLASH|OT6_BLUDG ; chickenlip: a heavy bird, packs of
+                                ;   five; the blade or the fist.  ice
+                                ;   vanilla
+        .word   $00aa
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; grenade: answers a Fight with
+                                ;   Exploder (its own hp) unless the blow
+                                ;   breaks it, since a broken body does not
+                                ;   counter: break it in one swing (locke's
+                                ;   point, boosted) or use what it does not
+                                ;   answer, edgar's tools (pierce) and
+                                ;   sabin's blitzes (bludgeon).  ice|water
+                                ;   vanilla; absorbs fire
+        .word   $00a3
+        .byte   2, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; intangir:
+                                ;   absorbs every element, so every class
+                                ;   breaks it, setzer's special among them,
+                                ;   but not a blade of an element it drinks.
+                                ;   its meteo after a hit and its escape
+                                ;   under 1280 hp run through its turns,
+                                ;   and a broken body has none: break it
+                                ;   to bring it down.  two, under the house
+                                ;   curve's miniboss count, because its
+                                ;   meteo takes the whole L18-22 four that
+                                ;   first meets it: one double strike
+                                ;   breaks it again as it recovers (three
+                                ;   shields: 3 wipes in 16 meetings; four:
+                                ;   3 in 15; two: 0 in 18; wob-side-
+                                ;   trips.md section 3)
         ; ---- the world of ruin: the solitary island to tzen's collapsing
         ; house (docs/design/route-wor-sabin.md section 8) ---------------
         ; Celes is alone to Tzen and holds slash (every sword; pierce only
