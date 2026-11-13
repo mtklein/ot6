@@ -440,6 +440,10 @@ TEST_ENV = {
     # battle's snapshots outside Kohlingen; no write
     "battle_boostreach": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kohlingen-v1",
+    # #469: RELM's boosted Sketch drawing an attack with no number, outside
+    # Kohlingen (Muus and Deep Eye); no write
+    "battle_sketchboost": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-locke-v1",
     # #292: NUMBER 024 (7 shields) is two steps from this save point
     "battle_hudcount":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/n024-entry-save-v1",

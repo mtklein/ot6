@@ -253,7 +253,7 @@ local function actorAim(c)
     -- a tool that aims at the whole side (NoiseBlaster's targeting $6A):
     -- the cursor already covers it, so the confirm is the press
     mf = mf + 1
-    btn = (mf - 1) % 8 < 4 and { a = true } or {}
+    btn = (mf > 8 and (mf - 1) % 8 < 4) and { a = true } or {}   -- a fresh press: the list's A released
   else
     btn = c.ally and aim(Tc, allyS) or aim(Tm, tgtMon)
   end
@@ -305,7 +305,9 @@ local function runCase(c)
           held = nil
           if H.readByte(MENU) ~= 0 then
             local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
-            if a == actS and not c.sent then held = actorPress(c, st) else held = defendPress(st) end
+            if a == actS and not c.sent then held = actorPress(c, st)
+            elseif a == actS and st == ST_TGT then held = "a"   -- the confirm not yet landed
+            else held = defendPress(st) end
           end
         end
         H.setPad((held and ph < 6) and { [held] = true } or {})

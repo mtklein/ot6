@@ -1245,13 +1245,16 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;     boost (#461);
 ;   * actions that never have a boost reward, where a boost was raised on
 ;     the command window before the row was picked (#463; Ot6Boost refuses R
-;     on such a row, Ot6RowNoBoost): Ot6Filch, Ot6Bestow (whose transfer
-;     charges its one pip), an Item that moves no number (Ot6ActionEnd,
-;     Ot6ItemNoBoost), a Magic, Lore or X-Magic turn none of whose spells
-;     moves one, Scan aimed at the party included (Ot6ActionEnd, on
-;     Ot6QueueFold's OT6_SPELLNONE verdict), a summon that moves none
-;     (Ot6QueueFold; both Ot6SpellNoBoost), Revert (Ot6RevertTake), and
+;     on such a row, Ot6RowNoBoost): an Item that moves no number
+;     (Ot6ActionEnd, Ot6ItemNoBoost, the Gravity Rod's Quartr included,
+;     #469), a Magic, Lore or X-Magic turn none of whose spells moves one,
+;     Scan aimed at the party and Vanish at a monster included (Ot6ActionEnd,
+;     on Ot6QueueFold's OT6_SPELLNONE verdict), a summon or MagiTek beam that
+;     moves none (Ot6QueueFold; both Ot6SpellNoBoost), NoiseBlaster and Air
+;     Anchor (Ot6QueueFold, Ot6ToolNoBoost), Revert (Ot6RevertTake), and
 ;     Row, Def., Leap, Control and Possess (Ot6CmdNoBoost);
+;   * a Sketch whose drawn attack moves no number (Ot6SketchNoBoost, #469:
+;     only the draw can tell);
 ;   * an action that never ran (#346, Ot6ActionEnd's NOACTION arm) or never
 ;     began: a Rage start the pool cannot pay (Ot6RageStartGate), a Jackpot
 ;     or Master's Mark whose boost was taken back under three after the pick
@@ -2551,10 +2554,10 @@ OT6_LIFE3_ID = $35
 ;     scales with magnitude; BP alone pays for certainty.  Slot (cmd $0f) is
 ;     gated too and would be flat for the same reason; it has no arm here
 ;     because it is unpriced (base 0), not because it was overlooked.
-;   * Filch and Bestow ride cmd $05's gate with Steal, and for them the
-;     boost buys nothing at all (Ot6Bestow's header says the same), so
-;     charging for it would be charging for nothing.  The whole @steal arm
-;     is therefore flat, with no per-row split.
+;   * Filch and Bestow ride cmd $05's gate with Steal.  Bestow's boost buys
+;     pips, which are their own price, so it is flat; Filch's buys a shield
+;     a point and pays per shield (#469, Ot6ThiefCharge's Ot6PerPointPrice
+;     arm), as Trickshot's multiplied coin escalates there.
 ;
 ; entry (jsl from CreateAction, right after jsr GetMPCost): a8/i16,
 ; A = vanilla cost, X = attacker entity, Y = queue slot. db=$7e (the site

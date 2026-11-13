@@ -41,7 +41,14 @@ without extra code.
 
 What a boost buys on every action, kit or not, and proposals for the
 actions where it buys nothing yet, are in [boost-rewards.md](boost-rewards.md)
-(#469).
+(#469). Built so far: a single-target status or cure (Safe, Shell, Rflect,
+Vanish on the party, Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle,
+Stop, Imp, Dispel) reaches one more body per point, each body paying its own
+cast; Debilitator's weaknesses, Filch's shields and Bestow's pips (below).
+**Def. stays unboostable** (owner, 2026-11-13): a boost raised for it is
+dropped, never charged, as before. NoiseBlaster, Air Anchor, MagiTek Confuser
+and X-fer and the Gravity Rod used from Item refuse a boost, and a Sketch
+that draws an attack with no number drops it.
 
 Boost-tier folding means kits list **base spells only**: Fire is a
 kit entry, and Fire 2/3 are what boosting does to it. Terra's and
@@ -136,12 +143,12 @@ The 8 Tools, verbatim ✦, learned by acquisition.
 | # | Tool | MP | Chip | Source (WoB) |
 |---|---|---|---|---|
 | 1 | AutoCrossbow ✦ | 4 | piercing, whole side (one hit per body) | join (signature) |
-| 2 | NoiseBlaster | 6 | — (confuse) | Figaro shop |
+| 2 | NoiseBlaster | 6 | — (confuse; takes no boost) | Figaro shop |
 | 3 | Bio Blaster | 8 | poison | Figaro shop |
 | 4 | Flash | 6 | — (blind) | Figaro's tool merchant (shop 82), restocked at South Figaro (shop 5) |
 | 5 | Drill | 16 | piercing ×2 | Figaro castle, after the sand dive |
 | 6 | Chain Saw | 18 | slashing | Zozo chest (vanilla) |
-| 7 | Debilitator | 10 | adds + reveals a random weakness ✦ | Vector's weapon shop (shop 27), open during the banquet |
+| 7 | Debilitator | 10 a weakness | adds + reveals a random weakness, one more a point ✦ | Vector's weapon shop (shop 27), open during the banquet |
 | 8 | **Overclock** ✦ (divine) | Σ | the Tool's own, twice | Magitek factory (story: switch `$0068`) |
 
 The MP column is mp-economy.md's "scaled by tier 3–20" (AutoCrossbow 3–4,
@@ -176,6 +183,13 @@ no single price; its cost is the **sum (Σ)** of the two it fires.
   `Ot6DebilReveal` banks the added bit as a pending reveal, so the HUD draws
   its glyph instead of '?', and keeps it out of the species codex (the
   weakness is this body's, for this battle).  `battle_debilitator`.
+  **A boost adds one more weakness a point** (#469, the steps family), each
+  revealed as the first, until the body has none left to take, and each is
+  its own firing's price: 10 / 20 / 30 / 40, 80 overclocked
+  (`Ot6DebilSteps`, `Ot6ToolPrice`; `battle_boostreach`).  NoiseBlaster and
+  Air Anchor take no boost: their status lands at a tool's hit rate of 255
+  wherever an immunity does not stop it, so there is no certainty left to buy,
+  and R is refused on their rows (`Ot6ToolNoBoost`).
 - AutoCrossbow's piercing clears waves: one chip per body across a
   whole side, and exactly one chip against a solo boss. Drill answers armored
   bosses. Chain Saw covers slashing, so Edgar alone spans two physical
@@ -613,8 +627,8 @@ probes, redistributes and corrodes, with some merchant work as well
 | 1 | Steal ✦ (4 MP) | vanilla steal; boost buys certainty | join |
 | 2 | Mug (4 MP) | Capture: a swing that steals on each hit; boost buys swings | South Figaro escape (`$001E`) |
 | 3 | Trickshot (4 MP, escalates) | a thrown coin: piercing, past defense; boost multiplies | Lete River (`$001A`) |
-| 4 | Filch ✦ (6 MP) | take one shield, class-blind, and bank it as 1 BP | join (was: Opera house) |
-| 5 | Bestow ✦ (5 MP) | give an ally 1 BP | join (was: Vector) |
+| 4 | Filch ✦ (6 MP a shield) | take one shield, class-blind, and bank it as 1 BP; boost takes one more shield a point | join (was: Opera house) |
+| 5 | Bestow ✦ (5 MP) | give an ally 1 BP; boost hands as many as are pending | join (was: Vector) |
 | 6 | Dismantle (8 MP) | defense corrode, then a piercing stab; boost buys steps | Sealed Gate (`$0079`) |
 | 7 | Appraise (3 MP) | Scan's read of one enemy; boost reads them all | Thamasa, Strago met (`$008D`) |
 | 8 | **Master's Mark** (divine, 3 BP, 99 MP) | every enemy robbed and read | Floating Continent, the Air Force (`$00A0`) |
@@ -660,18 +674,20 @@ remover. It reveals nothing (it takes the shield without teaching the row, so it
 complements Debilitator rather than replacing it) and deals no damage. A landed
 Filch gives Locke **+2 BP on the turn**, the filched pip plus his own unboosted
 regen, which nothing else in the game does. Against an already-Broken or
-shieldless target it is a no-op. Filch reads no boost, so R does not raise
-one on its row, and one raised before the row is picked is never charged
-(#463, `battle_boostkeep`).
+shieldless target it is a no-op. A boost takes one more shield a point
+(#469, Break's ladder: four at three points), class-blind as the first;
+only the first banks a pip, and each shield is its own Filch's price,
+6 / 12 / 18 / 24, level with Break's 25 for four. A boosted Filch earns no
+regen pip, so it nets the filched pip less the points (`battle_boostkeep`).
 
 Bestow is the sketch verbatim. Its debit rides `OT6_BOOST_REVEALED` so that
 `Ot6ActionEnd` does the subtraction, which is the only BP charge path in the game
 and is what stops Bestow being free: if it were charged inline, Ot6ActionEnd would
 still pay Locke his regen and Bestow would yield a pip a turn for 5 MP. The
-pip handed over is the whole charge at every boost: a boost raised for Bestow
-buys nothing, so R does not raise one on its row and a Bestow raised to two
-or three points before the row was picked costs the one pip it gives
-(#463). At 0 BP
+pips handed over are the whole charge: a Bestow hands as many pips as are
+pending (one at 0 or 1 point, two at two, three at three), as many as the
+ally can hold, and Locke is charged exactly those (#469), so a Locke with
+three banked can bring an ally's divine a turn closer. At 0 BP
 the row greys and, since #232, the confirm refuses it (`Ot6KitConfirmMP` reads
 the same `Ot6BushidoRowGrey` that coloured it), so the turn and the 5 MP stay
 with the player; a self-target and an ally already at the 5 cap are still

@@ -519,7 +519,7 @@ steps[#steps + 1] = H.call(function()
   inFold[0x0C] = true                     -- Break (Ot6InFoldTbl's own arm)
   -- #469: a single-target status or cure buys reach (Ot6ReachTbl), so it is
   -- neither quiet nor loud here (battle_boostreach plays it)
-  local okR, reach = pcall(H.sym, "Ot6ReachTbl")
+  local okR, reach = pcall(function() return H.sym("Ot6ReachTbl") end)
   if okR then
     reach = reach & 0x3FFFFF
     for i = 0, 15 do
@@ -542,7 +542,13 @@ steps[#steps + 1] = H.call(function()
   H.log(string.format("[boostkeep] TERRA's spells (- buys nothing, + the multiplier): %s; quiet $%s, loud $%s",
     table.concat(names, " "), quiet and string.format("%02X", quiet) or "none",
     loud and string.format("%02X", loud) or "none"))
-  assert(quiet and loud, "TERRA knows a spell the boost buys nothing on and one it multiplies")
+  -- #469: Shell, the spell fire-out-v1's TERRA held that bought nothing, buys
+  -- reach now; a list with no other leaves the quiet cases unplayed (said here)
+  assert(loud, "TERRA knows a spell the boost multiplies")
+  if quiet == nil then
+    H.log("[boostkeep] NOTE: TERRA's list holds no spell the boost buys nothing on (Shell buys reach since #469): "
+      .. "the quiet cases are not played")
+  end
 end)
 
 -- snapshot L: LOCKE's window, four pips banked
@@ -610,7 +616,12 @@ for _, c in ipairs(CASES) do
     if c.item == "cure" then c.item = cureItem end
     if c.spell == "quiet" then c.spell = quiet elseif c.spell == "loud" then c.spell = loud end
   end)
-  add(runCase(c))
+  if c.spell == "quiet" then
+    steps[#steps + 1] = H.cond(function() return quiet ~= nil end, runCase(c),
+      { H.call(function() c.skipped = true end) })
+  else
+    add(runCase(c))
+  end
 end
 
 steps[#steps + 1] = H.call(function()
@@ -620,6 +631,7 @@ steps[#steps + 1] = H.call(function()
     if not ok then bad[#bad + 1] = msg end
   end
   for _, c in ipairs(CASES) do
+    if c.skipped then goto continue end
     -- what the case played: the actor's action, at the case's boost; R on
     -- the row raised it (rowR = 1) or was refused (rowR = 0)
     if c.rowR then
@@ -692,6 +704,7 @@ steps[#steps + 1] = H.call(function()
       check(c.bankEnd == c.bank0 - c.boost, string.format("%s: the bank went %d -> %d, "
         .. "%d spent and no regen (a boost spent, whatever it found)", c.name, c.bank0, c.bankEnd, c.boost))
     end
+    ::continue::
   end
   assert(#bad == 0, #bad .. " boost-keep assertion(s) failed: " .. table.concat(bad, "; "))
   H.log("[boostkeep] VERDICT: R refused on every row the boost buys nothing on, and a boost raised before such "

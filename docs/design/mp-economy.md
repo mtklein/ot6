@@ -266,6 +266,16 @@ escalation (#463, below); Scan's boost buys breadth and Break's chips. None of t
 commands is in the gate, so the boost buys them x2/x4/x8 and nothing
 else, and the price follows at 2.5x per level.
 
+**Per body — the boost buys more of the same application (#469):** a
+reach spell's bodies, Debilitator's weaknesses and Filch's shields are each
+priced as their own use, `base x (1 + boost)` capped at 99
+(`Ot6PerPointPrice`): Safe 12 / 24 / 36 / 48, Debilitator 10 / 20 / 30 / 40,
+Filch 6 / 12 / 18 / 24. Vanilla prices its own party tier this way (Haste 10,
+Haste2 38 for the party), and Overclock and Coin Toss are OT6's precedent for
+"priced as the uses it replaces". The boost buys bodies or steps, not a
+number, so the 2.5x does not apply. Bestow's boost buys pips, which are
+their own price: it stays flat.
+
 **Flat — the boost buys certainty, and BP already paid for it:**
 **Steal**, **Rage** and **Slot**. These are the *chance verbs*, and the
 owner exempted them on 2026-09-17. Boost on them does not multiply

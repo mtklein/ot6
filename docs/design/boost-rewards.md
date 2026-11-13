@@ -1,11 +1,61 @@
 # A boost reward for every action (#469)
 
 Scope: every action a player can take in battle, what a boost buys on it
-today, and a proposal for each one that buys nothing. Design only: nothing
-here is built. DESIGN.md's rule is the starting point: "Every boost buys
+today, and a proposal for each one that buys nothing. DESIGN.md's rule is the starting point: "Every boost buys
 something (owner, 2026-10-22). An action with no reward for boosting
 doesn't take a boost ... Each such action is a design opportunity: what
 would a boost naturally buy, and which boost family does it join."
+
+## What is built
+
+The first tranche (#469, `wt/boost-rewards`): the four holes are closed and
+proposals 1, 3, 4 and 5 are built; proposal 2 is declined.
+
+- **The four holes.** NoiseBlaster and Air Anchor refuse the boost
+  (`Ot6ToolNoBoost`: R is refused on their Tools row, a boost raised on the
+  command window is dropped at the queue, `Ot6QueueFold`, and their price is
+  flat, `Ot6ToolPrice`). Certainty, proposal 4's reward for them, would buy
+  nothing: a tool's hit rate is ItemProp +21, `$FF` for both, and CheckHit
+  takes `$FF` as a certain hit, so their status already lands wherever an
+  immunity does not stop it. Debilitator has its reward (proposal 4). MagiTek
+  Confuser and X-fer refuse it (`Ot6RowNoBoost`'s MagiTek arm, R on the cell;
+  `Ot6QueueFold`'s, a boost raised before), and so does the Gravity Rod used
+  from Item (`Ot6ItemNoBoost` reads an equipment's cast spell, ItemProp +18
+  bit 7, through `Ot6SpellNoBoost`: Quartr is a fraction). A Sketch whose drawn
+  attack has no number drops its boost once the brush has drawn it
+  (`Ot6SketchNoBoost`, in Cmd_0d before `_c21554`); the menu cannot refuse R,
+  since the draw is a roll. Suites: `battle_boostreach` (NoiseBlaster, the
+  Gravity Rod), `battle_magitekboost`, `battle_sketchboost`.
+- **Proposal 1, reach**, as written below, for the fourteen spells
+  (`Ot6ReachTbl`, `ot6_reach.asm`). `Ot6SpellReach` runs in CalcAttackEffect
+  right after ChooseTarget; it and Shadow's `Ot6TrickReach` share one walk,
+  `Ot6ReachWalk`, which passes over a body that is not standing, a vanished
+  one for a physical attack, a reflecting one for a reflectable spell, and one
+  on which none of the attack's statuses would change (`Ot6ReachLands`: set
+  mode, a status it lacks and may take; lift mode, one it holds). Vanish at a
+  monster reaches nobody and its boost is dropped at the queue. The price is
+  per body, base x (1 + boost) capped at 99 (`Ot6PerPointPrice`, through
+  `Ot6MagicPrice`). Suite: `battle_boostreach` (Safe at 0, 1 and 2 points,
+  Imp at a monster).
+- **Proposal 2, Def., is declined** (owner, 2026-11-13: leave Defend
+  unboostable). Def. keeps refusing the boost as before (`Ot6CmdNoBoost`, a
+  boost raised on the command window is dropped); `battle_boostkeep`'s Def.
+  cases still hold it.
+- **Proposal 3, Bestow**, as written: the pips pending, one at 0 or 1 point,
+  as many as the ally can hold, and Locke is charged exactly those
+  (`Ot6Bestow`). Suite: `battle_boostkeep`.
+- **Proposal 4, Debilitator**: one firing and one more a point, stopping
+  when the body has no element left (`Ot6DebilSteps`, a loop in
+  TargetEffect_56), priced per firing (`Ot6ToolPrice`: 10 / 20 / 30 / 40,
+  80 overclocked). Suite: `battle_boostreach`.
+- **Proposal 5, Filch**, as written: `Ot6TakeShields` with one plus the
+  points, the first shield banking the pip, priced per shield
+  (`Ot6ThiefCharge`, `Ot6ThiefRowCost`: 6 / 12 / 18 / 24). A boost that finds
+  no shield (a Broken or shieldless body) is spent: only the resolve can tell.
+  Suite: `battle_boostkeep`.
+
+`Ot6PerPointPrice` is mp-economy.md's per-body arm, beside the multiplier's
+x2.5 and the chance verbs' flat price.
 
 ## What a boost point buys
 
@@ -41,7 +91,7 @@ guidelines, a bug.
 | Fight, Capture, Mug | swings |
 | Jump (Dragoon Boots) | the multiplier (command `$16` is outside `Ot6BoostDmg`'s gate; read, not played) |
 | Item: Potion, Tonic, Ether and the rest that heal a number | the multiplier |
-| Item: equipment used as a spell (rods, shields) | the multiplier, when the spell has a number |
+| Item: equipment used as a spell (rods, shields) | the multiplier, when the spell has a number; refused when it has none (the Gravity Rod, #469) |
 | Item: Antidote, Eyedrop, Soft, Remedy, Green Cherry, Echo Screen | refused |
 | Item: Fenix Down, Revivify, X-Potion, X-Ether, Elixir, Megalixir, Tent, Sleeping Bag | refused (fractions) |
 | Item: Smoke Bomb, Warp Stone | refused |
@@ -49,7 +99,7 @@ guidelines, a bug.
 | Magic with a number (Drain, Pearl, Flare, Quake, Merton, Osmose, Ultima...) | the multiplier |
 | Scan | every enemy at a point; Study at 3 (Strago) |
 | Break | a shield a point |
-| Magic, single-target statuses: Safe, Shell, Rflect, Vanish, Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle, Stop, Imp, Dispel | refused |
+| Magic, single-target statuses: Safe, Shell, Rflect, Vanish, Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle, Stop, Imp, Dispel | reach (#469; Vanish on the party only) |
 | Magic, death: Doom, X-Zone | refused |
 | Magic, fractions: Demi, Quartr, W Wind | refused |
 | Magic: Float, Warp, Quick | refused |
@@ -64,8 +114,8 @@ guidelines, a bug.
 | Revert | refused (`Ot6RevertTake`) |
 | Runic | duration; RunicBlade at 3 (Celes) |
 | Steal | certainty |
-| Filch | refused |
-| Bestow | refused (it hands one pip at every boost) |
+| Filch | a shield a point (#469) |
+| Bestow | the pips pending (#469) |
 | Trickshot | the multiplier |
 | Dismantle | steps |
 | Appraise | every enemy at a point |
@@ -73,7 +123,8 @@ guidelines, a bug.
 | SwdTech | the tech (the cursor row is the boost); Cleave at 3 (Cyan) |
 | Blitz | the multiplier; Bum Rush at 3 (Sabin) |
 | Tools with a number: AutoCrossbow, Bio Blaster, Flash, Drill, Chain Saw | the multiplier; Overclock at 3 (Edgar) |
-| Tools without one: NoiseBlaster, Debilitator, Air Anchor | **spent for nothing**, at an escalating price |
+| Tools without one: NoiseBlaster, Air Anchor | refused (#469) |
+| Debilitator | a weakness a point (#469) |
 | Throw, a damaging item | the multiplier |
 | Throw, the smoke and the exit | reach |
 | Slot | the rig's certainty |
@@ -82,13 +133,13 @@ guidelines, a bug.
 | Dance | the multiplier on every step, and the stumble's certainty |
 | Rage | the coin's certainty |
 | Leap | refused (`Ot6CmdNoBoost`) |
-| Sketch | the multiplier when the sketched attack has a number; **spent for nothing** when it has none |
+| Sketch | the multiplier when the sketched attack has a number; dropped when it has none (#469) |
 | Control, and the commanded monster's attacks | refused (`Ot6CmdNoBoost`, at the head of both branches) |
 | Mimic | what the copied action's boost buys; kept where that is nothing |
 | Umaro's arms | swings, the multiplier, throws; Storm at 3 |
 | Assassinate | the divine (Shadow) |
 | MagiTek beams with a number, Health, Shock | the multiplier |
-| MagiTek: Confuser, X-fer | **spent for nothing** (#469's opening comment) |
+| MagiTek: Confuser, X-fer | refused (#469) |
 | Possess | refused (`Ot6CmdNoBoost`) |
 
 ### Holes to close whatever is decided
