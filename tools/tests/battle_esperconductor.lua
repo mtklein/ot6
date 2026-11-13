@@ -83,6 +83,9 @@ H.run({ maxFrames = 700000 }, {
     end),
     H.cond(function() return tgt ~= nil end,
       { H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000 }),
+        -- the plan is done at the confirm; the Bolt lands when EDGAR's turn resolves
+        H.waitUntilSoft(function() return #writes > 0 or not H.battleLoadStarted() end, 2400, "the Bolt lands"),
+        H.waitFrames(30),
         H.call(function()
           H.log(string.format("[conductor] slot %d's shield writes during the cast: %s", tgt.slot,
             table.concat(writes, ",")))
@@ -94,8 +97,8 @@ H.run({ maxFrames = 700000 }, {
             .. "(one for the weakness, one for Conductor)")
           done, tgt = true, nil
         end),
-        H.cond(function() return H.battleLoadStarted() end, { H.kitBattle({}, {}) }, {}) },
-      { H.kitBattle({}, {}) }),
+        H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}) },
+      { H.fightBattleByMenu(40000) }),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the map", 2),
     H.fieldCare({ tag = "care between battles" }),
   }, "a lightning-weak monster takes EDGAR's Bolt"),
