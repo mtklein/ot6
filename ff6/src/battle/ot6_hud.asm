@@ -538,7 +538,8 @@ Ot6ShownBitTbl:
 ; goes back to it whatever happened while it was grey.
 ;
 ; Display only: it writes the sprite's palette bits and an unused palette.
-; a8/i16, db = $7e (Ot6BgHud_ext's context).  clobbers a/x/y.
+; a8/i16, db = $7e (Ot6BgHud_ext's context).  clobbers x/y; exits with the
+; whole of a clear, as the battle code it returns to expects.
 .proc Ot6GreyPaint
         .a8
         .i16
@@ -594,8 +595,13 @@ Ot6ShownBitTbl:
         cpy     #$000c
         bcc     @slot
         pla
-        rts
-.endproc
+        shorta0                 ; leave b = 0: Ot6GreyHeld's 16-bit reads
+        rts                     ;   leave $ff there, and the battle code
+.endproc                        ;   WaitFrame returns to does a 16-bit tax
+                                ;   on a with b assumed clear (the probe
+                                ;   that found it: C1/44D9 dispatching on
+                                ;   $ff04, build/attempts/wt/polish-shield-
+                                ;   hud/probes/tr5.txt)
 
 ; [ move one broken monster onto a grey copy of its palette ]
 
@@ -725,8 +731,10 @@ Ot6ShownBitTbl:
         asl
         asl
         tay
-        lda     #$0010
-        sta     OT6_SCR_COLS    ; colours left
+        clc
+        adc     #$0020
+        pha                     ; the destination's end (no scratch byte:
+                                ;   WaitFrame's callers hold their own)
 @c:     lda     $7f00,x         ; bgr555
         pha                     ; $03,s after the next push: the colour
         and     #$001f
@@ -777,8 +785,10 @@ Ot6ShownBitTbl:
         inx
         iny
         iny
-        dec     OT6_SCR_COLS
+        tya
+        cmp     $01,s
         bne     @c
+        pla
         shorta0
         ply
         rts
