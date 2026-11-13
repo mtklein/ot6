@@ -45,8 +45,12 @@ end
 local function worn(c) return H.readByte(0x1600 + 37 * c + 0x1E) end
 local function seated(c) return (H.readByte(0x1850 + c) & 7) == H.readByte(0x1A6D) and H.readByte(0x1850 + c) ~= 0 end
 
-local msgs, before, battle, done, tries = {}, nil, nil, false, 0
+local msgs, before, battle, done, tries, earns = {}, nil, nil, false, 0, 0
+local function exp24(c) local r = 0x1600 + 37 * c; return H.readByte(r + 0x11) | (H.readByte(r + 0x12) << 8)
+  | (H.readByte(r + 0x13) << 16) end
 local function arm()
+  local earn = H.sym("Ot6EsperEarn")
+  emu.addMemoryCallback(function() if battle then earns = earns + 1 end end, emu.callbackType.exec, earn, earn)
   local show = H.sym("Ot6ShowMsg")
   emu.addMemoryCallback(function()
     if battle then msgs[#msgs + 1] = { id = emu.getState()["cpu.a"] & 0xFF, v0 = H.readWord(0x2F35),
@@ -65,13 +69,15 @@ local function pace(what)
     H.waitUntil(function() return H.battleActive() end, 1200, what .. ": the battle is up", 2),
     H.call(function()
       tries = tries + 1
-      msgs = {}
+      msgs, earns = {}, 0
       battle = { form = H.readWord(0x3ED4), rand = H.readByte(0x57BD), seats = {} }
       for s = 0, 3 do
         local a = H.readByte(0x3ED8 + s * 2)
         if a < 12 then battle.seats[s] = a end
       end
       before = snapshot()
+      battle.exp = {}
+      for _, a in pairs(battle.seats) do battle.exp[a] = exp24(a) end
       H.log(string.format("[earn] battle %d: formation $%03X, random=%d", tries, battle.form, battle.rand))
     end),
   })
@@ -85,6 +91,10 @@ local function judge()
   end
   H.assertEq(battle.rand, 1, "the battle paced into on the world map is a random one (OT6_RANDBTL)")
   local pts = mp * 2
+  local won = false
+  for _, a in pairs(battle.seats) do if exp24(a) > battle.exp[a] then won = true end end
+  H.log(string.format("[earn] won=%s; Ot6EsperEarn ran %d time(s)", tostring(won), earns))
+  if not won then return false end
   local after = snapshot()
   local earners, crossed = {}, {}
   for s, a in pairs(battle.seats) do
@@ -168,7 +178,7 @@ H.run({ maxFrames = 400000 }, {
   end),
   H.driveUntil(function() return done end, 380000, {
     pace("a random battle by the opera house"),
-    H.kitBattle({}, {}),
+    H.fightBattleByMenu(40000),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
       "back on the world map", 2),
     H.call(function()
