@@ -47,13 +47,17 @@ Evidence is under `build/attempts/wt/v040-the-end/`. Line numbers are into
    fights (`d3_k0_s12` and `d3B_k0_s11` are one, opening key be4C): together
    they hold 32 distinct opening keys and 29 distinct Kefka keys
    (`build/attempts/wt/v040-the-end-4/union_keys.txt`). At 16
-   shields he still wins 4 of 48, so his row stays at 12.
+   shields he still won 4 of 48 then, so his row stayed at 12.
 7. **The Megalixir near the top of the bag.** On the entry the Barrier
    Rings' replay made (plates sha256 214d1cc7) the Megalixir sat at bag
    slot 101, the battle's Item list took 1,260 frames to reach it, and
    twice the member reaching for it fell first; moved up before the climb,
    with one Megalixir in flight at a time, the leg wins 48 of 48 again
    (27 distinct opening keys, 30 distinct Kefka keys: 5.4).
+8. **Kefka at 16 shields, the most of any boss.** On v0.42's line he wins
+   every one of the 44 runs of both grids that reach him at 16, as at 12
+   (30 distinct Kefka keys); the four runs lost are the third tier's, the
+   same at both counts (5.5).
 
 ## 1. The climb
 
@@ -90,7 +94,7 @@ unpicked in list order.
 | 512 | Magic `$15C` | 72 / 41,000 | weak earth | 8 | slash, special |
 | 513 | Girl `$15E` | 58 / 9,999 | absorbs every element | 3 | slash, pierce |
 | 513 | Sleep `$15F` | 71 / 40,000 | none | 8 | bludgeon, special |
-| 514 | Kefka `$12A` | 71 / 62,000 | none; nulls poison | 12 | slash, pierce, bludgeon, special |
+| 514 | Kefka `$12A` | 71 / 62,000 | none; nulls poison | 16 | slash, pierce, bludgeon, special |
 
 The generated floor stood for each before (six shields, slash only). The
 lessons:
@@ -106,8 +110,8 @@ lessons:
 - **Steel for the lady.** The Girl absorbs every element, so a spell heals
   her and only a weapon breaks her. When she stands alone she casts Life 2
   on the dead (`AIScript::_350`); a break holds that turn.
-- **Kefka takes every hand**, twelve shields: the last fight is the whole
-  party's.
+- **Kefka takes every hand**, sixteen shields, the most of any boss (#514,
+  5.5; twelve until v0.43): the last fight is the whole party's.
 
 `battle_breakwor_end` checks the rows in the built ROM, their vanilla weak
 and absorb bytes, that event battle 101 opens on 471 and the tier table
@@ -165,8 +169,14 @@ now that a leg boots it.
 What the leg depends on (#480): the entry contract (the statues beaten,
 parties 1 and 3 on their plates, party 2 on 412's save point), twelve
 members in the three parties, the bag's floor and its Megalixir, Phoenix and Kirin owned and
-worn by nobody with STRAGO and LOCKE in party 2, and the three standing
-after the care.
+worn by nobody with STRAGO and LOCKE in party 2, a Cure caster and a Life
+caster among the twelve once the stones are on, and the three standing
+after the care. The curers who keep their last point through Kefka's
+break (5.3) are read from the party there, not listed: each member whose
+Magic holds Cure or Life by what it has learned or the stone it wears (on
+v0.42's line "[curers] TERRA (Cure, Life), CELES (Cure), STRAGO (Life),
+LOCKE (Cure), SHADOW (Cure, Life), SABIN (Cure)": SABIN's Starlet joins the
+five the list named).
 
 ## 5. Measured
 
@@ -239,6 +249,12 @@ wor-kt-plates-v1 (entry) VIOLATED ... switch $02CA (party 2 not yet on a
 plate of 411 ...): expected 0, read 1". The positive is the leg's play: "ok:
 the three parties before Kefka: who stands = every member" (`p3`).
 `T.standing` is the one helper the three statue legs call too.
+Two more (#515, `build/attempts/wt/polish-kefka/px13/negs.sh`, from the
+graph's v0.42 `wor-kt-plates-v1`): with Phoenix's owned bit cleared, "stone
+26 for STRAGO: owned, unworn (worn by nil), STRAGO in party 2: got false";
+with every actor's learned Cure and Life cleared, every esper taken off and
+the stones off, "[curers] none" and "a Cure caster () and a Life caster ()
+among the three parties for Kefka's Fallen One ...: got false".
 
 ### 5.1 The bag, the order and Kefka's shields (second round)
 
@@ -520,11 +536,78 @@ distinct Kefka keys, every one won.
   on a new crisis, `r6g_k0_s1`). Only gen_wor_kefka sets
   `opts.megalixir`, so no other leg's play moves.
 
+### 5.5 Kefka at 16 shields on v0.42's line (#514)
+
+Evidence is under `build/attempts/wt/polish-kefka/` (`px13/` and `air/`:
+`tally_<arm>.txt`, `lab/`, `pre/`, `jobs_*.txt`, `*.head`), the same two
+grids (48 runs an arm), from the graph's `wor-kt-plates-v1` capture of
+v0.42's line (sha256 addb7578, the tracked save byte for byte: the gear
+baseline, leveling move 2, the Evil Oscar fix and the divines all upstream
+of it). The order there is "TERRA, CELES, STRAGO, SHADOW, RELM, CYAN, EDGAR,
+LOCKE, GOGO, MOG, SETZER, SABIN": RELM, third at v0.40, is fifth now.
+
+| arm | the leg | ROM | runs won | Kefka met / won (keys) | tier 3 lost (keys) | deaths in Kefka's tier |
+|---|---|---|---|---|---|---|
+| `k12` | main's leg | main's, 12 shields (7a4fd945) | 44 of 48 | 44 / 44 (30) | 4 (3) | 9 |
+| **`k16`** | main's leg | **16 shields (ec3a220e)** | 44 of 48 | **44 / 44 (30)** | 4 (3) | 20 |
+| `c16` | the curers read from the party (#515) | 16 | 44 of 48 | 44 / 44 (30) | 4 (3) | 20 |
+| `m16` | `c16` + the Megalixir open in the third tier too (`vs` the Girl and the Sleep) | 16 | 44 of 48 | 45 / 44 (27 / 1) | 3 (2) | 63 |
+| `or16` | `c16` + RELM third (her rod and brush for the Sleep) | 16 | 45 of 48 | 47 / 45 (30 / 1) | 1 (1) | 55 |
+
+Quoted: "4 Kefka: won 44, lost 0; distinct keys won 30, lost 0; deaths in
+the tier 9" and "Kefka's battle: 48 runs; won 44, lost 4, other 0; distinct
+opening keys won 26, lost 3" (`px13/tally_k12.txt`); "4 Kefka: won 44, lost
+0; distinct keys won 30, lost 0; deaths in the tier 20" and the same battle
+line (`px13/tally_k16.txt`, `air/tally_c16.txt`); "4 Kefka: won 44, lost 1;
+distinct keys won 27, lost 1; deaths in the tier 63" (`air/tally_m16.txt`).
+Every arm's "3 lady+sleeper: won 44, lost 4; distinct keys won 26, lost 3"
+(`m16`: "won 45, lost 3"). `or16`: "3 lady+sleeper: won 47, lost 1; distinct
+keys won 30, lost 1; deaths in the tier 105; ticks 10000-24494", "4 Kefka:
+won 45, lost 2; distinct keys won 30, lost 1; deaths in the tier 55",
+"Kefka's battle: 48 runs; won 45, lost 3" (`px13/tally_or16.txt`).
+
+- **Kefka at 16 holds wherever he is met.** At 16 he lost none of the 44
+  runs that reached him, on 30 distinct Kefka keys, as at 12; the first
+  three tiers play byte for byte as at 12 (the same four runs lost, the same
+  keys), so the battle's outcome is the same on every one of the 48 draws.
+  He costs more at 16: 20 deaths in his tier across the grids against 9.
+  His row is 16, the most of any boss (Storm Drgn 14), and
+  `battle_breakwor_end` holds it above every other row.
+- **What loses is the third tier, at 12 and at 16 alike**: four runs on
+  three tier-3 keys (be2C twice, beA8, be34), the four members killed by
+  the Sleep's Meteo two at a time ("[death] f+14458 entity 1 char 6 from
+  667/5539 by slot 3 cmd $0C atk $DF" and entity 2 in the same frame,
+  `k16_k2_s4`) and its Special, after Condemned on SHADOW ("entity 3 char 3
+  from 3179/4956 by nobody", twice, `k16B_k0_s6`). The tier is twice as long
+  as at v0.40 (16,181-38,741 ticks against 7,945-22,065, `tally_r6_*`) with
+  188 deaths against 109. That is a regression of the line upstream (the
+  front four's levels and HP: CELES L63 5,539 against L68 6,313, RELM 4,942
+  against 6,358), not of Kefka's row; it is #514's open end, below.
+- **Not kept**: the Megalixir in the third tier (`m16`): the crises there
+  come as Meteo's double kills, faster than the 30% trigger; it turned one
+  losing key's run into a win (`m16B_k0_s6`, by the care lines' party item:
+  "party item $EF: 3 members inside their round"), but drinking it there
+  left Kefka without it and he won one run (`m16_k4_s13`, 9 deaths in his
+  tier). The curers read from the party (`c16`) add SABIN (Starlet) to the
+  five and moved nothing: `c16`'s tallies are `k16`'s.
+- **RELM third** (`or16`) puts the third tier back in v0.40's shape (105
+  deaths, 10,000-24,494 ticks, one run lost) but meets Kefka on a key he
+  wins at 16 only with the stock order: be78, lost twice at 16 ("tier 4
+  Kefka LOST after 7166 ticks, 4 deaths", `or16_k0_s8`, `or16B_k0_s7`: Fallen
+  One, CELES fell reaching for the Megalixir and his Fire 3 took TERRA and
+  STRAGO at 1 HP before the second landed) and won at 12 on the same draws
+  ("tier 4 Kefka WON after 21311 ticks, 6 deaths, key be78", `or12_k0_s8`,
+  `or12B_k0_s7`; `or12_k2_s9` lost the same third tier as `or16_k2_s9`). So
+  16 is thinner than 12 with Kefka, though on the line's own order it
+  decides no draw. Not kept: the order stays the strongest first.
+
 ## 6. Not done
 
-- **Every draw at 16 shields.** At 12 the leg wins every draw of both grids
-  (5.3); at 16, the owner's want, Kefka wins 4 of 48 (`k16`), so the row
-  stays at 12 until a lever closes those.
+- **The third tier on every draw** (#514's open end): on v0.42's line the
+  lady and the sleeper take 4 of 48 runs at 12 shields and at 16 (5.5), so
+  the battle no longer wins every draw at either count. Kefka's row is 16
+  because he holds there wherever he is met; the third tier needs its own
+  lever (the order, levels or kit for the front four).
 - **STRAGO's options** (#512): his nuke lore never reaches his turns
   (`v039-kefka-tower-2/pg0`: "actor=1 char=7 plan=fight" every turn, no lore
   line at all, so a rule ahead of the nuke repertoire decides first); Kefka's

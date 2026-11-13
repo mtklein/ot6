@@ -36,3 +36,5 @@ looks like one of the weakness icons next to it. A broken enemy now turns
 grey until it recovers, and its shield is drawn cracked. In a fight with
 several kinds of enemies, a broken enemy may keep its colours; the
 cracked shield still marks it.
+
+**Kefka has more shields.** Kefka now has 16 shields instead of 12, the most of any boss in the game.
