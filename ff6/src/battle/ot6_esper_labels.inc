@@ -105,7 +105,7 @@ Ot6RungLabelTbl:
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b5,$ff,$ff   ; Sraphim 2: Mag.Pwr +1
         .byte   $8d,$a8,$ff,$83,$a8,$a8,$a6,$ff,$ff,$ff,$ff,$ff   ; Sraphim 3: No Doom
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b6,$ff,$ff   ; Sraphim 4: Stamina +2
-        .byte   $86,$ab,$9a,$9c,$9e,$ff,$ff,$ff,$ff,$ff,$ff,$ff   ; Sraphim 5: Grace
+        .byte   $82,$ae,$ab,$9e,$ff,$91,$a2,$a7,$a0,$ff,$ff,$ff   ; Sraphim 5: Cure Ring
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Golem 1: Stamina +1
         .byte   $95,$a2,$a0,$a8,$ab,$ff,$ff,$ff,$ca,$b5,$ff,$ff   ; Golem 2: Vigor   +1
         .byte   $8d,$a8,$ff,$8c,$ae,$9d,$9d,$a5,$9e,$ff,$ff,$ff   ; Golem 3: No Muddle
