@@ -85,7 +85,7 @@ local function close()
   if rec == nil or not rec.ended or H.frame <= rec.ended + 1 then return false end
   rec.mp1 = mp()
   recs[#recs + 1] = rec
-  H.log(string.format("[overclock] use %d: NoiseBlaster at %d BP (f%d): %d firing(s), MP %d -> %d", #recs,
+  H.log(string.format("[overclock] use %d: Debilitator at %d BP (f%d): %d firing(s), MP %d -> %d", #recs,
     rec.pend, rec.f, rec.passes, rec.mp0, rec.mp1))
   rec = nil
   return true
@@ -116,7 +116,7 @@ local function use(boost)
     H.kitBattle({ { who = EDGAR, cmd = CMD_TOOLS, row = TOOL, boost = boost } },
       { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = function() return close() end }),
     H.call(function() ended = true end),
-  }, "a 3-BP NoiseBlaster use, or the party in danger"), function() ended = false end)
+  }, "a 3-BP Debilitator use, or the party in danger"), function() ended = false end)
 end
 
 -- the route's fight driver fights the battle out from wherever it stands
