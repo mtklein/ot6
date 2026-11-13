@@ -559,6 +559,8 @@ TEST_ENV = {
     # house, and the ladder's page under Skills (twelve stones owned)
     "battle_esperearn":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    "battle_esperladder":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "menu_esperdetail":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     "battle_economizer": "OT6_TIMEOUT=1800 "
