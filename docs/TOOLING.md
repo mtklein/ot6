@@ -574,8 +574,8 @@ before calling into it (README.md there, "Render on demand" and "Script
 callbacks, paid per use"); the eleventh (#396) advances the master clock a
 whole memory access at a time when its 2-clock steps would only count, and
 leaves the same machine state (README.md there, "Batched clock stepping":
-48 legs on px13 and the Air made the same savestates; about 1.4x as fast
-on px13, 1.1x on the Air). On px13 and on the Air the first four played six
+33 legs from power-on to the end made the same savestates on px13, and on
+the Air; about 1.4x as fast on px13, 1.1x on the Air). On px13 and on the Air the first four played six
 legs (the full gen_zozo2_arrival, battle_rage, a cold boot, an SRAM
 Continue, an in-game save, wipe_reclass) exactly as a stock 2.2.1 build
 did: every log line but `[CPU]`/`[emulator]`, every screenshot, every
