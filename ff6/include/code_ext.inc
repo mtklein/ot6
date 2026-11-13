@@ -117,7 +117,7 @@ CODE_EXT_INC = 1
 .global Ot6EsperFold             ;   victory, its messages, the kept rungs folded
 .global Ot6EsperProgress, Ot6EsperContinue ; into UpdateEquip, a character's count
                                  ;   for the menu (ot6_esper.asm)
-.global Ot6LadderTbl, Ot6RungLabelTbl, Ot6RungCostTbl, Ot6EsperBattleInit
+.global Ot6LadderTbl, Ot6RungLabelTbl, Ot6RungCostTbl, Ot6EsperBattleInit, Ot6EsperImmune
 .global Ot6DanceRowDecorate      ; #34: DrawDanceListText's per-row MP cost
                                  ;   (flat Ot6DanceCost)
 .global Ot6RestageGate_ext, Ot6FramePost_ext, Ot6NmiScratchRestore_ext
