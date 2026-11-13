@@ -60,10 +60,10 @@ proposals 1, 3, 4 and 5 are built; proposal 2 is declined.
   (`Ot6Bestow`). Suite: `battle_boostkeep`.
 - **Proposal 4, Debilitator**: one firing and one more a point, stopping
   when the body has no element left (`Ot6DebilSteps`, a loop in
-  TargetEffect_56), priced per firing (`Ot6ToolPrice`: 10 / 20 / 30 / 40,
+  TargetEffect_56), priced per point (`Ot6ToolPrice`: 10 / 20 / 30 / 40,
   80 overclocked). Suite: `battle_boostreach`.
 - **Proposal 5, Filch**, as written: `Ot6TakeShields` with one plus the
-  points, the first shield banking the pip, priced per shield
+  points, the first shield banking the pip, priced per point
   (`Ot6ThiefCharge`, `Ot6ThiefRowCost`: 6 / 12 / 18 / 24). A boost that finds
   no shield (a Broken or shieldless body) is spent: only the resolve can tell.
   Suite: `battle_boostkeep`.

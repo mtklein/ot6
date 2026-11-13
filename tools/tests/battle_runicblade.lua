@@ -229,16 +229,17 @@ end
 -- handed to the fight driver, danger() above) is left and the next starts
 -- them over, up to BATTLES.  Measured at 54d4955d (#469's second review) on
 -- the tracked wor-tomb-v1, over 0-15 encounters used up first (PACE_BURN),
--- with the hand-over in place: 16 successes in 48 battles, the battle counts
--- 3, 2, 1, 7, 6, 5, 4, 3, 2, 1, 5, 4, 1, 2, 1, 1 for burns 0-15, every
--- battle before the passing one handed over with a member down
--- (build/attempts/wt/boost-rewards-4/labs/blade_b*/).  The rate is 0.33;
--- its one-sided 95% (Clopper-Pearson) lower bound is 0.22, and at it
--- BATTLES = 37 misses with 0.778^37 = 9.4e-5, under 1e-4 (at the measured
--- rate, 0.667^37 = 3e-7).  The burns share much of one encounter sequence,
--- so the 48 battles are not 48 independent draws; the bound is the
--- conservative one for that reason.
-local BATTLES = 37
+-- with the hand-over in place: the battle each burn passed at was 3, 2, 1, 7,
+-- 6, 5, 4, 3, 2, 1, 5, 4, 1, 2, 1, 1 (build/attempts/wt/boost-rewards-4/
+-- labs/blade_b*/), every battle before it handed over with a member down.
+-- That is 48 battles but not 48 draws: the pass is close to a function of
+-- the absolute encounter index (the passing battle + the burn), so encounter
+-- 3 covers burns 0-2, encounter 10 burns 3-9, and so on.  Counted by
+-- encounter, about 5 passes in 16 distinct encounters; dependence widens the
+-- interval rather than narrowing it, so the bound is taken on 5 of 16: its
+-- one-sided 95% (Clopper-Pearson) lower bound is 0.132, and BATTLES = 66
+-- misses with 0.868^66 = 8.8e-5, under 1e-4.
+local BATTLES = 66
 local battles, ok = 0, false
 local body = {
   H.cond(function() return not inBattle() end, {
@@ -364,6 +365,6 @@ local steps = {
       H.call(function() burned = burned + 1; H.log(string.format("[blade] burned encounter %d of %d", burned, burn)) end),
     }, "the encounters PACE_BURN uses up")
   end)(),
-  H.driveUntil(function() return ok end, 500000, body, "the three steps in one battle"),
+  H.driveUntil(function() return ok end, 900000, body, "the three steps in one battle"),
 }
-H.run({ maxFrames = 600000 }, steps)
+H.run({ maxFrames = 1000000 }, steps)

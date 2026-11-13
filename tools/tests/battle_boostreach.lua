@@ -367,7 +367,7 @@ local function runCase(c)
             for k = 1, 3 do
               local e = (t + 2 * k) % 8
               if stands(e) and safe(e) then passed = true
-              elseif stands(e) and passed then c.allyT = t // 2; break
+              elseif stands(e) and passed and lands(e, SAFE) then c.allyT = t // 2; break
               elseif stands(e) then break end
             end
           end
@@ -375,7 +375,8 @@ local function runCase(c)
         H.assertEq(c.allyT ~= nil, true, c.name .. ": a seat whose walk passes a body under Safe before one it reaches")
       end
       c.aimBit = c.ally and H.readWord(0x3018 + c.allyT * 2) or H.readWord(0x3018 + 8 + tgtMon * 2)
-      c.safe0, c.imp0 = {}, {}
+      c.safe0, c.imp0, c.lands0 = {}, {}, {}
+      for e = 0, 6, 2 do c.lands0[e] = lands(e, SAFE) end
       for e = 0, 6, 2 do
         c.safe0[e] = (H.readByte(0x3EF8 + e) & 0x40) ~= 0
         c.imp0[e] = (H.readByte(0x3EE4 + e) & 0x20) ~= 0
@@ -687,7 +688,7 @@ steps[#steps + 1] = H.call(function()
             passed = passed + 1
             check((c.mask & (1 << (e // 2))) == 0, string.format("%s: the walk passed over entity %d, already under "
               .. "Safe (mask $%04X)", c.name, e, c.mask))
-          elseif passed > 0 and beyond == nil and H.readByte(0x3ED8 + e) ~= 0xFF then
+          elseif passed > 0 and beyond == nil and c.lands0[e] then
             beyond = e
           end
         end

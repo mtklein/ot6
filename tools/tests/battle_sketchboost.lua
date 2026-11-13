@@ -163,7 +163,8 @@ local function runTry(t)
       H.setPad({})
       H.log(string.format("[sketch] try %d (delay %d%s): pending at the confirm %s; drew %s%s; bank %s -> %s", t.n,
         t.delay, t.inject and string.format(", $%02X injected", t.inject) or "", tostring(t.pendAtConfirm), t.drawn and string.format("$%02X", t.drawn) or "nothing (missed)",
-        t.drawn and (noNumber(t.drawn) and " (no number)" or " (a number)") or "", tostring(t.bank0),
+        t.drawn and (noNumber(t.drawn) and " (buys nothing)" or (t.drawn == SCAN and " (Scan: breadth)"
+          or " (a number)")) or "", tostring(t.bank0),
         tostring(t.bankEnd)))
     end),
   }
