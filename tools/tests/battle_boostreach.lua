@@ -55,7 +55,7 @@
 --                  body has no element left; 80 MP.  The Tools list's drawn
 --                  price (the decorator's cost cell) is the charge.
 -- The run: Continue wor-kohlingen-v1 (EDGAR SABIN CELES SETZER outside
--- Kohlingen), pace to an encounter with two or more bodies standing, one with
+-- Kohlingen), CELES equips Phantom through the field menu (Vanish, Demi), pace to an encounter with two or more bodies standing, one with
 -- a shield (the target); everyone Defends until EDGAR's window opens with
 -- three pips banked (snapshot E), then on to CELES's with three (snapshot C).
 -- Nothing is written; everything is observed.
@@ -69,6 +69,7 @@ local BANK, PEND, CURMP, BATTINV = 0x3E9C, 0x3E9D, 0x3C08, 0x2686
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_TOOLS = 0x00, 0x01, 0x02, 0x09
 local EDGAR, SABIN, CELES, SETZER = 4, 5, 6, 9
 local SAFE, IMP, VANISH = 0x1C, 0x23, 0x26
+local PHANTOM = 20
 local NOISE, DEBIL, GRAVITY = 0xA3, 0xA7, 0x3A
 local BURN = type(BOOSTREACH_BURN) == "number" and BOOSTREACH_BURN or 0
 local DRAWS = 12 + BURN
@@ -484,6 +485,10 @@ local steps = {
     MPB = H.sym("MagicProp") & 0x3FFFFF
     installObservers()
   end),
+  -- CELES puts on Phantom (owned, worn by nobody here) through the field menu,
+  -- as a player would for its spells: Vanish and Demi, the latter one the
+  -- boost buys nothing on (a fraction)
+  H.equipEsper(function() return (H.readByte(0x1850 + CELES) >> 3) & 3 end, PHANTOM, { tag = "Phantom -> CELES" }),
   (function()
     local P = H.newPacer({ tag = "boostreach pace" })
     local sx, sy

@@ -1,3 +1,4 @@
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- lab_anchor.lua -- does Air Anchor deal damage, and does a boost multiply it?  (#469 review; a one-off lab)
 -- OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-dino-v1 tools/tests/run.sh tools/tests/lab_anchor.lua <log>
 -- EDGAR throws Air Anchor at 0 BP, then at 1 BP, in one battle (H.kitBattle); everyone else Defends.  Logged: the
