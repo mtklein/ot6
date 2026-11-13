@@ -24,7 +24,7 @@ local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __
 
 local function arm()
   emu.addMemoryCallback(function(addr, v)
-    if tgt and addr == 0x7E3E38 + tgt.ent then writes[#writes + 1] = v end
+    if tgt and (addr & 0xFFFF) == 0x3E38 + tgt.ent then writes[#writes + 1] = v end
   end, emu.callbackType.write, 0x7E3E38, 0x7E3E38 + 0x14)
 end
 
@@ -97,6 +97,7 @@ H.run({ maxFrames = 700000 }, {
         H.cond(function() return H.battleLoadStarted() end, { H.kitBattle({}, {}) }, {}) },
       { H.kitBattle({}, {}) }),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the map", 2),
+    H.fieldCare({ tag = "care between battles" }),
   }, "a lightning-weak monster takes EDGAR's Bolt"),
   H.logStep("[conductor] PASS: the signature's Bolt takes two shields from a lightning-weak monster"),
 })
