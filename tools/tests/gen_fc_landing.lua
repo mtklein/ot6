@@ -262,8 +262,16 @@ H.run({ maxFrames = 600000 }, flatten({
   -- shop (POTION to 65 -- the combat heal; FENIX DOWN to ~level; TONIC 99),
   -- then the bag arranged so the combat items sit at slots 0-4, then back
   -- out to the world for the boarding walk (measured: probe_fc_prep.lua).
+  H.call(function()
+    -- the held RIGHT below enters Thamasa from this tile and no other (#528)
+    H.assertEq(H.worldMode() and H.worldX() == 249 and H.worldY() == 128, true,
+      string.format("at (249,128), west of Thamasa, on the world map (at (%d,%d), map %d)",
+        H.worldX(), H.worldY(), H.readWord(0x1f64) & 0x1FF))
+  end),
+  -- ends off the world for Thamasa, not in a Tent the walk's care pitches
+  -- after a battle on the step (#522's H.offWorld, #528)
   (function() local W = H.newWalkFighter("held RIGHT onto (250,128)")
-    return H.driveUntil(function() return not H.worldMode() end, 2000, {
+    return H.driveUntil(function() return H.offWorld() end, 2000, {
       H.call(function()
         if W.frame() then return end
         H.setPad({ right = true })

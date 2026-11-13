@@ -19,12 +19,16 @@ local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
--- gen_vector_entry's grind-and-replan world walker
+-- gen_vector_entry's grind-and-replan world walker.  It ends at the tile,
+-- or off the world map for a field map (H.offWorld), not in the Tent's
+-- interior (map 3): the walk's own field care can pitch a Tent after a
+-- battle, and read as "left the world" the Tent ended the walk wherever it
+-- stood (#522, gen_voyage; #528).
 local function worldGrind(tx, ty, what)
   local plan, idx, ph = nil, 1, 0
   local W = H.newWalkFighter(what or string.format("worldGrind (%d,%d)", tx, ty))
   return H.driveUntil(function()
-    return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
+    return H.offWorld() or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 30000, {
     H.call(function()
@@ -269,6 +273,12 @@ H.run({ maxFrames = 260000 }, {
 
   -- ---- 5. the base re-cross, battle 123, the crash -------------------------
   worldGrind(167, 194, "pocket walk -> (167,194)"),
+  H.call(function()
+    -- the held LEFT below enters the base from this tile and no other (#528)
+    H.assertEq(H.worldMode() and H.worldX() == 167 and H.worldY() == 194, true,
+      string.format("the pocket walk ends at (167,194), east of the base, on the world map (at (%d,%d), map %d)",
+        H.worldX(), H.worldY(), map()))
+  end),
   pressWalk("left", function() return not H.worldMode() and map() == 377 end,
     900, "(166,194) -> IMPERIAL BASE east door (30,13)"),
   H.waitUntil(landed(377, 10), 2400, "base east landing", 1),

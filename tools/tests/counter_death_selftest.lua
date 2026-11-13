@@ -60,6 +60,7 @@ end
 
 local FIGHT_ROW, MAGIC_ROW = 0x00, 0x02
 local OSCAR, SKYBASE, VETERAN, ALLOVER, APOK, RETAINER, QUIET = 0x0B7, 0x0FC, 0x0FB, 0x0BB, 0x00C, 0x007, 0x00D
+local PHASE, COELECITE = 0x0BC, 0x0B3
 local FIRE, METEOR = 0x00, 0x13
 -- a battle: party entity 0 (and `others`) at 3000 HP, Fight and Magic on
 -- the command table, no command queued; `mons[slot] = { species, hp }`
@@ -130,26 +131,39 @@ check("a Fire at a lone Veteran (Roulette) becomes a Fight (it answers a Fight w
     return p.kind == "fight" and p.reason == "counter_magic"
   end)
 check("a Fight aimed at Allo Ver (Doom on any hit) goes to the body beside it",
-  { { "if not noDeath and self:deathAnswer(slot, e, a, true) ~= nil then return hp end\n", "" },
+  { { "if not noDeath and self:deathAnswer(slot, e, a) == e then return hp end\n", "" },
     { "if dk ~= nil and killed == nil then killed = dk end", "" } },
   function(H)
     battle({ [0] = { ALLOVER, 8000 }, [1] = { QUIET, 5000 } })
     local p = driver(H):counterAimPlan(0, { kind = "fight", row = 0, aim = 0 })
     return p.aimHard == 1
   end)
-check("a lone Apokryphos's L.5 Doom kills the actor at level 40, a partner at 40, nobody at 41",
-  { { 'if not onlyE and M.deathReach(b(0)) == "party" then', "if false then" } },
+-- a counter's L.5 Doom lands on the one who struck alone (#528: CheckRetal
+-- presets $b8, ChooseTarget keeps it for $2C targeting), not on a partner
+-- at a multiple of five
+local function lone5(H)
+  local FIGHT = { cmd = 0x00 }
+  battle({ [0] = { APOK, 9000 } }, { party = { [0] = 40 } })
+  local top, _, _, _, k = driver(H):counterWorst(0, 0, FIGHT, 3000)
+  if not (top == 3000 and k == 0) then return false end
+  battle({ [0] = { APOK, 9000 } }, { party = { [0] = 41, [1] = 40 } })
+  top, _, _, _, k = driver(H):counterWorst(0, 0, FIGHT, 3000)
+  if not (top < 3000 and k == nil) then return false end
+  -- and a Fight from level 41 stays on it with the partner at 40
+  local p = driver(H):counterAimPlan(0, { kind = "fight", row = 0, aim = 0 })
+  return p.aimHard == nil and p.aim == 0
+end
+check("a lone Apokryphos's counter L.5 Doom kills the actor at level 40, not a partner at 40 (deathAnswer asks a counter's reach)",
+  { { 'if M.deathReach(b(0), true) == "party" then', 'if M.deathReach(b(0)) == "party" then' } }, lone5)
+check("a lone Apokryphos's counter L.5 Doom kills the actor at level 40, not a partner at 40 (M.deathReach's counter rule)",
+  { { 'if counter then return "attacker" end', "" } }, lone5)
+check("a dying Coelecite beside one other body answers with Magnitude8 (if_num_monsters 1 on the bodies the hit leaves)",
+  { { "if u.monsters == nil then u.monsters = n - (u.dies == true and 1 or 0) end",
+      "if u.monsters == nil then u.monsters = n end" } },
   function(H)
-    local FIGHT = { cmd = 0x00 }
-    battle({ [0] = { APOK, 9000 } }, { party = { [0] = 40 } })
-    local top, _, _, _, k = driver(H):counterWorst(0, 0, FIGHT, 3000)
-    if not (top == 3000 and k == 0) then return false end
-    battle({ [0] = { APOK, 9000 } }, { party = { [0] = 41, [1] = 40 } })
-    top, _, _, _, k = driver(H):counterWorst(0, 0, FIGHT, 3000)
-    if not (top < 3000 and k == 1) then return false end
-    battle({ [0] = { APOK, 9000 } }, { party = { [0] = 41, [1] = 41 } })
-    top, _, _, _, k = driver(H):counterWorst(0, 0, FIGHT, 3000)
-    return top < 3000 and k == nil
+    battle({ [0] = { COELECITE, 400 }, [1] = { QUIET, 5000 } })
+    local _, _, atks = driver(H):counterWorst(0, 0, { cmd = 0x00, dies = true }, 3000)
+    return #atks == 1 and atks[1] == 0xBC
   end)
 check("the Apokryphos beside another body answers nothing (if_num_monsters 1, on the bodies standing)",
   { { "if u.monsters == nil then", "if false then" },
@@ -240,6 +254,24 @@ check("a Meteor (every body) with the Oscar standing, and a Fire spread over it,
     if p.kind ~= "fight" then return false end
     p = driver(H):counterMagicPlan(0, { kind = "magic", spell = FIRE, all = true })
     return p.kind == "fight"
+  end)
+check("a Fire spread by its scored contract (tc.all) with the Oscar standing becomes a Fight",
+  { { "local spread = plan.all or (tc ~= nil and tc.all) or", "local spread = plan.all or" } },
+  function(H)
+    battle({ [0] = { QUIET, 5000 }, [1] = { OSCAR, 7000 } })
+    local p = driver(H):counterMagicPlan(0, { kind = "magic", spell = FIRE,
+      targetContract = { chars = 0, monsters = 3, all = true } })
+    return p.kind == "fight" and p.reason == "counter_magic"
+  end)
+check("a Fire at the Phase (Blow Fish, 1000, on any hit) goes to the body beside it from 900 HP, stays from 3000",
+  { { "if killed == nil and top < hp then return nil end", "if killed == nil then return nil end" } },
+  function(H)
+    battle({ [0] = { QUIET, 5000 }, [1] = { PHASE, 7000 } })
+    local p = driver(H):counterMagicPlan(0, { kind = "magic", spell = FIRE, aim = 1 })
+    if not (p.kind == "magic" and p.aimHard == nil and p.aim == 1) then return false end
+    battle({ [0] = { QUIET, 5000 }, [1] = { PHASE, 7000 } }); w16(0x3BF4, 900)
+    p = driver(H):counterMagicPlan(0, { kind = "magic", spell = FIRE, aim = 1 })
+    return p.kind == "magic" and p.aimHard == 0
   end)
 
 check("the verb veto (#372) does not price a Death: a Pummel beside the Sky Base is not refused",
