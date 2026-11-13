@@ -16,11 +16,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "4b7d6b31dc2a2442a14f5850da44b3c2eb52535c8c9b9dd39af12bfad010eceb",
-    "generator_sig": "6e59b8036c3c9d5085340608002376b88602715f65e2dc90dd7b9f5a0083b196 gen_sabin_magitek",
+    "generator_sig": "0324a63b9f2f1930e6edca549bf2d812b94f9c5c3b0b5bd3db5c49809f8d50f4 gen_sabin_magitek",
     "ancestors": [
       {
         "path": "build/states/doma_defended.stamp",
-        "sha256": "ff2ef99464072bb30cfccb908e3da7457181071d48d817f977b2956ed1f5960c"
+        "sha256": "8208617d6f48ec4057a6dbee102ee3000c44e6585502052a783dbaf3e65daad6"
       }
     ]
   }

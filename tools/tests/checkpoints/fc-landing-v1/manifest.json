@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "6e37cf106faee1858c47a22b7209415689277b194bc9d57c8c975dc07e62e504",
-    "generator_sig": "678cfeaab75dab7cd3e2b3f73439166f33f0e8b34799fbbf7b1a3ef4a3e57125 gen_fc_landing build/checkpoints/thamasa-done-v1/manifest.json build/checkpoints/thamasa-done-v1/thamasa-done.sram",
+    "generator_sig": "a79aaa7bb533f26046f43561a90120d65015b30ace0b58e14772ad0e2263c642 gen_fc_landing build/checkpoints/thamasa-done-v1/manifest.json build/checkpoints/thamasa-done-v1/thamasa-done.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/thamasa-done-v1/manifest.json",
-        "sha256": "6d2e9dd6e95dc0efc706bfa3d8a5891e58628ad98057eab7e625ee0a0846f7c7"
+        "sha256": "ea7cb0d86e3e79d699f5b73facbbe43021d56a44cef88dac858adaad5c981ea7"
       }
     ]
   }

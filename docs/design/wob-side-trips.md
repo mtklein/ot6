@@ -180,28 +180,27 @@ leads to it); its pool is group 68, the clearing's, won on 132.
 
 Under `build/attempts/wt/v043-wob-zones/`:
 
-- `replay2/`: the play from power-on at dbc09160 (rebased on main's de4ee995) on
-  px13 (`gate_dbc09160.log`, `ninja -k 0`; its one red edge, battle_ragedriver,
-  read GAU's Rage price only over battles he did not level up in, and every
-  possessed battle of this play levelled him; the suite now reads his battle
-  MP, and the gate at fcde78a1 is green, `gate2.log`), with each leg's log.
-  Every battle won, none fled by choice:
+- `replay3/`: the play from power-on at 84d9daa2 (rebased on main's e3f989e4,
+  emulator pin ot6-2.2.1-7) on px13: "gate: GREEN -- ninja -k 0 -j 4 exited 0"
+  (`gate.log`), with each leg's log. Every battle won, none fled by choice; the
+  same counts as the dbc09160 replay (`replay2/`):
 
-  | leg | battles (distinct keys) | the hunts | not clean |
-  |---|---|---|---|
-  | `wob_forest_hunt` | 6 (6) | 132: 2; 134: 2 | - |
-  | `wob_train_hunt` | 11 (11) | 151: 11 | - |
-  | `wob_south_hunt` | 15 (14) | group 20: 10; group 17: 2 | the Bug's spine petrified a member 4 times (cured after the battle) |
-  | `wob_airship_hunt` | 23 (22) | group 27: 10; group 22: 2; group 25: 7; group 124: 4 | - |
-  | `wob_esper_mtn_hunt` | 11 (11) | 375: 4; 374: 7 | the Adamanchyts sneezed 3 members out (1 in formation 164, 2 in 165); both won |
+  | leg | battles (distinct keys) | not clean |
+  |---|---|---|
+  | `wob_forest_hunt` | 6 (6) | - |
+  | `wob_train_hunt` | 11 (11) | - |
+  | `wob_south_hunt` | 15 (14) | the Bug's spine petrified a member (cured after the battle) |
+  | `wob_airship_hunt` | 23 (22) | - |
+  | `wob_esper_mtn_hunt` | 11 (11) | the Adamanchyts sneezed members out of 2 battles; both won |
 
   Levels after: SABIN L14, CYAN L14, SHADOW L12-13 (forest, train); CELES L20,
   LOCKE L20, EDGAR L21, SABIN L21 (south); LOCKE L23, EDGAR L23, SABIN L23,
   SETZER L19 (airship); TERRA L25, LOCKE L28, STRAGO L26, RELM L24 (Esper
   Mountain). `suite_battle_breakwob_sidetrips.log`, `suite_battle_vanish.log`
   and `suite_battle_ragedriver.log`: PASS. Checkpoint drift before the re-cut:
-  54 of 70 tracked keys drifted (`before.txt`); after `--recut`, 70 of 70
-  "none" (`after.txt`).
+  43 of 70 tracked keys drifted (`before.txt`); after `--recut`, 70 of 70
+  "none" (`after.txt`). `replay2/` is the round before, at dbc09160 on
+  de4ee995.
 - `rows2/`: the shipped `battle_breakwob_sidetrips` red on main's rows
   (`main.log`: "$0E8 Bug has no Ot6ShieldTbl row (want 2, class $03)" and seven
   more), on the Grenade keyed by slash (`mut_grenade_slash.log`: "$0AA Grenade
