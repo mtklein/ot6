@@ -12993,6 +12993,7 @@ function Driver:makePlanRules(actor)
     -- physical hit clears Muddle the same way, and the turn goes on the
     -- fight instead (the A/B lever against the rule)
     if r ~= nil and self.opts.unmuddle == false then r = nil end
+    if r ~= nil and self.noAllyCross then r = nil end
     local fight = r ~= nil and cmdRow(actor, BATTLE.CMD_FIGHT) or nil
     if fight ~= nil then
       self.healSaid = nil
@@ -15070,6 +15071,11 @@ function Driver:cross(toward)
       .. "$%02X, window %s; %s) -- dropping the plan and backing out (drop #%d this battle)", self.tag or "fight",
       toward, L.name, table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig(), M.crossReads(), self.crossDropN))
     self.steerDead, self.steerLast = {}, nil
+    -- a window that will not cross to the party will not for the rest of this battle: no ally-aimed Fight is planned
+    -- again in it (the #328 line at 293ff9e6, gen_wor_kt_guardian: a side attack, a Muddled ally, and the unmuddle
+    -- Fight planned again into the same dead crossing: "FIGHT DRIVER STUCK: crossing to the chars in a side
+    -- attack")
+    if toward == "chars" then self.noAllyCross = true end
     self:dropPlan("cross_dead")
     return { "b" }
   end
@@ -16296,6 +16302,7 @@ function Driver:idle()
   self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
   self.crossDropN = 0
+  self.noAllyCross = nil
   self.emptySince, self.emptyBackN, self.emptyWaitN = nil, 0, 0
   self.turnN = 0                        -- the [board] lines' count (#422)
   self.raceActDeclined = nil
