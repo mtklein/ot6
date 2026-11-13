@@ -1,5 +1,11 @@
 # Magicite as sub-jobs
 
+> **v0.44 (#328):** the while-worn stat packages below are retired; a
+> stone's stats are now kept rungs of its ladder
+> ([esper-rework.md](esper-rework.md), plan A). The packages' tables stay
+> here as the record of what the ladder's first and second stats were taken
+> from.
+
 Scope: the espers; the World of Balance roster, then the World of Ruin's
 twelve (last section). Locked ✦. Pillar (DESIGN.md ✦):
 equipping a magicite grants its kit *while equipped*. Spells are

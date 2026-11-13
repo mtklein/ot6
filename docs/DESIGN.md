@@ -21,7 +21,10 @@ touches vanilla behavior where a pillar requires it.
    action, bank up to 5, spend up to 3 to boost an action. A boosted action
    earns no BP.
 4. **Magicite are second jobs.** Equipping a magicite grants its spells
-   and a small stat package *while equipped*; nothing is taught permanently. One copy
+   *while equipped*; no spell is taught permanently. What a character keeps
+   is the esper's ladder: Magic Points from battles won wearing it buy five
+   ranks of stat points and relic-style effects ([esper-rework.md](design/esper-rework.md),
+   plan A, built in v0.44). One copy
    of each magicite exists, so kitting the party is a puzzle, the same way
    Octopath allows one shrine license at a time.
 
