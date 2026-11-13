@@ -1,5 +1,8 @@
 -- @suite savestate=minecart_entry slow
 -- battle_esperstats.lua -- espers-as-sub-jobs: the while-equipped stat boost
+-- #328 (the esper ladder, docs/design/esper-rework.md plan A): the while-worn stat packages are retired, so
+-- every stone below is now asserted to move no stat while worn (each delta 0 against BASE); its spells are
+-- asserted as before.  What a character keeps from wearing a stone is battle_esperladder's.
 -- plus a per-esper kit confirmation for the four Zozo espers and the two MRF
 -- stones.
 --
@@ -343,28 +346,28 @@ local function add(list) for _, s in ipairs(list) do all[#all + 1] = s end end
 
 add(driveSteps("base", nil));  add({ checkBase() })
 add(driveSteps("ramuh", RAMUH))
-add({ checkEsper("ramuh", RAMUH, { stam = 4, mag = 2 },
+add({ checkEsper("ramuh", RAMUH, {},
   { { BOLT, "Bolt" }, { RASP, "Rasp" } }) })
 add(driveSteps("siren", SIREN))
-add({ checkEsper("siren", SIREN, { spd = 4, mag = 2 },
+add({ checkEsper("siren", SIREN, {},
   { { SLEEP, "Sleep" }, { MUTE, "Mute" }, { BSERK, "Bserk" } },
   { { SLOW, "Slow (not in the plan)" }, { FIRE, "Fire (not in the plan)" } }) })
 add(driveSteps("kirin", KIRIN))
-add({ checkEsper("kirin", KIRIN, { mag = 4, stam = 2 },
+add({ checkEsper("kirin", KIRIN, {},
   { { CURE, "Cure (base tier -- PROOF here, no innate mage in the party)" },
     { REGEN, "Regen" } },
   { { CURE2, "Cure2 (a tier: boost Cure)" }, { ANTDOT, "Antdot (not in the plan)" },
     { SCAN, "Scan (not in the plan)" } }) })
 add(driveSteps("stray", STRAY))
-add({ checkEsper("stray", STRAY, { mag = 4, spd = 2 },
+add({ checkEsper("stray", STRAY, {},
   { { MUDDLE, "Muddle" }, { IMP, "Imp" } },
   { { FLOAT, "Float (not in the plan)" }, { BSERK, "Bserk (Siren's, not Stray's)" } }) })
 add(driveSteps("ifrit", IFRIT))
-add({ checkEsper("ifrit", IFRIT, { vig = 12, stam = 4, mag = -3 },
+add({ checkEsper("ifrit", IFRIT, {},
   { { FIRE, "Fire (base tier -- PROOF here)" }, { DRAIN, "Drain" } },
   { { FIRE2, "Fire2 (a tier: boost Fire)" } }) })
 add(driveSteps("shiva", SHIVA))
-add({ checkEsper("shiva", SHIVA, { mag = 6, spd = 4, vig = -6 },
+add({ checkEsper("shiva", SHIVA, {},
   { { ICE, "Ice (base tier)" }, { OSMOSE, "Osmose" }, { SHELL, "Shell" } },
   { { ICE2, "Ice2 (pre-folded tier)" }, { RASP, "Rasp (Ramuh's)" } }) })
 add({ H.call(function() H.log("[esperstats] all scenarios passed") end) })

@@ -135,8 +135,6 @@ tools/tests/lib/ot6.lua	emu.loadSavestate	1
 tools/tests/lib/ot6.lua	emu.write	1
 tools/tests/lib/ot6.lua	emu.writeWord	1
 tools/tests/menu_blitzpage.lua	.writeByte(	1
-tools/tests/menu_esperdetail_tube6.lua	.writeByte(	1
-tools/tests/menu_esperdetail_tube6.lua	emu.write	1	quarantine: #418 constructed control -- no Ot6EsperStatTbl row is $0000 since #418, so Terrato's two bytes are zeroed in the emulator's ROM image for one detail-page visit and put back after it; the property is that a $0000 row draws no caption and no term
 # menu_lorepage.lua (#122): unit-style expedient, the menu_ragepage.lua
 # precedent.  Strago is unreachable by play until the v0.13 route lands (he
 # joins in that unrouted stretch), so no savestate in the chain contains him;
@@ -178,3 +176,4 @@ tools/tests/battle_auraband.lua	.writeByte(	1	quarantine: #445 mechanism test --
 tools/tests/battle_shadowstays.lua	.writeByte(	1	quarantine: #445 mechanism test -- the Shadow-leave roll is a fixed function of $be at the roll site and a chain can miss it for 146 wins, so $be is set at the jsr Rand until a roll passes
 tools/tests/battle_lockekit.lua	.writeByte(	1	quarantine: #382 staging -- no fixture of the route holds a Thief Glove; LOCKE's Steal command becomes Capture ($06) in his record before the stage-8 battles, the rewrite the glove makes at battle init
 tools/tests/battle_mimicboost.lua	.writeByte(	3	quarantine: #261/#461 mechanism staging -- no fixture has a Mimic beside LOCKE, nor beside SwdTech and Slot (GOGO is World of Ruin); three field command bytes give STRAGO Mimic and TERRA SwdTech and Slot before the first encounter (the battle_mimic expedient), and everything after is the engine's own
+tools/tests/menu_esperdetail.lua	emu.write	2	quarantine: #328 the ladder page's white branch -- the leader's count on one stone set to 200 on the live esper page (SRAM $317C00) for one detail-page visit; the property is the drawing of a reached rung, not play
