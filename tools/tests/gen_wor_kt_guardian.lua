@@ -247,7 +247,12 @@ H.run({ maxFrames = 3000000 }, {
     H.assertEq(H.partyOfChar(CELES), 2, "CELES is in party 2 (the 292 Ribbon's wearer)")
     if wears(CELES, RIBBON) then return H.logStep("[ribbons] CELES wears one") end
     H.assertEq(H.invCountOf(RIBBON) >= 1, true, "the bag holds the 292 Ribbon for CELES (the chest above)")
-    local slot = H.readByte(0x1600 + 37 * CELES + 0x24) == WALL_RING and 5 or 4
+    -- over her Wall Ring where she wears one, else over the relic that is not her Genji Glove: over the Glove the
+    -- Relic menu's re-equip takes her second blade, and no gear-back can return it (on the line after v0.42 she wore
+    -- the Glove and the Economizer, and the Ribbon over the Glove left "gear back ... slot 1 item $13 ... 4 A presses
+    -- on the target were not taken", build/attempts/wt/polish-kefka/px13/lab/attr_main_guardian)
+    local r1, r2 = H.readByte(0x1600 + 37 * CELES + 0x23), H.readByte(0x1600 + 37 * CELES + 0x24)
+    local slot = (r2 == WALL_RING or r1 == 0xD1) and 5 or 4
     return H.seqStep({
       H.keepGear(CELES, "the 292 Ribbon onto CELES", H.equipKit(CELES, { { slot, RIBBON } },
         { tag = "the 292 Ribbon onto CELES" })),
