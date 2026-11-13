@@ -2042,13 +2042,19 @@ Ot6ShieldTbl:
                                 ;   vanilla; absorbs fire
         .word   $00a3
         .byte   2, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; intangir:
-                                ;   absorbs every element, so every hand
-                                ;   but magic breaks it, setzer's among
-                                ;   them.  its meteo after a hit and its
-                                ;   escape under 1280 hp run through its
-                                ;   turns, and a broken body has none:
-                                ;   break it to bring it down.  the house
-                                ;   curve's miniboss count (wob-side-
+                                ;   absorbs every element, so every class
+                                ;   breaks it, setzer's special among them,
+                                ;   but not a blade of an element it drinks.
+                                ;   its meteo after a hit and its escape
+                                ;   under 1280 hp run through its turns,
+                                ;   and a broken body has none: break it
+                                ;   to bring it down.  two, under the house
+                                ;   curve's miniboss count, because its
+                                ;   meteo takes the whole L18-22 four that
+                                ;   first meets it: one double strike
+                                ;   breaks it again as it recovers (three
+                                ;   shields: 3 wipes in 16 meetings; four:
+                                ;   3 in 15; two: 0 in 18; wob-side-
                                 ;   trips.md section 3)
         ; ---- the world of ruin: the solitary island to tzen's collapsing
         ; house (docs/design/route-wor-sabin.md section 8) ---------------
