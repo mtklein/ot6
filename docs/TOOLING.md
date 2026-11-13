@@ -369,7 +369,9 @@ its line's (v0.42: the 117 line runs were 12,787 s of 13,060), so run.sh
 confines a run of the line (`lib/line_cpus.py`: the generators on the
 prev= chain from power-on and the cutters booted from them, by
 `OT6_WORKER`) to the CPUs the machine lists in `~/.config/ot6/line-cpus`
-(px13: `0-3,12-15`), with `taskset`. Everything else runs anywhere. A
+(px13: `0-3,12-15`), with `taskset`, until the machine already has one
+confined emulator per fast core (several trees replaying at once); a
+further line run then goes unconfined. Everything else runs anywhere. A
 machine without the file (the Macs) confines nothing. Where a run is
 placed never changes what it plays: confined and unconfined runs made
 byte-identical savestates.

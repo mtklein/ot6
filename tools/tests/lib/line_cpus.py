@@ -18,6 +18,9 @@ no confinement: the Macs, whose schedulers place work by their own rules,
 have none.  `<worker>` is the run's OT6_WORKER: a generator's state name, or
 a cutter's checkpoint key with "-" as "_" (savestate_ninja.py's naming).
 Confinement changes where the emulator runs, never what it computes.
+Once the machine already has one confined emulator per fast core (several
+trees replaying their lines at once), a further line run goes unconfined
+rather than share a fast core with another line run.
 """
 import os
 import sys
@@ -60,9 +63,57 @@ def main(argv):
         "savestate_graph", HERE.parent / "savestate_graph.py")
     g = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(g)
-    if argv[1] in line_workers(g.STATES):
+    if argv[1] in line_workers(g.STATES) and confined_now(cpus) < cores(cpus):
         print(cpus)
     return 0
+
+
+def cpu_set(spec):
+    out = set()
+    for part in spec.split(","):
+        a, _, b = part.partition("-")
+        out.update(range(int(a), int(b or a) + 1))
+    return out
+
+
+def cores(spec):
+    """Physical cores among the listed CPUs (SMT siblings count once)."""
+    seen = set()
+    for c in cpu_set(spec):
+        try:
+            with open(f"/sys/devices/system/cpu/cpu{c}/topology/thread_siblings_list") as f:
+                seen.add(f.read().strip())
+        except OSError:
+            seen.add(str(c))
+    return len(seen)
+
+
+def confined_now(spec):
+    """Emulators already confined to these CPUs (other trees' lines too).
+    Once there is one per fast core, another would share a core with a
+    line run on its SMT sibling, so it runs unconfined instead."""
+    want = cpu_set(spec)
+    n = 0
+    try:
+        pids = os.listdir("/proc")
+    except OSError:
+        return 0
+    for pid in pids:
+        if not pid.isdigit():
+            continue
+        try:
+            with open(f"/proc/{pid}/comm") as f:
+                if f.read().strip() != "Mesen":
+                    continue
+            with open(f"/proc/{pid}/status") as f:
+                for line in f:
+                    if line.startswith("Cpus_allowed_list:"):
+                        if cpu_set(line.split()[1]) == want:
+                            n += 1
+                        break
+        except (OSError, ValueError):
+            continue
+    return n
 
 
 if __name__ == "__main__":
