@@ -225,16 +225,20 @@ local function step(n, plan, doneFn)
   }
 end
 
--- the three steps, in one battle; a battle that ends before them is left and
--- the next starts them over, up to BATTLES.  Measured at 1a22db99 on this
--- branch's own wor-tomb-v1, over 0-15 encounters used up first
--- (PACE_BURN): 16 successes in 34 battles, the battle counts 1, 2, 1, 5, 3,
--- 1, 3, 3, 3, 1, 4, 1, 1, 1, 3, 1 for burns 0-15
--- (build/attempts/wt/v027-kits/budgets/battle_runicblade_*.out).  The rate
--- is 0.47; its one-sided 95% lower bound is 0.32, and at it BATTLES = 24
--- misses with 0.678^24 = 8.9e-5, under 1e-4 (at the measured rate,
--- 0.53^24 = 2.3e-7).
-local BATTLES = 24
+-- the three steps, in one battle; a battle that ends before them (or is
+-- handed to the fight driver, danger() above) is left and the next starts
+-- them over, up to BATTLES.  Measured at 54d4955d (#469's second review) on
+-- the tracked wor-tomb-v1, over 0-15 encounters used up first (PACE_BURN),
+-- with the hand-over in place: 16 successes in 48 battles, the battle counts
+-- 3, 2, 1, 7, 6, 5, 4, 3, 2, 1, 5, 4, 1, 2, 1, 1 for burns 0-15, every
+-- battle before the passing one handed over with a member down
+-- (build/attempts/wt/boost-rewards-4/labs/blade_b*/).  The rate is 0.33;
+-- its one-sided 95% (Clopper-Pearson) lower bound is 0.22, and at it
+-- BATTLES = 37 misses with 0.778^37 = 9.4e-5, under 1e-4 (at the measured
+-- rate, 0.667^37 = 3e-7).  The burns share much of one encounter sequence,
+-- so the 48 battles are not 48 independent draws; the bound is the
+-- conservative one for that reason.
+local BATTLES = 37
 local battles, ok = 0, false
 local body = {
   H.cond(function() return not inBattle() end, {
