@@ -250,7 +250,7 @@ bytes, `ItemProp+5` to `+13`).
 
 | Esper | while worn (today's) | stats (1st / 2nd) | rung 3 (75) | rung 5 (500), the signature |
 |---|---|---|---|---|
-| Ramuh | Bolt, Rasp | Stm / Mag | immune to Dark (Goggles) | †*Conductor*: the wearer's lightning spells take one more shield |
+| Ramuh | Bolt, Rasp | Stm / Mag | immune to Dark (Goggles) | †*Conductor*: the wearer's lightning spells take one more shield (a Magic or X-Magic cast, from a monster whose matched weaknesses include lightning) |
 | Kirin | Cure, Regen | Mag / Stm | immune to Poison (Star Pendant) | Regen in every battle (Cure Ring) |
 | Stray | Muddle, Imp | Mag / Spd | immune to Imp | steals succeed more often (Sneak Ring) |
 | Siren | Mute, Sleep, Bserk | Spd / Mag | immune to Sleep | immune to Berserk and Muddle (Peace Ring) |
@@ -264,7 +264,7 @@ bytes, `ItemProp+5` to `+13`).
 | Unicorn | Pearl, Remedy | Stm / Mag | immune to Zombie | immune to Dark, Zombie and Poison (Amulet) |
 | Golem | Safe | Stm / Vig | immune to Muddle | covers allies at low HP (True Knight) |
 | ZoneSeek | Shell, Haste | Mag / Stm | immune to Mute | Shell in every battle (Force Shld's bit) |
-| Sraphim | Cure, Life | Stm / Mag | immune to Doom's countdown | †*Grace*: keeps its boost points when KO'd and revived |
+| Sraphim | Cure, Life | Stm / Mag | immune to Doom's countdown | Regen in every battle (Cure Ring); the design's *Grace* (keep the boost points through a KO) would do nothing, since no code clears a fallen character's bank |
 | Palidor | Float, Slow | Spd / Vig | walks faster (Sprint Shoes) | Float in every battle (Cherub Down) |
 | Fenrir | Stop, X-Zone | Spd / Mag | more pre-emptive strikes (Gale Hairpin) | †immune to Stop and Slow (vanilla's protection bytes cover neither) |
 | Starlet | Cure, Regen, Remedy | Mag / Spd | immune to Berserk | max MP +25% (Minerva) |
@@ -275,7 +275,7 @@ bytes, `ItemProp+5` to `+13`).
 | Bahamut | Flare, W Wind | Mag / Vig | max HP +25% (Red Cap) | Fight and spells deal more damage (Hero Ring) |
 | Phoenix | Life, Antdot | Stm / Spd | immune to Doom's countdown and Zombie | †*Rebirth*: enters every battle under Life 3 |
 | Ragnarok | Ultima, Warp | Vig / Mag | max MP +25% (Minerva) | Fight strikes four times (Offering's X-Fight) |
-| Crusader | Merton, Meteor | all four +1 at rungs 1 and 2 | max HP +25% (Red Cap) | Gauntlet (two-handed grip) and Genji Glove (two weapons) both allowed |
+| Crusader | Merton, Meteor | all four +1 at rungs 1, 2 and 4 | max HP +25% (Red Cap) | Gauntlet (two-handed grip) and Genji Glove (two weapons) both allowed |
 
 Odin and Raiden share one counter: Raiden replaces Odin, and the progress
 carries over.

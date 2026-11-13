@@ -11,7 +11,8 @@
 --      points are the live esper page's ($317C00) for the leader and that stone (Odin and Raiden share one);
 --   2. the five rung rows (tilemap rows 17-25, cols 16-27): Ot6RungLabelTbl's twelve tiles for the stone's rung,
 --      white (attribute $20) once the points reach the rung's cost (10 / 30 / 75 / 200 / 500), grey ($28) until;
---   3. no learn-rate colon or percent on the spell rows, and row 27 blank.
+--   3. no learn-rate colon or percent on the spell rows, and row 27 blank;
+--   4. each of the stone's GenjuProp spells draws on its row (cols 5-11), and an empty slot leaves the row blank.
 -- The play from power-on gives the leader some progress and leaves most rungs grey; the white branch is then
 -- staged once (declared in state_write_waivers.txt): the leader's count on the first stone is set to 200
 -- (rank 4) on the live page and the page revisited, so rows 1-4 read white, row 5 grey and the caption "Rank 4
@@ -35,6 +36,7 @@ local function sramW(a) local m = emu.memType.snesMemory; return emu.read(a, m) 
 local function slotOf(e) if e < 12 then return e elseif e == 12 then return 11 else return e - 1 end end
 local function rankOf(n) local r = 0; for _, c in ipairs(COSTS) do if n >= c then r = r + 1 end end; return r end
 local LABELS = H.sym("Ot6RungLabelTbl") & 0x3FFFFF
+local GENJU = H.sym("GenjuProp") & 0x3FFFFF
 local function label(e, k, i) return emu.read(LABELS + ((slotOf(e) * 5 + k) * 12) + i, emu.memType.snesPrgRom) end
 
 local leader = nil
@@ -85,6 +87,16 @@ local function checkPage(e, tag)
     local want = p >= COSTS[k + 1] and 0x20 or 0x28
     H.assertEq(attr(16, y) & 0x3C, want, string.format("%s: rung %d %s", tag, k + 1,
       want == 0x20 and "white (reached)" or "grey (not reached)"))
+  end
+  -- 4. the spell rows: each of the stone's five GenjuProp spells (row bytes +1, +3, .. +9; $FF none) is drawn
+  -- at col 5 of rows 17-25 (a name, so not blank), and an empty slot blanks the row
+  for k = 0, 4 do
+    local sp = emu.read(GENJU + e * 11 + 1 + 2 * k, emu.memType.snesPrgRom)
+    local y = 17 + 2 * k
+    local drawn = false
+    for x = 5, 11 do if cell(x, y) ~= BLANK then drawn = true end end
+    H.assertEq(drawn, sp ~= 0xFF, string.format("%s: spell row %d %s (GenjuProp spell $%02X)", tag, k + 1,
+      sp ~= 0xFF and "draws its spell's name" or "is blank", sp))
   end
   -- 3. the dead columns and row 27
   for y = 17, 25, 2 do
