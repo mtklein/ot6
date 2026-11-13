@@ -2013,6 +2013,35 @@ Ot6ShieldTbl:
                                 ;   fire|holy vanilla is the elemental
                                 ;   reward for reading past the ninja's
                                 ;   absorb
+        ; ---- the world of balance by the blackjack (wob-side-trips.md) -----
+        ; What the airship opens after the opera and no story leg walks: the
+        ; forests between Vector and Maranda (world groups 17, 18, 20), the
+        ; bomb isle (27) and Triangle Island (124, 28).  The party that
+        ; first meets them is the post-opera four: CELES (a blade), LOCKE
+        ; (a knife: the point), EDGAR (a pike and his tools: the point) and
+        ; SABIN (fists and blitzes: the blow).  Vanilla elements stay.
+        .word   $00e8
+        .byte   2, OT6_SLASH|OT6_PIERCE ; bug: a shell on wings; cut or
+                                ;   spear it.  ice|water vanilla; alone, it
+                                ;   answers a Fight with a petrifying spine
+        .word   $003d
+        .byte   2, OT6_SLASH|OT6_BLUDG ; chickenlip: a heavy bird, packs of
+                                ;   five; the blade or the fist.  ice
+                                ;   vanilla
+        .word   $00aa
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; grenade: a Fight makes it explode
+                                ;   (Exploder, its own hp), so its keys
+                                ;   are the ones that are not Fight: edgar's
+                                ;   tools (pierce) and sabin's blitzes
+                                ;   (bludgeon).  ice|water vanilla;
+                                ;   absorbs fire
+        .word   $00a3
+        .byte   4, OT6_SLASH|OT6_PIERCE|OT6_BLUDG ; intangir: absorbs every
+                                ;   element, so only steel breaks it.  its
+                                ;   dangers all run through its turns and
+                                ;   counters (meteo for a hit, meteo as it
+                                ;   dies, the escape under 1280 hp), and a
+                                ;   broken body has none: break it to kill it
         ; ---- the world of ruin: the solitary island to tzen's collapsing
         ; house (docs/design/route-wor-sabin.md section 8) ---------------
         ; Celes is alone to Tzen and holds slash (every sword; pierce only
