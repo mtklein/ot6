@@ -173,28 +173,35 @@ leads to it); its pool is group 68, the clearing's, won on 132.
 
 Under `build/attempts/wt/v043-wob-zones/`:
 
-- `replay/`: the play from power-on on the branch's ROM (`gate1.log`, `ninja -k
-  0` at 5c2357b9; its one red edge, audit_chests, wanted the Chocobo Suit in
-  `tools/chests_opened.txt`), with each leg's log. Every battle won, none
-  fled, no member down:
+- `replay2/`: the play from power-on at dbc09160 (rebased on main's de4ee995) on
+  px13 (`gate_dbc09160.log`, `ninja -k 0`; its one red edge, battle_ragedriver,
+  read GAU's Rage price only over battles he did not level up in, and every
+  possessed battle of this play levelled him; the suite now reads his battle
+  MP, and the gate at fcde78a1 is green, `gate2.log`), with each leg's log.
+  Every battle won, none fled by choice:
 
-  | leg | battles (distinct keys) | the hunts |
-  |---|---|---|
-  | `wob_forest_hunt` | 6 (6) | 132: 2 battles; 134: 2 |
-  | `wob_train_hunt` | 11 (11) | 151: 11 |
-  | `wob_south_hunt` | 15 (14) | group 20: 10; group 17: 2 |
-  | `wob_airship_hunt` | 23 (22) | group 27: 10; group 22: 2; group 25: 7; group 124: 4 |
-  | `wob_esper_mtn_hunt` | 11 (11) | 375: 4; 374: 7 |
+  | leg | battles (distinct keys) | the hunts | not clean |
+  |---|---|---|---|
+  | `wob_forest_hunt` | 6 (6) | 132: 2; 134: 2 | - |
+  | `wob_train_hunt` | 11 (11) | 151: 11 | - |
+  | `wob_south_hunt` | 15 (14) | group 20: 10; group 17: 2 | the Bug's spine petrified a member 4 times (cured after the battle) |
+  | `wob_airship_hunt` | 23 (22) | group 27: 10; group 22: 2; group 25: 7; group 124: 4 | - |
+  | `wob_esper_mtn_hunt` | 11 (11) | 375: 4; 374: 7 | the Adamanchyts sneezed 3 members out (1 in formation 164, 2 in 165); both won |
 
   Levels after: SABIN L14, CYAN L14, SHADOW L12-13 (forest, train); CELES L20,
   LOCKE L20, EDGAR L21, SABIN L21 (south); LOCKE L23, EDGAR L23, SABIN L23,
-  SETZER L19 (airship); TERRA L25, LOCKE L27, STRAGO L27, RELM L23 (Esper
-  Mountain). `suite_battle_breakwob_sidetrips.log`: PASS.
-- `rows/`: `battle_breakwob_sidetrips` red on main's rows (`main.log`: "$0E8 Bug
-  has no Ot6ShieldTbl row (want 2, class $03)" and five more), red on the
-  Grenade keyed by slash (`mut_grenade_slash.log`: "$0AA Grenade class mask $07,
-  want $06") and on the Intangir without special (`mut_intangir_nospecial.log`:
-  "$0A3 Intangir class mask $07, want $0F"), PASS on the rows (`rows.log`).
-  These ran with the Intangir on four shields; the suite's expectation moved to
-  two with the row.
-- `lab/`: the strategy runs of section 3.
+  SETZER L19 (airship); TERRA L25, LOCKE L28, STRAGO L26, RELM L24 (Esper
+  Mountain). `suite_battle_breakwob_sidetrips.log`, `suite_battle_vanish.log`
+  and `suite_battle_ragedriver.log`: PASS. Checkpoint drift before the re-cut:
+  54 of 70 tracked keys drifted (`before.txt`); after `--recut`, 70 of 70
+  "none" (`after.txt`).
+- `rows2/`: the shipped `battle_breakwob_sidetrips` red on main's rows
+  (`main.log`: "$0E8 Bug has no Ot6ShieldTbl row (want 2, class $03)" and seven
+  more), on the Grenade keyed by slash (`mut_grenade_slash.log`: "$0AA Grenade
+  class mask $07, want $06"), on the Intangir without special
+  (`mut_intangir_nospecial.log`: "$0A3 Intangir class mask $07, want $0F") and on
+  the Grenade's vanilla fire absorb cleared (`mut_grenade_absorb.log`: "$0AA
+  Grenade absorb byte $00, want vanilla $01"); PASS on the rows (`rows.log`).
+- `lab2/`: the Intangir's shield counts and the battle_vanish and
+  battle_ragedriver runs of this round; `lab/`: the first round's strategy runs
+  (section 3); `replay/`: the first round's replay at 5c2357b9.

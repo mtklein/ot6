@@ -16,11 +16,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "904d0bb562f4694a3c0e4d045ca2e51ed9d395df49c3e1e7f4dc281222c1aed2",
-    "generator_sig": "50a5b57f0c14ace280a6e6ae30010ffdff42b08fa05c222b9e381c6eb70f9198 gen_sabin_falls",
+    "generator_sig": "d1dee5fb370ec12df3a0c95233cb8d30e8171bd18c27394ccaa24f62b0da520e gen_sabin_falls",
     "ancestors": [
       {
         "path": "build/states/train_done.stamp",
-        "sha256": "391b3b6ca06b9735b10d33ddc637d7fde33ea8999868da0f3a89ceacce11dc0b"
+        "sha256": "c02149c7f322d183e2ec3372b55ad38d7b04f18a33c48d6ec17ed45c9aedced9"
       }
     ]
   }
