@@ -43,9 +43,12 @@ end
 local function raging(s) return (H.readByte(0x3EF9 + s * 2) & 0x01) ~= 0 end
 local function recMp() return H.readWord(0x1600 + 37 * GAU + 0x0D) end
 local function recLevel() return H.readByte(0x1600 + 37 * GAU + 8) end
--- a battle GAU levels up in is not a price reading: the level-up raises his MP with his max at the battle's end
--- (#524 landing at 9d0374c8: "record MP 323 -> 353" over a battle that took his max MP up, and the price assert read
--- "got 353 ($161), want 315 ($13B)").  RD_LEVELUPS = true is the mutant that measures such a battle anyway.
+-- a battle GAU levels up in is not a price reading off his record: the level-up raises his MP with his max at the
+-- battle's end (#524 landing at 9d0374c8: "record MP 323 -> 353" over a battle that took his max MP up, and the price
+-- assert read "got 353 ($161), want 315 ($13B)").  Such a battle is read off his battle MP as the possessed turn
+-- starts instead: in v043-wob-zones's replay every one of 16 cave battles that possessed him also levelled him
+-- ("no Rage planned and possessed past its start within 16 cave battles", battles 6 and 16 the possessed ones).
+-- RD_LEVELUPS = true is the mutant that reads the record over a level-up anyway.
 RD_LEVELUPS = RD_LEVELUPS or false
 
 -- per battle: the Rage plans made in it, GAU's Cmd_10s (his seat in Y),
@@ -63,7 +66,13 @@ H.run({ maxFrames = 900000 }, {
     n0 = #H.outcomes
     emu.addMemoryCallback(function()
       local s = gauSlot()
-      if cur and s ~= nil and (emu.getState()["cpu.y"] & 0xFF) == s * 2 then cur.cmd10 = cur.cmd10 + 1 end
+      if cur and s ~= nil and (emu.getState()["cpu.y"] & 0xFF) == s * 2 then
+        cur.cmd10 = cur.cmd10 + 1
+        -- his battle MP ($3C08) as the possessed turn's Cmd_10 starts: the start's price is paid and nothing else
+        -- has been, and no level-up has run yet (it runs at the battle's end), so this reads the price in a battle
+        -- he levels up in too
+        if cur.cmd10 == 2 then cur.mpAt2 = H.readWord(0x3C08 + s * 2) end
+      end
     end, emu.callbackType.exec, H.sym("Cmd_10"), H.sym("Cmd_10"))
   end),
   H.navTo(A[1], A[2], { maxFrames = 3000 }),
@@ -86,7 +95,7 @@ H.run({ maxFrames = 900000 }, {
         .. "GAU L%d -> L%d", #H.outcomes - n0, #H.rages - nr0, cur.cmd10, tostring(cur.tier),
         cur.beast and string.format("$%02X", cur.beast) or "-", cur.mp0, cur.mp1, cur.lv0, cur.lv1))
       if cur.rage and cur.cmd10 >= 2 and done == nil then
-        if cur.lv1 == cur.lv0 or RD_LEVELUPS then done = cur
+        if cur.lv1 == cur.lv0 or RD_LEVELUPS or cur.mpAt2 ~= nil then done = cur
         else H.log("[rage] GAU levelled up in this battle: his record MP is not the Rage's price; the next one") end
       end
     end
@@ -122,9 +131,17 @@ H.run({ maxFrames = 900000 }, {
     H.log(string.format("[rage] measured: entry %d ($%02X) at %d BP, score %d, battle MP %d; Cmd_10 %d, "
       .. "tier %d, beast $%02X, record MP %d -> %d", r.entry, r.rage, r.boost, r.score, r.mp, done.cmd10,
       done.tier, done.beast, done.mp0, done.mp1))
+    H.log(string.format("[rage] battle MP at the possessed turn's Cmd_10: %s; GAU L%d -> L%d", tostring(done.mpAt2),
+      done.lv0, done.lv1))
     H.assertEq(done.cmd10 >= 2, true, "1. Cmd_10 ran for GAU's seat at the start and a possessed turn")
     H.assertEq(done.beast, r.rage, "1. GAU's seat possessed by the planned beast ($33A8)")
-    H.assertEq(done.mp1, done.mp0 - 8, "2. 8 MP for the start and none for the possessed turns after it")
+    -- the record over a battle he does not level up in, else his battle MP at the possessed turn (RD_LEVELUPS reads
+    -- the record anyway: the mutant)
+    local paid = (done.lv1 == done.lv0 or RD_LEVELUPS) and done.mp1 or done.mpAt2
+    H.assertEq(paid, done.mp0 - 8, "2. 8 MP for the start and none for the possessed turns after it")
+    if done.mpAt2 ~= nil then
+      H.assertEq(done.mpAt2, done.mp0 - 8, "2. his battle MP at the possessed turn: the start's 8 and nothing else")
+    end
     H.assertEq(done.tier, math.min(r.boost, 3), "3. OT6_RAGETIER holds the plan's boost")
   end),
   -- the control: the same driver with the line off
