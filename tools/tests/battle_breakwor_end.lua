@@ -9,7 +9,8 @@
 --   2. event battle 101 deals formation 471, and FinalBattleIDTbl chains 471 -> 512 -> 513 -> 514; every species of
 --      the four has an authored row;
 --   3. the lessons: each tier between its bodies takes every hand (slash, pierce, bludgeon, special), so any four the
---      order menu puts in front hold a key in every tier; Kefka takes every hand.
+--      order menu puts in front hold a key in every tier; Kefka takes every hand, and holds more shields than any
+--      other species' row in Ot6ShieldTbl (the most of any boss, #514).
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -121,8 +122,21 @@ H.run({ maxFrames = 600 }, {
       end
     end
     if (classOf(0x12A) & HANDS) ~= HANDS then problem("$12A Kefka: class mask $%02X, want every hand", classOf(0x12A)) end
+    -- the most shields of any boss (#514): more than every other row the table holds
+    local kef, rows, top, topSp = shield[0x12A] and shield[0x12A][1] or 0, 0, -1, nil
+    for sp, r in pairs(shield) do
+      if sp ~= 0x12A then
+        rows = rows + 1
+        if r[1] > top then top, topSp = r[1], sp end
+      end
+    end
+    if kef <= top then
+      problem("$12A Kefka holds %d shields, not more than $%03X's %d: he should hold the most of any boss", kef,
+        topSp, top)
+    end
     H.log(string.format("checked %d formation-species pairs of the four tiers; the lessons: every hand in every tier, "
-      .. "and every hand finds Kefka", n))
+      .. "every hand finds Kefka, and his %d shields against the other %d rows (the most among them: $%03X's %d)", n, kef,
+      rows, topSp or 0, top))
     H.assertEq(#problems, 0, "Kefka's battle break row mismatches")
     H.log("Kefka's battle break rows verified against the built ROM")
   end),
