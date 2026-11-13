@@ -495,12 +495,27 @@ HB_POLL=10     # heartbeat check every HB_POLL * 0.5 s
 SLOT_READY="$WDIR/emu-slot"
 python3 "$ROOT/tools/tests/lib/emu_slot.py" --hold $$ "$SLOT_READY" &
 slot_pid=$!
+# Polled every 0.1 s: emu_slot.py writes the file about 0.1 s after it
+# starts when a slot is free, and a 1 s poll made every run wait a whole
+# second here (#396: 1.01 s of a 5.5 s trivial run on px13).
 until [ -s "$SLOT_READY" ]; do
   kill -0 "$slot_pid" 2>/dev/null || { echo "emu_slot.py exited without a slot"; exit 2; }
-  sleep 1
+  sleep 0.1
 done
 read -r slot_k slot_n slot_wait < "$SLOT_READY"
 [ "$slot_wait" -gt 0 ] && echo "[emu-slot] waited ${slot_wait}s for slot $slot_k of $slot_n" >&2
+
+# A run of the play from power-on (the line, qualification's whole critical
+# path) is confined to the machine's fast cores when the machine names them
+# in ~/.config/ot6/line-cpus (lib/line_cpus.py; px13: its four Zen 5 cores,
+# where a run plays about 1.35x faster than on its Zen 5c cores, #396).
+# Where a process runs never changes what the emulator computes.
+LINE_PIN=""
+LINE_CPUS=$(python3 "$ROOT/tools/tests/lib/line_cpus.py" "$label" 2>/dev/null)
+if [ -n "$LINE_CPUS" ] && command -v taskset > /dev/null 2>&1; then
+  LINE_PIN="taskset -c $LINE_CPUS"
+  echo "[line] $label is a run of the line: confined to CPUs $LINE_CPUS" >&2
+fi
 
 RETRIES="${OT6_TIMEOUT_RETRIES:-1}"
 attempt=0
@@ -518,7 +533,7 @@ while :; do
   # its first seconds (the tiles record at frame 21 at the latest), so a
   # log with no [ot6] line after OT6_LOAD_GRACE seconds is that death:
   # kill it and say so as a FAIL, which is deterministic and never retried.
-  run_mesen "$SHARED_APP$BIN_SUB/Mesen" --testrunner --timeout="$CAP" --enableStdout \
+  run_mesen $LINE_PIN "$SHARED_APP$BIN_SUB/Mesen" --testrunner --timeout="$CAP" --enableStdout \
     "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1 &
   mesen_pid=$!
   load_grace="${OT6_LOAD_GRACE:-120}"
