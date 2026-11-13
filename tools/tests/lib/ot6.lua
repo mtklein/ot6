@@ -12478,7 +12478,14 @@ end
 -- on itself at 0 BP (#521's landing: on a snapshot a level lower, CELES as
 -- host drank X-Potions on herself at 1,067 and 815 HP, "actor=0 heal entity
 -- 0 (1067/4251) with $EA", and was never felled inside 20,000 frames); its
--- other plans stand.  ZINGER_OFF (a global) turns it off, the control arm.
+-- other plans stand.  A cast heal is care like a drunk one: the rule once
+-- knew only items, so on wt/v043-wob-towns's replay CELES as host cast Cure
+-- ($2D) on herself 11 times, "actor=0 cure entity 0 (1517/4251) with $2D",
+-- undoing the others' Fights, and stood 20,000 frames on; and by the same
+-- gap a cast heal or raise another member aimed elsewhere would have become
+-- a Fight on the host.  A heal or raise is care, and care that covers the
+-- whole party stands for every actor.  ZINGER_OFF (a global) turns it off,
+-- the control arm.
 M.zingers = {}           -- every Zinger plan this run, oldest first (battle_zinger reads them)
 function Driver:zingerPlan(actor, plan)
   if ZINGER_OFF or plan == nil then return plan end
@@ -12486,10 +12493,10 @@ function Driver:zingerPlan(actor, plan)
   if za == 0xFF or za < 8 or zt >= 8 or zt % 2 ~= 0 then return plan end
   local host = zt // 2
   if M.readWord(0x3BF4 + host * 2) == 0 then return plan end
-  local care = plan.kind == "item" or plan.kind == "defer" or plan.kind == "switch"
-    or (plan.ally and plan.reason ~= "zinger")
-  if care and plan.target ~= host then return plan end
-  if actor == host and not (care and plan.kind ~= "defer" and plan.kind ~= "switch" and not plan.all) then
+  local care = plan.kind == "item" or plan.kind == "heal" or plan.kind == "raise" or plan.kind == "defer"
+    or plan.kind == "switch" or (plan.ally and plan.reason ~= "zinger")
+  if care and (plan.target ~= host or plan.all) then return plan end
+  if actor == host and not (care and plan.kind ~= "defer" and plan.kind ~= "switch") then
     return plan
   end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
