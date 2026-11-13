@@ -6366,6 +6366,7 @@ _loadplayer:
         jsl     UpdateEquip
         jsr     UpdateEquipBattle
         jsr     LoadCharProp
+        jsl     Ot6EsperBattleInit      ; ot6 #328: Facet and Rebirth
         jsr     ValidateSpellList
         jsr     InitCmdList
 @2570:  dex2                ; next character
