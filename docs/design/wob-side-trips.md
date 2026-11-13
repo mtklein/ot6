@@ -129,7 +129,14 @@ What the labs taught:
    member's other verb (EDGAR's tool, SABIN's Pummel), else the magic line,
    else an item (`Driver:absorbWeaponPlan`; `battle_vanish` part 4c, red with
    `M.ABSORB_WEAPON_GUARD = false`). It is inert where no standing body drinks
-   a weapon's element.
+   a weapon's element, but that is not only off the story's path: in the
+   replay at dbc09160 it fired on the main line too, in gate_cave_save (2
+   turns), vector_crash (1), wor_tritoch (2), wor_phoenix (2), wor_locke (1)
+   and wor_kt_guardian (1) ("no Fight: slot ... absorbs the hand's element"),
+   so it moves those legs' play and is part of the checkpoint drift the
+   re-cut answers. It changes the verb rather than re-aiming the Fight at a
+   body that does not absorb, and it reads the ROM's absorb byte rather than
+   the live slot's; both are a follow-up issue.
 4. **With that fixed, two shields hold and three and four do not.** The
    Triangle Island hunt from `terra-returned-v1` (LOCKE L21, EDGAR L21, SABIN
    L22, SETZER L18: the levels the island first sees) at seed shifts 0, 4, 8,
@@ -138,7 +145,7 @@ What the labs taught:
    | shields | Intangir meetings (distinct battle keys) | won | wipes |
    |---|---|---|---|
    | 4 (`intangir4_k*.log`) | 15 (15) | 12 | 3 |
-   | 3 (`intangir3_m*.log`) | 16 (16) | 13 | 3 |
+   | 3 (`intangir3_m*.log`) | 16 (15: beEC-g00D2 twice) | 13 | 3 |
    | 2 (`intangir2_n*.log`) | 18 (16) | 18 | 0 |
 
    Every wipe is the same: the Intangir recovers, the first hits that re-chip
