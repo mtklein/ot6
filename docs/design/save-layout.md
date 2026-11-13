@@ -62,6 +62,35 @@ Page stride is `OT6_CODEX_STRIDE` (`$0400`): slot 2 at `$316400`, slot 3 at
 starts empty and refills through play; an O7 page is cloned into all three
 slots once, then stamped O8, so existing players lose no knowledge.
 
+## Expanded SRAM: esper progress (bank `$31`, since v0.44)
+
+The esper ladder's Magic Points, per character per esper (#328,
+[esper-rework.md](esper-rework.md) plan A; `ot6_esper.asm`). It sits past the
+codex in the same bank: `$317000-$317FFF` is battery offset `$3000-$3FFF`,
+which no earlier build wrote (every tracked battery held zeroes there when
+this shipped). Like the codex, it is outside `CalcSaveSlotChecksum` and
+carries its own magic word.
+
+Four `$0400`-byte pages: slots 1/2/3 at `$317000`/`$317400`/`$317800`, and the
+**live** page at `$317C00`, the only one play reads and writes. A load copies
+its slot's page into the live page (`Ot6EsperLoaded`: the title screen's
+Continue through `Ot6EsperContinue`, the reload after a game over through
+`Ot6CodexLoaded`), a save copies the live page into the slot it writes
+(`Ot6EsperSaveAs`, from `Ot6CodexSaveAs`), and New Game clears it
+(`Ot6EsperNewGame`, from `Ot6CodexNewGame`). So progress earned after the
+last save goes back with everything else on a reload, which the codex, written
+in place, does not.
+
+| Address (slot 1 page) | Bytes | Symbol | Meaning | Owner procs | Since |
+|------------------|-------|--------|---------|-------------|-------|
+| $317000-$317001 | 2 | OT6_ESPER_MAGIC | Page signature `$3145` ('E1'). A page without it reads as no progress. | ot6_esper.asm `Ot6EsperLoaded`/`Ot6EsperSaveAs`/`Ot6EsperEnsureLive` | v0.44 |
+| $317010-$31727F | 624 | OT6_ESPER_CTR | Magic Points, one little-endian word per character (actors 0-11) per esper slot (26: GenjuProp order with Odin and Raiden sharing one), actor-major; capped at 9999. | `Ot6EsperEarn` writes the live page at a victory; `Ot6EsperFold` (UpdateEquip), `Ot6EsperSig` (battle) and `Ot6EsperProgress` (menu) read it | v0.44 |
+| $317F00-$317F05 | 6 | OT6_ESPER_PEND, OT6_ESPER_SHOWN | Live page only, never copied: the victory screen's pending rank lines (one byte per party slot) and the Magic Points to announce. Cleared once shown. | `Ot6EsperEarn`, `Ot6EsperMsg` | v0.44 |
+
+Old-save read: a save from before v0.44 has no signed page for its slot, so
+its characters start with no esper progress; nothing else about the save
+changes.
+
 ## Free space
 
 - Scrap `$1E1D-$1E3F` (35 bytes). Used: `$1E1D-$1E2B` (the 15 bytes above).
