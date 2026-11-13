@@ -39,6 +39,13 @@ local ZONES = {
   { what = "Triangle Island (group 124)", land = { 243, 39 }, lap = { { 243, 38 }, { 244, 38 } },
     forms = { [6] = "Leafer", [7] = "Leafer x2, Dark Wind", [210] = "Intangir" } },
 }
+-- every World of Balance entrance and event trigger (route_data's short entrances and triggers of world 0),
+-- kept off every walk: Albrook's door (138,203) is the tile east of the save
+local DOORS = { {21,92}, {22,92}, {22,93}, {26,39}, {26,131}, {27,39}, {27,130}, {28,131}, {30,6}, {30,48}, {31,48},
+  {33,9}, {45,154}, {54,85}, {64,76}, {65,76}, {66,226}, {66,227}, {73,93}, {75,102}, {77,235}, {84,33}, {85,112},
+  {85,113}, {86,111}, {86,112}, {90,99}, {98,92}, {102,100}, {104,64}, {117,61}, {118,61}, {119,149}, {120,149},
+  {120,187}, {121,187}, {125,150}, {138,203}, {139,203}, {156,84}, {157,84}, {165,35}, {165,194}, {166,194},
+  {169,194}, {177,92}, {178,82}, {178,92}, {179,71}, {185,93}, {214,148}, {220,115}, {229,130}, {250,128} }
 local won = {}
 local function lowest()
   local m = 99
@@ -49,6 +56,19 @@ end
 local function zone(z)
   local steps = {}
   if z.land then
+    -- onto a tile beside the parked Blackjack by a walk that keeps off the doors, then aboard
+    steps[#steps + 1] = H.lazy(function()
+      local ax, ay = H.readByte(0x1F62), H.readByte(0x1F63)
+      for _, d in ipairs({ { 0, 1 }, { 0, -1 }, { -1, 0 }, { 1, 0 } }) do
+        local bx, by = ax + d[1], ay + d[2]
+        local door = false
+        for _, t in ipairs(DOORS) do if t[1] == bx and t[2] == by then door = true end end
+        if not door and H.worldPassable(bx, by) and H.worldBfs(bx, by, nil, nil, nil, H.worldAvoidSet(DOORS)) then
+          return H.worldNavTo(bx, by, { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, avoid = DOORS })
+        end
+      end
+      error(string.format("no tile beside the Blackjack at (%d,%d) is reachable", ax, ay))
+    end)
     steps[#steps + 1] = K.board()
     steps[#steps + 1] = H.flyTo(z.land[1], z.land[2], { what = "the Blackjack to " .. z.what, fight = FIGHT })
   end
@@ -57,7 +77,7 @@ local function zone(z)
     say("hunt", string.format("%s: lowest L%d", z.what, lowest()))
     H.log("[kit] " .. kitLine(FOUR))
   end)
-  steps[#steps + 1] = K.worldHunt({ what = z.what, lap = z.lap, forms = z.forms, won = won })
+  steps[#steps + 1] = K.worldHunt({ what = z.what, lap = z.lap, forms = z.forms, won = won, avoid = DOORS })
   steps[#steps + 1] = H.call(function()
     say("hunt", string.format("%s: done; lowest L%d", z.what, lowest()))
   end)
