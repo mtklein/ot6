@@ -47,6 +47,7 @@ local plan = {
 local k, res, triedR, done = 1, {}, false, false
 local cm = nil       -- the commit in play: { cell, bank0, committed, pendAtConfirm, endF, bankEnd, cmd, atk }
 local commits = {}
+local filler = nil   -- an unboosted Fire Beam turn that banks the pip a commit needs (the old ROM spent it)
 
 H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
@@ -92,7 +93,19 @@ H.run({ maxFrames = 40000 }, {
             cm = { p = p, cell = p.cell }
             commits[#commits + 1] = cm
           end
-          if st == ST_CMD then
+          if st == ST_CMD and filler == "sent" then filler = nil end
+          if p.commit and st == ST_CMD and bank(terra) < 1 and pend(terra) == 0 and filler == nil then
+            filler = true
+            H.log("[magitek] no pip to raise for " .. p.cell .. ": an unboosted Fire Beam banks one first")
+          end
+          if filler == true then
+            if st == ST_CMD then btn = "a"
+            elseif st == ST_MAGITEK then
+              local col, row = H.readByte(0x893F + terra), H.readByte(0x8943 + terra)
+              btn = row > 0 and "up" or col > 0 and "left" or "a"
+            elseif st == ST_TGT then btn = "a"; filler = "sent"
+            end
+          elseif st == ST_CMD then
             if p.commit then
               if pend(terra) < 1 then btn = "r"
               else
