@@ -199,13 +199,19 @@ TERRA, LOCKE and STRAGO as above, and RELM (Chocobo Brush: special) from
 | `$0EE` Mandrake | a root | 23 | 1150 | fire | water | 4 · slash | **2** · slash\|bludg |
 | `$0D0` Insecare | an insect's shell | 23 | 977 | fire\|wind | — | 4 · pierce | **2** · pierce\|bludg |
 | `$0EB` Abolisher | a beast | 24 | 860 | — | — | 5 · slash | **2** · slash\|pierce |
-| `$0D6` Adamanchyt | the shelled tank | 24 | 1305 | — | — | 5 · bludg | **3** · pierce\|bludg |
+| `$0D6` Adamanchyt | the mountain's wall | 24 | 1305 | — | — | 5 · bludg | 5 · pierce\|bludg |
 | `$0B8` Slurm | an ooze | 23 | 505 | fire | — | 4 · bludg | **2** · bludg\|special |
 
 Lesson: the insect, the shell and the ooze turn the blades the party
 carries and take STRAGO's rod; the ooze takes RELM's brush too, the
 mountain she joins on. The floor's Insecare row (pierce) was a key no hand
-here held; its Fire weakness was the only answer. (#283 covers the
+here held; its Fire weakness was the only answer. The Adamanchyt stays at five,
+above the house curve: TERRA learns Break on this mountain (level 24), and
+the shell is the body her boosted Break is read on (a 3-BP Break takes four
+of its five; `battle_breakfour` measures it here, and went red when this
+doc's first draft gave the shell three:
+`build/attempts/wt/v043-wob-rows/gate/suite_battle_breakfour.red.log`, "the
+counted cast within 12 tries: got false"). (#283 covers the
 mountain's full pool and map 374; these five rows are this doc's.)
 
 ## 12. The Floating Continent (map 393)
