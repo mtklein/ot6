@@ -11,7 +11,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local TERRA, LOCKE, STRAGO, RELM = 0, 1, 7, 8
 local NAMES = { [TERRA] = "TERRA", [LOCKE] = "LOCKE", [STRAGO] = "STRAGO", [RELM] = "RELM" }
 local FOUR = { TERRA, LOCKE, STRAGO, RELM }
-local FIGHT = {}
+local FIGHT = { tactical = true, boost = true, bank = 2, items = true, healPercent = 50, nuke = { 2, 1, 0 } }
 H.NAV_REFIRE_HOLD = true
 local CHOCOBO_SUIT = 0x9E
 
