@@ -312,6 +312,16 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(map(), 9, "booted on map 9, the scenario hub")
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(sw(0x0044), 0, "$0044 clear -- SABIN's scenario is not done")
+    -- #472, a hard dependency: no counter on SABIN's road sells an Antidote
+    -- (SHADOW's house merchant, shop 39, has none), so the bag answers his
+    -- poison with what LOCKE's South Figaro shop sold (gen_sfigaro, ANTIDOTE
+    -- to 6).  His walk's measured worst is 3 landings (v0.36's boost chain:
+    -- "POISONED camp_intro ... antidote=0").  SABIN_ANTIDOTES (a lab global)
+    -- raises the floor for the negative control.
+    local need = type(SABIN_ANTIDOTES) == "number" and SABIN_ANTIDOTES or 3
+    H.assertEq(H.invCountOf(ANTIDOTE) >= need, true, string.format("SABIN sets out with at least %d "
+      .. "Antidotes, his walk's measured worst (the bag holds %d): gen_sfigaro's South Figaro buy "
+      .. "(shop 8) is the last that sells them", need, H.invCountOf(ANTIDOTE)))
     H.log(string.format("[hub] f%d (%d,%d); SABIN NPC obj 17 at (%d,%d)",
       H.frame, H.fieldX(), H.fieldY(), objX(17), objY(17)))
   end),
