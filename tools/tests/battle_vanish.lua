@@ -31,6 +31,7 @@
 --      aimed at a body that can be hit is left alone, and DODGE_OFF leaves
 --      the plan as made (the control); with every body faded, each actor's
 --      Fight becomes its cast where it has one (logged).
+--   4. the reveal's guards and the absorbed-weapon answer (Driver:revealLine, Driver:absorbWeaponPlan; see part 4).
 -- Negative control: stub H.dodges to nil and 1 goes red.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
@@ -199,17 +200,69 @@ H.run({ maxFrames = 90000 }, {
       -- the cast this actor has: a Magic row ($202E, command $02) and a line magicOnlyLine would play
       local hasMagic = false
       for row = 0, 3 do if H.readByte(0x202E + actor * 12 + row * 3) == 0x02 then hasMagic = true end end
-      local line = hasMagic and D:magicOnlyLine(actor, 0) or nil
+      local line = hasMagic and (D:magicOnlyLine(actor, 0) or D:revealLine(actor, standing[1])) or nil
       local p = D:dodgePlan(actor, { kind = "fight", row = 0, boostLeft = 0, aim = standing[1] })
       H.log(string.format("[test] every body Vanished: actor %d's Fight becomes %s (Magic row %s, a line %s)", actor,
         p.kind, tostring(hasMagic), line and line.kind or "none"))
       H.assertEq(p.kind, line and line.kind or "fight", string.format(
-        "3. every body faded: actor %d's Fight becomes its cast where it has one, else stays a Fight", actor))
+        "3. every body faded: actor %d's Fight becomes its cast (or its reveal, Driver:revealLine) where it has one, "
+        .. "else stays a Fight", actor))
       if p.kind ~= "fight" then castBy = actor end
     end
     H.assertEq(castBy ~= nil, true, "3. every body faded: some actor's Fight became a cast (the case is not vacuous)")
     for _, s in ipairs(standing) do setBit(ST1 + (4 + s) * 2, 0x10, false) end
     H.log(string.format("[test] dodgePlan: re-aim checked on %d standing body(ies); a cast for actor %s when every body "
       .. "faded", #standing, tostring(castBy)))
+  end),
+
+  -- 4. the reveal's own guards (v043-wob-zones review): with every body Vanished,
+  --   a. Driver:revealLine offers a spell to an actor that can cast one of M.REVEAL_SPELLS, and none once a standing
+  --      body is under Reflect (STATUS3 $80, $3EF8): the bounce would land on the party every turn (the control and
+  --      the negative, on one actor);
+  --   b. a classless skill (Bio Blaster: Ot6WeapClassTbl $00, magic that lands on a Vanished body) is left as
+  --      planned, and a classed one (AutoCrossbow: pierce, a steel blow that misses) is answered as a Fight is;
+  --   c. Driver:absorbWeaponPlan: a Fight with a weapon whose element the aimed body absorbs is not a Fight (the
+  --      element and the absorb byte stubbed through M.weaponElement and M.monsterAbsorb, since no Kolts body
+  --      absorbs the party's weapons); the same Fight is left alone with the stubs off (inert where nothing is
+  --      absorbed) and with M.ABSORB_WEAPON_GUARD = false (the control arm).
+  H.call(function()
+    DODGE_OFF = nil
+    local D = F.driver
+    local standing = {}
+    for s = 0, 5 do if monAlive(s) then standing[#standing + 1] = s end end
+    for _, s in ipairs(standing) do setBit(ST1 + (4 + s) * 2, 0x10, true) end
+    local caster = nil
+    for actor = 0, 3 do if caster == nil and D:revealLine(actor, standing[1]) ~= nil then caster = actor end end
+    H.assertEq(caster ~= nil, true, "4a. some actor has a reveal spell on the faded stage (the case is not vacuous)")
+    for _, s in ipairs(standing) do setBit(0x3EF8 + (4 + s) * 2, 0x80, true) end
+    local r = D:revealLine(caster, standing[1])
+    H.log(string.format("[test] 4a. actor %d's reveal under Reflect: %s", caster, r and string.format("spell $%02X",
+      r.spell) or "none"))
+    H.assertEq(r == nil or not H.spellReflectable(r.spell), true,
+      "4a. no reflectable reveal while a standing body is under Reflect")
+    for _, s in ipairs(standing) do setBit(0x3EF8 + (4 + s) * 2, 0x80, false) end
+    H.assertEq(H.weaponClass(0xA4), 0, "4b. precondition: Bio Blaster ($A4) carries no class")
+    H.assertEq(H.weaponClass(0xAA) ~= 0, true, "4b. precondition: AutoCrossbow ($AA) carries a class")
+    local bio = { kind = "skill", cmd = 0x09, skill = 0xA4, row = 0, boostLeft = 0, aim = standing[1] }
+    H.assertEq(D:dodgePlan(caster, bio), bio, "4b. a classless Tool (Bio Blaster) on the faded stage is left alone")
+    local xb = D:dodgePlan(caster, { kind = "skill", cmd = 0x09, skill = 0xAA, row = 0, boostLeft = 0,
+      aim = standing[1] })
+    H.assertEq(xb.kind ~= "skill", true, "4b. a classed Tool (AutoCrossbow) on the faded stage becomes the caster's "
+      .. "cast or reveal")
+    for _, s in ipairs(standing) do setBit(ST1 + (4 + s) * 2, 0x10, false) end
+    local fight = function() return { kind = "fight", row = 0, boostLeft = 0, aim = standing[1] } end
+    H.assertEq(D:absorbWeaponPlan(0, fight()).kind, "fight", "4c. nothing absorbed: the Fight is left alone")
+    local we, ma = H.weaponElement, H.monsterAbsorb
+    H.weaponElement = function() return 0x02 end
+    H.monsterAbsorb = function() return 0xFF end
+    local a = D:absorbWeaponPlan(0, fight())
+    H.ABSORB_WEAPON_GUARD = false
+    local c = D:absorbWeaponPlan(0, fight())
+    H.ABSORB_WEAPON_GUARD = nil
+    H.weaponElement, H.monsterAbsorb = we, ma
+    H.log(string.format("[test] 4c. absorbed: actor 0's Fight becomes %s (%s); guard off: %s", a.kind,
+      tostring(a.reason), c.kind))
+    H.assertEq(a.kind ~= "fight", true, "4c. a Fight whose weapon the body absorbs is not a Fight")
+    H.assertEq(c.kind, "fight", "4c. M.ABSORB_WEAPON_GUARD = false: the Fight stands (the control)")
   end),
 })

@@ -7216,14 +7216,24 @@ end
 -- (slash, bolt) and Assassin (pierce) at 2 BP lands 3 + 3 hits, six
 -- chips on a slash|pierce-weak gauge -- Nerapa's five, in one action;
 -- one of those blades alone at 2 BP swings six times and lands three.
+-- A hand whose weapon's element the slot's body absorbs chips nothing: the hit heals it (M.absorbedHand).
 local function fightChips(actor, slot, boost)
   local r, l = handsOf(actor)
   local mainHits, offHits = M.fightHits(l ~= nil and 2 or 1, boost)
-  local n = mainHits * hitChips(slot, M.weaponClass(r), M.weaponElement(r))
-  if l then
+  local n = M.absorbedHand(slot, r) and 0 or mainHits * hitChips(slot, M.weaponClass(r), M.weaponElement(r))
+  if l and not M.absorbedHand(slot, l) then
     n = n + offHits * hitChips(slot, M.weaponClass(l), M.weaponElement(l))
   end
   return n
+end
+-- whether monster slot `slot`'s body absorbs the element of weapon `item` (M.weaponElement; the slot's species
+-- read live, $57C0): such a Fight heals it and chips nothing (the Intangir absorbs every element, and EDGAR's
+-- Blizzard and SABIN's Poison Claw Fought it 137 times for 0, build/attempts/wt/v043-wob-zones/lab/
+-- intangir2_s16.log key be74)
+function M.absorbedHand(slot, item)
+  local e = M.weaponElement(item)
+  if e == 0 or slot == nil then return false end
+  return (M.monsterAbsorb(M.readWord(0x57C0 + slot * 2)) & e) ~= 0
 end
 
 local function toolChips(slot, tool)
@@ -12254,6 +12264,7 @@ function Driver:makePlan(actor)
   end
   self._race = nil
   plan = self:lockeMug(actor, plan)
+  plan = self:absorbWeaponPlan(actor, plan)
   plan = self:dodgePlan(actor, plan)
   plan = self:counterAimPlan(actor, plan)
   plan = self:counterMagicPlan(actor, plan)
@@ -12283,9 +12294,17 @@ end
 -- (Driver:magicOnlyLine) when there is one.  Other plans are left alone.
 -- DODGE_OFF (a global) turns it off, the control arm.
 function Driver:dodgePlan(actor, plan)
-  -- a skill (a Tool, a Blitz) swung at a Vanished body misses as a Fight does (the Intangir: AutoCrossbow and
-  -- Pummel 'took 0 off', airship_a8.log); only the Vanish answer at the end is offered for one
-  if plan == nil or (plan.kind ~= "fight" and plan.kind ~= "skill") or DODGE_OFF then return plan end
+  -- a skill that is a steel blow (a Tool or Blitz the chip model prices by class: AutoCrossbow, Drill, Pummel,
+  -- Suplex, Bum Rush) misses a Vanished body as a Fight does (the Intangir: AutoCrossbow and Pummel 'took 0 off',
+  -- airship_a8.log); a classless one (Bio Blaster, Flash, Aura Bolt) is magic and lands, so it is left alone
+  if plan == nil or DODGE_OFF then return plan end
+  if plan.kind == "skill" then
+    local cls = plan.cmd == BATTLE.CMD_TOOLS and M.weaponClass(plan.skill)
+      or (plan.cmd == BATTLE.CMD_BLITZ and (BATTLE.BLITZ_SHAPE[plan.skill] or {}).class) or 0
+    if (cls or 0) == 0 then return plan end
+  elseif plan.kind ~= "fight" then
+    return plan
+  end
   local function dodger(s)
     return M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
   end
@@ -12303,34 +12322,51 @@ function Driver:dodgePlan(actor, plan)
     end
   end
   if cmdRow(actor, BATTLE.CMD_MAGIC) then
-    local line = plan.kind == "fight" and self:magicOnlyLine(actor, plan.boostLeft or 0) or nil
+    local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
     if line then
       M.log(string.format("[%s] actor=%d every standing monster is under Vanish or Image: a cast (%s) for the "
-        .. "Fight that would miss", self.tag or "fight", actor, line.kind))
+        .. "%s that would miss", self.tag or "fight", actor, line.kind, plan.kind == "fight" and "Fight" or "skill"))
       return line
     end
-    -- No spell the magic line would choose (the Intangir absorbs every element: '[fight] magic-only: no line ...
-    -- absorb $FF', and four Fights a round took 0 off it for 100,000 frames, build/attempts/wt/v043-wob-zones/lab/
-    -- airship_a8.log), but a spell that lands still ends Vanish, and then the Fights land: under Vanish, the
-    -- cheapest castable spell from M.REVEAL_SPELLS, the ones that hurt without an element first, an absorbed one
-    -- last (it heals the body a little).  Image is not answered this way: a hit ends it.
-    if why == "Vanish" then
-      for _, id in ipairs(M.REVEAL_SPELLS) do
-        local cell, cost = spellCell(actor, id, true)
-        if cell ~= nil then
-          M.log(string.format("[%s] actor=%d every standing monster is under Vanish and no spell would hurt it: "
-            .. "spell $%02X (%d MP) at slot %d to end the Vanish", self.tag or "fight", actor, id, cost or -1, aim))
-          return { kind = "magic", spell = id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0, aim = aim,
-                   vetoOk = true, reason = "reveal" }
-        end
-      end
-    end
+    local rv = why == "Vanish" and self:revealLine(actor, aim) or nil
+    if rv then return rv end
   end
   return plan
 end
--- The spells Driver:dodgePlan casts to end a Vanish when no spell would hurt the body: Drain, Rasp, Demi, Slow
+-- The spells Driver:revealLine casts to end a Vanish when no spell would hurt the body: Drain, Rasp, Demi, Slow
 -- and Poison (no element, or poison), then Fire, Ice and Bolt (an absorbed hit still lands)
 M.REVEAL_SPELLS = { 0x04, 0x1A, 0x10, 0x19, 0x03, 0x00, 0x01, 0x02 }
+-- No spell the magic line would choose (the Intangir absorbs every element: 'magic-only: no line ... absorb $FF',
+-- and four Fights a round took 0 off it for 100,000 frames, build/attempts/wt/v043-wob-zones/lab/airship_a8.log),
+-- but a spell that lands still ends Vanish, and then the blows land: the first castable spell of M.REVEAL_SPELLS
+-- at the Vanished slot `aim`.  The plan skips the cast guard's absorb half (vetoOk: the absorbed hit is the point),
+-- so it judges the other two halves itself, here: no reveal while any standing body holds an enemy Runic that would
+-- take the spell (Driver:runicSlot) or the spell is reflectable and a standing body is under Reflect (M.castVeto
+-- with no element: the bounce would land on the party every turn).  nil when no reveal may go.
+function Driver:revealLine(actor, aim)
+  local slots = activeSlots()
+  for _, id in ipairs(M.REVEAL_SPELLS) do
+    local cell, cost = spellCell(actor, id, true)
+    if cell ~= nil then
+      local rs = self:runicSlot(id)
+      local s, why = M.castVeto(0, M.spellReflectable(id), slots)
+      if rs == nil and s == nil then
+        M.log(string.format("[%s] actor=%d every standing monster is under Vanish and no spell would hurt it: "
+          .. "spell $%02X (%d MP) at slot %d to end the Vanish", self.tag or "fight", actor, id, cost or -1, aim))
+        return { kind = "magic", spell = id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0, aim = aim,
+                 vetoOk = true, reason = "reveal" }
+      end
+      local key = string.format("noreveal:%d:%02X", actor, id)
+      if not self.statusSaid[key] then
+        self.statusSaid[key] = true
+        M.log(string.format("[%s] actor=%d no reveal by spell $%02X: %s", self.tag or "fight", actor, id,
+          rs ~= nil and string.format("slot %d holds an enemy Runic", rs)
+            or string.format("slot %d is under %s", s.slot, why == "reflect" and "Reflect" or why)))
+      end
+    end
+  end
+  return nil
+end
 
 -- A Fight by a member whose hand holds a weapon whose blow heals what it hits (M.weaponHeals: the Heal Rod,
 -- ItemProp +27 high nibble $0C, battle_main.asm AttackerEffect_0c), or GOGO's Mimic of a Fight while his does
@@ -12363,6 +12399,46 @@ function Driver:healWeaponPlan(actor, plan)
   end
   return self:noLineItem(actor, "the hand's weapon heals and there is no magic line")
     or { kind = "switch", reason = "heal_weapon" }
+end
+
+-- A Fight whose every weapon hand's element the target absorbs (M.absorbedHand) heals it and chips nothing: the
+-- Intangir absorbs every element, and EDGAR's Blizzard (ice) and SABIN's Poison Claw (poison) Fought it 137 times
+-- for 0 in one meeting (build/attempts/wt/v043-wob-zones/lab/intangir2_s16.log, key be74).  A person who sees the
+-- blow heal it reaches for the hand's other verb: EDGAR's tool and SABIN's Pummel (each when the bag or the pool
+-- pays for it at the base), else the magic line, else the no-line turn, else the window handed on.  A hand that
+-- holds no element, or a target that absorbs none of them, leaves the plan alone, so it is inert wherever no body
+-- absorbs the party's weapons.  M.ABSORB_WEAPON_GUARD = false turns it off, the control arm.
+function Driver:absorbWeaponPlan(actor, plan)
+  if plan == nil or plan.kind ~= "fight" or plan.ally or M.ABSORB_WEAPON_GUARD == false then return plan end
+  local aim = plan.aim
+  if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
+  if aim == nil then return plan end
+  local r, l = handsOf(actor)
+  if not M.absorbedHand(aim, r) or (l ~= nil and not M.absorbedHand(aim, l)) then return plan end
+  local key = string.format("absorbweapon:%d:%d", actor, aim)
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d no Fight: slot %d (species $%03X) absorbs the hand's element ($%02X), so the "
+      .. "blow heals it", self.tag or "fight", actor, aim, M.readWord(0x57C0 + aim * 2), M.weaponElement(r)))
+  end
+  local id = M.readByte(BATTLE.BCHID + actor * 2)
+  local tool = self.opts.tool or BATTLE.AUTOCROSSBOW
+  if (id == 4 or id == 0x0C) and cmdRow(actor, BATTLE.CMD_TOOLS) and self:battInvIdx(tool) then
+    return { kind = "skill", cmd = BATTLE.CMD_TOOLS, skill = tool, row = cmdRow(actor, BATTLE.CMD_TOOLS),
+             boostLeft = 0, reason = "absorb_weapon" }
+  end
+  local blitz = self.opts.blitz or BATTLE.PUMMEL
+  if id == 5 and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
+     and M.kitBoost(actor, blitz, 0) ~= nil then
+    return { kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = blitz, row = cmdRow(actor, BATTLE.CMD_BLITZ),
+             boostLeft = 0, reason = "absorb_weapon" }
+  end
+  if cmdRow(actor, BATTLE.CMD_MAGIC) then
+    local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
+    if line then return line end
+  end
+  return self:noLineItem(actor, "the hand's weapon is absorbed and there is no other verb")
+    or { kind = "switch", reason = "absorb_weapon" }
 end
 
 -- Love Token (#466): Barb-e's spell (ai_script.asm, AIScript::_190: `attack

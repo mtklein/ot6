@@ -2032,26 +2032,24 @@ Ot6ShieldTbl:
                                 ;   five; the blade or the fist.  ice
                                 ;   vanilla
         .word   $00aa
-        .byte   3, OT6_PIERCE|OT6_BLUDG ; grenade: a Fight makes it explode
-                                ;   (Exploder, its own hp), so its keys
-                                ;   are the ones that are not Fight: edgar's
-                                ;   tools (pierce) and sabin's blitzes
-                                ;   (bludgeon).  ice|water vanilla;
-                                ;   absorbs fire
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; grenade: answers a Fight with
+                                ;   Exploder (its own hp) unless the blow
+                                ;   breaks it, since a broken body does not
+                                ;   counter: break it in one swing (locke's
+                                ;   point, boosted) or use what it does not
+                                ;   answer, edgar's tools (pierce) and
+                                ;   sabin's blitzes (bludgeon).  ice|water
+                                ;   vanilla; absorbs fire
         .word   $00a3
-        .byte   2, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; intangir:
+        .byte   4, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; intangir:
                                 ;   absorbs every element, so every hand
                                 ;   but magic breaks it, setzer's among
-                                ;   them.  its dangers all run through its
-                                ;   turns and counters (meteo for a hit,
-                                ;   meteo as it dies, the escape under
-                                ;   1280 hp), and a broken body has none:
-                                ;   break it to kill it.  two, so one
-                                ;   double strike breaks it again as it
-                                ;   recovers, before the turn that would
-                                ;   answer the hit (four: the meteo it
-                                ;   cast between two re-breaking hits
-                                ;   took an L18-22 four, 1 fight in 3)
+                                ;   them.  its meteo after a hit and its
+                                ;   escape under 1280 hp run through its
+                                ;   turns, and a broken body has none:
+                                ;   break it to bring it down.  the house
+                                ;   curve's miniboss count (wob-side-
+                                ;   trips.md section 3)
         ; ---- the world of ruin: the solitary island to tzen's collapsing
         ; house (docs/design/route-wor-sabin.md section 8) ---------------
         ; Celes is alone to Tzen and holds slash (every sword; pierce only
