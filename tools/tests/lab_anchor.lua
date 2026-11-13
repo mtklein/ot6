@@ -52,7 +52,7 @@ H.run({ maxFrames = 200000 }, {
   H.kitBattle({
     { who = EDGAR, cmd = 0x09, row = ANCHOR, boost = 0 },
     { who = EDGAR, cmd = 0x09, row = ANCHOR, boost = 1 },
-  }, { maxFrames = 60000, untilPlanDone = true }),
+  }, { maxFrames = 60000 }),
   H.call(function()
     local h = hpAll()
     H.log(string.format("[anchor] after: HP %d %d %d %d %d %d", h[0], h[1], h[2], h[3], h[4], h[5]))

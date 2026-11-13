@@ -70,6 +70,11 @@ local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_TOOLS = 0x00, 0x01, 0x02, 0x09
 local EDGAR, SABIN, CELES, SETZER = 4, 5, 6, 9
 local SAFE, IMP, VANISH = 0x1C, 0x23, 0x26
 local PHANTOM = 20
+-- the reach spells (boost-rewards.md proposal 1), named here rather than read
+-- off the ROM, so a ROM without them is judged by the rule and not by itself
+local REACH = { [0x1B] = true, [0x1C] = true, [0x1D] = true, [0x1E] = true, [0x20] = true, [0x21] = true,
+  [0x23] = true, [0x24] = true, [0x25] = true, [0x26] = true, [0x2C] = true, [0x32] = true, [0x33] = true,
+  [0x34] = true }
 local NOISE, DEBIL, GRAVITY = 0xA3, 0xA7, 0x3A
 local BURN = type(BOOSTREACH_BURN) == "number" and BOOSTREACH_BURN or 0
 local DRAWS = 12 + BURN
@@ -136,7 +141,7 @@ local function lands(e, spell, first)
   if (H.readRomByte(r + 2) & 1) ~= 0 and (H.readByte(0x3EE4 + e) & 0x10) ~= 0 then return false end
   if (H.readRomByte(r + 3) & 2) == 0 and (H.readByte(0x3EF8 + e) & 0x80) ~= 0 then return false end
   local lift = (H.readRomByte(r + 4) & 4) ~= 0
-  if not lift and (H.readRomByte(r + 4) & 8) ~= 0 then lift = holds(first, spell) end   -- a toggle
+  if not lift and (H.readRomByte(r + 4) & 8) ~= 0 then lift = first ~= nil and holds(first, spell) end   -- a toggle
   local cur = { 0x3EE4, 0x3EE5, 0x3EF8, 0x3EF9 }
   local ok = { 0x331C, 0x331D, 0x3330, 0x3331 }
   for k = 1, 4 do
@@ -155,11 +160,19 @@ local drawn = {}       -- the Tools list's drawn price per tool id (Ot6ToolRowDe
 local function installObservers()
   if installed then return end
   installed = true
+  -- only the decorator's own stores are the drawn cost (DrawToolsListText's
+  -- template writes the same cells first)
+  local dec = H.sym("Ot6ToolRowDecorate")
+  local function inDec()
+    local st = emu.getState()
+    local pc = (st["cpu.k"] << 16) | st["cpu.pc"]
+    return pc >= dec and pc < dec + 0x80
+  end
   emu.addMemoryCallback(function(_, v)
-    if H.readByte(0x6168) == 0 then drawn[H.readByte(0x575A)] = v end
+    if H.readByte(0x6168) == 0 and inDec() then drawn[H.readByte(0x575A)] = v end
   end, emu.callbackType.write, 0x7E5758, 0x7E5758)
   emu.addMemoryCallback(function(_, v)
-    if H.readByte(0x6168) == 0 then drawn[H.readByte(0x5760)] = v end
+    if H.readByte(0x6168) == 0 and inDec() then drawn[H.readByte(0x5760)] = v end
   end, emu.callbackType.write, 0x7E575E, 0x7E575E)
   local function cx() return emu.getState()["cpu.x"] & 0xFF end
   local function onExec(a, fn)
@@ -567,7 +580,7 @@ local steps = {
       if id ~= 0xFF then
         list[#list + 1] = string.format("$%02X", id)
         local r = MPB + id * 14
-        if quiet == nil and id < 0x36 and not inFold[id] and not H.isReachSpell(id)
+        if quiet == nil and id < 0x36 and not inFold[id] and not REACH[id]
            and ((H.readRomByte(r + 4) & 0x80) ~= 0 or H.readRomByte(r + 6) == 0) then quiet = id end
       end
     end
@@ -647,8 +660,12 @@ steps[#steps + 1] = H.call(function()
       tostring(c.pendAtConfirm), c.boost))
     if c.spell then
       H.assertEq(c.mask ~= nil, true, c.name .. ": the cast reached CalcAttackEffect")
-      check((c.mask & c.aimBit) ~= 0, string.format("%s: the mask $%04X holds the body aimed at", c.name, c.mask))
-      local want = c.vanmon and 1 or 1 + math.min(c.boost, c.eligible)
+      if not c.here then
+        check((c.mask & c.aimBit) ~= 0, string.format("%s: the mask $%04X holds the body aimed at", c.name, c.mask))
+      end
+      -- a reach spell covers the target and a body a point it can land on;
+      -- anything else (the quiet spell, Vanish at a monster) the one body
+      local want = (REACH[c.spell] and not c.vanmon) and 1 + math.min(c.boost, c.eligible) or 1
       check(popc(c.mask) == want, string.format("%s: at %d BP the mask $%04X holds %d bodies (want %d: the target "
         .. "and %d of the %d others it can land on)", c.name, c.boost, c.mask, popc(c.mask), want,
         math.min(c.boost, c.eligible), c.eligible))
@@ -705,7 +722,9 @@ steps[#steps + 1] = H.call(function()
       check(c.bankEnd == wantBank, string.format("%s: bank %d -> %d (want %d)", c.name, c.bank0, c.bankEnd,
         wantBank))
     end
-    if c.sameMp then
+    if c.sameMp and not c.vanmon then
+      -- (Vanish's list draws the reach price: the list cannot know the cursor
+      -- will cross to a monster; the charge is its own, checked below)
       check(c.listPrice == byName[c.sameMp].listPrice, string.format("%s: the list drew %s MP with the boost "
         .. "pending, %s %s (its own price)", c.name, tostring(c.listPrice), c.sameMp,
         tostring(byName[c.sameMp].listPrice)))
