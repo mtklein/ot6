@@ -360,6 +360,20 @@ ceiling on any one machine, whatever a caller launches.
 `python3 tools/tests/lib/emu_slot.py --status` prints held and total;
 `--selftest` checks the limit on a private pool.
 
+**The line runs on the fast cores.** px13's cores are not alike: four Zen 5
+cores (CPUs 0-3 and their SMT siblings 12-15, 5.16 GHz) and eight Zen 5c
+(4-11, 16-23, 3.29 GHz), and its kernel doesn't steer work to the fast
+ones (amd_pstate's preferred-core ranking is off). The same leg played
+1.3-1.4x slower on a Zen 5c core (#396). A qualification's wall time is
+its line's (v0.42: the 117 line runs were 12,787 s of 13,060), so run.sh
+confines a run of the line (`lib/line_cpus.py`: the generators on the
+prev= chain from power-on and the cutters booted from them, by
+`OT6_WORKER`) to the CPUs the machine lists in `~/.config/ot6/line-cpus`
+(px13: `0-3,12-15`), with `taskset`. Everything else runs anywhere. A
+machine without the file (the Macs) confines nothing. Where a run is
+placed never changes what it plays: confined and unconfined runs made
+byte-identical savestates.
+
 New work requires a fresh observation that the host is on AC power.
 `live.py --place` excludes battery-powered machines and reports the reason
 in its output and worker grid; unknown or stale power observations also
