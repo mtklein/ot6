@@ -26,7 +26,7 @@ local WANT = {
   [0x0E8] = { "Bug", 2, SLASH | PIERCE, ICE | WATER, 0 },
   [0x03D] = { "ChickenLip", 2, SLASH | BLUDG, ICE, 0 },
   [0x0AA] = { "Grenade", 3, PIERCE | BLUDG, ICE | WATER, FIRE },
-  [0x0A3] = { "Intangir", 4, SLASH | PIERCE | BLUDG | SPECIAL, 0, 0xFF },
+  [0x0A3] = { "Intangir", 3, SLASH | PIERCE | BLUDG | SPECIAL, 0, 0xFF },
 }
 local BUG, CHICKENLIP, GRENADE, INTANGIR = 0x0E8, 0x03D, 0x0AA, 0x0A3
 -- the world groups (RandBattleGroup index = WorldBattleGroup byte) and the species each must deal
