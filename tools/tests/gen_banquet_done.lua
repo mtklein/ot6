@@ -446,7 +446,16 @@ local steps = {
 
   -- ---- 1. the grind to Vector ----------------------------------------------
   worldGrind(120, 188, "the I->J world grind -> (120,188)"),
-  pressWalk("up", function() return not H.worldMode() end, 900,
+  H.call(function()
+    -- the held UP below steps onto the Vector trigger from this tile and no
+    -- other (#528)
+    H.assertEq(H.worldMode() and H.worldX() == 120 and H.worldY() == 188, true,
+      string.format("the grind ends at (120,188), below the Vector trigger, on the world map (at (%d,%d), map %d)",
+        H.worldX(), H.worldY(), map()))
+  end),
+  -- ends off the world for Vector, not in a Tent the walk's care pitches
+  -- after a battle on the step (#522's H.offWorld, #528)
+  pressWalk("up", function() return H.offWorld() end, 900,
     "step onto the Vector trigger (120,187)"),
   H.waitUntil(landed(253, 10), 2400, "Vector 253 (post-attack)", 1),
   H.waitFrames(30),
