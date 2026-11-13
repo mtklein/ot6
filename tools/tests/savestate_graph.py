@@ -388,14 +388,12 @@ STATES = [
     # state hung off the checkpoint.
     S("vector_entry", gen="gen_vector_entry", prev="blackjack",
       checkpoint="post-opera-v1", cutter="gen_post_opera_checkpoint"),
-    # post-opera-v1 -> the open country the Blackjack reaches and no story
-    # leg walks: the forests by Albrook, the bomb isle, the north isles, the
-    # plain north of Thamasa and Triangle Island, each hunted until every
-    # formation is won (docs/design/wob-side-trips.md, #279 #280 #282): a
+    # post-opera-v1 -> the forests by Albrook no story leg walks, each hunted
+    # until every formation is won (docs/design/wob-side-trips.md, #282): a
     # branch beside vector_entry.  Nothing boots it.
-    S("wob_airship_hunt", gen="gen_wob_airship_hunt", prev="blackjack",
+    S("wob_south_hunt", gen="gen_wob_south_hunt", prev="blackjack",
       checkpoint="post-opera-v1", cutter="gen_post_opera_checkpoint",
-      timeout=7200),
+      timeout=3600),
     # gen_vector_sneak: the Returner sympathizer's choice dialog ($01F0) and
     # the FACING-GATED ledge on {43,38} -> control at {57,34}.
     S("vector_sneak", gen="gen_vector_sneak", prev="vector_entry"),
@@ -488,6 +486,14 @@ STATES = [
     S("narshe_mission", gen="gen_narshe_mission", prev="n128_won",
       checkpoint="terra-returned-v1", cutter="gen_terra_returned_checkpoint",
       timeout=3600),
+    # terra-returned-v1 -> the islands only the airship reaches and no story
+    # leg walks (the bomb isle, the north isles, the plain north of Thamasa,
+    # Triangle Island), each hunted until every formation is won
+    # (docs/design/wob-side-trips.md, #279 #280 #282): a branch beside
+    # narshe_mission.  Nothing boots it.
+    S("wob_airship_hunt", gen="gen_wob_airship_hunt", prev="n128_won",
+      checkpoint="terra-returned-v1", cutter="gen_terra_returned_checkpoint",
+      timeout=7200),
     # ---- boundary G -> G' (#428) -------------------------------------------
     # The World of Balance detour that teaches MOG Water Rondo, the first
     # time the airship is the party's own (docs/design/route-water-rondo.md):

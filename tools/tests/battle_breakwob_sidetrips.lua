@@ -1,17 +1,17 @@
 -- @suite
--- battle_breakwob_sidetrips.lua -- the World of Balance break rows for the side trips the Blackjack opens after the
--- opera: the forests between Vector and Maranda (world groups 20, 17, 18), the bomb isle (27) and Triangle Island
--- (124, 28), re-verified from the built ROM (battle_breakwor_sidetrips's shape: pure ROM bytes, no savestate).
+-- battle_breakwob_sidetrips.lua -- the World of Balance break rows for the side trips off the story's path: the
+-- forests by Albrook (world groups 20, 17, 18), walked from the opera's landing, and the airship's islands, the bomb
+-- isle (27) and Triangle Island (124, 28), re-verified from the built ROM (battle_breakwor_sidetrips's shape: pure ROM bytes, no savestate).
 -- docs/design/wob-side-trips.md section 2 is the design; the tables below are its, and the only place the
 -- expectations live.
 --
 --   1. Bug, ChickenLip, Grenade and Intangir carry exactly their designed Ot6ShieldTbl rows, keep their vanilla
 --      weak and absorb bytes, and have no Ot6ElemAddTbl row;
---   2. every species of every formation of those world groups has a key for the post-opera four (CELES's blade,
---      LOCKE's knife, EDGAR's pike and tools, SABIN's fists and blitzes), and each group still deals the species
---      it is checked for;
+--   2. every species of every formation of those world groups has a key in the hands of the four that first meets
+--      it (the forests: the post-opera four; the islands: the four the wheel is handed to, SETZER among them), and
+--      each group still deals the species it is checked for;
 --   3. the lessons: the Grenade's keys are the hands that are not Fight (EDGAR's tools pierce, SABIN's blitzes
---      bludgeon); the Intangir absorbs every element, so every steel hand keys it.
+--      bludgeon); the Intangir absorbs every element, so every other hand keys it, SETZER's special too.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -23,16 +23,20 @@ local WANT = {
   [0x0E8] = { "Bug", 2, SLASH | PIERCE, ICE | WATER, 0 },
   [0x03D] = { "ChickenLip", 2, SLASH | BLUDG, ICE, 0 },
   [0x0AA] = { "Grenade", 3, PIERCE | BLUDG, ICE | WATER, FIRE },
-  [0x0A3] = { "Intangir", 4, SLASH | PIERCE | BLUDG, 0, 0xFF },
+  [0x0A3] = { "Intangir", 4, SLASH | PIERCE | BLUDG | SPECIAL, 0, 0xFF },
 }
 local BUG, CHICKENLIP, GRENADE, INTANGIR = 0x0E8, 0x03D, 0x0AA, 0x0A3
 -- the world groups (RandBattleGroup index = WorldBattleGroup byte) and the species each must deal
-local GROUPS = { { 20, "the forest east of Albrook", { BUG } }, { 17, "the forest west of Albrook", { CHICKENLIP } },
-  { 18, "the forest by Maranda", { CHICKENLIP } }, { 27, "the bomb isle", { GRENADE } },
-  { 124, "Triangle Island", { INTANGIR } }, { 28, "Triangle Island's shore", { INTANGIR } } }
--- the hands the post-opera four hold (post-opera-v1): CELES (RegalCutlass: slash), LOCKE (MithrilKnife: pierce),
--- EDGAR (Mithril Pike and AutoCrossbow: pierce), SABIN (Kaiser and Pummel: bludgeon)
-local HANDS = SLASH | PIERCE | BLUDG
+local GROUPS = { { 20, "the forest east of Albrook", { BUG }, "post-opera" },
+  { 17, "the forest west of Albrook", { CHICKENLIP }, "post-opera" },
+  { 18, "the forest by Maranda", { CHICKENLIP }, "post-opera" }, { 27, "the bomb isle", { GRENADE }, "airship" },
+  { 124, "Triangle Island", { INTANGIR }, "airship" }, { 28, "Triangle Island's shore", { INTANGIR }, "airship" } }
+-- the hands that meet each group: the forests, the post-opera four on foot (post-opera-v1: CELES's RegalCutlass,
+-- slash; LOCKE's MithrilKnife, pierce; EDGAR's Mithril Pike and AutoCrossbow, pierce; SABIN's Kaiser and Pummel,
+-- bludgeon); the islands, the four the wheel is handed to (terra-returned-v1: LOCKE's knife, pierce; EDGAR's
+-- Blizzard, slash, and his tools, pierce; SABIN's Poison Claw, slash, and Pummel, bludgeon; SETZER's cards, special)
+local POST_OPERA = SLASH | PIERCE | BLUDG
+local AIRSHIP = SLASH | PIERCE | BLUDG | SPECIAL
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),
@@ -109,9 +113,10 @@ H.run({ maxFrames = 600 }, {
         for _, sp in ipairs(formSpecies(f)) do
           n = n + 1
           seen[sp] = true
-          if (classOf(sp) & HANDS) == 0 then
-            problem("formation %d (%s): species $%03X (class $%02X) has no key in the four's hands", f, g[2], sp,
-              classOf(sp))
+          local hands = g[4] == "airship" and AIRSHIP or POST_OPERA
+          if (classOf(sp) & hands) == 0 then
+            problem("formation %d (%s): species $%03X (class $%02X) has no key in the %s four's hands", f, g[2], sp,
+              classOf(sp), g[4])
           end
         end
       end
@@ -128,11 +133,11 @@ H.run({ maxFrames = 600 }, {
     if (classOf(GRENADE) & PIERCE) == 0 then problem("$0AA Grenade: EDGAR's tools (pierce) hold no key") end
     if (classOf(GRENADE) & BLUDG) == 0 then problem("$0AA Grenade: SABIN's blitzes (bludgeon) hold no key") end
     if absorb(INTANGIR) ~= 0xFF then problem("$0A3 Intangir: no longer absorbs every element") end
-    if (classOf(INTANGIR) & HANDS) ~= HANDS then
-      problem("$0A3 Intangir: class $%02X, want every steel hand ($%02X): it absorbs every element", classOf(INTANGIR),
-        HANDS)
+    if (classOf(INTANGIR) & AIRSHIP) ~= AIRSHIP then
+      problem("$0A3 Intangir: class $%02X, want every hand the four hold ($%02X): it absorbs every element",
+        classOf(INTANGIR), AIRSHIP)
     end
-    H.log("the lessons: the Grenade takes the hands that are not Fight; the Intangir takes every steel hand")
+    H.log("the lessons: the Grenade takes the hands that are not Fight; the Intangir takes every hand but magic")
     H.assertEq(#problems, 0, "WoB side trips break row mismatches")
     H.log("WoB side trips break rows verified against the built ROM")
   end),

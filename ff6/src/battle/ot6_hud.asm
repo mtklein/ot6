@@ -2013,13 +2013,16 @@ Ot6ShieldTbl:
                                 ;   fire|holy vanilla is the elemental
                                 ;   reward for reading past the ninja's
                                 ;   absorb
-        ; ---- the world of balance by the blackjack (wob-side-trips.md) -----
-        ; What the airship opens after the opera and no story leg walks: the
-        ; forests between Vector and Maranda (world groups 17, 18, 20), the
-        ; bomb isle (27) and Triangle Island (124, 28).  The party that
-        ; first meets them is the post-opera four: CELES (a blade), LOCKE
-        ; (a knife: the point), EDGAR (a pike and his tools: the point) and
-        ; SABIN (fists and blitzes: the blow).  Vanilla elements stay.
+        ; ---- the world of balance off the story's path (wob-side-trips.md) --
+        ; What no story leg walks: the forests by Albrook (world groups 17,
+        ; 18, 20), on foot from the opera's landing, where the post-opera four
+        ; meet them: CELES (a blade), LOCKE (a knife: the point), EDGAR (a
+        ; pike and his tools: the point) and SABIN (fists and blitzes: the
+        ; blow); and the airship's islands, the bomb isle (27) and Triangle
+        ; Island (124, 28), first reached once Setzer hands over the wheel,
+        ; by LOCKE, EDGAR (a blade now), SABIN (claws: an edge, and his
+        ; blitzes) and SETZER (cards and dice: special).  Vanilla elements
+        ; stay.
         .word   $00e8
         .byte   2, OT6_SLASH|OT6_PIERCE ; bug: a shell on wings; cut or
                                 ;   spear it.  ice|water vanilla; alone, it
@@ -2036,12 +2039,14 @@ Ot6ShieldTbl:
                                 ;   (bludgeon).  ice|water vanilla;
                                 ;   absorbs fire
         .word   $00a3
-        .byte   4, OT6_SLASH|OT6_PIERCE|OT6_BLUDG ; intangir: absorbs every
-                                ;   element, so only steel breaks it.  its
-                                ;   dangers all run through its turns and
-                                ;   counters (meteo for a hit, meteo as it
-                                ;   dies, the escape under 1280 hp), and a
-                                ;   broken body has none: break it to kill it
+        .byte   4, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; intangir:
+                                ;   absorbs every element, so every hand
+                                ;   but magic breaks it, setzer's among
+                                ;   them.  its dangers all run through its
+                                ;   turns and counters (meteo for a hit,
+                                ;   meteo as it dies, the escape under
+                                ;   1280 hp), and a broken body has none:
+                                ;   break it to kill it
         ; ---- the world of ruin: the solitary island to tzen's collapsing
         ; house (docs/design/route-wor-sabin.md section 8) ---------------
         ; Celes is alone to Tzen and holds slash (every sword; pierce only
