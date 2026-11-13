@@ -17,6 +17,10 @@ local won = {}
 local MAP_CARS, MAP_HALL = 141, 151
 -- the hallway's step-on events (route_data map 151): its two ends and its two compartment doors
 local HALL_TRIGGERS = { { 26, 8 }, { 26, 9 }, { 1, 8 }, { 1, 9 }, { 19, 7 }, { 9, 7 } }
+-- the front cars' doors and step-on events (route_data map 141) other than the one the walk takes: (38,8) above
+-- the boot tile is the smokestack car's
+local CAR_DOORS = { { 91, 8 }, { 100, 8 }, { 109, 8 }, { 48, 8 }, { 103, 8 }, { 116, 8 }, { 82, 8 }, { 75, 8 },
+  { 66, 8 }, { 38, 8 }, { 31, 7 } }
 local HALL = { [72] = "Bomb x2, Hazer x2", [80] = "Whisper, StillGoing, Hazer x2", [90] = "Whisper" }
 local function seated()
   local t = {}
@@ -34,7 +38,7 @@ H.run({ maxFrames = 1500000 }, {
   end),
   -- @@setup-end
   -- the passenger car's door (_cba694: 141 (59,8) -> 151 (2,8))
-  H.navTo(59, 8, { maxFrames = 16000, playBattles = "tactical", fight = FIGHT,
+  H.navTo(59, 8, { maxFrames = 16000, playBattles = "tactical", fight = FIGHT, avoid = CAR_DOORS,
     arrive = function() return map() == MAP_HALL end }),
   H.waitUntil(function() return map() == MAP_HALL and settled() end, 4000, "the hallway, map 151", 5),
   H.call(function()

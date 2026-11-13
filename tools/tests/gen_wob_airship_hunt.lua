@@ -70,6 +70,12 @@ local function board()
       end),
     }, "A on the parked Blackjack: its hold (map 7)"), function() ph = 0 end),
     H.release(),
+    -- the hold's stairs are in-map links (route_data map 7): (10,29) -> (50,61), (50,50) -> (40,17), and (40,10)
+    -- up to the deck
+    H.navTo(10, 29, { maxFrames = 6000, arrive = function() return H.fieldX() >= 45 and H.fieldY() >= 55 end }),
+    H.waitUntil(function() return settled() and H.fieldX() >= 45 end, 2400, "the hold's stair (10,29) -> (50,61)", 5),
+    H.navTo(50, 50, { maxFrames = 6000, arrive = function() return H.fieldX() == 40 and H.fieldY() <= 17 end }),
+    H.waitUntil(function() return settled() and H.fieldX() == 40 end, 2400, "the hold's stair (50,50) -> (40,17)", 5),
     H.navTo(40, 10, { maxFrames = 6000, arrive = function() return map() == MAP_DECK end }),
     H.waitUntil(function() return map() == MAP_DECK and settled() end, 2400, "the Blackjack's deck (map 6)", 5),
     H.navTo(15, 6, { maxFrames = 3000 }),
