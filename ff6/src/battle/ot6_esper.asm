@@ -170,6 +170,16 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
         rts
 .endproc
 
+; The title screen's Continue (field_menu.asm MenuState_23, on the confirm):
+; vanilla loads the slot there and never passes LoadSavedGame, which only the
+; reload after a game over calls.  A (a8) = the slot.  rtl.
+.proc Ot6EsperContinue
+        php
+        jsr     Ot6EsperLoaded
+        plp
+        rtl
+.endproc
+
 ; A (a16) = slot 1..3.  Copy that slot page's counters into the live page.
 ; The three slots get their own loops so no scratch cell is needed.
 .proc Ot6EsperCopySlotToLive
