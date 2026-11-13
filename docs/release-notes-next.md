@@ -14,10 +14,11 @@ only to your own party. Imp and Vanish follow the target: aimed at someone
 who already has the status, they remove it from the others who have it too.
 
 Boosting Edgar's Debilitator now adds one more weakness per point, each shown
-on the enemy as the first one is. Each weakness costs the Debilitator's price.
+on the enemy as the first one is. Each point costs the Debilitator's price
+again.
 
-Boosting Locke's Filch now takes one more shield per point, at one Filch's
-price each. Only the first shield taken becomes a boost point for Locke.
+Boosting Locke's Filch now takes one more shield per point, each point
+costing one Filch's price. Only the first shield taken becomes a boost point for Locke.
 
 Boosting Locke's Bestow now hands over as many boost points as you raised:
 two at two points, three at three, as many as the ally can hold. Locke pays
@@ -25,5 +26,6 @@ exactly the points handed over.
 
 NoiseBlaster, MagiTek Confuser and X-fer, and the Gravity Rod used as an
 item no longer take a boost, since boosting them did nothing. A Sketch that
-draws an attack with no damage or healing number, or a status spell, no
-longer uses up the boost raised for it.
+draws an attack with no damage or healing number for a boost to raise (a
+status spell such as Slow or Imp, or Break) no longer uses up the boost
+raised for it.

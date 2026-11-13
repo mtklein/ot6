@@ -11,8 +11,8 @@
 --     cast through Magic covers one more body on the target's side per
 --     point, in battle order after the target and wrapping, passing over a
 --     body it cannot land on (not standing; under Rflect for a reflectable
---     spell; holding every status it sets, or immune to them); each body
---     pays its own cast: the list draws base x (1 + boost) and that is
+--     spell; holding every status it sets, or immune to them); each point
+--     pays the cast again: the list draws base x (1 + boost) and that is
 --     charged (Ot6SpellReach, Ot6PerPointPrice);
 --   * Debilitator adds one weakness and one more a point, until the body has
 --     no element left, priced one firing a weakness (Ot6DebilSteps);

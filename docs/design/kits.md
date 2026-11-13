@@ -43,12 +43,12 @@ What a boost buys on every action, kit or not, and proposals for the
 actions where it buys nothing yet, are in [boost-rewards.md](boost-rewards.md)
 (#469). Built so far: a single-target status or cure (Safe, Shell, Rflect,
 Vanish on the party, Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle,
-Stop, Imp, Dispel) reaches one more body per point, each body paying its own
-cast; Debilitator's weaknesses, Filch's shields and Bestow's pips (below).
+Stop, Imp, Dispel) reaches one more body per point, each point paying the
+spell's price again; Debilitator's weaknesses, Filch's shields and Bestow's pips (below).
 **Def. stays unboostable** (owner, 2026-11-13): a boost raised for it is
 dropped, never charged, as before. NoiseBlaster, MagiTek Confuser and X-fer
 and the Gravity Rod used from Item refuse a boost, and a Sketch that draws an
-attack with no number, or a reach spell, drops it.
+attack with no number (a sketched Imp, Slow or Break among them: their other payoffs are Magic's) drops it.
 
 Boost-tier folding means kits list **base spells only**: Fire is a
 kit entry, and Fire 2/3 are what boosting does to it. Terra's and

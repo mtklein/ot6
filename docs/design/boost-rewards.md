@@ -25,9 +25,11 @@ proposals 1, 3, 4 and 5 are built; proposal 2 is declined.
   `Ot6QueueFold`'s, a boost raised before), and so does the Gravity Rod used
   from Item (`Ot6ItemNoBoost` reads an equipment's cast spell, ItemProp +18
   bit 7, through `Ot6SpellNoBoost`: Quartr is a fraction). A Sketch whose drawn
-  attack has no number, or is a reach spell (reach serves Magic and
-  X-Magic only, and a sketch keeps command `$0D`), drops its boost once the
-  brush has drawn it (`Ot6SketchNoBoost`, in Cmd_0d before `_c21554`); the
+  attack has no number drops its boost once the brush has drawn it: reach,
+  a tier's fold and OT6's Break chips serve a queued Magic or X-Magic only,
+  and a sketch keeps command `$0D`, so a sketched Imp, Slow, Slow 2 or Break
+  buys nothing; a sketched Scan does buy (`Ot6Analyze` reads every enemy for
+  any character's boosted Scan) and keeps it (`Ot6SketchNoBoost`, in Cmd_0d before `_c21554`); the
   menu cannot refuse R, since the draw is a roll. **This is a deliberate
   exception to #463's rule** that a boost only the resolve shows was useless
   is spent (a Steal on a robbed body): the TLM's call in #469's review, since
@@ -42,12 +44,13 @@ proposals 1, 3, 4 and 5 are built; proposal 2 is declined.
   mode, a status it lacks and may take; lift mode, one it holds). Imp and
   Vanish toggle (MagicProp +4 bit 3): their reach follows the body aimed at,
   lifting the status from the others that hold it when that body holds it,
-  setting it otherwise. The price is per point, not per body reached: a
-  point that finds nobody is still paid for, as a Scan's is. Vanish at a
-  monster reaches nobody and its boost is dropped at the queue. The price is
-  per body, base x (1 + boost) capped at 99 (`Ot6PerPointPrice`, through
-  `Ot6MagicPrice`). Suite: `battle_boostreach` (Safe at 0, 1 and 2 points,
-  Imp at a monster).
+  setting it otherwise. Vanish at a monster reaches nobody and its boost is
+  dropped at the queue. The price is per point, not per body reached: base
+  x (1 + boost), capped at 99 (`Ot6PerPointPrice`, through `Ot6MagicPrice`),
+  and a point that finds nobody is still paid for, as a Scan's is. Suite:
+  `battle_boostreach` (Safe at 0, 1 and 2 points and past two bodies already
+  under it, Imp at a monster and lifted from two imped allies, Vanish at a
+  monster, the quiet Demi).
 - **Proposal 2, Def., is declined** (owner, 2026-11-13: leave Defend
   unboostable). Def. keeps refusing the boost as before (`Ot6CmdNoBoost`, a
   boost raised on the command window is dropped); `battle_boostkeep`'s Def.
@@ -65,7 +68,7 @@ proposals 1, 3, 4 and 5 are built; proposal 2 is declined.
   no shield (a Broken or shieldless body) is spent: only the resolve can tell.
   Suite: `battle_boostkeep`.
 
-`Ot6PerPointPrice` is mp-economy.md's per-body arm, beside the multiplier's
+`Ot6PerPointPrice` is mp-economy.md's per-point arm, beside the multiplier's
 x2.5 and the chance verbs' flat price.
 
 ## What a boost point buys

@@ -228,8 +228,8 @@ makes:
 
 There is one exception since #469: where the boost buys more of the same
 application rather than a bigger number -- a reach spell's bodies,
-Debilitator's weaknesses, Filch's shields -- the price is per body or per
-step (below), whatever the command gate says, and NoiseBlaster, which takes
+Debilitator's weaknesses, Filch's shields -- the price is per point
+(below), whatever the command gate says, and NoiseBlaster, which takes
 no boost, stays flat though Tools escalate. Otherwise there is nothing
 else to check. `Ot6BoostDmg`'s command gate names
 fight `$00`, capture `$06`, bushido `$07`, steal `$05`, slot `$0f` and
@@ -548,7 +548,7 @@ gate). The boost buys swings.
 
 Base prices are `Ot6AbilityCostTbl`'s, `Ot6StealCost`'s and
 `Ot6DanceCost`'s; the boosted columns are the formula above, for the
-rows the one test says escalate, and the per-body arm (#469) for the rows
+rows the one test says escalate, and the per-point arm (#469) for the rows
 whose boost buys more of the same application. `battle_costtable` prints this whole
 table out of the built ROM, flat rows marked.
 
@@ -562,10 +562,10 @@ table out of the built ROM, flat rows marked.
 | Bestow (flat: its boost buys pips, #469) | 5 | 5 | 5 | 5 |
 | NoiseBlaster (flat: takes no boost, #469) | 6 | 6 | 6 | 6 |
 | Flash | 6 | 15 | 38 | 94 |
-| Filch (per shield, #469) | 6 | 12 | 18 | 24 |
+| Filch (per point, #469) | 6 | 12 | 18 | 24 |
 | Bio Blaster / **Dance** | 8 | 20 | 50 | 99 |
 | AuraBolt | 10 | 25 | 63 | 99 |
-| Debilitator (per weakness, #469; 80 overclocked) | 10 | 20 | 30 | 40 |
+| Debilitator (per point, #469; 80 overclocked) | 10 | 20 | 30 | 40 |
 | Suplex | 13 | 33 | 81 | 99 |
 | Air Anchor | 14 | 35 | 88 | 99 |
 | Mantra / Drill | 16 | 40 | 99 | 99 |
