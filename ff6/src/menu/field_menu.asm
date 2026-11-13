@@ -2850,6 +2850,8 @@ MenuState_23:
         sta     wGameTimeSeconds
         lda     zSelSaveSlot
         sta     wSaveSlotToLoad
+        jsl     Ot6EsperContinue        ; OT6 #328: the slot's esper progress
+                                        ;   goes live (A = the slot)
         lda     #MENU_STATE::TERMINATE
         sta     zNextMenuState
         stz     zMenuState
