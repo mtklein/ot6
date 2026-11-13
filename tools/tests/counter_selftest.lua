@@ -288,5 +288,79 @@ check("Demon Kiss ($47) is a Death Special",
   "specialClass", "return ((b or 0) & 0x3F) == 0x07", "return ((b or 0) & 0x3F) == 0x08",
   function() return H.specialClass(rom:byte(MONPROP + 0x0B7 * 32 + 0x1F + 1)) == "wound" end)
 
+-- ---- the Death answers the counter models price (#523) --------------------
+-- Sky Base ($0FC, _252): `if_self_dead / end_if / if_cmd FIGHT / end_if /
+-- if_hit / attack BLASTER, NOTHING, NOTHING` x4; Veteran ($0FB, _251):
+-- `... if_cmd MAGIC / attack NOTHING, NOTHING, ROULETTE`; Allo Ver ($0BB,
+-- _187): `if_hit / attack NOTHING, NOTHING, DOOM`; Apokryphos ($00C, _12):
+-- `if_self_dead / end_if / if_num_monsters 1 / if_hit / attack L5_DOOM,
+-- L4_FLARE, L3_MUDDLE`; Retainer ($007, _7): `if_self_dead / attack
+-- SPECIAL`; Sleep ($15F, _351): `if_self_dead / ... attack SPECIAL`
+local DOOM, ROULETTE, L5_DOOM, BLASTER, FIRE = 0x0D, 0x8C, 0x94, 0xB1, 0x00
+check("$0FC answers a spell with Blaster ($B1) and a Fight with nothing",
+  "retalAnswer", "if c == 0x01 then holds = either(use.cmd, a, b)", "if c == 0x01 then holds = true",
+  function()
+    return ids(H.retalAnswer(scriptOf(0x0FC), { cmd = MAGIC_CMD, atk = FIRE, elem = 0x01, dies = false })) == "B1"
+      and ids(H.retalAnswer(scriptOf(0x0FC), { cmd = FIGHT, dies = false })) == ""
+  end)
+check("$0FB answers a spell with Roulette ($8C)",
+  "retalAnswer", "if c == 0x01 then holds = either(use.cmd, a, b)", "if c == 0x01 then holds = false",
+  function() return ids(H.retalAnswer(scriptOf(0x0FB), { cmd = MAGIC_CMD, atk = FIRE, dies = false })) == "8C" end)
+check("$0BB answers a Fight, alive or dying, with Doom ($0D)",
+  "retalAnswer", "elseif c == 0x05 then holds = true", "elseif c == 0x05 then holds = false",
+  function()
+    return ids(H.retalAnswer(scriptOf(0x0BB), { cmd = FIGHT, dies = false })) == "0D"
+      and ids(H.retalAnswer(scriptOf(0x0BB), { cmd = FIGHT, dies = true })) == "0D"
+  end)
+-- if_num_monsters 1 (FC 13 01 01, AICond_13 @1cfa): n >= the monsters alive
+check("$00C alone answers a Fight with L.5 Doom, L4 Flare, L3 Muddle; beside another body, with nothing",
+  "retalAnswer", "use.monsters ~= nil then holds = b >= use.monsters", "use.monsters ~= nil then holds = true",
+  function()
+    return ids(H.retalAnswer(scriptOf(0x00C), { cmd = FIGHT, dies = false, monsters = 1 })) == "94,95,96"
+      and ids(H.retalAnswer(scriptOf(0x00C), { cmd = FIGHT, dies = false, monsters = 2 })) == ""
+  end)
+check("$00C with the count unknown is walked both ways (L.5 Doom in, not certain)",
+  "retalAnswer", "elseif c == 0x13 and a == 1 and use.monsters ~= nil then", "elseif c == 0x13 and a == 1 then",
+  function()
+    local a, sure = H.retalAnswer(scriptOf(0x00C), { cmd = FIGHT, dies = false })
+    return ids(a) == "94,95,96" and not sure
+  end)
+check("$007 answers only the hit that kills it, with its Special; so does $15F",
+  "retalAnswer", "use.dies ~= nil then holds = use.dies", "use.dies ~= nil then holds = not use.dies",
+  function()
+    return ids(H.retalAnswer(scriptOf(0x007), { cmd = FIGHT, dies = true })) == "EF"
+      and ids(H.retalAnswer(scriptOf(0x007), { cmd = FIGHT, dies = false })) == ""
+      and ids(H.retalAnswer(scriptOf(0x15F), { cmd = FIGHT, dies = true })) == "EF"
+  end)
+assert(rom:byte(MONPROP + 0x007 * 32 + 0x1F + 1) == 0x47 and rom:byte(MONPROP + 0x15F * 32 + 0x1F + 1) == 0x47,
+  "the Retainer's and the Sleep's Specials in MonsterProp (+$1F): $47, Death")
+-- M.deathLands on the records: CheckHit's guard miss (+2 bit 1) and level
+-- multiple (+4 bit 6, the divisor at +8)
+assert(rom:byte(MAGIC + L5_DOOM * 14 + 5) & 0x40 ~= 0 and rom:byte(MAGIC + L5_DOOM * 14 + 9) == 5,
+  "L.5 Doom in MagicProp: the level-multiple flag (+4 bit 6), 5 at +8")
+check("L.5 Doom lands at level 40, not at 41",
+  "deathLands", "if d == 0 or (level or 0) % d ~= 0 then return false end", "",
+  function() return H.deathLands(rec(L5_DOOM), false, 40) and not H.deathLands(rec(L5_DOOM), false, 41) end)
+check("a Death guard stops Doom, Blaster, Roulette and L.5 Doom",
+  "deathLands", "if guard and (byteAt(2) & 0x02) ~= 0 then return false end", "",
+  function()
+    for _, a in ipairs({ DOOM, BLASTER, ROULETTE, L5_DOOM }) do
+      if H.deathLands(rec(a), true, 40) then return false end
+      if not H.deathLands(rec(a), false, 40) then return false end
+    end
+    return true
+  end)
+check("Fire is no Death answer",
+  "deathLands", "if M.attackClass(byteAt) ~= \"wound\" then return false end", "",
+  function() return not H.deathLands(rec(FIRE), false, 40) end)
+check("L.5 Doom reaches the whole party, Blaster and Doom the one who struck, Roulette anyone",
+  "deathReach", "if (t & 0x01) == 0 and (t & 0x0C) ~= 0 then return \"party\" end", "",
+  function()
+    return H.deathReach(rom:byte(MAGIC + L5_DOOM * 14 + 1)) == "party"
+      and H.deathReach(rom:byte(MAGIC + BLASTER * 14 + 1)) == "attacker"
+      and H.deathReach(rom:byte(MAGIC + DOOM * 14 + 1)) == "attacker"
+      and H.deathReach(rom:byte(MAGIC + ROULETTE * 14 + 1)) == "roulette"
+  end)
+
 print(string.format("counter_selftest: PASS -- %d assertions, each failed by its own mutant: %s",
   n, table.concat(checks, "; ")))
