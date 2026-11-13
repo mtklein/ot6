@@ -16871,6 +16871,17 @@ function M.setzerBattle(plan, opts)
         Z.rec.seq[#Z.rec.seq + 1] = { t = "hit", y = ev.y, class = ev.class }
       end
     end, emu.callbackType.exec, c, c)
+    -- a body's break running out (Ot6Tick's recovery arm, `lda OT6_SHIELD_MAX,x`
+    -- 10 bytes in: its shields go back to their max), in the same sequence as
+    -- the passes, so the replay restores them where the engine did
+    local tk = M.sym("Ot6Tick") + 10
+    M.assertEq(M.readRomByte(tk & 0x3FFFFF) == 0xBD and M.readRomWord((tk & 0x3FFFFF) + 1) == 0x3E39, true,
+      "Ot6Tick's recovery arm is `lda $3e39,x` 10 bytes in")
+    emu.addMemoryCallback(function()
+      if live() and Z.rec then
+        Z.rec.seq[#Z.rec.seq + 1] = { t = "recover", y = emu.getState()["cpu.x"] & 0xff }
+      end
+    end, emu.callbackType.exec, tk, tk)
     emu.addMemoryCallback(function(_, v)
       if live() and Z.rec and Z.rec.row == 0x5B and v == 0x26 then
         Z.rec.dmg, Z.rec.b6, Z.rec.b7, Z.rec.class = M.readWord(0x11B0), M.readByte(0xB6), M.readByte(0xB7),
@@ -18363,17 +18374,36 @@ function M.setzerReplay(r, classOf)
   local st = {}
   for b = 0, 5 do local o = r.mon0[b]; st[b] = { hp = o.hp, sh = o.sh, brk = o.brk ~= 0, cls = o.cls } end
   local passes, cur, bad = {}, nil, {}
-  for _, ev in ipairs(r.seq or {}) do
-    if ev.t == "pay" then
-      cur = { cost = ev.c, hits = {} }
-      passes[#passes + 1] = cur
-    elseif ev.t == "hit" and ev.y >= 8 and cur then
-      cur.hits[#cur.hits + 1] = { slot = (ev.y - 8) // 2, class = ev.class }
+  -- a break that runs out during the action (the seq's "recover", Ot6Tick)
+  -- puts the body's shields back to its max at that point in the order: on
+  -- #397's replay slot 0 stood broken at 0 shields as the hires began and
+  -- ended at its max of 3 (wt/polish-shield-hud-3)
+  local function recover(y)
+    if y < 8 then return end
+    local b = (y - 8) // 2
+    if st[b] and r.mon0[b] then
+      st[b].sh, st[b].brk = r.mon0[b].shmax or st[b].sh, false
+      st[b].recovered = (st[b].recovered or 0) + 1
     end
   end
+  local before = {}
+  for _, ev in ipairs(r.seq or {}) do
+    if ev.t == "pay" then
+      cur = { cost = ev.c, hits = {}, order = {} }
+      passes[#passes + 1] = cur
+    elseif ev.t == "hit" and ev.y >= 8 and cur then
+      local h = { slot = (ev.y - 8) // 2, class = ev.class }
+      cur.hits[#cur.hits + 1] = h
+      cur.order[#cur.order + 1] = h
+    elseif ev.t == "recover" then
+      if cur then cur.order[#cur.order + 1] = { recover = ev.y } else before[#before + 1] = ev.y end
+    end
+  end
+  for _, y in ipairs(before) do recover(y) end
   for pi, p in ipairs(passes) do
     local n = math.max(1, #p.hits)
-    for _, h in ipairs(p.hits) do
+    for _, h in ipairs(p.order) do
+     if h.recover then recover(h.recover) else
       local t = st[h.slot]
       h.want = classOf(t.cls)
       if h.class ~= h.want then
@@ -18387,6 +18417,7 @@ function M.setzerReplay(r, classOf)
       d = math.min(d, 9999, t.hp)
       t.hp = t.hp - d
       h.d = d
+     end
     end
   end
   return st, passes, bad
@@ -18437,25 +18468,11 @@ function M.setzerCheckCoins(r, i, rate, classOf, tag)
   for b = 0, 5 do
     if r.mon0[b].present then
       M.assertEq(r.mon1[b].hp, st[b].hp, string.format("%s %d: slot %d's HP after every pass", tag, i, b))
-      local want = st[b].sh
-      if st[b].brk and r.mon1[b].brk == 0 and (r.mon0[b].shmax or 0) > 0 then
-        -- the body stood broken through the passes and its break ran out
-        -- during the action (its own turn ticks the timer while the hires
-        -- animate), so the recovery put its shields back to its max (#397's
-        -- replay, wt/polish-shield-hud-3: slot 0 broken at 0, recovered to 3).
-        -- Only a body no pass hit can be judged this way: a hit after the
-        -- recovery would have met shields the replay cannot place in time.
-        local hit = false
-        for _, p in ipairs(passes) do
-          for _, h in ipairs(p.hits) do if h.slot == b then hit = true end end
-        end
-        M.assertEq(hit, false, string.format("%s %d: slot %d recovered from its break during the action and "
-          .. "was hit too, which the replay cannot order", tag, i, b))
-        want = r.mon0[b].shmax
-        M.log(string.format("[%s] %d: slot %d's break ran out during the action: shields back to its max %d",
-          tag, i, b, want))
+      if st[b].recovered then
+        M.log(string.format("[%s] %d: slot %d's break ran out during the action (%d recovery): shields back to "
+          .. "its max %d where the engine restored them", tag, i, b, st[b].recovered, r.mon0[b].shmax or -1))
       end
-      M.assertEq(r.mon1[b].sh, want, string.format("%s %d: slot %d's shields after every pass", tag, i, b))
+      M.assertEq(r.mon1[b].sh, st[b].sh, string.format("%s %d: slot %d's shields after every pass", tag, i, b))
     end
   end
   return passes
