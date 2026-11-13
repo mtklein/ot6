@@ -1,5 +1,8 @@
 -- @suite savestate=minecart_entry slow
 -- battle_esperstats_wor.lua -- the twelve World of Ruin stones' while-worn
+-- #328 (the esper ladder, docs/design/esper-rework.md plan A): the while-worn stat packages are retired, so
+-- every stone below is now asserted to move no stat while worn (each delta 0 against BASE); its spells are
+-- asserted as before.  What a character keeps from wearing a stone is battle_esperladder's.
 -- stat packages (#418), in battle.
 --
 -- Same instrument as battle_esperstats.lua and battle_esperstats_tube6.lua:
@@ -32,18 +35,18 @@ local STATE = "build/states/minecart_entry.mss.lua"
 
 -- esper indices (GenjuProp order) and their packages: vig, spd, stm, mag
 local PACKAGE = {
-  [4]  = { "Terrato",  0, -3,  4,  6 },
-  [9]  = { "Palidor",  2,  4,  0,  0 },
-  [10] = { "Tritoch",  0,  3, -3,  7 },
-  [11] = { "Odin",     4,  4, -2,  0 },
-  [12] = { "Raiden",   6,  4, -3,  0 },
-  [13] = { "Bahamut",  3,  0, -3,  7 },
-  [14] = { "Alexandr", 4, -3,  6,  0 },
-  [15] = { "Crusader", 3,  3,  3,  3 },
-  [16] = { "Ragnarok", 5,  0, -3,  5 },
-  [24] = { "Fenrir",   0,  6, -3,  4 },
-  [25] = { "Starlet",  0,  4, -3,  6 },
-  [26] = { "Phoenix", -2,  2,  6,  0 },
+  [4]  = { "Terrato",  0,  0,  0,  0 },
+  [9]  = { "Palidor",  0,  0,  0,  0 },
+  [10] = { "Tritoch",  0,  0,  0,  0 },
+  [11] = { "Odin",  0,  0,  0,  0 },
+  [12] = { "Raiden",  0,  0,  0,  0 },
+  [13] = { "Bahamut",  0,  0,  0,  0 },
+  [14] = { "Alexandr",  0,  0,  0,  0 },
+  [15] = { "Crusader",  0,  0,  0,  0 },
+  [16] = { "Ragnarok",  0,  0,  0,  0 },
+  [24] = { "Fenrir",  0,  0,  0,  0 },
+  [25] = { "Starlet",  0,  0,  0,  0 },
+  [26] = { "Phoenix",  0,  0,  0,  0 },
 }
 local RIDES = {
   { 9, 24, 4 },      -- the v0.27 pair, and Terrato (the old no-mod row)
@@ -191,8 +194,8 @@ for i, stones in ipairs(RIDES) do
 end
 
 add({ H.call(function()
-  H.log("[esperstats-wor] all twelve World of Ruin stones carry their planned "
-    .. "stat packages in battle")
+  H.log("[esperstats-wor] none of the twelve World of Ruin stones moves a stat "
+    .. "while worn (#328: the packages are retired)")
 end) })
 
 H.run({ maxFrames = 120000 }, all)   -- 5 rides, each a reload + menu equips + ride-in
