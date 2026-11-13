@@ -12480,7 +12480,7 @@ end
 -- 0 (1067/4251) with $EA", and was never felled inside 20,000 frames); its
 -- other plans stand.  A cast heal is care like a drunk one: the rule once
 -- knew only items, so on wt/v043-wob-towns's replay CELES as host cast Cure
--- ($2D) on herself 22 times, "actor=0 cure entity 0 (1517/4251) with $2D",
+-- ($2D) on herself 11 times, "actor=0 cure entity 0 (1517/4251) with $2D",
 -- undoing the others' Fights, and stood 20,000 frames on; and by the same
 -- gap a cast heal or raise another member aimed elsewhere would have become
 -- a Fight on the host.  A heal or raise is care, and care that covers the

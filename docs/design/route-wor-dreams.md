@@ -285,7 +285,11 @@ host (the ally-Fight the Muddle rule presses), at the plan's boost when it
 was a Fight; care for the other members stands.  The host does not heal
 itself either: its own heal on itself becomes the same Fight on itself at 0
 BP (v0.42, #521's landing: on a snapshot a level lower, CELES as host drank
-X-Potions on herself and was not felled inside 20,000 frames).  `ZINGER_OFF`
+X-Potions on herself and was not felled inside 20,000 frames).  A cast heal
+is care like a drunk one (v0.43: on `wt/v043-wob-towns`'s replay, battle key
+beC0, CELES as host cast Cure on herself between the others' Fights and stood
+20,000 frames on, since the rule then knew only items); a heal or raise aimed
+at another member, or covering the whole party, stands for every actor.  `ZINGER_OFF`
 (a global) is the control.  A person who saw where the Zinger went does the same: the
 host's fall is the only way to the boss, and the party revives the host
 once Wrexsoul is out.
@@ -303,7 +307,14 @@ in: true").  Two mutants at 568bea1a (`mkmut.py`, `mutants.sh`, the same
 snapshot), each red on its assertion: the Fight aimed at another living
 member (`mutZA`: "1. the plan's target is the member $33F9 names: got 1,
 want 0"), the line ignoring `ZINGER_OFF` (`mutZB`: "control: with
-ZINGER_OFF no Zinger plan: got 12").
+ZINGER_OFF no Zinger plan: got 12").  At v0.43 (`wt/v043-zinger`, after
+cast heals became care) it passed on 22 distinct battle keys over two
+snapshots, main's at v0.42 and `wt/v043-wob-towns`'s, seed shifts 0-52, every
+member hosting on some key: the host fell 3,764 to 6,375 frames after the
+plan, and the host's own heal became a Fight on 23 of 24 runs; the rule as it
+was stays red on beC0 ("2. the host falls within 20000 frames of the plan"),
+and the line off is red on both snapshots ("1. a Zinger plan once Wrexsoul
+hides").
 
 ## 6. Supplies and kits
 

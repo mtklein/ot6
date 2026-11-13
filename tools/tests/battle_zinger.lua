@@ -16,7 +16,9 @@
 --   2. that member falls within 20000 frames of the first Zinger plan (the
 --      lab, eight battle keys with the line: 3,544 to 10,682 frames from the
 --      hide to the fall, and 13,921 on the leg's own snapshot with a TERRA
---      host; without the line the earliest fall came 24,804 frames in);
+--      host; v0.43's grid, 22 battle keys on main's and wt/v043-wob-towns's
+--      snapshots: 3,764 to 6,375; without the line the earliest fall came
+--      24,804 frames in);
 --   3. Wrexsoul is back ($33F8 cleared, its slot standing) within 600 frames
 --      of the fall;
 -- then the control: the same snapshot, ZINGER_OFF set, the fight driven as
