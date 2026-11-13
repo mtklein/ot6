@@ -3499,9 +3499,10 @@ Ot6ShieldTbl:
                                 ;   weakness vanilla
         ; formation 514
         .word   $012a
-        .byte   12, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; kefka:
-                                ;   every hand finds him.  no weakness
-                                ;   vanilla; nulls poison
+        .byte   16, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; kefka:
+                                ;   every hand finds him, and the most
+                                ;   shields of any boss (storm drgn 14).
+                                ;   no weakness vanilla; nulls poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian (the wob's: battle 75)

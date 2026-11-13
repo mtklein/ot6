@@ -29,7 +29,7 @@ local WANT = {
   [0x15C] = { "Magic", 8, SLASH | SPECIAL, EARTH, 0 },
   [0x15E] = { "Girl", 3, SLASH | PIERCE, ALL, ALL },
   [0x15F] = { "Sleep", 8, BLUDG | SPECIAL, 0, 0 },
-  [0x12A] = { "Kefka", 12, HANDS, 0, 0 },
+  [0x12A] = { "Kefka", 16, HANDS, 0, 0 },
 }
 local TIERS = { 0x1D7, 0x200, 0x201, 0x202 }
 
