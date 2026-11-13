@@ -972,17 +972,21 @@ local CASES = {
 activeCases = CASES
 -- The precondition every case starts from: every member alive at READY_PCT
 -- of max HP or better, and every case's actor free to play its verb.
-local function ready()
-  -- a monster still standing: a snapshot over the last one's death (alive
-  -- in $3A75 at 0 HP, the victory a few frames off) gave GAU's Rage no
-  -- body to strike, and the battle ended before his action ran (wt/polish-shield-hud-4's lab:
-  -- "timeout after 6000 frames driving toward rage entry 0 resolves")
-  local up = false
+-- A monster still standing (present, in the alive mask $3A75, HP above 0).
+-- A snapshot over the last one's death (alive at 0 HP, the victory a few
+-- frames off) gave GAU's Rage no body to strike, and the battle ended
+-- before his action ran (wt/polish-shield-hud-4's lab: "timeout after 6000
+-- frames driving toward rage entry 0 resolves"); the gates page such a
+-- battle's victory and take the next encounter.
+local function monsterUp()
   for s = 0, 5 do
     if (H.readByte(0x3AA8 + s * 2) & 1) == 1 and ((H.readByte(0x3A75) >> s) & 1) == 1
-       and H.readWord(0x3BFC + s * 2) > 0 then up = true end
+       and H.readWord(0x3BFC + s * 2) > 0 then return true end
   end
-  if not up then return false, "no monster standing" end
+  return false
+end
+local function ready()
+  if not monsterUp() then return false, "no monster standing" end
   if not standing() then
     return false, string.format("a member down or under %d%% of max HP", READY_PCT)
   end
@@ -1148,6 +1152,19 @@ local function gateStep()
         if not H.battleActive() then H.setPad({}) return end
         battleSetup()
         serving.mode, serving.since = "fill", nil
+        return
+      end
+      if not monsterUp() then
+        serving.unready = serving.unready + 1
+        if serving.unready >= MEASURE_BATTLES then
+          error(string.format("precondition: no battle of %d let the party get ready; the last ended with no "
+            .. "monster standing; seats %s", MEASURE_BATTLES, seatsLine()), 0)
+        end
+        H.log(string.format("[procboost] battle %d cannot serve: no monster standing; taking the next encounter; "
+          .. "seats %s", serving.n, seatsLine()))
+        serving.n, serving.mode = serving.n + 1, "out"
+        serving.W = H.newWalkFighter("procboost: a battle that ended")
+        serving.W.frame()
         return
       end
       local full = true
@@ -1533,6 +1550,7 @@ local function gauEncounter(k)
   H.driveUntil(function() return snap ~= nil or not H.battleLoadStarted() end, 30000, {
     H.call(function()
       local s = slotOf[GAU]
+      if not monsterUp() then pulse("a") return end        -- its victory: page it
       if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD and (H.readByte(ACTOR) & 3) == s
          and H.readByte(BANK + s * 2) >= BOOST and H.readByte(PEND + s * 2) == 0 and ready() then
         H.setPad({})
