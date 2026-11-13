@@ -220,7 +220,9 @@ def explain(fresh: bytes, tracked: bytes, offs: list[int]) -> list[str]:
         slot = next((s for s, p in sc.SLOT_PTR.items() if p <= off < p + SLOT_LEN), None)
         if slot is not None:
             where = f"slot {slot} ${0x1600 + off - sc.SLOT_PTR[slot]:04X}"
-        elif 0x2000 <= off < 0x4000:
+        elif 0x3000 <= off < 0x4000:
+            where = f"esper progress {sram_addr(off)}" + esper_cell(off)
+        elif 0x2000 <= off < 0x3000:
             where = f"codex {sram_addr(off)}"
         else:
             where = f"sram {sram_addr(off)}"
@@ -229,6 +231,25 @@ def explain(fresh: bytes, tracked: bytes, offs: list[int]) -> list[str]:
     if len(rest) > 40:
         lines.append(f"... and {len(rest) - 40} more byte(s) by address")
     return lines
+
+
+# The esper ladder's progress pages (#328, ot6_memory.inc OT6_ESPER_*): battery
+# $3000-$3FFF, four $400-byte pages (slots 1-3, then the live page), each a
+# magic word and then one word per character (12) per esper slot (26).
+ESPER_PAGES = ("slot 1", "slot 2", "slot 3", "live")
+ESPER_CHARS = ("TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES",
+               "STRAGO", "RELM", "SETZER", "MOG", "GAU")
+
+
+def esper_cell(off: int) -> str:
+    page, rel = divmod(off - 0x3000, 0x400)
+    if rel < 0x10:
+        return f" ({ESPER_PAGES[page]} page's signature)"
+    i = (rel - 0x10) // 2
+    if i >= 12 * 26:
+        return f" ({ESPER_PAGES[page]} page, past the counters)"
+    return (f" ({ESPER_PAGES[page]} page: {ESPER_CHARS[i // 26]}'s esper slot "
+            f"{i % 26} count)")
 
 
 # ---------------------------------------------------- is the capture today's --

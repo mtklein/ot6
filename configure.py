@@ -813,6 +813,13 @@ check("spell_grants",
        "ff6/src/text/magic_name_en.json", "docs/design/kits.md",
        "docs/design/magicite.md", "docs/design/magicite-tube-six.md",
        copy_if_changed_from("build/ot6.sfc")])
+# #328: the esper ladder (Ot6LadderTbl) and its menu labels (Ot6RungLabelTbl)
+# are docs/design/esper-rework.md's table, held in tools/esper_ladder.py's
+# SPEC; the selftest's mutants move one rung's bit, stat and label.
+check("esper_ladder",
+      "python3 tools/esper_ladder.py --selftest"
+      " && python3 tools/esper_ladder.py",
+      ["tools/esper_ladder.py", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.
