@@ -9,7 +9,9 @@ its signature.  SPEC below is the design doc's 26-row table (Odin and Raiden
 share a row), one entry per counter slot in GenjuProp order.  An effect is the
 ten bytes Ot6LadderTbl carries for it (ItemProp +5..+13 and +25, the bits a
 relic would set), or no bytes for the five signatures that are new code
-(Conductor, Facet, Grace, Rebirth, and Fenrir's Stop and Slow immunity).
+(Conductor, Facet, Rebirth, and Fenrir's Stop and Slow immunity; the doc's
+Grace for Sraphim would do nothing, since no code clears a fallen
+character's boost bank, so Sraphim's signature is the Cure Ring's Regen).
 
   python3 tools/esper_ladder.py --labels     write ff6/src/battle/ot6_esper_labels.inc
   python3 tools/esper_ladder.py              check build/ot6.sfc against SPEC
@@ -79,7 +81,7 @@ SPEC = [
     ("ZoneSeek", "Mag", "Stm", eff("No Mute", p2=S2["mute"]), eff("Auto Shell", s3=0x20)),
     ("Carbunkl", "Stm", "Mag", eff("Barrier Ring", r13=0x01), eff("Facet")),
     ("Phantom", "Spd", "Mag", eff("Back Guard", r10=0x02), eff("Mirage Vest", s2=0x04)),
-    ("Sraphim", "Stm", "Mag", eff("No Doom", p2=S2["doom"]), eff("Grace")),
+    ("Sraphim", "Stm", "Mag", eff("No Doom", p2=S2["doom"]), eff("Cure Ring", s3=0x02)),
     ("Golem", "Stm", "Vig", eff("No Muddle", p2=S2["muddle"]), eff("True Knight", r12=0x40)),
     ("Unicorn", "Stm", "Mag", eff("No Zombie", p1=S1["zombie"]),
      eff("Amulet", p1=S1["dark"] | S1["zombie"] | S1["poison"])),
