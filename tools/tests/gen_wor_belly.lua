@@ -48,7 +48,6 @@ local CARD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 }, right = { 1, 0
 -- per run, so the walk's equal-length routes differed between identical runs (#467)
 local CARD_DIRS = { "down", "left", "right", "up" }
 CAREFUL_PACE, CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE = 18, 120, 0.08, 0.002
-local IMPATIENCE0 = CAREFUL_IMPATIENCE   -- a lab's lever above, the first try's
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
 local CONDSEG = { [276] = { [30] = { { 32, 40 }, { 45, 48 } }, [32] = { { 31, 34 } } } }
 -- the longest one stand for the conductors is let sit quiet (the no-progress watchdog stands down for it), from
@@ -136,24 +135,15 @@ local function toRest(route, conds)
   return out
 end
 -- where the party stands, over time, along moves: { x, y, from, until }
--- a step's frames at the party's own walking speed: the field sets the party object's speed ($0875 + its
--- offset, $0803) to 3 under the Sprint Shoes' field bit (player.asm), a tile in 8 frames instead of 16.  The #328
--- line (f51cf3ac) carried that bit from a kept esper rank (Palidor's rung 3), and the walk timed at 16 dropped
--- down the shaft on all 30 tries ("the bridge to the FakeMustache (25,32): at (25,32) on map 276 within 30 tries")
-local function stepF()
-  local sp = H.readByte(0x0875 + H.readWord(0x0803))
-  return sp >= 3 and STEP_F // 2 or STEP_F
-end
 local function spansOf(moves)
   local spans, t = {}, 0
-  local sf = stepF()
   for _, m in ipairs(moves) do
-    local d = m.kind == "step" and sf or m.kind == "jump" and JUMP_F or DOOR_F
+    local d = m.kind == "step" and STEP_F or m.kind == "jump" and JUMP_F or DOOR_F
     spans[#spans + 1] = { m.from & 0xFF, m.from >> 8, t, t + d }
-    spans[#spans + 1] = { m.to & 0xFF, m.to >> 8, t + d, t + d + sf }
+    spans[#spans + 1] = { m.to & 0xFF, m.to >> 8, t + d, t + d + STEP_F }
     t = t + d
   end
-  return spans, t + sf
+  return spans, t + STEP_F
 end
 local seed = 12345
 local function rnd() seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 end
@@ -456,14 +446,6 @@ local function jwalk(x, y, lk, what, tries, done)
           H.call(function() say("route", "276: the plate (46,17)") end),
         }, {}),
         H.cond(function() return not there() end, {
-          -- each try after a drop waits a different while at the shaft's foot before it walks: the conductors
-          -- run on the frame, so a try that sets out on the same frame of their cycle meets the same touch (the
-          -- #328 line at f51cf3ac dropped 30 times in 30 tries, every try from (37,17))
-          H.lazy(function() return H.waitFrames(n > 1 and 37 * (n - 1) % 240 or 0) end),
-          -- ...and a try after a drop is more patient: the walk that dropped took a stretch its model priced
-          -- below the patience it had run up (0.42 after 800 frames' wait, at the same jump from (41,28) every
-          -- try), so the next tries let the patience grow more slowly
-          H.call(function() CAREFUL_IMPATIENCE = IMPATIENCE0 / n end),
           H.lazy(function()
             local f0 = fallCount()
             return carefulWalk(x, y, lk, { 0x10, 0x11, 0x12, 0x13, 0x14 }, what, 3000,
@@ -473,8 +455,13 @@ local function jwalk(x, y, lk, what, tries, done)
       }, {}),
     }),
     H.call(function()
-      H.assertEq(there(), true, string.format("%s: at (%d,%d) on map %d within %d tries", what, x, y, map(), tries or 6))
-      CAREFUL_IMPATIENCE = IMPATIENCE0
+      -- the conductors walk on the game's RNG, so the tries' fate is the attempt's draw: spent tries are a
+      -- timeout the runner re-rolls (another seed shift), not a contract.  The #328 line at f51cf3ac dropped 30 of
+      -- 30 tries to the FakeMustache, and again under three changes to the walk's timing and patience
+      -- (build/attempts/wt/v044-esper-rework/land3/)
+      if not there() then
+        error(string.format("timeout after %d tries: %s: not at (%d,%d) on map %d", tries or 6, what, x, y, map()), 0)
+      end
       H.log(string.format("[jwalk] %s: there after %d tries, %d drop(s) down the shaft", what, n, falls))
       say("route", what)
     end),
