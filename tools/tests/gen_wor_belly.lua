@@ -48,6 +48,7 @@ local CARD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 }, right = { 1, 0
 -- per run, so the walk's equal-length routes differed between identical runs (#467)
 local CARD_DIRS = { "down", "left", "right", "up" }
 CAREFUL_PACE, CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE = 18, 120, 0.08, 0.002
+local IMPATIENCE0 = CAREFUL_IMPATIENCE   -- a lab's lever above, the first try's
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
 local CONDSEG = { [276] = { [30] = { { 32, 40 }, { 45, 48 } }, [32] = { { 31, 34 } } } }
 -- the longest one stand for the conductors is let sit quiet (the no-progress watchdog stands down for it), from
@@ -459,6 +460,10 @@ local function jwalk(x, y, lk, what, tries, done)
           -- run on the frame, so a try that sets out on the same frame of their cycle meets the same touch (the
           -- #328 line at f51cf3ac dropped 30 times in 30 tries, every try from (37,17))
           H.lazy(function() return H.waitFrames(n > 1 and 37 * (n - 1) % 240 or 0) end),
+          -- ...and a try after a drop is more patient: the walk that dropped took a stretch its model priced
+          -- below the patience it had run up (0.42 after 800 frames' wait, at the same jump from (41,28) every
+          -- try), so the next tries let the patience grow more slowly
+          H.call(function() CAREFUL_IMPATIENCE = IMPATIENCE0 / n end),
           H.lazy(function()
             local f0 = fallCount()
             return carefulWalk(x, y, lk, { 0x10, 0x11, 0x12, 0x13, 0x14 }, what, 3000,
@@ -469,6 +474,7 @@ local function jwalk(x, y, lk, what, tries, done)
     }),
     H.call(function()
       H.assertEq(there(), true, string.format("%s: at (%d,%d) on map %d within %d tries", what, x, y, map(), tries or 6))
+      CAREFUL_IMPATIENCE = IMPATIENCE0
       H.log(string.format("[jwalk] %s: there after %d tries, %d drop(s) down the shaft", what, n, falls))
       say("route", what)
     end),
