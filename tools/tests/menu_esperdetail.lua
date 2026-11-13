@@ -133,8 +133,25 @@ local function visit(e, tag)
 end
 
 local owned = {}
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 H.run({ maxFrames = 60000 }, {
-  H.bootCheckpoint("fire-out-v1"),
+  -- the cold Continue battle_lockekit uses for this save (its contract carries no tile for bootCheckpoint)
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  (function()
+    local ph = 0
+    return H.driveUntil(function() return H.worldMode() and bright() >= 15 and H.worldHasControl() end, 6000, {
+      H.call(function()
+        ph = (ph + 1) % 48
+        if bright() < 15 then H.setPad({}); return end
+        H.setPad(ph < 8 and { "a" } or {})
+      end),
+    }, "cold Continue -> world map control")
+  end)(),
+  H.release(),
+  H.waitFrames(60),
+  H.call(function() H.assertEntryContract("fire-out-v1") end),
   H.call(function()
     leader = leaderOf()
     H.assertEq(leader ~= nil and leader < 12, true, "a leader who can wear stones")
