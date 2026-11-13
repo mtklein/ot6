@@ -60,14 +60,29 @@ OT6_FACTORY_BIT  = 1 << ($68 & 7)
 .endproc
 
 ; [ a Tool's price for this caster: the escalated row, twice when overclocked ]
+; #469: two rows are not escalated.  Debilitator's boost buys more weaknesses,
+; each its own firing (Ot6DebilSteps), so it pays per point: base x (1 +
+; boost), 10 / 20 / 30 / 40 (Ot6PerPointPrice), and Overclock's two firings
+; 80.  NoiseBlaster and Air Anchor buy nothing with a boost (Ot6ToolNoBoost),
+; so their price is their base at every boost, overclock or not: a boost
+; raised on the command window for them is dropped at the queue
+; (Ot6QueueFold), after this price was taken.
 ; in: A = tool item id, X = caster entity offset.  out: A = price.
 ; a8/i16, db = $7e; preserves X and Y.
 .proc Ot6ToolPrice
         .a8
         .i16
-        jsl     Ot6CostFor      ; the row's base
+        jsl     Ot6ToolNoBoost
+        bcc     :+
+        jml     Ot6CostFor      ; flat: the row's base
+:       cmp     #ITEM::DEBILITATOR
+        bne     :+
+        jsl     Ot6CostFor
+        jsl     Ot6PerPointPrice        ; one firing a weakness
+        bra     @oc
+:       jsl     Ot6CostFor      ; the row's base
         jsl     Ot6BoostPriceFor        ; x2.5 per pending boost, capped at 99
-        pha
+@oc:    pha
         jsl     Ot6Overclocks
         pla                     ; (pla leaves the carry alone)
         bcc     @out

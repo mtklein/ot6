@@ -11,14 +11,17 @@
 -- Where the menu can name a row the boost buys nothing on, R does not raise
 -- one there (Ot6Boost, Ot6RowNoBoost) and its price does not escalate; a
 -- boost raised on the command window before such a row was picked is dropped
--- before anything charges it (Ot6KeepBoost).  The rows: Filch and Bestow
--- (Bestow's transfer is its one pip at every boost), an item that moves no
+-- before anything charges it (Ot6KeepBoost).  The rows: an item that moves no
 -- number (a status cure, a Fenix Down: Ot6ItemNoBoost), a spell that moves
 -- none (TERRA's, chosen off the ROM: Ot6SpellNoBoost); and Def., a command
 -- with no list (Ot6CmdNoBoost: Row, Def., Leap, Control, Possess).  So:
 --   * <row>-r: R pressed with the cursor on the row leaves the pending at 0
 --     (refused) on those rows, at 1 on the controls (Tonic, a multiplied
---     spell);
+--     spell, and since #469 Filch and Bestow);
+--   * Filch and Bestow buy with a boost since #469: Filch takes one shield
+--     and one more a point, banking only the first, priced one Filch a
+--     shield; Bestow hands the pips pending (one at 0 BP), as many as the
+--     ally can hold, and Locke is charged exactly those;
 --   * <row>-b1/b2: raised on the command window, then the row: the bank ends
 --     where the unboosted case's does, and the spell's price (drawn and
 --     charged) is its own.
@@ -307,6 +310,7 @@ local function runCase(c)
       c.sent, c.after, c.endF, c.rolled, c.read, c.row = false, false, nil, false, 0, nil
       c.triedR, c.pendAfterR = false, nil
       c.hp0 = hp(terraS)
+      c.sh0, c.ally0 = shield(tgtMon), bank(terraS)
       armed = c
       ev(c, "START " .. chars() .. " | " .. mons())
     end),
@@ -317,6 +321,7 @@ local function runCase(c)
           c.after = true
           c.bankEnd = bank(actS)
           c.hpEnd = hp(terraS)
+          c.shEnd, c.allyEnd = shield(tgtMon), bank(terraS)
           ev(c, "six frames after the actor's Ot6ActionEnd: " .. chars() .. " | " .. mons())
         end
         local ac = lockeAim(c)
@@ -552,14 +557,11 @@ add(snapAt("A", function() return bank(lockeS) >= 1 and live(tgtMon) and liveCou
 -- spend: the boosted case's bank ends `boost` below where it stood (no regen)
 local CASES = {
   { name = "filch-b0",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0 },
-  { name = "filch-b1",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 1, keep = "filch-b0" },
-  { name = "filch-r",      snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0, rowR = 0 },
+  { name = "filch-b2",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 2 },
+  { name = "filch-r",      snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0, rowR = 1 },
   { name = "bestow-b0",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true },
-  { name = "bestow-b1",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 1, ally = true,
-    keep = "bestow-b0" },
-  { name = "bestow-b2",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 2, ally = true,
-    keep = "bestow-b0" },
-  { name = "bestow-r",     snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true, rowR = 0 },
+  { name = "bestow-b2",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 2, ally = true },
+  { name = "bestow-r",     snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true, rowR = 1 },
   { name = "appraise2-b1", snap = "L", cmd = CMD_STEAL, rowName = "appraise", boost = 1, spend = true },
   { name = "tonic-b0",     snap = "L", cmd = CMD_ITEM, item = TONIC, boost = 0, ally = true },
   { name = "tonic-b1",     snap = "L", cmd = CMD_ITEM, item = TONIC, boost = 1, ally = true, spend = true },
@@ -631,6 +633,33 @@ steps[#steps + 1] = H.call(function()
       check(c.charged > byName[c.moreMp].charged, string.format("%s: charged %d MP, %s %d (the price escalates)",
         c.name, c.charged, c.moreMp, byName[c.moreMp].charged))
     end
+    -- #469: Filch takes one shield and one more a point, banking the first;
+    -- each shield is its own Filch's price.  Bestow hands the pips pending
+    -- (one at 0), as many as the ally can hold, and charges exactly those.
+    if c.rowName == "filch" then
+      local want = math.min(c.boost + 1, c.sh0)
+      check(c.sh0 - c.shEnd == want, string.format("%s: Filch at %d BP took %d shield(s) of %d (want %d)", c.name,
+        c.boost, c.sh0 - c.shEnd, c.sh0, want))
+      local regen = c.boost == 0 and 1 or 0
+      local wantBank = math.min(5, c.bank0 - c.boost + (want > 0 and 1 or 0) + regen)
+      check(c.bankEnd == wantBank, string.format("%s: the bank went %d -> %d (want %d: %d spent, the first "
+        .. "shield banked, %s)", c.name, c.bank0, c.bankEnd, wantBank, c.boost, regen == 1 and "the regen pip"
+        or "no regen"))
+      if c.boost > 0 then
+        local b0 = byName["filch-b0"].charged
+        check(c.charged == math.min(99, b0 * (c.boost + 1)), string.format("%s: charged %d MP, filch-b0 %d "
+          .. "(one Filch's price a shield)", c.name, c.charged, b0))
+      end
+    end
+    if c.rowName == "bestow" then
+      local want = math.min(math.max(1, c.boost), 5 - c.ally0, c.bank0)
+      check(c.allyEnd - c.ally0 == want, string.format("%s: Bestow at %d BP handed %d pip(s) (ally %d -> %d; "
+        .. "want %d)", c.name, c.boost, c.allyEnd - c.ally0, c.ally0, c.allyEnd, want))
+      check(c.bankEnd == c.bank0 - want, string.format("%s: LOCKE's bank went %d -> %d (want %d: the pips "
+        .. "handed, no regen)", c.name, c.bank0, c.bankEnd, c.bank0 - want))
+      check(c.charged == byName["bestow-b0"].charged, string.format("%s: charged %d MP, bestow-b0 %d (flat)",
+        c.name, c.charged, byName["bestow-b0"].charged))
+    end
     if c.rowName == "appraise" then
       if c.snap == "A" then
         H.assertEq(c.read, 1, c.name .. ": Appraise read the one body standing")
@@ -652,7 +681,7 @@ steps[#steps + 1] = H.call(function()
   assert(#bad == 0, #bad .. " boost-keep assertion(s) failed: " .. table.concat(bad, "; "))
   H.log("[boostkeep] VERDICT: R refused on every row the boost buys nothing on, and a boost raised before such "
     .. "a row (or Def.) never charged; Tonic's, the multiplied spell's, Appraise's and a Steal's on a robbed body "
-    .. "spent")
+    .. "spent; Filch took a shield a point and Bestow handed the pips pending (#469)")
 end)
 
 H.run({ maxFrames = 600000 }, steps)

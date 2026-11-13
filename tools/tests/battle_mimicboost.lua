@@ -13,11 +13,13 @@
 -- earned (Ot6KeepBoost and its callers; ot6_boost.asm).  So a boosted
 -- copy of these ends with the copier's bank where the unboosted copy of the
 -- same action from the same snapshot ends:
---   * Filch and Bestow (cmd $05): neither reads a boost.  Bestow hands one
---     pip over and charges exactly that one, and a refused one charges
---     nothing, so the boosted case is at 2.  Here the copy meets TERRA at
+--   * Bestow (cmd $05) refused: a Bestow hands the pips pending and charges
+--     exactly those (#469), and a refused one charges nothing, so the
+--     boosted case is at 2.  Here the copy meets TERRA at
 --     the 5 cap (LOCKE's own Bestow and her regen put her there), so it is
---     the refusal that is measured (battle_boostkeep plays the transfer);
+--     the refusal that is measured (battle_boostkeep plays the transfer).
+--     Filch's boost buys shields since #469, so its copy spends like the
+--     source's (battle_boostkeep plays it); filch-b0 stays as a control;
 --   * Steal on a body with nothing left to take: no roll, so no ladder;
 --   * SwdTech: the source's boost bought the tech at its own menu;
 --   * Slot, a reel result: the source's boost bought the rig at its spin;
@@ -466,7 +468,6 @@ local CASES = {
   { name = "steal-b0",   snap = "L", cmd = CMD_STEAL, row = "steal",  srcBoost = 3, boost = 0 },
   { name = "steal-b1",   snap = "L", cmd = CMD_STEAL, row = "steal",  srcBoost = 3, boost = 1, keep = "steal-b0" },
   { name = "filch-b0",   snap = "L", cmd = CMD_STEAL, row = "filch",  srcBoost = 0, boost = 0 },
-  { name = "filch-b1",   snap = "L", cmd = CMD_STEAL, row = "filch",  srcBoost = 0, boost = 1, keep = "filch-b0" },
   { name = "bestow-b0",  snap = "L", cmd = CMD_STEAL, row = "bestow", srcBoost = 0, boost = 0 },
   { name = "bestow-b2",  snap = "L", cmd = CMD_STEAL, row = "bestow", srcBoost = 0, boost = 2, keep = "bestow-b0" },
   { name = "trick-b0",   snap = "L", cmd = CMD_STEAL, row = "trick",  srcBoost = 0, boost = 0 },

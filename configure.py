@@ -436,6 +436,10 @@ TEST_ENV = {
     # snapshots; no write
     "battle_boostkeep": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #469: reach, Debilitator's steps and the last refusals, from one
+    # battle's snapshots outside Kohlingen; no write
+    "battle_boostreach": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kohlingen-v1",
     # #292: NUMBER 024 (7 shields) is two steps from this save point
     "battle_hudcount":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/n024-entry-save-v1",
