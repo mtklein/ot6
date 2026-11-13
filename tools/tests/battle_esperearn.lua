@@ -158,10 +158,13 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(H.worldMode(), true, "on the world map")
     local x, y = H.worldX(), H.worldY()
     A = { x, y }
-    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-      if B == nil and H.worldPassable(x + d[1], y + d[2]) then B = { x + d[1], y + d[2] } end
+    -- a plain tile that rolls random battles (property $40) and is walkable ($10 clear): never an entrance
+    local function plain(tx, ty) return (H.worldTileProp(tx, ty) & 0x50) == 0x40 end
+    H.assertEq(plain(x, y), true, "the save tile rolls random battles")
+    for _, d in ipairs({ { -1, 0 }, { 0, -1 }, { 0, 1 }, { 1, 0 } }) do
+      if B == nil and plain(x + d[1], y + d[2]) then B = { x + d[1], y + d[2] } end
     end
-    H.assertEq(B ~= nil, true, "a passable tile beside the party")
+    H.assertEq(B ~= nil, true, "a plain tile that rolls random battles beside the party")
   end),
   H.driveUntil(function() return done end, 380000, {
     pace("a random battle by the opera house"),

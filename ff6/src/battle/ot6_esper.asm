@@ -556,6 +556,119 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
 
 ; ------------------------------------------------------------------------------
 
+; [ the signatures that are new code ]
+;
+; Four rung-5 effects have no vanilla bit (docs/design/esper-rework.md, the
+; table's dagger rows): Conductor (Ramuh), Facet (Carbunkl), Rebirth
+; (Phoenix), and Fenrir's Stop and Slow immunity.  Each asks Ot6EsperSig
+; whether the character holds it.
+
+OT6_SLOT_RAMUH    = 0
+OT6_SLOT_CARBUNKL = 18
+OT6_SLOT_PHOENIX  = 25
+OT6_SLOT_FENRIR   = 23
+
+; in: A (16 bits, whatever the m flag) = actor | counter slot << 8.  out: C set
+; when that actor's count on that esper has reached the signature (rung 5).
+; Preserves a/x/y and every flag but C.  rts.
+.proc Ot6EsperSig
+        php
+        longai
+        phx
+        pha
+        lda     f:OT6_ESPER_LIVE+OT6_ESPER_MAGIC
+        cmp     #OT6_ESPER_MAGIC_WORD
+        bne     @no
+        lda     1,s
+        and     #$00ff
+        cmp     #OT6_ESPER_CHARS
+        bcs     @no
+        jsr     Ot6EsperRowOff
+        pha                     ; [row] [actor | slot << 8]
+        lda     4,s             ; the slot byte
+        and     #$00ff
+        asl
+        clc
+        adc     1,s
+        tax
+        pla
+        lda     f:OT6_ESPER_LIVE+OT6_ESPER_CTR,x
+        cmp     #OT6_RUNG5      ; C = reached
+        bra     @out
+@no:    clc
+@out:   pla                     ; (pulls leave C alone)
+        plx
+        bcs     @yes
+        plp
+        clc
+        rts
+@yes:   plp
+        sec
+        rts
+.endproc
+
+; jsl from InitChars after LoadCharProp, once per seated character at battle
+; start.  x = the battle slot * 2 (either index width), db = $7e.  Facet:
+; the boost bank opens at two points (Ot6InitBP opened it at one).  Rebirth:
+; the character enters under Life 3 (status 4 bit $04, through the status-to-
+; set cell LoadCharProp fills, $3de9).  Preserves everything.
+.proc Ot6EsperBattleInit
+        php
+        longi
+        shorta
+        pha
+        lda     $3ed8,x         ; actor
+        xba
+        lda     #OT6_SLOT_CARBUNKL
+        xba
+        jsr     Ot6EsperSig
+        bcc     @rebirth
+        lda     #$02
+        sta     OT6_BP_CLASS,x  ; Facet
+@rebirth:
+        lda     $3ed8,x
+        xba
+        lda     #OT6_SLOT_PHOENIX
+        xba
+        jsr     Ot6EsperSig
+        bcc     @out
+        lda     $3de9,x         ; status 4 to set at the start
+        ora     #$04            ; Life 3
+        sta     $3de9,x
+@out:   pla
+        plp
+        rtl
+.endproc
+
+; Conductor: A (a8) = the shields a lightning-weak monster has left after a
+; hit's chip; x = the attacker.  One more goes when the attacker holds
+; Ramuh's signature and the hit carried lightning ($11a1 bit $04).  rts from
+; Ot6Chip (same bank).  Preserves x/y.
+.proc Ot6Conductor
+        .a8
+        beq     @out            ; none left to take
+        pha
+        lda     $11a1
+        and     #$04            ; lightning
+        beq     @keep
+        txa
+        cmp     #$08
+        bcs     @keep           ; a monster's attack
+        lda     $3ed8,x
+        xba
+        lda     #OT6_SLOT_RAMUH
+        xba
+        jsr     Ot6EsperSig
+        bcc     @keep
+        pla
+        dec     a
+        rts
+@keep:  pla
+@out:   rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ a character's progress on one esper, for the menu ]
 ;
 ; in: A (a8) = actor, X (i16) = esper index (GenjuProp order).  out: A (a16) =
