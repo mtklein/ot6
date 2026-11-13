@@ -74,7 +74,7 @@ stay.
 | Bug `$0E8` | forest east of Albrook (20) | 16 / 310 | weak ice, water; alone, it answers a Fight with a petrifying spine | 2 | slash, pierce | a shell on wings: cut or spear it; trash in packs of three to six |
 | ChickenLip `$03D` | forests north-west of Albrook and by Maranda (17, 18) | 18 / 545 | weak ice; Quake when alone | 2 | slash, bludgeon | a heavy bird in packs of five: the blade or the fist |
 | Grenade `$0AA` | the bomb isle (27) | 17 / 3,000 | weak ice, water; absorbs fire; a Fight makes it explode (Exploder: its own HP) | 3 | pierce, bludgeon | its keys are the hands that are not Fight: EDGAR's tools (pierce) and SABIN's blitzes (bludgeon). A blade's Fight (slash) is the lesson's wrong answer, so slash stays off |
-| Intangir `$0A3` | Triangle Island (124, 28) | 26 / 32,000 | absorbs every element; starts Clear, Haste, Shell, Safe, Float; Meteo for a hit, Meteo as it dies, escapes under 1,280 HP | 4 | slash, pierce, bludgeon, special | absorbs every element, so every hand but magic breaks it, SETZER's among them (the trip his airship opens). Its dangers all run through its turns and counters, and a broken body has neither (`Ot6Gate`, the CheckRetal hook): break it to kill it |
+| Intangir `$0A3` | Triangle Island (124, 28) | 26 / 32,000 | absorbs every element; starts Vanished, Hasted, Shelled, Safe, Floating; Meteo on its turn after a hit, Meteo as it dies, escapes under 1,280 HP | 2 | slash, pierce, bludgeon, special | absorbs every element, so every hand but magic breaks it, SETZER's among them (the trip his airship opens). Its Meteo and its escape run through its turns, and a broken body has none (`Ot6Gate`; nor counters, the CheckRetal hook): break it to kill it. Two shields, so one double strike (LOCKE's Genji pair) breaks it again as it recovers, before the turn that would answer the hit (section 3) |
 
 `battle_breakwob_sidetrips` checks the four rows in the built ROM, their
 vanilla weak and absorb bytes, that every species of world groups 20, 17,
@@ -92,12 +92,91 @@ and the hunt fails at the worst case of the encounter counters' draws
 (`M.worstCaseEncounters`). The walker plays every battle with the fight
 driver; nothing is fled.
 
-RESULTS
+Every battle every leg met was won, none fled, in the labs below (booted from
+the tracked saves on the branch's ROM, so they are strategy evidence; the
+qualified play is section 5's replay):
+
+| leg | battles | formations won | levels after |
+|---|---|---|---|
+| forest | 6, all won | 65, 66, 68, 69 | SABIN L14, CYAN L14, SHADOW L12 |
+| train | 11, all won | 72, 80, 90 | SABIN L14, CYAN L14, SHADOW L13 |
+| south | 15 (11 and 4), all won | 139-142 (group 20), 145, 149 (group 17) | CELES L21, LOCKE L20, EDGAR L21, SABIN L21 |
+| Esper Mountain | 11 (4 and 7), all won | 164-169 | TERRA L26, LOCKE L27, STRAGO L27, RELM L24 |
+| airship, Triangle Island only (the lowest levels, straight from the save) | 30 over three seed shifts, all won | 6, 7, 210 | LOCKE L21, EDGAR L21, SABIN L22, SETZER L18, unchanged (the Intangir pays no XP); Fenix Downs 20 to 17 or 18 |
+
+What the labs taught:
+
+1. **The Adamanchyt pair sneezes a Fighting party out of the battle.**
+   Formation 165 (Adamanchyt x2, `AIScript::_214`: Sneeze for every Fight)
+   ended "PARTY LEFT ... 4 of 4 seated fled" in each of its meetings while
+   the four Fought (`lab/espermtn_e1_fight_sneezed.log`, 14 battles left that
+   way). The leg's driver casts instead of Fighting where a member can pay
+   (`nuke = { Bolt, Ice, Fire }`, gen_fc_landing's shape), and the pair fell
+   with two of four sneezed out (`lab/espermtn_e3.log`). The pair's row is
+   #254's; its lesson (magic, not steel) is worth keeping there.
+2. **The Intangir starts Vanished, and nothing the driver did could touch it.**
+   Every Fight, Tool and Blitz missed, and the magic line found no spell
+   (`magic-only: no line ... absorb $FF`): 100,000 frames at 32,000 HP
+   (`lab/airship_a8.log`). A spell that lands ends Vanish, absorbed or not, so
+   the fight driver now casts one when every standing body is Vanished and no
+   spell would hurt it (`Driver:dodgePlan`, `M.REVEAL_SPELLS`: SABIN's Ice
+   from SHIVA, EDGAR's Slow from BISMARK). Then the four broke it and killed
+   it twice.
+3. **On four shields the Intangir is a coin flip; on two, a sure thing.**
+   With four, the third meeting wiped the four: it recovered, the first hits
+   armed its Meteo before the second break, and the Meteo took all four from
+   80% (`lab/intangir_i2.log`: `[death] ... atk $DF (ONE ACTION from >= 80%)`).
+   With two, nine meetings over seed shifts 0, 8 and 16 (eight distinct battle
+   keys) were all won (`lab/intangir2_s0.log`, `_s8`, `_s16`). One member
+   falls in most of them, to the Meteo it casts as it dies (the death counter
+   is not a turn); the field care revives them.
 
 ## 4. What the other bodies here are
 
-AUTHORED
+The coverage audit's claimed areas hold these zones' other floor bodies, and
+#254 authors them (its branch `wt/v043-wob-rows`, `break-coverage-wob.md`):
+FossilFang, Ralph and Wyvern (the southern forests), Chimera and Cephaler (the
+north isles, the plain north of Thamasa), Mandrake, Insecare, Abolisher,
+Adamanchyt and Slurm (Esper Mountain), Hazer, Whisper and StillGoing (the
+train). The Phantom Forest's Ghost and Poplium and the bomb isle's Bomb were
+authored before.
+
+Not covered by either: the Baskervor (`$01D`, formations 160, 162, 191 on the
+Thamasa continent) is still on the generated floor. The line meets it
+(formation 191 in `esper_mtn_save.log`), so it was not first met in these
+zones, and the audit lists its group as unclaimed, so it is not in #254's
+list.
+
+Map 130 (a spring of the Phantom Forest's, the coverage audit's "unvisited")
+has no entrance in the forest's maps (route_data: no short or long entrance
+leads to it); its pool is group 68, the clearing's, won on 132.
 
 ## 5. Evidence
 
-EVIDENCE
+Under `build/attempts/wt/v043-wob-zones/`:
+
+- `replay/`: the play from power-on on the branch's ROM (`gate1.log`, `ninja -k
+  0` at 5c2357b9; its one red edge, audit_chests, wanted the Chocobo Suit in
+  `tools/chests_opened.txt`), with each leg's log. Every battle won, none
+  fled, no member down:
+
+  | leg | battles (distinct keys) | the hunts |
+  |---|---|---|
+  | `wob_forest_hunt` | 6 (6) | 132: 2 battles; 134: 2 |
+  | `wob_train_hunt` | 11 (11) | 151: 11 |
+  | `wob_south_hunt` | 15 (14) | group 20: 10; group 17: 2 |
+  | `wob_airship_hunt` | 23 (22) | group 27: 10; group 22: 2; group 25: 7; group 124: 4 |
+  | `wob_esper_mtn_hunt` | 11 (11) | 375: 4; 374: 7 |
+
+  Levels after: SABIN L14, CYAN L14, SHADOW L12-13 (forest, train); CELES L20,
+  LOCKE L20, EDGAR L21, SABIN L21 (south); LOCKE L23, EDGAR L23, SABIN L23,
+  SETZER L19 (airship); TERRA L25, LOCKE L27, STRAGO L27, RELM L23 (Esper
+  Mountain). `suite_battle_breakwob_sidetrips.log`: PASS.
+- `rows/`: `battle_breakwob_sidetrips` red on main's rows (`main.log`: "$0E8 Bug
+  has no Ot6ShieldTbl row (want 2, class $03)" and five more), red on the
+  Grenade keyed by slash (`mut_grenade_slash.log`: "$0AA Grenade class mask $07,
+  want $06") and on the Intangir without special (`mut_intangir_nospecial.log`:
+  "$0A3 Intangir class mask $07, want $0F"), PASS on the rows (`rows.log`).
+  These ran with the Intangir on four shields; the suite's expectation moved to
+  two with the row.
+- `lab/`: the strategy runs of section 3.

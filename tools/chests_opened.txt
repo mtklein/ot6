@@ -236,3 +236,4 @@
 242	map 334 Kefka's Tower, Ribbon (29,29) -- on the tower's line (gen_wor_kt_poltergeist, #273)
 225	map 410 Kefka's Tower, Nutkin Suit (38,12; opened in 296, which shares the bits) -- a branch (gen_wor_kt_gauntlet, #273)
 235	map 410 Kefka's Tower, Gauntlet (49,12; opened in 296) -- a branch (gen_wor_kt_gauntlet, #273)
+108	map 374 Esper Mountain, Chocobo Suit (18,9) -- a branch (gen_wob_esper_mtn_hunt, #283)
