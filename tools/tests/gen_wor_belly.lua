@@ -63,7 +63,8 @@ local CARD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 }, right = { 1, 0
 -- the directions in a fixed order: pairs() over string keys follows the hash seed, which Lua 5.4 draws
 -- per run, so the walk's equal-length routes differed between identical runs (#467)
 local CARD_DIRS = { "down", "left", "right", "up" }
-CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE, CAREFUL_RISK_CAP = 200, 0.08, 0.002, 0.2
+CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_RISK_CAP = 200, 0.08, 0.5
+CAREFUL_PATIENCE, CAREFUL_QUANTILE = 100, 0.1
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
 -- the conductors' rules (above): a tick every 4 frames, a step of 16
 local COND_TICK, COND_STEP = 4, 16
@@ -359,14 +360,14 @@ local function doMove(mv, what, abort)
     end })
 end
 local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
-  local moves, waits, lastWhy, stood, waitStart, lastJump = 0, 0, nil, 0, nil, false
+  local moves, waits, lastWhy, standRisks, waitStart, lastJump = 0, 0, nil, {}, nil, false
   local function there() return H.fieldX() == tx and H.fieldY() == ty and H.tileAligned() end
   local function oneMove()
     local conds = condList(objs)
     local here = (H.fieldY() << 8) | H.fieldX()
     -- routes are planned around each conductor's tile and the tiles beside it on its row; when that closes every
     -- way (a conductor's stretch is the only way past it), around its own tile alone, the stretch's risk weighed
-    -- the same way, so the walk's patience (CAREFUL_IMPATIENCE) can take a stretch rather than stand on "no
+    -- the same way, so the walk's patience (CAREFUL_PATIENCE) can take a stretch rather than stand on "no
     -- route" (#495: on the main line the walk to the FakeMustache spent its whole step budget standing there,
     -- "BUDGET SPENT -- 3000 steps (31 moves, 2969 waits)", every play)
     local closed, tight = {}, {}
@@ -392,21 +393,27 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       plan[wk] = true
     end
     local mv = nil
-    -- patience runs out: the risk a person takes grows with the frames stood on a rest (four a wait)
-    local thr = math.min(CAREFUL_RISK + stood * CAREFUL_IMPATIENCE, CAREFUL_RISK_CAP)
-    -- off a rest, the stretch already begun is finished: standing on a conductor's row is the risk
+    -- patience: a person who has stood a while takes the stretch at one of its better moments, not at any price.
+    -- After CAREFUL_PATIENCE looks from one stand the bar is the CAREFUL_QUANTILE of the prices this stand has seen
+    -- (the stretch's own good windows: some stretches never come cheap), never above CAREFUL_RISK_CAP
+    local thr = CAREFUL_RISK
+    if #standRisks >= CAREFUL_PATIENCE then
+      local sorted = table.move(standRisks, 1, #standRisks, 1, {})
+      table.sort(sorted)
+      local q = sorted[math.max(1, math.ceil(#sorted * CAREFUL_QUANTILE))]
+      thr = math.max(thr, math.min(q, CAREFUL_RISK_CAP))
+    end
     local onRest = isRest(here, conds)
-    if not onRest then thr = math.max(thr, 0.9) end
-    if best and bestR <= thr then
+    -- standing here a while (none on a rest): off a rest it is a risk of its own, weighed against going on
+    local rs = onRest and 0 or simRisk({ { H.fieldX(), H.fieldY(), 0, 64 } }, 64, conds)
+    if best and (bestR <= thr or (not onRest and rs > CAREFUL_RISK and bestR <= rs)) then
       if bestR > CAREFUL_RISK then
-        H.log(string.format("[careful] %s: f%d after %d frames' wait, a stretch at risk %.2f from (%d,%d)", what,
-          H.frame, stood * 4, bestR, H.fieldX(), H.fieldY()))
+        H.log(string.format("[careful] %s: f%d after %d frames' wait, a stretch at risk %.2f from (%d,%d) (bar %.2f, "
+          .. "standing %.2f)", what, H.frame, #standRisks * 4, bestR, H.fieldX(), H.fieldY(), thr, rs))
       end
       mv = best[1]
     else
-      -- standing here: is it safe enough for a while?
-      local sp = { { H.fieldX(), H.fieldY(), 0, 64 } }
-      local rs = isRest(here, conds) and 0 or simRisk(sp, 64, conds)
+      standRisks[#standRisks + 1] = best and bestR or 1
       if rs > CAREFUL_RISK then
         -- a conductor closing in: the move whose stretch to a rest runs the least risk, if less than standing
         local cand = {}
@@ -451,7 +458,6 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
     end
     if mv == nil then
       waits = waits + 1
-      stood = stood + 1
       -- a person waiting for the conductors to clear stands still on purpose: the bridge's middle is crossed on
       -- the conductor's own row, and a wait for it outlasted the no-progress watchdog (#486, the graph's play
       -- at ec0ff9aa: "waiting at (49,18): no route" for 1808 frames).  Declared for CAREFUL_QUIET frames of one
@@ -478,7 +484,7 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
     end
     if lastJump and EV_END and H.frame - EV_END < 200 then DWELLS[#DWELLS + 1] = H.frame - EV_END end
     lastJump = mv.kind == "jump"
-    if mv.kind == "jump" then stood = 0 end
+    standRisks = {}
     lastWhy = nil
     if mv.kind == "jump" then
       H.log(string.format("[careful] f%d jump %s from (%d,%d) (risk %.2f); %s", H.frame, mv.link[3], H.fieldX(),
