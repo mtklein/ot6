@@ -36,6 +36,17 @@ Don't edit `tools/tests/run.sh` or any other shell script while a `ninja`
 or `run.sh` is executing it: bash reads scripts incrementally, and the
 running instances resume at shifted offsets and fail.
 
+### Qualifying from a fresh clone
+
+`sh tools/gate.sh` runs ninja and nothing else, so a fresh clone needs three
+things first or the gate goes red at once: `python3 configure.py` (it writes
+`build.ninja`; ninja has nothing to run without it), the base ROM
+`Final Fantasy III (USA).sfc` (SHA-1 in the README) at the repository root,
+and `tools/bin/flips` (the Flips bullet under Installed pieces; the release
+patch needs it). A clone also has none of the generated savestates, so its
+first gate replays the whole line; a worktree takes them from a sibling with
+`sh tools/worktree-setup.sh`.
+
 ### One play from power-on, and cuts
 
 A `.mss` belongs to one ROM, so after a ROM change every generated state

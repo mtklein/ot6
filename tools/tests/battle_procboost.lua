@@ -116,9 +116,17 @@ local FIGHT_TRIES, ROUND_FRAMES = 12, 2 * 3345
 local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eight
 -- tries per Rage entry: a try whose battle is won before the Rage runs (another's
 -- action felled the last monster first) measures nothing, and the next spends one
--- more of GAU's windows first (#534's replay, gau_joined: rage entry 0's try 1)
+-- more of GAU's windows first (#534's replay, gau_joined: rage entry 0's try 1).
+-- 3 because CAND_HOLD (below) now screens out the blow-in-flight cause at the window: all 8 entries then
+-- played on try 1 (build/attempts/wt/v044-crusader/procboost/pb_fix3.log), so tries 2 and 3 are reserves
+-- for another's action landing first, each costing a window (ROUND_FRAMES, runBudget counts them).
 local RAGE_TRIES = 3
-local GAU_ENCOUNTERS = 4                   -- Veldt encounters taken for GAU's window (#411)
+-- Veldt encounters taken for GAU's window (#411).  The Veldt deals by sector (GetVeldtBattle), not from a
+-- four-word pool, so the budget is measured, not read off odds: 80 encounters (the first 16 of the line, each at five
+-- seed shifts) gave GAU's window ready in 76 and not in 4
+-- (build/attempts/wt/polish-suites/gau-measure-s*.log, "[lab] encounter" lines).  q = 0.12 is the
+-- 95% upper bound of 4 in 80, and ceil(ln MEASURE_FAIL / ln q) = ceil(ln 1e-3 / ln 0.12) = 4.
+local GAU_ENCOUNTERS = 4
 local GAU_STATE = "build/states/gau_joined.mss.lua"
 local RAGECOUNT, RAGEBEAST, MP = 0x3A9A, 0x33A8, 0x3C08
 
@@ -139,7 +147,10 @@ local CMD_SUMMON = 0x19                       -- what GetCmdForAI names an esper
 local slotOf, snap, armed = {}, nil, nil
 local snapSeats                               -- the seats as the snapshot was taken
 local SETTLE, settled = 8, 0                  -- released frames on its window first
-local CAND_HOLD, cand = 90, nil               -- GAU's window: frames a candidate snapshot must hold (#534)
+-- GAU's window: frames a candidate snapshot must hold (#534).  The one blow in flight measured felled the last
+-- monster 9 frames after the candidate (pb_fix3.log); 90 is ten times that
+-- (it only delays the snapshot by that many frames).
+local CAND_HOLD, cand = 90, nil
 local unreadySaid = -1200
 local weapspell                               -- OT6_WEAPSPELL, off the dbg
 local learned                                 -- GAU's rage-window length
@@ -1692,7 +1703,9 @@ end)
 
 -- The run's cap is the sum of its steps' own bounds, so no step's budget is
 -- cut short by it: the walk out, MEASURE_BATTLES battles at 30000, every
--- try's reach and resolve, and the Rage half's walk, gate and cases.
+-- try's reach and resolve, and the Rage half's walk, gate and cases (each
+-- Rage entry's RAGE_TRIES tries, try n spending n-1 windows first as the
+-- other cases' do).
 local function runBudget()
   local f = 20 + 20 + 3000 + 1800 + 900 + 30000 + 900 + 30000 * MEASURE_BATTLES
   for _, c in ipairs(CASES) do
@@ -1703,7 +1716,9 @@ local function runBudget()
     end
   end
   f = f + 20 + GAU_ENCOUNTERS * (6000 + 30000 + 900 + 30000) + 2
-  for _ = 1, #RAGE do f = f + 2 + 6000 + 6000 end
+  for _, c in ipairs(RAGE) do
+    for n = 1, c.tries do f = f + 2 + 6000 + (n - 1) * ROUND_FRAMES + 6000 end
+  end
   return f
 end
 H.run({ maxFrames = runBudget() }, steps)

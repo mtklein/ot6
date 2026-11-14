@@ -14,7 +14,10 @@
 -- the battle reads it; a real Genji Glove keeps vanilla's cut (#534: without the gate the grip holder's swing fell
 -- x0.982 and a weapon-and-shield holder's x0.751, build/attempts/wt/v044-crusader/real_rom.log).
 --
--- Continue post-opera-v1.  Four seated members are picked from the save: G holds a two-hand-capable weapon; D holds
+-- Continue post-opera-v1.  The gear is the suite's to have (#535): when no seated member wears a Genji Glove, or none
+-- holds a two-hand-capable weapon, the bag's goes on through the Relic / Equip menus (H.equipKit under H.keepGear,
+-- H.equipWeapon), and a save whose bag cannot supply one fails at that precondition, named.  Then four seated
+-- members are picked: G holds a two-hand-capable weapon; D holds
 -- a weapon in the main hand and none in the off hand, with a weapon D can wear in the bag; S holds a weapon and a
 -- shield; J wears a real Genji Glove.  G's off hand, and J's if it holds anything, are emptied through Equip ->
 -- Rmove (play).  A snapshot there; then two branches from it, which differ only in Crusader's count on all four
@@ -50,6 +53,89 @@ local function prop(item, off) return H.readRomByte(IP + item * 30 + off) end
 local function wearable(item, c) return ((prop(item, 1) | (prop(item, 2) << 8)) >> c) & 1 == 1 end
 local function slot(c, s) return H.readByte(0x1600 + 37 * c + 0x1F + s) end
 local function hex(v) return string.format("$%02X", v) end
+
+-- Staging from the bag, through the menus (#535).  The save's play decides who wears what, so the suite puts the
+-- Genji Glove and a two-hand-capable weapon on the party itself when no seated member has them, and fails with the
+-- precondition named when the bag cannot supply them either.
+local GENJI = 0xD1
+local stage_ = {}                     -- { glove = { who, slot }, grip = { who, item } }, as planned
+local function seatedList()
+  local m = {}
+  for c = 0, 11 do if seated(c) then m[#m + 1] = c end end
+  return m
+end
+local function wearsGenji(c)
+  for rs = 4, 5 do
+    local it = slot(c, rs)
+    if it ~= 0xFF and (prop(it, 12) & 0x10) ~= 0 then return true end
+  end
+  return false
+end
+-- J's Ragnarok claims (the Hyper Wrist's vigor x1.5, no Offering) are the signature's own only when no relic worn
+-- already carries the Hyper Wrist's bit (ItemProp+11 $80) or the Offering's (+12 $01): a member wearing one has
+-- them at rank 4 too (staged on SABIN, who wears a $D2: vigor 168 at both ranks, glove lab, crusader-v4-glove.log)
+local function ragnarokClean(c)
+  for rs = 4, 5 do
+    local it = slot(c, rs)
+    if it ~= 0xFF and ((prop(it, 11) & 0x80) ~= 0 or (prop(it, 12) & 0x01) ~= 0) then return false end
+  end
+  return true
+end
+local function twoHand(w) return H.isWeapon(w) and (prop(w, 19) & 0x40) ~= 0 end
+local function hasShield(c) return slot(c, 1) ~= 0xFF and (prop(slot(c, 1), 0) & 0x07) == 3 end
+
+local function planGlove()
+  IP = IP or (H.sym("ItemProp") & 0x3FFFFF)
+  stage_ = {}
+  local m = seatedList()
+  for _, c in ipairs(m) do
+    if wearsGenji(c) and H.isWeapon(slot(c, 0)) then return end
+  end
+  H.assertEq(H.invCountOf(GENJI) > 0, true, "precondition: a seated member wears a Genji Glove, or the bag holds "
+    .. "one to put on (the save supplies neither)")
+  -- X: a seated member with a weapon in the main hand and no relic that already carries Ragnarok's bits (J's
+  -- claims are about them); one that is no shield-bearer first (the shield-bearer is S's to be), and one without
+  -- a two-hand-capable weapon (G's to be)
+  local best, bestScore
+  for _, c in ipairs(m) do
+    if H.isWeapon(slot(c, 0)) then
+      local score = (hasShield(c) and 0 or 2) + (twoHand(slot(c, 0)) and 0 or 1)
+        + (ragnarokClean(c) and 8 or 0)
+      if bestScore == nil or score > bestScore then best, bestScore = c, score end
+    end
+  end
+  H.assertEq(best ~= nil, true, "precondition: a seated member holds a weapon to wear the Genji Glove beside")
+  stage_.glove = { who = best, slot = (slot(best, 4) == 0xFF) and 4 or 5 }
+end
+
+local function planGrip()
+  stage_.grip = nil
+  local m = seatedList()
+  for _, c in ipairs(m) do
+    if twoHand(slot(c, 0)) and not H.isWeapon(slot(c, 1)) then return end
+  end
+  -- Y: a seated member with no weapon in the off hand to hold it: one with an empty main hand first (the save
+  -- left him unarmed), else one holding another weapon, which goes back to the bag
+  local best
+  for _, pass in ipairs({ "empty", "armed" }) do
+    for _, c in ipairs(m) do
+      local armed = H.isWeapon(slot(c, 0))
+      if best == nil and (pass == "armed") == armed and not H.isWeapon(slot(c, 1)) and not wearsGenji(c)
+          and not (stage_.glove and stage_.glove.who == c) then
+        for i = 0, 255 do
+          local it = H.readByte(0x1869 + i)
+          if best == nil and it ~= 0xFF and H.readByte(0x1969 + i) > 0 and twoHand(it) and wearable(it, c) then
+            best = { who = c, item = it }
+          end
+        end
+      end
+    end
+  end
+  H.assertEq(best ~= nil, true, "precondition: a seated member holds a two-hand-capable weapon (ItemProp+19 bit "
+    .. "$40), or the bag holds one that a seated member with a weapon and an empty or shield off hand can wield "
+    .. "(the save supplies neither)")
+  stage_.grip = best
+end
 
 local G, D, W, S, J                   -- the grip member, the two-weapon member, the bag's weapon for D, a member
                                       -- with a weapon and a shield, and one wearing a real Genji Glove
@@ -112,7 +198,15 @@ local function branch(name, count, restore)
     H.log(string.format("[crusader] %s: %s's hands now %s / %s (the menu %s the %s)", name, NAMES[D],
       hex(slot(D, 0)), hex(r.offHand), r.equip.refused and "refused" or "took", hex(W)))
   end)
-  local function all() return have(r, G) and have(r, D) and have(r, S) and have(r, J) end
+  -- D is done when its second swing has been computed too, if the menu gave it one: the plan used to end on D's
+  -- main-hand pass, and on draws where that came last the off hand's never ran (seed shifts 12, 16 and 20,
+  -- build/attempts/wt/polish-suites/crusader-old-s12.log)
+  local function dDone()
+    if r.offHand ~= W then return have(r, D) end
+    for _, p in ipairs(r.passes[D]) do if p.hand == 1 then return true end end
+    return false
+  end
+  local function all() return have(r, G) and dDone() and have(r, S) and have(r, J) end
   steps[#steps + 1] = H.driveUntil(all, 300000, {
     open(name),
     H.call(function()
@@ -142,49 +236,6 @@ H.run({ maxFrames = 900000 }, {
     IP = H.sym("ItemProp") & 0x3FFFFF
     H.assertEq(emu.read(LIVE, emu.memType.snesMemory) | (emu.read(LIVE + 1, emu.memType.snesMemory) << 8), 0x3145,
       "the live esper page is signed ('E1', ot6_esper.asm OT6_ESPER_MAGIC_WORD)")
-    local m = {}
-    for c = 0, 11 do if seated(c) then m[#m + 1] = c end end
-    for _, c in ipairs(m) do
-      H.log(string.format("[crusader] seated %s: hands %s / %s", NAMES[c], hex(slot(c, 0)), hex(slot(c, 1))))
-    end
-    -- G: a two-hand-capable weapon in the main hand
-    for _, c in ipairs(m) do
-      local w = slot(c, 0)
-      if G == nil and H.isWeapon(w) and (prop(w, 19) & 0x40) ~= 0 and not H.isWeapon(slot(c, 1)) then G = c end
-    end
-    H.assertEq(G ~= nil, true, "a seated member holds a two-hand-capable weapon, one hand only")
-    -- D: another, a weapon in the main hand and none in the off hand, and a weapon in the bag D can wear
-    for _, c in ipairs(m) do
-      if D == nil and c ~= G and H.isWeapon(slot(c, 0)) and not H.isWeapon(slot(c, 1)) then
-        for i = 0, 255 do
-          local it = H.readByte(0x1869 + i)
-          if W == nil and it ~= 0xFF and H.readByte(0x1969 + i) > 0 and H.isWeapon(it) and wearable(it, c) then
-            D, W = c, it
-          end
-        end
-      end
-    end
-    H.assertEq(D ~= nil, true, "another seated member with one weapon and a weapon in the bag to wear")
-    -- S: a third, a weapon in the main hand and a shield in the off hand (the common kit)
-    for _, c in ipairs(m) do
-      if S == nil and c ~= G and c ~= D and H.isWeapon(slot(c, 0)) and slot(c, 1) ~= 0xFF
-          and (prop(slot(c, 1), 0) & 0x07) == 3 then S = c end
-    end
-    H.assertEq(S ~= nil, true, "a third seated member with a weapon and a shield")
-    -- J: the fourth, wearing a real Genji Glove (a relic whose ItemProp+12 carries $10)
-    for _, c in ipairs(m) do
-      if J == nil and c ~= G and c ~= D and c ~= S and H.isWeapon(slot(c, 0)) then
-        for rs = 4, 5 do
-          local it = slot(c, rs)
-          if it ~= 0xFF and (prop(it, 12) & 0x10) ~= 0 then J = c end
-        end
-      end
-    end
-    H.assertEq(J ~= nil, true, "a fourth seated member wearing a real Genji Glove, a weapon in the main hand")
-    H.log(string.format("[crusader] J = %s (%s / %s, relics %s %s)", NAMES[J], hex(slot(J, 0)), hex(slot(J, 1)),
-      hex(slot(J, 4)), hex(slot(J, 5))))
-    H.log(string.format("[crusader] G = %s (%s, weapon effects $%02X), D = %s (bag weapon %s), S = %s (%s / %s)",
-      NAMES[G], hex(slot(G, 0)), prop(slot(G, 0), 19), NAMES[D], hex(W), NAMES[S], hex(slot(S, 0)), hex(slot(S, 1))))
     local x, y = H.worldX(), H.worldY()
     local function plain(tx, ty) return (H.worldTileProp(tx, ty) & 0x50) == 0x40 end
     A = { x, y }
@@ -225,6 +276,74 @@ H.run({ maxFrames = 900000 }, {
         .. "Genji's one-weapon cut %s: damage before variance %d", cur.name, NAMES[a], p.hand == 1 and "off" or "main",
         p.bp, p.vig, p.lvl, tostring(p.grip), tostring(p.genji), p.dmg))
     end, emu.callbackType.exec, bd, bd)
+  end),
+  -- The gear this suite needs is the party's to have, not the save's: a Genji Glove worn by a member holding a
+  -- weapon (J) and a two-hand-capable weapon in a member's main hand (G).  When the save's play left them in the
+  -- bag instead (it wears whatever the route's Optimum chose), they go on through the menus, as a player would.
+  H.call(function() planGlove() end),
+  H.lazy(function()
+    if not stage_.glove then return H.logStep("[crusader] a seated member already wears a Genji Glove") end
+    local label = string.format("staging the Genji Glove on %s", NAMES[stage_.glove.who])
+    H.log("[crusader] " .. label .. " (the save has no seated member wearing one; the bag holds it)")
+    return H.keepGear(stage_.glove.who, label, H.equipKit(stage_.glove.who, { { stage_.glove.slot, GENJI } },
+      { tag = label }))
+  end),
+  H.call(function()
+    if stage_.glove then
+      H.assertEq(slot(stage_.glove.who, stage_.glove.slot), GENJI, "the Genji Glove is worn on " ..
+        NAMES[stage_.glove.who])
+    end
+    planGrip()
+  end),
+  H.lazy(function()
+    if not stage_.grip then return H.logStep("[crusader] a seated member already holds a two-hand-capable weapon") end
+    local label = string.format("staging %s (a two-hand-capable weapon) in %s's main hand", hex(stage_.grip.item),
+      NAMES[stage_.grip.who])
+    H.log("[crusader] " .. label .. " (no seated member holds one; the bag does)")
+    return H.equipWeapon(function() return (H.readByte(0x1850 + stage_.grip.who) >> 3) & 3 end, stage_.grip.item,
+      { slot = 0, tag = label })
+  end),
+  H.call(function()
+    local m = seatedList()
+    for _, c in ipairs(m) do
+      H.log(string.format("[crusader] seated %s: hands %s / %s, relics %s %s", NAMES[c], hex(slot(c, 0)),
+        hex(slot(c, 1)), hex(slot(c, 4)), hex(slot(c, 5))))
+    end
+    -- J: wearing a real Genji Glove (a relic whose ItemProp+12 carries $10), a weapon in the main hand; picked first,
+    -- as the staged Glove's wearer is the one member the others must not take
+    for _, c in ipairs(m) do
+      if J == nil and H.isWeapon(slot(c, 0)) and wearsGenji(c) then J = c end
+    end
+    H.assertEq(J ~= nil, true, "precondition: a seated member wearing a real Genji Glove, a weapon in the main hand")
+    H.assertEq(ragnarokClean(J), true, "precondition: J wears no relic carrying the Hyper Wrist's or the Offering's "
+      .. "bit (they would be J's at rank 4 too)")
+    -- G: another, a two-hand-capable weapon in the main hand
+    for _, c in ipairs(m) do
+      local w = slot(c, 0)
+      if G == nil and c ~= J and twoHand(w) and not H.isWeapon(slot(c, 1)) then G = c end
+    end
+    H.assertEq(G ~= nil, true, "precondition: a seated member besides J holds a two-hand-capable weapon, one hand only")
+    -- D: another, a weapon in the main hand and none in the off hand, and a weapon in the bag D can wear
+    for _, c in ipairs(m) do
+      if D == nil and c ~= G and c ~= J and H.isWeapon(slot(c, 0)) and not H.isWeapon(slot(c, 1)) then
+        for i = 0, 255 do
+          local it = H.readByte(0x1869 + i)
+          if W == nil and it ~= 0xFF and H.readByte(0x1969 + i) > 0 and H.isWeapon(it) and wearable(it, c) then
+            D, W = c, it
+          end
+        end
+      end
+    end
+    H.assertEq(D ~= nil, true, "precondition: another seated member with one weapon and a weapon in the bag to wear")
+    -- S: a fourth, a weapon in the main hand and a shield in the off hand (the common kit)
+    for _, c in ipairs(m) do
+      if S == nil and c ~= G and c ~= D and c ~= J and H.isWeapon(slot(c, 0)) and hasShield(c) then S = c end
+    end
+    H.assertEq(S ~= nil, true, "precondition: a fourth seated member with a weapon and a shield")
+    H.log(string.format("[crusader] J = %s (%s / %s, relics %s %s)", NAMES[J], hex(slot(J, 0)), hex(slot(J, 1)),
+      hex(slot(J, 4)), hex(slot(J, 5))))
+    H.log(string.format("[crusader] G = %s (%s, weapon effects $%02X), D = %s (bag weapon %s), S = %s (%s / %s)",
+      NAMES[G], hex(slot(G, 0)), prop(slot(G, 0), 19), NAMES[D], hex(W), NAMES[S], hex(slot(S, 0)), hex(slot(S, 1))))
   end),
   H.removeEquip(function() return G end, 1, { tag = "G's off hand" }),
   -- J keeps one weapon only, so the real Glove's vanilla cut applies

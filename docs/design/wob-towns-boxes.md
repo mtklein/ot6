@@ -183,8 +183,8 @@ replayed line's states (the ROM with these rows), under
 | 416 Commando x4 | 6 | 5 (be90 be30 be80 beF0 beD4) | 5 | 0 |
 | 476 Specter | 4 | 4 (beE0 be28 beD4 beB4) | 4 | 0 |
 | 61 Telstar | 4 | 4 (beA4 be04 be84 beF0) | 4 | 0 |
-| 170 Gigantos (default kit) | 6 | 5 (be90 be64 beB4 be40 beE4) | 4 | 1 (be90) |
-| 170 Gigantos (no Steal at the box) | 6 | 7 (be90 beB4 be78 be40 beDC beE4 be64) | 6 | 1 (beB4) |
+| 170 Gigantos (default kit) | 6 runs, 7 fights (s0's first attempt wiped and its reload fought again) | 5 (be90 be64 beB4 be40 beE4) | 4 keys, 6 fights (be64 and beB4 each drew twice: s0's reload and s20, s4 and s12) | 1 key, 1 fight (be90, s0 attempt 1) |
+| 170 Gigantos (no Steal at the box) | 6 runs, 8 fights (s4's and s12's first attempts wiped on beB4 and reloaded) | 7 (be90 beB4 be78 be40 beDC beE4 be64) | 6 keys, 6 fights | 1 key, 2 fights (beB4) |
 
 - Every guards run passed on its first attempt; both formations fell within
   2,231-4,394 ticks.
