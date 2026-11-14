@@ -158,8 +158,11 @@ line's party already spends its gil at Jidoor's shops on this leg.
   slash|special: CYAN's blade, and special for the guidelines' spirit rule
   (#347). The rooms car (153) hangs off the front strip the train leg walks;
   `wob_train_specter` boots `train_b68_entry` (the capture inside the train
-  that #286's branch added), goes in by the door 141 (48,8) and wins the
-  box.
+  that #286's branch added). The car's door 141 (48,8) lands in 153's
+  corridor, where no side of the box is on foot; the box's compartment is
+  reached from the hallway (151, by 141 (59,8)): its door (19,7) lands in
+  the compartment at 153 (23,11), its door (9,7) in the box's, (23,28)
+  (`_cba6bd`, `_cba6ca`, by the car's `$017E`). The leg tries both.
 - **Lobo** (L5) is on an authored row and no leg plays it: from
   `narshe-mission-v1` the Beginner's House door (map 20 (33,54)) was not on
   foot from Narshe's south gate (lab `school1`), and a party past L20 meets
