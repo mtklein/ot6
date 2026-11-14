@@ -14,6 +14,9 @@
 -- against a mutant -- one edit to the lib's source, made here -- under which
 -- it must fail.
 local mem = {}
+-- the ROM bytes the lib reads: setzerBattle asserts Ot6Tick's recovery arm
+-- (`lda $3e39,x`) 10 bytes in, and every symbol stubs to 0 here
+local rom = { [10] = 0xBD, [11] = 0x39, [12] = 0x3E }
 local printed = {}
 emu = {
   eventType = { inputPolled = 1, startFrame = 2 },
@@ -22,8 +25,8 @@ emu = {
   addEventCallback = function() return 1 end,
   removeEventCallback = function() end,
   addMemoryCallback = function() return 1 end,
-  read = function(a) return mem[a] or 0 end,
-  readWord = function(a) return (mem[a] or 0) | ((mem[a + 1] or 0) << 8) end,
+  read = function(a, t) local m = t == 2 and rom or mem; return m[a] or 0 end,
+  readWord = function(a, t) local m = t == 2 and rom or mem; return (m[a] or 0) | ((m[a + 1] or 0) << 8) end,
   write = function(a, v) mem[a] = v end,
   writeWord = function(a, v) mem[a] = v & 0xFF; mem[a + 1] = v >> 8 end,
   setInput = function() end,
