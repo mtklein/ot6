@@ -2927,6 +2927,8 @@ CoverEffect:
         lda     $3018,x
         bit     $f0
         beq     @129a
+        jsl     Ot6KnightGate           ; ot6 #534: Golem's ladder cover only
+        bcc     @129a                   ;   from a knight at half HP or more
         jsr     CheckCoverTarget
 @129a:  dex2
         bpl     @1288

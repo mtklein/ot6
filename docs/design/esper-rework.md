@@ -43,6 +43,33 @@ the off hand empty: no shield, and never the second weapon the Genji bit
 allows. Two weapons, or a weapon and a shield, are the player's own choice
 in the Equip list.
 
+**The other rungs with a downside (#534 audit of all 130, 2026-11-14).**
+*Ragnarok's signature* was the Offering's four strikes, which cannot be made
+free of cost: it halves every physical hit the holder makes (`CalcDmg`'s
+`lsr $11b0`: Fight, Jump, Throw, Tools, physical Blitz and SwdTech, Black
+Belt counters), forces random targets, and drops criticals and weapon
+procs. It is now the Hyper Wrist's vigor x1.5 (`$11d7 & $80`, applied at the
+end of `UpdateEquip`). The x1.5 cannot wrap: `UpdateEquipBattle` reads vigor's
+low byte, so it would at 171 before the x1.5, and a holder's vigor is at
+most 100 (the highest base of a member who can wear espers, SABIN's 47; the
+ladder's 19 for one member, every Vig rung and Crusader's; and the gear's
+best, +7 on each of two weapons, +6 armor, +4 helmet, +5 on each relic, an
+upper bound), so 150 at most. *Golem's signature* is the True Knight's
+cover, which vanilla grants with no gate on the knight's own HP, so a frail
+or nearly dead knight steps in front of the blow and can die.
+`Ot6KnightGate` (CoverEffect's True Knight walk) lets a knight who does not
+wear the relic cover only at half its max HP or more and never while near
+fatal; the True Knight relic itself stays vanilla.
+`battle_espercrusader` holds Ragnarok's (one aimed hit at x1.5 vigor,
+against rank 4) and `battle_esperknight` Golem's (below half no cover, above
+half a cover).
+
+Accepted as they are: Terrato's rung 3, the Black Belt's counter (a
+counter the player does not choose); Palidor's signature, permanent Float
+(Dirt Drgn's 50 Gs hits a floating member); Phoenix's signature, Life 3,
+under vanilla's hit-rate rule for it; and the immunities, which also block
+an Imp or a Berserk the player casts on purpose.
+
 **Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
 member heals is 25% stronger. Rung 5: anyone the member revives comes back
 at full HP. Both are `Ot6SeraphHeal`, called in `CalcTargetDmg` once per
@@ -325,7 +352,7 @@ bytes, `ItemProp+5` to `+13`).
 | Carbunkl | Rflect, Safe | Stm / Mag | Shell when HP is low (Barrier Ring) | †*Facet*: starts every battle with 2 boost points |
 | Bismark | Haste, Slow | Vig / Stm | Safe when HP is low (MithrilGlove) | max HP +25% (Red Cap) |
 | Unicorn | Pearl, Remedy | Stm / Mag | immune to Zombie | immune to Dark, Zombie and Poison (Amulet) |
-| Golem | Safe | Stm / Vig | immune to Muddle | covers allies at low HP (True Knight) |
+| Golem | Safe | Stm / Vig | immune to Muddle | covers allies at low HP while at half its own HP or more (True Knight) |
 | ZoneSeek | Shell, Haste | Mag / Stm | immune to Mute | Shell in every battle (Force Shld's bit) |
 | Sraphim | Cure, Life | Stm / Mag | †the member's healing +25% (Cure, Life, healing items, and Regen ticks the holder receives) | †*Full revive*: anyone the member revives comes back at full HP (Life, Fenix Down; Life 2 already did) |
 | Palidor | Float, Slow | Spd / Vig | walks faster (Sprint Shoes) | Float in every battle (Cherub Down) |
@@ -337,7 +364,7 @@ bytes, `ItemProp+5` to `+13`).
 | Odin / Raiden | Meteor, Bserk (Raiden: + Quick) | Vig / Spd | Fight never misses (Sniper Sight) | Haste in every battle (RunningShoes) |
 | Bahamut | Flare, W Wind | Mag / Vig | max HP +25% (Red Cap) | Fight and spells deal more damage (Hero Ring) |
 | Phoenix | Life, Antdot | Stm / Spd | immune to Doom's countdown and Zombie | †*Rebirth*: enters every battle under Life 3 |
-| Ragnarok | Ultima, Warp | Vig / Mag | max MP +25% (Minerva) | Fight strikes four times (Offering's X-Fight) |
+| Ragnarok | Ultima, Warp | Vig / Mag | max MP +25% (Minerva) | vigor x1.5 (Hyper Wrist) |
 | Crusader | Merton, Meteor | all four +1 at rungs 1, 2 and 4 | max HP +25% (Red Cap) | Gauntlet (two-handed grip) and Genji Glove (two weapons) both allowed |
 
 Odin and Raiden share one counter: Raiden replaces Odin, and the progress

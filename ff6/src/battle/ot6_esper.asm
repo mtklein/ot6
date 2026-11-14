@@ -616,6 +616,49 @@ out:    plx
 
 ; ------------------------------------------------------------------------------
 
+; [ Golem's cover: only from a knight who can take the hit ]
+;
+; jsl from CoverEffect's True Knight walk (battle_main.asm), for each candidate
+; whose relic effects 4 carry the cover bit ($3c58 & $40), before
+; CheckCoverTarget.  Vanilla's cover has no gate on the knight's own HP, so a
+; frail or nearly dead knight still steps in front of the blow and can die.
+; Golem's signature (Ot6LadderTbl row 21, rung 5) grants the bit as a pure
+; upgrade (#534), so a knight who does not wear the True Knight relic covers
+; only at half its max HP or more and never while near fatal; one wearing the
+; relic keeps vanilla's cover (ITEM::TRUE_KNIGHT is the only item that
+; carries the bit).
+;
+; in: a16, x = the candidate's entity offset, index width either (CoverEffect
+; runs .i8: no index immediates, no index pushes), db=$7e.  out: carry set =
+; it may cover.  a clobbered; x/y kept.
+.proc Ot6KnightGate
+        .a16
+        php
+        shorta
+        lda     $3cd0,x                 ; relic 1
+        cmp     #ITEM::TRUE_KNIGHT
+        beq     yes
+        lda     $3cd1,x                 ; relic 2
+        cmp     #ITEM::TRUE_KNIGHT
+        beq     yes
+        longa
+        lda     $3ee4,x
+        bit     #$0200                  ; near fatal
+        bne     no
+        lda     $3bf4,x                 ; current HP x2 (HP < 10000: no carry out)
+        asl
+        cmp     $3c1c,x                 ; max HP
+        bcs     yes                     ; at half or more
+no:     plp
+        clc
+        rtl
+yes:    plp
+        sec
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ the signatures that are new code ]
 ;
 ; Five rung-5 effects have no vanilla bit (docs/design/esper-rework.md, the
@@ -1056,13 +1099,14 @@ Ot6LadderTbl:
         eff     0,0,0,0,$04,0,0,0,0,0
         stat    1,1,1,1
         eff     0,0,0,0,0,0,0,$18,0,0
-; 15 Ragnarok: Vig / Mag; max MP +25% (Minerva); Fight strikes four times
-;    (Offering)
+; 15 Ragnarok: Vig / Mag; max MP +25% (Minerva); vigor x1.5 (Hyper Wrist;
+;    #534: Offering's four strikes halved every physical hit, forced random
+;    targets and dropped criticals and weapon procs, so it was no pure upgrade)
         stat    1,0,0,0
         stat    0,0,0,1
         eff     0,0,0,0,$20,0,0,0,0,0
         stat    2,0,0,0
-        eff     0,0,0,0,0,0,0,$01,0,0
+        eff     0,0,0,0,0,0,$80,0,0,0
 ; 16 Kirin: Mag / Stm; immune to Poison; Regen (Cure Ring)
         stat    0,0,0,1
         stat    0,0,1,0

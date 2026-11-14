@@ -29,17 +29,19 @@
 --   rank 5:  the menu takes it; D's Fight computes damage for both hands; G's swing has the grip and no cut, from
 --            the same battle power, vigor and level, and more damage than rank 4's; S's swing takes no cut and
 --            loses nothing; J's still takes the real Glove's cut.
+-- J also holds Ragnarok (499 / 500): at rank 5 its vigor is the Hyper Wrist's x1.5 of rank 4's and its Fight is one
+-- aimed hit (#534: the signature was the Offering's four strikes).
 -- Every claim is logged as ok or NOT before the verdict, so a red run names each one that fails.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local NAMES = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES", "STRAGO", "RELM",
   "SETZER", "MOG", "GAU" }
-local LIVE, CRUSADER = 0x317C00, 14
+local LIVE, CRUSADER, RAGNAROK = 0x317C00, 14, 15
 local CMD_FIGHT = 0x00
 local function seated(c) local b = H.readByte(0x1850 + c); return b ~= 0 and (b & 7) == H.readByte(0x1A6D) end
-local function stage(a, n)
-  local addr = LIVE + 0x10 + (a * 26 + CRUSADER) * 2
+local function stage(a, n, stone)
+  local addr = LIVE + 0x10 + (a * 26 + (stone or CRUSADER)) * 2
   emu.write(addr, n & 0xFF, emu.memType.snesMemory)
   emu.write(addr + 1, n >> 8, emu.memType.snesMemory)
 end
@@ -99,8 +101,9 @@ local function branch(name, count, restore)
     r.passes = { [G] = {}, [D] = {}, [S] = {}, [J] = {} }
     cur = r
     for _, c in ipairs({ G, D, S, J }) do stage(c, count) end
-    H.log(string.format("[crusader] %s: Crusader's count on %s, %s, %s and %s staged at %d", name, NAMES[G],
-      NAMES[D], NAMES[S], NAMES[J], count))
+    stage(J, count, RAGNAROK)
+    H.log(string.format("[crusader] %s: Crusader's count on %s, %s, %s and %s, and Ragnarok's on %s, staged at %d",
+      name, NAMES[G], NAMES[D], NAMES[S], NAMES[J], NAMES[J], count))
   end)
   steps[#steps + 1] = H.equipWeapon(function() return (H.readByte(0x1850 + D) >> 3) & 3 end, W,
     { slot = 1, refusable = true, result = r.equip, tag = name .. ": " .. "D's off hand" })
@@ -209,8 +212,14 @@ H.run({ maxFrames = 900000 }, {
       -- a Fight's pass only: an item or a physical spell also runs CalcDmg (#534 round 1: a pass with battle
       -- power 0 was recorded for the two-weapon member before his Fight, and ended the plan early)
       if H.readByte(0x3A7C) ~= CMD_FIGHT then return end
+      -- each member's first Fight only: a pass from another member closes the one before it, so the fight-out's
+      -- later Fights never add to a count
+      if cur.last ~= nil and cur.last ~= a then cur.closed = cur.closed or {}; cur.closed[cur.last] = true end
+      cur.last = a
+      if cur.closed and cur.closed[a] then return end
       local p = { hand = lastHand[e], dmg = H.readWord(0x11B0), bp = H.readByte(0x11A6), vig = H.readByte(0x11AE),
-        lvl = H.readByte(0x11AF), grip = (H.readByte(0xB3) & 0x40) == 0, genji = (H.readByte(0x3C58 + e) & 0x10) ~= 0 }
+        lvl = H.readByte(0x11AF), grip = (H.readByte(0xB3) & 0x40) == 0, genji = (H.readByte(0x3C58 + e) & 0x10) ~= 0,
+        offering = (H.readByte(0x3C58 + e) & 0x01) ~= 0, swings = H.readByte(0x3A70) }
       table.insert(cur.passes[a], p)
       H.log(string.format("[crusader] %s: %s's damage pass, %s hand: battle power %d, vigor x2 %d, level %d, grip %s, "
         .. "Genji's one-weapon cut %s: damage before variance %d", cur.name, NAMES[a], p.hand == 1 and "off" or "main",
@@ -268,11 +277,21 @@ H.run({ maxFrames = 900000 }, {
     check(s5.dmg >= s4.dmg, "rank 5: S's swing (a weapon and a shield) loses nothing to the signature")
     -- J: the real Genji Glove and one weapon keep vanilla's cut at both ranks
     local j4, j5 = R4.passes[J][1], R5.passes[J][1]
-    H.assertEq(same(j4, j5), true, "J swings from the same battle power, vigor and level at rank 4 and rank 5")
+    H.assertEq(j4.bp == j5.bp and j4.lvl == j5.lvl, true, "J swings from the same battle power and level at rank 4 and rank 5")
     H.log(string.format("[crusader] J's damage before variance: rank 4 %d (cut %s, grip %s), rank 5 %d (cut %s, grip %s)",
       j4.dmg, tostring(j4.genji), tostring(j4.grip), j5.dmg, tostring(j5.genji), tostring(j5.grip)))
     check(j4.genji, "rank 4: J's swing takes the real Genji Glove's one-weapon cut (vanilla)")
     check(j5.genji, "rank 5: J's swing still takes the real Genji Glove's one-weapon cut (vanilla)")
+    -- J also holds Ragnarok (499 / 500): its signature is the Hyper Wrist's vigor x1.5, one aimed hit, no Offering
+    local hj4, hj5 = hands(R4, J), hands(R5, J)
+    local v = j4.vig // 2
+    local want = math.min(255, 2 * (v + (v >> 1)))
+    H.log(string.format("[crusader] J's Ragnarok: vigor x2 rank 4 %d, rank 5 %d (want %d); damage passes rank 4 %d/%d, "
+      .. "rank 5 %d/%d (main/off); Offering's bit rank 5 %s", j4.vig, j5.vig, want, hj4[0], hj4[1], hj5[0], hj5[1],
+      tostring(j5.offering)))
+    check(j5.vig == want and want > j4.vig, "rank 5: J's vigor is x1.5 rank 4's (Ragnarok's signature, Hyper Wrist)")
+    check(not j5.offering and hj5[0] == 1 and hj5[1] == 0,
+      "rank 5: J's Fight is one hit, aimed (no Offering: no four strikes, no random target)")
     H.assertEq(#bad, 0, "Crusader's signature's claims that failed: " .. table.concat(bad, "; "))
   end),
   H.logStep("[crusader] PASS: Crusader's signature gives a second weapon in the menu and its swing in battle, and "
