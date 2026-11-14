@@ -10,7 +10,7 @@
 -- ItemProp+19) when the other hand is empty (UpdateEquipBattle; Disable2Hand clears it otherwise), and the grip
 -- raises the swing's battle power by 3/4 (CalcDmg: $B2 bit 14 clear).  A Genji bit left on a member who does not
 -- hold two weapons also cuts the swing's damage by 1/4 (CalcDmg's $3C58 bit $10; UpdateEquip_03 clears it only for
--- two weapons): that is logged here, not asserted, for the release's call.
+-- two weapons), so the signature must not leave that cut on a member it gives one weapon (G and S below).
 --
 -- Continue post-opera-v1.  Three seated members are picked from the save (S below): G holds a two-hand-capable weapon and D,
 -- another, holds a weapon in the main hand and something else in the off hand, with a weapon D can wear in the bag.
