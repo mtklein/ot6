@@ -6927,6 +6927,8 @@ UpdateEquipBattle:
         sta     $3b55,x     ; set mblock
         lda     $cf         ;
         trb     $d8
+        jsl     Ot6LadderGenji          ; ot6 #534: a Genji bit from the esper
+                                        ;   ladder alone takes no one-weapon cut
         lda     $bc
         sta     $3c6c,x     ; status 2 effects
         lda     $d4

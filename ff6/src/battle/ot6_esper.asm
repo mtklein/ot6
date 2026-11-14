@@ -560,6 +560,62 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
 
 ; ------------------------------------------------------------------------------
 
+; [ Crusader's Genji bit: the menu's permission, never vanilla's cut ]
+;
+; jsl from UpdateEquipBattle right after `lda $cf / trb $d8`, which has
+; cleared the Genji bit ($11d8 & $10) for a member holding two weapons.  What
+; is left of it is read once more in battle: CalcDmg's one-weapon cut, damage
+; x3/4 for a Genji Glove worn without a second weapon (#534).  Crusader's
+; signature (Ot6LadderTbl row 14, rung 5) sets the bit so the Equip menu takes
+; a second weapon; it is meant as a pure upgrade, so a bit that no worn piece
+; of gear carries (ItemProp+12 & $10 on none of $11c6-$11cb: it came from the
+; ladder alone) is cleared here, before $3c58 is written.  A real Genji Glove
+; keeps vanilla's cut.  $2e6e, the in-battle Item equip's Genji permission
+; (btlgfx check_equip), was copied before this and keeps the bit either way.
+;
+; dp=$1100, a8, X preserved.  rtl.
+.proc Ot6LadderGenji
+        .a8
+        php
+        shorta
+        longi                           ; before the phx, so the plx matches it
+        phx
+        lda     $d8                     ; relic effects 4
+        and     #$10
+        beq     out                     ; no Genji bit left (none, or two weapons)
+        ldx     #$0005                  ; weapon, shield, helmet, armor, relics
+slot:   lda     $c6,x
+        cmp     #$ff
+        beq     next
+        phx
+        longa
+        and     #$00ff
+        asl                             ; id x2
+        pha
+        asl
+        asl
+        asl
+        asl                             ; id x32
+        sec
+        sbc     1,s                     ; id x30
+        tax
+        pla
+        shorta
+        lda     f:ItemProp+12,x
+        plx
+        and     #$10
+        bne     out                     ; a worn piece carries it: vanilla
+next:   dex
+        bpl     slot
+        lda     #$10
+        trb     $d8                     ; the ladder's alone: no cut
+out:    plx
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ the signatures that are new code ]
 ;
 ; Five rung-5 effects have no vanilla bit (docs/design/esper-rework.md, the
