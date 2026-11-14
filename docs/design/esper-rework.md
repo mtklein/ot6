@@ -429,6 +429,28 @@ In rough order. S is a day's work, M a few days, L a week or more.
    grids are re-read for drift. The harness also needs a wearing policy (who
    wears what, and when to rotate), which is the same choice a player makes.
 
+### The two labbed signatures (owner: "lab half-cost spells and permanent Haste before shipping them")
+
+Measured on the line's own captures at the landing (the replay from power-on at e9e2646e: `wor-kt-poltergeist-v1`
+for the Goddess's leg, `wor-kt-plates-v1` for Kefka's), each Continued as it is (base) or with every character's
+count on Shiva (half-cost spells) or on Odin and Raiden (Haste) raised to the signature, an upper bound: the line
+itself masters neither. Four seed shifts an arm and leg, 24 runs; the boss's battle key from each log
+(`build/attempts/wt/v044-esper-rework-2/siglab/keys.txt`, `tally.txt`).
+
+| leg | arm | won | distinct keys | the boss's last tick (median of the wins) | deaths in the boss fight |
+|---|---|---|---|---|---|
+| the Goddess ($1D5) | base | 4 of 4 | 4 | 8,510 | 3, 1, 2, 1 |
+| | half-cost spells | 3 of 4 | 4 | 9,052 | 1, 4 (wipe), 0, 3 |
+| | Haste | 4 of 4 | 3 | 10,708 | 3, 0, 3, 0 |
+| Kefka (tier 2, $201) | base | 3 of 4 | 4 | 7,278 | 0, 1, 4 (wipe), 0 |
+| | half-cost spells | 3 of 4 | 4 | 7,835 | 2, 2, 1, 1 (lost later) |
+| | Haste | 4 of 4 | 4 | 9,336 | 2, 4, 1, 0 |
+
+Neither signature makes the late bosses easy, even on every member at once: the fights take as long, members
+still fall, and the base arm loses about as often. Both ship. An earlier lab on the tracked saves (the old line's
+progress) had party-wide Haste wipe the Goddess on both of its seeds, since Haste also speeds the Doom countdown
+her Overcast sets; with the line's own ranks it won all four.
+
 ### Still to build (after v0.44's first landing)
 
 The page under Skills > Espers shows the selected character's rank, Magic
