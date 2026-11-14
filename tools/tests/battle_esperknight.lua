@@ -12,7 +12,7 @@
 -- HP ("above half") or at one under half its max, above near fatal ("below half").  Everyone Defends (the real
 -- menu) until a monster's attack on near-fatal T walks the cover candidates and asks Ot6KnightGate about K (an
 -- opportunity), then 180 frames for the attack to resolve.  A branch whose battle gives no opportunity (T dies to a
--- spell, the battle ends) goes again from the snapshot after more idle frames, at most six tries.
+-- spell, the battle ends) goes again from the snapshot after more idle frames, at most sixteen tries (the lab on post-opera-v1 found its first above-half opportunity on the sixth).
 --   above half: K covers T (Ot6CoverBP, the cover's commit, runs on K);
 --   below half: an opportunity, and no cover.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -21,7 +21,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local NAMES = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES", "STRAGO", "RELM",
   "SETZER", "MOG", "GAU" }
 local LIVE, GOLEM, TRUE_KNIGHT = 0x317C00, 21, 0xBE
-local TRIES, IDLE = 6, 45
+local TRIES, IDLE = 16, 45
 local function seated(c) local b = H.readByte(0x1850 + c); return b ~= 0 and (b & 7) == H.readByte(0x1A6D) end
 local function slot(c, s) return H.readByte(0x1600 + 37 * c + 0x1F + s) end
 
@@ -79,7 +79,7 @@ local function branch(name, kHp)
   return H.seqStep(t)
 end
 
-H.run({ maxFrames = 600000 }, {
+H.run({ maxFrames = 900000 }, {
   H.bootCheckpoint("post-opera-v1"),
   H.call(function()
     H.assertEq(emu.read(LIVE, emu.memType.snesMemory) | (emu.read(LIVE + 1, emu.memType.snesMemory) << 8), 0x3145,
