@@ -14,3 +14,9 @@ element, so a weapon that carries one heals it, but Locke's knife, Edgar's
 tools, Sabin's blitzes and Setzer's cards and dice all break it. A broken
 Intangir loses its turns, so it cannot answer your hits with Meteo or run away,
 and with it broken you can finally bring it down.
+
+Thirty-seven World of Balance monsters that still used generic shields now
+have shields and weak points designed for them. In each area the party you
+have there carries a weapon that breaks them, and common monsters mostly
+have two shields instead of three to five, so a break lands while it still
+matters. Elemental weaknesses are unchanged.

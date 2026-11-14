@@ -270,6 +270,15 @@ H.run({ maxFrames = 400000 }, {
   }, "C: the wearer casts the granted spell"),
   -- D. the old shield back on: the grant goes
   H.waitUntil(function() return H.worldHasControl() end, 3000, "D: world control", 5),
+  -- care again before the Equip menu: C's battle can leave the wearer down or petrified, and the menu refuses them
+  -- (2026-11-13, #254's replay: CYAN petrified in C's battle, status1 $40, then "D unequip slot 1 item $5E: equip
+  -- options: 4 A presses on the target were not taken"); a player uses a Soft first
+  H.fieldCare({ tag = "shield: care before D", threshold = 0.95 }),
+  H.waitUntil(function() return H.worldHasControl() end, 3000, "D: world control after the care", 5),
+  H.call(function()
+    H.assertEq(H.relicMenuRefuses(who), false, string.format("D: the wearer (char %d) is up for the Equip menu "
+      .. "after the care (HP %d, status1 $%02X)", who, H.charHp(who), H.charStatus1(who)))
+  end),
   lazy(function() return H.equipLoadout(who, { { LHAND, oldShield } }, { tag = "D unequip" }) end),
   H.call(function()
     H.assertEq(rec(0x1F + LHAND), oldShield, "D: the left hand holds the old shield again")

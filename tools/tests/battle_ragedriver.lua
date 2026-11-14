@@ -50,6 +50,8 @@ local function recLevel() return H.readByte(0x1600 + 37 * GAU + 8) end
 -- was a level-up battle (gate/suite_battle_ragedriver.red.log).  RD_LEVELUPS = true is the mutant that reads the
 -- record anyway.
 RD_LEVELUPS = RD_LEVELUPS or false
+-- RD_BMIN_OFF = 1 is the mutant that misreads the battle MP by one (the price off by one on the level-up path)
+RD_BMIN_OFF = RD_BMIN_OFF or 0
 
 -- per battle: the Rage plans made in it, GAU's Cmd_10s (his seat in Y),
 -- and the tier and beast the first frame his RAGE status reads set
@@ -94,7 +96,7 @@ H.run({ maxFrames = 900000 }, {
         cur.beast and string.format("$%02X", cur.beast) or "-", cur.mp0, cur.mp1, cur.lv0, cur.lv1))
       if cur.rage and cur.cmd10 >= 2 and done == nil then
         done = cur
-        done.after = (cur.lv1 == cur.lv0 or RD_LEVELUPS) and cur.mp1 or cur.bmin
+        done.after = (cur.lv1 == cur.lv0 or RD_LEVELUPS) and cur.mp1 or (cur.bmin + RD_BMIN_OFF)
         if done.after ~= cur.mp1 then
           H.log(string.format("[rage] GAU levelled up in this battle: the price is read on his battle MP, lowest %d",
             cur.bmin))

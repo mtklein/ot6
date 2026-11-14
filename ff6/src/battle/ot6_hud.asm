@@ -2056,6 +2056,152 @@ Ot6ShieldTbl:
                                 ;   shields: 3 wipes in 16 meetings; four:
                                 ;   3 in 15; two: 0 in 18; wob-side-
                                 ;   trips.md section 3)
+        ; ---- the world of balance: the species the route met on the
+        ; floor (#254; docs/design/break-coverage-wob.md, one section per
+        ; area, and one battle_breakwob_* suite per area) ----------------
+        ; Vanilla element bits stay (and the plains' poison adds in
+        ; Ot6ElemAddTbl).  House curve: 1 pests, 2 trash, 3 tanks, 4
+        ; miniboss-grade.  Each row keys at least one hand of the party
+        ; that meets the body there.
+        ; -- the narshe mines, terra alone (map 50) --
+        .word   $0046
+        .byte   1, OT6_PIERCE|OT6_BLUDG ; vaporite: a 15-hp wisp; terra's
+                                ;   knife or her fire.  fire|holy
+                                ;   vanilla; absorbs bolt
+        ; -- the figaro desert and the plains to south figaro (world
+        ; groups 1, 12, 3, 5): terra's knife, locke's blade, edgar's pike;
+        ; edgar's bio blaster is the plains' element (poison) --
+        .word   $005c
+        .byte   2, OT6_SLASH|OT6_PIERCE ; sand ray: a flat fish; any edge.
+                                ;   ice|water vanilla, poison an ot6 add
+        .word   $0023
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; fossilfang: bones; the blade
+                                ;   slides off, point or blow cracks
+                                ;   them.  fire|ice|holy|water vanilla;
+                                ;   absorbs poison (bio heals it)
+        .word   $0015
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; rhinotaur: a horned hide; the
+                                ;   pike goes in, fists stagger it.
+                                ;   absorbs bolt; poison an ot6 add
+        .word   $0012
+        .byte   2, OT6_SLASH|OT6_PIERCE ; rhodox: a small beast; poison an
+                                ;   ot6 add
+        .word   $00a8
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; greasemonk: slick, so stab or
+                                ;   club it.  poison vanilla
+        ; -- the south figaro cave (map 72): all three fire-weak, terra's
+        ; fire the cave's lesson; the eye takes the point, the worm the
+        ; edge --
+        .word   $0063
+        .byte   2, OT6_PIERCE   ; bleary: an eye.  fire vanilla
+        .word   $0062
+        .byte   2, OT6_SLASH|OT6_BLUDG ; crawly: a soft worm.  fire vanilla
+        .word   $002e
+        .byte   1, OT6_SLASH|OT6_PIERCE ; hornet: a pest.  fire vanilla
+        ; -- mt. kolts (map 98) --
+        .word   $0032
+        .byte   2, OT6_SLASH|OT6_PIERCE ; trilium: a flower; cut the stalk.
+                                ;   fire vanilla; absorbs water
+        ; -- locke and celes out of south figaro (maps 87, 69, 70): locke's
+        ; daggers pierce, celes's blade slashes; each body takes one of the
+        ; two, the bear only the blade --
+        .word   $0011
+        .byte   2, OT6_PIERCE|OT6_SLASH ; commander: imperial rank, the
+                                ;   imperial answer (pierce), and celes's
+                                ;   blade (slash).  poison vanilla
+        .word   $0071
+        .byte   2, OT6_SLASH|OT6_PIERCE ; vector pup: a hound.  fire
+                                ;   vanilla
+        .word   $0094
+        .byte   2, OT6_SLASH|OT6_BLUDG ; primordite: soft and primitive.
+                                ;   bolt vanilla
+        .word   $0036
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; trilobiter: a shell; find the
+                                ;   seam.  no element
+        .word   $00f5
+        .byte   3, OT6_SLASH|OT6_BLUDG ; gold bear: the cave's tank; no
+                                ;   element
+        ; -- the phantom train (maps 141, 142, 145): cyan's katana, and
+        ; holy (sabin's aurabolt) for every ghost --
+        .word   $0008
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; hazer: a spirit.  holy vanilla
+        .word   $000e
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; whisper: a spirit.  fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $00ba
+        .byte   2, OT6_SLASH|OT6_BLUDG ; stillgoing: a dead body; cut or
+                                ;   break it.  fire|holy vanilla;
+                                ;   absorbs poison
+        ; -- narshe's back way with banon (map 48) --
+        .word   $00ef
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; 1st class: a guard in plate.
+                                ;   poison vanilla
+        .word   $00f4
+        .byte   2, OT6_SLASH|OT6_PIERCE ; wild rat: fire vanilla; absorbs
+                                ;   poison (the guard's bio heals it)
+        ; -- the plains between narshe, kohlingen, jidoor and zozo (world
+        ; groups 9, 10, 11, 13) --
+        .word   $0078
+        .byte   2, OT6_SLASH|OT6_PIERCE ; red fang: a wolf; poison an ot6
+                                ;   add
+        .word   $002a
+        .byte   2, OT6_PIERCE   ; vulture: a flier, brought down by the
+                                ;   point.  wind vanilla
+        .word   $0090
+        .byte   3, OT6_SLASH|OT6_BLUDG ; over-grunk: the plains' tank.
+                                ;   fire vanilla
+        .word   $008c
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; mind candy: a magic moth;
+                                ;   setzer's cards.  fire|wind vanilla
+        ; -- the south continent round albrook (world groups 14, 21) --
+        .word   $007b
+        .byte   2, OT6_SLASH|OT6_PIERCE ; ralph: a beast; poison an ot6 add
+        .word   $0081
+        .byte   3, OT6_SLASH|OT6_PIERCE ; wyvern: a dragon's hide.  ice
+                                ;   vanilla
+        .word   $008d
+        .byte   2, OT6_SLASH|OT6_BLUDG ; weedfeeder: fire|wind vanilla
+        .word   $006b
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; joker: a conjurer (world group
+                                ;   15, three to a formation: the grind
+                                ;   by the banquet); setzer's cards.
+                                ;   bolt|poison vanilla
+        ; -- the plains round thamasa (world groups 22, 23) --
+        .word   $0096
+        .byte   2, OT6_SLASH|OT6_PIERCE ; cephaler: bolt vanilla (locke's
+                                ;   thunderblade)
+        .word   $001f
+        .byte   4, OT6_SLASH|OT6_PIERCE ; chimera: 2237 hp, miniboss-grade;
+                                ;   poison an ot6 add
+        .word   $001d
+        .byte   2, OT6_SLASH|OT6_PIERCE ; baskervor: a hound (world group
+                                ;   24, the forest by thamasa); poison an
+                                ;   ot6 add
+        ; -- esper mountain (maps 372, 375): strago's rod is the key the
+        ; blades lack (the shell, the ooze), relm's brush the ooze's --
+        .word   $00ee
+        .byte   2, OT6_SLASH|OT6_BLUDG ; mandrake: a root.  fire vanilla;
+                                ;   absorbs water
+        .word   $00d0
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; insecare: an insect's shell.
+                                ;   fire|wind vanilla
+        .word   $00eb
+        .byte   2, OT6_SLASH|OT6_PIERCE ; abolisher: no element
+        .word   $00d6
+        .byte   5, OT6_PIERCE|OT6_BLUDG ; adamanchyt: the mountain's wall,
+                                ;   five shields, the floor's, kept above
+                                ;   the house curve for battle_breakfour's
+                                ;   measurement (a 3-bp break takes four of
+                                ;   the five).  the blades turn.
+                                ;   no element
+        .word   $00b8
+        .byte   2, OT6_BLUDG|OT6_SPECIAL ; slurm: an ooze, not cut.  fire
+                                ;   vanilla
+        ; -- the floating continent (map 393) --
+        .word   $0169
+        .byte   3, OT6_SLASH|OT6_PIERCE|OT6_SPECIAL ; naughty: a demon,
+                                ;   the pool's elite.  fire|bolt|holy
+                                ;   vanilla; absorbs ice
         ; ---- the world of ruin: the solitary island to tzen's collapsing
         ; house (docs/design/route-wor-sabin.md section 8) ---------------
         ; Celes is alone to Tzen and holds slash (every sword; pierce only

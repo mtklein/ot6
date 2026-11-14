@@ -430,7 +430,10 @@ local function shopTrip()
     -- build/attempts/wt/gen-robust/lab/gen-robust/kolts_regen/
     -- south_figaro.log).
     buyTo(0xF2, 1, 3, "ANTIDOTE to 3"),
-    buyTo(0xF4, 2, 2, "SOFT to 2"),
+    -- Softs to 4: SABIN's scenario must inherit two (gen_sabin_world), no shop stands between here and the
+    -- split, and Mt. Kolts petrifies: on the #254 ROM's replay EDGAR was petrified on the climb and the party
+    -- reached the hub with one (build/attempts/wt/v043-wob-rows/gate/sabin_world.red.log)
+    buyTo(0xF4, 2, 4, "SOFT to 4"),
     buyTo(0xF0, 5, 15, "FENIX DOWN to 15"),
     buyTo(0xE8, 0, 99, "TONIC to 99"),   -- the rite of passage: a full bag of Tonics for field care
     tapUntil("b", inState(0x25), "shop: back to the options window"),
