@@ -19,8 +19,10 @@ local STATE = "build/states/wor_kt_guardian.mss.lua"
 local OVERLAY = { [0xBB] = "Wall Rings", [0xB7] = "Barrier Rings", [0xDC] = "Safety Bit" }
 local function rec(ch, off) return H.readByte(0x1600 + 37 * ch + off) end
 local walking, other, who, item, slot = nil, nil, nil, nil, nil
-local function violations()
-  local v = H.gearBaselineViolations()
+-- case 3's threats: nil, or (staged, below) a Wound threat under which the relic rule ranks the Safety Bit
+local THREAT3 = nil
+local function violations(threats)
+  local v = H.gearBaselineViolations({ threats = threats })
   for _, l in ipairs(v) do H.log("[gbsplit] violation: " .. l) end
   return v
 end
@@ -99,6 +101,54 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(H.gearOverlayWorn(OVERLAY[item]), false, "2: its relic is on no party's member")
     H.log("[gbsplit] 1-2: another party's overlay relic is red, and the dress takes it off that party")
   end),
+  -- 3's precondition, staged when the save leaves the Bit in the bag (#534's replay: GOGO wore it at L45 for the
+  -- factory's L.5 Doom, reached L47, and the save's baseline took it off): each party walks in turn until the relic
+  -- rule, planned for that party from the bag, puts the Bit on one of its members, and it goes on there through the
+  -- Relic menu; then the walking party walks again
+  H.lazy(function()
+    local SAFETY = 0xDC
+    for ch = 0, 13 do
+      if (H.readByte(0x1850 + ch) & 7) ~= 0 and (rec(ch, 0x23) == SAFETY or rec(ch, 0x24) == SAFETY) then
+        return H.call(function() end)
+      end
+    end
+    if H.invCountOf(SAFETY) == 0 then return H.call(function() end) end
+    local placed = false
+    local steps = {}
+    -- first as the save leaves it (no threats), then under a Wound threat (STATUS1 $80, what the Bit guards: the
+    -- factory's L.5 Doom) when no party's rule ranks the Bit without one; case 3 then dresses under that threat
+    for _, threat in ipairs({ false, { s1 = 0x80, s2 = 0x00 } }) do
+    for _, p in ipairs(H.partyNumbers()) do
+      steps[#steps + 1] = H.cond(function() return not placed end, {
+        H.call(function() THREAT3 = threat or nil end),
+        H.switchParty(p, { tag = "3: party " .. p .. " walks (where does the rule put the Safety Bit?)" }),
+        H.lazy(function()
+          -- the baseline's own check names where the relic rule puts a relic it ranks: "the relic rule puts $DC
+          -- in NAME's slot N"
+          for _, l in ipairs(H.gearBaselineViolations({ threats = THREAT3 })) do
+            local name, s = l:match("^the relic rule puts %$DC in (.-)'s slot (%d)")
+            if not placed and name then
+              for _, ch in ipairs(H.partyRoster(p)) do
+                if not placed and H.SPLIT_NAMES[ch] == name then
+                  placed = true
+                  local label = string.format("3: the Safety Bit on %s (party %d), where the relic rule puts it", name, p)
+                  H.log("[gbsplit] " .. label)
+                  return H.keepGear(ch, label, H.equipKit(ch, { { tonumber(s), SAFETY } }, { tag = label }))
+                end
+              end
+            end
+          end
+          return H.call(function() end)
+        end),
+      }, {})
+    end
+    end
+    steps[#steps + 1] = H.call(function()
+      if placed then H.log(string.format("[gbsplit] 3: staged %s", THREAT3 and "under a Wound threat" or "as the save leaves it")) end
+    end)
+    steps[#steps + 1] = H.switchParty(walking, { tag = "3: party " .. walking .. " walks again" })
+    return H.seqStep(steps)
+  end),
   -- 3. the Safety Bit's overlay over a Bit the relic rule puts back (#526)
   H.lazy(function()
     local SAFETY = 0xDC
@@ -125,7 +175,7 @@ H.run({ maxFrames = 120000 }, {
         end
       end),
       H.overlayOn("Safety Bit", "field_gearbaseline_split case 3a"),
-      H.gearBaseline({ tag = "3a: the dress, the overlay open" }),
+      H.lazy(function() return H.gearBaseline({ tag = "3a: the dress, the overlay open", threats = THREAT3 }) end),
       H.call(function()
         H.assertGearBaseline = real
         H.assertEq(worn(), true, "3a: the relic rule put the Safety Bit back on " .. H.SPLIT_NAMES[bit.ch])
@@ -138,10 +188,10 @@ H.run({ maxFrames = 120000 }, {
       -- (b) the factory's fix: the overlay closed before the save's dress
       H.overlayOn("Safety Bit", "field_gearbaseline_split case 3b"),
       H.overlayOff("Safety Bit"),
-      H.gearBaseline({ tag = "3b: the dress, the overlay closed first" }),
+      H.lazy(function() return H.gearBaseline({ tag = "3b: the dress, the overlay closed first", threats = THREAT3 }) end),
       H.call(function()
         H.assertEq(worn(), true, "3b: the Safety Bit stays where the relic rule puts it")
-        H.assertEq(#violations(), 0, "3b: no violation")
+        H.assertEq(#violations(THREAT3), 0, "3b: no violation")
         H.log("[gbsplit] 3b: green")
         H.log("[gbsplit] PASSED: another party's overlay relic is red, and the dress takes it off that party; the "
           .. "Safety Bit's overlay closed before the dress is green where left open it is red")
