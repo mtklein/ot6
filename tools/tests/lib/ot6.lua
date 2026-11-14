@@ -19765,6 +19765,9 @@ end
 -- the bit already gone).
 -- M.ALLY_ATTRIBUTION = false switches it off (the negative control).
 M.ALLY_ATTRIBUTION = true
+-- M.DOOM_ATTRIBUTION = false switches off the Doom rule in the [death] line's "by" (a Condemned member's
+-- Doom is nobody's action; battle_doom's negative control).
+M.DOOM_ATTRIBUTION = true
 -- A party command seen beginning (#320).  ExecCmd, SaveForMimic and the
 -- HP the command takes can all land inside one frame (measured: SABIN's
 -- unmuddle Fight on CELES at 75 HP, first seen on the frame she read 0),
@@ -20236,7 +20239,11 @@ function Driver:watchHits()
        and not self.deathSaid[e] then
       self.deathSaid[e] = true
       local savedAct = self.monAct
-      if self.condemnedAt[e] ~= nil and M.frame - self.condemnedAt[e] <= 30 then self.monAct = nil end
+      -- ...and an ally's action open as it lands is not its cause either: a Doom queued behind the member's
+      -- own command lands as that command runs (battle_doom's retry on kolts_cave: TERRA condemned at 0, her
+      -- Fenix Down on a corpse ahead of the Doom, read 'by entity 2 char 0 cmd $01 atk $F0 (its own action)')
+      local doomed = M.DOOM_ATTRIBUTION and self.condemnedAt[e] ~= nil and M.frame - self.condemnedAt[e] <= 30
+      if doomed then self.monAct = nil end
       local from = last
       if self.monAct ~= nil and self.monAct.hp0[e] ~= nil and self.monAct.hp0[e] ~= 0xFFFF then
         from = self.monAct.hp0[e]
@@ -20249,7 +20256,7 @@ function Driver:watchHits()
         self.monAct.kills = self.monAct.kills + 1
         if from >= maxhp then self.monAct.fullKills = self.monAct.fullKills + 1 end
       end
-      local ally = self.monAct == nil and self:allyAct() or nil
+      local ally = self.monAct == nil and not doomed and self:allyAct() or nil
       local rec = { e = e, char = M.readByte(BATTLE.BCHID + e * 2), tick = self.battleTick,
                     from = from, maxhp = maxhp, bp = bp,
                     slot = self.monAct and self.monAct.slot, cmd = self.monAct and self.monAct.cmd,

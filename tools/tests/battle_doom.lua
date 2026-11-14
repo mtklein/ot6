@@ -80,6 +80,10 @@ local F = nil
 local doomedA, bpA, lineA, frameA = nil, nil, nil, nil
 local doomedB, actorB, lineB, frameB = nil, nil, nil, nil
 local deathFrame, deathLine = nil, nil
+-- B's tries (below): the windows passed over, the snapshot before B and the test's record at it
+local TRIES_B = 4
+local skipB, windowsB, windowFrameB, triesB, lostB = 0, 0, nil, {}, {}
+local snapReq, loadReq, snapB, modelB = nil, nil, nil, nil
 
 -- Every line the driver says is kept, and once B's member is condemned, so
 -- is what that member's count and gauge read on the frame it was said: the
@@ -176,6 +180,38 @@ local function watchCounts()
   end
 end
 
+-- B's member dead by an action (a monster's, or a member's) since its poke, before its Doom: the [death]
+-- line's attribution, or nil
+local function monsterKilledB()
+  if doomedB == nil or lineB == nil or hp(doomedB) > 0 then return nil end
+  for i = lineB + 1, #lines do
+    local l = lines[i]
+    if l:find("%[death%] f%+%d+ entity " .. doomedB .. " char") and not l:find("by nobody", 1, true) then
+      return l:match("(by slot %d+ cmd %$%x+ atk %$%x+)") or l:match("(by entity %d+ char %d+ cmd %$%x+ atk %$%x+)")
+        or "an action"
+    end
+  end
+  return nil
+end
+-- the test's own record, kept beside the machine's snapshot so a restored try starts where the snapshot does
+local function copy(t)
+  if type(t) ~= "table" then return t end
+  local o = {}
+  for k, v in pairs(t) do o[k] = copy(v) end
+  return o
+end
+local function saveModel()
+  return { n = #lines, saidAt = copy(saidAt), lastCount = copy(lastCount), lastCountFrame = copy(lastCountFrame),
+           periods = copy(periods), decremented = copy(decremented), accLast = copy(accLast), visits = copy(visits),
+           sim = copy(sim), periodVisits = copy(periodVisits), visitFrame = copy(visitFrame), minVisit = minVisit }
+end
+local function restoreModel(m)
+  for i = #lines, m.n + 1, -1 do lines[i] = nil end
+  saidAt, lastCount, lastCountFrame = copy(m.saidAt), copy(m.lastCount), copy(m.lastCountFrame)
+  periods, decremented, accLast, visits = copy(m.periods), copy(m.decremented), copy(m.accLast), copy(m.visits)
+  sim, periodVisits, visitFrame, minVisit = copy(m.sim), copy(m.periodVisits), copy(m.visitFrame), m.minVisit
+end
+
 H.run({ maxFrames = 90000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
@@ -244,57 +280,119 @@ H.run({ maxFrames = 90000 }, {
     H.waitFrames(1),
   }, "a member's command window is open with an ally standing"),
 
-  -- B. the next command window of ANOTHER member with an Item row (and a
-  -- Potion or Tonic in the bag): condemn a third member at 1 and hurt
-  -- them to a third, so the heal line has a patient to refuse
+  -- A's Doom lands first, and the machine and the test's own record are kept there: B starts from that point,
+  -- and goes again from it when its try cannot finish (below)
   H.driveUntil(function()
     watchCounts()
-    if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_CMD then return false end
-    local e = H.readByte(ACTOR) & 3
-    if e == doomedA or hp(e) == 0 or maxhp(e) == 0 or not hasRow(e, CMD_ITEM) then return false end
-    if not (bagHas(0xE9) or bagHas(0xE8)) then
-      error("no Potion or Tonic in the battle bag: nothing for the heal line to refuse", 0)
-    end
-    local c = nil
-    for p = 0, 3 do
-      if p ~= e and p ~= doomedA and hp(p) > 0 and maxhp(p) > 0
-         and (turnFrames(p) == nil or turnFrames(p) >= H.COUNT_FRAMES) then c = p end
-    end
-    if c == nil then return false end
-    H.writeByte(ST2 + c * 2, H.readByte(ST2 + c * 2) | 0x01)
-    H.writeByte(DOOM_COUNT + c * 2, 2)
-    H.writeWord(0x3BF4 + c * 2, math.max(1, maxhp(c) // 3))
-    -- doomedA's corpse (its own Doom already landed) is a revivable body, and
-    -- the driver's raise block sits ahead of the heal loop: with a Fenix Down
-    -- in the battle bag (the mog-gear route now carries one) it returns a
-    -- revive before it ever weighs healing the condemned member -- correct,
-    -- higher-priority play, but not the decision #190's rule is about.  Zero
-    -- the battle-bag Fenix (id $F0) so this turn's care decision is the heal
-    -- we mean to see refused; the corpse stays down, which part C still wants.
-    for i = 0, 251 do
-      if H.readByte(0x2686 + i * 5) == 0xF0 then H.writeByte(0x2686 + i * 5 + 3, 0) end
-    end
-    doomedB, actorB, lineB, frameB = c, e, #lines, H.frame
-    H.log(string.format("[test] f%d Condemned poked onto entity %d char %d (count 1, %d frames; "
-      .. "its next turn %s frames away) and its HP set to %d/%d, at actor %d's open command window",
-      H.frame, c, H.readByte(BCHID + c * 2), H.COUNT_FRAMES, tostring(turnFrames(c)), hp(c),
-      maxhp(c), e))
-    return true
-  end, 20000, {
-    H.call(function() F.frame() end),
-    H.waitFrames(1),
-  }, "another member's command window is open with a third member standing"),
-
-  -- ...then keep fighting until the Doom has landed on both (or the battle ends)
-  H.driveUntil(function()
-    watchCounts()
-    if not H.battleLoadStarted() then return true end
-    if deathFrame == nil and hp(doomedB) == 0 then deathFrame, deathLine = H.frame, #lines end
-    return hp(doomedA) == 0 and hp(doomedB) == 0 and H.frame - deathFrame > 60
+    return hp(doomedA) == 0 or not H.battleLoadStarted()
   end, 6000, {
     H.call(function() F.frame() end),
     H.waitFrames(1),
-  }, "the Doom lands on both condemned members"),
+  }, "A's Doom lands"),
+  H.call(function() snapReq = H.requestSaveState() end),
+  H.waitFrames(2),
+  H.call(function()
+    H.checkReq(snapReq, "the snapshot before B")
+    snapB, modelB = snapReq.blob, saveModel()
+    H.log(string.format("[test] f%d the snapshot before B: A (entity %s) down, %d line(s) said", H.frame,
+      tostring(doomedA), #lines))
+  end),
+  -- B, retried within a bound: a monster can kill the hurt, condemned member before its count runs out (the
+  -- landing at cdbc1a5f, kolts_cave's draw there: "[death] f+359 entity 0 char 4 from 83/250 by slot 3 cmd
+  -- $12 atk $02": slot 3's spell one-shots that member from 232/250 as well, try after try), and then the Doom
+  -- never lands and the phase has nothing to observe.  The try is a lost experiment, not a result: the machine
+  -- and the test's record go back to the snapshot before B, and B condemns another member while one stands
+  -- (the monsters answer whom they answer), else pokes at a later command window, at most TRIES_B times.
+  H.repeatN(TRIES_B, {
+    H.cond(function()
+      if doomedB == nil then return true end
+      local by = monsterKilledB()
+      if by == nil then return false end
+      triesB[#triesB + 1] = string.format("entity %d at window %d: %s", doomedB, windowsB, by)
+      lostB[doomedB] = true
+      rawLog(string.format("[test] B's try on entity %d (window %d) lost: killed by an action before its Doom "
+        .. "(%s); back to the snapshot before B, on another patient while one stands, else a later window",
+        doomedB, windowsB, by))
+      return true
+    end, {
+      H.cond(function() return doomedB ~= nil end, {
+        H.call(function() loadReq = H.requestLoadState(snapB) end),
+        H.waitFrames(2),
+        H.call(function()
+          H.checkReq(loadReq, "the snapshot before B")
+          restoreModel(modelB)
+          skipB, windowsB, windowFrameB = math.max(skipB, windowsB), 0, nil
+          doomedB, actorB, lineB, frameB, deathFrame, deathLine = nil, nil, nil, nil, nil, nil
+        end),
+      }, {}),
+      -- B. the next command window of ANOTHER member with an Item row (and a
+      -- Potion or Tonic in the bag): condemn a third member at 1 and hurt
+      -- them to a third, so the heal line has a patient to refuse
+      H.driveUntil(function()
+        watchCounts()
+        if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_CMD then return false end
+        local e = H.readByte(ACTOR) & 3
+        if e == doomedA or hp(e) == 0 or maxhp(e) == 0 or not hasRow(e, CMD_ITEM) then return false end
+        if not (bagHas(0xE9) or bagHas(0xE8)) then
+          error("no Potion or Tonic in the battle bag: nothing for the heal line to refuse", 0)
+        end
+        -- a retry (below) takes a patient no earlier try lost while one stands, so the monsters' answer moves
+        -- with it; with every patient tried, it passes over the windows its earlier tries poked at
+        local c, fresh = nil, false
+        for p = 0, 3 do
+          if p ~= e and p ~= doomedA and hp(p) > 0 and maxhp(p) > 0
+             and (turnFrames(p) == nil or turnFrames(p) >= H.COUNT_FRAMES) then
+            if not lostB[p] then c, fresh = p, true elseif not fresh then c = p end
+          end
+        end
+        if c == nil then return false end
+        local untried = false
+        for p = 0, 3 do
+          if p ~= doomedA and hp(p) > 0 and maxhp(p) > 0 and not lostB[p] then untried = true end
+        end
+        if not fresh and untried then return false end
+        if H.frame ~= windowFrameB then windowFrameB, windowsB = H.frame, windowsB + 1 end
+        if not fresh and windowsB <= skipB then return false end
+        H.writeByte(ST2 + c * 2, H.readByte(ST2 + c * 2) | 0x01)
+        H.writeByte(DOOM_COUNT + c * 2, 2)
+        H.writeWord(0x3BF4 + c * 2, math.max(1, maxhp(c) // 3))
+        -- doomedA's corpse (its own Doom already landed) is a revivable body, and
+        -- the driver's raise block sits ahead of the heal loop: with a Fenix Down
+        -- in the battle bag (the mog-gear route now carries one) it returns a
+        -- revive before it ever weighs healing the condemned member -- correct,
+        -- higher-priority play, but not the decision #190's rule is about.  Zero
+        -- the battle-bag Fenix (id $F0) so this turn's care decision is the heal
+        -- we mean to see refused; the corpse stays down, which part C still wants.
+        for i = 0, 251 do
+          if H.readByte(0x2686 + i * 5) == 0xF0 then H.writeByte(0x2686 + i * 5 + 3, 0) end
+        end
+        doomedB, actorB, lineB, frameB = c, e, #lines, H.frame
+        H.log(string.format("[test] f%d Condemned poked onto entity %d char %d (count 1, %d frames; "
+          .. "its next turn %s frames away) and its HP set to %d/%d, at actor %d's open command window",
+          H.frame, c, H.readByte(BCHID + c * 2), H.COUNT_FRAMES, tostring(turnFrames(c)), hp(c),
+          maxhp(c), e))
+        return true
+      end, 20000, {
+        H.call(function() F.frame() end),
+        H.waitFrames(1),
+      }, "another member's command window is open with a third member standing"),
+
+      -- ...then keep fighting until the Doom has landed on both (or the battle ends)
+      H.driveUntil(function()
+        watchCounts()
+        if not H.battleLoadStarted() then return true end
+        if deathFrame == nil and hp(doomedB) == 0 then deathFrame, deathLine = H.frame, #lines end
+        return hp(doomedA) == 0 and hp(doomedB) == 0 and H.frame - deathFrame > 60
+      end, 6000, {
+        H.call(function() F.frame() end),
+        H.waitFrames(1),
+      }, "the Doom lands on both condemned members"),
+    }, {}),
+  }),
+  H.call(function()
+    H.assertEq(monsterKilledB() == nil, true, string.format("B's condemned member outlived its count within %d "
+      .. "tries (lost: %s)", TRIES_B, #triesB > 0 and table.concat(triesB, "; ") or "none"))
+  end),
 
   H.call(function()
     H.setPad({})
