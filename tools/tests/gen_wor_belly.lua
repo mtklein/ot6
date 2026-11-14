@@ -413,8 +413,22 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
     local onRest = isRest(here, conds)
     -- standing here a while (none on a rest): off a rest it is a risk of its own
     local rs = onRest and 0 or simRisk({ { H.fieldX(), H.fieldY(), 0, 64 } }, 64, conds)
-    if best and bestR <= thr then
-      if bestR > CAREFUL_RISK then
+    -- staging: from a rest, the stretch's first move alone when it and a stand where it lands are safe (a jump onto
+    -- row 30 at (31,30) while $10 is away), so the rest of the stretch is weighed from there, with a shorter lead
+    -- for the conductors to close in.  The descent (31,28) -> (29,32) priced 0.24-0.66 from row 28 and never
+    -- went under the cap in 12000 frames (n7: 19 BUDGET SPENT, all "at (31,28)"); from (31,30) $11 has one jump's
+    -- time to come, not two.  A conductor that comes after the party there is met as off any rest (below)
+    local stageR = nil
+    if best and bestR > thr and onRest and #best > 1 and not isRest(best[1].to, conds) then
+      local s2, t2 = spansOf({ best[1] })
+      s2[#s2][4] = t2 + 64
+      stageR = simRisk(s2, t2 + 64, conds)
+    end
+    if best and (bestR <= thr or (stageR and stageR <= CAREFUL_RISK)) then
+      if bestR > thr then
+        H.log(string.format("[careful] %s: f%d staging from (%d,%d): the stretch at risk %.2f, its first move and a "
+          .. "stand at %.2f", what, H.frame, H.fieldX(), H.fieldY(), bestR, stageR))
+      elseif bestR > CAREFUL_RISK then
         H.log(string.format("[careful] %s: f%d after %d frames' wait, a stretch at risk %.2f from (%d,%d)", what,
           H.frame, stood * 4, bestR, H.fieldX(), H.fieldY()))
       end
@@ -488,9 +502,10 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       BELLY_PRED = { f0 = H.frame, risk = bestR, spans = sp, step = stepF() }
       -- every stretch begun on a conductor's reach, with its price: the model's calibration (each drop follows
       -- the last of these)
-      if bestR > 0 then
+      local r = (bestR > thr and stageR) or bestR
+      if r > 0 then
         H.log(string.format("[careful] %s: f%d stretch from (%d,%d) at risk %.3f, %d move(s)", what, H.frame,
-          H.fieldX(), H.fieldY(), bestR, #best))
+          H.fieldX(), H.fieldY(), r, (bestR > thr and stageR) and 1 or #best))
       end
     end
     if lastJump and EV_END and H.frame - EV_END < 200 then DWELLS[#DWELLS + 1] = H.frame - EV_END end
