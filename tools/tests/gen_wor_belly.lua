@@ -139,9 +139,12 @@ end
 -- under the Sprint Shoes' field bit, $11DF bit $20, unless $1EB8 bit $02 turns it off; else 2) and the party
 -- object's speed byte reads 2 again at rest, so the bit is read, not the byte (1c8490d1 read the byte at rest:
 -- 2 every time, so its halving never applied, which is why it changed nothing).  Measured on wor_belly_in with
--- STRAGO's kept Palidor rank (the Sprint Shoes bit): a step 8 frames, a jump 76 (the jump script sets its own
--- speed, so jumps are as before), the door (6,20) entered in 9
--- (build/attempts/wt/v044-esper-rework-3/belly/probe_belly.log)
+-- STRAGO's kept Palidor rank (the Sprint Shoes bit): a step 8 frames, two jumps held (49,32) -> (49,28) 76, so
+-- a jump 38, half of JUMP_F like the step, and the door (6,20) entered in 9
+-- (build/attempts/wt/v044-esper-rework-3/belly/probe_belly.log).  At the drops of the walk that priced a jump at
+-- 72 (belly5), the party landed on the conductors' row (41,30) 41 frames into the stretch against the 72
+-- predicted, beside the conductor at (40,30), and jumped on to (41,32) by 83 against 144
+-- (build/attempts/wt/v044-esper-rework-3/belly/belly5.log, "[jwalk] drop 31: predicted ... observed ...")
 local function stepF()
   if (H.readByte(0x11DF) & 0x20) ~= 0 and (H.readByte(0x1EB8) & 0x02) == 0 then return STEP_F // 2 end
   return STEP_F
@@ -150,7 +153,7 @@ local function spansOf(moves)
   local spans, t = {}, 0
   local sf = stepF()
   for _, m in ipairs(moves) do
-    local d = m.kind == "step" and sf or m.kind == "jump" and JUMP_F or DOOR_F
+    local d = m.kind == "step" and sf or m.kind == "jump" and JUMP_F * sf // STEP_F or DOOR_F
     spans[#spans + 1] = { m.from & 0xFF, m.from >> 8, t, t + d }
     spans[#spans + 1] = { m.to & 0xFF, m.to >> 8, t + d, t + d + sf }
     t = t + d
