@@ -30,11 +30,38 @@ draws an attack with no damage or healing number for a boost to raise (a
 status spell such as Slow or Imp, or Break) no longer uses up the boost
 raised for it.
 
-The shield count under each enemy is easier to read: it is drawn in the same
-numerals as your HP, yellow on a dark plate beside a shield, and it no longer
-looks like one of the weakness icons next to it. A broken enemy now turns
+The shield count under each enemy is easier to read: it is drawn in white in
+the same numerals as your HP, beside a white shield, and it no longer looks
+like one of the weakness icons next to it. A weakness you have not found yet
+shows as a grey question mark. A broken enemy now turns
 grey until it recovers, and its shield is drawn cracked. In a fight with
 several kinds of enemies, a broken enemy may keep its colours; the
 cracked shield still marks it.
 
 **Kefka has more shields.** Kefka now has 16 shields instead of 12, the most of any boss in the game.
+
+**Espers teach bonuses that stay.** A worn esper still lends its spells and
+summon, but no longer raises or lowers stats while worn. Instead, every won
+battle pays Magic Points to each living party member for the esper they
+wear, twice as many in random battles; members outside the party earn none.
+Each esper has five ranks, at 10, 30, 75, 200 and 500 Magic Points: a point
+in each of its two stats, a small lasting effect such as an immunity, two
+more points in its main stat, and at the top an effect on the level of a
+relic. A rank once reached stays with that character whatever they wear
+later. The victory screen shows the Magic Points and any new rank, and the
+esper's page under Skills shows the selected character's rank, points and
+every rank's reward, grey until reached. Sraphim is the healer's esper: at
+its third rank, the HP that character restores, by spell or by item, is a
+quarter more, and at the top, anyone they bring back with Life or a Fenix
+Down returns with full HP.
+
+A few top ranks do something no relic does. Ramuh's makes a lightning spell
+that hits a weakness take one more shield. Carbunkl's starts every battle
+with two boost points, and Phoenix's with Life 3. Fenrir's protects against
+Stop and Slow. Crusader's lets the Gauntlet and the Genji Glove be worn
+together. Odin and Raiden share one Magic Point count. Gau, Umaro and Gogo
+can't wear espers, so they never earn Magic Points. Magic Points are kept
+with your save: loading a save loses any earned since.
+
+**Saves.** This release uses the v0.44 save layout. Saves from earlier
+releases load, and their characters start with no esper progress.

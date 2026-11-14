@@ -24,7 +24,8 @@
 --   GOGO's command entered as Bum Rush ($64, the copy) at 2 BP pending, ran Pummel ($5D: Ot6BlitzTake rewrote $b6),
 --   set the multi-attack counter to 1 (Pummel's two blows, not Bum Rush's four), and cost GOGO no MP.
 -- A battle where SABIN or GOGO cannot act is fought out and the next taken; one where GOGO's Mimic copied something
--- else (another member acted between), or that ended first, is not counted; at most 12.
+-- else (another member acted between), or that ended first, is not counted; one where SABIN falls before his Bum Rush
+-- runs, or GOGO before his copy does, is fled and not counted (cannotServe, below); at most 12.
 -- Old-ROM red and mutants: build/attempts/wt/v041-cleave-bumrush/bumrushmimic/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -57,15 +58,28 @@ end
 -- Defends sat under 60,000-HP monsters to a wipe.  So GOGO's first action end after his plan entry is
 -- confirmed (kitBattle's "entry N of N: confirmed, char $0C" line) closes a record of its own: the
 -- copy ran, not as a Blitz, and judge() does not count it.
-local gogoConfirmed = nil
+-- The care that took that window is held off instead (kitBattle's opts.care as a function): from SABIN's
+-- confirmed Bum Rush until GOGO's copy has resolved, no other member opens a care window, so nothing the party
+-- does runs between the two and the copy is Bum Rush's.  Care before SABIN's confirm stands (it keeps the
+-- party up while the bank fills).  The not-a-Blitz record above stays as the guard for anything else that
+-- could still run between them.
+local gogoConfirmed, sabinConfirmed = nil, nil
 do
   local rawLog = H.log
   H.log = function(msg)
     if type(msg) == "string" and msg:find("^%[kit%] f%d+ entry %d+ of %d+: confirmed, char %$0C") then
       gogoConfirmed = H.frame
     end
+    if type(msg) == "string" and msg:find("^%[kit%] f%d+ entry %d+ of %d+: confirmed, char %$05") then
+      sabinConfirmed = H.frame
+    end
     return rawLog(msg)
   end
+end
+-- BRM_CARE_ON = true is the mutant that leaves the others' care on through the copy (the 01822cae shape)
+local function careAllowed()
+  if BRM_CARE_ON then return true end
+  return sabinConfirmed == nil or (recs[GOGO] ~= nil and recs[GOGO].ended ~= nil)
 end
 
 local function arm()
@@ -121,10 +135,37 @@ local function arm()
 end
 local function closed() return recs[GOGO] ~= nil and recs[GOGO].ended ~= nil and H.frame > recs[GOGO].ended + 30 end
 
+-- A battle that can no longer serve is fled and not counted.  SABIN's bank goes with him when he falls, and the
+-- staged monsters stand at 60,000 HP, so a battle whose SABIN falls before his Bum Rush runs (or whose GOGO falls
+-- before his copy does) cannot be fought out the way a battle that never could serve is: burn 6 on
+-- wor-kt-factory-v1 at 742257a2 met formation 00D9/00FC, whose Death felled SABIN again after every raise, his
+-- bank never reached three, and the others fought on under 60,000 HP to a wipe
+-- (build/attempts/wt/v044-esper-rework-6/v044-esper-land/build/lab/sl/brmB/s0b6.log).  So the battle is fled the
+-- moment either falls (H.fleeBattle), and the next taken.
+local kitDone, fell = false, nil
+local function out(who)
+  local s = seats[who]
+  return s ~= nil and ((H.readByte(0x3AA0 + s * 2) & 1) == 0 or (H.readByte(0x3EE4 + s * 2) & 0xC2) ~= 0)
+end
+local function cannotServe()
+  if fell ~= nil then return true end
+  local why = nil
+  if recs[SABIN] == nil and out(SABIN) then why = "SABIN fell before his Bum Rush ran (his bank went with him)"
+  elseif not closed() and recs[GOGO] == nil and out(GOGO) then why = "GOGO fell before his copy ran" end
+  if why == nil then return false end
+  fell = why
+  local words = {}
+  for _, w in ipairs(H.formationWords()) do words[#words + 1] = string.format("%04X", w) end
+  H.log(string.format("[bumrushmimic] f%d formation %s: %s -- fled, not counted", H.frame,
+    table.concat(words, " "), why))
+  return true
+end
+
 local function decide()
   battles = battles + 1
   H.assertEq(battles <= 12, true, "a counted Mimic of Bum Rush within 12 battles")
-  seats, recs, plan, mode, gogoConfirmed = {}, {}, {}, "play", nil
+  seats, recs, plan, mode, gogoConfirmed, sabinConfirmed = {}, {}, {}, "play", nil, nil
+  kitDone, fell = false, nil
   for s = 0, 3 do
     local id = H.readByte(0x3ED8 + s * 2)
     if id == SABIN or id == GOGO then seats[id] = s end
@@ -216,14 +257,23 @@ H.run({ maxFrames = 900000 }, {
     H.cond(function() return not H.battleActive() end, { H.paceToEncounter("bumrushmimic", 0) }, {}),
     H.call(decide),
     H.cond(function() return mode == "fightout" end, { H.fightBattleByMenu(40000) }, {
-      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed }),
-      H.call(function()
-        if not closed() then
-          H.log("[bumrushmimic] the battle ended before GOGO's copy resolved: not counted")
-          return
-        end
-        if judge() then done = true end
-      end),
+      H.driveUntil(function() return kitDone or cannotServe() end, 62000, {
+        H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed,
+                             care = careAllowed }),
+        H.call(function() kitDone = true end),
+      }, "the kit's battle plays out, or can no longer serve"),
+      H.cond(function() return fell ~= nil end, {
+        H.fleeBattle(9000, { onCantRun = "return" }),
+        H.call(function() H.assertEq(H.fleeOutcome, "fled", "the battle that can no longer serve is fled") end),
+      }, {
+        H.call(function()
+          if not closed() then
+            H.log("[bumrushmimic] the battle ended before GOGO's copy resolved: not counted")
+            return
+          end
+          if judge() then done = true end
+        end),
+      }),
     }),
   }, "a counted Mimic of Bum Rush"),
   H.call(function()

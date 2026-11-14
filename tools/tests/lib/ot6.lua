@@ -487,6 +487,14 @@ function M.requestSaveState()
   return req
 end
 
+-- A suite about to press the console's Reset (a person's input the pad cannot carry; the suite declares its
+-- emu.reset in state_write_waivers.txt) says so first: the title it brings is no game over (the TitleScreen
+-- canary stands down once).
+function M.expectTitle(why)
+  M.titleExpected = true
+  M.log(string.format("[reset] f%d the title is expected: %s", M.frame, tostring(why)))
+end
+
 function M.requestLoadState(blob)
   M.finishRecoveryTrace("state_reload")
   -- a restored snapshot restarts the experiment: the post-game-over pad
@@ -4586,12 +4594,58 @@ function M.glyphCanary()
 end
 
 -- true if any OT6 shield/broken glyph word sits in the bg3 field-area map
--- (the under-monster hud). formation-agnostic presence check.  The shield
--- gauge (the emblem $71 and the count cells) draws under attribute $29, text
--- palette 2 (#397); the broken shield, a count cell's tile, under $3D,
--- text palette 7.
-M.HUD_GAUGE_ATTR = 0x29
+-- (the under-monster hud), in whatever text palette. formation-agnostic
+-- presence check.  The shield
+-- gauge (the emblem $71 and the count cells) draws under attribute $21, text
+-- palette 0, plain white (#397, palette 2's gold until the owner's
+-- 2026-11-14 call); the broken shield, a count cell's tile, under $3D,
+-- text palette 7; an unrevealed weakness's '?' under $25, palette 1's grey.
+M.HUD_GAUGE_ATTR = 0x21
 M.HUD_BROKEN_ATTR = 0x3D
+M.HUD_QMARK_ATTR = 0x25
+
+-- The colours the under-monster line draws in, read from what the screen
+-- has: each glyph's art from the battle font in VRAM (byte $B000 + cell*16)
+-- and its palette's colours from CGRAM (BG3 text palette p is colours
+-- 4p..4p+3).  A glyph's colour is its stroke: the colour of the highest
+-- index its art uses (3, the bold stroke, or 2 where the art has no 3: the
+-- staff icon is drawn in grey alone).  drawn: the tilemap words as the
+-- screen has them, { emblem = w, count = w, qmark = w } (glyph | attr << 8),
+-- so a cell's palette is the one it is really drawn in.  Returns
+--   { gauge = { emblem = c, count = c }, qmark = c,
+--     icons = { {name, colour}, ... } }   -- the 8 elements, the 4 classes
+-- with each icon's palette taken from Ot6ElemPalTbl and its cell from
+-- Ot6ElemGlyphTbl / Ot6ClassGlyphTbl.
+M.HUD_ICON_NAMES = { "fire", "ice", "lightning", "poison", "wind", "holy", "earth", "water",
+  "slash", "pierce", "bludgeon", "special" }
+function M.hudColours(drawn)
+  local vr, rom, cg = emu.memType.snesVideoRam, emu.memType.snesPrgRom, emu.memType.snesCgRam
+  local function stroke(cell, pal)
+    local top = 0
+    for r = 0, 7 do
+      local p0 = emu.read(0xB000 + cell * 16 + 2 * r, vr)
+      local p1 = emu.read(0xB000 + cell * 16 + 2 * r + 1, vr)
+      for c = 0, 7 do
+        local v = ((p0 >> c) & 1) | (((p1 >> c) & 1) << 1)
+        if v > top then top = v end
+      end
+    end
+    return emu.readWord((pal * 4 + top) * 2, cg) & 0x7FFF
+  end
+  local function palOf(attr) return (attr >> 2) & 7 end
+  local function cell(w) return stroke(w & 0xFF, palOf(w >> 8)) end
+  local out = { gauge = { emblem = cell(drawn.emblem), count = cell(drawn.count) },
+    qmark = cell(drawn.qmark), icons = {} }
+  local pals = M.sym("Ot6ElemPalTbl") & 0x3FFFFF
+  local ecells = M.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
+  local ccells = M.sym("Ot6ClassGlyphTbl") & 0x3FFFFF
+  for k = 0, 11 do
+    local cell = k < 8 and emu.read(ecells + k, rom) or emu.read(ccells + k - 8, rom)
+    out.icons[#out.icons + 1] = { M.HUD_ICON_NAMES[k + 1],
+      stroke(cell, palOf(emu.read(pals + k, rom))) }
+  end
+  return out
+end
 function M.fieldHudPresent()
   local vr = emu.memType.snesVideoRam
   local reg = M.readByte(0x897b)
@@ -4599,7 +4653,9 @@ function M.fieldHudPresent()
   local set = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1}
   for off = 0, 0x7FE, 2 do
     local attr = emu.read(base+off+1, vr)
-    if (attr == M.HUD_GAUGE_ATTR or attr == M.HUD_BROKEN_ATTR) and set[emu.read(base+off, vr)] then
+    -- any text palette: presence is not a colour (priority and char bit 8
+    -- set, as every HUD cell has them)
+    if (attr & 0x23) == 0x21 and set[emu.read(base+off, vr)] then
       return true
     end
   end
@@ -7416,7 +7472,10 @@ end
 -- Whether the Doom takes entity e before it can act again
 -- (M.doomRule), and the count over it (M.doomCount; nil when not
 -- condemned): for the member acting now, its next turn is a full
--- refill away; for anyone else, wherever its gauge stands.
+-- refill away; for anyone else, wherever its gauge stands, so a full
+-- gauge (eta 0) is a turn already queued, 0 frames away, not a full
+-- refill (battle_doom's patient at 01822cae: "its next turn 412 frames
+-- away" with its window already queued, and it acted first).
 local function doomLast(e, actor)
   local count = M.doomCount({ s2 = M.readByte(BATTLE.ST2 + e * 2),
                               count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
@@ -7424,7 +7483,7 @@ local function doomLast(e, actor)
   local const = M.readWord(BATTLE.ATB_CONST + e * 2)
   local eta = etaOf(e * 2)
   local period = const > 0 and math.ceil(0xFF00 / const) or nil
-  local ticks = (e == actor or eta == 0) and period or eta
+  local ticks = (e == actor) and period or eta
   return M.doomRule({ count = count, turnFrames = ticks and ticks * 2 or nil }), count
 end
 
@@ -13057,6 +13116,11 @@ function Driver:blitzVsOk()
 end
 
 function Driver:makePlanRules(actor)
+  -- opts.holdFor(char id, actor) -> true: that member Defends this window (a suite staging a battle's length by
+  -- play, battle_ragedriver: the others Defend until GAU's possessed turn is seen)
+  if type(self.opts.holdFor) == "function" and self.opts.holdFor(M.readByte(0x3ED8 + actor * 2), actor) then
+    return { kind = "defend" }
+  end
   -- What a round costs this party, measured rather than assumed.  For each
   -- entity, the most HP it has lost between two consecutive turns of the
   -- actor now deciding: that is the damage that will land before this actor
@@ -13396,6 +13460,7 @@ function Driver:makePlanRules(actor)
     -- physical hit clears Muddle the same way, and the turn goes on the
     -- fight instead (the A/B lever against the rule)
     if r ~= nil and self.opts.unmuddle == false then r = nil end
+    if r ~= nil and self.noAllyCross then r = nil end
     local fight = r ~= nil and cmdRow(actor, BATTLE.CMD_FIGHT) or nil
     if fight ~= nil then
       self.healSaid = nil
@@ -15473,6 +15538,11 @@ function Driver:cross(toward)
       .. "$%02X, window %s; %s) -- dropping the plan and backing out (drop #%d this battle)", self.tag or "fight",
       toward, L.name, table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig(), M.crossReads(), self.crossDropN))
     self.steerDead, self.steerLast = {}, nil
+    -- a window that will not cross to the party will not for the rest of this battle: no ally-aimed Fight is planned
+    -- again in it (the #328 line at 293ff9e6, gen_wor_kt_guardian: a side attack, a Muddled ally, and the unmuddle
+    -- Fight planned again into the same dead crossing: "FIGHT DRIVER STUCK: crossing to the chars in a side
+    -- attack")
+    if toward == "chars" then self.noAllyCross = true end
     self:dropPlan("cross_dead")
     return { "b" }
   end
@@ -15500,6 +15570,10 @@ function Driver:button(actor)
     self.steerDead, self.steerLast, self.tgtVisited, self.tgtCycled = {}, nil, {}, false
   end
   if st == BATTLE.ST_CMD then self.tgtSpin, self.confirmed = 0, nil end
+  -- a Defend (opts.holdFor): right at the command window swaps the Fight row to Def, A takes it (kitBattle's)
+  if self.plan ~= nil and self.plan.kind == "defend" and M.readByte(BATTLE.MENU) ~= 0 then
+    if st == BATTLE.ST_CMD then return { "right" } elseif st == 0x27 then return { "a" } else return { "b" } end
+  end
   -- Unknown-menu-state stall guard, on EVERY path (plan or no plan): the
   -- Phantom Train wipe was SHADOW's Throw list ($24), a state this driver
   -- does not know, holding its menu open while the ghosts chipped the
@@ -16713,6 +16787,7 @@ function Driver:idle()
   self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
   self.crossDropN = 0
+  self.noAllyCross = nil
   self.emptySince, self.emptyBackN, self.emptyWaitN = nil, 0, 0
   self.turnN = 0                        -- the [board] lines' count (#422)
   self.raceActDeclined = nil
@@ -17445,7 +17520,8 @@ end
 -- and opts.planDone(), when given, says its last action has resolved).
 -- While the plan has entries, a window the others' care has work for (a
 -- raise, a Potion under half HP, the plan character's lost control:
--- M.newSpinnerCare) goes to care instead (opts.care = false: never); a
+-- M.newSpinnerCare) goes to care instead (opts.care = false: never; a
+-- function: no new care window while it returns false); a
 -- fight-out Fight (the plan spent, or its character out) raises the
 -- pending boost to the bank first, up to 3 (#470).  Each battle starts the
 -- plan's entries afresh (M.freshKitEntries).
@@ -17656,7 +17732,9 @@ function M.kitBattle(plan, opts)
       -- care setzerBattle gives SETZER's party): a fallen member raised, a
       -- member under half HP given a Potion (a Tonic without), the plan's
       -- character's lost control answered; else the script below
-      if care ~= nil and (careActor == a or (careActor == nil and care.wants(a))) then
+      -- (a care window already begun finishes; opts.care() gates new ones)
+      local careNow = care ~= nil and (type(opts.care) ~= "function" or opts.care() ~= false)
+      if care ~= nil and (careActor == a or (careActor == nil and careNow and care.wants(a))) then
         careActor = a
         care.window()
         return
@@ -20457,6 +20535,22 @@ function Driver:watchHits()
     self.condemnedAt = self.condemnedAt or {}
     local dc = M.doomCount({ s2 = M.readByte(0x3EE5 + e * 2), count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
     if dc ~= nil and dc <= 0 then self.condemnedAt[e] = M.frame end
+    -- The count's last step and its Doom can land on one frame (CondemnDeath with nothing queued ahead), and
+    -- then the byte is never read at 1 above: the visit that carries the member's status-counter accumulator
+    -- ($3adc) with the count at 1 is that step.  Seen that way, it marks the Doom for the ally reading below only
+    -- (the [death] line; a monster's action open as it lands keeps its reading, which commitMonAct's ledger
+    -- prices): battle_doom's Defends under B on kolts_cave at 742257a2 read 'by entity 1 char 1 cmd $15
+    -- atk $FF (an ally's action)' for a Doom whose CLEARED line said it landed
+    -- (build/attempts/wt/v044-esper-rework-7/lab/d4).
+    self.doomStep = self.doomStep or {}
+    do
+      local acc, prev = M.readByte(0x3ADC + e * 2), self.doomStep[e]
+      local at = prev and prev.at
+      if prev ~= nil and prev.count == 1 and acc ~= prev.acc and prev.acc + M.readByte(0x3ADD + e * 2) > 0xFF then
+        at = M.frame
+      end
+      self.doomStep[e] = { acc = acc, count = dc, at = at }
+    end
     if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
        and not self.deathSaid[e] then
       self.deathSaid[e] = true
@@ -20478,7 +20572,8 @@ function Driver:watchHits()
         self.monAct.kills = self.monAct.kills + 1
         if from >= maxhp then self.monAct.fullKills = self.monAct.fullKills + 1 end
       end
-      local ally = self.monAct == nil and not doomed and self:allyAct() or nil
+      local stepped = M.DOOM_ATTRIBUTION and self.doomStep[e].at ~= nil and M.frame - self.doomStep[e].at <= 30
+      local ally = self.monAct == nil and not doomed and not stepped and self:allyAct() or nil
       local rec = { e = e, char = M.readByte(BATTLE.BCHID + e * 2), tick = self.battleTick,
                     from = from, maxhp = maxhp, bp = bp,
                     slot = self.monAct and self.monAct.slot, cmd = self.monAct and self.monAct.cmd,
@@ -22677,6 +22772,13 @@ function M.run(opts, steps)
     local ok, addr = pcall(function() return M.sym("TitleScreen") end)
     if ok then
       rawAddMemoryCallback(function()
+        -- a title the body asked for (M.expectTitle: the console's Reset button) is no game over: the canary
+        -- stands down until the game is entered again
+        if M.titleExpected then
+          M.titleExpected, canaryInGame = false, false
+          M.log(string.format("[retry] f%d the title the body's Reset asked for: not a game over", M.frame))
+          return
+        end
         if canaryInGame then
           titleExecFired = titleExecFired + 1
           M.gameOverFired = M.gameOverFired + 1

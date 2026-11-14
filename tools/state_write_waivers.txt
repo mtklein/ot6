@@ -65,8 +65,8 @@ tools/tests/battle_bumrushmimic.lua	.writeByte(	3
 tools/tests/battle_bumrushmimic.lua	.writeWord(	1
 tools/tests/battle_divines.lua	.writeByte(	7
 tools/tests/battle_divines.lua	.writeWord(	6
-tools/tests/battle_doom.lua	.writeByte(	5	quarantine: #190 mechanism staging -- Condemned is poked in the engine's own shape (STATUS2 $01 and the $3B05 count, all StartCondemn writes) because the route's only source is Nerapa on the FC escape; the property under test is the driver's read of the count.  Also zeroes the battle-bag Fenix Down (BATTINV $2686 count) so the condemned member's care decision is the heal #190 refuses, not a legitimate revive of the corpse doomedA's own Doom leaves
-tools/tests/battle_doom.lua	.writeWord(	1	quarantine: #190 mechanism staging -- the patient's HP is set to a third so the heal line has a member to refuse, battle_healerdown's shape
+tools/tests/battle_doom.lua	.writeByte(	5	quarantine: #190 mechanism staging -- Condemned is poked in the engine's own shape (STATUS2 $01 and the $3B05 count, all StartCondemn writes) because the route's only source is Nerapa on the FC escape; the property under test is the driver's read of the count.  Also zeroes the battle-bag Fenix Down (BATTINV $2686 count) so the condemned member's care decision is the heal #190 refuses, not a legitimate revive of a member a monster felled before it
+tools/tests/battle_doom.lua	.writeWord(	1	quarantine: #190 mechanism staging -- the patient's HP is set to half, under the care line, so the heal line has a member to refuse, battle_healerdown's shape
 tools/tests/battle_dotchip.lua	.writeByte(	39
 tools/tests/battle_dotchip.lua	.writeWord(	4
 tools/tests/battle_esperstats.lua	.writeByte(	1
@@ -136,8 +136,6 @@ tools/tests/lib/ot6.lua	emu.loadSavestate	1
 tools/tests/lib/ot6.lua	emu.write	1
 tools/tests/lib/ot6.lua	emu.writeWord	1
 tools/tests/menu_blitzpage.lua	.writeByte(	1
-tools/tests/menu_esperdetail_tube6.lua	.writeByte(	1
-tools/tests/menu_esperdetail_tube6.lua	emu.write	1	quarantine: #418 constructed control -- no Ot6EsperStatTbl row is $0000 since #418, so Terrato's two bytes are zeroed in the emulator's ROM image for one detail-page visit and put back after it; the property is that a $0000 row draws no caption and no term
 # menu_lorepage.lua (#122): unit-style expedient, the menu_ragepage.lua
 # precedent.  Strago is unreachable by play until the v0.13 route lands (he
 # joins in that unrouted stretch), so no savestate in the chain contains him;
@@ -179,3 +177,10 @@ tools/tests/battle_auraband.lua	.writeByte(	1	quarantine: #445 mechanism test --
 tools/tests/battle_shadowstays.lua	.writeByte(	1	quarantine: #445 mechanism test -- the Shadow-leave roll is a fixed function of $be at the roll site and a chain can miss it for 146 wins, so $be is set at the jsr Rand until a roll passes
 tools/tests/battle_lockekit.lua	.writeByte(	1	quarantine: #382 staging -- no fixture of the route holds a Thief Glove; LOCKE's Steal command becomes Capture ($06) in his record before the stage-8 battles, the rewrite the glove makes at battle init
 tools/tests/battle_mimicboost.lua	.writeByte(	3	quarantine: #261/#461 mechanism staging -- no fixture has a Mimic beside LOCKE, nor beside SwdTech and Slot (GOGO is World of Ruin); three field command bytes give STRAGO Mimic and TERRA SwdTech and Slot before the first encounter (the battle_mimic expedient), and everything after is the engine's own
+tools/tests/menu_esperdetail.lua	emu.write	2	quarantine: #328 the ladder page's white branch -- the leader's count on one stone set to 200 on the live esper page (SRAM $317C00) for one detail-page visit; the property is the drawing of a reached rung, not play
+tools/tests/battle_esperladder.lua	emu.write	2	quarantine: #328 one count staged one short of rung 3 (T's count on the stone set to 74 on the live esper page, SRAM $317C00): about thirty battles in one stone stand between a fixture and a rung-3 crossing; everything after is play
+tools/tests/battle_espersigs.lua	emu.write	2	quarantine: #328 three signatures staged on the live esper page (SRAM $317C00): a signature takes 500 Magic Points in one stone, most of a World of Ruin; the property is what the battle opens with, not play
+tools/tests/battle_esperconductor.lua	emu.write	2	quarantine: #328 Ramuh's signature staged on EDGAR (count 500 on the live esper page, SRAM $317C00): a signature takes 500 Magic Points in one stone; the property is the shield its Bolt takes, not play
+tools/tests/battle_esperreload.lua	emu.reset	1	quarantine: the console's Reset button, a person's input the pad cannot carry; the run then Continues from the title through the menus, and nothing in emulated state is edited
+tools/tests/battle_esperconductorfight.lua	emu.write	2	quarantine: #328 Ramuh's signature staged on LOCKE (count 500 on the live esper page): the property is the shield his ThunderBlade Fight takes, not play
+tools/tests/battle_esperseraph.lua	emu.write	2	quarantine: #328 Sraphim's rungs staged on TERRA (count 75 or 500 on the live esper page, SRAM $317C00) after a battle snapshot is restored, so each pair of cases is one draw: Sraphim is a World of Ruin stone; the property is the amount her heal or revive restores, not play

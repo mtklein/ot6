@@ -1,5 +1,8 @@
 -- @suite savestate=minecart_entry slow
 -- battle_esperstats_tube6.lua -- the six tube-room stones, in battle:
+-- #328 (the esper ladder, docs/design/esper-rework.md plan A): the while-worn stat packages are retired, so
+-- every stone below is now asserted to move no stat while worn (each delta 0 against BASE); its spells are
+-- asserted as before.  What a character keeps from wearing a stone is battle_esperladder's.
 -- Maduin, Shoat, Phantom, Carbunkl, Bismark and Unicorn grant their designed
 -- spell lists live and carry a while-worn stat mod.
 --
@@ -313,7 +316,7 @@ local function add(list) for _, s in ipairs(list) do all[#all + 1] = s end end
 add(driveSteps("base", nil));  add({ checkBase() })
 
 add(driveSteps("maduin", MADUIN))
-add({ checkEsper("maduin", MADUIN, { mag = 7, stam = 3, vig = -6 },
+add({ checkEsper("maduin", MADUIN, {},
   { { FIRE, "Fire (base tier -- PROOF here, no innate mage)" },
     { ICE, "Ice (base tier)" }, { BOLT, "Bolt (base tier)" } },
   { { FIRE2, "Fire2 (dead pre-folded tier -- BROKEN ROW FIX)" },
@@ -321,30 +324,30 @@ add({ checkEsper("maduin", MADUIN, { mag = 7, stam = 3, vig = -6 },
     { BOLT2, "Bolt2 (dead pre-folded tier -- BROKEN ROW FIX)" } }) })
 
 add(driveSteps("shoat", SHOAT))
-add({ checkEsper("shoat", SHOAT, { spd = 6, stam = 2, vig = -4 },
+add({ checkEsper("shoat", SHOAT, {},
   { { BREAK, "Break" }, { DOOM, "Doom" } },
   { { BIO, "Bio (pre-folded poison cap -- BROKEN ROW FIX)" } }) })
 
 add(driveSteps("bismark", BISMARK))
-add({ checkEsper("bismark", BISMARK, { vig = 10, stam = 3, spd = -2 },
+add({ checkEsper("bismark", BISMARK, {},
   { { HASTE, "Haste (fold base)" }, { SLOW, "Slow (fold base)" } },
   { { LIFE, "Life (kits.md revival rule -- BROKEN ROW FIX)" },
     { FIRE, "Fire (Maduin's job -- newly assertable on this party)" },
     { ICE, "Ice (Maduin's job)" }, { BOLT, "Bolt (Maduin's job)" } }) })
 
 add(driveSteps("carbunkl", CARBUNKL))
-add({ checkEsper("carbunkl", CARBUNKL, { stam = 6, mag = 2, spd = -2 },
+add({ checkEsper("carbunkl", CARBUNKL, {},
   { { RFLECT, "Rflect" }, { SAFE, "Safe" } },
   { { WARP, "Warp (field furniture)" }, { SHELL, "Shell (Shiva's)" },
     { HASTE, "Haste (moved to Bismark)" } }) })
 
 add(driveSteps("phantom", PHANTOM))
-add({ checkEsper("phantom", PHANTOM, { spd = 6, mag = 2, stam = -2 },
+add({ checkEsper("phantom", PHANTOM, {},
   { { VANISH, "Vanish" }, { DEMI, "Demi" } },
   { { BSERK, "Bserk (removes player control -- the Ifrit reason)" } }) })
 
 add(driveSteps("unicorn", UNICORN))
-add({ checkEsper("unicorn", UNICORN, { stam = 5, mag = 2 },
+add({ checkEsper("unicorn", UNICORN, {},
   { { PEARL, "Pearl (branch A -- the paladin's smite)" }, { REMEDY, "Remedy" } },
   { { CURE2, "Cure2 (dead pre-folded tier)" }, { SAFE, "Safe (-> Carbunkl)" },
     { SHELL, "Shell (Shiva's)" }, { DISPEL, "Dispel (branch B's row)" } }) })

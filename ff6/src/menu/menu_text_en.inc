@@ -105,15 +105,10 @@ MENU_TEXT_INC = 1
 .define GENJU_LEARN_RATE                BG1B, {13, 15}, {"Learn.Rate"}
 .define GENJU_AT_LEVEL_UP               {z"At level up..."}
 
-; The esper detail page's while-worn stat-mod line.  The stat
-; names are space-padded to exactly 7 characters (+ the terminator = the
-; 8-byte stride Ot6GenjuStatNameTbl indexes by), matching the Vigor/Speed/
-; Stamina/Mag.Pwr labels the status and equip screens use.
-.define OT6_GENJU_WHILE_WORN            {z"While worn..."}
-.define OT6_GENJU_STAT_VIGOR            {"Vigor  "}
-.define OT6_GENJU_STAT_SPEED            {"Speed  "}
-.define OT6_GENJU_STAT_STAMINA          {"Stamina"}
-.define OT6_GENJU_STAT_MAGPWR           {"Mag.Pwr"}
+; The esper detail page's ladder column (#328): the caption's "Rank n" and
+; the slash between the points and the next rung's cost.
+.define OT6_GENJU_RANK                  {z"Rank "}
+.define OT6_SLASH_CHAR                  z"/"
 
 ; The Bushido loadout configurator's labels.  These
 ; MUST come through this file's encode pipeline: a bare string literal in

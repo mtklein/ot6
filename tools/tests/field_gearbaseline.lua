@@ -179,8 +179,18 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(slot ~= nil, true, "6: the healer " .. healer.name .. " wears a Ribbon after case 5's dress")
     return H.keepGear(healer.ch, label, H.unequipRelics(healer.ch, { slot }, { tag = label }))
   end),
-  H.reservePrize(RIBBON, 1, "field_gearbaseline case 6: two Ribbons for three wearers"),
-  H.call(function()
+  -- all but one held: the Ribbons the party owns (the line's count moves: four at f916b884, where two for three
+  -- let the mutant's dress land on a state the real rule also keeps), so the healer's is the only one in play
+  H.lazy(function()
+    local n = H.invCountOf(RIBBON)
+    for _, m in ipairs(members()) do
+      for s = 4, 5 do if rec(m.ch, 0x1F + s) == RIBBON then n = n + 1 end end
+    end
+    H.log(string.format("[gbtest] 6: the party owns %d Ribbon(s); %d held", n, n - 1))
+    H.assertEq(n >= 2, true, "precondition 6: two Ribbons or more, so one held leaves a choice")
+    return H.reservePrize(RIBBON, n - 1, "field_gearbaseline case 6: one Ribbon in play")
+  end),
+  H.lazy(function()
     H.realHealer = H.gearHealer
     local realPlan = H.gearPrizePlan(members())
     local ribboned = {}
@@ -191,21 +201,35 @@ H.run({ maxFrames = 120000 }, {
       end
       return false
     end
-    local pick = nil
+    local cands = {}
     local o = H.gearStatusOrder(members())
     for i = #o, 1, -1 do
-      if pick == nil and o[i].ch ~= healer.ch and not ribboned[o[i].ch] and canTake(o[i].ch) then pick = o[i] end
+      if o[i].ch ~= healer.ch and not ribboned[o[i].ch] and canTake(o[i].ch) then cands[#cands + 1] = o[i] end
     end
-    H.assertEq(pick ~= nil, true, "precondition 6: a member who can take a Ribbon and gets none from the real plan")
-    H.log(string.format("[gbtest] 6: the mutant's healer: %s", pick.name))
-    H.gearHealer = function(m)
-      for _, x in ipairs(m) do if x.ch == pick.ch then return x end end
-      return H.realHealer(m)
+    H.assertEq(#cands > 0, true, "precondition 6: a member who can take a Ribbon and gets none from the real plan")
+    -- with one Ribbon in play (above), every member the mutant names in the healer's place takes it, and the real
+    -- rule reads red on each: every wrong healer is tried, the dress put back to the real rule's between them
+    local function try(i)
+      local pick = cands[i]
+      return H.seqStep({
+        H.call(function()
+          H.log(string.format("[gbtest] 6: the mutant's healer: %s", pick.name))
+          H.gearHealer = function(m)
+            for _, x in ipairs(m) do if x.ch == pick.ch then return x end end
+            return H.realHealer(m)
+          end
+        end),
+        H.gearBaseline({ tag = "6: the dress under the healer mutant" }),
+        H.call(function() H.gearHealer = H.realHealer end),
+        red("6: the healer mutant's dress, read by the real rule", "the rule puts the Ribbon $CA on"),
+        H.lazy(function()
+          if i == #cands then return H.logStep("[gbtest] 6: every wrong healer read red") end
+          return H.seqStep({ H.gearBaseline({ tag = "6: back to the real rule" }), try(i + 1) })
+        end),
+      })
     end
+    return try(1)
   end),
-  H.gearBaseline({ tag = "6: the dress under the healer mutant" }),
-  H.call(function() H.gearHealer = H.realHealer end),
-  red("6: the healer mutant's dress, read by the real rule", "the rule puts the Ribbon $CA on"),
   H.gearBaseline({ tag = "6: the dress under the real rule" }),
   green("6: the real rule"),
   H.reservePrize(RIBBON, 0),

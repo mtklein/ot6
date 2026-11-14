@@ -555,6 +555,26 @@ TEST_ENV = {
     # one battle of scripted turns (3-11k frames on the branch's runs)
     # the Economizer at every boost (owner, 2026-10-26), from the save the
     # play makes by Maranda with TERRA wearing it
+    # #328: the esper ladder -- Magic Points at a random battle by the opera
+    # house, and the ladder's page under Skills (twelve stones owned)
+    "battle_esperearn":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    "battle_esperladder":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    "battle_espersigs":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    "battle_esperconductor":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    "battle_esperconductorfight":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #328: Sraphim's healing +25% and full revives, TERRA's Cure, Life,
+    # Potion and Fenix Down on LOCKE (battle_lifefold's snapshots)
+    "battle_esperseraph":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    "battle_esperreload":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    "menu_esperdetail":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     "battle_economizer": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-colosseum-v1",
     # #388: SABIN's divine, Bum Rush, from the save by Duncan's house where he
@@ -813,6 +833,15 @@ check("spell_grants",
        "ff6/src/text/magic_name_en.json", "docs/design/kits.md",
        "docs/design/magicite.md", "docs/design/magicite-tube-six.md",
        copy_if_changed_from("build/ot6.sfc")])
+# #328: the esper ladder (Ot6LadderTbl) and its menu labels (Ot6RungLabelTbl)
+# are docs/design/esper-rework.md's table, parsed from the doc (relic effects
+# by the ItemProp bytes of the relic each cell names); the selftest's mutants
+# move one rung's bit, stat and label in the ROM and two cells in the doc.
+check("esper_ladder",
+      "python3 tools/esper_ladder.py --selftest"
+      " && python3 tools/esper_ladder.py",
+      ["tools/esper_ladder.py", "docs/design/esper-rework.md", "ff6/src/menu/item_prop_en.dat",
+       "ff6/src/text/item_name_en.json", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.

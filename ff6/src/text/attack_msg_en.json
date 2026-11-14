@@ -81,7 +81,7 @@
     "Weak against piercing",
     "Weak against bludgeoning",
     "Weak against special",
-    "",
+    "{var_char}: esper rank {var0}{key}",
     "",
     "",
     "",

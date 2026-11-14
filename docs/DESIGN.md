@@ -21,7 +21,10 @@ touches vanilla behavior where a pillar requires it.
    action, bank up to 5, spend up to 3 to boost an action. A boosted action
    earns no BP.
 4. **Magicite are second jobs.** Equipping a magicite grants its spells
-   and a small stat package *while equipped*; nothing is taught permanently. One copy
+   *while equipped*; no spell is taught permanently. What a character keeps
+   is the esper's ladder: Magic Points from battles won wearing it buy five
+   ranks of stat points and relic-style effects ([esper-rework.md](design/esper-rework.md),
+   plan A, built in v0.44). One copy
    of each magicite exists, so kitting the party is a puzzle, the same way
    Octopath allows one shrine license at a time.
 
@@ -107,11 +110,14 @@ Octopath; kits.md "Strago").
 count and revealed-weakness icons are how an Octopath battle reads to the
 player. Under each monster, one line on the battlefield's text layer: the
 shield gauge, a shield emblem and the count in the battle font's own
-numerals, yellow on a navy plate, and then the weaknesses, a '?' for each
+numerals, both plain white, and then the weaknesses, a grey '?' for each
 unrevealed one and its element or weapon-class icon once revealed (the
-battle font already holds the weapon glyphs, from item names). The gauge is
-one badge in its own palette and the weaknesses are bare glyphs, so a count
-does not read as one of the keys (#397). A broken monster shows a broken
+battle font already holds the weapon glyphs, from item names). The gauge
+takes no element's hue, so a count does not read as one of the keys: #397
+drew it gold on navy, the lightning and holy icons' yellow, and a revealed
+bolt beside the count read as a smear of it (owner, 2026-11-14). White is
+also the wind and weapon-class icons' colour, and the '?' grey earth's: the
+battle text palettes hold no other white or mid grey. A broken monster shows a broken
 shield where the gauge was, and its sprite turns grey until it recovers: a
 grey copy of its palette in a monster palette the formation left unused, so
 a formation with three monster palettes keeps its colours.

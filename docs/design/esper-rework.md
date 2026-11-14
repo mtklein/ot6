@@ -1,8 +1,63 @@
 # Esper rework: spells while worn, bonuses for keeps
 
 Scope: what an equipped esper gives, and what a character keeps from
-having worn it. Tracks #328. Design research only: nothing here is built,
-and nothing in the game changes until the owner picks a plan.
+having worn it. Tracks #328. The owner approved plan A on 2026-11-12 with
+these calls: progress per character, the bench earns no Magic Points,
+random battles pay double, kept bonuses take no slots, and half-cost spells
+and permanent Haste are labbed before they ship.
+
+**Built (v0.44):** plan A, in `ot6_esper.asm`: the Magic Points hook
+(`Ot6EsperEarn`, `Ot6EsperMsg`), the progress store in expanded SRAM
+([save-layout.md](save-layout.md)), the ladder folded into `UpdateEquip`
+(`Ot6EsperFold`, `Ot6LadderTbl`, held to the table below by
+`tools/esper_ladder.py`), the five new-code signatures (`Ot6EsperBattleInit`
+for Facet and Rebirth, `Ot6EsperImmune` for Fenrir, `Ot6Conductor`,
+`Ot6SeraphHeal` for Sraphim's full revives, which also holds its rung 3), and the
+Skills > Espers page's ladder column. Conductor's matched-weakness gate stays untested by design: no hit on the line can separate it, since only a hit carrying lightning plus another element the target is weak to could. Two departures from the table: rung 4
+of Crusader is all four stats +1, like its rungs 1 and 2; and Sraphim's
+rungs 3 and 5 are the owner's later call (2026-11-14, below), because
+*Grace* would do nothing (no code clears a fallen character's boost bank, so
+it already survives a KO), and the stand-ins that shipped first (immune to
+Doom's countdown, the Cure Ring's Regen) repeated Phoenix's rung 3 and
+Kirin's signature. The rest of this doc is the design as proposed.
+
+**Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
+member heals is 25% stronger. Rung 5: anyone the member revives comes back
+at full HP. Both are `Ot6SeraphHeal`, called in `CalcTargetDmg` once per
+target, after the amount is computed and before the 9999 cap and the
+heal-or-damage choice:
+
+- *What counts as healing.* Any HP the member's own action restores: the
+  Cure family, Life and Life 2, a heal from a Blitz, Lore or Dance, and a
+  Tonic, Potion or Fenix Down used from Item. MP restored (an Ether,
+  Osmose) is not (tested: battle_esperseraph's Ether case). A monster's heal
+  is not (the `cpx #$0008` gate: reasoned from code, untested; no fixture
+  stages a monster healing cheaply by play).
+- *Regen.* The game keeps no record of who cast a Regen: each tick is the
+  Regen'd member's own action. So a holder's own Regen ticks heal 25% more,
+  whoever cast it, and a Regen the holder cast on someone else does not.
+- *The boost.* A boost on Cure buys the tier (Cure 2, Cure 3), and the 25%
+  goes on top of the tier's amount. A boost that buys the multiplier (a
+  Potion from Item) is applied first, then the variance, then the 25%:
+  amount + amount / 4, the quarter rounded down.
+- *Caps.* The amount is still capped at 9999 and the target's HP at its max;
+  the engine has no overheal.
+- *Undead and zombies.* A heal that hurts an undead monster or a zombie is
+  the same amount turned to damage, so the 25% applies to that damage too
+  ("all healing").
+- *Revives.* A revive is an action that lifts a KO'd target's KO (Life,
+  Life 2, a Fenix Down, a character's Life 3 on a KO'd body). With rung 5
+  it heals the target's max HP. Life 2 and Life 3 already revived at full;
+  Life and a Fenix Down (an eighth of max HP) now do too, and with rung 3
+  alone they give 25% more than an eighth.
+- *Rebirth.* Phoenix's Rebirth (Life 3 rising on its own) is not the member
+  reviving anyone: the only action a KO'd body takes is that revival, so
+  `Ot6SeraphHeal` skips a KO'd actor, and Rebirth's HP is the vanilla
+  eighth, even on a Sraphim master. (Reasoned from code, untested.)
+- *Reflect.* A heal bounced off Reflect is computed by `CalcReflectDmg` with
+  the reflector as the actor, so the 25% (and the full revive) follows
+  whoever reflected it, not the caster. That is an FF6 engine quirk, accepted
+  as it stands rather than built around.
 
 **Terms.** *Magic Points* are what a won battle awards toward the
 equipped espers (FF3 US calls them Magic Points; other releases call them
@@ -236,7 +291,7 @@ bytes, `ItemProp+5` to `+13`).
 
 | Esper | while worn (today's) | stats (1st / 2nd) | rung 3 (75) | rung 5 (500), the signature |
 |---|---|---|---|---|
-| Ramuh | Bolt, Rasp | Stm / Mag | immune to Dark (Goggles) | †*Conductor*: the wearer's lightning spells take one more shield |
+| Ramuh | Bolt, Rasp | Stm / Mag | immune to Dark (Goggles) | †*Conductor*: the wearer's lightning spells take one more shield (a Magic or X-Magic cast, from a monster whose matched weaknesses include lightning) |
 | Kirin | Cure, Regen | Mag / Stm | immune to Poison (Star Pendant) | Regen in every battle (Cure Ring) |
 | Stray | Muddle, Imp | Mag / Spd | immune to Imp | steals succeed more often (Sneak Ring) |
 | Siren | Mute, Sleep, Bserk | Spd / Mag | immune to Sleep | immune to Berserk and Muddle (Peace Ring) |
@@ -250,7 +305,7 @@ bytes, `ItemProp+5` to `+13`).
 | Unicorn | Pearl, Remedy | Stm / Mag | immune to Zombie | immune to Dark, Zombie and Poison (Amulet) |
 | Golem | Safe | Stm / Vig | immune to Muddle | covers allies at low HP (True Knight) |
 | ZoneSeek | Shell, Haste | Mag / Stm | immune to Mute | Shell in every battle (Force Shld's bit) |
-| Sraphim | Cure, Life | Stm / Mag | immune to Doom's countdown | †*Grace*: keeps its boost points when KO'd and revived |
+| Sraphim | Cure, Life | Stm / Mag | †the member's healing +25% (Cure, Life, healing items, and Regen ticks the holder receives) | †*Full revive*: anyone the member revives comes back at full HP (Life, Fenix Down; Life 2 already did) |
 | Palidor | Float, Slow | Spd / Vig | walks faster (Sprint Shoes) | Float in every battle (Cherub Down) |
 | Fenrir | Stop, X-Zone | Spd / Mag | more pre-emptive strikes (Gale Hairpin) | †immune to Stop and Slow (vanilla's protection bytes cover neither) |
 | Starlet | Cure, Regen, Remedy | Mag / Spd | immune to Berserk | max MP +25% (Minerva) |
@@ -261,7 +316,7 @@ bytes, `ItemProp+5` to `+13`).
 | Bahamut | Flare, W Wind | Mag / Vig | max HP +25% (Red Cap) | Fight and spells deal more damage (Hero Ring) |
 | Phoenix | Life, Antdot | Stm / Spd | immune to Doom's countdown and Zombie | †*Rebirth*: enters every battle under Life 3 |
 | Ragnarok | Ultima, Warp | Vig / Mag | max MP +25% (Minerva) | Fight strikes four times (Offering's X-Fight) |
-| Crusader | Merton, Meteor | all four +1 at rungs 1 and 2 | max HP +25% (Red Cap) | Gauntlet (two-handed grip) and Genji Glove (two weapons) both allowed |
+| Crusader | Merton, Meteor | all four +1 at rungs 1, 2 and 4 | max HP +25% (Red Cap) | Gauntlet (two-handed grip) and Genji Glove (two weapons) both allowed |
 
 Odin and Raiden share one counter: Raiden replaces Odin, and the progress
 carries over.
@@ -414,6 +469,54 @@ In rough order. S is a day's work, M a few days, L a week or more.
    tracked save past Zozo is re-cut (checkpoint freshness), and the boss
    grids are re-read for drift. The harness also needs a wearing policy (who
    wears what, and when to rotate), which is the same choice a player makes.
+
+### The two labbed signatures (owner: "lab half-cost spells and permanent Haste before shipping them")
+
+Measured on the line's own captures at the landing (the replay from power-on at e9e2646e: `wor-kt-poltergeist-v1`
+for the Goddess's leg, `wor-kt-plates-v1` for Kefka's), each Continued as it is (base) or with every character's
+count on Shiva (half-cost spells) or on Odin and Raiden (Haste) raised to the signature, an upper bound: the line
+itself masters neither. Four seed shifts an arm and leg, 24 runs; the boss's battle key from each log
+(`build/attempts/wt/v044-esper-rework-2/siglab/keys.txt`, `tally.txt`).
+
+| leg | arm | won | distinct keys | the boss's last tick (median of the wins) | deaths in the boss fight |
+|---|---|---|---|---|---|
+| the Goddess ($1D5) | base | 4 of 4 | 4 | 8,510 | 3, 1, 2, 1 |
+| | half-cost spells | 3 of 4 | 4 | 9,052 | 1, 4 (wipe), 0, 3 |
+| | Haste | 4 of 4 | 3 | 10,708 | 3, 0, 3, 0 |
+| Kefka (tier 2, $201) | base | 3 of 4 | 4 | 7,278 | 0, 1, 4 (wipe), 0 |
+| | half-cost spells | 3 of 4 | 4 | 7,835 | 2, 2, 1, 1 (lost later) |
+| | Haste | 4 of 4 | 4 | 9,336 | 2, 4, 1, 0 |
+
+Neither signature makes the late bosses easy, even on every member at once: the fights take as long, members
+still fall, and the base arm loses about as often. Both ship. An earlier lab on the tracked saves (the old line's
+progress) had party-wide Haste wipe the Goddess on both of its seeds, since Haste also speeds the Doom countdown
+her Overcast sets; with the line's own ranks it won all four.
+
+### Still to build (after v0.44's first landing)
+
+The page under Skills > Espers shows the selected character's rank, Magic
+Points and next cost on the title row, and the five rungs as short labels,
+white once reached and grey until then. What it does not do yet, the
+remaining part of step 6:
+
+- **Say what a rung does.** The labels name a relic ("Gold Hairpin") or an
+  immunity ("No Sleep"); the five new signatures (Conductor, Facet,
+  Rebirth, No Stop/Slow, Full Revive) and Sraphim's "Heal +25%" need a
+  sentence. Proposed: a cursor on the rung
+  rows (today the cursor walks only the spell rows, `GenjuDetailCursorProp`
+  {1, 7}) and the help line at the top of the screen showing the rung's
+  description, from a 130-entry text table beside `Ot6RungLabelTbl`.
+- **Mark "have".** An effect the character already holds (from gear or
+  another stone's rung) is marked so a player tours toward new ones, as the
+  table's notes say. The fold already computes it (`Ot6EsperFold`'s bits
+  for that character minus this rung's).
+- **The status page's list of kept bonuses** (optional, as the doc says).
+- **Teaching.** One Narshe school line in plain words: "A stone teaches its
+  wearer bonuses that stay. Every battle won pays Magic Points to the stone
+  each member wears; see Skills > Espers." (step 7).
+- **A wearing policy for the harness** (step 8): today the route equips
+  stones for their spells only, so the ladder grows wherever the route's
+  wearers happen to fight.
 
 ## Plan B — abilities while worn, the same ladder for keeps
 
