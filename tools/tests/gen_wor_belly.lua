@@ -197,7 +197,7 @@ end
 -- The walk's own pauses between moves (LAT before the first, DWELL_S after a step, DWELL_J after a jump: the
 -- landing is waited for, then the next move pressed) are exposure on the tile it stands on.  DWELL_J: the walk
 -- decides 4 frames after a jump's event ends (median and minimum of every pause the lab walks logged,
--- "pauses after a jump", n2) and presses within 4 more (jumpStep pulses A four frames in eight).
+-- "pauses after a jump", labs n8 and n9) and presses within 4 more, once facing the jump's way.
 local LAT, DWELL_S, DWELL_J = 2, 4, 8
 local function jumpEv() return (JUMP_F * stepF() // STEP_F) - 2 end
 local function spansOf(moves)
@@ -618,6 +618,12 @@ local function armTrace()
     if #BELLY_TRACE > 200 then table.remove(BELLY_TRACE, 1) end
   end, emu.eventType.endFrame)
 end
+-- The tries a bridge walk is allowed, from the hardest one's measured rate: the walk to the FakeMustache passed
+-- 24 of its 44 tries over 24 plays from both wor_belly_in captures at 12 seed shifts each (lab n8, n9:
+-- build/attempts/wt/v044-esper-rework-4/belly/; 0-4 drops a pass), 0.55 a try; at the rate's 95% lower bound
+-- (Wilson, 0.40) a play needs more than 14 tries less than once in a thousand ((1 - 0.40)^14 = 0.0008).  The
+-- other walks pass more often a try (Genji Armor, Magical Brsh, the door: 0.9 and up)
+local BRIDGE_TRIES = 14
 local function jwalk(x, y, lk, what, tries, done)
   local n = 0
   armTrace()
@@ -678,7 +684,7 @@ end
 local function bridgeChest(o)
   return H.cond(function() return not H.chestOpen(o.bit) end, {
     jwalk(o.stand[1], o.stand[2], LINKS276, string.format("276: the bridge to the %s (%d,%d)", o.what, o.stand[1],
-      o.stand[2]), 30),
+      o.stand[2]), BRIDGE_TRIES),
     chest(o),
   }, {})
 end
@@ -700,7 +706,7 @@ local function dropDown()
   return H.cond(function() return not (H.chestOpen(ETHER.bit) and H.chestOpen(RED_JACKET.bit)) end, {
     H.call(function() f0 = fallCount() end),
     H.lazy(function()
-      return jwalk(36, 30, LINKS276, "276: onto the conductors' row (36,30)", 30, dropped)
+      return jwalk(36, 30, LINKS276, "276: onto the conductors' row (36,30)", BRIDGE_TRIES, dropped)
     end),
     H.withReset(H.driveUntil(function()
       return dropped() and map() == 276 and H.hasControl() and H.tileAligned() and H.fieldY() == 17
@@ -774,7 +780,7 @@ H.run({ maxFrames = 2400000 }, {
   bridgeChest(MAGICAL_BRSH),
   dropDown(),
   bridgeChest(FAKEMUSTACHE),
-  jwalk(21, 32, LINKS276, "276: across the bridge to the door (21,33)", 30),
+  jwalk(21, 32, LINKS276, "276: across the bridge to the door (21,33)", BRIDGE_TRIES),
   H.call(function()
     for _, o in ipairs({ GENJI_ARMOR, MAGICAL_BRSH, ETHER, RED_JACKET, FAKEMUSTACHE }) do
       H.assertEq(H.chestOpen(o.bit), true, string.format("276: the %s's chest (bit %d) is open", o.what, o.bit))
