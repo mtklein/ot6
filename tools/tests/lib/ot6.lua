@@ -4594,12 +4594,58 @@ function M.glyphCanary()
 end
 
 -- true if any OT6 shield/broken glyph word sits in the bg3 field-area map
--- (the under-monster hud). formation-agnostic presence check.  The shield
--- gauge (the emblem $71 and the count cells) draws under attribute $29, text
--- palette 2 (#397); the broken shield, a count cell's tile, under $3D,
--- text palette 7.
-M.HUD_GAUGE_ATTR = 0x29
+-- (the under-monster hud), in whatever text palette. formation-agnostic
+-- presence check.  The shield
+-- gauge (the emblem $71 and the count cells) draws under attribute $21, text
+-- palette 0, plain white (#397, palette 2's gold until the owner's
+-- 2026-11-14 call); the broken shield, a count cell's tile, under $3D,
+-- text palette 7; an unrevealed weakness's '?' under $25, palette 1's grey.
+M.HUD_GAUGE_ATTR = 0x21
 M.HUD_BROKEN_ATTR = 0x3D
+M.HUD_QMARK_ATTR = 0x25
+
+-- The colours the under-monster line draws in, read from what the screen
+-- has: each glyph's art from the battle font in VRAM (byte $B000 + cell*16)
+-- and its palette's colours from CGRAM (BG3 text palette p is colours
+-- 4p..4p+3).  A glyph's colour is its stroke: the colour of the highest
+-- index its art uses (3, the bold stroke, or 2 where the art has no 3: the
+-- staff icon is drawn in grey alone).  drawn: the tilemap words as the
+-- screen has them, { emblem = w, count = w, qmark = w } (glyph | attr << 8),
+-- so a cell's palette is the one it is really drawn in.  Returns
+--   { gauge = { emblem = c, count = c }, qmark = c,
+--     icons = { {name, colour}, ... } }   -- the 8 elements, the 4 classes
+-- with each icon's palette taken from Ot6ElemPalTbl and its cell from
+-- Ot6ElemGlyphTbl / Ot6ClassGlyphTbl.
+M.HUD_ICON_NAMES = { "fire", "ice", "lightning", "poison", "wind", "holy", "earth", "water",
+  "slash", "pierce", "bludgeon", "special" }
+function M.hudColours(drawn)
+  local vr, rom, cg = emu.memType.snesVideoRam, emu.memType.snesPrgRom, emu.memType.snesCgRam
+  local function stroke(cell, pal)
+    local top = 0
+    for r = 0, 7 do
+      local p0 = emu.read(0xB000 + cell * 16 + 2 * r, vr)
+      local p1 = emu.read(0xB000 + cell * 16 + 2 * r + 1, vr)
+      for c = 0, 7 do
+        local v = ((p0 >> c) & 1) | (((p1 >> c) & 1) << 1)
+        if v > top then top = v end
+      end
+    end
+    return emu.readWord((pal * 4 + top) * 2, cg) & 0x7FFF
+  end
+  local function palOf(attr) return (attr >> 2) & 7 end
+  local function cell(w) return stroke(w & 0xFF, palOf(w >> 8)) end
+  local out = { gauge = { emblem = cell(drawn.emblem), count = cell(drawn.count) },
+    qmark = cell(drawn.qmark), icons = {} }
+  local pals = M.sym("Ot6ElemPalTbl") & 0x3FFFFF
+  local ecells = M.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
+  local ccells = M.sym("Ot6ClassGlyphTbl") & 0x3FFFFF
+  for k = 0, 11 do
+    local cell = k < 8 and emu.read(ecells + k, rom) or emu.read(ccells + k - 8, rom)
+    out.icons[#out.icons + 1] = { M.HUD_ICON_NAMES[k + 1],
+      stroke(cell, palOf(emu.read(pals + k, rom))) }
+  end
+  return out
+end
 function M.fieldHudPresent()
   local vr = emu.memType.snesVideoRam
   local reg = M.readByte(0x897b)
@@ -4607,7 +4653,9 @@ function M.fieldHudPresent()
   local set = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1}
   for off = 0, 0x7FE, 2 do
     local attr = emu.read(base+off+1, vr)
-    if (attr == M.HUD_GAUGE_ATTR or attr == M.HUD_BROKEN_ATTR) and set[emu.read(base+off, vr)] then
+    -- any text palette: presence is not a colour (priority and char bit 8
+    -- set, as every HUD cell has them)
+    if (attr & 0x23) == 0x21 and set[emu.read(base+off, vr)] then
       return true
     end
   end

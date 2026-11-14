@@ -240,8 +240,8 @@ H.run({ maxFrames = 90000 }, {
   H.call(function()
     local slots = hudSlotWords()
     for i, w in ipairs(slots) do
-      H.assertEq(w, 0x21BF,
-        string.format("hud line %d: unprobed class shows the '?' slot", i))
+      H.assertEq(w, (H.HUD_QMARK_ATTR << 8) | 0xBF,
+        string.format("hud line %d: unprobed class shows the '?' slot, in the '?' grey", i))
     end
     H.screenshot("class_hud_qmark")
   end),

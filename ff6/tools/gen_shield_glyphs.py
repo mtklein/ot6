@@ -9,21 +9,22 @@
 #
 # The shield gauge is two cells under the monster (#397): a fixed shield
 # emblem (Ot6BgGlyphData in ot6_hud.asm) and, right of it, this count tile.
-# Both draw in battle text palette 2 (1 = navy, 2 = grey, 3 = yellow), so the
-# gauge reads as one gold-and-navy badge, unlike the weakness icons beside
-# it, which are bare white or coloured glyphs on no plate.
+# Both draw in battle text palette 0 (1 = black, 2 = grey, 3 = white), plain
+# white like the party's HP numerals.  No weakness icon is drawn in a hue
+# there: the gauge used to be gold on navy (palette 2), the yellow the
+# lightning and holy icons are drawn in, so a revealed bolt beside the count
+# read as a smear of the count (owner, 2026-11-14).
 #
 # Counts 1-9: the battle font's own numeral (SmallFontGfx $b4-$bd, the bold
-# 2-pixel strokes the party's HP is drawn in), in yellow on a navy plate.
-# Before #397 the count was a 3x5 numeral in white on the grey shield body,
-# which could not be read at native size (#445's README screenshots).
-# Counts 10-99: two 3x7 numerals on the same plate, the only way two digits
-# fit eight pixels.
+# 2-pixel strokes the party's HP is drawn in, with its own black shadow).
+# Counts 10-99: two 3x7 numerals, white with a black shadow right and below,
+# the only way two digits fit eight pixels.
 #
 # The broken tile takes the emblem's place while a monster is broken (the
-# count cell is then empty): the emblem cracked down the middle, its right
-# half dropped a row, in text palette 7 (grey outline and body, red rim).
-#
+# count cell is then empty): the #397 emblem cracked down the middle, its
+# right half dropped a row, in text palette 7 (grey outline and body, red
+# rim).
+
 # Colors: plane 0 = bit 0, plane 1 = bit 1; each row is stored plane 0 then
 # plane 1.
 #
@@ -55,13 +56,23 @@ NARROW = {
     9: ["XXX", "X.X", "X.X", "XXX", "..X", "..X", "XXX"],
 }
 
-# the plate's bottom row: rounded corners, so the plate reads as a tag
-PLATE_FOOT = "01111110"
-
 # the shield gauge's emblem (cell $71, ot6_hud.asm's Ot6BgGlyphData takes it
-# from the OT6_EMBLEM_TILE this file defines): a grey shield with a yellow
-# rim and a navy outline in palette 2
+# from the OT6_EMBLEM_TILE this file defines): a plain white shield with a
+# black outline in palette 0
 EMBLEM = [
+    "13333331",
+    "13333331",
+    "13333331",
+    "13333331",
+    "01333310",
+    "00133100",
+    "00011000",
+    "00000000",
+]
+
+# the #397 emblem (grey body, rim, outline), which the broken tile cracks;
+# drawn in palette 7 it is the grey shield with a red rim
+BROKEN_BASE = [
     "13333331",
     "13222231",
     "13222231",
@@ -74,15 +85,16 @@ EMBLEM = [
 
 
 def broken_rows():
-    """The emblem cracked: a zigzag gap down the middle and the right half
-    dropped a row.  Drawn in palette 7 (grey outline and body, red rim)."""
+    """The #397 emblem cracked: a zigzag gap down the middle and the right
+    half dropped a row.  Drawn in palette 7 (grey outline and body, red
+    rim)."""
     out = [["0"] * 8 for _ in range(8)]
     for r in range(8):
         for c in range(4):
-            out[r][c] = EMBLEM[r][c]
+            out[r][c] = BROKEN_BASE[r][c]
         for c in range(4, 8):
             if r + 1 < 8:
-                out[r + 1][c] = EMBLEM[r][c]
+                out[r + 1][c] = BROKEN_BASE[r][c]
     for r in range(8):
         out[r][3 if r % 2 else 4] = "0"
     return ["".join(r) for r in out]
@@ -99,20 +111,25 @@ def font_digit(d):
     return rows
 
 
-def plate_rows(n):
+def count_rows(n):
     if n < 10:
-        # the font numeral's own shadow (1) and background (0) both become
-        # the plate (1): yellow stroke on navy
-        rows = ["".join("3" if ch == "3" else "1" for ch in r) for r in font_digit(n)[:7]]
-    else:
-        g = [["1"] * 8 for _ in range(7)]
-        for d, col in ((n // 10, 0), (n % 10, 4)):
-            for r, pat in enumerate(NARROW[d]):
-                for c, ch in enumerate(pat):
-                    if ch == "X":
-                        g[r][col + c] = "3"
-        rows = ["".join(r) for r in g]
-    return rows + [PLATE_FOOT]
+        # the font numeral as it is: white stroke, black shadow
+        return font_digit(n)
+    g = [["0"] * 8 for _ in range(8)]
+    for d, col in ((n // 10, 0), (n % 10, 4)):
+        for r, pat in enumerate(NARROW[d]):
+            for c, ch in enumerate(pat):
+                if ch == "X":
+                    g[r][col + c] = "3"
+    # the shadow, as the font draws it: right of and below each stroke pixel
+    for r in range(8):
+        for c in range(8):
+            if g[r][c] == "3":
+                for dr, dc in ((0, 1), (1, 0), (1, 1)):
+                    rr, cc = r + dr, c + dc
+                    if rr < 8 and cc < 8 and g[rr][cc] == "0":
+                        g[rr][cc] = "1"
+    return ["".join(r) for r in g]
 
 
 def encode(rows):
@@ -130,7 +147,7 @@ def encode(rows):
 def tile(n):
     if n == 100:
         return encode(broken_rows())
-    return encode(plate_rows(n))
+    return encode(count_rows(n))
 
 
 def render():

@@ -289,7 +289,7 @@
         jne     @done
         ; the shield gauge (#397): the lead cell and cell 0.  shielded: the
         ; emblem (fixed cell $71) in the lead cell and the slot's count tile
-        ; in cell 0, both in text palette 2, one gold-and-navy badge.
+        ; in cell 0, both in text palette 0, plain white.
         ; broken: the broken shield (the slot's tile 100) in the lead cell,
         ; palette 7, and cell 0 empty.  shieldless: both empty.
         lda     $3e90,y
@@ -380,7 +380,9 @@
         lda     $3ed3
         sta     f:$7e0000+OT6_SHADOW+4,x
         bra     @next
-@q:     lda     #OT6_QMARK      ; '?', default attr already in place
+@q:     lda     #OT6_QMARK_ATTR ; '?' in grey: attr first, as above
+        sta     f:$7e0000+OT6_SHADOW+5,x
+        lda     #OT6_QMARK
         sta     f:$7e0000+OT6_SHADOW+4,x
 @next:  asl     OT6_SCR_BIT
         inc     OT6_SCR_IDX
@@ -388,9 +390,9 @@
 @cls:   ; class-weakness slots: same claim/cap flow, from the authored
         ; class mask (OT6_BP_CLASS monster half, seeded at battle init) and the
         ; revealed-classes byte the chips and codex maintain. the icons
-        ; are the vanilla item-class glyphs, white like the '?' (the
-        ; default $21 attr from the fill is already in place, so only the
-        ; glyph byte is written, as with the '?' cell).
+        ; are the vanilla item-class glyphs, white (the default $21 attr
+        ; from the fill is already in place, so only the glyph byte is
+        ; written; the '?' writes its grey attr first).
         lda     #$01
         sta     OT6_SCR_BIT
         lda     #$00
@@ -420,7 +422,9 @@
         plx
         sta     f:$7e0000+OT6_SHADOW+4,x
         bra     @cnext
-@cq:    lda     #OT6_QMARK      ; '?', default attr already in place
+@cq:    lda     #OT6_QMARK_ATTR ; '?' in grey, attr first
+        sta     f:$7e0000+OT6_SHADOW+5,x
+        lda     #OT6_QMARK
         sta     f:$7e0000+OT6_SHADOW+4,x
 @cnext: asl     OT6_SCR_BIT
         inc     OT6_SCR_IDX
@@ -3528,13 +3532,18 @@ Ot6ShieldSlotCellTbl:
 
 ; the shield gauge's emblem cell (#397; Ot6BgGlyphCellTbl's first entry,
 ; which held the broken shield before the broken art became a per-slot tile)
-; and the gauge's tilemap attributes: priority, char bit 8, and text
-; palette 2 (navy, grey, yellow; btlgfx BattleFontPal) for the gauge, where
-; the weakness icons beside it draw in palette 0 or their element's hue, or
-; palette 7 (grey, red) for the broken shield
+; and the line's tilemap attributes: priority, char bit 8, and a text
+; palette (btlgfx BattleFontPal; colours 1/2/3).  The gauge: palette 0
+; (black, grey, white), plain white like the HP numerals.  It was palette 2
+; (navy, grey, yellow), the lightning and holy icons' yellow, and a revealed
+; bolt beside the count read as a smear of it.  The broken shield: palette 7
+; (grey, grey, red).  An unrevealed weakness's '?': palette 1 (navy, grey,
+; the mid grey vanilla draws unusable list entries in), apart from the
+; gauge's white.  The weakness icons are in Ot6ElemPalTbl (ot6_icons.asm).
 OT6_EMBLEM      = $71
-OT6_GAUGE_ATTR  = $21 | (2 << 2)
+OT6_GAUGE_ATTR  = $21 | (0 << 2)
 OT6_BROKEN_ATTR = $21 | (7 << 2)
+OT6_QMARK_ATTR  = $21 | (1 << 2)
 
 ; monster slot -> its OT6_SHPEND bit
 Ot6ShieldBitTbl:
@@ -3567,9 +3576,10 @@ Ot6BgGlyphCellTbl:
         .byte   $6d
 
 Ot6BgGlyphData:
-; the shield gauge's emblem (#397), in text palette 2: a grey shield with a
-; yellow rim and a navy outline (gen_shield_glyphs.py draws it, beside the
-; count tiles; the broken shield is each slot's tile 100, the emblem cracked)
+; the shield gauge's emblem (#397), in text palette 0: a plain white shield
+; with a black outline (gen_shield_glyphs.py draws it, beside the count
+; tiles; the broken shield is each slot's tile 100, #397's grey emblem
+; cracked)
         .byte   OT6_EMBLEM_TILE
 ; pips-0
         .byte   $00,$00,$db,$00,$db,$00,$00,$00

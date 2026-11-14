@@ -39,8 +39,11 @@
 -- And how the shield gauge looks (#397), read from VRAM and WRAM:
 --   1h. under the head, the gauge: the emblem (cell $71) one cell left of
 --      the line's anchor and the head's count cell at the anchor, both under
---      the gauge attribute $29 (text palette 2), the count cell holding the
---      ROM's tile for 4;
+--      the gauge attribute $21 (text palette 0), the count cell holding the
+--      ROM's tile for 4; its two unrevealed weaknesses as '?' under $25
+--      (palette 1); and the colours on screen: the gauge plain white, the
+--      '?' a mid grey, neither one any weakness icon's colour but for the
+--      icons colourCheck names;
 --   3h. broken, the lead cell holds the head's broken-shield tile (tile 100)
 --      under $3D (text palette 7) and the count cell is empty; and the head's sprite is moved
 --      onto a spare monster palette (one the formation left unloaded) that
@@ -104,10 +107,58 @@ local function headLine()
   if a == 0 then return nil end
   return a, vword(a - 1), vword(a)
 end
+-- the gauge's cells drawn (any attribute: the attribute and the colours are
+-- asserted on their own, after colourCheck)
 local function gaugeShown()
   local a, lead, count = headLine()
-  return a ~= nil and lead == (GAUGE << 8) | 0x71
-    and count == (GAUGE << 8) | slotCell(hs) and tileIs(slotCell(hs), H.readByte(0x3E40 + hs * 2))
+  return a ~= nil and lead & 0xFF == 0x71
+    and count & 0xFF == slotCell(hs) and tileIs(slotCell(hs), H.readByte(0x3E40 + hs * 2))
+end
+-- The line's colours, as the screen has them (H.hudColours): the gauge
+-- plain white, emblem and count alike; an unrevealed weakness's '?' a mid
+-- grey, well apart from that white; and neither the colour of any weakness
+-- icon, save the ones named here.  The four white icons share the gauge's
+-- white and earth's icon shares the '?' grey: the battle text palettes
+-- hold no other white or mid grey, and every one of their eight palettes
+-- is drawn in (build/attempts/wt/v044-shield-colors/census_*.log).  The
+-- lists are exact, so a recoloured icon, or the gauge put back on a hue,
+-- goes red here.  #397's gold gauge was lightning's and holy's yellow.
+local SHARE_WHITE = { wind = true, slash = true, pierce = true, special = true }
+local SHARE_GREY = { earth = true }
+local function rgb(c) return c & 31, (c >> 5) & 31, (c >> 10) & 31 end
+local function colourCheck()
+  local a, lead, count = headLine()
+  H.assertEq(vword(a + 1) & 0xFF, 0xBF, "the head's first weakness cell is a '?' (nothing revealed)")
+  local c = H.hudColours({ emblem = lead, count = count, qmark = vword(a + 1) })
+  local parts = {}
+  for _, ic in ipairs(c.icons) do parts[#parts + 1] = string.format("%s=%04X", ic[1], ic[2]) end
+  H.log(string.format("[colours] gauge emblem %04X count %04X; '?' %04X; icons %s",
+    c.gauge.emblem, c.gauge.count, c.qmark, table.concat(parts, " ")))
+  local gauge, qm = c.gauge.emblem, c.qmark
+  H.assertEq(c.gauge.count, gauge, "the shield count draws in the emblem's colour")
+  for _, ic in ipairs(c.icons) do
+    local name, col = ic[1], ic[2]
+    H.assertEq(col == gauge, SHARE_WHITE[name] == true,
+      string.format("the %s icon's colour (%04X) %s the shield gauge's (%04X)", name, col,
+        SHARE_WHITE[name] and "is" or "is not", gauge))
+    H.assertEq(col == qm, SHARE_GREY[name] == true,
+      string.format("the %s icon's colour (%04X) %s the '?' colour (%04X)", name, col,
+        SHARE_GREY[name] and "is" or "is not", qm))
+  end
+  local r, g, b = rgb(gauge)
+  H.assertEq(r == g and g == b and r >= 28, true,
+    string.format("the shield gauge is plain white (got %04X)", gauge))
+  local qr, qg, qb = rgb(qm)
+  H.assertEq(qr == qg and qg == qb and qr >= 8 and qr <= 23, true,
+    string.format("an unrevealed weakness's '?' is a mid grey (got %04X)", qm))
+  H.assertEq(r - qr >= 8, true, "the '?' grey stands well apart from the gauge's white")
+end
+-- the head's weakness cells while nothing is revealed: its fire '?' and its
+-- PIERCE '?', both in the '?' attribute
+local function qmarksShown()
+  local a = headLine()
+  return a ~= nil and vword(a + 1) == (H.HUD_QMARK_ATTR << 8) | 0xBF
+    and vword(a + 2) == (H.HUD_QMARK_ATTR << 8) | 0xBF
 end
 local function brokenShown()
   local a, lead, count = headLine()
@@ -399,9 +450,15 @@ H.run({ maxFrames = 60000 }, {
   report("seeded"),
   -- 1h. the gauge under the head
   H.waitUntil(function() return gaugeShown() end, 600,
-    "the head's shield gauge drawn: emblem, then its count tile, palette 2", 1),
+    "the head's shield gauge drawn: emblem, then its count tile, palette 0", 1),
   H.call(function()
     greyReport("seeded")
+    colourCheck()
+    local _, lead, count = headLine()
+    H.assertEq(lead >> 8, GAUGE, "the shield emblem draws under the gauge attribute (palette 0)")
+    H.assertEq(count >> 8, GAUGE, "the shield count draws under the gauge attribute (palette 0)")
+    H.assertEq(qmarksShown(), true,
+      "the head's two unrevealed weaknesses drawn as '?' in the '?' attribute")
     H.assertEq(palsLoaded() < 3, true,
       "precondition: the formation left a monster palette unloaded (a spare for the grey)")
     H.assertEq(palBits(hs), ownBits(hs), "the head starts on its own palette")

@@ -110,11 +110,14 @@ Octopath; kits.md "Strago").
 count and revealed-weakness icons are how an Octopath battle reads to the
 player. Under each monster, one line on the battlefield's text layer: the
 shield gauge, a shield emblem and the count in the battle font's own
-numerals, yellow on a navy plate, and then the weaknesses, a '?' for each
+numerals, both plain white, and then the weaknesses, a grey '?' for each
 unrevealed one and its element or weapon-class icon once revealed (the
-battle font already holds the weapon glyphs, from item names). The gauge is
-one badge in its own palette and the weaknesses are bare glyphs, so a count
-does not read as one of the keys (#397). A broken monster shows a broken
+battle font already holds the weapon glyphs, from item names). The gauge
+takes no element's hue, so a count does not read as one of the keys: #397
+drew it gold on navy, the lightning and holy icons' yellow, and a revealed
+bolt beside the count read as a smear of it (owner, 2026-11-14). White is
+also the wind and weapon-class icons' colour, and the '?' grey earth's: the
+battle text palettes hold no other white or mid grey. A broken monster shows a broken
 shield where the gauge was, and its sprite turns grey until it recovers: a
 grey copy of its palette in a monster palette the formation left unused, so
 a formation with three monster palettes keeps its colours.

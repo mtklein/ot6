@@ -83,8 +83,8 @@ local function check(n, tag)
   H.assertEq(hex(got), hex(want),
     string.format("%s: the drawn shield tile is the ROM's tile for the true count %d", tag, n))
   -- #397: the count is half of a two-cell gauge, the emblem one cell left of
-  -- it, both under the gauge attribute (text palette 2), apart from the
-  -- weakness cells' palette 0
+  -- it, both under the gauge attribute (text palette 0, plain white; the
+  -- colours themselves are battle_break's colourCheck)
   local lead = emu.read((addr - 1) * 2, vr) | (emu.read((addr - 1) * 2 + 1, vr) << 8)
   H.log(string.format("[hudcount] %s: lead cell %04X, count cell %04X", tag, lead, drawn or 0))
   H.assertEq(lead, (H.HUD_GAUGE_ATTR << 8) | 0x71,
