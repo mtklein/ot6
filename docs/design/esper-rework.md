@@ -10,13 +10,48 @@ and permanent Haste are labbed before they ship.
 (`Ot6EsperEarn`, `Ot6EsperMsg`), the progress store in expanded SRAM
 ([save-layout.md](save-layout.md)), the ladder folded into `UpdateEquip`
 (`Ot6EsperFold`, `Ot6LadderTbl`, held to the table below by
-`tools/esper_ladder.py`), the four new-code signatures (`Ot6EsperBattleInit`
-for Facet and Rebirth, `Ot6EsperImmune` for Fenrir, `Ot6Conductor`), and the
+`tools/esper_ladder.py`), the five new-code signatures (`Ot6EsperBattleInit`
+for Facet and Rebirth, `Ot6EsperImmune` for Fenrir, `Ot6Conductor`,
+`Ot6SeraphHeal` for Sraphim's full revives, which also holds its rung 3), and the
 Skills > Espers page's ladder column. Conductor's matched-weakness gate stays untested by design: no hit on the line can separate it, since only a hit carrying lightning plus another element the target is weak to could. Two departures from the table: rung 4
 of Crusader is all four stats +1, like its rungs 1 and 2; and Sraphim's
-signature is the Cure Ring's Regen, because *Grace* would do nothing (no code
-clears a fallen character's boost bank, so it already survives a KO). The
-rest of this doc is the design as proposed.
+rungs 3 and 5 are the owner's later call (2026-11-14, below), because
+*Grace* would do nothing (no code clears a fallen character's boost bank, so
+it already survives a KO), and the stand-ins that shipped first (immune to
+Doom's countdown, the Cure Ring's Regen) repeated Phoenix's rung 3 and
+Kirin's signature. The rest of this doc is the design as proposed.
+
+**Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
+member heals is 25% stronger. Rung 5: anyone the member revives comes back
+at full HP. Both are `Ot6SeraphHeal`, called in `CalcTargetDmg` once per
+target, after the amount is computed and before the 9999 cap and the
+heal-or-damage choice:
+
+- *What counts as healing.* Any HP the member's own action restores: the
+  Cure family, Life and Life 2, a heal from a Blitz, Lore or Dance, and a
+  Tonic, Potion or Fenix Down used from Item. MP restored (an Ether,
+  Osmose) is not. A monster's heal is not.
+- *Regen.* The game keeps no record of who cast a Regen: each tick is the
+  Regen'd member's own action. So a holder's own Regen ticks heal 25% more,
+  whoever cast it, and a Regen the holder cast on someone else does not.
+- *The boost.* A boost on Cure buys the tier (Cure 2, Cure 3), and the 25%
+  goes on top of the tier's amount. A boost that buys the multiplier (a
+  Potion from Item) is applied first, then the variance, then the 25%:
+  amount + amount / 4, the quarter rounded down.
+- *Caps.* The amount is still capped at 9999 and the target's HP at its max;
+  the engine has no overheal.
+- *Undead and zombies.* A heal that hurts an undead monster or a zombie is
+  the same amount turned to damage, so the 25% applies to that damage too
+  ("all healing").
+- *Revives.* A revive is an action that lifts a KO'd target's KO (Life,
+  Life 2, a Fenix Down, a character's Life 3 on a KO'd body). With rung 5
+  it heals the target's max HP. Life 2 and Life 3 already revived at full;
+  Life and a Fenix Down (an eighth of max HP) now do too, and with rung 3
+  alone they give 25% more than an eighth.
+- *Rebirth.* Phoenix's Rebirth (Life 3 rising on its own) is not the member
+  reviving anyone: the only action a KO'd body takes is that revival, so
+  `Ot6SeraphHeal` skips a KO'd actor, and Rebirth's HP is the vanilla
+  eighth, even on a Sraphim master.
 
 **Terms.** *Magic Points* are what a won battle awards toward the
 equipped espers (FF3 US calls them Magic Points; other releases call them
@@ -264,7 +299,7 @@ bytes, `ItemProp+5` to `+13`).
 | Unicorn | Pearl, Remedy | Stm / Mag | immune to Zombie | immune to Dark, Zombie and Poison (Amulet) |
 | Golem | Safe | Stm / Vig | immune to Muddle | covers allies at low HP (True Knight) |
 | ZoneSeek | Shell, Haste | Mag / Stm | immune to Mute | Shell in every battle (Force Shld's bit) |
-| Sraphim | Cure, Life | Stm / Mag | immune to Doom's countdown | Regen in every battle (Cure Ring); the design's *Grace* (keep the boost points through a KO) would do nothing, since no code clears a fallen character's bank |
+| Sraphim | Cure, Life | Stm / Mag | †the member's healing +25% (Cure, Life, Regen ticks, healing items) | †*Full revive*: anyone the member revives comes back at full HP (Life, Fenix Down; Life 2 already did) |
 | Palidor | Float, Slow | Spd / Vig | walks faster (Sprint Shoes) | Float in every battle (Cherub Down) |
 | Fenrir | Stop, X-Zone | Spd / Mag | more pre-emptive strikes (Gale Hairpin) | †immune to Stop and Slow (vanilla's protection bytes cover neither) |
 | Starlet | Cure, Regen, Remedy | Mag / Spd | immune to Berserk | max MP +25% (Minerva) |
@@ -459,8 +494,9 @@ white once reached and grey until then. What it does not do yet, the
 remaining part of step 6:
 
 - **Say what a rung does.** The labels name a relic ("Gold Hairpin") or an
-  immunity ("No Sleep"); the four new signatures (Conductor, Facet,
-  Rebirth, No Stop/Slow) need a sentence. Proposed: a cursor on the rung
+  immunity ("No Sleep"); the five new signatures (Conductor, Facet,
+  Rebirth, No Stop/Slow, Full Revive) and Sraphim's "Heal +25%" need a
+  sentence. Proposed: a cursor on the rung
   rows (today the cursor walks only the spell rows, `GenjuDetailCursorProp`
   {1, 7}) and the help line at the top of the screen showing the rung's
   description, from a 130-entry text table beside `Ot6RungLabelTbl`.

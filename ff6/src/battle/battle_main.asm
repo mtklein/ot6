@@ -1857,7 +1857,9 @@ CalcTargetDmg:
         jsr     CalcDmgMod
         bra     @0b9b
 @0b98:  jsr     CalcDmgRatio
-@0b9b:  stz     $f2
+@0b9b:  jsl     Ot6SeraphHeal   ; ot6 #328: Sraphim's healing +25% and
+                                ;   full revives (ot6_esper.asm)
+        stz     $f2
         lda     $3ee4,y
         asl
         bmi     @0bfa

@@ -567,6 +567,10 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "battle_esperconductorfight":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #328: Sraphim's healing +25% and full revives, TERRA's Cure, Life,
+    # Potion and Fenix Down on LOCKE (battle_lifefold's snapshots)
+    "battle_esperseraph":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     "battle_esperreload":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "menu_esperdetail":

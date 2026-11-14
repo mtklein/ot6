@@ -562,24 +562,24 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
 
 ; [ the signatures that are new code ]
 ;
-; Four rung-5 effects have no vanilla bit (docs/design/esper-rework.md, the
+; Five rung-5 effects have no vanilla bit (docs/design/esper-rework.md, the
 ; table's dagger rows): Conductor (Ramuh), Facet (Carbunkl), Rebirth
-; (Phoenix), and Fenrir's Stop and Slow immunity.  (The fifth, Sraphim's
-; Grace, has a vanilla stand-in: see Ot6LadderTbl.)  Each asks Ot6EsperSig
-; whether the character holds it.
+; (Phoenix), Fenrir's Stop and Slow immunity, and Sraphim's full revives;
+; so has one rung-3 effect, Sraphim's +25% healing (Ot6SeraphHeal).  Each
+; asks Ot6EsperSig (rung 5) or Ot6EsperCount whether the character holds it.
 
 OT6_SLOT_RAMUH    = 0
 OT6_SLOT_CARBUNKL = 18
+OT6_SLOT_SRAPHIM  = 20
 OT6_SLOT_PHOENIX  = 25
 OT6_SLOT_FENRIR   = 23
 
-; in: A (16 bits, whatever the m flag) = actor | counter slot << 8.  out: C set
-; when that actor's count on that esper has reached the signature (rung 5).
-; Preserves a/x/y and every flag but C.  rts.
-.proc Ot6EsperSig
-        php
-        longai
-        phx
+; in: A (a16) = actor | counter slot << 8, i16.  out: A (a16) = that actor's
+; Magic Points on that esper (0 for a guest, or with no progress page).  X
+; clobbered; Y kept.  rts.
+.proc Ot6EsperCount
+        .a16
+        .i16
         pha
         lda     f:OT6_ESPER_LIVE+OT6_ESPER_MAGIC
         cmp     #OT6_ESPER_MAGIC_WORD
@@ -597,11 +597,25 @@ OT6_SLOT_FENRIR   = 23
         adc     1,s
         tax
         pla
+        pla
         lda     f:OT6_ESPER_LIVE+OT6_ESPER_CTR,x
+        rts
+@no:    pla
+        lda     #$0000
+        rts
+.endproc
+
+; in: A (16 bits, whatever the m flag) = actor | counter slot << 8.  out: C set
+; when that actor's count on that esper has reached the signature (rung 5).
+; Preserves a/x/y and every flag but C.  rts.
+.proc Ot6EsperSig
+        php
+        longai
+        phx
+        pha
+        jsr     Ot6EsperCount
         cmp     #OT6_RUNG5      ; C = reached
-        bra     @out
-@no:    clc
-@out:   pla                     ; (pulls leave C alone)
+        pla                     ; (pulls leave C alone)
         plx
         bcs     @yes
         plp
@@ -709,6 +723,91 @@ OT6_SLOT_FENRIR   = 23
         rts
 @keep:  pla
 @out:   rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ Sraphim: healing +25%, and full revives ]
+;
+;  Sraphim's two rungs that are new code: rung 3, the member's healing is
+; 25% stronger, and rung 5 (its signature), anyone the member revives comes
+; back at full HP.
+;
+; jsl from CalcTargetDmg (battle_main.asm @0b9b), once per target, right after
+; CalcDmgMod or CalcDmgRatio has left the amount in $f0 and before the
+; element, undead and zombie handling, the 9999 cap and the heal-or-damage
+; choice.  x = the attacker, y = the target (either index width), db = $7e, a8.
+; Preserves a/x/y and p.
+;
+; A heal is an action with $11a4 bit 0 (heal) whose $11a3 bit 7 (MP) is
+; clear: the Cure family, Regen's ticks, Life and Life 2, Pearl Wind and
+; every other HP heal a character's command carries, a Tonic or a Potion
+; or a Fenix Down from Item.  An Ether's or Osmose's MP is not HP and is left
+; alone.  Only a character's action counts, and not one whose actor is
+; KO'd: the only action a KO'd body takes is Life 3's own revival (Phoenix's
+; Rebirth, ReraiseEffect's command $26), which nobody performs on them.
+; Regen's tick runs as the Regen'd body's own action (Cmd_22), since the
+; game keeps no record of who cast the Regen: so a holder's own Regen heals
+; 25% more, whoever cast it, and a Regen the holder cast on someone else
+; heals as it always did.
+;
+; Rung 3: $f0 += $f0 / 4 (the quarter rounds down), after the boost's
+; multiplier (Ot6BoostDmg, on the base) and the random variance; a boosted
+; Cure is already Cure 2 or Cure 3 (the boost bought the tier), and the
+; quarter goes on top of that.  It goes on before the heal-or-damage choice,
+; so a heal that hurts an undead body or a zombie (the same amount, turned
+; into damage) is 25% stronger too.  The cap is unchanged: the amount is
+; still clipped at 9999 and the target's HP at its max.
+;
+; Rung 5: a revive -- the target is KO'd ($3ee4 bit 7) and this action lifts
+; it ($3dfc bit 7, MagicStatusEffect's status-1-to-clear, filled before this
+; call) -- heals the target's max HP ($3c1c), so it rises at full.  Life 2
+; and a character's Life 3 on a KO'd body already did (power 16/16 of max
+; HP, Ot6Life3Revive); Life and a Fenix Down (2/16) now do too.
+.proc Ot6SeraphHeal
+        .a8
+        php
+        longai
+        pha
+        phx
+        cpx     #$0008
+        bcs     @out            ; a monster's action
+        lda     $11a4
+        lsr
+        bcc     @out            ; not a heal
+        lda     $11a3
+        bit     #$0080
+        bne     @out            ; MP, not HP
+        lda     $3ee4,x
+        bit     #$0080
+        bne     @out            ; a KO'd actor: Life 3's own revival
+        lda     $3ed8,x         ; actor
+        and     #$00ff
+        ora     #OT6_SLOT_SRAPHIM << 8
+        jsr     Ot6EsperCount   ; (clobbers X, pushed above)
+        cmp     #OT6_RUNG3
+        bcc     @out
+        tax                     ; the count
+        lda     $f0
+        lsr
+        lsr
+        clc
+        adc     $f0             ; + a quarter, rounded down
+        bcc     :+
+        lda     #$ffff          ; (saturate; the 9999 cap is downstream)
+:       sta     $f0
+        cpx     #OT6_RUNG5
+        bcc     @out
+        lda     $3ee4,y
+        and     $3dfc,y
+        bit     #$0080
+        beq     @out            ; not a revive
+        lda     $3c1c,y         ; the target's max HP
+        sta     $f0
+@out:   plx
+        pla
+        plp
+        rtl
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -932,16 +1031,14 @@ Ot6LadderTbl:
         eff     0,0,0,0,0,$02,0,0,0,0
         stat    0,2,0,0
         eff     0,0,0,0,0,0,0,0,0,$04
-; 20 Sraphim: Stm / Mag; immune to Doom's countdown; Regen (Cure Ring).  The
-;    design's Grace (keep the boost bank through KO and revive) would do
-;    nothing: no code clears a fallen character's bank (OT6_BP_CLASS), so the
-;    bank already survives a KO.  The healer's Regen stands in, the overlap
-;    with Kirin's on purpose (#328).
+; 20 Sraphim: Stm / Mag; the member's healing +25% (new code); full revives
+;    (new code): both Ot6SeraphHeal (owner, 2026-11-14: they replace Doom's
+;    countdown, which Phoenix's rung 3 holds, and Kirin's Regen)
         stat    0,0,1,0
         stat    0,0,0,1
-        eff     0,0,S2_DOOM,0,0,0,0,0,0,0
+        none
         stat    0,0,2,0
-        eff     0,0,0,$02,0,0,0,0,0,0
+        none
 ; 21 Golem: Stm / Vig; immune to Muddle; covers allies (True Knight)
         stat    0,0,1,0
         stat    1,0,0,0

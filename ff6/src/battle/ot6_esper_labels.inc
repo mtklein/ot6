@@ -103,9 +103,9 @@ Ot6RungLabelTbl:
         .byte   $8c,$a2,$ab,$9a,$a0,$9e,$ff,$95,$9e,$ac,$ad,$ff   ; Phantom 5: Mirage Vest
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Sraphim 1: Stamina +1
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b5,$ff,$ff   ; Sraphim 2: Mag.Pwr +1
-        .byte   $8d,$a8,$ff,$83,$a8,$a8,$a6,$ff,$ff,$ff,$ff,$ff   ; Sraphim 3: No Doom
+        .byte   $87,$9e,$9a,$a5,$ff,$ca,$b6,$b9,$cd,$ff,$ff,$ff   ; Sraphim 3: Heal +25%
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b6,$ff,$ff   ; Sraphim 4: Stamina +2
-        .byte   $82,$ae,$ab,$9e,$ff,$91,$a2,$a7,$a0,$ff,$ff,$ff   ; Sraphim 5: Cure Ring
+        .byte   $85,$ae,$a5,$a5,$ff,$91,$9e,$af,$a2,$af,$9e,$ff   ; Sraphim 5: Full Revive
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Golem 1: Stamina +1
         .byte   $95,$a2,$a0,$a8,$ab,$ff,$ff,$ff,$ca,$b5,$ff,$ff   ; Golem 2: Vigor   +1
         .byte   $8d,$a8,$ff,$8c,$ae,$9d,$9d,$a5,$9e,$ff,$ff,$ff   ; Golem 3: No Muddle
