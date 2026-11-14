@@ -674,7 +674,7 @@ opening keys won 27, lost 1" (`air/tally_g12.txt`); "4 Kefka: won 46, lost
 
 - **be30 at 16** (`g16_k0_s13`): the first Megalixir confirmed while STRAGO
   fell from 1 HP, the second planned, and then his Special took CELES from
-  5,102 ("ONE ACTION from >= 80%"), RELM and CYAN from full; at 12 the same
+  5,102 and CYAN from 5,840 of 5,840 ("ONE ACTION from >= 80%"); at 12 the same
   draw "tier 4 Kefka WON after 19175 ticks, 4 deaths, key be30"
   (`g12_k0_s13`). The four more shields keep him in his cycle longer, and
   his Special, not Fallen One or Ultima, decides this one.
