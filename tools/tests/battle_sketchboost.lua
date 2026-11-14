@@ -269,11 +269,18 @@ local function windowsNeeded()
     a, pFirst, b, 1 - pFirst, pNum, nWin, MISS_ODDS))
   assert(nWin <= WMAX, string.format("the odds ask for %d windows, more than WMAX (%d)", nWin, WMAX))
 end
+local function anyLive()
+  for m = 0, 5 do if live(m) then return true end end
+  return false
+end
+-- a battle RELM can take a natural try in: up, a monster standing, one with a numberless sketch
+local function usable() return H.battleLoadStarted() and anyLive() and pickTarget() end
 -- leave a battle that has no body left to sketch (or has ended) for the world map
 local function leaveBattle()
   local ph = 0
   return H.repeatN(1, {
-    H.cond(function() return H.battleLoadStarted() end, { H.fleeBattle(9000, { onCantRun = "fight" }) }, {}),
+    H.cond(function() return H.battleLoadStarted() and anyLive() end,
+      { H.fleeBattle(9000, { onCantRun = "fight" }) }, {}),
     H.driveUntil(function() return H.worldMode() and H.worldHasControl() end, 6000, {
       H.call(function() ph = (ph + 1) % 24; H.setPad(ph < 4 and { "a" } or {}) end),
     }, "back on the world map for another encounter"),
@@ -282,31 +289,43 @@ local function leaveBattle()
   })
 end
 -- drive to RELM's next window with a pip banked and nothing pending, and
--- snapshot it into t.snap
+-- snapshot it into t.snap; a battle that ends (or keeps no body to sketch)
+-- before the window opens gives way to the next encounter, up to three
 local function windowSnap(t)
-  local tick = 0
-  return {
-    H.call(function() t.snap = nil end),
-    H.driveUntil(function() return t.snap ~= nil end, 30000, {
-      H.call(function()
-        assert(H.battleLoadStarted(), "the battle is still up while RELM's window " .. t.window .. " is sought")
-        tick = tick + 1
-        if tick % 12 == 6 then H.setPad({}) return end
-        if tick % 12 ~= 0 or H.readByte(MENU) == 0 then return end
-        local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
-        if a == relmS and st == ST_CMD and pend(relmS) == 0 and bank(relmS) >= 1 and pickTarget() then
-          H.setPad({}); t.snap = H.requestSaveState(); t.tgt = tgtMon
-          H.log(string.format("[sketch] window %d f%d: RELM bank %d, target m%d", t.window, H.frame, bank(relmS),
-            tgtMon))
-          return
-        end
-        local b = defendPress(st)
-        H.setPad(b and { [b] = true } or {})
-      end),
-    }, "RELM's window " .. t.window),
-    H.waitFrames(2),
-    H.call(function() H.checkReq(t.snap, "window " .. t.window) end),
-  }
+  local out = { H.call(function() t.snap = nil end) }
+  for round = 1, 3 do
+    local tick = 0
+    out[#out + 1] = H.cond(function() return t.snap == nil end, {
+      H.cond(function() return not usable() end, {
+        H.call(function()
+          H.log(string.format("[sketch] window %d: no body to sketch in this battle; another encounter (%d of 3)",
+            t.window, round))
+        end),
+        leaveBattle(), findEncounter() }, {}),
+      H.driveUntil(function() return t.snap ~= nil or not usable() end, 30000, {
+        H.call(function()
+          tick = tick + 1
+          if tick % 12 == 6 then H.setPad({}) return end
+          if tick % 12 ~= 0 or H.readByte(MENU) == 0 then return end
+          local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
+          if a == relmS and st == ST_CMD and pend(relmS) == 0 and bank(relmS) >= 1 then
+            H.setPad({}); t.snap = H.requestSaveState(); t.tgt = tgtMon
+            H.log(string.format("[sketch] window %d f%d: RELM bank %d, target m%d", t.window, H.frame, bank(relmS),
+              tgtMon))
+            return
+          end
+          local b = defendPress(st)
+          H.setPad(b and { [b] = true } or {})
+        end),
+      }, "RELM's window " .. t.window),
+      H.waitFrames(2),
+    }, {})
+  end
+  out[#out + 1] = H.call(function()
+    assert(t.snap, "RELM's window " .. t.window .. " opened within three encounters")
+    H.checkReq(t.snap, "window " .. t.window)
+  end)
+  return out
 end
 
 local steps = {
@@ -384,9 +403,6 @@ for k = 1, WMAX do
   if k == 1 then
     body[#body + 1] = H.call(function() t.snap = snap; t.tgt = tgtMon end)
   else
-    body[#body + 1] = H.cond(function() return not (H.battleLoadStarted() and H.battleActive() and pickTarget()) end,
-      { H.call(function() H.log("[sketch] window " .. k .. ": no body to sketch here; another encounter") end),
-        leaveBattle(), findEncounter() }, {})
     for _, st in ipairs(windowSnap(t)) do body[#body + 1] = st end
   end
   for _, st in ipairs(runTry(t)) do body[#body + 1] = st end
