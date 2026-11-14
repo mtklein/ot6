@@ -135,15 +135,27 @@ local function toRest(route, conds)
   return out
 end
 -- where the party stands, over time, along moves: { x, y, from, until }
+-- a step's frames at the party's real speed.  The field picks the speed as each step starts (player.asm: 3
+-- under the Sprint Shoes' field bit, $11DF bit $20, unless $1EB8 bit $02 turns it off; else 2) and the party
+-- object's speed byte reads 2 again at rest, so the bit is read, not the byte (1c8490d1 read the byte at rest:
+-- 2 every time, so its halving never applied, which is why it changed nothing).  Measured on wor_belly_in with
+-- STRAGO's kept Palidor rank (the Sprint Shoes bit): a step 8 frames, a jump 76 (the jump script sets its own
+-- speed, so jumps are as before), the door (6,20) entered in 9
+-- (build/attempts/wt/v044-esper-rework-3/belly/probe_belly.log)
+local function stepF()
+  if (H.readByte(0x11DF) & 0x20) ~= 0 and (H.readByte(0x1EB8) & 0x02) == 0 then return STEP_F // 2 end
+  return STEP_F
+end
 local function spansOf(moves)
   local spans, t = {}, 0
+  local sf = stepF()
   for _, m in ipairs(moves) do
-    local d = m.kind == "step" and STEP_F or m.kind == "jump" and JUMP_F or DOOR_F
+    local d = m.kind == "step" and sf or m.kind == "jump" and JUMP_F or DOOR_F
     spans[#spans + 1] = { m.from & 0xFF, m.from >> 8, t, t + d }
-    spans[#spans + 1] = { m.to & 0xFF, m.to >> 8, t + d, t + d + STEP_F }
+    spans[#spans + 1] = { m.to & 0xFF, m.to >> 8, t + d, t + d + sf }
     t = t + d
   end
-  return spans, t + STEP_F
+  return spans, t + sf
 end
 local seed = 12345
 local function rnd() seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 end
@@ -354,6 +366,11 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       return H.waitFrames(4)
     end
     moves, waitStart = moves + 1, nil
+    if best and mv == best[1] then
+      -- the stretch the walk priced, kept for the drop's report (#328 review: predicted against observed)
+      local sp = spansOf(best)
+      BELLY_PRED = { f0 = H.frame, risk = bestR, spans = sp, step = stepF() }
+    end
     if mv.kind == "jump" then stood = 0 end
     lastWhy = nil
     if mv.kind == "jump" then
@@ -419,6 +436,18 @@ local function fallCount()
   if s and not inShaft then
     falls = falls + 1
     H.log(string.format("[jwalk] f%d dropped down the shaft (%d); %s", H.frame, falls, objLine()))
+    local p = BELLY_PRED
+    if p then
+      local pr = {}
+      for _, sp in ipairs(p.spans) do pr[#pr + 1] = string.format("(%d,%d)@%d-%d", sp[1], sp[2], sp[3], sp[4]) end
+      local ob = {}
+      for _, r in ipairs(BELLY_TRACE or {}) do
+        if r.f >= p.f0 then ob[#ob + 1] = string.format("%d:(%d,%d)c%s", r.f - p.f0, r.x, r.y, r.c) end
+      end
+      H.log(string.format("[jwalk] drop %d: predicted (step %d frames, risk %.2f) %s", falls, p.step, p.risk,
+        table.concat(pr, " ")))
+      H.log(string.format("[jwalk] drop %d: observed since the stretch began %s", falls, table.concat(ob, " ")))
+    end
   end
   inShaft = s
   return falls
@@ -426,8 +455,21 @@ end
 -- the careful walk to (x, y) on the bridge, again from wherever the party stands while it is not there (a
 -- conductor's touch drops it to the shaft's foot, where the plate (46,17) opens the way back: _cb8062,
 -- $01F0 for this load of the map), at most `tries` times; done() ends it early
+-- the party's tile and the conductors' columns each frame on 276, the last 200 frames (a drop's report)
+local function armTrace()
+  if BELLY_TRACE then return end
+  BELLY_TRACE = {}
+  emu.addEventCallback(function()
+    if map() ~= 276 then return end
+    local c = {}
+    for _, o in ipairs({ 0x10, 0x11, 0x12 }) do c[#c + 1] = string.format("%d/%d", H.objX(o), H.objY(o)) end
+    BELLY_TRACE[#BELLY_TRACE + 1] = { f = H.frame, x = H.fieldX(), y = H.fieldY(), c = table.concat(c, ",") }
+    if #BELLY_TRACE > 200 then table.remove(BELLY_TRACE, 1) end
+  end, emu.eventType.endFrame)
+end
 local function jwalk(x, y, lk, what, tries, done)
   local n = 0
+  armTrace()
   local function there() return (done and done()) or (H.fieldX() == x and H.fieldY() == y and H.tileAligned()) end
   return H.seqStep({
     H.repeatN(tries or 6, {
@@ -455,13 +497,7 @@ local function jwalk(x, y, lk, what, tries, done)
       }, {}),
     }),
     H.call(function()
-      -- the conductors walk on the game's RNG, so the tries' fate is the attempt's draw: spent tries are a
-      -- timeout the runner re-rolls (another seed shift), not a contract.  The #328 line at f51cf3ac dropped 30 of
-      -- 30 tries to the FakeMustache, and again under three changes to the walk's timing and patience
-      -- (build/attempts/wt/v044-esper-rework/land3/)
-      if not there() then
-        error(string.format("timeout after %d tries: %s: not at (%d,%d) on map %d", tries or 6, what, x, y, map()), 0)
-      end
+      H.assertEq(there(), true, string.format("%s: at (%d,%d) on map %d within %d tries", what, x, y, map(), tries or 6))
       H.log(string.format("[jwalk] %s: there after %d tries, %d drop(s) down the shaft", what, n, falls))
       say("route", what)
     end),
