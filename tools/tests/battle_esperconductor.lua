@@ -73,7 +73,7 @@ H.run({ maxFrames = 700000 }, {
     -- the budget from the zone's pool: the battles within which every slot comes up, at 99%
     local pool = H.encounterPool(H.worldEncounterGroup(B[1], B[2]))
     local pmin = 1
-    for _, sl in pairs(pool) do if sl.odds and sl.odds > 0 then pmin = math.min(pmin, sl.odds / 256) end end
+    for slot = 1, 4 do local sl = pool[slot]; if sl and sl.odds and sl.odds > 0 then pmin = math.min(pmin, sl.odds / 256) end end
     BUDGET = math.ceil(math.log(0.01) / math.log(1 - pmin))
     H.log(string.format("[conductor] the rarest slot %.3f: budget %d battles", pmin, BUDGET))
   end),
