@@ -21,6 +21,28 @@ it already survives a KO), and the stand-ins that shipped first (immune to
 Doom's countdown, the Cure Ring's Regen) repeated Phoenix's rung 3 and
 Kirin's signature. The rest of this doc is the design as proposed.
 
+**Crusader's signature is a pure upgrade (#534, 2026-11-14).** It sets the
+Gauntlet's and the Genji Glove's bits (relic effects 4, `$11d8` `$08` and
+`$10`). The Genji bit lets the Equip menu put a second weapon in the off
+hand, and the battle swings it. The Gauntlet bit gives a two-hand-capable
+weapon its grip (battle power +3/4) when the other hand is empty. Vanilla
+also cuts a Fight's damage to 3/4 for a Genji bit worn without two weapons
+(`CalcDmg`, `$3c58 & $10`), which made the signature a loss for every holder
+without a second weapon: x0.982 on the grip, x0.751 on a weapon and a shield
+(`build/attempts/wt/v044-crusader/real_rom.log`). `Ot6LadderGenji`, called
+from `UpdateEquipBattle`, clears a Genji bit that no worn piece of gear
+carries before the battle reads it, so the ladder's bit never cuts; a real
+Genji Glove keeps vanilla's cut, and `$2e6e` (the in-battle Item command's
+two-weapon permission) keeps the bit either way. `battle_espercrusader`
+holds all of it, rank 4 against rank 5 from one snapshot.
+
+*Optimum for a holder* follows the Gauntlet bit first (`EquipOptimum`): it
+puts the strongest two-hand-capable weapon the member can wear in the main
+hand (the strongest of any weapon if none is two-hand-capable) and leaves
+the off hand empty: no shield, and never the second weapon the Genji bit
+allows. Two weapons, or a weapon and a shield, are the player's own choice
+in the Equip list.
+
 **Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
 member heals is 25% stronger. Rung 5: anyone the member revives comes back
 at full HP. Both are `Ot6SeraphHeal`, called in `CalcTargetDmg` once per

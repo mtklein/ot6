@@ -64,7 +64,8 @@ cast at an enemy weak to lightning take one more shield. Carbunkl's starts every
 with two boost points, and Phoenix's starts every battle under Life 3, which
 revives its wearer once when they fall. Fenrir's protects against
 Stop and Slow. Crusader's gives its wearer the Gauntlet's two-handed grip and
-the Genji Glove's two weapons at once, with neither worn. Odin and Raiden share one Magic Point count. Gau, Umaro and Gogo
+the Genji Glove's two weapons at once, with neither worn, and without the
+Genji Glove's damage penalty on a single weapon. Odin and Raiden share one Magic Point count. Gau, Umaro and Gogo
 can't wear espers, so they never earn Magic Points. Magic Points are kept
 with your save: loading a save loses any earned since.
 
