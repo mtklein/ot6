@@ -76,7 +76,7 @@ H.run({ maxFrames = 900000 }, {
     local grp = H.fieldEncounterGroup(H.mapId())
     local pool = H.encounterPool(grp)
     local pmin = 1
-    for _, sl in pairs(pool) do if sl.odds and sl.odds > 0 then pmin = math.min(pmin, sl.odds / 256) end end
+    for slot = 1, 4 do local sl = pool[slot]; if sl and sl.odds and sl.odds > 0 then pmin = math.min(pmin, sl.odds / 256) end end
     BUDGET = math.ceil(math.log(0.01) / math.log(1 - pmin))
     H.log(string.format("[rage] the cave's group %d: the rarest slot %.3f; budget %d battles (every slot at 99%%)",
       grp, pmin, BUDGET))
