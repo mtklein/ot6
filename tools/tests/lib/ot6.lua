@@ -20535,6 +20535,22 @@ function Driver:watchHits()
     self.condemnedAt = self.condemnedAt or {}
     local dc = M.doomCount({ s2 = M.readByte(0x3EE5 + e * 2), count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
     if dc ~= nil and dc <= 0 then self.condemnedAt[e] = M.frame end
+    -- The count's last step and its Doom can land on one frame (CondemnDeath with nothing queued ahead), and
+    -- then the byte is never read at 1 above: the visit that carries the member's status-counter accumulator
+    -- ($3adc) with the count at 1 is that step.  Seen that way, it marks the Doom for the ally reading below only
+    -- (the [death] line; a monster's action open as it lands keeps its reading, which commitMonAct's ledger
+    -- prices): battle_doom's Defends under B on kolts_cave at 742257a2 read 'by entity 1 char 1 cmd $15
+    -- atk $FF (an ally's action)' for a Doom whose CLEARED line said it landed
+    -- (build/attempts/wt/v044-esper-rework-7/lab/d4).
+    self.doomStep = self.doomStep or {}
+    do
+      local acc, prev = M.readByte(0x3ADC + e * 2), self.doomStep[e]
+      local at = prev and prev.at
+      if prev ~= nil and prev.count == 1 and acc ~= prev.acc and prev.acc + M.readByte(0x3ADD + e * 2) > 0xFF then
+        at = M.frame
+      end
+      self.doomStep[e] = { acc = acc, count = dc, at = at }
+    end
     if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
        and not self.deathSaid[e] then
       self.deathSaid[e] = true
@@ -20556,7 +20572,8 @@ function Driver:watchHits()
         self.monAct.kills = self.monAct.kills + 1
         if from >= maxhp then self.monAct.fullKills = self.monAct.fullKills + 1 end
       end
-      local ally = self.monAct == nil and not doomed and self:allyAct() or nil
+      local stepped = M.DOOM_ATTRIBUTION and self.doomStep[e].at ~= nil and M.frame - self.doomStep[e].at <= 30
+      local ally = self.monAct == nil and not doomed and not stepped and self:allyAct() or nil
       local rec = { e = e, char = M.readByte(BATTLE.BCHID + e * 2), tick = self.battleTick,
                     from = from, maxhp = maxhp, bp = bp,
                     slot = self.monAct and self.monAct.slot, cmd = self.monAct and self.monAct.cmd,
