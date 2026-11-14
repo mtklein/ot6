@@ -55,5 +55,13 @@ its third rank, the HP that character restores, by spell or by item, is a
 quarter more, and at the top, anyone they bring back with Life or a Fenix
 Down returns with full HP.
 
+A few top ranks do something no relic does. Ramuh's makes a lightning spell
+that hits a weakness take one more shield. Carbunkl's starts every battle
+with two boost points, and Phoenix's with Life 3. Fenrir's protects against
+Stop and Slow. Crusader's lets the Gauntlet and the Genji Glove be worn
+together. Odin and Raiden share one Magic Point count. Gau, Umaro and Gogo
+can't wear espers, so they never earn Magic Points. Magic Points are kept
+with your save: loading a save loses any earned since.
+
 **Saves.** This release uses the v0.44 save layout. Saves from earlier
 releases load, and their characters start with no esper progress.
