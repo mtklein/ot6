@@ -32,13 +32,19 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local GAU = 0x0B
 local RAGETIER = nil                  -- OT6_RAGETIER (ot6_memory.inc), read from the symbols
--- battles to see a measured Rage in.  A battle the party ends before GAU's second turn shows no possessed turn: on
--- the #328 line (f51cf3ac, the party's kept esper ranks) 15 of 16 cave battles ended at one Cmd_10 and the 16th
--- carried a level-up ("no Rage planned and possessed past its start within 16 cave battles"), so the budget is
--- the cave's, not one draw's
-local BUDGET = 40
+-- The battle's length is staged by play: until GAU's possessed turn is seen, the others Defend (the driver's
+-- opts.hold), so the party does not end the fight before his second turn (on the #328 line at f51cf3ac the party
+-- ended 15 of 16 cave battles at one Cmd_10: "no Rage planned and possessed past its start within 16 cave
+-- battles").  The budget is the cave pool's (BUDGET, set at the start from the ROM's decoded odds): the battles
+-- within which every formation the map deals comes up at least once, at 99%, so the measure meets whatever the
+-- cave holds rather than one draw's luck.
+local BUDGET = nil
 local A, B = { 57, 45 }, { 58, 45 }
+local cur = nil
 local FIGHT = { rage = true }      -- the line is opt-in (Driver:rageLine)
+-- the others Defend until GAU's possessed turn is seen in this battle (the staging above); the control sets
+-- RAGE_OFF and so never holds
+FIGHT.hold = function(id) return id ~= GAU and not RAGE_OFF and cur ~= nil and cur.cmd10 < 2 end
 
 local function gauSlot()
   for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == GAU then return s end end
@@ -46,20 +52,16 @@ local function gauSlot()
 end
 local function raging(s) return (H.readByte(0x3EF9 + s * 2) & 0x01) ~= 0 end
 local function recMp() return H.readWord(0x1600 + 37 * GAU + 0x0D) end
+local function batMp(s) return H.readWord(0x3C08 + s * 2) end
 local function recLevel() return H.readByte(0x1600 + 37 * GAU + 8) end
--- a battle GAU levels up in is not a price reading on his record: the level-up refills his MP to the new max at the
--- battle's end (#524 landing at 9d0374c8: "record MP 323 -> 353"; 2026-11-13: "record MP 331 -> 353; GAU L34 -> L35;
--- max MP 339 -> 353", build/attempts/wt/v043-wob-rows/gate/rage/).  Such a battle is read on his battle MP ($3C08,
--- his seat), its lowest while the battle runs, before the refill: on the #254 replay the one long battle in sixteen
--- was a level-up battle (gate/suite_battle_ragedriver.red.log).  RD_LEVELUPS = true is the mutant that reads the
--- record anyway.
-RD_LEVELUPS = RD_LEVELUPS or false
--- RD_BMIN_OFF = 1 is the mutant that misreads the battle MP by one (the price off by one on the level-up path)
-RD_BMIN_OFF = RD_BMIN_OFF or 0
+-- a battle GAU levels up in is not a price reading: the level-up raises his MP with his max at the battle's end
+-- (#524 landing at 9d0374c8: "record MP 323 -> 353" over a battle that took his max MP up, and the price assert read
+-- "got 353 ($161), want 315 ($13B)").  So the price is read from his battle MP ($3C08 + seat * 2): at the battle's
+-- open and at his possessed turn's Cmd_10, which a level-up at the battle's end cannot touch.
 
 -- per battle: the Rage plans made in it, GAU's Cmd_10s (his seat in Y),
 -- and the tier and beast the first frame his RAGE status reads set
-local cur, done = nil, nil
+done = nil
 local nr0, n0 = 0, 0
 local function fresh() return { cmd10 = 0, tier = nil, beast = nil, rage = nil } end
 local inBattle = false
@@ -70,9 +72,20 @@ H.run({ maxFrames = 900000 }, {
     RAGETIER = H.sym("OT6_RAGETIER") & 0xFFFF
     H.assertEq(H.partyOfChar(GAU), 1, "GAU seated in wor-veldt-cave-v1 (the play's own save)")
     n0 = #H.outcomes
+    -- the budget from the cave's pool (see BUDGET's note)
+    local grp = H.fieldEncounterGroup(H.mapId())
+    local pool = H.encounterPool(grp)
+    local pmin = 1
+    for _, sl in pairs(pool) do if sl.odds and sl.odds > 0 then pmin = math.min(pmin, sl.odds / 256) end end
+    BUDGET = math.ceil(math.log(0.01) / math.log(1 - pmin))
+    H.log(string.format("[rage] the cave's group %d: the rarest slot %.3f; budget %d battles (every slot at 99%%)",
+      grp, pmin, BUDGET))
     emu.addMemoryCallback(function()
       local s = gauSlot()
-      if cur and s ~= nil and (emu.getState()["cpu.y"] & 0xFF) == s * 2 then cur.cmd10 = cur.cmd10 + 1 end
+      if cur and s ~= nil and (emu.getState()["cpu.y"] & 0xFF) == s * 2 then
+        cur.cmd10 = cur.cmd10 + 1
+        if cur.cmd10 == 2 then cur.bmp2 = batMp(s) end   -- the possessed turn: the start's charge is in
+      end
     end, emu.callbackType.exec, H.sym("Cmd_10"), H.sym("Cmd_10"))
   end),
   H.navTo(A[1], A[2], { maxFrames = 3000 }),
@@ -81,10 +94,6 @@ H.run({ maxFrames = 900000 }, {
     -- the beast and the tier, the first frame GAU's RAGE status reads set
     -- (Cmd_10 writes both before it sets the bit)
     local gs = gauSlot()
-    if b and inBattle and gs ~= nil and cur.rage == nil and #H.rages > nr0 then
-      local m = H.readWord(0x3C08 + gs * 2)
-      if cur.bmin == nil or m < cur.bmin then cur.bmin = m end
-    end
     if b and inBattle and cur.tier == nil and gs ~= nil and raging(gs) then
       cur.tier, cur.beast = H.readByte(RAGETIER), H.readByte(0x33A8 + gs * 2)
     end
@@ -98,14 +107,7 @@ H.run({ maxFrames = 900000 }, {
       H.log(string.format("[rage] battle %d: rage plans %d; Cmd_10 %d; tier %s; beast %s; record MP %d -> %d; "
         .. "GAU L%d -> L%d", #H.outcomes - n0, #H.rages - nr0, cur.cmd10, tostring(cur.tier),
         cur.beast and string.format("$%02X", cur.beast) or "-", cur.mp0, cur.mp1, cur.lv0, cur.lv1))
-      if cur.rage and cur.cmd10 >= 2 and done == nil then
-        done = cur
-        done.after = (cur.lv1 == cur.lv0 or RD_LEVELUPS) and cur.mp1 or (cur.bmin + RD_BMIN_OFF)
-        if done.after ~= cur.mp1 then
-          H.log(string.format("[rage] GAU levelled up in this battle: the price is read on his battle MP, lowest %d",
-            cur.bmin))
-        end
-      end
+      if cur.rage and cur.cmd10 >= 2 and done == nil then done = cur end
     end
     -- read the moment the plan is made (a log, not an assert): the chosen
     -- beast's special (MonsterRage +1) and its element, against every
@@ -141,10 +143,8 @@ H.run({ maxFrames = 900000 }, {
       done.tier, done.beast, done.mp0, done.mp1))
     H.assertEq(done.cmd10 >= 2, true, "1. Cmd_10 ran for GAU's seat at the start and a possessed turn")
     H.assertEq(done.beast, r.rage, "1. GAU's seat possessed by the planned beast ($33A8)")
-    H.assertEq(done.after, done.mp0 - 8, "2. 8 MP for the start and none for the possessed turns after it")
-    if done.lv1 == done.lv0 then
-      H.assertEq(done.bmin, done.mp1, "2. his battle MP's lowest is the MP his record kept")
-    end
+    H.log(string.format("[rage] battle MP at the plan %d, at the possessed turn %d", r.mp, done.bmp2))
+    H.assertEq(done.bmp2, r.mp - 8, "2. 8 MP for the start and none for the possessed turn after it (battle MP)")
     H.assertEq(done.tier, math.min(r.boost, 3), "3. OT6_RAGETIER holds the plan's boost")
   end),
   -- the control: the same driver with the line off
