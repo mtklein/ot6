@@ -181,6 +181,17 @@ piercing.
 - **Jank:** the three-squad control scheme stays byte-for-byte,
   including vanilla's unusual moogle gear; losing all squads is still
   a game over.
+- **How the line plays it:** the squad that will face the Marshal sits
+  out the waves. Four of the six marches pass (15,19) and the other two
+  (20,20), so Mog's squad, the strongest and the last to face him, holds
+  (15,19) for four waves, Kushu's holds (20,20) for two, and Locke's
+  waits beside Terra, meeting only a guard that beat a squad. The waves
+  are fought with the fight driver, not blind presses, so Mog's squad
+  comes through four of them with Mog standing for his strip (#143).
+  With two waves a squad, Locke's squad met the Marshal at about half HP
+  with an empty bag (it holds a couple of heals at most, and nothing in
+  the event restores HP), where one Marshal hit drops a member; at full
+  HP the first squad won on every draw the lab dealt (wt/v044-moogle).
 
 ## Mt. Kolts
 

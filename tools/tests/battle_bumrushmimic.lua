@@ -51,6 +51,23 @@ local function whoX()
   return nil
 end
 
+-- GOGO's Mimic copies whatever action ran last.  When that was not SABIN's Bum Rush (a member's care heal ran
+-- between them: wor-kt-factory-v1's draw at b215c0c6, "[care] f5512 actor 1 confirms the heal on slot 1"),
+-- the copy never reaches Ot6BlitzTake and leaves no record, so the battle was never closed and the idle
+-- Defends sat under 60,000-HP monsters to a wipe.  So GOGO's first action end after his plan entry is
+-- confirmed (kitBattle's "entry N of N: confirmed, char $0C" line) closes a record of its own: the
+-- copy ran, not as a Blitz, and judge() does not count it.
+local gogoConfirmed = nil
+do
+  local rawLog = H.log
+  H.log = function(msg)
+    if type(msg) == "string" and msg:find("^%[kit%] f%d+ entry %d+ of %d+: confirmed, char %$0C") then
+      gogoConfirmed = H.frame
+    end
+    return rawLog(msg)
+  end
+end
+
 local function arm()
   local take, hc, ae = H.sym("Ot6BlitzTake"), H.sym("Ot6HitCount"), H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
@@ -85,6 +102,12 @@ local function arm()
   end, emu.callbackType.exec, join, join)
   emu.addMemoryCallback(function()
     local who = whoX()
+    if who == GOGO and recs[GOGO] == nil and gogoConfirmed ~= nil and H.frame > gogoConfirmed then
+      recs[GOGO] = { cmdId = 0, pend = -1, mp0 = 0, mp1 = 0, ran = 0, sets = {}, blows = {}, ended = H.frame }
+      H.log(string.format("[bumrushmimic] f%d GOGO's action ended without Ot6BlitzTake: his Mimic copied "
+        .. "something other than a Blitz", H.frame))
+      return
+    end
     local r = who and recs[who]
     if r == nil or r.ended or r.ran == nil then return end
     r.ended = H.frame
@@ -101,7 +124,7 @@ local function closed() return recs[GOGO] ~= nil and recs[GOGO].ended ~= nil and
 local function decide()
   battles = battles + 1
   H.assertEq(battles <= 12, true, "a counted Mimic of Bum Rush within 12 battles")
-  seats, recs, plan, mode = {}, {}, {}, "play"
+  seats, recs, plan, mode, gogoConfirmed = {}, {}, {}, "play", nil
   for s = 0, 3 do
     local id = H.readByte(0x3ED8 + s * 2)
     if id == SABIN or id == GOGO then seats[id] = s end

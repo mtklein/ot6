@@ -102,15 +102,28 @@ local function logPools(tag)
 end
 
 -- tap Y until the leader offset says squad p is active.  CheckChangeParty
--- needs Y seen UP then DOWN, control, alignment; the press-release cycle
--- below satisfies the latch, and a press eaten by the switch fade just
--- gets retried.
+-- needs Y seen UP then DOWN, control, alignment; the 6-frame press and
+-- 40-frame release below satisfy the latch, and a press eaten by the
+-- switch fade just gets retried.  A wave that collides with a parked squad
+-- during the deployment opens its battle mid-switch: it is won by the same
+-- edge-tapped A as the waves, and the presses resume once the field has
+-- control again.
 local function ySwitchTo(p)
+  local n = 0
   return H.driveUntil(function()
     return H.readWord(0x0803) == LEADER_OFF[p]
-  end, 1800, {
-    H.pressButtons({ "y" }, 6),
-    H.waitFrames(40),
+  end, 6000, {
+    H.call(function()
+      if H.battleLoadStarted() or H.dialogWaiting() then
+        aPhase = (aPhase + 1) % 8
+        H.setPad(aPhase < 4 and { "a" } or {})
+        n = 0
+        return
+      end
+      if not H.hasControl() then H.setPad({}); n = 0; return end
+      n = n % 46 + 1
+      H.setPad(n <= 6 and { "y" } or {})
+    end),
   }, "Y-switch to party " .. p)
 end
 
@@ -399,21 +412,42 @@ H.run({ maxFrames = 200000 }, {
   end),
   H.saveState("moogle_defense.mss"),
 
+  -- The deployment keeps LOCKE's squad, the first to take the Marshal, out
+  -- of the waves.  The six guards' marches (_ccab6f) start up the x=15
+  -- column from (15,34..39) and end on (14,13) beside TERRA:
+  --   NPC_4, NPC_9  east, through (20,20), then along y=18
+  --   NPC_5, NPC_6  the middle, up x=15 from (15,23)
+  --   NPC_7, NPC_8  west, through (10,21), then along y=19 to (15,19)
+  -- so (15,19) is on four marches and (20,20) on the other two.  MOG's
+  -- squad, the strongest and the last to take the Marshal (#143), holds
+  -- (15,19) for four waves; KUSHU's holds (20,20) for two; LOCKE's stands
+  -- on (14,14), the last tile before TERRA, where it meets only a guard
+  -- that beat a squad, and takes the Marshal at full HP.
+  -- Lab, wt/v044-moogle (build/attempts/wt/v044-moogle/): with two waves
+  -- a squad (the old deployment) LOCKE's squad met the Marshal at about
+  -- half HP and lost him on 9 of 18 distinct fights.  Four waves on MOG's
+  -- squad fought by blind A-taps left MOG down on one draw in 16, and the
+  -- Equip menu refuses a wounded member (CheckSkillValid), so his gear
+  -- was lost (#143); four on KUSHU's squad at (15,18) were annihilating on
+  -- 10 of 31 draws; three and three from the fork at (15,31) needs MOG's
+  -- squad on (12,28) before NPC_6, and it arrives late.  The waves are
+  -- fought by the library's fight driver below, not blind A-taps.
   H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
   ySwitchTo(3),
   H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
+  H.navTo(15, 19, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(1),
   H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
   logPools("deployed"),
 
   -- ===================================================================== --
   -- Phase 4b: the waves.  No positioning input is needed: each march
-  -- collides with its arm's squad, the collision auto-engages that squad,
-  -- tap-A wins the wave (Vomammoth + Lobo), and the win path despawns the
-  -- guard, so $060A..$060F clear one by one, two waves per squad at ~90-190
-  -- HP each.  advanceStory's playBattles mode is this driver.
+  -- collides with the squad on its arm, the collision auto-engages that
+  -- squad, the fight driver (playBattles = "tactical": kill order, boost,
+  -- items) wins the wave (Vomammoth + Lobo), and the win path despawns
+  -- the guard, so $060A..$060F clear one by one: four waves on MOG's
+  -- squad, two on KUSHU's.
   -- ===================================================================== --
   -- reserve = {}: the care after each wave serves the squad that fought
   -- and spends the bag down to nothing here -- the Marshal is this
@@ -421,7 +455,7 @@ H.run({ maxFrames = 200000 }, {
   -- ruling; the route's reserve floor holds everywhere else).
   H.advanceStory(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
-  end, 60000, { playBattles = true, reserve = {} }),
+  end, 60000, { playBattles = "tactical", reserve = {} }),
   H.logStep(function()
     return string.format("all six wave guards down at frame %d; corridor open",
       H.frame)
@@ -434,6 +468,9 @@ H.run({ maxFrames = 200000 }, {
   ySwitchTo(2),
   H.waitUntil(calm(30), 1800, "party 2 active and calm"),
   stripMog(),
+  -- (15,19) is on the x=15 corridor every squad walks to the Marshal:
+  -- MOG's squad steps off it, back to the west arm
+  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
 
   -- ===================================================================== --
   -- Phase 4c: the Marshal, up to three input-driven attempts, by the
