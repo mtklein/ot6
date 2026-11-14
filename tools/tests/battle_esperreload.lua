@@ -59,7 +59,9 @@ end
 -- random battles, fought out, until the live page is ahead of slot 3's (at most eight)
 local function earn(tag)
   local n = 0
-  return H.driveUntil(function() return not same(page(LIVE), saved) end, 300000, {
+  return H.driveUntil(function()
+    return not same(page(LIVE), saved) and not H.battleLoadStarted() and H.worldHasControl()
+  end, 300000, {
     H.call(function() n = n + 1; H.assertEq(n <= 8, true, tag .. ": a battle that pays a stone-wearer within eight") end),
     pace(tag .. ": a random battle"),
     H.waitUntil(function() return H.battleActive() end, 1200, tag .. ": the battle is up", 2),
