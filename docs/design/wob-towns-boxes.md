@@ -181,6 +181,7 @@ replayed line's states (the ROM with these rows), under
 |---|---|---|---|---|
 | 417 Mega Armor + ProtoArmor | 6 | 6 (be88 beDC beAC be78 be8C be2C) | 6 | 0 |
 | 416 Commando x4 | 6 | 5 (be90 be30 be80 beF0 beD4) | 5 | 0 |
+| 476 Specter | 4 | 4 (beE0 be28 beD4 beB4) | 4 | 0 |
 | 61 Telstar | 4 | 4 (beA4 be04 be84 beF0) | 4 | 0 |
 | 170 Gigantos (default kit) | 6 | 5 (be90 be64 beB4 be40 beE4) | 4 | 1 (be90) |
 | 170 Gigantos (no Steal at the box) | 6 | 7 (be90 beB4 be78 be40 beDC beE4 be64) | 6 | 1 (beB4) |
