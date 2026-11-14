@@ -180,7 +180,7 @@ H.run({ maxFrames = 120000 }, {
     return H.keepGear(healer.ch, label, H.unequipRelics(healer.ch, { slot }, { tag = label }))
   end),
   H.reservePrize(RIBBON, 1, "field_gearbaseline case 6: two Ribbons for three wearers"),
-  H.call(function()
+  H.lazy(function()
     H.realHealer = H.gearHealer
     local realPlan = H.gearPrizePlan(members())
     local ribboned = {}
@@ -191,40 +191,39 @@ H.run({ maxFrames = 120000 }, {
       end
       return false
     end
-    -- the mutant is a member whose naming moves the Ribbons: its plan's Ribbon set differs from the real plan's
-    -- (the #328 line at f916b884: the mutant named EDGAR, and the status order then put the other two Ribbons on
-    -- CYAN and the real healer TERRA, the real plan's own set, so the dress left nothing for the rule to name)
-    local function setOf(plan)
-      local t = {}
-      for _, x in ipairs(plan.targets) do if x.id == RIBBON then t[#t + 1] = x.m.ch end end
-      table.sort(t)
-      return table.concat(t, ",")
-    end
-    local realSet = setOf(realPlan)
-    local pick = nil
+    local cands = {}
     local o = H.gearStatusOrder(members())
     for i = #o, 1, -1 do
-      if pick == nil and o[i].ch ~= healer.ch and not ribboned[o[i].ch] and canTake(o[i].ch) then
-        local cand = o[i]
-        H.gearHealer = function(m)
-          for _, x in ipairs(m) do if x.ch == cand.ch then return x end end
-          return H.realHealer(m)
-        end
-        if setOf(H.gearPrizePlan(members())) ~= realSet then pick = cand end
-        H.gearHealer = H.realHealer
-      end
+      if o[i].ch ~= healer.ch and not ribboned[o[i].ch] and canTake(o[i].ch) then cands[#cands + 1] = o[i] end
     end
-    H.assertEq(pick ~= nil, true, "precondition 6: a member who can take a Ribbon, gets none from the real plan, and "
-      .. "whose naming as healer moves the Ribbons")
-    H.log(string.format("[gbtest] 6: the mutant's healer: %s", pick.name))
-    H.gearHealer = function(m)
-      for _, x in ipairs(m) do if x.ch == pick.ch then return x end end
-      return H.realHealer(m)
+    H.assertEq(#cands > 0, true, "precondition 6: a member who can take a Ribbon and gets none from the real plan")
+    -- the real rule keeps a worn prize where its plan can, so a mutant's dress can land on a state the real rule
+    -- also accepts (the #328 line at f916b884: the mutant named EDGAR, and its dress, EDGAR, CYAN and TERRA in
+    -- Ribbons, read clean: 'a violation names "the rule puts the Ribbon $CA on" (got 0: )').  Such a mutant
+    -- proves nothing either way: the dress goes back to the real rule's and the next candidate is named
+    local function try(i)
+      local pick = cands[i]
+      return H.seqStep({
+        H.call(function()
+          H.log(string.format("[gbtest] 6: the mutant's healer: %s", pick.name))
+          H.gearHealer = function(m)
+            for _, x in ipairs(m) do if x.ch == pick.ch then return x end end
+            return H.realHealer(m)
+          end
+        end),
+        H.gearBaseline({ tag = "6: the dress under the healer mutant" }),
+        H.call(function() H.gearHealer = H.realHealer end),
+        H.lazy(function()
+          if has(violations(), "the rule puts the Ribbon $CA on") or i == #cands then
+            return red("6: the healer mutant's dress, read by the real rule", "the rule puts the Ribbon $CA on")
+          end
+          H.log(string.format("[gbtest] 6: %s as healer dresses a state the real rule accepts; the next", pick.name))
+          return H.seqStep({ H.gearBaseline({ tag = "6: back to the real rule" }), try(i + 1) })
+        end),
+      })
     end
+    return try(1)
   end),
-  H.gearBaseline({ tag = "6: the dress under the healer mutant" }),
-  H.call(function() H.gearHealer = H.realHealer end),
-  red("6: the healer mutant's dress, read by the real rule", "the rule puts the Ribbon $CA on"),
   H.gearBaseline({ tag = "6: the dress under the real rule" }),
   green("6: the real rule"),
   H.reservePrize(RIBBON, 0),
