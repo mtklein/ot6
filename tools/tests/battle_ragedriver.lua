@@ -44,7 +44,7 @@ local cur = nil
 local FIGHT = { rage = true }      -- the line is opt-in (Driver:rageLine)
 -- the others Defend until GAU's possessed turn is seen in this battle (the staging above); the control sets
 -- RAGE_OFF and so never holds
-FIGHT.hold = function(id) return id ~= GAU and not RAGE_OFF and cur ~= nil and cur.cmd10 < 2 end
+FIGHT.holdFor = function(id) return id ~= GAU and not RAGE_OFF and cur ~= nil and cur.cmd10 < 2 end
 
 local function gauSlot()
   for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == GAU then return s end end
