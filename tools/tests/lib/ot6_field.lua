@@ -751,6 +751,27 @@ function M.bfsReach(sx, sy, sz, links, tx, ty, avoid)
   return out
 end
 
+-- The exit tiles of map m (default the live map): its short entrances and
+-- every tile of its long ones (ShortEntrancePtrs / LongEntrancePtrs, the
+-- reading of route_data.py `map`), as a list of { x, y } for an avoid list.
+-- The floor's BFS walks onto them like any tile, and stepping on one leaves
+-- the map.
+function M.exitTiles(m)
+  m = m or (M.mapId() & 0x1FF)
+  local out = {}
+  for _, t in ipairs({ { M.sym("ShortEntrancePtrs"), 6, false }, { M.sym("LongEntrancePtrs"), 7, true } }) do
+    local base = t[1] & 0x3FFFFF
+    local function w(o) return M.readRomByte(base + o) | (M.readRomByte(base + o + 1) << 8) end
+    for o = w(m * 2), w(m * 2 + 2) - 1, t[2] do
+      local x, y = M.readRomByte(base + o), M.readRomByte(base + o + 1)
+      local len = t[3] and (M.readRomByte(base + o + 2) & 0x7F) or 0
+      local vert = t[3] and (M.readRomByte(base + o + 2) & 0x80) ~= 0
+      for i = 0, len do out[#out + 1] = { vert and x or x + i, vert and y + i or y } end
+    end
+  end
+  return out
+end
+
 -- Step: walk to (tx, ty) over the map's tile-event links as well as its
 -- floor (M.bfsReach's legs, planned where the party stands when the step
 -- starts): each walk leg is a navTo (opts reach it: fight, playBattles,
@@ -1011,11 +1032,18 @@ function M.navTo(txIn, tyIn, opts)
   local spareSet = {}
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   -- opts.avoid = { {x,y}, ... }: walkable tiles the plan must never route
-  -- through (one-way entrances mid-region); see M.bfsPath
-  local avoidSet = {}
-  for _, t in ipairs(opts.avoid or {}) do
-    avoidSet[((t[2] & 0xFF) << 8) | (t[1] & 0xFF)] = true
+  -- through (one-way entrances mid-region); see M.bfsPath.  A function
+  -- returning that list is read at each plan, as txIn/tyIn are (a step
+  -- built before the map it walks is known: T.trainLap)
+  local function avoidTiles()
+    local set, av = {}, opts.avoid
+    if type(av) == "function" then av = av() end
+    for _, t in ipairs(av or {}) do
+      set[((t[2] & 0xFF) << 8) | (t[1] & 0xFF)] = true
+    end
+    return set
   end
+  local avoidSet = type(opts.avoid) == "function" and {} or avoidTiles()
   M.navReset()
   local plan, idx = nil, 1
   local pend = nil          -- the in-flight/unverified step
@@ -1285,6 +1313,7 @@ function M.navTo(txIn, tyIn, opts)
       -- 7. (re)plan when we have no plan or it ran out
       if plan and idx > #plan then plan = nil end
       if not plan then
+        if type(opts.avoid) == "function" then avoidSet = avoidTiles() end
         plan = M.bfsPath(resolve(txIn), resolve(tyIn), NAV.blocked, avoidSet)
         if not plan then
           -- the party's z-level ($b2) as the model reads it can disagree
@@ -12464,7 +12493,7 @@ function M.kefkaTowerKit(K, fight)
   -- floor cannot raise the party fails here, not at the statue.  The steps between two battles are bounded by the
   -- map's own rate (K.worstSteps, the hunt's bound: the most steps to a random battle over every encounter counter,
   -- with and without a Charm Bangle; opts.stepCap overrides it, a mutant's lever), and the lap's walk keeps off the
-  -- map's push-back tiles (T.avoid).
+  -- map's push-back tiles (T.avoid) and its exits (M.exitTiles).
   function T.trainLap(what, level, opts)
     opts = opts or {}
     local cap, min, burn = opts.cap or 60, opts.min or 0, opts.burn or 0
@@ -12489,8 +12518,33 @@ function M.kefkaTowerKit(K, fight)
       M.call(function()
         local m, x, y = K.map(), M.fieldX(), M.fieldY()
         P, Q, n0, wp = { x, y, m = m }, nil, #M.outcomes, 2
+        -- off the lap: the push-back tiles and the map's exits (a lap tile on an exit leaves the map at its first
+        -- step: gen_wor_kt_guardian on 292, "lap 292 (81,7) <-> (80,7)", the exit to 334 (6,48), then "navTo: no
+        -- path (6,48)->(80,7)")
+        P.avoid, P.off = {}, {}
+        for _, t in ipairs(A() or {}) do P.avoid[#P.avoid + 1] = t end
+        for _, t in ipairs(M.exitTiles(m)) do P.avoid[#P.avoid + 1] = t end
+        for _, t in ipairs(P.avoid) do P.off[t[1] .. "," .. t[2]] = true end
         for _, d in ipairs({ { 0, -2 }, { 0, 2 }, { -2, 0 }, { 2, 0 }, { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } }) do
-          if Q == nil and M.bfsReach(nil, nil, nil, L(), x + d[1], y + d[2], A()) then Q = { x + d[1], y + d[2] } end
+          local qx, qy = x + d[1], y + d[2]
+          -- bfsReach lets its target stand on an avoided tile, so an avoided candidate is skipped here
+          if Q == nil and not P.off[qx .. "," .. qy] and M.bfsReach(nil, nil, nil, L(), qx, qy, P.avoid) then
+            Q = { qx, qy }
+          end
+        end
+        -- none of the eight off the exits (292 (81,7): its only orthogonal neighbour the floor reaches is the exit
+        -- (80,7)): the nearest tile the floor reaches, off the exits (ties to the smaller y, then the smaller x)
+        if Q == nil then
+          local best = nil
+          for k in pairs(M.bfsReach(nil, nil, nil, L(), nil, nil, P.avoid)) do
+            local qx, qy = k & 0xFF, (k >> 8) & 0xFF
+            local d = math.abs(qx - x) + math.abs(qy - y)
+            if d > 0 and not P.off[qx .. "," .. qy] and (best == nil or d < best[3]
+                or (d == best[3] and (qy < best[2] or (qy == best[2] and qx < best[1])))) then
+              best = { qx, qy, d }
+            end
+          end
+          if best then Q = { best[1], best[2] } end
         end
         M.assertEq(Q ~= nil, true, string.format("%s: a lap tile the floor reaches from %d (%d,%d)", what, m, x, y))
         P.cap = opts.stepCap or K.worstSteps(m)
@@ -12517,7 +12571,7 @@ function M.kefkaTowerKit(K, fight)
           P.quietSaid = true
         end),
         M.navTo(function() return (wp == 1 and P or Q)[1] end, function() return (wp == 1 and P or Q)[2] end,
-          { maxFrames = 20000, playBattles = "tactical", fight = fight, avoid = A() }),
+          { maxFrames = 20000, playBattles = "tactical", fight = fight, avoid = function() return P.avoid end }),
         M.call(function()
           M.assertEq(K.map(), P.m, what .. ": the lap stays on its map")
           wp = wp % 2 + 1
