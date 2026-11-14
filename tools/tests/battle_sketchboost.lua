@@ -73,7 +73,12 @@ local SCAN = 0x18
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function pend(s) return H.readByte(PEND + s * 2) end
 local function bank(s) return H.readByte(BANK + s * 2) end
-local function live(m) return (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) > 0 end
+-- a monster standing: present ($3AA8.0), in the battle's live mask ($3A75: a
+-- body the sketches took down leaves it, its HP word need not reach 0) and HP up
+local function live(m)
+  return (H.readByte(0x3AA8 + m * 2) & 1) == 1 and ((H.readByte(0x3A75) >> m) & 1) == 1
+    and H.readWord(0x3BFC + m * 2) > 0
+end
 local function cmdRow(s, cmd)
   for r = 0, 3 do
     if H.readByte(CMDTBL + s * 12 + r * 3) == cmd then return r end
@@ -314,10 +319,23 @@ local function windowSnap(t)
               tgtMon))
             return
           end
+          if a == relmS and st == ST_CMD then
+            H.log(string.format("[sketch] window %d f%d: RELM's window passed (bank %d, pending %d): Defend",
+              t.window, H.frame, bank(relmS), pend(relmS)))
+          end
           local b = defendPress(st)
           H.setPad(b and { [b] = true } or {})
         end),
       }, "RELM's window " .. t.window),
+      H.call(function()
+        if t.snap == nil then
+          local hp = {}
+          for s2 = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + s2 * 2)) end
+          H.log(string.format("[sketch] window %d f%d: the battle gave no window (up %s, live mask $%02X, "
+            .. "target %s; party HP %s)", t.window, H.frame, tostring(H.battleLoadStarted()), H.readByte(0x3A75),
+            tostring(pickTarget() and tgtMon), table.concat(hp, "/")))
+        end
+      end),
       H.waitFrames(2),
     }, {})
   end
