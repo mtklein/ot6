@@ -191,12 +191,31 @@ H.run({ maxFrames = 120000 }, {
       end
       return false
     end
+    -- the mutant is a member whose naming moves the Ribbons: its plan's Ribbon set differs from the real plan's
+    -- (the #328 line at f916b884: the mutant named EDGAR, and the status order then put the other two Ribbons on
+    -- CYAN and the real healer TERRA, the real plan's own set, so the dress left nothing for the rule to name)
+    local function setOf(plan)
+      local t = {}
+      for _, x in ipairs(plan.targets) do if x.id == RIBBON then t[#t + 1] = x.m.ch end end
+      table.sort(t)
+      return table.concat(t, ",")
+    end
+    local realSet = setOf(realPlan)
     local pick = nil
     local o = H.gearStatusOrder(members())
     for i = #o, 1, -1 do
-      if pick == nil and o[i].ch ~= healer.ch and not ribboned[o[i].ch] and canTake(o[i].ch) then pick = o[i] end
+      if pick == nil and o[i].ch ~= healer.ch and not ribboned[o[i].ch] and canTake(o[i].ch) then
+        local cand = o[i]
+        H.gearHealer = function(m)
+          for _, x in ipairs(m) do if x.ch == cand.ch then return x end end
+          return H.realHealer(m)
+        end
+        if setOf(H.gearPrizePlan(members())) ~= realSet then pick = cand end
+        H.gearHealer = H.realHealer
+      end
     end
-    H.assertEq(pick ~= nil, true, "precondition 6: a member who can take a Ribbon and gets none from the real plan")
+    H.assertEq(pick ~= nil, true, "precondition 6: a member who can take a Ribbon, gets none from the real plan, and "
+      .. "whose naming as healer moves the Ribbons")
     H.log(string.format("[gbtest] 6: the mutant's healer: %s", pick.name))
     H.gearHealer = function(m)
       for _, x in ipairs(m) do if x.ch == pick.ch then return x end end
