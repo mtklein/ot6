@@ -278,8 +278,11 @@ local function anyLive()
   for m = 0, 5 do if live(m) then return true end end
   return false
 end
--- a battle RELM can take a natural try in: up, a monster standing, one with a numberless sketch
-local function usable() return H.battleLoadStarted() and anyLive() and pickTarget() end
+-- a battle RELM can take a natural try in: up, a monster standing, one with a numberless sketch,
+-- and RELM standing (HP $3BF4: a Defending party can lose him)
+local function usable()
+  return H.battleLoadStarted() and anyLive() and pickTarget() and H.readWord(0x3BF4 + relmS * 2) > 0
+end
 -- leave a battle that has no body left to sketch (or has ended) for the world map
 local function leaveBattle()
   local ph = 0
@@ -306,7 +309,7 @@ local function windowSnap(t)
           H.log(string.format("[sketch] window %d: no body to sketch in this battle; another encounter (%d of 3)",
             t.window, round))
         end),
-        leaveBattle(), findEncounter() }, {}),
+        leaveBattle(), H.fieldCare({ tag = "care before window " .. t.window, threshold = 0.9 }), findEncounter() }, {}),
       H.driveUntil(function() return t.snap ~= nil or not usable() end, 30000, {
         H.call(function()
           tick = tick + 1
