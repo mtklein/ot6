@@ -130,7 +130,8 @@ H.run({ maxFrames = 900000 }, {
   H.bootCheckpoint("post-opera-v1"),
   H.call(function()
     IP = H.sym("ItemProp") & 0x3FFFFF
-    H.assertEq(H.readWord(LIVE) ~= 0, true, "the esper page is signed (a ROM with the esper rework)")
+    H.assertEq(emu.read(LIVE, emu.memType.snesMemory) | (emu.read(LIVE + 1, emu.memType.snesMemory) << 8), 0x3145,
+      "the live esper page is signed ('E1', ot6_esper.asm OT6_ESPER_MAGIC_WORD)")
     local m = {}
     for c = 0, 11 do if seated(c) then m[#m + 1] = c end end
     for _, c in ipairs(m) do
