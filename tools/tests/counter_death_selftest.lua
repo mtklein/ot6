@@ -154,7 +154,7 @@ local function lone5(H)
   return p.aimHard == nil and p.aim == 0
 end
 check("a lone Apokryphos's counter L.5 Doom kills the actor at level 40, not a partner at 40 (deathAnswer asks a counter's reach)",
-  { { 'if M.deathReach(b(0), true) == "party" then', 'if M.deathReach(b(0)) == "party" then' } }, lone5)
+  { { 'local r = M.deathReach(b(0), true)', 'local r = M.deathReach(b(0))' } }, lone5)
 check("a lone Apokryphos's counter L.5 Doom kills the actor at level 40, not a partner at 40 (M.deathReach's counter rule)",
   { { 'if counter then return "attacker" end', "" } }, lone5)
 check("a dying Coelecite beside one other body answers with Magnitude8 (if_num_monsters 1 on the bodies the hit leaves)",
@@ -279,6 +279,65 @@ check("the verb veto (#372) does not price a Death: a Pummel beside the Sky Base
   function(H)
     battle({ [0] = { QUIET, 5000 }, [2] = { SKYBASE, 9000 } })
     return driver(H):counterVetoed(0, { cmd = 0x0A, atk = 0x5D }, { 0, 2 }, "Pummel", false) == false
+  end)
+
+-- #530: Roulette's cursor stops on any standing member, so a guarded actor
+-- still draws a Roulette that can take the partner beside him
+check("a Fire at the Veteran from a guarded actor still draws a Roulette that kills the unguarded partner (#530)",
+  { { 'if r == "party" or r == "roulette" then', 'if r == "party" then' } },
+  function(H)
+    battle({ [1] = { VETERAN, 6000 } }, { party = { [0] = 41, [1] = 41 }, guard = true })
+    local _, _, _, _, k = driver(H):counterWorst(1, 0, { cmd = 0x02, atk = FIRE }, 3000)
+    if k ~= 1 then return false end
+    -- the partner guarded too: it lands on nobody
+    w8(0x3AA1 + 2, 0x04)
+    _, _, _, _, k = driver(H):counterWorst(1, 0, { cmd = 0x02, atk = FIRE }, 3000)
+    return k == nil
+  end)
+
+-- #533: the FossilFang answers a Fight with Sand Storm on every member
+local FOSSIL = 0x023
+local function fourAt19() return { party = { [0] = 19, [1] = 19, [2] = 19, [3] = 19 } } end
+check("the FossilFang's Sand Storm answer to a Fight is priced on all four members, not the one who struck (#533)",
+  { { "if (m == e or spreads) and hp > 0", "if m == e and hp > 0" } },
+  function(H)
+    battle({ [0] = { FOSSIL, 3000 } }, fourAt19())
+    local d = driver(H)
+    local all, a, wide = d:counterPartyTake(0, 0, { cmd = 0x00 })
+    local one = d:counterHit(0, 0, 0x69, 3000, true)
+    return a == 0x69 and wide and one > 0 and all == 4 * one
+  end)
+check("a Fight at the FossilFang re-aims at the body beside it that answers a Fight with nothing (#533)",
+  { { "if not wide or price == 0 then return plan end", "do return plan end" } },
+  function(H)
+    battle({ [0] = { FOSSIL, 3000 }, [1] = { QUIET, 3000 } }, fourAt19())
+    local p = driver(H):counterPartyPlan(0, { kind = "fight", row = 0, aim = 0 })
+    return p.kind == "fight" and p.aimHard == 1 and p.aim == 1
+  end)
+check("an answer on the one who struck alone is no party-wide counter (M.answerSpreads reads the targeting)",
+  { { "return (t & 0x80) == 0 and (t & 0x01) == 0 and (t & 0x0C) ~= 0", "return true" } },
+  function(H)
+    -- the Phase answers any hit with Blow Fish, which reaches the one who struck
+    battle({ [0] = { PHASE, 7000 }, [1] = { QUIET, 3000 } }, fourAt19())
+    local p = driver(H):counterPartyPlan(0, { kind = "fight", row = 0, aim = 0 })
+    return p.aimHard == nil and p.aim == 0 and H.answerSpreads(0x69) and not H.answerSpreads(0xEE)
+  end)
+check("EDGAR at a lone FossilFang takes his tool (AutoCrossbow: answered with nothing) for the Fight (#533)",
+  { { "local d = draws({ cmd = verb.cmd, atk = verb.skill }, all)", "local d = price" } },
+  function(H)
+    battle({ [0] = { FOSSIL, 3000 } }, fourAt19())
+    w8(0x3ED8, 0x04)                                  -- entity 0 is EDGAR
+    w8(0x202E + 3 * 3, 0x09)                          -- his Tools row
+    w8(0x2686, 0xAA); w8(0x2686 + 3, 5)               -- AutoCrossbow x5 in the battle bag
+    local p = driver(H):counterPartyPlan(0, { kind = "fight", row = 0, aim = 0 })
+    return p.kind == "skill" and p.cmd == 0x09 and p.skill == 0xAA and p.reason == "counter_party"
+  end)
+check("a killing blow at the FossilFang stands (the kill ends its answers)",
+  { { 'if plan.reason == "finish" then return plan end', "" } },
+  function(H)
+    battle({ [0] = { FOSSIL, 300 }, [1] = { QUIET, 3000 } }, fourAt19())
+    local p = driver(H):counterPartyPlan(0, { kind = "fight", row = 0, aim = 0, reason = "finish" })
+    return p.aimHard == nil and p.aim == 0
   end)
 
 print(string.format("counter_death_selftest: PASS -- %d cases, each failed by its own mutant: %s", n,
