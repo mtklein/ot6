@@ -7472,7 +7472,10 @@ end
 -- Whether the Doom takes entity e before it can act again
 -- (M.doomRule), and the count over it (M.doomCount; nil when not
 -- condemned): for the member acting now, its next turn is a full
--- refill away; for anyone else, wherever its gauge stands.
+-- refill away; for anyone else, wherever its gauge stands, so a full
+-- gauge (eta 0) is a turn already queued, 0 frames away, not a full
+-- refill (battle_doom's patient at 01822cae: "its next turn 412 frames
+-- away" with its window already queued, and it acted first).
 local function doomLast(e, actor)
   local count = M.doomCount({ s2 = M.readByte(BATTLE.ST2 + e * 2),
                               count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
@@ -7480,7 +7483,7 @@ local function doomLast(e, actor)
   local const = M.readWord(BATTLE.ATB_CONST + e * 2)
   local eta = etaOf(e * 2)
   local period = const > 0 and math.ceil(0xFF00 / const) or nil
-  local ticks = (e == actor or eta == 0) and period or eta
+  local ticks = (e == actor) and period or eta
   return M.doomRule({ count = count, turnFrames = ticks and ticks * 2 or nil }), count
 end
 
@@ -17517,7 +17520,8 @@ end
 -- and opts.planDone(), when given, says its last action has resolved).
 -- While the plan has entries, a window the others' care has work for (a
 -- raise, a Potion under half HP, the plan character's lost control:
--- M.newSpinnerCare) goes to care instead (opts.care = false: never); a
+-- M.newSpinnerCare) goes to care instead (opts.care = false: never; a
+-- function: no new care window while it returns false); a
 -- fight-out Fight (the plan spent, or its character out) raises the
 -- pending boost to the bank first, up to 3 (#470).  Each battle starts the
 -- plan's entries afresh (M.freshKitEntries).
@@ -17728,7 +17732,9 @@ function M.kitBattle(plan, opts)
       -- care setzerBattle gives SETZER's party): a fallen member raised, a
       -- member under half HP given a Potion (a Tonic without), the plan's
       -- character's lost control answered; else the script below
-      if care ~= nil and (careActor == a or (careActor == nil and care.wants(a))) then
+      -- (a care window already begun finishes; opts.care() gates new ones)
+      local careNow = care ~= nil and (type(opts.care) ~= "function" or opts.care() ~= false)
+      if care ~= nil and (careActor == a or (careActor == nil and careNow and care.wants(a))) then
         careActor = a
         care.window()
         return

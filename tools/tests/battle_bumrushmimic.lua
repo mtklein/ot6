@@ -57,15 +57,28 @@ end
 -- Defends sat under 60,000-HP monsters to a wipe.  So GOGO's first action end after his plan entry is
 -- confirmed (kitBattle's "entry N of N: confirmed, char $0C" line) closes a record of its own: the
 -- copy ran, not as a Blitz, and judge() does not count it.
-local gogoConfirmed = nil
+-- The care that took that window is held off instead (kitBattle's opts.care as a function): from SABIN's
+-- confirmed Bum Rush until GOGO's copy has resolved, no other member opens a care window, so nothing the party
+-- does runs between the two and the copy is Bum Rush's.  Care before SABIN's confirm stands (it keeps the
+-- party up while the bank fills).  The not-a-Blitz record above stays as the guard for anything else that
+-- could still run between them.
+local gogoConfirmed, sabinConfirmed = nil, nil
 do
   local rawLog = H.log
   H.log = function(msg)
     if type(msg) == "string" and msg:find("^%[kit%] f%d+ entry %d+ of %d+: confirmed, char %$0C") then
       gogoConfirmed = H.frame
     end
+    if type(msg) == "string" and msg:find("^%[kit%] f%d+ entry %d+ of %d+: confirmed, char %$05") then
+      sabinConfirmed = H.frame
+    end
     return rawLog(msg)
   end
+end
+-- BRM_CARE_ON = true is the mutant that leaves the others' care on through the copy (the 01822cae shape)
+local function careAllowed()
+  if BRM_CARE_ON then return true end
+  return sabinConfirmed == nil or (recs[GOGO] ~= nil and recs[GOGO].ended ~= nil)
 end
 
 local function arm()
@@ -124,7 +137,7 @@ local function closed() return recs[GOGO] ~= nil and recs[GOGO].ended ~= nil and
 local function decide()
   battles = battles + 1
   H.assertEq(battles <= 12, true, "a counted Mimic of Bum Rush within 12 battles")
-  seats, recs, plan, mode, gogoConfirmed = {}, {}, {}, "play", nil
+  seats, recs, plan, mode, gogoConfirmed, sabinConfirmed = {}, {}, {}, "play", nil, nil
   for s = 0, 3 do
     local id = H.readByte(0x3ED8 + s * 2)
     if id == SABIN or id == GOGO then seats[id] = s end
@@ -216,7 +229,8 @@ H.run({ maxFrames = 900000 }, {
     H.cond(function() return not H.battleActive() end, { H.paceToEncounter("bumrushmimic", 0) }, {}),
     H.call(decide),
     H.cond(function() return mode == "fightout" end, { H.fightBattleByMenu(40000) }, {
-      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed }),
+      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed,
+                           care = careAllowed }),
       H.call(function()
         if not closed() then
           H.log("[bumrushmimic] the battle ended before GOGO's copy resolved: not counted")
