@@ -34,8 +34,9 @@ mutant builders `mkmut.py` and `rowmuts.sh`; the launchers `lab.sh`,
    `$01F0` and opens the way round to (52,13) and (59,32).  The jumps want
    facing and A.  The walk (`careful.lua`) samples where the conductors
    can be a few steps ahead (Monte Carlo over their measured ranges, lab
-   `x5`: `x5_cond.txt`) and steps when the risk is under 0.08, or 0.9 when
-   standing off a rest tile.
+   `x5`: `x5_cond.txt`, under the field's own touch rules since v0.44, see
+   "The conductors' touch" below) and steps when the risk is under 0.08,
+   up to 0.2 after a long stand.
 3. **The crushing room (280) is timer 0.**  It runs 256 frames (`$1189`) and
    the drop ~264; only the tiles where `$01B5` or `$01BF` hold (and the
    corridors at x25-27 and x53-55 from y49 down) are safe.  The way on is
@@ -645,6 +646,48 @@ longest stand 5759 frames; 4 of 4 after, none spent, the longest stand 1852.
 The FakeMustache's walk drops down the shaft more on the way (11, 7, 9 and 7 times after the last target, against 5, 2, 9 and
 3 before, the last at the failure, e.g. `bo_s2` "21,33:8/9"). A cap of 0.3 on the risk patience takes was
 tried and dropped (`bc_s*`: 28-33 "BUDGET SPENT" a run).
+
+**The conductors' touch (v0.44).** With the esper rework STRAGO's Palidor
+rung gives the Sprint Shoes' field bit, the party walks a tile in 8 frames,
+and the walk priced for 16 broke: 3 passes in 220 tries to the FakeMustache
+from the two `wor_belly_in` captures at shifts 0-3 (2 and 3 play alike), five of the eight
+plays failing its 30-try assert (lab `o1`, build/attempts/wt/v044-esper-rework-4/belly/).
+Pricing the real speed was not enough; the walk's model of a touch was
+wrong. Read from the field code and measured on `wor_belly_in`
+(`probe_touch2.log`): a conductor acts only on its own update tick, every
+4 frames, and only standing on a tile; then, with no event running, it
+touches a character on any of the four tiles beside it (`CheckCollosions`;
+the party counts as standing where it last stood at its own tick), and
+otherwise draws a direction, stays half the time (up and down are walls)
+and steps a tile in 16 frames. A jump is an event, so no touch lands in
+the air. The old model let a conductor touch a tile away on its row at any
+of its step times, and held the party on its take-off tile for a whole
+jump, so it overpriced jumps across row 30 and then, its patience grown to
+0.3-0.5, took stretches whose real price was higher. The "flicker" in the
+conductors' tile log (a tile and back a frame apart) is the pixel read: a
+step right shows at its end, a step left at its start.
+
+The walk now simulates those rules from where each conductor stands or is
+stepping, prices only the frames the party stands with no event running
+(a jump's take-off, the 4-8 frames between landing and the next press, a
+step's own tile until it lands), plans the cheapest route where a tile in
+a conductor's reach costs three (row 28 instead of the length of row 30),
+caps its patience at 0.2, stages a stretch's first move from a rest when
+that move and a stand after it are safe (the descent from (31,28) to the
+FakeMustache priced 0.24-0.66 as a whole and never came under the cap in
+12000 frames: lab `n7`, 19 "BUDGET SPENT"), weighs going on, stepping
+away and standing against each other off a rest, and presses A for a jump
+only once the party faces its way (the "either way" tiles jump the way the
+party faces: a jump pressed with the turn went back down onto $11's row,
+lab `n6`). Over 24 plays at 12 seed shifts from both captures (labs `n8`,
+`n9`) all 24 passed; the FakeMustache took 44 tries for its 24 passes
+(0.55 a try, 0-4 drops a pass), and over the 314 stretches the walk began
+the model priced 25.8 touches and 25 came. The bridge walks are allowed
+14 tries: at the rate's 95% lower bound, 0.40, a play needs more than 14
+less than once in a thousand. Two other patience rules were tried and
+dropped: a bar at the stand's own 10th percentile took stretches at
+0.3-0.4 (labs `n4`, `n5`: 9 passes in 325 tries), and the 0.2 cap without
+staging stood out its budgets at (31,28).
 
 **The gear downstream.** The gear and relic care picks the new pieces up on
 its own: the Genji Armor goes on TERRA at the belly's save point and stays
