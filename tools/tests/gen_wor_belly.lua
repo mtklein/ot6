@@ -63,6 +63,7 @@ local CARD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 }, right = { 1, 0
 -- the directions in a fixed order: pairs() over string keys follows the hash seed, which Lua 5.4 draws
 -- per run, so the walk's equal-length routes differed between identical runs (#467)
 local CARD_DIRS = { "down", "left", "right", "up" }
+local FACE = { up = 0, right = 1, down = 2, left = 3 }
 CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE, CAREFUL_RISK_CAP = 200, 0.08, 0.002, 0.2
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
 -- the conductors' rules (above): a tick every 4 frames, a step of 16
@@ -340,7 +341,15 @@ local function jumpStep(L, what, abort)
       if bn == 0 then drv.idle() end
       local on = H.fieldX() == L[1] and H.fieldY() == L[2] and H.tileAligned() and not H.dialogWaiting()
       local pad = {}
-      if on then pf = pf or H.frame; pad[L[3]] = true; if (H.frame - pf) % 8 < 4 then pad.a = true end end
+      -- A only once the party faces the jump's way: the "either way" tiles (_cb7ea8) jump the way it faces, and A
+      -- pressed with the turn jumped a party just landed facing down back down (n6, (31,30): "jump up" went to
+      -- (31,32) and $11 touched it).  Facing: the party object's $087F, 0 up 1 right 2 down 3 left
+      local face = H.readByte(0x087f + H.readWord(0x0803))
+      if on then
+        pf = pf or H.frame
+        pad[L[3]] = true
+        if face == FACE[L[3]] and (H.frame - pf) % 8 < 4 then pad.a = true end
+      end
       H.setPad(pad)
     end),
   }, what .. ": a jump"), function() n, ctl, f0, bn, pf = 0, 0, nil, 0, nil end)
@@ -381,6 +390,13 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       if (not route or #route == 0) and plan == closed and tried == 0 then
         plan = tight
         route = planRoute(tx, ty, lk, plan, conds)
+        -- a conductor's tile on the way beyond the next rest (row 32's $11 on (31,32), the only way down to
+        -- the FakeMustache) closes every route, though only the stretch to the rest is walked and weighed: plan
+        -- through it (n6: landed mid-stretch on row 30, the walk saw "no route" and jumped back)
+        if not route or #route == 0 then
+          plan = {}
+          route = planRoute(tx, ty, lk, plan, conds)
+        end
       end
       if not route or #route == 0 then break end
       tried = tried + 1
