@@ -2,7 +2,7 @@
 -- battle_breakwobfc.lua -- the Floating Continent's monster box, its authored break row re-verified from the
 -- shipped ROM (the battle_breakgate discipline): Gigantos carries its Ot6ShieldTbl row, and its formation (170) is
 -- chippable by the landing party, TERRA, LOCKE and EDGAR's blades (slash) and SHADOW's point (pierce).
--- docs/design/wob-side-trips.md section 4 is the design these numbers come from.
+-- docs/design/wob-towns-boxes.md section 4 is the design these numbers come from.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local WANT = {                    -- species -> { shields, class mask }

@@ -1,4 +1,4 @@
--- gen_wob_kohlingen.lua -- a branch beside the search for TERRA (#284, docs/design/wob-side-trips.md section 3):
+-- gen_wob_kohlingen.lua -- a branch beside the search for TERRA (#284, docs/design/wob-towns-boxes.md section 3):
 -- boot `figaro_submerged` (LOCKE, CELES, EDGAR and SABIN in the engine room, the castle parked west by Kohlingen),
 -- out of the castle as gen_zozo2_arrival goes, and into Kohlingen (world (26,39) -> map 188), the town the route
 -- walks past: its two chests (the Green Beret, 195 (37,53), and the Elixir, 197 (42,10); treasure bits 65 and 69,

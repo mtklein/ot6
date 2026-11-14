@@ -1,4 +1,4 @@
--- gen_wob_fc_gigantos.lua -- a branch beside the Floating Continent (#285, docs/design/wob-side-trips.md section
+-- gen_wob_fc_gigantos.lua -- a branch beside the Floating Continent (#285, docs/design/wob-towns-boxes.md section
 -- 4): boot `fc_landing` (TERRA, LOCKE and EDGAR on map 394 at the landing save point (7,12)), take SHADOW in at
 -- (10,16) and dress him as gen_fc_alcove does, cross to the floor switch at (44,11) (_cad62f, $01F5: it lays the
 -- tiles that reach the box; the route's own crossing never steps on it), and win the monster box at 394 (48,15)

@@ -1,4 +1,4 @@
--- gen_wob_base_guards.lua -- a branch beside the raid on Vector (#281, docs/design/wob-side-trips.md section 1):
+-- gen_wob_base_guards.lua -- a branch beside the raid on Vector (#281, docs/design/wob-towns-boxes.md section 1):
 -- boot `blackjack` (EDGAR, SABIN, LOCKE and CELES on foot by the Blackjack outside Vector, the first point the
 -- southern continent can be reached), walk east to the Imperial Base and fight its guards.  Until the Narshe meeting sets
 -- $0076 the base's ten soldiers stand ($045E-$0467, NPCProp::_377) and a touch is a fight: the magitek rider NPC_1

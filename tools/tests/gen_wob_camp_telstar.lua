@@ -1,4 +1,4 @@
--- gen_wob_camp_telstar.lua -- a branch beside SABIN's scenario (#285, docs/design/wob-side-trips.md section 4):
+-- gen_wob_camp_telstar.lua -- a branch beside SABIN's scenario (#285, docs/design/wob-towns-boxes.md section 4):
 -- boot `camp_intro` (SABIN and SHADOW in the Imperial Camp, map 117) and win the camp's monster box at (17,18)
 -- (treasure bit 212, event battle group 32: formation 61, Telstar $044), and the MithrilGlove beside it (19,18),
 -- which the route also walks past.  (The Barrier Ring's chest at (15,8) is not on foot from the box's yard: lab

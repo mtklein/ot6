@@ -1,4 +1,4 @@
--- gen_wob_base_treasure.lua -- a branch beside the voyage (#281, docs/design/wob-side-trips.md section 2):
+-- gen_wob_base_treasure.lua -- a branch beside the voyage (#281, docs/design/wob-towns-boxes.md section 2):
 -- Continue the `banquet-done-v1` battery (TERRA and LOCKE on the world outside Vector, (120,188)), walk east to the
 -- Imperial Base (world (165,194) -> map 377), and open the treasure room the Emperor's reward unlocks (map 378, the
 -- thirteen chests behind the lock NPC $045D that _cb2566 hides at a banquet score of 67 or more,

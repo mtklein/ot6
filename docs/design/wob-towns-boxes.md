@@ -1,4 +1,4 @@
-# World of Balance: the side trips off the line
+# World of Balance: the towns, the base and the monster boxes
 
 Issues #281 (the Imperial Base: its guards and its treasure room), #284
 (Kohlingen, SHADOW's hire and Jidoor's auction) and #285 (the monster boxes),
@@ -16,6 +16,7 @@ first reach it; nothing boots what a branch leaves, so the line from power-on
 | `wob_auction` | `narshe-mission-v1` | Jidoor's auction until Golem and ZoneSeek are bought |
 | `wob_camp_telstar` | `camp_intro` | the Imperial Camp's Telstar box |
 | `wob_fc_gigantos` | `fc_landing` | the Floating Continent's Gigantos box |
+| `wob_train_specter` | `train_b68_entry` | the Phantom Train's Specter box |
 
 ## 1. The Imperial Base's guards (#281)
 
@@ -142,7 +143,7 @@ line's party already spends its gil at Jidoor's shops on this leg.
 |---|---|---|---|
 | Narshe school 107 (54,28) | Lobo `$019` | 3 pierce (authored) | none (below) |
 | Imperial Camp 117 (17,18) | Telstar `$044` | 4 bludg (authored) | `wob_camp_telstar` |
-| Phantom Train 153 (22,24) | Specter `$156` | **3 slash\|special** (new) | none (below) |
+| Phantom Train 153 (22,24) | Specter `$156` | **3 slash\|special** (new) | `wob_train_specter` |
 | Floating Continent 394 (48,15) | Gigantos `$0AE` | **5 slash\|bludg** (new) | `wob_fc_gigantos` |
 
 - **Gigantos** (L25, 6000 HP, Throat Jab x5, weak poison) was on the floor
@@ -155,11 +156,10 @@ line's party already spends its gil at Jidoor's shops on this leg.
   leg opens no menu between them and the box.
 - **Specter** (L19, 1500 HP, weak fire|holy) is a spirit, so its row is 3
   slash|special: CYAN's blade, and special for the guidelines' spirit rule
-  (#347). No leg plays it: the rooms car (153) hangs off the front strip the
-  train leg walks, and no state stands between `forest_done` and
-  `train_done`; adding one would move the line's frames (an `H.saveState`
-  takes two). `battle_breakwobtrain.lua` checks the row; the fight waits for
-  a capture inside the train.
+  (#347). The rooms car (153) hangs off the front strip the train leg walks;
+  `wob_train_specter` boots `train_b68_entry` (the capture inside the train
+  that #286's branch added), goes in by the door 141 (48,8) and wins the
+  box.
 - **Lobo** (L5) is on an authored row and no leg plays it: from
   `narshe-mission-v1` the Beginner's House door (map 20 (33,54)) was not on
   foot from Narshe's south gate (lab `school1`), and a party past L20 meets

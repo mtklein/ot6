@@ -1,4 +1,4 @@
--- gen_wob_auction.lua -- a branch beside the Sealed Gate mission (#284, docs/design/wob-side-trips.md section 3):
+-- gen_wob_auction.lua -- a branch beside the Sealed Gate mission (#284, docs/design/wob-towns-boxes.md section 3):
 -- Continue the `narshe-mission-v1` battery (the v0.6 four outside Narshe, the Blackjack two tiles south), fly to
 -- Jidoor and sit in on the Auction House (map 200, the auctioneer's clerk NPC_12 at (19,24), _cb4e47) until both
 -- magicite it sells in the World of Balance have been bought: Golem (20000 GP) and ZoneSeek (10000 GP)

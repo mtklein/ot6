@@ -2,7 +2,7 @@
 -- battle_breakwobbase.lua -- the Imperial Base's guard fights' authored break rows, re-verified from the shipped
 -- ROM (the battle_breakgate discipline): the three species carry their Ot6ShieldTbl rows, and both guard
 -- formations (416, 417) are chippable by the party that first meets them, EDGAR, SABIN, LOCKE and CELES after the
--- Opera (pierce: the pikes and daggers; slash: the blades; bludg: SABIN's blitzes).  docs/design/wob-side-trips.md
+-- Opera (pierce: the pikes and daggers; slash: the blades; bludg: SABIN's blitzes).  docs/design/wob-towns-boxes.md
 -- section 1 is the design these numbers come from.
 local H = dofile("tools/tests/lib/ot6.lua")
 

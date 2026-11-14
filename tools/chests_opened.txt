@@ -253,3 +253,4 @@
 211	map 117 the Imperial Camp, MithrilGlove (19,18) (gen_wob_camp_telstar, a branch, #285)
 212	map 117 the Imperial Camp, the monster box (17,18): Telstar (gen_wob_camp_telstar, a branch, #285)
 95	map 394 the Floating Continent, the monster box (48,15): Gigantos, past the (44,11) floor switch (gen_wob_fc_gigantos, a branch, #285)
+243	map 153 the Phantom Train's rooms car, the monster box (22,24): Specter (gen_wob_train_specter, a branch, #285)
