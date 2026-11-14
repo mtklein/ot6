@@ -36,19 +36,42 @@ local watches, objLine, doomLine, pace = K.watches, K.objLine, K.doomLine, K.pac
 
 -- ---- the careful walk: the conductors watched ----
 -- The bridge's conductors (276 NPC_1..3: random walkers, collision_on, _cb8251) drop the party down the
--- shaft when one touches it.  Each walks a stretch of one row (CONDSEG, measured: x5_cond.txt), a tile every
--- 16-20 frames, either way at even odds.  A person watches them: from where the party stands, a route to the
--- target is planned around their tiles, and of it only the stretch up to the next tile no conductor can
--- reach (a rest) is weighed: the share of CAREFUL_TRIALS simulated walks of the conductors in which one
--- comes within a tile of where the party stands while it stands there.  At or under CAREFUL_RISK the
--- stretch's first move is made; otherwise other routes are tried (the riskiest tile closed, up to five
--- times), then the party stands (on a rest, or where standing is safe enough), or steps or jumps away.
+-- shaft when one touches it.  Each walks a stretch of one row (CONDSEG, measured: x5_cond.txt).  How, read
+-- from the field code and measured (build/attempts/wt/v044-esper-rework-4/belly/probe_touch2.log):
+-- * a conductor acts on its own update tick, every 4 frames (obj.asm UpdateObjActions: 6 objects a frame), and
+--   only while it stands on a tile.  Then, with no event running, it touches a character standing on any of
+--   the four tiles beside it (CheckCollosions; the party "stands" on the tile it last stood on at its own tick,
+--   $087A/$087B, so mid-step it is still on the tile it left); otherwise it draws a direction (NPCMoveRand,
+--   Rand & 3): up and down are walls on its row, so it stays half the time and steps left or right a quarter
+--   each, unless the end of its stretch or an object is there.  A step is 16 frames, and the tick that lands it
+--   is its next chance to touch.  Probe: $12 landed on (48,30) at f974 and the party on (49,30) was dropped
+--   the next frame, its first tick there.
+-- * a jump is an event (_cb7e4c...: 34 frames under the Sprint Shoes, f897-f930), so no tick touches the party
+--   in the air, wherever the party is registered meanwhile.
+-- * the interval between a conductor's moves is 16 frames plus a geometric wait in ticks (0, 4, 8... at
+--   1/2, 1/4, 1/8...), matching cond1.txt's 16/20/24/28 counts.  The "flicker" there (a tile and back within
+--   1-4 frames) is objX reading the pixel position: a step right shows when it ends and a step left when it
+--   begins, so a step right followed at once by one left reads as two changes a frame apart.  Real moves.
+-- A person watches them: from where the party stands, a route to the target is planned around their tiles, and
+-- of it only the stretch up to the next tile no conductor can reach (a rest) is weighed: the share of
+-- CAREFUL_TRIALS simulated walks of the conductors, under the rules above and from where each stands or is
+-- stepping now, that touch the party along that stretch.  At or under CAREFUL_RISK the stretch's first move is
+-- made; otherwise other routes are tried (the riskiest tile closed, up to five times), then the party stands
+-- (on a rest, or where standing is safe enough), or steps or jumps away.  Patience lets the walk take a riskier
+-- stretch after a long stand, up to CAREFUL_RISK_CAP and no further.
 local CARD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 }, right = { 1, 0 } }
 -- the directions in a fixed order: pairs() over string keys follows the hash seed, which Lua 5.4 draws
 -- per run, so the walk's equal-length routes differed between identical runs (#467)
 local CARD_DIRS = { "down", "left", "right", "up" }
-CAREFUL_PACE, CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE = 18, 120, 0.08, 0.002
+CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE, CAREFUL_RISK_CAP = 200, 0.08, 0.002, 0.2
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
+-- the conductors' rules (above): a tick every 4 frames, a step of 16
+local COND_TICK, COND_STEP = 4, 16
+-- each conductor's tick phase (frame % 4), learned as it starts a step (armTrace)
+local CPHASE, CPX = {}, {}
+-- the frame the last event (a jump) ended on 276, and the walk's measured pause after a jump before its next
+-- move is pressed (logged with the walk's end: DWELL_J's evidence)
+local EV_END, EV_ON, DWELLS = nil, false, {}
 local CONDSEG = { [276] = { [30] = { { 32, 40 }, { 45, 48 } }, [32] = { { 31, 34 } } } }
 -- the longest one stand for the conductors is let sit quiet (the no-progress watchdog stands down for it), from
 -- the conductors' cycle (#495): a conductor steps a tile every 16-20 frames either way at even odds, and a
@@ -66,7 +89,7 @@ local function condList(objs)
   local out = {}
   for _, o in ipairs(objs) do
     local ox, oy = H.objX(o), H.objY(o)
-    if not (ox == 0 and oy == 0) then out[#out + 1] = { ox, oy } end
+    if not (ox == 0 and oy == 0) then out[#out + 1] = { ox, oy, o = o } end
   end
   return out
 end
@@ -85,8 +108,14 @@ local function isRest(k, conds)
   return true
 end
 -- the route to (tx, ty) as moves { kind = "step"|"jump"|"door", dir, link, from, to } (keys (y<<8)|x)
--- around the closed tiles
-local function planRoute(tx, ty, lk, closed)
+-- around the closed tiles, the cheapest where a move onto a tile a conductor can reach costs 1 + CAREFUL_REACH_W
+-- and any other 1: a person crossing the bridge keeps off the conductors' rows where another way is not much
+-- longer.  The shortest route to the FakeMustache from row 32's middle (37,32) runs west along conductor $10's row
+-- 30 and then $11's row 32 (nine tiles in reach); the one that leaves row 30 at (34,30) for row 28 and comes down
+-- at (31,28) has seven, and its first stretch ends on row 28 after four.  Under shortest-first every lab walk
+-- stood at (37,32) pricing the long stretch at 0.6-0.9 (n1, build/attempts/wt/v044-esper-rework-4/belly/).
+CAREFUL_REACH_W = 2
+local function planRoute(tx, ty, lk, closed, conds)
   local sx, sy = H.fieldX(), H.fieldY()
   local byTile, door = {}, {}
   for _, L in ipairs(lk) do
@@ -101,9 +130,18 @@ local function planRoute(tx, ty, lk, closed)
     end
   end
   local start, goal = (sy << 8) | sx, (ty << 8) | tx
-  local parent, q, qi = { [start] = false }, { start }, 1
-  while qi <= #q and qi <= 8000 do
-    local k = q[qi]; qi = qi + 1
+  -- Dijkstra over small integer costs: a bucket per cost
+  local parent, cost, buckets, done, n = { [start] = false }, { [start] = 0 }, { [0] = { start } }, {}, 0
+  local c0 = 0
+  while n <= 8000 do
+    local k
+    while c0 <= 4000 do
+      local b = buckets[c0]
+      if b and #b > 0 then k = table.remove(b); if not done[k] and cost[k] == c0 then break end; k = nil
+      else c0 = c0 + 1 end
+    end
+    if k == nil then break end
+    done[k], n = true, n + 1
     if k == goal then
       local out = {}
       while parent[k] do table.insert(out, 1, parent[k].mv); k = parent[k].from end
@@ -112,10 +150,13 @@ local function planRoute(tx, ty, lk, closed)
     local x, y = k & 0xFF, k >> 8
     local function visit(nk, mv)
       if mv.kind == "step" and door[nk] and nk ~= goal then mv.kind = "door"; nk = door[nk] end
-      if parent[nk] == nil and not closed[nk] then
+      if closed[nk] or done[nk] then return end
+      local nc = c0 + 1 + ((conds and not isRest(nk, conds)) and CAREFUL_REACH_W or 0)
+      if cost[nk] == nil or nc < cost[nk] then
         mv.from, mv.to = k, nk
-        parent[nk] = { from = k, mv = mv }
-        q[#q + 1] = nk
+        parent[nk], cost[nk] = { from = k, mv = mv }, nc
+        buckets[nc] = buckets[nc] or {}
+        table.insert(buckets[nc], 1, nk)
       end
     end
     for _, L in ipairs(byTile[k] or {}) do visit((L[5] << 8) | L[4], { kind = "jump", link = L, dir = L[3] }) end
@@ -149,50 +190,101 @@ local function stepF()
   if (H.readByte(0x11DF) & 0x20) ~= 0 and (H.readByte(0x1EB8) & 0x02) == 0 then return STEP_F // 2 end
   return STEP_F
 end
+-- the party's exposure along moves: { x, y, from, until } spans, each a tile the party is registered on with no
+-- event running, so a conductor's tick beside it touches.  A step keeps the party on the tile it leaves until it
+-- lands (a step of stepF() frames); a jump is an event (JUMP_EV frames), untouchable; a door carries it off.
+-- The walk's own pauses between moves (LAT before the first, DWELL_S after a step, DWELL_J after a jump: the
+-- landing is waited for, then the next move pressed) are exposure on the tile it stands on.  DWELL_J: the walk
+-- decides 4 frames after a jump's event ends (median and minimum of every pause the lab walks logged,
+-- "pauses after a jump", n2) and presses within 4 more (jumpStep pulses A four frames in eight).
+local LAT, DWELL_S, DWELL_J = 2, 4, 8
+local function jumpEv() return (JUMP_F * stepF() // STEP_F) - 2 end
 local function spansOf(moves)
-  local spans, t = {}, 0
+  local spans, e = {}, 0
   local sf = stepF()
+  local s = LAT
   for _, m in ipairs(moves) do
-    local d = m.kind == "step" and sf or m.kind == "jump" and JUMP_F * sf // STEP_F or DOOR_F
-    spans[#spans + 1] = { m.from & 0xFF, m.from >> 8, t, t + d }
-    spans[#spans + 1] = { m.to & 0xFF, m.to >> 8, t + d, t + d + sf }
-    t = t + d
+    local fx, fy = m.from & 0xFF, m.from >> 8
+    if m.kind == "step" then
+      spans[#spans + 1] = { fx, fy, e, s + sf }
+      e = s + sf
+      s = e + DWELL_S
+    elseif m.kind == "jump" then
+      spans[#spans + 1] = { fx, fy, e, s + 1 }
+      e = s + jumpEv()
+      s = e + DWELL_J
+    else
+      spans[#spans + 1] = { fx, fy, e, s + 1 }
+      e = s + DOOR_F
+      s = e + DWELL_S
+    end
   end
-  return spans, t + sf
+  local last = moves[#moves]
+  local tEnd = e + stepF()
+  if last then spans[#spans + 1] = { last.to & 0xFF, last.to >> 8, e, tEnd } end
+  return spans, tEnd
 end
 local seed = 12345
 local function rnd() seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 end
+-- a conductor as it is now: its tile (where a step under way lands), and the frames to its next tick there
+local function condNow(c)
+  local b = 0x29 * c.o
+  local px, py = H.readWord(0x086a + b), H.readWord(0x086d + b)
+  if (px & 15) == 0 and (py & 15) == 0 then
+    local ph = CPHASE[c.o]
+    return px >> 4, ph and ((ph - H.frame - 1) % COND_TICK) + 1 or nil
+  end
+  local dir = H.readByte(0x087e + b)
+  if dir == 2 then return (px >> 4) + 1, COND_STEP - (px & 15) + 1 end
+  if dir == 4 then return px >> 4, (px & 15) + 1 end
+  return px >> 4, nil
+end
 local function simRisk(spans, tEnd, conds)
   local live = {}
   for _, c in ipairs(conds) do
     for _, sp in ipairs(spans) do
-      if sp[2] == c[2] then live[#live + 1] = c; break end
+      if math.abs(sp[2] - c[2]) <= 1 then
+        local x0, t0 = condNow(c)
+        local lo, hi = condRange({ x0, c[2] })
+        live[#live + 1] = { x0 = x0, y = c[2], t0 = t0, lo = lo, hi = hi }
+        break
+      end
     end
   end
   if #live == 0 then return 0, nil end
   seed = (H.frame * 7919 + 17) % 2147483648
   local hits, worst = 0, {}
+  local function touch(x, y, at)
+    for _, sp in ipairs(spans) do
+      if at >= sp[3] and at < sp[4] and math.abs(x - sp[1]) + math.abs(y - sp[2]) == 1 then
+        local k = (sp[2] << 8) | sp[1]
+        worst[k] = (worst[k] or 0) + 1
+        return true
+      end
+    end
+    return false
+  end
+  local function occupied(x, y, at)
+    for _, sp in ipairs(spans) do
+      if at >= sp[3] and at < sp[4] and x == sp[1] and y == sp[2] then return true end
+    end
+    return false
+  end
   for _ = 1, CAREFUL_TRIALS do
     local hit = false
     for _, c in ipairs(live) do
-      local lo, hi = condRange(c)
-      local x, tt = c[1], -math.floor(rnd() * CAREFUL_PACE)
-      local function check(at)
-        for _, sp in ipairs(spans) do
-          if sp[2] == c[2] and at >= sp[3] and at < sp[4] and math.abs(x - sp[1]) <= 1 then
-            local k = (sp[2] << 8) | sp[1]
-            worst[k] = (worst[k] or 0) + 1
-            return true
+      local x, t = c.x0, c.t0 or (1 + math.floor(rnd() * COND_TICK))
+      while not hit and t < tEnd do
+        hit = touch(x, c.y, t)
+        if not hit then
+          local u, nx = rnd(), nil
+          if u < 0.25 then nx = x - 1 elseif u < 0.5 then nx = x + 1 end
+          if nx and nx >= c.lo and nx <= c.hi and not occupied(nx, c.y, t) then
+            x, t = nx, t + COND_STEP
+          else
+            t = t + COND_TICK
           end
         end
-        return false
-      end
-      hit = check(0)
-      while not hit and tt < tEnd do
-        tt = tt + CAREFUL_PACE
-        local nx = x + (rnd() < 0.5 and -1 or 1)
-        if nx >= lo and nx <= hi then x = nx end
-        hit = check(math.max(tt, 0))
       end
       if hit then break end
     end
@@ -267,7 +359,7 @@ local function doMove(mv, what, abort)
     end })
 end
 local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
-  local moves, waits, lastWhy, stood, waitStart = 0, 0, nil, 0, nil
+  local moves, waits, lastWhy, stood, waitStart, lastJump = 0, 0, nil, 0, nil, false
   local function there() return H.fieldX() == tx and H.fieldY() == ty and H.tileAligned() end
   local function oneMove()
     local conds = condList(objs)
@@ -285,10 +377,10 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
     local best, bestR, tried = nil, 2, 0
     local plan = closed
     for _ = 1, 6 do
-      local route = planRoute(tx, ty, lk, plan)
+      local route = planRoute(tx, ty, lk, plan, conds)
       if (not route or #route == 0) and plan == closed and tried == 0 then
         plan = tight
-        route = planRoute(tx, ty, lk, plan)
+        route = planRoute(tx, ty, lk, plan, conds)
       end
       if not route or #route == 0 then break end
       tried = tried + 1
@@ -301,7 +393,7 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
     end
     local mv = nil
     -- patience runs out: the risk a person takes grows with the frames stood on a rest (four a wait)
-    local thr = CAREFUL_RISK + stood * CAREFUL_IMPATIENCE
+    local thr = math.min(CAREFUL_RISK + stood * CAREFUL_IMPATIENCE, CAREFUL_RISK_CAP)
     -- off a rest, the stretch already begun is finished: standing on a conductor's row is the risk
     local onRest = isRest(here, conds)
     if not onRest then thr = math.max(thr, 0.9) end
@@ -332,15 +424,19 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
         local fb, fr = nil, rs
         for _, c in ipairs(cand) do
           if not closed[c.to] or c.kind == "jump" then
+            -- the move and, off a rest, the stand where it lands after it (as the stand here is weighed): a step
+            -- along a conductor's row toward it is no way out of its way
             local s2, t2 = spansOf({ c })
+            if not isRest(c.to, conds) then s2[#s2][4] = t2 + 64; t2 = t2 + 64 end
             local r2 = simRisk(s2, t2, conds)
             if r2 < fr then fb, fr = c, r2 end
           end
         end
         if fb then
           mv = fb
-          H.log(string.format("[careful] %s: f%d out of a conductor's way from (%d,%d) (standing %.2f, %s %.2f)",
-            what, H.frame, H.fieldX(), H.fieldY(), rs, fb.kind .. " " .. tostring(fb.dir), fr))
+          H.log(string.format("[careful] %s: f%d out of a conductor's way from (%d,%d) (standing %.2f, %s %.2f; "
+            .. "%s)", what, H.frame, H.fieldX(), H.fieldY(), rs, fb.kind .. " " .. tostring(fb.dir), fr,
+            best and string.format("best of %d route(s) at risk %.2f against %.2f", tried, bestR, thr) or "no route"))
         end
       end
       if mv == nil then
@@ -373,7 +469,15 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       -- the stretch the walk priced, kept for the drop's report (#328 review: predicted against observed)
       local sp = spansOf(best)
       BELLY_PRED = { f0 = H.frame, risk = bestR, spans = sp, step = stepF() }
+      -- every stretch begun on a conductor's reach, with its price: the model's calibration (each drop follows
+      -- the last of these)
+      if bestR > 0 then
+        H.log(string.format("[careful] %s: f%d stretch from (%d,%d) at risk %.3f, %d move(s)", what, H.frame,
+          H.fieldX(), H.fieldY(), bestR, #best))
+      end
     end
+    if lastJump and EV_END and H.frame - EV_END < 200 then DWELLS[#DWELLS + 1] = H.frame - EV_END end
+    lastJump = mv.kind == "jump"
     if mv.kind == "jump" then stood = 0 end
     lastWhy = nil
     if mv.kind == "jump" then
@@ -397,8 +501,10 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       }, {}),
     }),
     H.call(function()
-      H.log(string.format("[careful] %s: %s after %d moves and %d waits", what, there() and "there" or "stopped",
-        moves, waits))
+      table.sort(DWELLS)
+      H.log(string.format("[careful] %s: %s after %d moves and %d waits; pauses after a jump (frames) n=%d min %s "
+        .. "median %s max %s", what, there() and "there" or "stopped", moves, waits, #DWELLS, tostring(DWELLS[1]),
+        tostring(DWELLS[(#DWELLS + 1) // 2]), tostring(DWELLS[#DWELLS])))
       -- the walk's step budget spent short of the target and with no drop to end it: said loud (jwalk tries
       -- again from where the party stands, and asserts after its last try)
       if not there() and not abort() then
@@ -445,7 +551,7 @@ local function fallCount()
       for _, sp in ipairs(p.spans) do pr[#pr + 1] = string.format("(%d,%d)@%d-%d", sp[1], sp[2], sp[3], sp[4]) end
       local ob = {}
       for _, r in ipairs(BELLY_TRACE or {}) do
-        if r.f >= p.f0 then ob[#ob + 1] = string.format("%d:(%d,%d)c%s", r.f - p.f0, r.x, r.y, r.c) end
+        if r.f >= p.f0 then ob[#ob + 1] = string.format("%d:(%d,%d)%sc%s", r.f - p.f0, r.x, r.y, r.e == 1 and "e" or "", r.c) end
       end
       H.log(string.format("[jwalk] drop %d: predicted (step %d frames, risk %.2f) %s", falls, p.step, p.risk,
         table.concat(pr, " ")))
@@ -465,8 +571,18 @@ local function armTrace()
   emu.addEventCallback(function()
     if map() ~= 276 then return end
     local c = {}
-    for _, o in ipairs({ 0x10, 0x11, 0x12 }) do c[#c + 1] = string.format("%d/%d", H.objX(o), H.objY(o)) end
-    BELLY_TRACE[#BELLY_TRACE + 1] = { f = H.frame, x = H.fieldX(), y = H.fieldY(), c = table.concat(c, ",") }
+    for _, o in ipairs({ 0x10, 0x11, 0x12 }) do
+      c[#c + 1] = string.format("%d/%d", H.objX(o), H.objY(o))
+      -- a step begins on the conductor's tick: its phase, for the walk's pricing
+      local px = H.readWord(0x086a + 0x29 * o)
+      if (px & 15) ~= 0 and (CPX[o] or 0) & 15 == 0 and CPX[o] then CPHASE[o] = H.frame % COND_TICK end
+      CPX[o] = px
+    end
+    local ev = H.eventRunning()
+    if EV_ON and not ev then EV_END = H.frame end
+    EV_ON = ev
+    BELLY_TRACE[#BELLY_TRACE + 1] = { f = H.frame, x = H.fieldX(), y = H.fieldY(), c = table.concat(c, ","),
+      e = ev and 1 or 0 }
     if #BELLY_TRACE > 200 then table.remove(BELLY_TRACE, 1) end
   end, emu.eventType.endFrame)
 end
