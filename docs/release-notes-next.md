@@ -50,8 +50,8 @@ relic. A rank once reached stays with that character whatever they wear
 later. The victory screen shows the Magic Points and any new rank, and the
 esper's page under Skills shows the selected character's rank, points and
 every rank's reward, grey until reached. Sraphim is the healer's esper: at
-its third rank, everything that character heals, by spell or by item, heals
-a quarter more, and at the top, anyone they bring back with Life or a Fenix
+its third rank, the HP that character restores, by spell or by item, is a
+quarter more, and at the top, anyone they bring back with Life or a Fenix
 Down returns with full HP.
 
 **Saves.** This release uses the v0.44 save layout. Saves from earlier

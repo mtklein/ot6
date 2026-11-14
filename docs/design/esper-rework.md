@@ -30,7 +30,9 @@ heal-or-damage choice:
 - *What counts as healing.* Any HP the member's own action restores: the
   Cure family, Life and Life 2, a heal from a Blitz, Lore or Dance, and a
   Tonic, Potion or Fenix Down used from Item. MP restored (an Ether,
-  Osmose) is not. A monster's heal is not.
+  Osmose) is not (tested: battle_esperseraph's Ether case). A monster's heal
+  is not (the `cpx #$0008` gate: reasoned from code, untested; no fixture
+  stages a monster healing cheaply by play).
 - *Regen.* The game keeps no record of who cast a Regen: each tick is the
   Regen'd member's own action. So a holder's own Regen ticks heal 25% more,
   whoever cast it, and a Regen the holder cast on someone else does not.
@@ -51,7 +53,11 @@ heal-or-damage choice:
 - *Rebirth.* Phoenix's Rebirth (Life 3 rising on its own) is not the member
   reviving anyone: the only action a KO'd body takes is that revival, so
   `Ot6SeraphHeal` skips a KO'd actor, and Rebirth's HP is the vanilla
-  eighth, even on a Sraphim master.
+  eighth, even on a Sraphim master. (Reasoned from code, untested.)
+- *Reflect.* A heal bounced off Reflect is computed by `CalcReflectDmg` with
+  the reflector as the actor, so the 25% (and the full revive) follows
+  whoever reflected it, not the caster. That is an FF6 engine quirk, accepted
+  as it stands rather than built around.
 
 **Terms.** *Magic Points* are what a won battle awards toward the
 equipped espers (FF3 US calls them Magic Points; other releases call them
@@ -299,7 +305,7 @@ bytes, `ItemProp+5` to `+13`).
 | Unicorn | Pearl, Remedy | Stm / Mag | immune to Zombie | immune to Dark, Zombie and Poison (Amulet) |
 | Golem | Safe | Stm / Vig | immune to Muddle | covers allies at low HP (True Knight) |
 | ZoneSeek | Shell, Haste | Mag / Stm | immune to Mute | Shell in every battle (Force Shld's bit) |
-| Sraphim | Cure, Life | Stm / Mag | †the member's healing +25% (Cure, Life, Regen ticks, healing items) | †*Full revive*: anyone the member revives comes back at full HP (Life, Fenix Down; Life 2 already did) |
+| Sraphim | Cure, Life | Stm / Mag | †the member's healing +25% (Cure, Life, healing items, and Regen ticks the holder receives) | †*Full revive*: anyone the member revives comes back at full HP (Life, Fenix Down; Life 2 already did) |
 | Palidor | Float, Slow | Spd / Vig | walks faster (Sprint Shoes) | Float in every battle (Cherub Down) |
 | Fenrir | Stop, X-Zone | Spd / Mag | more pre-emptive strikes (Gale Hairpin) | †immune to Stop and Slow (vanilla's protection bytes cover neither) |
 | Starlet | Cure, Regen, Remedy | Mag / Spd | immune to Berserk | max MP +25% (Minerva) |

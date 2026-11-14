@@ -17,6 +17,8 @@
 --   cure-0 / cure-75      Cure, unboosted
 --   cure2-0 / cure2-75    Cure at one boost point: Cure 2 (the boost bought the tier)
 --   item-0 / item-75      a Potion from Item (a Tonic when the bag has no Potion)
+--   mp-0 / mp-75          an Ether from Item (a Tincture when the bag has none): MP restored, which the rung leaves
+--                         alone
 --   life-0 / life-75 / life-500   Life on the KO'd LOCKE
 --   fenix-0 / fenix-500   a Fenix Down on the KO'd LOCKE
 -- The staging (declared in state_write_waivers.txt, a mechanism expedient: Sraphim is a World of Ruin stone and a
@@ -25,6 +27,7 @@
 -- Measured: the amount the action heals LOCKE (every write to his damage-healed cell, $33E4 + seat * 2, between
 -- TERRA's confirm and the end of her action), his HP at the end of her action, and the spell cast ($3410).
 --   rung 3:   cure-75 = cure-0 + cure-0 / 4 (rounded down), and the same for cure2 and item;
+--             mp-75 restores what mp-0 does (MP is not healing);
 --             life-75's revival heals life-0's + a quarter, and LOCKE stands at that HP;
 --   rung 5:   life-500 and fenix-500 raise LOCKE at his max HP; life-0 and fenix-0 raise him below it (Life and a
 --             Fenix Down give an eighth), the vanilla amount.
@@ -41,7 +44,7 @@ local KO = 0x80
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC = 0x00, 0x01, 0x02
 local TERRA, LOCKE, STRAGO = 0, 1, 7
 local FIRE, CURE, CURE2, LIFE = 0x00, 0x2D, 0x2E, 0x30
-local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
+local TONIC, POTION, TINCTURE, ETHER, FENIX = 0xE8, 0xE9, 0xEB, 0xEC, 0xF0
 local LIVE, SRAPHIM = 0x317C00, 20                  -- the live esper page; Sraphim's counter slot
 
 local function pend(s) return H.readByte(PEND + s * 2) end
@@ -67,6 +70,9 @@ local function spellCell(s, id)
     local a = b + (cell + 1) * 4
     if H.readByte(a) == id and (H.readByte(a + 1) & 0x80) == 0 then return cell end
   end
+end
+local function romPrice(id)
+  return H.readRomByte((H.sym("MagicProp") & 0x3FFFFF) + id * 14 + 5)
 end
 local function invIdx(id)
   for i = 0, 251 do if H.readByte(BATTINV + i * 5) == id and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end end
@@ -247,7 +253,7 @@ end
 
 -- ---- the run -------------------------------------------------------------------
 local snap, snapK = nil, nil
-local healItem, healName
+local healItem, healName, mpItem, mpName
 local CASES = {
   { name = "cure-0", cmd = CMD_MAGIC, spell = CURE, cast = CURE, boost = 0, stage = 0 },
   { name = "cure-75", cmd = CMD_MAGIC, spell = CURE, cast = CURE, boost = 0, stage = 75 },
@@ -255,6 +261,8 @@ local CASES = {
   { name = "cure2-75", cmd = CMD_MAGIC, spell = CURE, cast = CURE2, boost = 1, stage = 75 },
   { name = "item-0", cmd = CMD_ITEM, boost = 0, stage = 0 },
   { name = "item-75", cmd = CMD_ITEM, boost = 0, stage = 75 },
+  { name = "mp-0", cmd = CMD_ITEM, mp = true, boost = 0, stage = 0 },
+  { name = "mp-75", cmd = CMD_ITEM, mp = true, boost = 0, stage = 75 },
   { name = "life-0", cmd = CMD_MAGIC, spell = LIFE, cast = LIFE, boost = 0, stage = 0, ko = true },
   { name = "life-75", cmd = CMD_MAGIC, spell = LIFE, cast = LIFE, boost = 0, stage = 75, ko = true },
   { name = "life-500", cmd = CMD_MAGIC, spell = LIFE, cast = LIFE, boost = 0, stage = 500, ko = true },
@@ -318,9 +326,14 @@ local steps = {
     assert(healItem, "the bag holds a Potion or a Tonic")
     healName = healItem == POTION and "Potion" or "Tonic"
     assert(invIdx(FENIX), "the bag holds a Fenix Down")
-    for _, c in ipairs(CASES) do if c.cmd == CMD_ITEM and c.item == nil then c.item = healItem end end
+    mpItem = invIdx(ETHER) and ETHER or (invIdx(TINCTURE) and TINCTURE or nil)
+    assert(mpItem, "the bag holds an Ether or a Tincture")
+    mpName = mpItem == ETHER and "Ether" or "Tincture"
+    for _, c in ipairs(CASES) do
+      if c.cmd == CMD_ITEM and c.item == nil then c.item = c.mp and mpItem or healItem end
+    end
     H.log(string.format("[seraph] TERRA slot %d (%d MP), LOCKE slot %d (%d/%d), STRAGO slot %d; the item case "
-      .. "uses a %s", terraS, mp(terraS), lockeS, hp(lockeS), hpMax(lockeS), stragoS, healName))
+      .. "uses a %s, the MP case a %s", terraS, mp(terraS), lockeS, hp(lockeS), hpMax(lockeS), stragoS, healName, mpName))
   end),
   (function()
     local hurtSeen = false
@@ -396,7 +409,10 @@ for _, c in ipairs(CASES) do
     c.count = sramW(LIVE + 0x10 + (TERRA * 26 + SRAPHIM) * 2)
     H.assertEq(c.count, c.stage, c.name .. ": TERRA's Sraphim count")
     H.assertEq(ko(lockeS), c.ko == true, c.name .. (c.ko and ": LOCKE is KO'd" or ": LOCKE is alive"))
-    H.assertEq(mp(terraS) >= 40, true, c.name .. ": TERRA's MP pays the cast")
+    if c.cast then
+      H.assertEq(mp(terraS) >= romPrice(c.cast), true, string.format("%s: TERRA's MP (%d) pays $%02X (%d)",
+        c.name, mp(terraS), c.cast, romPrice(c.cast)))
+    end
     c.casts, c.heals = {}, {}
     armed = c
   end)
@@ -438,6 +454,12 @@ steps[#steps + 1] = H.call(function()
       check(a.amt > 0 and b.amt == quarter(a.amt), string.format("%s heals %d, %s's %d plus a quarter (%d)",
         b.name, b.amt, a.name, a.amt, quarter(a.amt)))
     end
+  end
+  -- MP restored is not healing: the same draw restores the same MP with the rung
+  do
+    local a, b = by["mp-0"], by["mp-75"]
+    check(a.amt ~= nil and a.amt > 0 and b.amt == a.amt, string.format("%s restores %s MP, as %s does (%s): MP is not "
+      .. "healed 25%% more", b.name, tostring(b.amt), a.name, tostring(a.amt)))
   end
   -- the revivals: vanilla's eighth without the signature, full with it
   for _, c in ipairs({ by["life-0"], by["life-75"], by["fenix-0"] }) do
