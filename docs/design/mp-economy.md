@@ -226,7 +226,12 @@ makes:
 
 > **A verb's price escalates exactly when `Ot6BoostDmg` multiplies it.**
 
-There is nothing else to check. `Ot6BoostDmg`'s command gate names
+There is one exception since #469: where the boost buys more of the same
+application rather than a bigger number -- a reach spell's bodies,
+Debilitator's weaknesses, Filch's shields -- the price is per point
+(below), whatever the command gate says, and NoiseBlaster, which takes
+no boost, stays flat though Tools escalate. Otherwise there is nothing
+else to check. `Ot6BoostDmg`'s command gate names
 fight `$00`, capture `$06`, bushido `$07`, steal `$05`, slot `$0f` and
 rage `$10`, plus every tier-family spell through `Ot6FoldTbl`. That
 list is the exemption list, read straight across. One scan, one gate,
@@ -265,6 +270,16 @@ Vanish, Dispel, Doom, a fraction like Demi) takes no boost and no
 escalation (#463, below); Scan's boost buys breadth and Break's chips. None of their
 commands is in the gate, so the boost buys them x2/x4/x8 and nothing
 else, and the price follows at 2.5x per level.
+
+**Per body — the boost buys more of the same application (#469):** a
+reach spell's bodies, Debilitator's weaknesses and Filch's shields are each
+priced as their own use, `base x (1 + boost)` capped at 99
+(`Ot6PerPointPrice`): Safe 12 / 24 / 36 / 48, Debilitator 10 / 20 / 30 / 40,
+Filch 6 / 12 / 18 / 24. Vanilla prices its own party tier this way (Haste 10,
+Haste2 38 for the party), and Overclock and Coin Toss are OT6's precedent for
+"priced as the uses it replaces". The boost buys bodies or steps, not a
+number, so the 2.5x does not apply. Bestow's boost buys pips, which are
+their own price: it stays flat.
 
 **Flat — the boost buys certainty, and BP already paid for it:**
 **Steal**, **Rage** and **Slot**. These are the *chance verbs*, and the
@@ -533,7 +548,8 @@ gate). The boost buys swings.
 
 Base prices are `Ot6AbilityCostTbl`'s, `Ot6StealCost`'s and
 `Ot6DanceCost`'s; the boosted columns are the formula above, for the
-rows the one test says escalate. `battle_costtable` prints this whole
+rows the one test says escalate, and the per-point arm (#469) for the rows
+whose boost buys more of the same application. `battle_costtable` prints this whole
 table out of the built ROM, flat rows marked.
 
 | row | base | boost 1 | boost 2 | boost 3 |
@@ -543,11 +559,13 @@ table out of the built ROM, flat rows marked.
 | **Slot** (chance verb, unpriced) | 0 | 0 | 0 | 0 |
 | **Jackpot** (divine: offered at 3 BP only) | -- | -- | -- | 99 |
 | Pummel / AutoCrossbow | 4 | 10 | 25 | 63 |
-| Bestow (flat, buys nothing) | 5 | 5 | 5 | 5 |
-| NoiseBlaster / Flash | 6 | 15 | 38 | 94 |
-| Filch (flat, buys nothing) | 6 | 6 | 6 | 6 |
+| Bestow (flat: its boost buys pips, #469) | 5 | 5 | 5 | 5 |
+| NoiseBlaster (flat: takes no boost, #469) | 6 | 6 | 6 | 6 |
+| Flash | 6 | 15 | 38 | 94 |
+| Filch (per point, #469) | 6 | 12 | 18 | 24 |
 | Bio Blaster / **Dance** | 8 | 20 | 50 | 99 |
-| AuraBolt / Debilitator | 10 | 25 | 63 | 99 |
+| AuraBolt | 10 | 25 | 63 | 99 |
+| Debilitator (per point, #469; 80 overclocked) | 10 | 20 | 30 | 40 |
 | Suplex | 13 | 33 | 81 | 99 |
 | Air Anchor | 14 | 35 | 88 | 99 |
 | Mantra / Drill | 16 | 40 | 99 | 99 |

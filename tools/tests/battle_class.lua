@@ -141,17 +141,25 @@ local s1c, s2c -- shield snapshot for the no-chip phases
 local terra    -- terra's party slot (char id 0)
 local terraCmds, terraSt1 = {}, nil  -- her pre-lab commands + status 1
 
--- under-enemy HUD: the first weakness-slot word after each shield glyph
--- on the bg3 field map (one per live hud line)
+-- under-enemy HUD: the first weakness-slot word of each live hud line whose
+-- shield gauge is on the bg3 field map.  A line is [lead][count][weakness
+-- x4] from its anchor minus one (#397): the lead cell is the emblem ($71) or,
+-- while broken, the slot's broken-shield tile, and the first weakness slot
+-- is the word after the anchor.  Read where the shadow puts the line
+-- (OT6_SHADOW, 6 lines x 14 bytes, +0 the anchor), so a line counts only
+-- while its gauge is really drawn there.
 local SHIELDG = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1}
 local function hudSlotWords()
   local vr = emu.memType.snesVideoRam
-  local reg = H.readByte(0x897b)
-  local base = ((reg - (reg % 4)) * 256) * 2
   local t = {}
-  for off = 0, 0x7FC, 2 do
-    if emu.read(base + off + 1, vr) == 0x21 and SHIELDG[emu.read(base + off, vr)] then
-      t[#t + 1] = emu.readWord(base + off + 2, vr)
+  for l = 0, 5 do
+    local addr = H.readWord(0xECF1 + l * 14)
+    if addr ~= 0 then
+      local lead = emu.readWord((addr - 1) * 2, vr)
+      local attr = lead >> 8
+      if (attr == H.HUD_GAUGE_ATTR or attr == H.HUD_BROKEN_ATTR) and SHIELDG[lead & 0xFF] then
+        t[#t + 1] = emu.readWord((addr + 1) * 2, vr)
+      end
     end
   end
   return t

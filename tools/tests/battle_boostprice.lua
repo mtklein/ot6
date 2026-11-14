@@ -44,9 +44,10 @@
 --      out of (99 and up, say) is spent down first with real unboosted
 --      Blitzes until one can.
 --   3. a boosted Blitz is queued at the boosted price and deducts it.
---   4. LOCKE's whole thief submenu stays FLAT under a boost -- Steal as well
---      as Filch and Bestow -- and the stamp is checked against the escalated
---      number it must NOT be, so the arm can tell the two rules apart.
+--   4. LOCKE's thief submenu does not escalate under a boost -- Steal and
+--      Bestow stay flat, Filch pays per shield (#469) -- and the stamp is
+--      checked against the escalated number it must NOT be, so the arm can
+--      tell the rules apart.
 --   5. a boosted Steal is queued at the flat price and deducts it.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
@@ -763,8 +764,8 @@ H.run({ maxFrames = 300000 }, {
   ------------------------------------------- 4/5. LOCKE's Steal, a chance verb --
   -- The other side of the one test.  Cmd $05 is in Ot6BoostDmg's gate, so no
   -- row of the thief submenu escalates: Steal's boost buys the rare/guarantee
-  -- ladder (odds, not magnitude) and Filch's and Bestow's buys nothing at
-  -- all.  Each assertion names the escalated number it must not be, so this
+  -- ladder (odds, not magnitude), Bestow's the pips it hands, and Filch's a
+  -- shield a point, priced per shield (#469).  Each assertion names the escalated number it must not be, so this
   -- section fails if the escalation ever comes back -- it does not merely
   -- stop mentioning it.
   openAt(function() return locke end, 1, "steal",
@@ -791,11 +792,12 @@ H.run({ maxFrames = 300000 }, {
       .. "outcomes rather than magnitude, and the BP already pays for it",
       price, wouldBe))
     H.assertEq(q[THIEF_FILCH], thiefCostOf(THIEF_FILCH),
-      "Filch stays flat on the same gate -- and for it a boost buys nothing "
-      .. "at all, so charging for it would be charging for nothing")
+      "Filch's row is stamped its base (Ot6ThiefListOpen stamps every thief "
+      .. "row flat, Trickshot's too); the live draw and the charge pay one "
+      .. "Filch a shield (#469, Ot6ThiefRowCost; battle_boostkeep's filch-b2 "
+      .. "measures the charge), never the 2.5x multiplier")
     H.assertEq(q[THIEF_BESTOW], thiefCostOf(THIEF_BESTOW),
-      "Bestow stays flat, for the same reason.  All three thief rows now take "
-      .. "one flat arm, with no per-row split left to go stale")
+      "Bestow stays flat: its boost buys pips, which are their own price")
     H.screenshot("boostprice_steal_boost1")
     rec = { cmd = CMD_STEAL, want = price, slot = locke }
     H.assertEq(mp(locke) >= price, true,

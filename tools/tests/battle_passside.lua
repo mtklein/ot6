@@ -398,8 +398,69 @@ local function play()
   end, reset = function() S = {} end }
 end
 
+-- SETZER's control through his case's window is the precondition every case
+-- needs, and the tomb's crowds take it: on 9b050d79's line every opening of
+-- all three crowds Zombied him before his row ran ("SETZER cannot take a
+-- command: Zombie (#1)", each case "interrupted 4 times ... its selected
+-- command never executed"; v0.42's line the same in crowds 1 and 2, its
+-- crowd 3 the one that let the cases run), so the suite passed or failed on
+-- which crowd came third (build/attempts/wt/polish-driver-gaps/
+-- passside-9b050d79.log, lab/ab/).  A player who sees the Zombie land
+-- puts a ward on him: before the walk he wears a relic from the bag whose
+-- record guards Zombie (ItemProp +6 bit 1: the Memento Ring, the Ribbon,
+-- the Amulet, the Safety Bit), in his second relic slot, through the Relic
+-- menu.  PASSSIDE_NO_WARD (a lab global) leaves him as he was, the control.
+local ZOMBIE_BIT = 0x02
+local function zombieWard()
+  local base = H.sym("ItemProp") & 0x3FFFFF
+  local function guards(id) return (H.readRomByte(base + id * 30 + 6) & ZOMBIE_BIT) ~= 0 end
+  local o = 0x1600 + 37 * SETZER
+  for s = 4, 5 do
+    local id = H.readByte(o + 0x1F + s)
+    if id ~= 0xFF and guards(id) then return nil, id end
+  end
+  for i = 0, 255 do
+    local id, n = H.readByte(0x1869 + i), H.readByte(0x1969 + i)
+    if n > 0 and id >= 0xB0 and guards(id) and H.wearsItem(SETZER, id) then return id end
+  end
+  -- none in the bag: one a party member wears, moved to him (the gear
+  -- baseline's Ribbon on CELES at 9b050d79's wor-tomb-v1)
+  local active = H.readByte(0x1A6D) & 0x07
+  for ch = 0, 15 do
+    if ch ~= SETZER and (H.readByte(0x1850 + ch) & 0x07) == active then
+      for s = 4, 5 do
+        local id = H.readByte(0x1600 + 37 * ch + 0x1F + s)
+        if id ~= 0xFF and guards(id) and H.wearsItem(SETZER, id) then return id, nil, ch, s end
+      end
+    end
+  end
+  return nil
+end
+
 H.run({ maxFrames = 900000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
+  H.lazy(function()
+    if PASSSIDE_NO_WARD then
+      H.log(string.format("[%s] PASSSIDE_NO_WARD: SETZER keeps his relics (the control)", TAG))
+      return H.call(function() end)
+    end
+    local id, worn, from, fromSlot = zombieWard()
+    if worn then
+      H.log(string.format("[%s] SETZER already wears $%02X, a Zombie ward", TAG, worn))
+      return H.call(function() end)
+    end
+    H.assertEq(id ~= nil, true, "the bag or a party member holds a relic SETZER can wear that guards Zombie "
+      .. "(ItemProp +6 bit 1): the tomb's crowds Zombie him before his case runs")
+    H.log(string.format("[%s] SETZER puts on $%02X against the crowds' Zombie (his second relic slot)%s", TAG, id,
+      from and string.format(", taken off char %d's slot %d", from, fromSlot) or ""))
+    return H.seqStep({
+      from and H.unequipRelics(from, { fromSlot }, { tag = TAG .. " ward" }) or H.call(function() end),
+      H.equipKit(SETZER, { { 5, id } }, { tag = TAG .. " ward" }),
+      H.call(function()
+        H.assertEq(H.readByte(0x1600 + 37 * SETZER + 0x24), id, "SETZER wears the Zombie ward")
+      end),
+    })
+  end),
   H.call(function()
     PW = H.passWatch()
     armExec()

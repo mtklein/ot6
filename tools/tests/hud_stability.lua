@@ -23,7 +23,8 @@ local function cellset()
   local t = {}
   for off = 0, 0x7FE, 2 do
     local lo = emu.read(base+off, vr)
-    if emu.read(base+off+1, vr) == 0x21 and GLYPH[lo] then
+    local attr = emu.read(base+off+1, vr)
+    if (attr == 0x21 or attr == H.HUD_GAUGE_ATTR or attr == H.HUD_BROKEN_ATTR) and GLYPH[lo] then
       t[#t+1] = string.format("%04x:%02x", (base+off)//2, lo)
     end
   end

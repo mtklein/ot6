@@ -18,7 +18,8 @@
 -- exists for; derived from the battle, not assumed).  Once its HUD line is
 -- drawn on the field map, the word there must name that slot's cell and
 -- the cell's VRAM tile must be the ROM's tile for the true count, which is
--- not the tile for 6.  Screenshot hudcount_<n>.
+-- not the tile for 6, with the shield emblem in the cell left of it (#397).
+-- Screenshot hudcount_<n>.
 --
 -- Then a SYNTHETIC step (declared in state_write_waivers.txt): the count is
 -- written to 11, AtmaWeapon's authored count, which no fixture reaches
@@ -81,6 +82,15 @@ local function check(n, tag)
     hex(romTile(6))))
   H.assertEq(hex(got), hex(want),
     string.format("%s: the drawn shield tile is the ROM's tile for the true count %d", tag, n))
+  -- #397: the count is half of a two-cell gauge, the emblem one cell left of
+  -- it, both under the gauge attribute (text palette 2), apart from the
+  -- weakness cells' palette 0
+  local lead = emu.read((addr - 1) * 2, vr) | (emu.read((addr - 1) * 2 + 1, vr) << 8)
+  H.log(string.format("[hudcount] %s: lead cell %04X, count cell %04X", tag, lead, drawn or 0))
+  H.assertEq(lead, (H.HUD_GAUGE_ATTR << 8) | 0x71,
+    string.format("%s: the shield emblem stands left of the count, under the gauge attribute", tag))
+  H.assertEq(word >> 8, H.HUD_GAUGE_ATTR,
+    string.format("%s: the count draws under the gauge attribute", tag))
   H.assertEq(hex(want) ~= hex(romTile(6)), true,
     string.format("%s: the tile for %d is not the tile for 6", tag, n))
 end

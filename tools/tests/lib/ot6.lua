@@ -1059,6 +1059,25 @@ function M.turnDenied(o)
   if ((o.s2 or 0) & M.ST2_BERSERK) ~= 0 then return "Berserk" end
   return nil
 end
+-- The monster a plan was made for, when it has fallen by the confirm
+-- (#470): the body a plan names outright (aimHard: STRAGO's study,
+-- Dischord, #388), else the slot a plain Fight chose for its class key
+-- (aim, chipAim #161) when no kill order is in force (ordered: a focus
+-- list steers instead, and its next live entry is still a target it
+-- chose).  Only plans the focus steer aims are asked: not an item, summon
+-- or heal, not a lore without a named body, not a cast on the party, not
+-- a scored contract (its own mismatch check backs out).  Measured on
+-- battle_classtarget shift 13 (#468): TERRA's Fight aimed at the 4-HP
+-- Cirpius in slot 2, LOCKE's queued Fight killed it 17 frames before her
+-- confirm, and she confirmed on the Tusker the cursor fell to.  Pure:
+-- o.alive(slot) says whether a slot stands.  Returns the fallen slot, or nil.
+function M.namedBodyFell(o)
+  if o.kind == "item" or o.kind == "summon" or o.kind == "heal" or o.ally or o.contract then return nil end
+  local named = o.aimHard
+  if named == nil and o.kind ~= "lore" and not o.ordered then named = o.aim end
+  if named ~= nil and not o.alive(named) then return named end
+  return nil
+end
 -- Whether the engine keeps a denied actor's open command window (see
 -- above): true for Stop and Frozen, false for the rest and for nil.
 function M.windowKept(denial)
@@ -2992,6 +3011,30 @@ end
 -- This is the only place in the library the 2.5x arithmetic appears.
 -- Every caller that wants to know what a boost will cost reaches here,
 -- the way every ROM surface that states a price reaches Ot6BoostPriceFor.
+-- #469's per-point arm (Ot6PerPointPrice): a boost that buys more bodies or
+-- steps (a reach spell, Debilitator, Filch) pays each as its own use, base x
+-- (1 + boost), capped at 99 and never below the base.
+function M.perPointPrice(base, boost)
+  base, boost = base or 0, math.max(0, math.min(boost or 0, 3))
+  return math.max(base, math.min(99, base * (1 + boost)))
+end
+-- Ot6ReachTbl, read once off the ROM (empty on a ROM without it); on M, not a
+-- file-scope local (the main chunk's 200-local limit)
+function M.isReachSpell(id)
+  if M.reachIds == nil then
+    local REACH = {}
+    M.reachIds = REACH
+    local ok, at = pcall(function() return M.sym("Ot6ReachTbl") end)
+    if ok then
+      for i = 0, 15 do
+        local v = M.readRomByte((at & 0x3FFFFF) + i)
+        if v == 0xFF then break end
+        REACH[v] = true
+      end
+    end
+  end
+  return M.reachIds[id] == true
+end
 function M.boostPrice(base, boost)
   base, boost = base or 0, boost or 0
   if boost <= 0 then return base end
@@ -3324,6 +3367,7 @@ function M.spellPrice(id, base, boost, actor)
     return M.spellMpCost(to), to
   end
   if econ then return 1, id end
+  if M.isReachSpell(id) then return M.perPointPrice(base, boost), id end
   return M.boostPrice(base, boost), id
 end
 
@@ -3509,8 +3553,11 @@ function M.overclocks(actor, boost)
   return boost >= 3 and actor ~= nil and M.readByte(0x3ED8 + actor * 2) == 4
     and (M.readByte(0x1E80 + (0x68 >> 3)) & (1 << (0x68 & 7))) ~= 0
 end
-function M.toolPrice(actor, base, boost)
-  local p = M.boostPrice(base, boost)
+function M.toolPrice(actor, base, boost, id)
+  -- #469 (Ot6ToolPrice): NoiseBlaster is flat at every boost, overclock or
+  -- not; Debilitator pays a firing a weakness
+  if id == 0xA3 then return base end
+  local p = id == 0xA7 and M.perPointPrice(base, boost) or M.boostPrice(base, boost)
   if p > 0 and M.overclocks(actor, boost) then p = math.min(99, p * 2) end
   return p
 end
@@ -3556,7 +3603,7 @@ function M.boostPlan(o)
   if o.spell then
     priceAt = function(b) return (M.spellPrice(o.id, base, b, o.slot)) end
   elseif o.slot ~= nil and o.id ~= nil and o.id >= 0xA3 and o.id <= 0xAA then
-    priceAt = function(b) return M.toolPrice(o.slot, base, b) end
+    priceAt = function(b) return M.toolPrice(o.slot, base, b, o.id) end
   end
   -- The ration is applied by handing affordBoost a SMALLER pool, not a
   -- smaller want: it then steps the boost down to the deepest level the
@@ -4497,12 +4544,32 @@ function M.ot6FontCells()
   local glyphs = M.sym("Ot6ShieldGlyphs") & 0x3FFFFF
   for s = 0, 5 do
     local n = M.readByte(have + s)
-    if n >= 1 and n <= 99 then
+    if n >= 1 and n <= 100 then        -- 100: the broken shield (#397)
       cells[emu.read(slotCells + s, rom)] = { rom = glyphs + (n - 1) * 16,
         tag = string.format("slot %d shield count %d", s, n) }
     end
   end
   return cells
+end
+
+-- Every battle-font char OT6 can put on the field map, as a set {[char] =
+-- true}, read from the ROM's own cell tables: the element icons
+-- (Ot6ElemGlyphTbl), the fixed hud cells (Ot6BgGlyphCellTbl, up to
+-- Ot6BgGlyphData), every slot's shield cell (Ot6ShieldSlotCellTbl), and $bf,
+-- the '?' the weakness slots borrow.  For the suites that assert no OT6 glyph
+-- is drawn while an animation owns bg3; it replaces their search for the
+-- pre-#397 shield tile's bytes.
+function M.ot6ClaimedChars()
+  local rom = emu.memType.snesPrgRom
+  local set = { [0xbf] = true }
+  local icons = M.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
+  for k = 0, 7 do set[emu.read(icons + k, rom)] = true end
+  local cells = M.sym("Ot6BgGlyphCellTbl") & 0x3FFFFF
+  local data = M.sym("Ot6BgGlyphData") & 0x3FFFFF
+  for a = cells, data - 1 do set[emu.read(a, rom)] = true end
+  local slots = M.sym("Ot6ShieldSlotCellTbl") & 0x3FFFFF
+  for k = 0, 5 do set[emu.read(slots + k, rom)] = true end
+  return set
 end
 
 -- Every OT6 font cell in VRAM must match its ROM source data, byte for
@@ -4519,14 +4586,20 @@ function M.glyphCanary()
 end
 
 -- true if any OT6 shield/broken glyph word sits in the bg3 field-area map
--- (the under-monster hud). formation-agnostic presence check.
+-- (the under-monster hud). formation-agnostic presence check.  The shield
+-- gauge (the emblem $71 and the count cells) draws under attribute $29, text
+-- palette 2 (#397); the broken shield, a count cell's tile, under $3D,
+-- text palette 7.
+M.HUD_GAUGE_ATTR = 0x29
+M.HUD_BROKEN_ATTR = 0x3D
 function M.fieldHudPresent()
   local vr = emu.memType.snesVideoRam
   local reg = M.readByte(0x897b)
   local base = ((reg - (reg % 4)) * 256) * 2
   local set = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1}
   for off = 0, 0x7FE, 2 do
-    if emu.read(base+off+1, vr) == 0x21 and set[emu.read(base+off, vr)] then
+    local attr = emu.read(base+off+1, vr)
+    if (attr == M.HUD_GAUGE_ATTR or attr == M.HUD_BROKEN_ATTR) and set[emu.read(base+off, vr)] then
       return true
     end
   end
@@ -12774,6 +12847,12 @@ function Driver:megalixirPlan(actor, plan)
   -- no action trace falls back to the fixed window o.flight (2400 frames); a traced one holds until the event, with
   -- o.maxFlight (6000) as the backstop for an event that never comes
   if row == nil or idx == nil or self:megalixirInFlight() then return plan end
+  -- never with a Zombie seated: the Megalixir reaches every seat and its HP is damage on a Zombie (the care lines'
+  -- party item and party cure skip it the same way, #515)
+  for e = 0, 3 do
+    local mx = M.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx ~= 0xFFFF and status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) then return plan end
+  end
   local low, first = 0, nil
   for e = 0, 3 do
     local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
@@ -16310,6 +16389,7 @@ function Driver:button(actor)
     -- steer to it through the same focus graph, as a one-entry list.  An
     -- authored or multi-part focus wins here byte-identical, because chipAim
     -- yields nil while one is in force, so plan.aim is unset then.
+    local ordered = focus ~= nil
     if focus == nil and self.plan.aim ~= nil then
       focus = { { slot = self.plan.aim, mask = 1 << self.plan.aim } }
     end
@@ -16317,6 +16397,19 @@ function Driver:button(actor)
     -- steered to it over any kill order, a single-target lore included
     if self.plan.aimHard ~= nil then
       focus = { { slot = self.plan.aimHard, mask = 1 << self.plan.aimHard } }
+    end
+    -- the body the plan was made for fell on the way here (M.namedBodyFell,
+    -- #470): re-planned against the live stage, not confirmed on wherever
+    -- the cursor fell
+    local fell = M.namedBodyFell({ kind = self.plan.kind, ally = self.plan.ally,
+      contract = self.plan.targetContract ~= nil, ordered = ordered, aim = self.plan.aim,
+      aimHard = self.plan.aimHard, alive = monAlive })
+    if fell ~= nil then
+      M.log(string.format("[%s] actor=%d: the %s plan's monster (slot %d) fell before the confirm "
+        .. "(live monsters %02X): backing out to re-plan (#470)", self.tag or "fight", actor,
+        tostring(self.plan.kind), fell, M.readByte(0x3A75)))
+      self:dropPlan("aim_fell")
+      return { "b" }
     end
     if focus and self.plan.kind ~= "item" and self.plan.kind ~= "summon"
        and self.plan.kind ~= "heal" and (self.plan.kind ~= "lore" or self.plan.aimHard ~= nil)
@@ -16697,6 +16790,24 @@ end
 --   roll lands), dmg/b6/b7/class being the last roll's.
 -- The list as it was drawn, per opening: M.vars.setzerList = { { ids,
 -- qty, flags, mode } }; opts.onList(list, pend) runs at each opening.
+-- What a scripted driver learns about a plan entry while it plays one
+-- battle (#470): the window it opened, its presses, its aim, a greyed
+-- command (a Mute), its member gone, a refusal seen.  All of it belongs to
+-- that battle, so M.kitBattle and M.setzerBattle clear it as each battle
+-- starts: a plan table played again in a later battle starts as asked.
+-- Kept, one Mute locked a reused plan into fight-outs for every later
+-- battle (#468: battle_runicblade went 0/24 once EDGAR was muted in battle
+-- 3, "char $04's command $02 is greyed"; the suite cleared its entries by
+-- hand since, and battle_jackpot its own).  A caller reads these after the
+-- battle; nothing it asked for (who, cmd, boost, row, slot...) is touched.
+M.KIT_ENTRY_STATE = { "opened", "seat", "presses", "lPresses", "tookBack", "allyPresses", "greyed",
+  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt" }
+function M.freshKitEntries(plan)
+  for _, q in ipairs(plan) do
+    for _, f in ipairs(M.KIT_ENTRY_STATE) do q[f] = nil end
+  end
+end
+
 function M.setzerBattle(plan, opts)
   opts = opts or {}
   for _, p in ipairs(plan) do
@@ -16728,6 +16839,7 @@ function M.setzerBattle(plan, opts)
       -- one that keeps its HP (kit-setzer round 5: a petrified Mad Oscar
       -- at 2,647 HP read alive by HP and held the victory text)
       t[s] = { hp = M.readWord(0x3BFC + s * 2), sh = M.readByte(0x3E40 + s * 2),
+        shmax = M.readByte(0x3E41 + s * 2),
         brk = M.readByte(0x3E90 + s * 2), cls = M.readByte(0x3EA4 + s * 2),
         present = (M.readByte(0x3AA8 + s * 2) & 1) == 1,
         alive = ((M.readByte(0x3A75) >> s) & 1) == 1 }
@@ -16816,6 +16928,17 @@ function M.setzerBattle(plan, opts)
         Z.rec.seq[#Z.rec.seq + 1] = { t = "hit", y = ev.y, class = ev.class }
       end
     end, emu.callbackType.exec, c, c)
+    -- a body's break running out (Ot6Tick's recovery arm, `lda OT6_SHIELD_MAX,x`
+    -- 10 bytes in: its shields go back to their max), in the same sequence as
+    -- the passes, so the replay restores them where the engine did
+    local tk = M.sym("Ot6Tick") + 10
+    M.assertEq(M.readRomByte(tk & 0x3FFFFF) == 0xBD and M.readRomWord((tk & 0x3FFFFF) + 1) == 0x3E39, true,
+      "Ot6Tick's recovery arm is `lda $3e39,x` 10 bytes in")
+    emu.addMemoryCallback(function()
+      if live() and Z.rec then
+        Z.rec.seq[#Z.rec.seq + 1] = { t = "recover", y = emu.getState()["cpu.x"] & 0xff }
+      end
+    end, emu.callbackType.exec, tk, tk)
     emu.addMemoryCallback(function(_, v)
       if live() and Z.rec and Z.rec.row == 0x5B and v == 0x26 then
         Z.rec.dmg, Z.rec.b6, Z.rec.b7, Z.rec.class = M.readWord(0x11B0), M.readByte(0xB6), M.readByte(0xB7),
@@ -17262,7 +17385,7 @@ function M.setzerBattle(plan, opts)
     end
   end
   return M.seqStep({
-    M.call(function() Z.inFlight = 0; M.logRomIdentity("[setzer]") end),
+    M.call(function() Z.inFlight = 0; M.freshKitEntries(plan); M.logRomIdentity("[setzer]") end),
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and Z.rec == nil then
@@ -17320,6 +17443,12 @@ end
 -- monster until the battle ends (opts.idle = "defend": everyone keeps
 -- Defending instead; opts.untilPlanDone ends the step once the plan is spent
 -- and opts.planDone(), when given, says its last action has resolved).
+-- While the plan has entries, a window the others' care has work for (a
+-- raise, a Potion under half HP, the plan character's lost control:
+-- M.newSpinnerCare) goes to care instead (opts.care = false: never); a
+-- fight-out Fight (the plan spent, or its character out) raises the
+-- pending boost to the bank first, up to 3 (#470).  Each battle starts the
+-- plan's entries afresh (M.freshKitEntries).
 -- Nothing is written.  M.vars.kit[k] records each entry:
 -- { who, actor, boost (pending at the confirm), refusedSeen, frame }.
 function M.kitBattle(plan, opts)
@@ -17328,6 +17457,17 @@ function M.kitBattle(plan, opts)
   local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
   local k, cool = 1, 0
   local hb, downHold = nil, {}
+  -- the others' care (#470): lib/ot6_field.lua's M.newSpinnerCare, with the
+  -- plan's character as its spinner; opts.care = false leaves the others
+  -- to the script (Defend or Fight) alone
+  local care, careActor = nil, nil
+  if opts.care ~= false and M.newSpinnerCare ~= nil then
+    care = M.newSpinnerCare({ name = "the plan's character", spinner = function()
+      local p = plan[k]
+      if p == nil then return nil end
+      for s = 0, 3 do if M.readByte(0x3ED8 + s * 2) == p.who then return s end end
+    end })
+  end
   local function pulse(btn)
     if cool > 0 then cool = cool - 1; M.setPad({}); return end
     M.setPad({ [btn] = true }); cool = 10
@@ -17404,7 +17544,16 @@ function M.kitBattle(plan, opts)
     return false
   end
   local stoodDown = {}
-  local function fight(a, st)
+  -- The fight-out spends the bank (#470): a member Fighting the battle
+  -- out (the plan done, or its character out of the fight) raises the
+  -- pending boost to what it has banked, up to 3, before the Fight -- the
+  -- boost-Fight default (docs/guidelines.md), and the pips a member one
+  -- round from the end would otherwise carry out unspent.  A Fight while
+  -- the plan still plays (opts.others) stays bare: its job is to thin the
+  -- formation, not end it before the plan.  spendR caps the R presses a
+  -- window gives it (a pending boost that does not rise is left).
+  local spendR = {}
+  local function fight(a, st, spend)
     local want = fightWant(a)
     if want == false then
       if not stoodDown[a] then
@@ -17419,6 +17568,12 @@ function M.kitBattle(plan, opts)
     if st == 0x05 then
       local row = cmdRowOf(a, 0x00)
       if row == nil then pulse("right"); return end
+      if spend and (spendR[a] or 0) < 4
+         and M.readByte(0x3E9D + a * 2) < math.min(M.readByte(0x3E9C + a * 2), 3) then
+        if cool == 0 then spendR[a] = (spendR[a] or 0) + 1 end
+        pulse("r")
+        return
+      end
       local cur = M.readByte(0x890F + a) & 3
       if cur ~= row then pulse(cur < row and "down" or "up") else pulse("a") end
     elseif st == 0x38 then
@@ -17458,6 +17613,8 @@ function M.kitBattle(plan, opts)
     end
     if M.readByte(MENU) == 0 then
       downHold = {}   -- (a reopened window's hold starts afresh, with a fresh cap)
+      spendR = {}
+      if care ~= nil then care.reset(); careActor = nil end
       if M.readByte(0x3A77) == 0 then pulse("a") else M.setPad({}) end
       return
     end
@@ -17491,10 +17648,20 @@ function M.kitBattle(plan, opts)
       return
     end
     if p == nil then
-      if opts.idle == "defend" then defend(st) else fight(a, st) end
+      if opts.idle == "defend" then defend(st) else fight(a, st, true) end
       return
     end
     if M.readByte(0x3ED8 + a * 2) ~= p.who then
+      -- the others' care while the plan plays (#470, M.newSpinnerCare, the
+      -- care setzerBattle gives SETZER's party): a fallen member raised, a
+      -- member under half HP given a Potion (a Tonic without), the plan's
+      -- character's lost control answered; else the script below
+      if care ~= nil and (careActor == a or (careActor == nil and care.wants(a))) then
+        careActor = a
+        care.window()
+        return
+      end
+      if careActor ~= nil then care.reset(); careActor = nil end
       local live, m = 0, M.readByte(0x3A75)
       while m ~= 0 do live = live + (m & 1); m = m >> 1 end
       -- the planned character out of the fight (removed from it, dead,
@@ -17510,7 +17677,8 @@ function M.kitBattle(plan, opts)
         p.goneLogged = true
         M.log(string.format("[kit] f%d char $%02X is out of the fight: the others fight the battle out", M.frame, p.who))
       end
-      if gone or p.greyed or opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
+      if gone or p.greyed then fight(a, st, true)
+      elseif opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
       return
     end
     local e = a * 2
@@ -17527,7 +17695,7 @@ function M.kitBattle(plan, opts)
       end
       p.greyed = true
     end
-    if p.greyed then fight(a, st); return end
+    if p.greyed then fight(a, st, true); return end
     if p.defend then
       if st == 0x27 and cool == 0 then done(p, a) end
       defend(st)
@@ -17673,9 +17841,7 @@ function M.kitBattle(plan, opts)
         return
       end
       k, cool, aim = 1, 0, nil
-      for i = 1, #plan do
-        local q = plan[i]; q.opened, q.seat, q.presses, q.lPresses, q.tookBack, q.allyPresses = nil, nil, nil, nil, nil, nil
-      end
+      M.freshKitEntries(plan)
       M.vars.kit = {}
       M.logRomIdentity("[kit]")
     end),
@@ -18308,17 +18474,36 @@ function M.setzerReplay(r, classOf)
   local st = {}
   for b = 0, 5 do local o = r.mon0[b]; st[b] = { hp = o.hp, sh = o.sh, brk = o.brk ~= 0, cls = o.cls } end
   local passes, cur, bad = {}, nil, {}
-  for _, ev in ipairs(r.seq or {}) do
-    if ev.t == "pay" then
-      cur = { cost = ev.c, hits = {} }
-      passes[#passes + 1] = cur
-    elseif ev.t == "hit" and ev.y >= 8 and cur then
-      cur.hits[#cur.hits + 1] = { slot = (ev.y - 8) // 2, class = ev.class }
+  -- a break that runs out during the action (the seq's "recover", Ot6Tick)
+  -- puts the body's shields back to its max at that point in the order: on
+  -- #397's replay slot 0 stood broken at 0 shields as the hires began and
+  -- ended at its max of 3 (wt/polish-shield-hud-3)
+  local function recover(y)
+    if y < 8 then return end
+    local b = (y - 8) // 2
+    if st[b] and r.mon0[b] then
+      st[b].sh, st[b].brk = r.mon0[b].shmax or st[b].sh, false
+      st[b].recovered = (st[b].recovered or 0) + 1
     end
   end
+  local before = {}
+  for _, ev in ipairs(r.seq or {}) do
+    if ev.t == "pay" then
+      cur = { cost = ev.c, hits = {}, order = {} }
+      passes[#passes + 1] = cur
+    elseif ev.t == "hit" and ev.y >= 8 and cur then
+      local h = { slot = (ev.y - 8) // 2, class = ev.class }
+      cur.hits[#cur.hits + 1] = h
+      cur.order[#cur.order + 1] = h
+    elseif ev.t == "recover" then
+      if cur then cur.order[#cur.order + 1] = { recover = ev.y } else before[#before + 1] = ev.y end
+    end
+  end
+  for _, y in ipairs(before) do recover(y) end
   for pi, p in ipairs(passes) do
     local n = math.max(1, #p.hits)
-    for _, h in ipairs(p.hits) do
+    for _, h in ipairs(p.order) do
+     if h.recover then recover(h.recover) else
       local t = st[h.slot]
       h.want = classOf(t.cls)
       if h.class ~= h.want then
@@ -18332,6 +18517,7 @@ function M.setzerReplay(r, classOf)
       d = math.min(d, 9999, t.hp)
       t.hp = t.hp - d
       h.d = d
+     end
     end
   end
   return st, passes, bad
@@ -18382,6 +18568,10 @@ function M.setzerCheckCoins(r, i, rate, classOf, tag)
   for b = 0, 5 do
     if r.mon0[b].present then
       M.assertEq(r.mon1[b].hp, st[b].hp, string.format("%s %d: slot %d's HP after every pass", tag, i, b))
+      if st[b].recovered then
+        M.log(string.format("[%s] %d: slot %d's break ran out during the action (%d recovery): shields back to "
+          .. "its max %d where the engine restored them", tag, i, b, st[b].recovered, r.mon0[b].shmax or -1))
+      end
       M.assertEq(r.mon1[b].sh, st[b].sh, string.format("%s %d: slot %d's shields after every pass", tag, i, b))
     end
   end
@@ -19295,25 +19485,47 @@ function M.battleLiveAt(snapFrame, startFrame)
     and (startFrame or 0) - snapFrame >= 90)
 end
 
+-- The statuses the [status] line names, from one entity's four status
+-- bytes and its Doom count (M.doomCount): every status that takes a turn,
+-- greys a command, hands the member's turns to the engine or costs HP over
+-- time.  Audited against the four bytes for #471 (Barb-e's counter muted
+-- the caster and no line said so; #466): STATUS1 Blind, Zombie, Poison,
+-- Imp, Petrify (Wound and Magitek are not statuses a member is "under";
+-- Vanish is a guard); STATUS2 Condemned, Mute, Berserk, Muddle, Sap,
+-- Sleep (Near Fatal and Image are not afflictions); STATUS3 Slow and Stop
+-- (the rest are buffs); STATUS4 Frozen (the rest are buffs, Morph, or
+-- command state).  Pure: the selftest feeds it bytes.
+M.STATUS_LOGGED = { "Stop", "Frozen", "Petrify", "Sleep", "Berserk", "Imp", "Zombie", "Condemned",
+                    "Mute", "Muddle", "Blind", "Poison", "Sap", "Slow" }
+function M.statusNames(s1, s2, s3, s4, doom)
+  local names = {}
+  local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
+  if den then names[#names + 1] = den end
+  if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
+  if (s1 & M.ST1_ZOMBIE) ~= 0 and (s1 & 0x80) == 0 then names[#names + 1] = "Zombie" end
+  -- the statuses that take a command or the member's control without
+  -- taking the turn (#471): Mute greys Magic, Muddle hands the turns to
+  -- the engine
+  if (s2 & M.ST2_MUTE) ~= 0 then names[#names + 1] = "Mute" end
+  if (s2 & M.ST2_MUDDLE) ~= 0 then names[#names + 1] = "Muddle" end
+  -- the statuses that cost a solo fighter over time rather than a
+  -- turn (#255): planned around, each said with the engine's reading
+  if (s1 & M.ST1_BLIND) ~= 0 then names[#names + 1] = "Blind" end
+  if (s1 & M.ST1_POISON) ~= 0 then names[#names + 1] = "Poison" end
+  if (s2 & M.ST2_SAP) ~= 0 then names[#names + 1] = "Sap" end
+  if (s3 & M.ST3_SLOW) ~= 0 then names[#names + 1] = "Slow" end
+  -- once the count is running (M.doomCount's note), not on the bit
+  if doom ~= nil then names[#names + 1] = "Condemned" end
+  return names
+end
+
 function Driver:watchStatuses()
   if self.battleTick > 4 and M.battleLiveAt(endSnap and endSnap.frame, self.startFrame) then
     for e = 0, 3 do
       if M.readWord(0x3C1C + e * 2) > 0 then
         local s1, s2, s3, s4 = statusOf(e)
-        local names = {}
-        local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
-        if den then names[#names + 1] = den end
-        if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
-        if (s1 & M.ST1_ZOMBIE) ~= 0 and (s1 & 0x80) == 0 then names[#names + 1] = "Zombie" end
-        -- the statuses that cost a solo fighter over time rather than a
-        -- turn (#255): planned around, each said with the engine's reading
-        if (s1 & M.ST1_BLIND) ~= 0 then names[#names + 1] = "Blind" end
-        if (s1 & M.ST1_POISON) ~= 0 then names[#names + 1] = "Poison" end
-        if (s2 & M.ST2_SAP) ~= 0 then names[#names + 1] = "Sap" end
-        if (s3 & M.ST3_SLOW) ~= 0 then names[#names + 1] = "Slow" end
-        -- once the count is running (M.doomCount's note), not on the bit
         local doom = M.doomCount({ s2 = s2, count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
-        if doom ~= nil then names[#names + 1] = "Condemned" end
+        local names = M.statusNames(s1, s2, s3, s4, doom)
         local on = {}
         for _, name in ipairs(names) do
           on[name] = true
@@ -19379,6 +19591,17 @@ function Driver:watchStatuses()
                 .. "battle, where the field care cures it (%s); planned around here",
                 item and string.format("$%02X x%d in the bag", item, bagCount(item))
                 or "no Eye Drop or Remedy in the bag: the next town's shop or inn")
+            elseif name == "Mute" then
+              local item = M.statusCure({ byte = 2, bit = M.ST2_MUTE,
+                has = function(it) return bagCount(it) > 0 end })
+              what = string.format("its Magic row is greyed (UpdateCmd_05); its Fight and Item "
+                .. "still answer; %s",
+                item and string.format("cure: $%02X x%d (Driver:coverPlan, #466)", item, bagCount(item))
+                or "no Echo Screen or Remedy in the bag: it lasts the battle")
+            elseif name == "Muddle" then
+              what = "the engine takes its turns and aims them at either side (no window "
+                .. "for it); a physical hit on it clears the bit (CalcMaxDmg @0c45: the Muddle "
+                .. "rule's hit, #170); no item record carries the bit"
             elseif name == "Slow" then
               what = string.format("its ATB constant is recomputed at half rate (SetStatus_12 -> "
                 .. "$3AC8, now $%04X) and every gauge ETA the driver reads already carries it; no "
@@ -19417,8 +19640,7 @@ function Driver:watchStatuses()
               n > 1 and string.format(", landing %d this battle", n) or "", what))
           end
         end
-        for _, name in ipairs({ "Stop", "Frozen", "Petrify", "Sleep", "Berserk",
-                                "Imp", "Zombie", "Condemned", "Blind", "Poison", "Sap", "Slow" }) do
+        for _, name in ipairs(M.STATUS_LOGGED) do
           local key = e .. ":" .. name
           if self.statusSaid[key] == "on" and not on[name] then
             self.statusSaid[key] = "off"

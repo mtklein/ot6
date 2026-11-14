@@ -1609,6 +1609,21 @@ H.run({ maxFrames = 3000 }, {
       d.plan = { reason = "megalixir" }
       d:dropPlan("actor_down")
       H.assertEq(ask(d, 1100), true, "a dropped plan releases it at once")
+      -- the Megalixir is Kefka's (#515): Driver:bagHeals offers it to the care lines only in a fight whose options
+      -- say opts.megalixir
+      local function offers(dd)
+        for _, it in ipairs(dd:bagHeals(0, nil, true)) do if it.id == H.MEGALIXIR then return true end end
+        return false
+      end
+      H.assertEq(offers(fresh(true)), true, "bagHeals offers the Megalixir in a fight with opts.megalixir")
+      H.assertEq(offers(H.newFightDriver("no megalixir stub", { actionTrace = true }).driver), false,
+        "...and in no other fight")
+      -- never with a Zombie seated (#515): the Megalixir reaches every seat, and on a Zombie its HP is damage
+      mem[0x3EE4 + 2 * 2] = 0x02
+      H.assertEq(ask(fresh(true), 9000), false, "a Zombie seated (entity 2): no Megalixir")
+      mem[0x3EE4 + 2 * 2], mem[0x3BF4 + 2 * 2] = 0x82, 0
+      H.assertEq(ask(fresh(true), 9000), true, "...a fallen Zombie is no seat it reaches: the other three drink")
+      mem[0x3EE4 + 2 * 2], mem[0x3BF4 + 2 * 2] = 0, 1
     end)
     H.readByte, H.readWord, H.frame = rb, rw, fr
     if not ok then error(err, 0) end

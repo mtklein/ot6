@@ -18,8 +18,9 @@
 ; point covers one more living ally, taken in battle order after the
 ; thrower (wrapping), so three points cover a party of four.  An ally the
 ; trick cannot land on is passed over for the next: one under Vanish (a
-; thrown item is physical, and a physical hit misses a vanished body) or,
-; for the smoke, one already doubled.  A point beyond the allies left finds
+; thrown item is physical, and a physical hit misses a vanished body) or one
+; already holding the trick's status (Ot6ReachWalk, ot6_reach.asm, the walk
+; the reach spells share since #469).  A point beyond the allies left finds
 ; nobody and is spent, as a Scan's boost is with one body standing (DESIGN.md
 ; "Every boost buys something").  Any character who
 ; Throws a trick gets the reach, as any thrower gets the multiplier; a Mimic
@@ -62,37 +63,16 @@
         bcs     @out
         lda     OT6_BOOST_REVEALED,x
         beq     @out            ; 0 BP: the thrower alone, vanilla
-        sta     OT6_SCR_BIT     ; the points left to place (scratch)
+        pha
         lda     #$0a            ; the targeting: vanilla's $02 makes
         sta     $bb             ;   ChooseTarget put the thrower alone back
                                 ;   in $b8 (@587e); $02|$08 (one side, the
                                 ;   side's targets taken) keeps the mask
                                 ;   this proc builds
-        txy                     ; y walks the seats after the thrower
-@next:  iny
-        iny
-        cpy     #$0008
-        bcc     :+
-        ldy     #$0000
-:       tya
-        cmp     $03,s           ; back to the thrower (x, parked by phx):
-        beq     @out            ;   every seat asked
-        lda     $3018,y         ; this seat's bit
-        and     $3a74           ; standing (alive and in the fight)
-        beq     @next
-        lda     $3ee4,y         ; under Vanish: a thrown trick is physical
-        bit     #$10            ;   (CalcItemEffect keeps $11a2's physical
-        bne     @next           ;   bit for a throw) and misses it
-        lda     $3411
-        cmp     #ITEM::SHADOW_EDGE
-        bne     :+
-        lda     $3ee5,y         ; the smoke: already doubled (Image)
-        bit     #$04
-        bne     @next
-:       lda     $3018,y
-        tsb     $b8             ; covered
-        dec     OT6_SCR_BIT
-        bne     @next
+        pla
+        txy                     ; the walk starts after the thrower
+        jsl     Ot6ReachWalk    ; (ot6_reach.asm, #469: the spells' reach
+                                ;   walks the same way)
 @out:   jmp     Ot6TrickReachOut
 .endproc
 

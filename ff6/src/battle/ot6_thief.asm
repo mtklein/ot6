@@ -454,9 +454,16 @@ Ot6ThiefBanner:
 ; backstop is the frame that shows it, the same path a 0-damage chip already
 ; relies on.
 ;
-; Filch reads no boost (#463): a boost raised for it buys nothing and is
-; kept (Ot6KeepBoost), so a boosted Filch ends the turn as the unboosted one
-; does, the filched pip and the regen pip both.  A Mimic's copy is the same.
+; A boost buys more shields (#469, boost-rewards.md proposal 5, Break's
+; ladder): one, plus one a point, four at three, class-blind as the first
+; (Ot6TakeShields, the leaf OT6's Break and Cleave's strip take).  Only the
+; first banks a pip: a 3-BP Filch would otherwise pay back four pips for
+; three spent.  Each shield is its own Filch's price, 6 / 12 / 18 / 24
+; (Ot6ThiefCharge), level with Break's 25 for four.  A boosted Filch spends
+; its points (Ot6ActionEnd) and earns no regen pip, so it nets Locke the one
+; filched pip less the points.  A boost that finds no shield (a Broken or
+; shieldless body) is spent: only the resolve can tell (#463).  A Mimic's
+; copy reads the copier's own pending boost.
 ;
 ; entry: jsl from Cmd_05's dispatch, db=$7e, a8/i8 (command context).  x =
 ; attacker entity offset, $b9 = the monster half of the target mask.  clobbers
@@ -469,7 +476,6 @@ Ot6ThiefBanner:
         .i8
         cpx     #$08
         bcs     done            ; monster attacker: never
-        jsl     Ot6KeepBoost    ; the boost buys nothing here
         phy                     ; the caller still needs y (i8: one byte)
         ; --- primary monster target -> entity offset (Ot6Assassinate's scan) ---
         ldy     #$08
@@ -485,14 +491,11 @@ Ot6ThiefBanner:
         bne     @out            ; already broken: no chip until recovery
         lda     OT6_SHIELD_CUR,y
         beq     @out            ; shieldless: plain no-op
-        dec     a
-        sta     OT6_SHIELD_CUR,y
-        bne     @bank
-        lda     #OT6_BREAK_TICKS
-        sta     OT6_BROKEN_TICKS,y         ; shields down: Break
-        lda     #$ff
-        sta     OT6_BRKTICK-8,y            ; arm the flash as pending
-@bank:  ; --- the chip landed: Locke keeps it as a boost point ---
+        lda     OT6_BOOST_REVEALED,x
+        and     #$03            ; the points (Ot6Boost caps the spend at 3)
+        inc     a               ; one shield, and one more a point
+        jsr     Ot6TakeShields  ; the last one taken breaks the body
+@bank:  ; --- the chip landed: Locke keeps the first as a boost point ---
         lda     OT6_BP_CLASS,x
         cmp     #$05
         bcs     @out            ; the bank cap holds; a filch never wraps
@@ -524,11 +527,12 @@ done:   plp
 ;     pip per turn for 5 MP (Ot6ThiefCostTbl; kits.md, mp-economy.md).
 ;   * there is exactly one BP charge path in the game and this uses it, so no
 ;     second clamp, no second cap, no way for the two to drift.
-; The pip handed over is the whole charge, at every boost (#463): boosting
-; into Bestow buys nothing (it is not a damage verb, and Ot6BoostDmg's cmd-$05
-; gate refuses to multiply anything under this command), so a pending boost
-; the player raised with L/R is set to the one pip, not added to: a Bestow at
-; two or three points costs the one it gives.  A Mimic's copy is the same.
+; The pips handed over are the whole charge (#469, boost-rewards.md proposal
+; 3): Bestow hands as many pips as are pending, one at 0 or 1 point, two at
+; two, three at three, so a Locke with three banked can bring an ally's
+; divine a turn closer.  A pip the ally cannot hold (the bank caps at 5) is
+; not handed and not charged: the pending is set to what was handed, never
+; added to.  A Mimic's copy reads the copier's own bank and pending.
 ;
 ; Three refusals, all no-ops rather than errors, because by the time this
 ; runs the turn is committed and there is no menu left to signal in.  Each
@@ -572,13 +576,27 @@ done:   plp
 @have:  lda     OT6_BP_CLASS,y
         cmp     #$05
         bcs     @keep           ; the ally is capped: the point would be lost
+        lda     OT6_BOOST_REVEALED,x    ; the pips pending: 0 hands one
+        bne     :+
         inc     a
-        sta     OT6_BP_CLASS,y  ; the ally banks it
+:       cmp     OT6_BP_CLASS,x  ; never more than Locke holds (R keeps the
+        bcc     :+              ;   pending under the bank; this is the
+        lda     OT6_BP_CLASS,x  ;   belt)
+:       pha                     ; [$01,s] the pips to hand
+        lda     #$05
+        sec
+        sbc     OT6_BP_CLASS,y  ; the room the ally has
+        cmp     $01,s
+        bcs     :+
+        sta     $01,s           ; hand only what it can hold
+:       pla
+        sta     OT6_BOOST_REVEALED,x    ; Locke's half: Ot6ActionEnd charges
+        clc                             ;   exactly what was handed
+        adc     OT6_BP_CLASS,y
+        sta     OT6_BP_CLASS,y  ; the ally banks them
         jsr     Ot6BankMoved    ; the ALLY's bank moved, and the ally
                                 ;   is the one who may have a kit window open,
                                 ;   since Locke is mid-action
-        lda     #$01            ; Locke's half: Ot6ActionEnd charges the one
-        sta     OT6_BOOST_REVEALED,x    ;   pip, whatever L/R raised
         bra     @out
 @keep:  jsl     Ot6KeepBoost    ; refused: nothing given, nothing charged
 @out:   ply
@@ -1084,9 +1102,13 @@ OT6_THIEF_NAMELEN = 10
         .a8
         .i16
         cmp     #OT6_THIEF_TRICK
-        bne     @mark
+        bne     @filch
         jsl     Ot6ThiefCostFor
         jml     Ot6BoostPriceFor
+@filch: cmp     #OT6_THIEF_FILCH ; #469: a shield a point, each its own Filch
+        bne     @mark
+        jsl     Ot6ThiefCostFor
+        jml     Ot6PerPointPrice
 @mark:  cmp     #OT6_THIEF_MARK
         bne     @flat
         lda     OT6_BOOST_REVEALED,x
@@ -1105,8 +1127,12 @@ OT6_THIEF_NAMELEN = 10
         .a8
         .i16
         cmp     #OT6_THIEF_TRICK
-        bne     @flat
+        bne     @filch
         jsl     Ot6ThiefCost
         jml     Ot6PendPrice
+@filch: cmp     #OT6_THIEF_FILCH ; #469: per shield (Ot6ThiefCharge's rule)
+        bne     @flat
+        jsl     Ot6ThiefCost
+        jml     Ot6PendPerPoint
 @flat:  jml     Ot6ThiefCost
 .endproc

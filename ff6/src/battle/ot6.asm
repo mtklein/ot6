@@ -110,3 +110,7 @@
 ; a reflected spell with nowhere to land shows no bounce (#520), appended for
 ; the same reason.
         .include "ot6_reflect.asm"
+
+; reach for the single-target statuses, and the boost's last refusals (#469),
+; appended for the same reason.
+        .include "ot6_reach.asm"

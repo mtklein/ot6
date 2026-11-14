@@ -2409,6 +2409,9 @@ function M.newSpinnerCare(o)
     end
   end
   function C.reset() W.actor, W.p = nil, nil end
+  -- Whether care has something other than a Defend for seat a's window
+  -- now (M.kitBattle asks before it lets care take the window, #470).
+  function C.wants(a) return carePlan(a).plan ~= "defend" end
 
   -- A step that ends a battle lost to the test with Fights: every window
   -- whose member has control (the spinner's included) Fights the first
@@ -5323,8 +5326,24 @@ local function careKernel(opts)
   local STALL_LIMIT = 1200
   local stall = 0
 
+  -- A cursor that comes closer to its row is progress, and resets the
+  -- stall clock: the item list is one column of 256 rows walked a press at
+  -- a time (12 frames a press), so a long walk is not a stall.  Without
+  -- this, a Tent past row ~100 dropped as "stalled 1201 frames" mid-walk,
+  -- and the Potion plan after it dropped walking back up (#449: battle_ragnarok
+  -- rk2_k4_s0, 99 downs then 99 ups, build/attempts/wt/v032-narshe-locke-3/lab/).
+  -- The best distance is kept per plan, screen and row, so a walk that
+  -- loses ground (a cursor that does not answer) still stalls.
+  local steerBest, steerFor = {}, nil
   local function steer(cur, wantRow)
     if cur == wantRow then return { "a" } end
+    if steerFor ~= want then steerBest, steerFor = {}, want end
+    local sk = M.readByte(CARE_ZM) .. ":" .. wantRow
+    local d = math.abs(cur - wantRow)
+    if steerBest[sk] == nil or d < steerBest[sk] then
+      if steerBest[sk] ~= nil then stall = 0 end
+      steerBest[sk] = d
+    end
     return { [cur < wantRow and "down" or "up"] = true }
   end
 

@@ -490,8 +490,17 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   -- #411: the Antidotes for the scenario's poison: the d5971e85 line
   -- reached tunnelarmr_entry with LOCKE poisoned and "antidote=0", which
   -- the field care cannot answer (audit_party_hp "POISONED").  Shop 8
-  -- sells them (ff6/src/menu/shop_prop.dat); 3 at 50 gil.
-  H.buyItem(0xF2, function() return 3 - H.invCountOf(0xF2) end, "ANTIDOTE to 3"),
+  -- sells them (ff6/src/menu/shop_prop.dat), 50 gil each.
+  -- #472: this counter is the last that sells them before SABIN's scenario
+  -- ends: SHADOW's house merchant (shop 39) sells Tonics, Fenix Downs and
+  -- Tents and nothing for poison, and the bag goes from here to SABIN.  So
+  -- a person stocks for both stretches: LOCKE's measured worst is 3 (the
+  -- v0.36 boost chain spent all 3 on CELES here, "used $F2 on char 6 ...
+  -- 0 left"), SABIN's walk to the camp 3 (the same chain's SABIN poisoned
+  -- three times there with none left: "POISONED camp_intro", v0.42's walk
+  -- spent 2), build/attempts/wt/v036-boost/round4/ninja-5642a784.log.
+  -- gen_sabin_world asserts its share at its start.
+  H.buyItem(0xF2, function() return 6 - H.invCountOf(0xF2) end, "ANTIDOTE to 6"),
   H.shopClose("South Figaro item shop (occupied)"),
   H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 },
     { tag = "bag: combat items on top (South Figaro item shop)" }),

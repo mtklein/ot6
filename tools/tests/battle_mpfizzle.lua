@@ -165,7 +165,8 @@ local function magicCell(a)
 end
 
 -- a spell the boost buys nothing on, as Ot6SpellNoBoost reads the ROM: not
--- a tier family (Ot6FoldTbl, and Break's chips), not Scan; a fraction of
+-- a tier family (Ot6FoldTbl, and Break's chips), not Scan, not a reach
+-- spell (#469); a fraction of
 -- HP/MP (MagicProp +$04 bit 7) or a power of 0
 local inFold = nil
 local function buysNothing(id)
@@ -173,6 +174,15 @@ local function buysNothing(id)
     inFold = { [0x0C] = true }
     local fold = H.sym("Ot6FoldTbl") & 0x3FFFFF
     for i = 0, 0x17 do inFold[H.readRomByte(fold + i)] = true end
+    -- #469: a single-target status or cure buys reach (Ot6ReachTbl)
+    local okR, reach = pcall(function() return H.sym("Ot6ReachTbl") end)
+    if okR then
+      for i = 0, 15 do
+        local r = H.readRomByte((reach & 0x3FFFFF) + i)
+        if r == 0xFF then break end
+        inFold[r] = true
+      end
+    end
   end
   if inFold[id] or id == 0x18 then return false end
   local mpb = H.sym("MagicProp") & 0x3FFFFF

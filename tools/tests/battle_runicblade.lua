@@ -24,6 +24,13 @@
 --      lands on him;
 --   3. EDGAR casts Bolt again inside the same stance: absorbed and sent back
 --      again.
+-- The battle is whatever the tomb deals.  A Defending party can be taken
+-- apart while the steps run (#469's replay: PowerDemon and two Exorays wiped
+-- it in the first battle, build/attempts/wt/boost-rewards-2/), so the steps
+-- run only while the party holds: once a seated member falls or drops under
+-- a third of max HP, the battle is handed to the route's fight driver,
+-- which fights it out, and the next battle starts the steps over
+-- (battle_overclock's hand-over, #468).
 -- Recorded at every $3410 write (the spell an attack pass is using) with
 -- the command, the counter flag and the target mask, and the two MP pools
 -- around each cast.  Old-ROM red and mutants:
@@ -138,50 +145,89 @@ end
 -- turn came) ends 1500 frames after its last pick; the battle is fought out
 -- and the next starts the steps over
 --
--- Each step's plan is played again in every battle the steps start over in,
--- so its entries are cleared back to what the step asked for first: kitBattle
--- keeps what it learns about an entry in the entry (p.greyed when EDGAR was
--- muted, p.goneLogged), and a flag left from one battle made every later
--- battle's EDGAR Fight instead of cast and the others fight the battle out
--- (#468: "char $04's command $02 is greyed" in battle 3 of 24, then no step
--- 3 in battles 4-24, build/attempts/wt/v036-fragile/A/logs/
+-- Each step's plan is played again in every battle the steps start over in;
+-- kitBattle clears what it learned about an entry in the battle before
+-- (M.freshKitEntries, #470: a Mute in battle 3 of 24 had greyed EDGAR's
+-- entry for battles 4-24, #468, build/attempts/wt/v036-fragile/A/logs/
 -- battle_runicblade__s13__k0.log.gz)
-local function step(n, plan, doneFn)
-  local asked = {}
-  for i, p in ipairs(plan) do
-    asked[i] = {}
-    for key, v in pairs(p) do asked[i][key] = v end
+-- why the party can no longer Defend through the steps, or nil: a seated
+-- member down (Wound or Petrify, or 0 HP) or under a third of max HP; or
+-- CELES or EDGAR a Zombie, who then takes no command, so the steps cannot be
+-- played.  Another member's Zombie is no danger by itself: it is out of the
+-- menu, and what it does to the party shows in their HP (#469 review: a
+-- Zombie SETZER at full HP handed battle 2 over for nothing)
+local handed = nil
+local function danger()
+  if not H.battleLoadStarted() then return nil end
+  for s = 0, 3 do
+    if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
+      local hp, mx, st1 = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2), H.readByte(0x3EE4 + s * 2)
+      local zombie = (st1 & 0x02) ~= 0 and (s == celes or s == edgar)
+      if hp == 0 or (st1 & 0xC0) ~= 0 or zombie or (mx > 0 and hp < mx / 3) then
+        return string.format("seat %d at %d/%d HP, status1 $%02X", s, hp, mx, st1)
+      end
+    end
   end
+  return nil
+end
+-- the route's fight driver fights the battle out from wherever it stands
+local function fightOut(tag)
+  local F = nil
+  return H.withReset(H.driveUntil(function() return not H.battleLoadStarted() end, 60000, {
+    H.call(function()
+      if F == nil then
+        F = H.newFightDriver(tag, { tactical = true, boost = true, items = true, bank = 0, healPercent = 55,
+          setzer = false })
+      end
+      F.frame()
+    end),
+  }, tag .. ": the battle fought out"), function() if F then F.idle() end; F = nil end)
+end
+local function step(n, plan, doneFn)
   return {
     H.call(function()
       mark[n] = { casts = #casts, absorbs = absorbs }
-      for i, p in ipairs(plan) do
-        for key in pairs(p) do p[key] = nil end
-        for key, v in pairs(asked[i]) do p[key] = v end
-      end
     end),
-    H.kitBattle(plan, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = function()
-      if doneFn() then return true end
-      local last = H.vars.kit[#H.vars.kit]
-      if last ~= nil and ownBolt(mark[n].casts + 1) == nil and H.frame > last.frame + 1500 then
-        H.log(string.format("[blade] f%d step %d: no Bolt of EDGAR's in 1500 frames since the last pick", H.frame, n))
-        return true
-      end
-      return false
-    end }),
+    H.cond(function() return handed == nil and inBattle() end, {
+      (function()
+        local ended = false
+        return H.withReset(H.driveUntil(function()
+          if ended then return true end
+          handed = handed or danger()
+          return handed ~= nil
+        end, 70000, {
+          H.kitBattle(plan, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = function()
+            if doneFn() then return true end
+            local last = H.vars.kit[#H.vars.kit]
+            if last ~= nil and ownBolt(mark[n].casts + 1) == nil and H.frame > last.frame + 1500 then
+              H.log(string.format("[blade] f%d step %d: no Bolt of EDGAR's in 1500 frames since the last pick",
+                H.frame, n))
+              return true
+            end
+            return false
+          end }),
+          H.call(function() ended = true end),
+        }, "step " .. n .. ", or the party in danger"), function() ended = false end)
+      end)(),
+    }, {}),
   }
 end
 
--- the three steps, in one battle; a battle that ends before them is left and
--- the next starts them over, up to BATTLES.  Measured at 1a22db99 on this
--- branch's own wor-tomb-v1, over 0-15 encounters used up first
--- (PACE_BURN): 16 successes in 34 battles, the battle counts 1, 2, 1, 5, 3,
--- 1, 3, 3, 3, 1, 4, 1, 1, 1, 3, 1 for burns 0-15
--- (build/attempts/wt/v027-kits/budgets/battle_runicblade_*.out).  The rate
--- is 0.47; its one-sided 95% lower bound is 0.32, and at it BATTLES = 24
--- misses with 0.678^24 = 8.9e-5, under 1e-4 (at the measured rate,
--- 0.53^24 = 2.3e-7).
-local BATTLES = 24
+-- the three steps, in one battle; a battle that ends before them (or is
+-- handed to the fight driver, danger() above) is left and the next starts
+-- them over, up to BATTLES.  Measured at 54d4955d (#469's second review) on
+-- the tracked wor-tomb-v1, over 0-15 encounters used up first (PACE_BURN),
+-- with the hand-over in place: the battle each burn passed at was 3, 2, 1, 7,
+-- 6, 5, 4, 3, 2, 1, 5, 4, 1, 2, 1, 1 (build/attempts/wt/boost-rewards-4/
+-- labs/blade_b*/), every battle before it handed over with a member down.
+-- That is 48 battles but not 48 draws: the pass is close to a function of
+-- the absolute encounter index (the passing battle + the burn), so encounter
+-- 3 covers burns 0-2, encounter 10 burns 3-9, and so on.  Counted by
+-- encounter, about 5 passes in 16 distinct encounters; dependence widens the
+-- interval rather than narrowing it, so the bound is taken on 5 of 16: its
+-- one-sided 95% (Clopper-Pearson) lower bound is 0.132, and BATTLES = 66
+-- misses with 0.868^66 = 8.8e-5, under 1e-4.
+local BATTLES = 66
 local battles, ok = 0, false
 local body = {
   H.cond(function() return not inBattle() end, {
@@ -204,6 +250,7 @@ local body = {
       H.assertEq(H.readWord(0x3BF4 + e2 * 2) > 0 and (H.readByte(0x3EE4 + e2 * 2) & 0xC2) == 0, true,
         string.format("seat %d stands (no Wound, Petrify or Zombie: the care before the walk saw to it)", e2))
     end
+    handed = nil
     H.log(string.format("[blade] battle %d: CELES seat %d (MP %d), EDGAR seat %d (MP %d)", battles, celes,
       H.readWord(0x3C08 + celes * 2), edgar, H.readWord(0x3C08 + edgar * 2)))
   end),
@@ -214,7 +261,7 @@ local function add(t) for _, s in ipairs(t) do body[#body + 1] = s end end
 -- fought out and the next one taken)
 local function live(fn)
   return H.call(function()
-    if not inBattle() then return end
+    if not inBattle() or handed ~= nil then return end
     if H.readWord(0x3BF4 + celes * 2) == 0 then
       local e = celes * 2
       H.log(string.format("[blade] CELES has fallen: this step is not counted (f%d: HP %d/%d, status %02X %02X "
@@ -274,12 +321,16 @@ add({
     if ok then
       H.log(string.format("[blade] PASS: a 2-BP Runic absorbs only; a 3-BP Runic absorbs and sends the spell back, "
         .. "again (battle %d)", battles))
+    elseif handed ~= nil then
+      H.log(string.format("[blade] battle %d handed to the fight driver (%s): the next", battles, handed))
+      mark.one, mark.two = nil, nil
     else
       H.log(string.format("[blade] battle %d ended before the three steps: the next", battles))
       mark.one, mark.two = nil, nil
     end
   end),
-  H.cond(function() return not ok and inBattle() end, { H.kitBattle({}, {}) }, {}),
+  H.cond(function() return not ok and inBattle() and handed ~= nil end, { fightOut("blade: handed over") }, {}),
+  H.cond(function() return not ok and inBattle() and handed == nil end, { H.kitBattle({}, {}) }, {}),
 })
 
 local steps = {
@@ -302,6 +353,6 @@ local steps = {
       H.call(function() burned = burned + 1; H.log(string.format("[blade] burned encounter %d of %d", burned, burn)) end),
     }, "the encounters PACE_BURN uses up")
   end)(),
-  H.driveUntil(function() return ok end, 500000, body, "the three steps in one battle"),
+  H.driveUntil(function() return ok end, 900000, body, "the three steps in one battle"),
 }
-H.run({ maxFrames = 600000 }, steps)
+H.run({ maxFrames = 1000000 }, steps)

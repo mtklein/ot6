@@ -41,3 +41,37 @@
 @out:   pla
         rtl
 .endproc
+
+; [ how many weaknesses this Debilitator adds: one, plus one a point (#469) ]
+;
+; boost-rewards.md proposal 4: a point buys one more firing of the add-a-
+; weakness effect on the same body (the steps family, Dismantle's and
+; Break's), each new bit revealed as the first is (Ot6DebilReveal), until the
+; body has no element left to take.  TargetEffect_56 runs the effect this
+; many times, stopping early when the body is full.  Priced per firing
+; (Ot6ToolPrice).  Only a character's Tools ($3a7c = $09; a Mimic's copy
+; reads the copier's own pending boost) is boosted; a Debilitator anything
+; else carries adds one, as vanilla's.
+;
+; in: A = the attacker's entity offset (DoTargetEffect's x), a8/i8, db=$7e.
+; out: A = 1..4.  Preserves X and Y.
+.proc Ot6DebilSteps
+        .a8
+        cmp     #$08
+        bcs     @one            ; a monster's
+        phx
+        tax
+        lda     $3a7c
+        cmp     #$09            ; Tools
+        bne     @onex
+        lda     OT6_BOOST_REVEALED,x
+        cmp     #$04
+        bcc     :+
+        lda     #$03            ; (defensive: Ot6Boost caps the spend at 3)
+:       inc     a
+        plx
+        rtl
+@onex:  plx
+@one:   lda     #$01
+        rtl
+.endproc

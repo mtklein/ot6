@@ -13,11 +13,13 @@
 -- earned (Ot6KeepBoost and its callers; ot6_boost.asm).  So a boosted
 -- copy of these ends with the copier's bank where the unboosted copy of the
 -- same action from the same snapshot ends:
---   * Filch and Bestow (cmd $05): neither reads a boost.  Bestow hands one
---     pip over and charges exactly that one, and a refused one charges
---     nothing, so the boosted case is at 2.  Here the copy meets TERRA at
+--   * Bestow (cmd $05) refused: a Bestow hands the pips pending and charges
+--     exactly those (#469), and a refused one charges nothing, so the
+--     boosted case is at 2.  Here the copy meets TERRA at
 --     the 5 cap (LOCKE's own Bestow and her regen put her there), so it is
---     the refusal that is measured (battle_boostkeep plays the transfer);
+--     the refusal that is measured (battle_boostkeep plays the transfer).
+--     Filch's boost buys shields since #469, so its copy spends like the
+--     source's (battle_boostkeep plays it); filch-b0 stays as a control;
 --   * Steal on a body with nothing left to take: no roll, so no ladder;
 --   * SwdTech: the source's boost bought the tech at its own menu;
 --   * Slot, a reel result: the source's boost bought the rig at its spin;
@@ -73,6 +75,15 @@ local function quietSpell(s)
   local mpb, fold = H.sym("MagicProp") & 0x3FFFFF, H.sym("Ot6FoldTbl") & 0x3FFFFF
   local inFold = { [0x0C] = true, [0x18] = true }
   for i = 0, 0x17 do inFold[H.readRomByte(fold + i)] = true end
+  -- #469: a single-target status or cure buys reach (Ot6ReachTbl)
+  local okR, reach = pcall(function() return H.sym("Ot6ReachTbl") end)
+  if okR then
+    for i = 0, 15 do
+      local id = H.readRomByte((reach & 0x3FFFFF) + i)
+      if id == 0xFF then break end
+      inFold[id] = true
+    end
+  end
   for i = 0, 53 do
     local id = H.readByte(0x2092 + s * 0x13C + i * 4)
     if id ~= 0xFF and not inFold[id] then
@@ -426,7 +437,9 @@ local steps = {
     quiet = quietSpell(terraS)
     H.log(string.format("[mimicboost] TERRA's spell the boost buys nothing on: %s",
       quiet and string.format("$%02X", quiet) or "none"))
-    assert(quiet, "TERRA knows a spell the boost buys nothing on")
+    -- #469: Shell, the one fire-out-v1's TERRA held, buys reach now, so no
+    -- copied quiet spell is played here (battle_boostreach plays the quiet
+    -- spell itself; a Mimic's copy of one is not covered)
     assert(bagIdx(TONIC) and bagIdx(ANTIDOTE), "the bag holds a Tonic and an Antidote")
   end),
 }
@@ -466,7 +479,6 @@ local CASES = {
   { name = "steal-b0",   snap = "L", cmd = CMD_STEAL, row = "steal",  srcBoost = 3, boost = 0 },
   { name = "steal-b1",   snap = "L", cmd = CMD_STEAL, row = "steal",  srcBoost = 3, boost = 1, keep = "steal-b0" },
   { name = "filch-b0",   snap = "L", cmd = CMD_STEAL, row = "filch",  srcBoost = 0, boost = 0 },
-  { name = "filch-b1",   snap = "L", cmd = CMD_STEAL, row = "filch",  srcBoost = 0, boost = 1, keep = "filch-b0" },
   { name = "bestow-b0",  snap = "L", cmd = CMD_STEAL, row = "bestow", srcBoost = 0, boost = 0 },
   { name = "bestow-b2",  snap = "L", cmd = CMD_STEAL, row = "bestow", srcBoost = 0, boost = 2, keep = "bestow-b0" },
   { name = "trick-b0",   snap = "L", cmd = CMD_STEAL, row = "trick",  srcBoost = 0, boost = 0 },
@@ -479,8 +491,6 @@ local CASES = {
   { name = "tonic-b1",   snap = "T", cmd = CMD_ITEM, item = TONIC, srcBoost = 0, boost = 1, spend = true },
   { name = "cure-b0",    snap = "T", cmd = CMD_ITEM, item = ANTIDOTE, srcBoost = 0, boost = 0 },
   { name = "cure-b1",    snap = "T", cmd = CMD_ITEM, item = ANTIDOTE, srcBoost = 0, boost = 1, keep = "cure-b0" },
-  { name = "quiet-b0",   snap = "T", cmd = CMD_MAGIC, srcBoost = 0, boost = 0 },
-  { name = "quiet-b1",   snap = "T", cmd = CMD_MAGIC, srcBoost = 0, boost = 1, keep = "quiet-b0" },
 }
 local byName = {}
 for _, c in ipairs(CASES) do

@@ -105,10 +105,16 @@ Octopath; kits.md "Strago").
 
 **Display ships with the break system**, not as later polish: the shield
 count and revealed-weakness icons are how an Octopath battle reads to the
-player. First pass rides the existing battle text engine: shield count beside
-each name in the monster list window and weakness glyphs on target-select.
-The battle font already contains weapon icon glyphs (dirk/sword/spear/… from
-item names).
+player. Under each monster, one line on the battlefield's text layer: the
+shield gauge, a shield emblem and the count in the battle font's own
+numerals, yellow on a navy plate, and then the weaknesses, a '?' for each
+unrevealed one and its element or weapon-class icon once revealed (the
+battle font already holds the weapon glyphs, from item names). The gauge is
+one badge in its own palette and the weaknesses are bare glyphs, so a count
+does not read as one of the keys (#397). A broken monster shows a broken
+shield where the gauge was, and its sprite turns grey until it recovers: a
+grey copy of its palette in a monster palette the formation left unused, so
+a formation with three monster palettes keeps its colours.
 
 **Sources of chip by character.** This is what makes party composition a
 puzzle: weapon attacks chip by weapon class; spells chip by element; each

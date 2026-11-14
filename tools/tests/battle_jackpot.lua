@@ -278,8 +278,7 @@ end
 
 local function pass(n, plan, wantN, o)
   return keyed(n, function(wait)
-  -- a try plays the plan afresh (setzerBattle keeps its per-entry progress on the entries)
-  for _, p in ipairs(plan) do p.aim, p.presses, p.lPresses, p.tookBack, p.refusedSeen = nil, nil, nil, nil, nil end
+  -- (a try plays the plan afresh: setzerBattle clears each entry's per-battle state, #470)
   o = o or {}
   local recs
   -- wait: frames stood on the grave before the press (the battle key: keyed,

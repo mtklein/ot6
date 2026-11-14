@@ -118,9 +118,11 @@
 ; vblank. shadow at OT6_SHADOW, 6 lines x 14 bytes:
 ;   +0  vram word address of the line's first cell (0 = line disabled)
 ;   +2  five tilemap words (glyph | attr << 8)
-; monsters: [shield-with-count][up to 4 weakness slots: elements, then
-; weapon classes, revealed icon or '?' on both axes]. heroes: one
-; pip-cluster cell. entities animate and drift, so each line remembers
+; monsters: [shield emblem][shield count][up to 4 weakness slots:
+; elements, then weapon classes, revealed icon or '?' on both axes]
+; (#397: the emblem is the line's lead cell, OT6_HUDLEAD, written at the
+; anchor minus one; a broken monster shows the broken shield there and an
+; empty count cell). entities animate and drift, so each line remembers
 ; its previous address; the flush blanks the old cells when it moves.
 ; line layout: +0 cur addr (0 = disabled), +2 prev addr, +4 five cells.
 
@@ -218,6 +220,9 @@
         lda     OT6_BRKLIVE     ; db=$7e is pinned at the top of this proc
         beq     :+
         jsr     Ot6BreakFlash
+:       lda     OT6_GREYLIVE    ; broken monsters in grey (#397): the same
+        beq     :+              ;   inline gate, after the flash, so a
+        jsr     Ot6GreyPaint    ;   flash's hand-back lands first
 :
         plb
         ply
@@ -276,40 +281,63 @@
         sta     f:$7e0000+OT6_SHADOW+8,x
         sta     f:$7e0000+OT6_SHADOW+10,x
         sta     f:$7e0000+OT6_SHADOW+12,x
+        sta     OT6_HUDLEAD,y   ; the lead cell too (db = $7e here)
         shorta0
         ; dead monsters: cells stay blank, line stays live (erases old art)
         lda     $3eec,y
         bit     #$c2
         jne     @done
-        ; cell 0: shield-with-count
+        ; the shield gauge (#397): the lead cell and cell 0.  shielded: the
+        ; emblem (fixed cell $71) in the lead cell and the slot's count tile
+        ; in cell 0, both in text palette 2, one gold-and-navy badge.
+        ; broken: the broken shield (the slot's tile 100) in the lead cell,
+        ; palette 7, and cell 0 empty.  shieldless: both empty.
         lda     $3e90,y
         beq     @count
-        lda     #$71            ; shield-broken
-        bra     @shld
+        lda     #$01
+        sta     OT6_GREYLIVE    ; a broken monster: wake the grey painter
+        lda     #100            ; the broken shield's tile
+        bra     @tile
 @count: lda     $3e40,y
-        beq     @slots          ; shieldless
-        cmp     #100            ; the glyph table runs 1..99
-        bcc     :+
+        jeq     @slots          ; shieldless
+        cmp     #100            ; the count tiles run 1..99
+        bcc     @tile
         lda     #99
-:       phx
-        pha                     ; the count
+@tile:  phx
+        pha                     ; the tile: a count 1..99, or 100 = broken
         longa
         tya
         lsr                     ; monster slot 0-5 (y is the 2-byte offset)
         tax
         shorta
-        pla
-        ; the slot's cell draws the count only once the flush has uploaded
-        ; its tile (#292); until then it still shows the last count, for a
-        ; frame or so.  ask for the upload when the cell holds another count.
+        lda     $01,s
+        ; the slot's cell draws the tile only once the flush has uploaded
+        ; it (#292); until then it still shows the last one, for a frame
+        ; or so.  ask for the upload when the cell holds another tile.
         cmp     OT6_SHHAVE,x    ; db = $7e here
         beq     :+
         sta     OT6_SHWANT,x
         lda     f:Ot6ShieldBitTbl,x
         tsb     OT6_SHPEND
 :       lda     f:Ot6ShieldSlotCellTbl,x
-        plx
-@shld:  sta     f:$7e0000+OT6_SHADOW+4,x
+        xba                     ; b = the slot's cell
+        pla                     ; a = the tile
+        plx                     ; the shadow line base
+        cmp     #100
+        bne     @gauge
+        lda     #OT6_BROKEN_ATTR ; broken: the slot's cell in the lead cell,
+        xba                     ;   palette 7; cell 0 stays empty.  whole-
+        longa                   ;   word store: the nmi flush can fire
+        sta     OT6_HUDLEAD,y   ;   between two byte stores
+        shorta0
+        bra     @slots
+@gauge: lda     #OT6_GAUGE_ATTR ; whole-word stores, as above
+        xba
+        longa                   ; a = attr << 8 | the slot's cell
+        sta     f:$7e0000+OT6_SHADOW+4,x        ; cell 0: the count tile
+        lda     #(OT6_GAUGE_ATTR << 8) | OT6_EMBLEM
+        sta     OT6_HUDLEAD,y   ; the lead cell: the emblem
+        shorta0
         ; weakness slots into cells 1-4: elements first (vanilla's own
         ; data), then the class weaknesses, sharing the same four cells.
         ; a fifth weakness is truncated, which is the deliberate cap: the
@@ -476,6 +504,295 @@
 ; bit s.
 Ot6ShownBitTbl:
         .byte   $01,$02,$04,$08,$10,$20
+
+; ------------------------------------------------------------------------------
+
+; [ broken monsters in grey (#397) ]
+
+; A broken monster's sprite is moved onto a grey copy of its own palette for
+; as long as it stays broken, so the state reads at a glance.
+;
+; Where the grey copy lives.  Monsters draw from obj palettes 0-2, one per
+; distinct monster palette in the formation (LoadMonsterPal: w7e8123 lists
+; the loaded palettes, $ffff past the last, and w7e80db bits 1-3 point each
+; slot at its palette); palette 3 is the engine's flash/death scratch and
+; 4-7 are the characters'.  A formation with fewer than three monster
+; palettes leaves the rest unused, and those are the spares this proc
+; writes: one lone boss or a pack of one species leaves two, two species
+; leave one, three leave none.  With no spare free the monster keeps its
+; colours (the HUD's broken shield still says it).  Two broken monsters of
+; one palette share one grey copy.  The PPU update DMAs all eight sprite
+; palettes from WRAM every frame (btlgfx_main.asm:1512-1518), so the copy
+; and the w7e80db repoint are WRAM writes, as with the break flash.
+;
+; Who owns the sprite.  The proc acts only on frames no battle script runs
+; (OT6_SCRIPTBUSY), only on a slot whose palette bits are 0-2 (3 is the
+; flash or an animation; the +5 shift of AnimCmd_80_35 moves them to 5-7),
+; and never while that slot's break flash is pending or live: the flash hands
+; the sprite back to its own palette and the grey follows the flash.  A
+; script that saved and restored w7e80db across the break (PushMonsterPalID/
+; PopMonsterPalID, or ExecAnimScript's save into w7e616e) or a palette
+; reload hands back a stale value; the next quiet frame corrects it either
+; way.  A monster's own palette is read
+; the way LoadMonsterPal assigns it (Ot6OwnPal), so a monster that recovers
+; goes back to it whatever happened while it was grey.
+;
+; Display only: it writes the sprite's palette bits and an unused palette.
+; a8/i16, db = $7e (Ot6BgHud_ext's context).  clobbers x/y; exits with the
+; whole of a clear, as the battle code it returns to expects.
+.proc Ot6GreyPaint
+        .a8
+        .i16
+        lda     a:OT6_SCRIPTBUSY
+        beq     :+
+        rts                     ; a script owns the sprites: keep the flag
+:       longa
+        ldx     #$0000
+@k:     lda     $8123,x         ; w7e8123: the formation's loaded palettes
+        cmp     #$ffff
+        beq     @kd
+        inx
+        inx
+        cpx     #$0006
+        bcc     @k
+@kd:    txa                     ; 2 * (palettes loaded, up to 3) = the
+        shorta                  ;   sprite bits of the first spare palette
+        pha                     ; $01,s: the first spare's bits (6 = none)
+        stz     OT6_GREYLIVE    ; recomputed below
+        ldy     #$0000
+@slot:  tyx
+        jsr     Ot6GreyHeld     ; a = the slot's palette bits
+        bcc     @next           ; no monster, or a dead one: death owns it
+        lda     OT6_BRKTICK,y
+        bne     @wait           ; a break flash is pending or live
+        lda     $80db,y
+        and     #$0e
+        cmp     #$06
+        bcs     @next           ; palette 3+: not ours to move
+        cmp     $01,s
+        bcs     @spare          ; already on a spare: the grey copy
+        lda     $3e90,y         ; on its own palette.  broken?
+        beq     @next
+        lda     $3aa8,y
+        lsr
+        bcc     @wait           ; broken but off the field (the whelk's
+                                ;   head in its shell): grey it when it is
+        jsr     Ot6GreyStart
+@wait:  lda     #$01
+        sta     OT6_GREYLIVE
+        bra     @next
+@spare: lda     $3e90,y
+        bne     @wait           ; broken and grey: keep watching
+        tyx                     ; recovered: back to its own palette
+        jsr     Ot6OwnPal
+        sta     OT6_SCR_BIT
+        lda     $80db,y
+        and     #$f1
+        ora     OT6_SCR_BIT
+        sta     $80db,y
+@next:  iny
+        iny
+        cpy     #$000c
+        bcc     @slot
+        pla
+        shorta0                 ; leave b = 0: Ot6GreyHeld's 16-bit reads
+        rts                     ;   leave $ff there, and the battle code
+.endproc                        ;   WaitFrame returns to does a 16-bit tax
+                                ;   on a with b assumed clear (the probe
+                                ;   that found it: C1/44D9 dispatching on
+                                ;   $ff04, build/attempts/wt/polish-shield-
+                                ;   hud/probes/tr5.txt)
+
+; [ move one broken monster onto a grey copy of its palette ]
+
+; y = its slot offset, $03,s = the first spare's bits (Ot6GreyPaint's
+; frame).  A spare another monster of the same palette already stands on is
+; shared; else the first spare no monster stands on gets a grey copy of its
+; palette.  None: the monster keeps its colours.
+; a8/i16, db = $7e.  preserves y; clobbers a/x and the OT6_SCR scratch.
+.proc Ot6GreyStart
+        .a8
+        .i16
+        tyx
+        jsr     Ot6OwnPal
+        sta     OT6_SCR_BIT     ; the palette to grey
+        ldx     #$0000
+@z:     jsr     Ot6GreyHeld     ; a = monster x's palette bits, or c=0
+        bcc     @zn
+        cmp     $03,s
+        bcc     @zn             ; on its own palette
+        sta     OT6_SCR_IDX
+        jsr     Ot6OwnPal
+        cmp     OT6_SCR_BIT
+        bne     @zn
+        lda     OT6_SCR_IDX
+        bra     @point          ; a grey copy of this palette: share it
+@zn:    inx
+        inx
+        cpx     #$000c
+        bcc     @z
+        lda     $03,s           ; first candidate spare
+@s:     cmp     #$06
+        bcs     @none
+        sta     OT6_SCR_IDX
+        ldx     #$0000
+@u:     jsr     Ot6GreyHeld
+        bcc     @un
+        cmp     OT6_SCR_IDX
+        beq     @taken
+@un:    inx
+        inx
+        cpx     #$000c
+        bcc     @u
+        jsr     Ot6GreyBuild    ; free: build the copy there
+        lda     OT6_SCR_IDX
+@point: sta     OT6_SCR_IDX
+        lda     $80db,y
+        and     #$f1
+        ora     OT6_SCR_IDX
+        sta     $80db,y
+@none:  rts
+@taken: lda     OT6_SCR_IDX
+        inc     a
+        inc     a
+        bra     @s
+.endproc
+
+; x = slot offset -> carry set and a = its sprite palette bits if the slot
+; holds a monster (w7e8117 names its palette) that is not dead, else carry
+; clear.  A retracted or not-yet-entered monster still holds its palette;
+; an empty slot does not, though LoadMonsterPal points it at the first
+; unloaded palette.  a8/i16, db = $7e.
+.proc Ot6GreyHeld
+        .a8
+        .i16
+        longa
+        lda     $8117,x
+        cmp     #$ffff
+        shorta
+        beq     @no
+        lda     $3eec,x
+        bit     #$c2
+        bne     @no
+        lda     $80db,x
+        and     #$0e
+        sec
+        rts
+@no:    clc
+        rts
+.endproc
+
+; x = slot offset -> a = the sprite palette bits LoadMonsterPal gives the
+; slot: twice the index of its palette (w7e8117) in the loaded list
+; (w7e8123), 0 when it is not among the first three.  a8/i16, db = $7e.
+; preserves x/y.
+.proc Ot6OwnPal
+        .a8
+        .i16
+        phy
+        longa
+        lda     $8117,x
+        ldy     #$0000
+@f:     cmp     $8123,y
+        beq     @got
+        iny
+        iny
+        cpy     #$0006
+        bcc     @f
+        ldy     #$0000
+@got:   tya
+        shorta
+        ply
+        rts
+.endproc
+
+; [ write a grey copy of one monster palette into another ]
+
+; OT6_SCR_BIT = the source's sprite bits, OT6_SCR_IDX = the destination's
+; (palette p's bits are 2p, and its 16 colours sit at w7e7e00::_8 + 32p,
+; $7e7f00 + 16 * bits).  Each colour becomes its luma, (2r + 5g + b) / 8,
+; on all three channels.  a8/i16, db = $7e.  preserves y.
+.proc Ot6GreyBuild
+        .a8
+        .i16
+        phy
+        longa
+        lda     OT6_SCR_BIT
+        and     #$00ff
+        asl
+        asl
+        asl
+        asl
+        tax
+        lda     OT6_SCR_IDX
+        and     #$00ff
+        asl
+        asl
+        asl
+        asl
+        tay
+        clc
+        adc     #$0020
+        pha                     ; the destination's end (no scratch byte:
+                                ;   WaitFrame's callers hold their own)
+@c:     lda     $7f00,x         ; bgr555
+        pha                     ; $03,s after the next push: the colour
+        and     #$001f
+        asl
+        pha                     ; $01,s: 2r
+        lda     $03,s
+        xba
+        lsr
+        lsr
+        and     #$001f          ; b
+        clc
+        adc     $01,s
+        sta     $01,s           ; 2r + b
+        lda     $03,s
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        and     #$001f          ; g
+        sta     $03,s
+        asl
+        asl
+        clc
+        adc     $03,s           ; 5g
+        clc
+        adc     $01,s
+        lsr
+        lsr
+        lsr                     ; luma 0..31
+        sta     $01,s
+        asl
+        asl
+        asl
+        asl
+        asl
+        ora     $01,s
+        asl
+        asl
+        asl
+        asl
+        asl
+        ora     $01,s
+        sta     $7f00,y
+        pla
+        pla
+        inx
+        inx
+        iny
+        iny
+        tya
+        cmp     $01,s
+        bne     @c
+        pla
+        shorta0
+        ply
+        rts
+.endproc
 
 
 ; ------------------------------------------------------------------------------
@@ -711,12 +1028,18 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; admitted window, so the whole transition redoes next nmi
         ; until it lands. within the window a drop is impossible by
         ; arithmetic: admission ends at v=248, the worst burst (all six
-        ; lines + pip transitioning at once) is ~70 words ~ 9 scanlines
+        ; lines + pip transitioning at once) is ~82 words ~ 10.3 scanlines
         ; at the measured PIO rate (~8 words/scanline, the font-slice
-        ; numbers above), ending ~257 < 262. residual risk: a transition
+        ; numbers above), ending ~259 < 262 (six-cell lines since #397:
+        ; ~70 words, ~257, before). residual risk: a transition
         ; deferred into a veil window leaves old glyphs one extra frame if
         ; the nmi is also late.
+        ;
+        ; each line is six cells (#397): the lead cell (OT6_HUDLEAD, the
+        ; shield gauge's emblem) at the anchor minus one, then the shadow's
+        ; five.  x walks the shadow lines, y the matching slot offsets.
         ldx     #$0000
+        ldy     #$0000
 @line:  longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; prev
         beq     @write
@@ -731,6 +1054,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
                                 ;   check grew the body past bcs reach)
         longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; reload prev (gate ate a)
+        dec     a               ; from the lead cell
         sta     hVMADDL                          ; blank the old cells
         ; the blank word is vanilla's $01ee junk fill rather than $21ff.
         ; cells a line abandons (a move or a disable) are rewritten once,
@@ -755,11 +1079,12 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         sta     hVMDATAL
         sta     hVMDATAL
         sta     hVMDATAL
+        sta     hVMDATAL
 @write: lda     f:$7e0000+OT6_SHADOW,x
         sta     f:$7e0000+OT6_SHADOW+2,x         ; prev = cur
-        tay
-        beq     @skip
-        sty     hVMADDL
+        beq     @skip           ; (n/z from the lda)
+        dec     a               ; from the lead cell
+        sta     hVMADDL
         lda     f:$7e0000+OT6_HUDVEIL-1          ; veil rides the high byte
         and     #$ff00                           ;   (low byte = randbtl)
         bne     @veil
@@ -808,6 +1133,18 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         lda     f:$7e0000+$896f                  ; battlefield $2105 shadow
         and     #$0040                           ;   bg3 tile size 16x16?
         bne     @veil
+        ; the lead cell.  a line anchored in column 0 would put it in the
+        ; last column of the row above, so there it is vanilla's fill word
+        lda     f:$7e0000+OT6_SHADOW,x
+        and     #$001f
+        beq     @edge
+        phx
+        tyx
+        lda     f:$7e0000+OT6_HUDLEAD,x
+        plx
+        bra     @lead
+@edge:  lda     #$01ee
+@lead:  sta     hVMDATAL
         lda     f:$7e0000+OT6_SHADOW+4,x
         sta     hVMDATAL
         lda     f:$7e0000+OT6_SHADOW+6,x
@@ -825,12 +1162,15 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         sta     hVMDATAL
         sta     hVMDATAL
         sta     hVMDATAL
+        sta     hVMDATAL
 @skip:  shorta0
         longa
         txa
         clc
         adc     #$000e
         tax
+        iny
+        iny
         shorta0
         cpx     #$0054          ; 6 monster lines x 14
         jcc     @line           ; (veil branch grew the body past bcc)
@@ -3159,9 +3499,10 @@ Ot6ShieldTbl:
                                 ;   weakness vanilla
         ; formation 514
         .word   $012a
-        .byte   12, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; kefka:
-                                ;   every hand finds him.  no weakness
-                                ;   vanilla; nulls poison
+        .byte   16, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; kefka:
+                                ;   every hand finds him, and the most
+                                ;   shields of any boss (storm drgn 14).
+                                ;   no weakness vanilla; nulls poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian (the wob's: battle 75)
@@ -3184,6 +3525,16 @@ Ot6ShieldTbl:
 ; fixed tiles used, so no new font cell is claimed.
 Ot6ShieldSlotCellTbl:
         .byte   $65,$66,$67,$69,$6a,$6b
+
+; the shield gauge's emblem cell (#397; Ot6BgGlyphCellTbl's first entry,
+; which held the broken shield before the broken art became a per-slot tile)
+; and the gauge's tilemap attributes: priority, char bit 8, and text
+; palette 2 (navy, grey, yellow; btlgfx BattleFontPal) for the gauge, where
+; the weakness icons beside it draw in palette 0 or their element's hue, or
+; palette 7 (grey, red) for the broken shield
+OT6_EMBLEM      = $71
+OT6_GAUGE_ATTR  = $21 | (2 << 2)
+OT6_BROKEN_ATTR = $21 | (7 << 2)
 
 ; monster slot -> its OT6_SHPEND bit
 Ot6ShieldBitTbl:
@@ -3216,11 +3567,10 @@ Ot6BgGlyphCellTbl:
         .byte   $6d
 
 Ot6BgGlyphData:
-; shield-broken: the plain grey shield, no numeral, with a big white X
-; struck corner to corner across the whole cell, arms running the full
-; 8x8 so they land on the background outside the shield's silhouette.
-        .byte   $ff,$81,$c3,$7e,$a5,$7e,$99,$7e
-        .byte   $5a,$3c,$24,$3c,$5a,$42,$81,$81
+; the shield gauge's emblem (#397), in text palette 2: a grey shield with a
+; yellow rim and a navy outline (gen_shield_glyphs.py draws it, beside the
+; count tiles; the broken shield is each slot's tile 100, the emblem cracked)
+        .byte   OT6_EMBLEM_TILE
 ; pips-0
         .byte   $00,$00,$db,$00,$db,$00,$00,$00
         .byte   $6c,$00,$6c,$00,$00,$00,$00,$00

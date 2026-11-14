@@ -3362,6 +3362,8 @@ Cmd_0d:
         stz     $3415
         lda     $3400
         sta     $b6
+        jsl     Ot6SketchNoBoost ; ot6 #469: a sketched attack with no
+                                ;   number drops the boost (ot6_reach.asm)
         lda     #$ff
         sta     $3400
         lda     #$01
@@ -8518,6 +8520,8 @@ CalcAttackEffect:
         jsl     Ot6Life3Targeting  ; ot6: a character's Life 3 keeps a KO'd
                                 ;   target (#327); x = attacker
         jsr     ChooseTarget
+        jsl     Ot6SpellReach   ; ot6 #469: a boosted single-target status
+                                ;   or cure reaches one more body a point
         jsl     Ot6Oblivion     ; ot6: divine gate -- ChooseTarget has set $b8/$b9,
                                 ;   so the Broken/boss test finally has its target.
                                 ;   x=attacker, $3a7d=attack id, props still editable.
@@ -9827,6 +9831,31 @@ MetamorphProp:
 ; [ target special effect $56: debilitator ]
 
 TargetEffect_56:
+        .a8
+        .i8
+        lda     $05,s           ; ot6 #469: the attacker (DoTargetEffect's x)
+        jsl     Ot6DebilSteps   ;   -> A = the firings its boost buys (1-4)
+@ot6more:
+        pha
+        jsr     DebilOne        ; one weakness, as vanilla adds it
+        sep     #$20            ;   (it returns a16)
+        .a8
+        pla
+        dec
+        beq     @ot6done
+        pha                     ; another firing: only while the body has
+        clr_a                   ;   an element left to take, so a later
+        lda     $3be0,y         ;   firing never marks the hit a miss
+        ora     $3ec8
+        not_a
+        tax
+        pla
+        cpx     #$00
+        bne     @ot6more
+@ot6done:
+        rts
+
+DebilOne:
 @3a8d:  clr_a
         lda     $3be0,y
         ora     $3ec8

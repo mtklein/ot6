@@ -976,6 +976,8 @@ done:   pla
 ; ($f4),y`), so pricing the fold off the list would make every untaught
 ; tier free.
 
+OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
+
 .proc Ot6QueueFold
         .a8
         php                     ; caller widths vary: pin our own
@@ -1023,9 +1025,22 @@ done:   pla
         and     f:$7e0000+OT6_SPELLNONE
         sta     f:$7e0000+OT6_SPELLNONE
 @spcmd: lda     $3a7a
-        cmp     #$19            ; #463: a summon that moves no number buys
-        bne     :+              ;   nothing with a boost (its price is the
-        txa                     ;   list's, Ot6MagicPrice's base for it)
+        cmp     #$09            ; #469: NoiseBlaster buys nothing with a
+        bne     @nottool        ;   boost (Ot6ToolNoBoost: its status lands
+        txa                     ;   at hit rate 255 wherever it can land),
+        cmp     #$08            ;   and is priced flat (Ot6ToolPrice) for it
+        jcs     @keep
+        lda     $3a7b
+        jsl     Ot6ToolNoBoost
+        jcc     @keep
+        jsl     Ot6KeepBoost
+        jmp     @keep
+@nottool:
+        cmp     #$1d            ; #469: a MagiTek beam that moves no number
+        beq     @spsum          ;   (Confuser, X-fer) buys nothing either;
+        cmp     #$19            ; #463: nor a summon that moves none (its
+        bne     :+              ;   price is the list's, Ot6MagicPrice's
+@spsum: txa                     ;   base for it)
         cmp     #$08
         jcs     @keep
         lda     $3a7b
@@ -1058,6 +1073,11 @@ done:   pla
         lda     $b9             ; Scan: aimed at a monster, it reads
         beq     @spnone         ;   (Ot6Analyze); at the party, nothing
         bra     @spbuy
+:       cmp     #OT6_VANISH_SPELL
+        bne     :+
+        lda     $b9             ; #469: Vanish reaches allies only
+        bne     @spnone         ;   (Ot6SpellReach): at a monster, nothing
+        bra     @spbuy
 :       jsl     Ot6SpellNoBoost
         bcs     @spnone
 @spbuy: lda     $3018,x
@@ -1074,7 +1094,12 @@ done:   pla
         sta     f:$7e0000+OT6_SPELLNONE
 @spmark:
         lda     $3a7b
-        cmp     #OT6_ANALYZE_SPELL
+        cmp     #OT6_VANISH_SPELL
+        bne     :+
+        lda     $b9             ; #469: Vanish aimed at a monster reaches
+        beq     @fold           ;   nobody: priced as itself (@scan)
+        jmp     @scan
+:       cmp     #OT6_ANALYZE_SPELL
         bne     @fold
         lda     $b9             ; Scan aimed at no monster: see @scan
         bne     @fold
@@ -1143,13 +1168,15 @@ done:   pla
         ; boost before any charge unless an X-Magic's other spell buys with
         ; it; and the cast is priced as plain Scan, not the boosted price (or
         ; the study's 99) the list's cost byte held at the confirm.
+        ; Vanish aimed at a monster is served the same way (#469: its boost
+        ; buys reach on the party only).
         lda     OT6_BOOST_REVEALED,x
         beq     @keep           ; unboosted: plain Scan already
         lda     $02,s           ; a mimic's copy keeps GetMPCost's 0 (#260)
         and     #$40
         bne     @keep
-        lda     #OT6_ANALYZE_SPELL
-        jsl     Ot6SpellMP      ; 3 MP, relics included
+        lda     $3a7b           ; Scan or Vanish
+        jsl     Ot6SpellMP      ; its own price, relics included
         sta     $3620,y
         bra     @keep
 .endproc
@@ -1218,13 +1245,16 @@ done:   pla
 ;     boost (#461);
 ;   * actions that never have a boost reward, where a boost was raised on
 ;     the command window before the row was picked (#463; Ot6Boost refuses R
-;     on such a row, Ot6RowNoBoost): Ot6Filch, Ot6Bestow (whose transfer
-;     charges its one pip), an Item that moves no number (Ot6ActionEnd,
-;     Ot6ItemNoBoost), a Magic, Lore or X-Magic turn none of whose spells
-;     moves one, Scan aimed at the party included (Ot6ActionEnd, on
-;     Ot6QueueFold's OT6_SPELLNONE verdict), a summon that moves none
-;     (Ot6QueueFold; both Ot6SpellNoBoost), Revert (Ot6RevertTake), and
+;     on such a row, Ot6RowNoBoost): an Item that moves no number
+;     (Ot6ActionEnd, Ot6ItemNoBoost, the Gravity Rod's Quartr included,
+;     #469), a Magic, Lore or X-Magic turn none of whose spells moves one,
+;     Scan aimed at the party and Vanish at a monster included (Ot6ActionEnd,
+;     on Ot6QueueFold's OT6_SPELLNONE verdict), a summon or MagiTek beam that
+;     moves none (Ot6QueueFold; both Ot6SpellNoBoost), NoiseBlaster
+;     (Ot6QueueFold, Ot6ToolNoBoost), Revert (Ot6RevertTake), and
 ;     Row, Def., Leap, Control and Possess (Ot6CmdNoBoost);
+;   * a Sketch whose drawn attack moves no number (Ot6SketchNoBoost, #469:
+;     only the draw can tell);
 ;   * an action that never ran (#346, Ot6ActionEnd's NOACTION arm) or never
 ;     began: a Rage start the pool cannot pay (Ot6RageStartGate), a Jackpot
 ;     or Master's Mark whose boost was taken back under three after the pick
@@ -1276,7 +1306,8 @@ done:   pla
 ; [ can a boost buy anything on this spell?  (#463) ]
 ;
 ; A spell's boost buys a tier (Ot6InFoldTbl: the families, and Break's
-; chips), Scan's breadth and study (Ot6Analyze), or Ot6BoostDmg's multiplier.
+; chips), Scan's breadth and study (Ot6Analyze), reach (Ot6InReachTbl, #469:
+; the single-target statuses and cures), or Ot6BoostDmg's multiplier.
 ; The multiplier moves a number only when the record has one: a power of 0
 ; (Rflect, Vanish, Dispel, Stop, Mute, Quick, X-Zone, Doom...) has none, and a
 ; fraction of HP/MP (+$04 bit 7: Demi, Quarter, a revival) is replaced by
@@ -1297,6 +1328,34 @@ done:   pla
         beq     @buys           ; Scan: breadth, and Strago's study
         jsl     Ot6InFoldTbl    ; a tier, or Break's chips (A preserved)
         bcs     @buys
+        jsl     Ot6InReachTbl   ; #469: a single-target status or cure,
+        bcs     @buys           ;   whose boost buys reach (A preserved)
+        plx
+        pla
+        plp
+        jml     Ot6SpellNoNumber ; the number itself
+@buys:  plx
+        pla
+        plp
+        clc
+        rtl
+.endproc
+
+; [ does this attack move no number?  (#469) ]
+;
+; Ot6SpellNoBoost's last question on its own, for a caller to whom the
+; Magic-gated rewards do not apply (Ot6SketchNoBoost: a sketch keeps command
+; $0d, so no fold, no OT6 Break chips and no reach): a fraction of HP/MP
+; (MagicProp +$04 bit 7) or a power of 0.
+; in: A = the attack id.  out: carry set = no number.  a8, either index
+; width; preserves A, X and Y.
+.proc Ot6SpellNoNumber
+        .a8
+        php
+        longi
+        .i16
+        pha
+        phx
         longa
         and     #$00ff
         pha
@@ -1333,7 +1392,10 @@ done:   pla
 ; Echo Screen, Smoke Bomb, Warp Stone) or a fraction of max HP/MP (ItemProp
 ; +19 bit 7: Fenix Down, Holy Water, X-Potion, X-Ether, Elixir, Megalixir,
 ; Sleeping Bag, Tent) moves no number by it.  Equipment used from Item (a rod
-; or shield's spell) is left to the spell: it buys.
+; or shield, ItemProp +18 bit 7: it casts +18's low six bits and breaks) buys
+; what its spell buys (Ot6SpellNoBoost, #469): the Gravity Rod's Quartr, a
+; fraction, buys nothing; Fire 2 off a Fire Rod is multiplied.  Other
+; equipment cannot be used from Item and is left alone.
 ;
 ; in: A = the item id.  out: carry set = no boost reward.  a8, either index
 ; width; preserves A, X and Y.
@@ -1360,8 +1422,14 @@ done:   pla
         lda     f:ItemProp,x
         and     #$07
         cmp     #$06
-        bne     @buys           ; not a consumable
-        lda     f:ItemProp+27,x
+        beq     @cons
+        lda     f:ItemProp+18,x ; equipment: does it cast from Item?
+        bpl     @buys           ;   no: nothing to buy, nothing refused
+        and     #$3f            ; the spell it casts
+        jsl     Ot6SpellNoBoost
+        bcs     @none
+        bra     @buys
+@cons:  lda     f:ItemProp+27,x
         cmp     #$01            ; Magicite: its boost buys a redraw
         beq     @buys
         lda     f:ItemProp+19,x
@@ -1389,9 +1457,19 @@ done:   pla
 ;     $302c,y + 4, four bytes a row, the esper's row 0 skipped);
 ;   * the Item list ($0a): Ot6ItemNoBoost on the bag row under the cursor
 ;     ($2686, five bytes a row);
-;   * the thief list ($30 in thief mode, $6168 = 3): Filch and Bestow.
-; Everywhere else (the command window, before the action is picked) R
-; stands.
+;   * Edgar's Tools ($30 with $6168 = 0, the tools shell's real-tools mode):
+;     Ot6ToolNoBoost on the tool under the cursor (#469: NoiseBlaster, Air
+;     Anchor is not: it hits), the shell's own row arithmetic (_c18470:
+;     scroll + cursor row,
+;     two columns, wItemList's three bytes a row at $4005);
+;   * the MagiTek list ($2a): Ot6SpellNoBoost on the beam under the cursor
+;     (#469: Confuser, X-fer), the attack id the confirm queues: the cursor
+;     cell (_c18491: row * 2 + column) + $83.  A cell empty for this rider
+;     (DefaultMagitekAttackTbl's $ff) cannot be confirmed, so its answer
+;     does not matter.
+; Filch and Bestow buy shields and pips since #469, so the thief list
+; refuses nothing.  Everywhere else (the command window, before the action is
+; picked) R stands.
 ;
 ; a8/i16, db=$7e; y = the active character's entity offset.  out: carry set
 ; = refuse.  Preserves x and y; clobbers a.
@@ -1406,15 +1484,18 @@ done:   pla
         shorta0
         lda     $7bc2
         cmp     #$0e
-        beq     @magic
+        jeq     @magic
         cmp     #$0a
         beq     @item
+        cmp     #$2a
+        beq     @magitek
         cmp     #$30
-        bne     @buys
+        jne     @buys
         lda     $6168
-        cmp     #$03            ; thief mode
-        bne     @buys
-        lda     $8967,x         ; row
+        jne     @buys           ; not the real-tools mode
+        lda     $895f,x         ; scroll
+        clc
+        adc     $8967,x         ; + row
         asl
         clc
         adc     $8963,x         ; + column: the list index
@@ -1427,11 +1508,19 @@ done:   pla
         tax
         pla
         shorta0
-        lda     $4005,x         ; the row's id
-        cmp     #OT6_THIEF_FILCH
-        beq     @none
-        cmp     #OT6_THIEF_BESTOW
-        beq     @none
+        lda     $4005,x         ; the row's tool (item id)
+        jsl     Ot6ToolNoBoost
+        bcs     @none
+        bra     @buys
+@magitek:
+        lda     $8943,x         ; row
+        asl
+        clc
+        adc     $893f,x         ; + column: the cell
+        clc
+        adc     #$83            ; the beam's attack id (CmdAttackOffsetTbl)
+        jsl     Ot6SpellNoBoost
+        bcs     @none
         bra     @buys
 @item:  lda     $8947,x         ; scroll
         clc
@@ -1472,6 +1561,30 @@ done:   pla
         rtl
 @none:  plx
         sec
+        rtl
+.endproc
+
+; [ can a boost buy anything on this tool?  (#469) ]
+;
+; A Tool's boost buys Ot6BoostDmg's multiplier (cmd $09 is outside its gate),
+; Debilitator's weaknesses (Ot6DebilSteps) and, at three points, Edgar's
+; Overclock.  NoiseBlaster (Confuse, power 0) moves no number, and its status
+; already lands wherever it can: a tool's hit rate is ItemProp +21, $ff, and
+; CheckHit takes $ff as a certain hit, so nothing is left for certainty to
+; buy; immunity, which stops it, no boost overrides.  A second firing
+; (Overclock) puts the same status on the same body.  So it buys nothing at
+; any boost.  Air Anchor is not here: its ItemProp +20 power is 128, a
+; piercing hit the multiplier doubles (boost-rewards.md, #469 review).
+;
+; in: A = the tool's item id.  out: carry set = no boost reward.  a8, either
+; index width; preserves A, X and Y.
+.proc Ot6ToolNoBoost
+        .a8
+        cmp     #ITEM::NOISEBLASTER
+        beq     @none
+        clc
+        rtl
+@none:  sec
         rtl
 .endproc
 
@@ -1525,6 +1638,10 @@ done:   pla
         beq     @spell
         cmp     #$19
         beq     @spell
+        cmp     #$1d            ; #469: a MagiTek beam, as a summon
+        beq     @spell
+        cmp     #$09            ; #469: NoiseBlaster
+        beq     @tool
         cmp     #$0f
         bne     @out
         lda     $3421,y         ; Slot: a kit row reads the boost
@@ -1533,6 +1650,10 @@ done:   pla
         cmp     #OT6_SETZER_JACKPOT+1
         bcc     @out            ;   Coin Toss, Hired Help, Jackpot
         bra     @drop           ;   above Jackpot: a reel result
+@tool:  lda     $3421,y         ; the copied tool (its item id)
+        jsl     Ot6ToolNoBoost
+        bcs     @drop
+        bra     @out
 @spell: lda     $3421,y         ; the copied spell, lore or esper record
         jsl     Ot6SpellNoBoost
         bcc     @out            ; it buys
@@ -1751,6 +1872,76 @@ OT6_ULTIMA_ID   = $14
 
 ; ------------------------------------------------------------------------------
 
+; [ a price paid once per point: the reach and steps rows (#469) ]
+;
+; mp-economy.md's per-body arm: an action whose boost buys more of the same
+; application -- a reach spell's bodies, Debilitator's weaknesses, Filch's
+; shields -- pays for each one as its own use: base x (1 + boost), capped at
+; 99 as every price is, and never below the base.  Beside Ot6BoostPriceFor
+; (the multiplier's x2.5) and the flat chance verbs.
+;
+; in: A = the base cost (a byte), X = the caster's entity offset.
+; out: A = the price.  a8/i16, db=$7e; preserves X and Y.  rtl.
+.proc Ot6PerPointPrice
+        .a8
+        .i16
+        php
+        phy                     ; the caller's Y
+        longa
+        and     #$00ff
+        pha                     ; [$01,s] the base, a word
+        shorta
+        lda     OT6_BOOST_REVEALED,x    ; this caster's pending boost
+        cmp     #$04
+        bcc     :+
+        lda     #$03            ; defensive: Ot6Boost caps the spend at 3
+:       longa
+        .a16
+        and     #$00ff
+        tay                     ; y = n
+        lda     $01,s           ; one use...
+@add:   dey
+        bmi     @cap
+        clc
+        adc     $01,s           ; ...and one more per point
+        bra     @add
+@cap:   cmp     #100
+        bcc     :+
+        lda     #99             ; the two-digit ceiling (#219, ruling 1)
+:       cmp     $01,s           ; ...and never cheaper than the base
+        bcs     :+              ;   (Phoenix's 110 is the one base above 99;
+        lda     $01,s           ;   no per-point row has it)
+:       ply                     ; drop the base
+        sep     #$20
+        .a8
+        ply                     ; the caller's Y
+        plp
+        rtl
+.endproc
+
+; [ the same, for the caster whose menu is open ($62ca): Ot6PendPrice's twin ]
+; in: A = the base.  out: A = the price.  a8/i16, db=$7e; preserves X and Y.
+.proc Ot6PendPerPoint
+        .a8
+        .i16
+        phx
+        phy
+        pha
+        lda     $62ca           ; active caster slot
+        longa
+        and     #$0003
+        asl                     ; slot -> entity offset
+        tax
+        shorta0
+        pla
+        jsl     Ot6PerPointPrice
+        ply
+        plx
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ is this spell id anywhere in a tier family?  the escalation's own gate ]
 ;
 ; Ot6BoostDmg asks the same question of $3a7d, byte for byte against the same
@@ -1922,8 +2113,13 @@ OT6_ULTIMA_ID   = $14
 ; place the four magic surfaces (the list's number, its grey, the confirm and
 ; the charge) get their answer from.
 ;
-; Two rules, and Ot6InFoldTbl decides which applies rather than a second
-; opinion doing it:
+; Three rules, and Ot6InFoldTbl and Ot6InReachTbl decide which applies rather
+; than a second opinion doing it:
+;   * a reach spell (#469: a single-target status or cure) pays for every
+;     body it reaches: base x (1 + boost), capped at 99 (Ot6PerPointPrice),
+;     vanilla's own Haste/Haste2 pricing and Overclock's and Coin Toss's
+;     "priced as the casts it replaces".  The boost buys bodies, not a
+;     number, so the 2.5x does not apply.
 ;   * a tier-family spell keeps its vanilla MP.  A family head folds up a tier
 ;     and pays that tier's own price -- the fold IS the escalation, and a
 ;     steeper one than 2.5x (Fire 4 -> Fire 2 20 -> Fire 3 51).  A tier the
@@ -1968,7 +2164,11 @@ OT6_ULTIMA_ID   = $14
 :       pla
 @plain: jsl     Ot6InFoldTbl    ; carry set = tier family (A preserved)
         bcs     @tier
-        jsl     Ot6SpellNoBoost ; #463: a spell the boost buys nothing on
+        jsl     Ot6InReachTbl   ; #469: a reach spell pays per body: each
+        bcc     :+              ;   point is one more cast of it
+        jsl     Ot6SpellMP
+        jml     Ot6PerPointPrice
+:       jsl     Ot6SpellNoBoost ; #463: a spell the boost buys nothing on
         bcc     :+              ;   is never escalated: no boost is allowed
         jml     Ot6SpellMP      ;   on it, so its price is its own
 :       jsl     Ot6SpellMP      ; the base price, relics included
@@ -2380,10 +2580,10 @@ OT6_LIFE3_ID = $35
 ;     scales with magnitude; BP alone pays for certainty.  Slot (cmd $0f) is
 ;     gated too and would be flat for the same reason; it has no arm here
 ;     because it is unpriced (base 0), not because it was overlooked.
-;   * Filch and Bestow ride cmd $05's gate with Steal, and for them the
-;     boost buys nothing at all (Ot6Bestow's header says the same), so
-;     charging for it would be charging for nothing.  The whole @steal arm
-;     is therefore flat, with no per-row split.
+;   * Filch and Bestow ride cmd $05's gate with Steal.  Bestow's boost buys
+;     pips, which are their own price, so it is flat; Filch's buys a shield
+;     a point and pays per shield (#469, Ot6ThiefCharge's Ot6PerPointPrice
+;     arm), as Trickshot's multiplied coin escalates there.
 ;
 ; entry (jsl from CreateAction, right after jsr GetMPCost): a8/i16,
 ; A = vanilla cost, X = attacker entity, Y = queue slot. db=$7e (the site

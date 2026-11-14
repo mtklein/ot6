@@ -540,4 +540,21 @@ OT6_BLUESEEN         := $ee2b
 .assert OT6_BLUESEEN = OT6_NMISCR + 8, error, "the blue-magic mark must follow the NMI's scratch save"
 .assert OT6_BLUESEEN <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; The under-monster HUD line's lead cell (#397): the cell left of the line's
+; anchor, where the shield gauge's emblem stands (or the broken shield).  One
+; tilemap word per monster slot, stride 2 by the slot offset 0,2..10, the
+; same index the builder holds in y.  The shadow line (OT6_SHADOW, 14 bytes)
+; keeps its layout; the flush writes this word first, at the anchor minus one.
+; The builder writes it on every frame a line is live, before the line's
+; anchor commits, so it needs no init.
+OT6_HUDLEAD          := $ee2c   ; 12 bytes
+.assert OT6_HUDLEAD = OT6_BLUESEEN + 1, error, "the hud lead cells must follow the blue-magic mark"
+; Broken monsters drawn in grey (#397, Ot6GreyPaint in ot6_hud.asm).
+; OT6_GREYLIVE wakes the painter: the HUD builder sets it on any frame it
+; draws a broken monster, and the painter recomputes it as it walks, so a
+; stale value costs one walk and needs no init (the OT6_BRKLIVE contract).
+OT6_GREYLIVE         := $ee38
+.assert OT6_GREYLIVE = OT6_HUDLEAD + 12, error, "the grey painter's flag must follow the hud lead cells"
+.assert OT6_GREYLIVE <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 .endif

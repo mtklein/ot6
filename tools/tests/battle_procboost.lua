@@ -32,10 +32,15 @@
 -- makes during the action is recorded ($11b0 in and out, $b5/$b6, $3a7c/$3a7d,
 -- pending, OT6_WEAPSPELL).  Asserted:
 --   magic   TERRA's Fire, boosted, runs as Fire 3 and leaves unmultiplied
---   fight   TERRA's Fight: every Blizzard Ice it casts leaves unmultiplied,
---           and the swings (command $00) do too; retried, each try a
---           round later than the last, until a try casts (a 1-in-4 roll
---           per hit)
+--   fight   the Fight of the first of TERRA, LOCKE and SHADOW holding a
+--           weapon whose on-hit spell is in Ot6FoldTbl, aimed at the
+--           standing body with the most HP: every spell it casts leaves
+--           unmultiplied, and the swings (command $00) do too, and every
+--           on-hit roll that came up under $40 cast (the roll, RNGTbl at
+--           $be + 1, is read at CheckWeaponMagic).  Retried, each try a
+--           round later than the last, until a roll comes up under $40; a
+--           battle whose toughest body falls to the first swing makes no
+--           roll at all and is fought out for the next (fightBattles)
 --   throw   SHADOW's MithrilKnife ($01, also Ice's id) leaves x8
 --   rod     LOCKE's Ice Rod from Item (runs as Ice 2) leaves x8
 --   magicite  LOCKE's Magicite from Item: the drawn esper's damage (or
@@ -158,6 +163,13 @@ local function onHitSpell(item)
   return b & 0x3F
 end
 
+-- the battle Rand's table (a permutation of 0..255)
+local RNG = {}
+do
+  local base = H.sym("RNGTbl") & 0x3FFFFF
+  for i = 0, 255 do RNG[i] = H.readRomByte(base + i) end
+end
+
 local installed = false
 local function installObservers()
   if installed then return end
@@ -190,6 +202,9 @@ local function installObservers()
       armed.timers = (armed.timers or 0) + 1
       return
     end
+    -- the beast GAU became, read as its attack runs, for an action that
+    -- wins the battle before Ot6ActionEnd (below) can read it
+    if armed.verb == "rage" and armed.beast == nil then armed.beast = H.readByte(RAGEBEAST + x) end
     armed.calls[#armed.calls + 1] = {
       b5 = H.readByte(0xB5), b6 = H.readByte(0xB6), a7c = H.readByte(0x3A7C),
       a7d = H.readByte(0x3A7D), pend = H.readByte(PEND + x),
@@ -218,6 +233,7 @@ local function installObservers()
     if armed == nil or armed.endF then return end
     local x = emu.getState()["cpu.x"] & 0xFFFF
     if x ~= armed.slot * 2 then return end
+    if armed.verb == "rage" and armed.beast == nil then armed.beast = H.readByte(RAGEBEAST + x) end
     armed.fb[#armed.fb + 1] = {
       a7c = H.readByte(0x3A7C), a7d = H.readByte(0x3A7D), pend = H.readByte(PEND + x),
       before = H.readByte(0x3A70) }
@@ -228,6 +244,24 @@ local function installObservers()
     local f = armed.fb[#armed.fb]
     if f.after == nil then f.after = H.readByte(0x3A70) end
   end, emu.callbackType.exec, fsites[1], fsites[1])
+  -- CheckWeaponMagic, entered after every swing of the fighter's Fight: the
+  -- on-hit roll is made only while $3a89 holds the swinging hand's spell
+  -- (bit 6); a swing that missed or felled its target cleared it first
+  -- (dead_sub's `stx $3a89`, the miss arm's `stz`), so the roll is skipped.
+  -- When made, it is `jsr Rand / cmp #$40`: RNGTbl[$be + 1] under $40 casts.
+  -- Recorded per swing: whether the roll was made, its table index and
+  -- value, and the target's HP after the swing.
+  local cw = H.sym("CheckWeaponMagic")
+  emu.addMemoryCallback(function()
+    if armed == nil or armed.endF or armed.verb ~= "fight" then return end
+    if (emu.getState()["cpu.x"] & 0xFFFF) ~= armed.slot * 2 then return end
+    local tm, ts = H.readByte(0xB9), nil
+    for s = 0, 5 do if ts == nil and ((tm >> s) & 1) == 1 then ts = s end end
+    local idx = (H.readByte(0xBE) + 1) & 0xFF
+    armed.swings[#armed.swings + 1] = {
+      roll = (H.readByte(0x3A89) & 0x40) ~= 0 and H.readByte(0xB5) ~= 0x16, idx = idx, val = RNG[idx],
+      ts = ts, thp = ts and H.readWord(0x3BFC + ts * 2) }
+  end, emu.callbackType.exec, cw, cw)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if armed == nil or armed.endF then return end
@@ -527,6 +561,20 @@ local function markConfirm(c)
   c.pendAtConfirm, c.bankAtConfirm = H.readByte(PEND + e), H.readByte(BANK + e)
   c.mpAtConfirm, armed = H.readWord(MP + e), c
 end
+-- the standing monster with the most HP, by slot (0..5), and the cursor that
+-- steers the Fight to it
+local mtc = H.targetCursor()
+local function toughest()
+  local best, bhp = nil, -1
+  for s = 0, 5 do
+    local hp = H.readWord(0x3BFC + s * 2)
+    if (H.readByte(0x3AA8 + s * 2) & 1) == 1 and ((H.readByte(0x3A75) >> s) & 1) == 1 and hp > bhp then
+      best, bhp = s, hp
+    end
+  end
+  assert(best ~= nil, "a monster stands to take the Fight")
+  return best
+end
 local function decide(c)
   local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
   if phase == "boost" then
@@ -568,6 +616,16 @@ local function decide(c)
     shut = 0
     if st == ST_CMD or st == LIST_OF[c.verb] then return "a" end   -- not taken
     if st ~= ST_TGT then return nil end
+    if c.verb == "fight" then
+      -- the swing aims at the standing body with the most HP: the on-hit
+      -- roll is made only on a swing its target survives (CheckWeaponMagic,
+      -- above), and a body that falls to the first swing leaves the rest of
+      -- them on its corpse (#397's replay: a Ninja at 1650 HP took 4128 from
+      -- LOCKE's first swing and all eight swings struck it, no roll made)
+      c.target = c.target or toughest()
+      local b = mtc.steer(c.target, tick)
+      if b ~= "a" then return b end
+    end
     markConfirm(c)
     phase = "confirmed"
     return "a"
@@ -592,7 +650,7 @@ local function tryCase(c, n)
   local req, spent, skip, deferring = nil, 0, false, nil
   return {
     H.call(function()
-      skip = c.hit ~= nil or (c.present ~= nil and not c.present())
+      skip = c.hit ~= nil or c.unservable ~= nil or (c.present ~= nil and not c.present())
       if skip then return end
       H.setPad({})
       req = H.requestLoadState(snap.blob)
@@ -604,9 +662,9 @@ local function tryCase(c, n)
       H.rearmInputInjection()
       inbound = {}
       c.slot = slotOf[c.char]
-      c.calls, c.fb, c.endF, c.beast, c.timers = {}, {}, nil, nil, nil
-      c.esper, c.cutF, c.cutSeats, c.drawn = nil, nil, nil, nil
-      c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm = nil, nil, nil
+      c.calls, c.fb, c.endF, c.beast, c.timers, c.swings = {}, {}, nil, nil, nil, {}
+      c.esper, c.cutF, c.cutSeats, c.drawn, c.wonF = nil, nil, nil, nil, nil
+      c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm, c.target = nil, nil, nil, nil
       c.spend = n - 1
       tick, phase, held, spent, deferring, shut = 0, "reach", nil, 0, nil, 0
     end),
@@ -656,6 +714,7 @@ local function tryCase(c, n)
           return
         end
         tick = tick + 1
+        mtc.observe()
         local ph = tick % 12
         if ph == 0 then held = decide(c) end
         if phase == "confirmed" and ph == 11 then phase = "target" end   -- sent once the window stays shut
@@ -663,9 +722,20 @@ local function tryCase(c, n)
       end),
     }, string.format("%s, try %d", c.name, n)),
     H.driveUntil(function()
-      return skip or c.cutF ~= nil or (c.endF ~= nil and H.frame >= c.endF + 30)
+      return skip or c.cutF ~= nil or c.wonF ~= nil or (c.endF ~= nil and H.frame >= c.endF + 30)
     end, 6000, {
       H.call(function()
+        -- the action felled the last monster: the battle is won, and the
+        -- engine goes to its victory without the actor's Ot6ActionEnd (a
+        -- boosted Rage's special on the Veldt's last body, wt/polish-shield-hud-4's
+        -- lab: "timeout after 6000 frames driving toward rage entry 0
+        -- resolves" over "Got Potion x1").  What the action did is recorded
+        -- by then; the next try restores the snapshot.
+        if armed == c and c.endF == nil and #c.calls + #c.fb > 0 and H.readByte(0x3A75) == 0 then
+          c.wonF = H.frame
+          H.setPad({})
+          return
+        end
         if c.cut and c.cut(c) then
           c.cutF, c.cutSeats = H.frame, seatsLine()
           H.setPad({})
@@ -701,6 +771,20 @@ local function tryCase(c, n)
         #fparts > 0 and table.concat(fparts, " | ") or "not reached",
         tostring(c.bankAtConfirm), bankAfter, pendAfter, tostring(c.mpAtConfirm), mpAfter,
         c.timers and string.format(" ; %d status-timer call(s) ($29) left out", c.timers) or ""))
+      if c.wonF then
+        H.log(string.format("[procboost] %s try %d: the action felled the last monster and won the battle at f%d "
+          .. "(no Ot6ActionEnd for it)", c.name, n, c.wonF))
+      end
+      if c.verb == "fight" then
+        local sw = {}
+        for i, w in ipairs(c.swings) do
+          sw[#sw + 1] = string.format("%d: slot %s at %s HP, %s", i, tostring(w.ts), tostring(w.thp),
+            w.roll and string.format("rolled RNGTbl[$%02X] = $%02X%s", w.idx, w.val, w.val < 0x40 and " (casts)" or "")
+              or "no roll")
+        end
+        H.log(string.format("[procboost] %s try %d passes (target slot %s, chosen at the most HP): %s", c.name, n,
+          tostring(c.target), #sw > 0 and table.concat(sw, "; ") or "none observed"))
+      end
       local measured = c.done == nil or c.done(c)
       if c.note then
         local note = c.note(c, measured)
@@ -711,7 +795,7 @@ local function tryCase(c, n)
       if measured then
         c.hit = { calls = c.calls, fb = c.fb, n = n, pendAtConfirm = c.pendAtConfirm,
                   bankAtConfirm = c.bankAtConfirm, bankAfter = bankAfter, pendAfter = pendAfter,
-                  beast = c.beast, esper = c.esper, cutF = c.cutF }
+                  beast = c.beast, esper = c.esper, cutF = c.cutF, swings = c.swings, wonF = c.wonF }
       end
       if c.drawn then
         c.drawsByTry = c.drawsByTry or {}
@@ -825,12 +909,28 @@ local function magiciteCall(c, calls)
   end
 end
 
-local function isCast(c, k) return k.b5 == CMD_MAGIC and k.b6 == c.castSpell end
+-- a cast of a fold-table spell from either of the fighter's hands: a fighter
+-- with two such weapons (ThunderBlade's Bolt and Blizzard's Ice in LOCKE's
+-- hands on #397's replay) procs whichever hand's swing rolled it
+local function isCast(c, k) return k.b5 == CMD_MAGIC and c.castSpells ~= nil and c.castSpells[k.b6] == true end
 local CASES = {
   { name = "magic", char = TERRA, verb = "magic", spell = FIRE, tries = 1 },
   { name = "fight", char = TERRA, verb = "fight", tries = FIGHT_TRIES,
+    -- measured once a roll came up under $40 (the verdict holds every such
+    -- roll to its cast) or a cast was seen; a try whose first swing felled
+    -- its target and made no roll marks the battle unable to serve the case
+    -- (every swing after it strikes the corpse), and the tries move to the
+    -- next battle (fightBattle, below)
     done = function(c)
       for _, k in ipairs(c.calls) do if isCast(c, k) then return true end end
+      for _, w in ipairs(c.swings) do if w.roll and w.val < 0x40 then return true end end
+      local rolled = false
+      for _, x in ipairs(c.swings) do if x.roll then rolled = true end end
+      local w = c.swings[1]
+      if w and not rolled and w.thp == 0 then
+        c.unservable = string.format("its first swing felled the toughest body standing (slot %s) and made no roll",
+          tostring(w.ts))
+      end
       return false
     end },
   { name = "throw", char = SHADOW, verb = "throw", item = MITHRIL_KNIFE, tries = 1 },
@@ -872,7 +972,21 @@ local CASES = {
 activeCases = CASES
 -- The precondition every case starts from: every member alive at READY_PCT
 -- of max HP or better, and every case's actor free to play its verb.
+-- A monster still standing (present, in the alive mask $3A75, HP above 0).
+-- A snapshot over the last one's death (alive at 0 HP, the victory a few
+-- frames off) gave GAU's Rage no body to strike, and the battle ended
+-- before his action ran (wt/polish-shield-hud-4's lab: "timeout after 6000
+-- frames driving toward rage entry 0 resolves"); the gates page such a
+-- battle's victory and take the next encounter.
+local function monsterUp()
+  for s = 0, 5 do
+    if (H.readByte(0x3AA8 + s * 2) & 1) == 1 and ((H.readByte(0x3A75) >> s) & 1) == 1
+       and H.readWord(0x3BFC + s * 2) > 0 then return true end
+  end
+  return false
+end
 local function ready()
+  if not monsterUp() then return false, "no monster standing" end
   if not standing() then
     return false, string.format("a member down or under %d%% of max HP", READY_PCT)
   end
@@ -974,7 +1088,7 @@ local function measureBattles()
 end
 local MEASURE_BATTLES, MUTER_ODDS = measureBattles()
 local UNREADY_FRAMES = 20000
-local serving = { n = 1, mode = "fill", since = nil, W = nil }
+local serving = { n = 1, mode = "fill", since = nil, W = nil, unready = 0 }
 local function battleSetup()
   slotOf = {}
   for s = 0, 3 do
@@ -999,19 +1113,237 @@ local function battleSetup()
       if who == nil and x and fold[x] then s, item, sp, who = slotOf[ch], it, x, ch end
     end
   end
+  -- every fold-table spell the fighter's hands cast: either hand's swing can
+  -- proc, and the case is about any of them
+  local spells, names = {}, {}
+  if who ~= nil then
+    for h = 0, 1 do
+      local x = onHitSpell(H.readByte(HANDS + s * 2 + h))
+      if x and fold[x] then spells[x] = true; names[#names + 1] = string.format("$%02X", x) end
+    end
+  end
+  CASES[2].castSpells = spells
   assert(who ~= nil, string.format("a seated fighter's weapon casts a fold-table spell on hit (TERRA holds $%02X, "
     .. "LOCKE $%02X, SHADOW $%02X)", H.readByte(HANDS + slotOf[TERRA] * 2), H.readByte(HANDS + slotOf[LOCKE] * 2),
     H.readByte(HANDS + slotOf[SHADOW] * 2)))
   CASES[2].char, CASES[2].castSpell = who, sp
   H.log(string.format("[procboost] the Fight case's fighter: char %d, slot %d, holds $%02X, casts spell $%02X on "
-    .. "hit (in Ot6FoldTbl); TERRA slot %d, LOCKE slot %d, SHADOW slot %d", who, s, item, sp, slotOf[TERRA],
-    slotOf[LOCKE], slotOf[SHADOW]))
+    .. "hit (in Ot6FoldTbl); its hands' fold-table spells %s; TERRA slot %d, LOCKE slot %d, SHADOW slot %d", who, s,
+    item, sp, table.concat(names, " "), slotOf[TERRA], slotOf[LOCKE], slotOf[SHADOW]))
   local w = {}
   for _, v in ipairs(H.formationWords()) do w[#w + 1] = string.format("%04X", v) end
   H.log(string.format("[procboost] battle %d for the measurement: group $%04X, formation %s; seats %s",
     serving.n, H.readWord(0x11E0), table.concat(w, " "), seatsLine()))
 end
 
+local function gateStep()
+  return H.driveUntil(function() return snap ~= nil end, 30000 * MEASURE_BATTLES, {
+    H.call(function()
+      if serving.mode == "out" then
+        if serving.W.frame() then return end      -- the battle, its reload, its care
+        serving.mode = "pace"
+      end
+      if serving.mode == "pace" then
+        if H.battleLoadStarted() then serving.mode = "up" H.setPad({}) return end
+        paceFrame()
+        return
+      end
+      if serving.mode == "up" then
+        if not H.battleActive() then H.setPad({}) return end
+        battleSetup()
+        serving.mode, serving.since = "fill", nil
+        return
+      end
+      if not monsterUp() then
+        serving.unready = serving.unready + 1
+        if serving.unready >= MEASURE_BATTLES then
+          error(string.format("precondition: no battle of %d let the party get ready; the last ended with no "
+            .. "monster standing; seats %s", MEASURE_BATTLES, seatsLine()), 0)
+        end
+        H.log(string.format("[procboost] battle %d cannot serve: no monster standing; taking the next encounter; "
+          .. "seats %s", serving.n, seatsLine()))
+        serving.n, serving.mode = serving.n + 1, "out"
+        serving.W = H.newWalkFighter("procboost: a battle that ended")
+        serving.W.frame()
+        return
+      end
+      local full = true
+      for _, ch in ipairs({ TERRA, LOCKE, SHADOW }) do
+        if H.readByte(BANK + slotOf[ch] * 2) < BOOST then full = false end
+      end
+      if full and ready() and H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD then
+        H.setPad({})
+        settled = settled + 1
+        if settled >= SETTLE then
+          snapSeats = seatsLine()
+          snap = H.requestSaveState()
+        end
+        return
+      end
+      settled = 0
+      if full then
+        serving.since = serving.since or H.frame
+        local stuck = unliftable()
+        if stuck or H.frame - serving.since >= UNREADY_FRAMES then
+          local why = stuck or select(2, ready())
+          -- (counted apart from the battles the fight case passes over, below)
+          serving.unready = serving.unready + 1
+          if serving.unready >= MEASURE_BATTLES then
+            error(string.format("precondition: no battle of %d let the party get ready (every "
+              .. "member alive at %d%% of max HP or better and every case's actor free to play "
+              .. "its verb); the last, %d frames after every bank filled: %s; seats %s",
+              MEASURE_BATTLES, READY_PCT, H.frame - serving.since, why, seatsLine()), 0)
+          end
+          H.log(string.format("[procboost] battle %d cannot serve: %d frames after every bank "
+            .. "reached %d, %s; fighting it out and taking the next encounter; seats %s",
+            serving.n, H.frame - serving.since, BOOST, why, seatsLine()))
+          serving.n, serving.mode = serving.n + 1, "out"
+          serving.W = H.newWalkFighter("procboost: a battle that cannot serve")
+          serving.W.frame()
+          return
+        end
+      end
+      if full and H.frame - unreadySaid >= 1200 then
+        local _, why = ready()
+        if why then
+          unreadySaid = H.frame
+          H.log(string.format("[procboost] f%d: every bank at %d, not ready yet: %s; seats %s",
+            H.frame, BOOST, why, seatsLine()))
+        end
+      end
+      bench(-1)
+    end),
+  }, string.format("every bank at %d, every member alive at %d%% of max HP and every case's actor "
+    .. "free to play its verb, within %d battles", BOOST, READY_PCT, MEASURE_BATTLES))
+end
+local function snapLog()
+  return H.call(function()
+    H.checkReq(snap, "snapshot")
+    -- the gate above is the precondition's check: it snapshots only a
+    -- ready party, and a precondition no battle reaches is its error
+    local idle, party, sides = {}, {}, {}
+    for id = 0, 255 do
+      local e = MAGICITE_POOL[id]
+      if e and e.idle then idle[#idle + 1] = e.name end
+      if e and e.hitsParty then party[#party + 1] = e.name end
+      if e and e.power > 0 then sides[#sides + 1] = string.format("%s %s%s", e.name, e.side, e.heal and " heal" or "") end
+    end
+    H.log(string.format("[procboost] the Magicite's pool: %d espers from RandGenju; %.3f of a draw "
+      .. "pays a boost; nothing to multiply: %s; hits the party too: %s; %d tries without a "
+      .. "redraw at most %.4f",
+      MAGICITE_N, MAGICITE_PAYS, table.concat(idle, " "),
+      #party > 0 and table.concat(party, " ") or "none", MAGICITE_TRIES, MAGICITE_PAYS ^ MAGICITE_TRIES))
+    H.log("[procboost] the Magicite's espers with power, by side: " .. table.concat(sides, ", "))
+    H.log(string.format("[procboost] snapshot f%d in battle %d: seats %s, after %d bench "
+      .. "action(s); %d battle(s) allowed (an Apokryphos/Misfit formation at most %.2f of a "
+      .. "draw, so %d unservable in a row at most %.4f)", H.frame, serving.n, snapSeats,
+      benchHeals, MEASURE_BATTLES, MUTER_ODDS, MEASURE_BATTLES, MUTER_ODDS ^ MEASURE_BATTLES))
+  end)
+end
+-- The fight case's battles.  The on-hit roll is made only on a swing its
+-- target survives, so a battle whose toughest body falls to the fighter's
+-- first swing cannot serve the case at all: on #397's replay the gear rule
+-- put ThunderBlade (Bolt) in LOCKE's hand, the measurement battle was
+-- formation $0B4's two Ninjas (1650 HP, weak to Bolt), and the first swing
+-- broke one and dealt it 4128; all eight swings of every try struck its
+-- corpse, no roll was made, and twelve tries came out the same
+-- (build/attempts/wt/polish-shield-hud-4/lab).  Such a battle is fought out
+-- from the snapshot by the route's walker, the next encounter taken and
+-- readied by the same gate, and the tries start again there; so are the
+-- tries of a battle whose swings rolled FIGHT_TRIES times over without one
+-- coming up under $40.  How many battles: every species of a battle whose
+-- first swing fell is taken to fall to it anywhere (its HP is its species'),
+-- q is the chance an encounter on 394 deals a formation all of whose bodies
+-- fall (the pool's slot odds, a +rand word's four formations alike), and
+-- the case gives up past the least N with q^N <= MEASURE_FAIL, naming the
+-- species that fell.  The run's frame cap allows FIGHT_BATTLES_CAP: N at
+-- the worst q short of 1, only the least likely formation in the pool
+-- standing.
+local FIGHT_POOL = H.encounterPool(H.fieldEncounterGroup(394))
+local falls = {}
+local function fallsOdds()
+  local q = 0
+  for slot = 1, 4 do
+    local e, k = FIGHT_POOL[slot], 0
+    for _, f in ipairs(e.formations) do
+      local all = #f.species > 0
+      for _, sp in ipairs(f.species) do if not falls[sp] then all = false end end
+      if all then k = k + 1 end
+    end
+    q = q + e.odds / 256 * k / #e.formations
+  end
+  return q
+end
+local function battlesAllowed(q)
+  if q <= 0 then return 1 end
+  if q >= 1 then return math.huge end
+  return math.max(1, math.ceil(math.log(MEASURE_FAIL) / math.log(q)))
+end
+local FIGHT_BATTLES_CAP
+do
+  local least = 1
+  for slot = 1, 4 do
+    local e = FIGHT_POOL[slot]
+    least = math.min(least, e.odds / 256 / #e.formations)
+  end
+  FIGHT_BATTLES_CAP = battlesAllowed(1 - least)
+end
+local function fightTriesFrames(c)
+  local f = 0
+  for n = 1, c.tries do f = f + 2 + 6000 + (n - 1) * ROUND_FRAMES + 6000 + 2 end
+  return f
+end
+local fightN = 1
+local function fightBattles(c)
+  local body = {}
+  for n = 1, c.tries do
+    for _, s in ipairs(tryCase(c, n)) do body[#body + 1] = s end
+  end
+  local req
+  body[#body + 1] = H.call(function()
+    if c.hit ~= nil then return end
+    local why = c.unservable or string.format("its %d tries made their rolls and none came up under $40", c.tries)
+    local sp, names = {}, {}
+    for _, v in ipairs(H.formationWords()) do
+      if v ~= 0xFFFF then sp[#sp + 1] = v; names[#names + 1] = string.format("$%03X", v) end
+    end
+    if c.unservable then for _, v in ipairs(sp) do falls[v] = true end end
+    local fell = {}
+    for v in pairs(falls) do fell[#fell + 1] = string.format("$%03X", v) end
+    table.sort(fell)
+    local q = fallsOdds()
+    local allowed = battlesAllowed(q)
+    H.log(string.format("[procboost] fight: battle %d (formation %s) cannot serve the case: %s; species that fall to "
+      .. "the first swing: %s, so an encounter is all of them at most %.4f of a draw, and %s battle(s) are allowed",
+      serving.n, table.concat(names, " "), why, table.concat(fell, " "), q, tostring(allowed)))
+    if fightN >= allowed or fightN >= FIGHT_BATTLES_CAP then
+      error(string.format("precondition: the fight case found no battle in %d whose toughest body survives the "
+        .. "fighter's first swing and rolls a cast (species that fall: %s; %.4f of 394's encounters are all of them; "
+        .. "%s allowed, the run's cap %d); the last: %s", fightN, table.concat(fell, " "), q, tostring(allowed),
+        FIGHT_BATTLES_CAP, why), 0)
+    end
+    fightN = fightN + 1
+    H.setPad({})
+    req = H.requestLoadState(snap.blob)
+  end)
+  body[#body + 1] = H.cond(function() return c.hit == nil end, {
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(req, "the snapshot, to fight its battle out")
+      H.rearmInputInjection()
+      snap, armed, settled, inbound = nil, nil, 0, {}
+      serving.n, serving.mode, serving.since = serving.n + 1, "out", nil
+      serving.W = H.newWalkFighter("procboost: a battle the fight case cannot use")
+      c.unservable = nil
+    end),
+    gateStep(),
+    H.waitFrames(2),
+    snapLog(),
+  }, {})
+  return H.driveUntil(function() return c.hit ~= nil end,
+    FIGHT_BATTLES_CAP * (fightTriesFrames(c) + 2 + 2 + 30000 * MEASURE_BATTLES + 2 + 10),
+    body, "the fight case, a battle at a time")
+end
 local steps = {
   H.call(function() if poolErr then error("the Magicite's pool: " .. poolErr, 0) end end),
   H.waitFrames(20),
@@ -1048,96 +1380,17 @@ local steps = {
   -- one Echo Screen had gone to SHADOW held the magic row grey for 26000
   -- frames (build/attempts/wt/procboost-v024/px13/new5/new_k5.log.gz), and
   -- Mute ends with the battle.
-  H.driveUntil(function() return snap ~= nil end, 30000 * MEASURE_BATTLES, {
-    H.call(function()
-      if serving.mode == "out" then
-        if serving.W.frame() then return end      -- the battle, its reload, its care
-        serving.mode = "pace"
-      end
-      if serving.mode == "pace" then
-        if H.battleLoadStarted() then serving.mode = "up" H.setPad({}) return end
-        paceFrame()
-        return
-      end
-      if serving.mode == "up" then
-        if not H.battleActive() then H.setPad({}) return end
-        battleSetup()
-        serving.mode, serving.since = "fill", nil
-        return
-      end
-      local full = true
-      for _, ch in ipairs({ TERRA, LOCKE, SHADOW }) do
-        if H.readByte(BANK + slotOf[ch] * 2) < BOOST then full = false end
-      end
-      if full and ready() and H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD then
-        H.setPad({})
-        settled = settled + 1
-        if settled >= SETTLE then
-          snapSeats = seatsLine()
-          snap = H.requestSaveState()
-        end
-        return
-      end
-      settled = 0
-      if full then
-        serving.since = serving.since or H.frame
-        local stuck = unliftable()
-        if stuck or H.frame - serving.since >= UNREADY_FRAMES then
-          local why = stuck or select(2, ready())
-          if serving.n >= MEASURE_BATTLES then
-            error(string.format("precondition: no battle of %d let the party get ready (every "
-              .. "member alive at %d%% of max HP or better and every case's actor free to play "
-              .. "its verb); the last, %d frames after every bank filled: %s; seats %s",
-              MEASURE_BATTLES, READY_PCT, H.frame - serving.since, why, seatsLine()), 0)
-          end
-          H.log(string.format("[procboost] battle %d cannot serve: %d frames after every bank "
-            .. "reached %d, %s; fighting it out and taking the next encounter; seats %s",
-            serving.n, H.frame - serving.since, BOOST, why, seatsLine()))
-          serving.n, serving.mode = serving.n + 1, "out"
-          serving.W = H.newWalkFighter("procboost: a battle that cannot serve")
-          serving.W.frame()
-          return
-        end
-      end
-      if full and H.frame - unreadySaid >= 1200 then
-        local _, why = ready()
-        if why then
-          unreadySaid = H.frame
-          H.log(string.format("[procboost] f%d: every bank at %d, not ready yet: %s; seats %s",
-            H.frame, BOOST, why, seatsLine()))
-        end
-      end
-      bench(-1)
-    end),
-  }, string.format("every bank at %d, every member alive at %d%% of max HP and every case's actor "
-    .. "free to play its verb, within %d battles", BOOST, READY_PCT, MEASURE_BATTLES)),
+  gateStep(),
   H.waitFrames(2),
-  H.call(function()
-    H.checkReq(snap, "snapshot")
-    -- the gate above is the precondition's check: it snapshots only a
-    -- ready party, and a precondition no battle reaches is its error
-    local idle, party, sides = {}, {}, {}
-    for id = 0, 255 do
-      local e = MAGICITE_POOL[id]
-      if e and e.idle then idle[#idle + 1] = e.name end
-      if e and e.hitsParty then party[#party + 1] = e.name end
-      if e and e.power > 0 then sides[#sides + 1] = string.format("%s %s%s", e.name, e.side, e.heal and " heal" or "") end
-    end
-    H.log(string.format("[procboost] the Magicite's pool: %d espers from RandGenju; %.3f of a draw "
-      .. "pays a boost; nothing to multiply: %s; hits the party too: %s; %d tries without a "
-      .. "redraw at most %.4f",
-      MAGICITE_N, MAGICITE_PAYS, table.concat(idle, " "),
-      #party > 0 and table.concat(party, " ") or "none", MAGICITE_TRIES, MAGICITE_PAYS ^ MAGICITE_TRIES))
-    H.log("[procboost] the Magicite's espers with power, by side: " .. table.concat(sides, ", "))
-    H.log(string.format("[procboost] snapshot f%d in battle %d: seats %s, after %d bench "
-      .. "action(s); %d battle(s) allowed (an Apokryphos/Misfit formation at most %.2f of a "
-      .. "draw, so %d unservable in a row at most %.4f)", H.frame, serving.n, snapSeats,
-      benchHeals, MEASURE_BATTLES, MUTER_ODDS, MEASURE_BATTLES, MUTER_ODDS ^ MEASURE_BATTLES))
-  end),
+  snapLog(),
 }
 for _, c in ipairs(CASES) do
-  for n = 1, c.tries do
-    for _, s in ipairs(tryCase(c, n)) do steps[#steps + 1] = s end
+  if c.verb == "fight" then
+    steps[#steps + 1] = fightBattles(c)
+  else
+    for n = 1, c.tries do
+      for _, s in ipairs(tryCase(c, n)) do steps[#steps + 1] = s end
+    end
   end
 end
 
@@ -1171,6 +1424,13 @@ steps[#steps + 1] = H.call(function()
       H.assertEq(k.dout, k.din, string.format("fight: a swing leaves unmultiplied (%d in)", k.din))
     end
   end
+
+  -- fight: every roll that came up under $40 cast its spell, one cast each
+  local due = 0
+  for _, w in ipairs(by.fight.hit.swings) do if w.roll and w.val < 0x40 then due = due + 1 end end
+  H.assertEq(casts, due, string.format("fight: a cast for every on-hit roll under $40 (%d such roll(s) in %d "
+    .. "pass(es))", due, #by.fight.hit.swings))
+  H.assertEq(casts > 0, true, "fight: the weapon cast its own spell")
 
   -- fight: the boost bought swings, seen by the observer the Rage row reads
   local f = by.fight.hit.fb[1]
@@ -1290,6 +1550,7 @@ local function gauEncounter(k)
   H.driveUntil(function() return snap ~= nil or not H.battleLoadStarted() end, 30000, {
     H.call(function()
       local s = slotOf[GAU]
+      if not monsterUp() then pulse("a") return end        -- its victory: page it
       if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD and (H.readByte(ACTOR) & 3) == s
          and H.readByte(BANK + s * 2) >= BOOST and H.readByte(PEND + s * 2) == 0 and ready() then
         H.setPad({})
@@ -1335,14 +1596,14 @@ for _, c in ipairs(RAGE) do
   for _, s in ipairs(tryCase(c, 1)) do steps[#steps + 1] = s end
 end
 steps[#steps + 1] = H.call(function()
-  local specials, dealt, covered, fights = 0, 0, 0, 0
+  local specials, dealt, covered, fights, charged = 0, 0, 0, 0, 0
   for _, c in ipairs(RAGE) do
     if c.entry < learned then
       H.assertEq(c.hit ~= nil, true, c.name .. ": the case happened")
       covered = covered + 1
       local h = c.hit
       H.assertEq(h.pendAtConfirm, BOOST, c.name .. ": pending boost at the confirm")
-      H.assertEq(h.beast ~= nil, true, c.name .. ": the action ended (Ot6ActionEnd)")
+      H.assertEq(h.beast ~= nil, true, c.name .. ": the action ran a beast (read at its attack or Ot6ActionEnd)")
       local special = specialOf(h.beast)
       H.assertEq(#h.calls + #h.fb > 0, true, c.name .. ": the start turn's attack was observed")
       for _, k in ipairs(h.calls) do
@@ -1365,19 +1626,28 @@ steps[#steps + 1] = H.call(function()
           "%s: beast $%02X's special $%02X gets no extra swings ($3a70 %d -> %s at pending %d)",
           c.name, h.beast, special, f.before, tostring(f.after), f.pend))
       end
-      -- ...and the pips are charged exactly as for any boosted action
-      H.assertEq(h.pendAfter, 0, c.name .. ": the pending boost is cleared at the action's end")
-      H.assertEq(h.bankAfter, h.bankAtConfirm - BOOST, string.format(
-        "%s: the %d pips are charged (bank %d -> %d)", c.name, BOOST, h.bankAtConfirm, h.bankAfter))
+      -- ...and the pips are charged exactly as for any boosted action, read
+      -- at its Ot6ActionEnd; an action that won the battle went to the
+      -- victory without one, and the banks end with the battle
+      if h.wonF then
+        H.log(string.format("[procboost] %s: the action won the battle at f%d, before Ot6ActionEnd; its charge "
+          .. "is not read", c.name, h.wonF))
+      else
+        charged = charged + 1
+        H.assertEq(h.pendAfter, 0, c.name .. ": the pending boost is cleared at the action's end")
+        H.assertEq(h.bankAfter, h.bankAtConfirm - BOOST, string.format(
+          "%s: the %d pips are charged (bank %d -> %d)", c.name, BOOST, h.bankAtConfirm, h.bankAfter))
+      end
     end
   end
   H.assertEq(covered, learned, "every learned rage was played")
+  H.assertEq(charged > 0, true, "a boosted Rage's charge was read at its Ot6ActionEnd")
   H.assertEq(specials > 0, true, "a boosted Rage's special ran under its own command and dealt damage")
   H.assertEq(fights > 0, true, "a boosted Rage's special ran through FightAttack (a physical Special)")
   H.log(string.format("[procboost] rage verdict: %d of %d rages played; %d damage call(s) "
     .. "unmultiplied, %d of them a special under its own command; %d FightAttack special(s) "
-    .. "with no extra swings; every start charged %d pips", covered, learned, dealt, specials,
-    fights, BOOST))
+    .. "with no extra swings; %d start(s) read at Ot6ActionEnd, each charged %d pips", covered, learned, dealt,
+    specials, fights, charged, BOOST))
 end)
 
 -- The run's cap is the sum of its steps' own bounds, so no step's budget is
@@ -1386,7 +1656,11 @@ end)
 local function runBudget()
   local f = 20 + 20 + 3000 + 1800 + 900 + 30000 + 900 + 30000 * MEASURE_BATTLES
   for _, c in ipairs(CASES) do
-    for n = 1, c.tries do f = f + 2 + 6000 + (n - 1) * ROUND_FRAMES + 6000 end
+    if c.verb == "fight" then
+      f = f + FIGHT_BATTLES_CAP * (fightTriesFrames(c) + 2 + 2 + 30000 * MEASURE_BATTLES + 2 + 10)
+    else
+      for n = 1, c.tries do f = f + 2 + 6000 + (n - 1) * ROUND_FRAMES + 6000 end
+    end
   end
   f = f + 20 + GAU_ENCOUNTERS * (6000 + 30000 + 900 + 30000) + 2
   for _ = 1, #RAGE do f = f + 2 + 6000 + 6000 end

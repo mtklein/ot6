@@ -436,6 +436,14 @@ TEST_ENV = {
     # snapshots; no write
     "battle_boostkeep": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #469: reach, Debilitator's steps and the last refusals, from one
+    # battle's snapshots outside Kohlingen; no write
+    "battle_boostreach": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kohlingen-v1",
+    # #469: RELM's boosted Sketch drawing an attack with no number, outside
+    # Kohlingen (Muus and Deep Eye); no write
+    "battle_sketchboost": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-locke-v1",
     # #292: NUMBER 024 (7 shields) is two steps from this save point
     "battle_hudcount":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/n024-entry-save-v1",
@@ -805,11 +813,12 @@ check("spell_grants",
        "ff6/src/text/magic_name_en.json", "docs/design/kits.md",
        "docs/design/magicite.md", "docs/design/magicite-tube-six.md",
        copy_if_changed_from("build/ot6.sfc")])
-# #292: the HUD's shield-count tiles are generated; the checked-in .inc must
-# be what the generator writes (counts 1-6 byte-identical to the old art is
-# asserted inside the generator).
+# #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
+# battle font's numerals); the checked-in .inc must be what the generator
+# writes.
 check("shield_glyphs", "python3 ff6/tools/gen_shield_glyphs.py --check",
-      ["ff6/tools/gen_shield_glyphs.py", "ff6/src/battle/ot6_shield_glyphs.inc"])
+      ["ff6/tools/gen_shield_glyphs.py", "ff6/src/battle/ot6_shield_glyphs.inc",
+       "ff6/src/gfx/small_font_en.2bpp"])
 check("encounters_selftest", "python3 tools/audit_encounters.py --selftest",
       ["tools/audit_encounters.py"])
 check("chestvis_selftest", "python3 tools/chest_visibility.py --selftest",
