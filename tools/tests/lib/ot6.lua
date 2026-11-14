@@ -487,6 +487,14 @@ function M.requestSaveState()
   return req
 end
 
+-- A suite about to press the console's Reset (a person's input the pad cannot carry; the suite declares its
+-- emu.reset in state_write_waivers.txt) says so first: the title it brings is no game over (the TitleScreen
+-- canary stands down once).
+function M.expectTitle(why)
+  M.titleExpected = true
+  M.log(string.format("[reset] f%d the title is expected: %s", M.frame, tostring(why)))
+end
+
 function M.requestLoadState(blob)
   M.finishRecoveryTrace("state_reload")
   -- a restored snapshot restarts the experiment: the post-game-over pad
@@ -12865,9 +12873,9 @@ function Driver:blitzVsOk()
 end
 
 function Driver:makePlanRules(actor)
-  -- opts.hold(char id, actor) -> true: that member Defends this window (a suite staging a battle's length by
+  -- opts.holdFor(char id, actor) -> true: that member Defends this window (a suite staging a battle's length by
   -- play, battle_ragedriver: the others Defend until GAU's possessed turn is seen)
-  if self.opts.hold and self.opts.hold(M.readByte(0x3ED8 + actor * 2), actor) then
+  if type(self.opts.holdFor) == "function" and self.opts.holdFor(M.readByte(0x3ED8 + actor * 2), actor) then
     return { kind = "defend" }
   end
   -- What a round costs this party, measured rather than assumed.  For each
@@ -15319,7 +15327,7 @@ function Driver:button(actor)
     self.steerDead, self.steerLast, self.tgtVisited, self.tgtCycled = {}, nil, {}, false
   end
   if st == BATTLE.ST_CMD then self.tgtSpin, self.confirmed = 0, nil end
-  -- a Defend (opts.hold): right at the command window swaps the Fight row to Def, A takes it (kitBattle's)
+  -- a Defend (opts.holdFor): right at the command window swaps the Fight row to Def, A takes it (kitBattle's)
   if self.plan ~= nil and self.plan.kind == "defend" and M.readByte(BATTLE.MENU) ~= 0 then
     if st == BATTLE.ST_CMD then return { "right" } elseif st == 0x27 then return { "a" } else return { "b" } end
   end
@@ -22351,6 +22359,13 @@ function M.run(opts, steps)
     local ok, addr = pcall(function() return M.sym("TitleScreen") end)
     if ok then
       rawAddMemoryCallback(function()
+        -- a title the body asked for (M.expectTitle: the console's Reset button) is no game over: the canary
+        -- stands down until the game is entered again
+        if M.titleExpected then
+          M.titleExpected, canaryInGame = false, false
+          M.log(string.format("[retry] f%d the title the body's Reset asked for: not a game over", M.frame))
+          return
+        end
         if canaryInGame then
           titleExecFired = titleExecFired + 1
           M.gameOverFired = M.gameOverFired + 1

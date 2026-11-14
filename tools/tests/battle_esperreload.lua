@@ -85,6 +85,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
     before = page(LIVE)
     H.log("[reload] 1: a won battle took the live page past slot 3's; the console's Reset")
     hits.loaded, hits.continue = 0, 0
+    H.expectTitle("battle_esperreload: the console's Reset before the Continue under test")
     emu.reset()
   end),
   H.bootCheckpoint("post-opera-v1"),
