@@ -62,12 +62,33 @@ local function hasRow(e, cmd)
   end
   return false
 end
-local function turnFrames(e)
+-- the ATB ticks until entity e's gauge fills (0 = full: its turn is queued, or its window is open)
+local function etaOf(e) return H.atbEta(H.readWord(ATB + e * 2), H.readWord(ATB_CONST + e * 2)) end
+-- frames until entity e's next turn, as the driver's doomLast reads it: for the member acting now
+-- (`acting`), a full refill; for anyone else, wherever its gauge stands, so a full gauge is a turn
+-- already queued (0), not a full refill away (the misread a full gauge used to get here and in the
+-- driver: a patient whose turn was queued read as "412 frames away", 01822cae)
+local function turnFrames(e, acting)
   local const = H.readWord(ATB_CONST + e * 2)
-  local eta = H.atbEta(H.readWord(ATB + e * 2), const)
+  local eta = etaOf(e)
   local period = const > 0 and math.ceil(0xFF00 / const) or nil
-  local ticks = (eta == 0 or eta == nil) and period or eta
+  local ticks = acting and period or eta
   return ticks and ticks * 2 or nil
+end
+-- A window opens on the frame its actor's command menu first reads open.  The pokes land only there:
+-- a poke later in a window can follow a plan the driver already made for it (01822cae's kolts_cave
+-- draw: a poke at a window whose plan was made, the Doom landing before the next decision), so the
+-- decision under test would never weigh the poke.  Called every frame of a poking drive.
+local lastWin = nil
+local function openWin()
+  if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_CMD then return nil end
+  return H.readByte(ACTOR) & 3
+end
+local function windowOpening()
+  local a = openWin()
+  local opening = a ~= nil and a ~= lastWin
+  lastWin = a
+  return opening
 end
 local function bagHas(id)
   for i = 0, 251 do
@@ -82,7 +103,7 @@ local doomedB, actorB, lineB, frameB = nil, nil, nil, nil
 local deathFrame, deathLine = nil, nil
 -- B's tries (below): the windows passed over, the snapshot before B and the test's record at it
 local TRIES_B = 4
-local skipB, windowsB, windowFrameB, triesB, lostB = 0, 0, nil, {}, {}
+local skipB, windowsB, triesB, lostB = 0, 0, {}, {}
 local snapReq, loadReq, snapB, modelB = nil, nil, nil, nil
 
 -- Every line the driver says is kept, and once B's member is condemned, so
@@ -207,6 +228,8 @@ local function patientFirstB()
   for i = lineB + 1, #lines do
     local l = lines[i]
     if l:find("no heal on entity " .. doomedB .. " %(") then return nil end
+    -- a member decided to heal or cure the patient: a decision weighed it (the assert below judges it)
+    if l:find("heal entity " .. doomedB .. " %(") or l:find("cure entity " .. doomedB .. " %(") then return nil end
     local who = l:match("%[board%] n=%d+ tick=%d+ form=%$%x+ who=(%d+)")
     if who ~= nil then
       if tonumber(who) == doomedB then return "its own turn came first: " .. l:match("%[board%].*") end
@@ -282,13 +305,14 @@ H.run({ maxFrames = 90000 }, {
     F = H.newFightDriver("doom", { tactical = true, boost = true, bank = 2,
                                    items = true, healPercent = 60,
                                    freeRound = "care" })
+    lastWin = openWin()   -- a window already open as the drive starts is not opening
   end),
 
   -- A. the first open command window of a member with a Fight row and a
   -- living ally: condemn that member at 2 (256 frames)
   H.driveUntil(function()
     watchCounts()
-    if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_CMD then return false end
+    if not windowOpening() then return false end
     local e = H.readByte(ACTOR) & 3
     if hp(e) == 0 or maxhp(e) == 0 or not hasRow(e, CMD_FIGHT) then return false end
     local allies = 0
@@ -299,7 +323,7 @@ H.run({ maxFrames = 90000 }, {
     doomedA, bpA, lineA, frameA = e, H.readByte(BP + e * 2), #lines, H.frame
     H.log(string.format("[test] f%d Condemned poked onto entity %d char %d at its open command "
       .. "window: count 2 (%d frames), its next turn %s frames away, %d BP held",
-      H.frame, e, H.readByte(BCHID + e * 2), 2 * H.COUNT_FRAMES, tostring(turnFrames(e)), bpA))
+      H.frame, e, H.readByte(BCHID + e * 2), 2 * H.COUNT_FRAMES, tostring(turnFrames(e, true)), bpA))
     return true
   end, 20000, {
     H.call(function() F.frame() end),
@@ -320,15 +344,20 @@ H.run({ maxFrames = 90000 }, {
   H.call(function()
     H.checkReq(snapReq, "the snapshot before B")
     snapB, modelB = snapReq.blob, saveModel()
+    lastWin = openWin()
     H.log(string.format("[test] f%d the snapshot before B: A (entity %s) down, %d line(s) said", H.frame,
       tostring(doomedA), #lines))
   end),
-  -- B, retried within a bound: a monster can kill the hurt, condemned member before its count runs out (the
-  -- landing at cdbc1a5f, kolts_cave's draw there: "[death] f+359 entity 0 char 4 from 83/250 by slot 3 cmd
-  -- $12 atk $02": slot 3's spell one-shots that member from 232/250 as well, try after try), and then the Doom
-  -- never lands and the phase has nothing to observe.  The try is a lost experiment, not a result: the machine
-  -- and the test's record go back to the snapshot before B, and B condemns another member while one stands
-  -- (the monsters answer whom they answer), else pokes at a later command window, at most TRIES_B times.
+  -- B, retried within a bound.  A try is lost, not failed, when it leaves no decision to observe: a monster
+  -- (or a member) kills the hurt, condemned patient before its count runs out (the landing at cdbc1a5f,
+  -- kolts_cave's draw there: "[death] f+359 entity 0 char 4 from 83/250 by slot 3 cmd $12 atk $02": slot 3's
+  -- spell one-shots that member from 232/250 as well, try after try), or the patient's own turn or its Doom
+  -- comes before any other member decides (patientFirstB).  The pokes themselves rule out the two ways the
+  -- latter used to be dealt: a patient with a full gauge (its turn queued) is never chosen, and the poke lands
+  -- on a window's opening frame, before the driver plans it.  A lost try is an experiment, not a result: the
+  -- machine and the test's record go back to the snapshot before B, and B condemns another member while one
+  -- stands (the monsters answer whom they answer), else pokes at a later command window, at most TRIES_B
+  -- times.  A heal or cure decided on the patient is a decision, not a lost try: the asserts judge it.
   H.repeatN(TRIES_B, {
     H.cond(function()
       if doomedB == nil then return true end
@@ -346,7 +375,8 @@ H.run({ maxFrames = 90000 }, {
         H.call(function()
           H.checkReq(loadReq, "the snapshot before B")
           restoreModel(modelB)
-          skipB, windowsB, windowFrameB = math.max(skipB, windowsB), 0, nil
+          skipB, windowsB = math.max(skipB, windowsB), 0
+          lastWin = openWin()   -- a window the snapshot holds open is not opening
           doomedB, actorB, lineB, frameB, deathFrame, deathLine = nil, nil, nil, nil, nil, nil
         end),
       }, {}),
@@ -355,7 +385,7 @@ H.run({ maxFrames = 90000 }, {
       -- them to a third, so the heal line has a patient to refuse
       H.driveUntil(function()
         watchCounts()
-        if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_CMD then return false end
+        if not windowOpening() then return false end
         local e = H.readByte(ACTOR) & 3
         if e == doomedA or hp(e) == 0 or maxhp(e) == 0 or not hasRow(e, CMD_ITEM) then return false end
         if not (bagHas(0xE9) or bagHas(0xE8)) then
@@ -365,7 +395,9 @@ H.run({ maxFrames = 90000 }, {
         -- with it; with every patient tried, it passes over the windows its earlier tries poked at
         local c, fresh = nil, false
         for p = 0, 3 do
-          if p ~= e and p ~= doomedA and hp(p) > 0 and maxhp(p) > 0
+          -- never a patient whose gauge is full (eta 0): its turn is queued, so it acts before any count
+          -- runs out and no other member's decision weighs it first
+          if p ~= e and p ~= doomedA and hp(p) > 0 and maxhp(p) > 0 and etaOf(p) ~= 0
              and (turnFrames(p) == nil or turnFrames(p) >= H.COUNT_FRAMES) then
             if not lostB[p] then c, fresh = p, true elseif not fresh then c = p end
           end
@@ -376,7 +408,7 @@ H.run({ maxFrames = 90000 }, {
           if p ~= doomedA and hp(p) > 0 and maxhp(p) > 0 and not lostB[p] then untried = true end
         end
         if not fresh and untried then return false end
-        if H.frame ~= windowFrameB then windowFrameB, windowsB = H.frame, windowsB + 1 end
+        windowsB = windowsB + 1
         if not fresh and windowsB <= skipB then return false end
         H.writeByte(ST2 + c * 2, H.readByte(ST2 + c * 2) | 0x01)
         H.writeByte(DOOM_COUNT + c * 2, 2)
