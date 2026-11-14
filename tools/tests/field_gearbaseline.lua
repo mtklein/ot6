@@ -207,10 +207,8 @@ H.run({ maxFrames = 120000 }, {
       if o[i].ch ~= healer.ch and not ribboned[o[i].ch] and canTake(o[i].ch) then cands[#cands + 1] = o[i] end
     end
     H.assertEq(#cands > 0, true, "precondition 6: a member who can take a Ribbon and gets none from the real plan")
-    -- the real rule keeps a worn prize where its plan can, so a mutant's dress can land on a state the real rule
-    -- also accepts (the #328 line at f916b884: the mutant named EDGAR, and its dress, EDGAR, CYAN and TERRA in
-    -- Ribbons, read clean: 'a violation names "the rule puts the Ribbon $CA on" (got 0: )').  Such a mutant
-    -- proves nothing either way: the dress goes back to the real rule's and the next candidate is named
+    -- with one Ribbon in play (above), every member the mutant names in the healer's place takes it, and the real
+    -- rule reads red on each: every wrong healer is tried, the dress put back to the real rule's between them
     local function try(i)
       local pick = cands[i]
       return H.seqStep({
@@ -223,11 +221,9 @@ H.run({ maxFrames = 120000 }, {
         end),
         H.gearBaseline({ tag = "6: the dress under the healer mutant" }),
         H.call(function() H.gearHealer = H.realHealer end),
+        red("6: the healer mutant's dress, read by the real rule", "the rule puts the Ribbon $CA on"),
         H.lazy(function()
-          if has(violations(), "the rule puts the Ribbon $CA on") or i == #cands then
-            return red("6: the healer mutant's dress, read by the real rule", "the rule puts the Ribbon $CA on")
-          end
-          H.log(string.format("[gbtest] 6: %s as healer dresses a state the real rule accepts; the next", pick.name))
+          if i == #cands then return H.logStep("[gbtest] 6: every wrong healer read red") end
           return H.seqStep({ H.gearBaseline({ tag = "6: back to the real rule" }), try(i + 1) })
         end),
       })
