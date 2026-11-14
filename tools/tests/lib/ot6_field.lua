@@ -12532,6 +12532,20 @@ function M.kefkaTowerKit(K, fight)
             Q = { qx, qy }
           end
         end
+        -- none of the eight off the exits (292 (81,7): its only orthogonal neighbour the floor reaches is the exit
+        -- (80,7)): the nearest tile the floor reaches, off the exits (ties to the smaller y, then the smaller x)
+        if Q == nil then
+          local best = nil
+          for k in pairs(M.bfsReach(nil, nil, nil, L(), nil, nil, P.avoid)) do
+            local qx, qy = k & 0xFF, (k >> 8) & 0xFF
+            local d = math.abs(qx - x) + math.abs(qy - y)
+            if d > 0 and not P.off[qx .. "," .. qy] and (best == nil or d < best[3]
+                or (d == best[3] and (qy < best[2] or (qy == best[2] and qx < best[1])))) then
+              best = { qx, qy, d }
+            end
+          end
+          if best then Q = { best[1], best[2] } end
+        end
         M.assertEq(Q ~= nil, true, string.format("%s: a lap tile the floor reaches from %d (%d,%d)", what, m, x, y))
         P.cap = opts.stepCap or K.worstSteps(m)
         M.assertEq(P.cap ~= nil, true, string.format("%s: map %d rolls random battles", what, m))
