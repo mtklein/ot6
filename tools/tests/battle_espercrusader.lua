@@ -12,10 +12,10 @@
 -- hold two weapons also cuts the swing's damage by 1/4 (CalcDmg's $3C58 bit $10; UpdateEquip_03 clears it only for
 -- two weapons): that is logged here, not asserted, for the release's call.
 --
--- Continue post-opera-v1.  Two seated members are picked from the save: G holds a two-hand-capable weapon and D,
+-- Continue post-opera-v1.  Three seated members are picked from the save (S below): G holds a two-hand-capable weapon and D,
 -- another, holds a weapon in the main hand and something else in the off hand, with a weapon D can wear in the bag.
 -- G's off hand is emptied through Equip -> Rmove (play).  A snapshot there; then two branches from it, which differ
--- only in Crusader's count on G and D (staged, declared in state_write_waivers.txt: a signature takes 500 Magic
+-- only in Crusader's count on G, D and S (staged, declared in state_write_waivers.txt: a signature takes 500 Magic
 -- Points in one stone): 499 (rank 4: every rung but the signature, so the same stats and the same Red Cap) and 500.
 -- In each, D's off hand is offered the bag's weapon through the Equip menu (play), then the branch walks into
 -- random battles until G and D have each Fought (unboosted, through the real menu, the others Defending).  Every
@@ -24,7 +24,9 @@
 --   rank 4:  the menu refuses D's second weapon; D's Fight computes damage for the main hand only; G's swing has
 --            no grip;
 --   rank 5:  the menu takes it; D's Fight computes damage for both hands; G's swing has the grip, from the same
---            battle power, vigor and level, and more damage than rank 4's.
+--            battle power, vigor and level, and more damage than rank 4's; and S, a third member holding a weapon
+--            and a shield (the common kit), loses nothing to the signature.
+-- Every claim is logged as ok or NOT before the verdict, so a red run names each one that fails.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -44,7 +46,8 @@ local function wearable(item, c) return ((prop(item, 1) | (prop(item, 2) << 8)) 
 local function slot(c, s) return H.readByte(0x1600 + 37 * c + 0x1F + s) end
 local function hex(v) return string.format("$%02X", v) end
 
-local G, D, W                         -- the grip member, the two-weapon member, the bag's weapon for D
+local G, D, W, S                      -- the grip member, the two-weapon member, the bag's weapon for D, and a
+                                      -- member with a weapon and a shield
 local snap
 local A, B = nil, nil                 -- two plain tiles that roll random battles
 local cur                             -- the branch being recorded
@@ -67,7 +70,7 @@ local function seatRead(tag)
   ent = {}
   for s = 0, 3 do
     local a = H.readByte(0x3ED8 + s * 2)
-    if a == G or a == D then
+    if a == G or a == D or a == S then
       local e = s * 2
       ent[a] = e
       H.log(string.format("[crusader] %s: %s seat %d: battle power main %d off %d, weapon effects main $%02X off "
@@ -90,11 +93,13 @@ local function branch(name, count, restore)
     steps[#steps + 1] = H.call(function() H.checkReq(req, "the snapshot after G's Rmove"); H.rearmInputInjection() end)
   end
   steps[#steps + 1] = H.call(function()
-    r.passes = { [G] = {}, [D] = {} }
+    r.passes = { [G] = {}, [D] = {}, [S] = {} }
     cur = r
     stage(G, count)
     stage(D, count)
-    H.log(string.format("[crusader] %s: Crusader's count on %s and %s staged at %d", name, NAMES[G], NAMES[D], count))
+    stage(S, count)
+    H.log(string.format("[crusader] %s: Crusader's count on %s, %s and %s staged at %d", name, NAMES[G], NAMES[D],
+      NAMES[S], count))
   end)
   steps[#steps + 1] = H.equipWeapon(function() return (H.readByte(0x1850 + D) >> 3) & 3 end, W,
     { slot = 1, refusable = true, result = r.equip, tag = name .. ": " .. "D's off hand" })
@@ -103,23 +108,24 @@ local function branch(name, count, restore)
     H.log(string.format("[crusader] %s: %s's hands now %s / %s (the menu %s the %s)", name, NAMES[D],
       hex(slot(D, 0)), hex(r.offHand), r.equip.refused and "refused" or "took", hex(W)))
   end)
-  steps[#steps + 1] = H.driveUntil(function() return have(r, G) and have(r, D) end, 300000, {
+  local function all() return have(r, G) and have(r, D) and have(r, S) end
+  steps[#steps + 1] = H.driveUntil(all, 300000, {
     open(name),
     H.call(function()
       r.battles = r.battles + 1
-      H.assertEq(r.battles <= 6, true, name .. ": G and D have both Fought within six battles")
+      H.assertEq(r.battles <= 6, true, name .. ": G, D and S have all Fought within six battles")
       seatRead(string.format("%s battle %d", name, r.battles))
     end),
-    H.cond(function() return ent[G] ~= nil and ent[D] ~= nil end, {
-      H.kitBattle({ { who = G, cmd = CMD_FIGHT, boost = 0 }, { who = D, cmd = CMD_FIGHT, boost = 0 } },
-        { untilPlanDone = true, idle = "defend", maxFrames = 60000,
-          planDone = function() return have(r, G) and have(r, D) end }),
+    H.cond(function() return ent[G] ~= nil and ent[D] ~= nil and ent[S] ~= nil end, {
+      H.kitBattle({ { who = G, cmd = CMD_FIGHT, boost = 0 }, { who = S, cmd = CMD_FIGHT, boost = 0 },
+        { who = D, cmd = CMD_FIGHT, boost = 0 } },
+        { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = all }),
       H.waitFrames(60),
     }, {}),
     H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the map", 2),
     H.fieldCare({ tag = name .. ": care between battles" }),
-  }, name .. ": G and D Fight")
+  }, name .. ": G, S and D Fight")
   steps[#steps + 1] = H.call(function() cur = nil end)
   return r, H.seqStep(steps)
 end
@@ -155,8 +161,14 @@ H.run({ maxFrames = 900000 }, {
       end
     end
     H.assertEq(D ~= nil, true, "another seated member with one weapon and a weapon in the bag to wear")
-    H.log(string.format("[crusader] G = %s (%s, weapon effects $%02X), D = %s (bag weapon %s)", NAMES[G],
-      hex(slot(G, 0)), prop(slot(G, 0), 19), NAMES[D], hex(W)))
+    -- S: a third, a weapon in the main hand and a shield in the off hand (the common kit)
+    for _, c in ipairs(m) do
+      if S == nil and c ~= G and c ~= D and H.isWeapon(slot(c, 0)) and slot(c, 1) ~= 0xFF
+          and (prop(slot(c, 1), 0) & 0x07) == 3 then S = c end
+    end
+    H.assertEq(S ~= nil, true, "a third seated member with a weapon and a shield")
+    H.log(string.format("[crusader] G = %s (%s, weapon effects $%02X), D = %s (bag weapon %s), S = %s (%s / %s)",
+      NAMES[G], hex(slot(G, 0)), prop(slot(G, 0), 19), NAMES[D], hex(W), NAMES[S], hex(slot(S, 0)), hex(slot(S, 1))))
     local x, y = H.worldX(), H.worldY()
     local function plain(tx, ty) return (H.worldTileProp(tx, ty) & 0x50) == 0x40 end
     A = { x, y }
@@ -180,7 +192,10 @@ H.run({ maxFrames = 900000 }, {
       armed = nil
       if e == nil or cur == nil then return end
       local a = H.readByte(0x3ED8 + e)
-      if (a ~= G and a ~= D) or cur.passes[a] == nil then return end
+      if cur.passes[a] == nil then return end
+      -- a Fight's pass only: an item or a physical spell also runs CalcDmg (#534 round 1: a pass with battle
+      -- power 0 was recorded for the two-weapon member before his Fight, and ended the plan early)
+      if H.readByte(0x3A7C) ~= CMD_FIGHT then return end
       local p = { hand = lastHand[e], dmg = H.readWord(0x11B0), bp = H.readByte(0x11A6), vig = H.readByte(0x11AE),
         lvl = H.readByte(0x11AF), grip = (H.readByte(0xB3) & 0x40) == 0, genji = (H.readByte(0x3C58 + e) & 0x10) ~= 0 }
       table.insert(cur.passes[a], p)
@@ -205,26 +220,36 @@ H.run({ maxFrames = 900000 }, {
       for _, p in ipairs(r.passes[a]) do t[p.hand or 0] = t[p.hand or 0] + 1 end
       return t
     end
+    -- every claim is checked and logged before the verdict, so one red run names all that fail
+    local bad = {}
+    local function check(ok, what)
+      H.log(string.format("[crusader] %s: %s", ok and "ok" or "NOT", what))
+      if not ok then bad[#bad + 1] = what end
+    end
     -- the menu
-    H.assertEq(R4.equip.refused, true, "rank 4: the Equip menu refuses D's second weapon")
-    H.assertEq(R4.offHand ~= W, true, "rank 4: D's off hand keeps what it had")
-    H.assertEq(R5.equip.refused, false, "rank 5: the Equip menu takes D's second weapon")
-    H.assertEq(R5.offHand, W, "rank 5: D's off hand holds the bag's weapon")
+    check(R4.equip.refused == true and R4.offHand ~= W, "rank 4: the Equip menu refuses D's second weapon")
+    check(R5.equip.refused == false and R5.offHand == W, "rank 5: the Equip menu takes D's second weapon")
     -- D's Fight: the second swing
     local h4, h5 = hands(R4, D), hands(R5, D)
     H.log(string.format("[crusader] D's damage passes: rank 4 main %d off %d; rank 5 main %d off %d",
       h4[0], h4[1], h5[0], h5[1]))
-    H.assertEq(h4[0] >= 1 and h4[1] == 0, true, "rank 4: D's Fight computes damage for the main hand only")
-    H.assertEq(h5[0] >= 1 and h5[1] >= 1, true, "rank 5: D's Fight computes damage for both hands (the second swing)")
-    -- G's Fight: the grip
-    local g4, g5 = R4.passes[G][1], R5.passes[G][1]
-    H.assertEq(g4.bp == g5.bp and g4.vig == g5.vig and g4.lvl == g5.lvl, true,
-      "G swings from the same battle power, vigor and level at rank 4 and rank 5")
-    H.assertEq(g4.grip, false, "rank 4: G's swing has no two-handed grip")
-    H.assertEq(g5.grip, true, "rank 5: G's swing has the two-handed grip (the Gauntlet's bit, one hand empty)")
-    H.log(string.format("[crusader] G's damage before variance: rank 4 %d, rank 5 %d (x%.3f); Genji's one-weapon cut "
-      .. "at rank 5: %s", g4.dmg, g5.dmg, g5.dmg / math.max(1, g4.dmg), tostring(g5.genji)))
-    H.assertEq(g5.dmg > g4.dmg, true, "rank 5: G's swing does more damage than rank 4's")
+    check(h4[0] >= 1 and h4[1] == 0, "rank 4: D's Fight computes damage for the main hand only")
+    check(h5[0] >= 1 and h5[1] >= 1, "rank 5: D's Fight computes damage for both hands (the second swing)")
+    -- G's Fight: the grip; S's: a weapon and a shield
+    local function same(a, b) return a.bp == b.bp and a.vig == b.vig and a.lvl == b.lvl end
+    local g4, g5, s4, s5 = R4.passes[G][1], R5.passes[G][1], R4.passes[S][1], R5.passes[S][1]
+    H.assertEq(same(g4, g5) and same(s4, s5), true,
+      "G and S each swing from the same battle power, vigor and level at rank 4 and rank 5")
+    check(not g4.grip, "rank 4: G's swing has no two-handed grip")
+    check(g5.grip, "rank 5: G's swing has the two-handed grip (the Gauntlet's bit, one hand empty)")
+    H.log(string.format("[crusader] G's damage before variance: rank 4 %d, rank 5 %d (x%.3f); grip %s, Genji's "
+      .. "one-weapon cut %s at rank 5", g4.dmg, g5.dmg, g5.dmg / math.max(1, g4.dmg), tostring(g5.grip),
+      tostring(g5.genji)))
+    check(g5.dmg > g4.dmg, "rank 5: G's swing does more damage than rank 4's (the grip's bonus)")
+    H.log(string.format("[crusader] S's damage before variance: rank 4 %d, rank 5 %d (x%.3f); Genji's one-weapon cut "
+      .. "%s at rank 5", s4.dmg, s5.dmg, s5.dmg / math.max(1, s4.dmg), tostring(s5.genji)))
+    check(s5.dmg >= s4.dmg, "rank 5: S's swing (a weapon and a shield) loses nothing to the signature")
+    H.assertEq(#bad, 0, "Crusader's signature's claims that failed: " .. table.concat(bad, "; "))
   end),
   H.logStep("[crusader] PASS: Crusader's signature gives a second weapon in the menu and its swing in battle, and "
     .. "the two-handed grip with one hand empty"),
