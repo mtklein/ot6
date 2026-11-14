@@ -193,6 +193,32 @@ local function monsterKilledB()
   end
   return nil
 end
+-- B's try with no decision to observe: the patient's own turn, or its Doom,
+-- came before any other member's decision weighed it (the first [board] line
+-- after the poke is the patient's, or its [death] comes first, with no
+-- refusal said before either).  Then the heal line had nobody to weigh the
+-- patient for.  kolts_cave's draws at 01822cae (wt/v044-moogle) gave both:
+-- entity 2 poked "its next turn 412 frames away" with its window already
+-- queued, the next decision its own ("[board] n=3 ... who=2"); and a poke
+-- at a window whose plan was already made, the Doom landing before the next.
+-- A lost try, like a kill: the description, or nil
+local function patientFirstB()
+  if doomedB == nil or lineB == nil then return nil end
+  for i = lineB + 1, #lines do
+    local l = lines[i]
+    if l:find("no heal on entity " .. doomedB .. " %(") then return nil end
+    local who = l:match("%[board%] n=%d+ tick=%d+ form=%$%x+ who=(%d+)")
+    if who ~= nil then
+      if tonumber(who) == doomedB then return "its own turn came first: " .. l:match("%[board%].*") end
+      return nil
+    end
+    if l:find("%[death%] f%+%d+ entity " .. doomedB .. " char") then
+      return "its Doom came before any member's decision: " .. l:match("%[death%].*")
+    end
+  end
+  return nil
+end
+local function lostWhyB() return monsterKilledB() or patientFirstB() end
 -- the test's own record, kept beside the machine's snapshot so a restored try starts where the snapshot does
 local function copy(t)
   if type(t) ~= "table" then return t end
@@ -306,13 +332,12 @@ H.run({ maxFrames = 90000 }, {
   H.repeatN(TRIES_B, {
     H.cond(function()
       if doomedB == nil then return true end
-      local by = monsterKilledB()
+      local by = lostWhyB()
       if by == nil then return false end
       triesB[#triesB + 1] = string.format("entity %d at window %d: %s", doomedB, windowsB, by)
       lostB[doomedB] = true
-      rawLog(string.format("[test] B's try on entity %d (window %d) lost: killed by an action before its Doom "
-        .. "(%s); back to the snapshot before B, on another patient while one stands, else a later window",
-        doomedB, windowsB, by))
+      rawLog(string.format("[test] B's try on entity %d (window %d) lost: %s; back to the snapshot before B, "
+        .. "on another patient while one stands, else a later window", doomedB, windowsB, by))
       return true
     end, {
       H.cond(function() return doomedB ~= nil end, {
@@ -390,7 +415,7 @@ H.run({ maxFrames = 90000 }, {
     }, {}),
   }),
   H.call(function()
-    H.assertEq(monsterKilledB() == nil, true, string.format("B's condemned member outlived its count within %d "
+    H.assertEq(lostWhyB() == nil, true, string.format("B's try stood (its patient outlived its count, and another member decided first) within %d "
       .. "tries (lost: %s)", TRIES_B, #triesB > 0 and table.concat(triesB, "; ") or "none"))
   end),
 
