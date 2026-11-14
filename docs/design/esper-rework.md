@@ -12,7 +12,7 @@ and permanent Haste are labbed before they ship.
 (`Ot6EsperFold`, `Ot6LadderTbl`, held to the table below by
 `tools/esper_ladder.py`), the four new-code signatures (`Ot6EsperBattleInit`
 for Facet and Rebirth, `Ot6EsperImmune` for Fenrir, `Ot6Conductor`), and the
-Skills > Espers page's ladder column. Two departures from the table: rung 4
+Skills > Espers page's ladder column. Conductor's matched-weakness gate stays untested by design: no hit on the line can separate it, since only a hit carrying lightning plus another element the target is weak to could. Two departures from the table: rung 4
 of Crusader is all four stats +1, like its rungs 1 and 2; and Sraphim's
 signature is the Cure Ring's Regen, because *Grace* would do nothing (no code
 clears a fallen character's boost bank, so it already survives a KO). The
