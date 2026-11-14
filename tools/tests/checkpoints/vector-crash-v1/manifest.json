@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "da296899f2c190eac99a8e9b25d4deca884b8e025712bd6d81a662dc1e5da884",
+  "sha256": "3190a70bb4ee1c9bdab47c9088d4ad3954bf0794e918d6723a3818ae9516a77e",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "da296899f2c190eac99a8e9b25d4deca884b8e025712bd6d81a662dc1e5da884",
-    "generator_sig": "a769fc5c0eb548f2e6fa91deea31365d2288fe7d0298aa4f2c025b2429554019 gen_vector_crash build/checkpoints/gate-cave-save-v1/manifest.json build/checkpoints/gate-cave-save-v1/gate-cave-save.sram",
+    "payload_sha256": "3190a70bb4ee1c9bdab47c9088d4ad3954bf0794e918d6723a3818ae9516a77e",
+    "generator_sig": "4cfb7902c81abfe9a281bc3f324a0755449260c3f5578c5ed02f72d17e939369 gen_vector_crash build/checkpoints/gate-cave-save-v1/manifest.json build/checkpoints/gate-cave-save-v1/gate-cave-save.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/gate-cave-save-v1/manifest.json",
-        "sha256": "7187c96e6bc1aaf10db6df6fa7300425b8c95b5e0fd373689fe1fe9038768d34"
+        "sha256": "80d26b8c0d2e07bff8db439f371b0388341893f05900219a809274792b79294a"
       }
     ]
   }
