@@ -203,7 +203,8 @@ check("setzerBattle clears its entries the same way", "lib",
 -- (3) the others' care while the plan plays, and the fight-out's bank
 local POTION = 0xE9
 check("kitBattle: while the plan plays, another member's window gives a hurt member a Potion, not a Defend (#470)",
-  "lib", "if care ~= nil and (careActor == a or (careActor == nil and care.wants(a))) then", "if false then",
+  "lib", "if care ~= nil and (careActor == a or (careActor == nil and careNow and care.wants(a))) then",
+  "if false then",
   function(L)
     -- SETZER's window (seat 1) while LOCKE's entry waits; seat 2 at 300/1500
     kitFrame(1, CMD)
