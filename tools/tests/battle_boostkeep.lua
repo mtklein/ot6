@@ -712,7 +712,10 @@ steps[#steps + 1] = H.call(function()
       check(c.sh0 - c.shEnd == want, string.format("%s: Filch at %d BP took %d shield(s) of %d (want %d)", c.name,
         c.boost, c.sh0 - c.shEnd, c.sh0, want))
       local regen = c.boost == 0 and 1 or 0
-      local wantBank = math.min(5, c.bank0 - c.boost + (want > 0 and 1 or 0) + regen)
+      -- the first shield's pip banks as the chip lands, before Ot6ActionEnd
+      -- spends the points, so at 5 BP it is lost to the cap (Ot6Filch: "a
+      -- Filch at 5 BP still takes the shield and banks nothing")
+      local wantBank = math.min(5, math.min(5, c.bank0 + (want > 0 and 1 or 0)) - c.boost + regen)
       check(c.bankEnd == wantBank, string.format("%s: the bank went %d -> %d (want %d: %d spent, the first "
         .. "shield banked, %s)", c.name, c.bank0, c.bankEnd, wantBank, c.boost, regen == 1 and "the regen pip"
         or "no regen"))
