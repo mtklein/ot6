@@ -13057,6 +13057,11 @@ function Driver:blitzVsOk()
 end
 
 function Driver:makePlanRules(actor)
+  -- opts.hold(char id, actor) -> true: that member Defends this window (a suite staging a battle's length by
+  -- play, battle_ragedriver: the others Defend until GAU's possessed turn is seen)
+  if self.opts.hold and self.opts.hold(M.readByte(0x3ED8 + actor * 2), actor) then
+    return { kind = "defend" }
+  end
   -- What a round costs this party, measured rather than assumed.  For each
   -- entity, the most HP it has lost between two consecutive turns of the
   -- actor now deciding: that is the damage that will land before this actor
@@ -15506,6 +15511,10 @@ function Driver:button(actor)
     self.steerDead, self.steerLast, self.tgtVisited, self.tgtCycled = {}, nil, {}, false
   end
   if st == BATTLE.ST_CMD then self.tgtSpin, self.confirmed = 0, nil end
+  -- a Defend (opts.hold): right at the command window swaps the Fight row to Def, A takes it (kitBattle's)
+  if self.plan ~= nil and self.plan.kind == "defend" and M.readByte(BATTLE.MENU) ~= 0 then
+    if st == BATTLE.ST_CMD then return { "right" } elseif st == 0x27 then return { "a" } else return { "b" } end
+  end
   -- Unknown-menu-state stall guard, on EVERY path (plan or no plan): the
   -- Phantom Train wipe was SHADOW's Throw list ($24), a state this driver
   -- does not know, holding its menu open while the ghosts chipped the
