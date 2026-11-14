@@ -104,17 +104,29 @@ end
 -- tap Y until the leader offset says squad p is active.  CheckChangeParty
 -- needs Y seen UP then DOWN, control, alignment; the 6-frame press and
 -- 40-frame release below satisfy the latch, and a press eaten by the
--- switch fade just gets retried.  A wave that collides with a parked squad
--- during the deployment opens its battle mid-switch: it is won by the same
--- edge-tapped A as the waves, and the presses resume once the field has
--- control again.
+-- switch fade just gets retried.  The switch has 1800 frames of its own.
+-- A wave that collides with a parked squad during the deployment opens
+-- its battle mid-switch (wt/v044-moogle's lab: eight switches of 700 took
+-- 1805-2489 frames, each with a wave fought inside it), so a battle is
+-- fought by the fight driver the waves use (H.climbFights: tactical,
+-- boost, items), not blind A-taps, and its frames are the battle's, not
+-- the switch's: the driveUntil's own cap only bounds a battle that never
+-- ends.  The presses resume once the field has control again.
+local SWITCH_FRAMES = 1800
 local function ySwitchTo(p)
-  local n = 0
-  return H.driveUntil(function()
+  local n, own = 0, 0
+  local fights = H.climbFights("Y-switch to party " .. p)
+  return H.withReset(H.driveUntil(function()
     return H.readWord(0x0803) == LEADER_OFF[p]
-  end, 6000, {
+  end, SWITCH_FRAMES + 40000, {
     H.call(function()
-      if H.battleLoadStarted() or H.dialogWaiting() then
+      if fights() then n = 0; return end
+      own = own + 1
+      if own > SWITCH_FRAMES then
+        error(string.format("Y-switch to party %d: %d frames outside battle without the switch", p,
+          SWITCH_FRAMES), 0)
+      end
+      if H.dialogWaiting() then
         aPhase = (aPhase + 1) % 8
         H.setPad(aPhase < 4 and { "a" } or {})
         n = 0
@@ -124,7 +136,7 @@ local function ySwitchTo(p)
       n = n % 46 + 1
       H.setPad(n <= 6 and { "y" } or {})
     end),
-  }, "Y-switch to party " .. p)
+  }, "Y-switch to party " .. p), function() n, own = 0, 0 end)
 end
 
 -- ------------------------------------------------- MOG's gear (#143) --
@@ -424,12 +436,12 @@ H.run({ maxFrames = 200000 }, {
   -- on (14,14), the last tile before TERRA, where it meets only a guard
   -- that beat a squad, and takes the Marshal at full HP.
   -- Lab, wt/v044-moogle (build/attempts/wt/v044-moogle/): with two waves
-  -- a squad (the old deployment) LOCKE's squad met the Marshal at about
-  -- half HP and lost him on 9 of 18 distinct fights.  Four waves on MOG's
-  -- squad fought by blind A-taps left MOG down on one draw in 16, and the
-  -- Equip menu refuses a wounded member (CheckSkillValid), so his gear
-  -- was lost (#143); four on KUSHU's squad at (15,18) were annihilating on
-  -- 10 of 31 draws; three and three from the fork at (15,31) needs MOG's
+  -- a squad (the old deployment) LOCKE's squad met the Marshal with 122-401
+  -- of its 478 HP (most draws 26-30%) and lost him on 9 of 18 distinct
+  -- fights.  Four waves on MOG's squad fought by blind A-taps left MOG down
+  -- on 1 in 31 distinct wave draws, and the Equip menu refuses a wounded
+  -- member (CheckSkillValid), so his gear was lost (#143); four on KUSHU's
+  -- squad at (15,18) were annihilating on 10 of 32 draws; three and three from the fork at (15,31) needs MOG's
   -- squad on (12,28) before NPC_6, and it arrives late.  The waves are
   -- fought by the library's fight driver below, not blind A-taps.
   H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),

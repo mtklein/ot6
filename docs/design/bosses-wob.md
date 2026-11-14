@@ -188,10 +188,12 @@ piercing.
   waits beside Terra, meeting only a guard that beat a squad. The waves
   are fought with the fight driver, not blind presses, so Mog's squad
   comes through four of them with Mog standing for his strip (#143).
-  With two waves a squad, Locke's squad met the Marshal at about half HP
-  with an empty bag (it holds a couple of heals at most, and nothing in
-  the event restores HP), where one Marshal hit drops a member; at full
-  HP the first squad won on every draw the lab dealt (wt/v044-moogle).
+  With two waves a squad, Locke's squad met the Marshal with 122 to 401
+  of its 478 HP, most draws around 26–30%, and an empty bag (it holds a
+  couple of heals at most, and nothing in the event restores HP). The
+  less HP it brought, the more often it lost: the cause is the squad's
+  HP on the whole, not one threshold. At full HP the first squad won on
+  every draw the lab dealt (wt/v044-moogle).
 
 ## Mt. Kolts
 
