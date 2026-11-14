@@ -163,6 +163,7 @@ end
 
 -- ---- the menu policy ---------------------------------------------------------
 local tick, held = 0, nil
+local burning = false  -- TERRA is in her bank burn's Item turn (snapshot B)
 local function defendPress(st)
   if st == ST_CMD then return "right" end
   if st == ST_DEF then return "a" end
@@ -401,6 +402,10 @@ local function snapAt(key, cond, fightOthers, first, who, burnTerra)
       H.call(function()
         Tm.observe(); Tc.observe()
         assert(H.battleLoadStarted(), "the battle is still up while snapshot " .. key .. " is sought")
+        if burning and H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_TGT and (H.readByte(ACTOR) & 3) == terraS then
+          H.setPad(aim(Tc, terraS))   -- the burn's Tonic on TERRA herself
+          return
+        end
         if first and not first.sent then
           local ac = lockeAim(first)
           if ac then H.setPad(ac) return end
@@ -424,11 +429,24 @@ local function snapAt(key, cond, fightOthers, first, who, burnTerra)
           H.log(string.format("[boostkeep] snapshot %s f%d: %s | %s", key, H.frame, chars(), mons()))
           return
         end
+        if burnTerra and a == terraS and st == ST_CMD then burning = false end
         if burnTerra and a == terraS and st == ST_CMD and bank(terraS) > 0 then
-          -- TERRA spends her bank on a boosted Fight, so an ally has room
-          -- for the pips a boosted Bestow hands (#469)
+          -- TERRA spends her bank on a boosted Tonic on herself, so an ally
+          -- has room for the pips a boosted Bestow hands (#469).  An item
+          -- needs no body but the target standing: a boosted Fight at the
+          -- other body left her nothing to aim at once it fell, and the
+          -- drive backed out of the target window until it timed out
+          -- (wor-kohlingen-v1 replayed at 35473b32 on px13)
           if pend(terraS) < math.min(3, bank(terraS)) then H.setPad({ r = true }) return end
-          local want, cur = cmdRow(terraS, CMD_FIGHT), H.readByte(CMDROW + terraS) & 3
+          local want, cur = cmdRow(terraS, CMD_ITEM), H.readByte(CMDROW + terraS) & 3
+          if cur == want then burning = true end
+          H.setPad({ [cur ~= want and (cur < want and "down" or "up") or "a"] = true })
+          return
+        end
+        if burning and a == terraS and st == ST_ITEM then
+          local want = bagIdx(TONIC)
+          assert(want, "the bag holds a Tonic for TERRA's burn")
+          local cur = H.readByte(0x8947 + terraS) + H.readByte(0x894F + terraS)
           H.setPad({ [cur ~= want and (cur < want and "down" or "up") or "a"] = true })
           return
         end
@@ -607,7 +625,7 @@ add(snapAt("R", function()
 end, false, rob))
 -- snapshot A: from R, every body but the target falls to TERRA and STRAGO
 add(snapAt("A", function() return bank(lockeS) >= 1 and live(tgtMon) and liveCount() == 1 end, true))
--- snapshot B: from L, TERRA spends her bank on boosted Fights until LOCKE's
+-- snapshot B: from L, TERRA spends her bank on boosted Tonics until LOCKE's
 -- window opens with three pips banked and TERRA at one or none, so a boosted
 -- Bestow's pips have room to land (#469)
 add({ H.call(function()
