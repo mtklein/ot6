@@ -565,6 +565,8 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "battle_esperconductor":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    "battle_esperconductorfight":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     "battle_esperreload":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "menu_esperdetail":
