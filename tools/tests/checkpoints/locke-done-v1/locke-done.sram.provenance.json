@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "85295d5b2f2cc82d5c61748959866def7e176115e3c832d8a9954c892cab37ef",
+  "payload_sha256": "77da479d1584a686fcbb96fbe7ecf495d3e28a88c55bd841ffd7cf48236e0f0e",
   "generator_sig": "6ae5b0d9ef8b7fe530734d67cec38a44807126da7b72b666efbf3b9fbeab2079 gen_tunnelarmr",
   "ancestors": [
     {
       "path": "build/states/celes_freed.stamp",
-      "sha256": "ec51962adf69aac2dc8cc6cfe954949940ebf950a22b5886ae62e244ce63960e"
+      "sha256": "8139476b2777a0822ede361f3b594bcf75e5e715340eddd891452a43a1f2f815"
     }
   ]
 }

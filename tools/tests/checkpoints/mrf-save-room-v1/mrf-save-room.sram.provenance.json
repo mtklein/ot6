@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "1ea02f5645af011495db516fc54427367da3ca79c102bdacb71c97c9a92c56ea",
+  "payload_sha256": "50ce76247475c9f1c6e28bbbe5b3a801458daf8a4717ea0a159e1c7a08b86d7b",
   "generator_sig": "293350ffc00d9ed82e0065f3ed5974533c3671314a7a709549886452201d4753 gen_mrf_save_room_checkpoint",
   "ancestors": [
     {
       "path": "build/states/ifrit_entry.stamp",
-      "sha256": "0eab28e4ae019198ad36a0771a03886ba05bfd23d217fba58723895b252ea12d"
+      "sha256": "a2493502e7e43223e247272ba328f74440291912dcd71d02d8657ccacdaba742"
     }
   ]
 }
