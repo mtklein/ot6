@@ -7047,7 +7047,30 @@ function M.equipWeapon(pos, itemId, opts)
     }, tag .. ": list cursor on the item (or the list's end)"),
     M.release(),
     M.cond(function() return found end, {
-      M.confirmA(tag .. ": equipped, back on slots",
+      opts.refusable and (function()
+        -- opts.refusable: the game may refuse the item on A (CheckCanEquipItem,
+        -- menu/equip.asm MenuState_57: a second weapon in the off hand without the
+        -- Genji Glove's bit buzzes and the list stays up).  One A on the settled
+        -- list, then up to 90 frames for the slot list; opts.result.refused says
+        -- which it was.
+        local n = 0
+        return M.seqStep({
+          M.driveUntil(function() return st() == ST_SLOT or n > 90 end, 600, {
+            M.call(function()
+              if n == 0 and not (st() == ST_ITEM and M.menuListSettled()) then M.setPad({}); return end
+              n = n + 1
+              M.setPad(n <= 2 and { "a" } or {})
+            end),
+          }, tag .. ": the A taken or refused"),
+          M.release(),
+          M.call(function()
+            local refused = st() ~= ST_SLOT
+            M.log(string.format("[%s] $%02X %s", tag, itemId, refused
+              and "refused: the list stays up and the slot keeps what it had" or "taken: back on slots"))
+            if opts.result then opts.result.refused = refused end
+          end),
+        })
+      end)() or M.confirmA(tag .. ": equipped, back on slots",
         function()
           return st() == ST_ITEM and M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR))) == itemId
         end,
@@ -7062,6 +7085,65 @@ function M.equipWeapon(pos, itemId, opts)
     M.driveUntil(menuBack(), 1200,
       { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
     M.waitFrames(20),
+  })
+end
+
+-- M.removeEquip(charId, slot, opts): take what one gear slot (0..3: R-Hand,
+-- L-Hand, Helmet, Armor) of an active-party member holds back to the bag,
+-- through Equip -> Rmove (menu/equip.asm: options $36, column 2 Remove;
+-- slot select $56, whose A puts the slot's item back through IncItemQty and
+-- empties it).  A slot already empty is a no-op; the slot is asserted empty
+-- after.  Reads and presses only.
+function M.removeEquip(charId, slot, opts)
+  opts = opts or {}
+  local tag = opts.tag or string.format("remove slot %d", slot)
+  local ZM, CUR, SLOTCUR = 0x26, 0x4b, 0x4e
+  local ST_MAIN, ST_CHAR, ST_OPT, ST_SLOT = 0x05, 0x06, 0x36, 0x56
+  local pos, base
+  local function st() return M.menuRunning() and M.readByte(ZM) or -1 end
+  local function held() return M.readByte(base + 0x1F + slot) end
+  return M.seqStep({
+    M.call(function()
+      -- charId may be a function: a caller that picks the member from the live save
+      if type(charId) == "function" then charId = charId() end
+      base = 0x1600 + 37 * charId
+      local partyByte = M.readByte(0x1850 + charId)
+      M.assertEq(partyByte & 0x07, M.readByte(0x1A6D) & 0x07, tag .. ": character is in the active party")
+      pos = (partyByte >> 3) & 0x03
+      M.log(string.format("[%s] char=%d row=%d slot %d holds $%02X", tag, charId, pos, slot, held()))
+    end),
+    M.cond(function() return held() ~= 0xFF end, {
+      M.driveUntil(function() return st() == ST_MAIN end, 1200,
+        { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
+      M.waitFrames(20),
+      M.driveUntil(function() return st() == ST_MAIN and M.readByte(CUR) == 2 end, 900,
+        { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, tag .. ": cursor on the Equip row"),
+      M.confirmA(tag .. ": character select",
+        function() return st() == ST_MAIN and M.readByte(CUR) == 2 end,
+        function() return st() == ST_CHAR end),
+      M.waitFrames(10),
+      M.driveUntil(function() return st() == ST_CHAR and M.readByte(CUR) == pos end, 600,
+        { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, tag .. ": character cursor"),
+      M.confirmA(tag .. ": equip options",
+        function() return st() == ST_CHAR and M.readByte(CUR) == pos end,
+        function() return st() == ST_OPT end),
+      M.waitFrames(10),
+      M.driveUntil(function() return st() == ST_OPT and M.readByte(CUR) == 2 end, 600,
+        { M.pressButtons({ "right" }, 2), M.waitFrames(10) }, tag .. ": cursor on the Rmove option"),
+      M.confirmA(tag .. ": remove slot select",
+        function() return st() == ST_OPT and M.readByte(CUR) == 2 end,
+        function() return st() == ST_SLOT end),
+      M.waitFrames(10),
+      M.driveUntil(function() return st() == ST_SLOT and M.readByte(SLOTCUR) == slot end, 600,
+        { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, tag .. ": slot cursor"),
+      M.confirmA(tag .. ": removed",
+        function() return st() == ST_SLOT and M.readByte(SLOTCUR) == slot end,
+        function() return held() == 0xFF end),
+      M.driveUntil(menuBack(), 1200,
+        { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
+      M.waitFrames(20),
+    }, {}),
+    M.call(function() M.assertEq(held(), 0xFF, string.format("%s: slot %d is empty", tag, slot)) end),
   })
 end
 

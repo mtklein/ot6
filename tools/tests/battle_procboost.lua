@@ -114,6 +114,10 @@ local FIRE, FIRE3 = 0x00, 0x09
 -- its replay); ROUND_FRAMES is twice the largest.
 local FIGHT_TRIES, ROUND_FRAMES = 12, 2 * 3345
 local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eight
+-- tries per Rage entry: a try whose battle is won before the Rage runs (another's
+-- action felled the last monster first) measures nothing, and the next spends one
+-- more of GAU's windows first (#534's replay, gau_joined: rage entry 0's try 1)
+local RAGE_TRIES = 3
 local GAU_ENCOUNTERS = 4                   -- Veldt encounters taken for GAU's window (#411)
 local GAU_STATE = "build/states/gau_joined.mss.lua"
 local RAGECOUNT, RAGEBEAST, MP = 0x3A9A, 0x33A8, 0x3C08
@@ -135,6 +139,7 @@ local CMD_SUMMON = 0x19                       -- what GetCmdForAI names an esper
 local slotOf, snap, armed = {}, nil, nil
 local snapSeats                               -- the seats as the snapshot was taken
 local SETTLE, settled = 8, 0                  -- released frames on its window first
+local CAND_HOLD, cand = 90, nil               -- GAU's window: frames a candidate snapshot must hold (#534)
 local unreadySaid = -1200
 local weapspell                               -- OT6_WEAPSPELL, off the dbg
 local learned                                 -- GAU's rage-window length
@@ -663,7 +668,7 @@ local function tryCase(c, n)
       inbound = {}
       c.slot = slotOf[c.char]
       c.calls, c.fb, c.endF, c.beast, c.timers, c.swings = {}, {}, nil, nil, nil, {}
-      c.esper, c.cutF, c.cutSeats, c.drawn, c.wonF = nil, nil, nil, nil, nil
+      c.esper, c.cutF, c.cutSeats, c.drawn, c.wonF, c.preemptF = nil, nil, nil, nil, nil, nil
       c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm, c.target = nil, nil, nil, nil
       c.spend = n - 1
       tick, phase, held, spent, deferring, shut = 0, "reach", nil, 0, nil, 0
@@ -722,7 +727,8 @@ local function tryCase(c, n)
       end),
     }, string.format("%s, try %d", c.name, n)),
     H.driveUntil(function()
-      return skip or c.cutF ~= nil or c.wonF ~= nil or (c.endF ~= nil and H.frame >= c.endF + 30)
+      return skip or c.cutF ~= nil or c.wonF ~= nil or c.preemptF ~= nil
+        or (c.endF ~= nil and H.frame >= c.endF + 30)
     end, 6000, {
       H.call(function()
         -- the action felled the last monster: the battle is won, and the
@@ -731,8 +737,13 @@ local function tryCase(c, n)
         -- lab: "timeout after 6000 frames driving toward rage entry 0
         -- resolves" over "Got Potion x1").  What the action did is recorded
         -- by then; the next try restores the snapshot.
-        if armed == c and c.endF == nil and #c.calls + #c.fb > 0 and H.readByte(0x3A75) == 0 then
-          c.wonF = H.frame
+        if armed == c and c.endF == nil and H.readByte(0x3A75) == 0 then
+          -- ...or the battle was won before the action ran at all: another
+          -- member's queued action felled the last monster after the
+          -- confirm (#534's replay, gau_joined: rage entry 0 over "Got Potion
+          -- x1" with no attack observed, $3a75 = 0, $3a7c = $1F).  Nothing
+          -- was measured; the try is not counted.
+          if #c.calls + #c.fb > 0 then c.wonF = H.frame else c.preemptF = H.frame end
           H.setPad({})
           return
         end
@@ -785,7 +796,11 @@ local function tryCase(c, n)
         H.log(string.format("[procboost] %s try %d passes (target slot %s, chosen at the most HP): %s", c.name, n,
           tostring(c.target), #sw > 0 and table.concat(sw, "; ") or "none observed"))
       end
-      local measured = c.done == nil or c.done(c)
+      if c.preemptF then
+        H.log(string.format("[procboost] %s try %d: the battle was won at f%d before the action ran (no attack "
+          .. "observed): not measured", c.name, n, c.preemptF))
+      end
+      local measured = c.preemptF == nil and (c.done == nil or c.done(c))
       if c.note then
         local note = c.note(c, measured)
         c.draws = c.draws or {}
@@ -1495,7 +1510,7 @@ end)
 -- ---- the Rage row, from gau_joined ---------------------------------------
 local RAGE = {}
 for e = 0, RAGE_ENTRIES - 1 do
-  RAGE[#RAGE + 1] = { name = "rage entry " .. e, char = GAU, verb = "rage", entry = e, tries = 1,
+  RAGE[#RAGE + 1] = { name = "rage entry " .. e, char = GAU, verb = "rage", entry = e, tries = RAGE_TRIES,
                       present = function() return e < learned end }
 end
 for _, s in ipairs({
@@ -1546,20 +1561,43 @@ local function gauEncounter(k)
   -- the same gate as the first half's: GAU's own window, his bank at
   -- BOOST, the party ready (activeCases is the Rage row now), the pad left
   -- alone for SETTLE frames on it
-  H.call(function() activeCases, settled, unreadySaid = RAGE, 0, -1200 end),
+  H.call(function() activeCases, settled, unreadySaid, cand = RAGE, 0, -1200, nil end),
   H.driveUntil(function() return snap ~= nil or not H.battleLoadStarted() end, 30000, {
     H.call(function()
       local s = slotOf[GAU]
-      if not monsterUp() then pulse("a") return end        -- its victory: page it
+      if not monsterUp() then
+        if cand then
+          -- a blow already in flight felled the last monster after the
+          -- candidate snapshot (#534's replay, gau_joined: the body at 0 HP ten
+          -- frames after it, the victory before the Rage could run): it is
+          -- dropped, and the next encounter is taken
+          H.log(string.format("[procboost] f%d: the last monster fell %d frame(s) after the candidate "
+            .. "snapshot at GAU's window: dropped", H.frame, H.frame - cand.at))
+          cand = nil
+        end
+        pulse("a") return                                  -- its victory: page it
+      end
       if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD and (H.readByte(ACTOR) & 3) == s
          and H.readByte(BANK + s * 2) >= BOOST and H.readByte(PEND + s * 2) == 0 and ready() then
         H.setPad({})
         settled = settled + 1
         if settled >= SETTLE then
-          snapSeats = seatsLine()
-          snap = H.requestSaveState()
+          -- a candidate, kept only if a monster still stands CAND_HOLD frames on
+          -- with the pad alone: what fells it in that time was in flight at the
+          -- snapshot, and would fell it in every try restored from it
+          if cand == nil then
+            snapSeats = seatsLine()
+            cand = { req = H.requestSaveState(), at = H.frame }
+          elseif H.frame - cand.at >= CAND_HOLD then
+            snap, cand = cand.req, nil
+          end
         end
         return
+      end
+      if cand then
+        H.log(string.format("[procboost] f%d: GAU's window closed or the party went unready %d frame(s) after "
+          .. "the candidate snapshot: dropped", H.frame, H.frame - cand.at))
+        cand = nil
       end
       settled = 0
       if H.readByte(BANK + s * 2) >= BOOST and H.frame - unreadySaid >= 1200 then
@@ -1593,7 +1631,9 @@ for _, s in ipairs({
   end),
 }) do steps[#steps + 1] = s end
 for _, c in ipairs(RAGE) do
-  for _, s in ipairs(tryCase(c, 1)) do steps[#steps + 1] = s end
+  for n = 1, c.tries do
+    for _, s in ipairs(tryCase(c, n)) do steps[#steps + 1] = s end
+  end
 end
 steps[#steps + 1] = H.call(function()
   local specials, dealt, covered, fights, charged = 0, 0, 0, 0, 0

@@ -560,6 +560,105 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
 
 ; ------------------------------------------------------------------------------
 
+; [ Crusader's Genji bit: the menu's permission, never vanilla's cut ]
+;
+; jsl from UpdateEquipBattle right after `lda $cf / trb $d8`, which has
+; cleared the Genji bit ($11d8 & $10) for a member holding two weapons.  What
+; is left of it is read once more in battle: CalcDmg's one-weapon cut, damage
+; x3/4 for a Genji Glove worn without a second weapon (#534).  Crusader's
+; signature (Ot6LadderTbl row 14, rung 5) sets the bit so the Equip menu takes
+; a second weapon; it is meant as a pure upgrade, so a bit that no worn piece
+; of gear carries (ItemProp+12 & $10 on none of $11c6-$11cb: it came from the
+; ladder alone) is cleared here, before $3c58 is written.  A real Genji Glove
+; keeps vanilla's cut.  $2e6e, the in-battle Item equip's Genji permission
+; (btlgfx check_equip), was copied before this and keeps the bit either way.
+;
+; dp=$1100, a8, X preserved.  rtl.
+.proc Ot6LadderGenji
+        .a8
+        php
+        shorta
+        longi                           ; before the phx, so the plx matches it
+        phx
+        lda     $d8                     ; relic effects 4
+        and     #$10
+        beq     out                     ; no Genji bit left (none, or two weapons)
+        ldx     #$0005                  ; weapon, shield, helmet, armor, relics
+slot:   lda     $c6,x
+        cmp     #$ff
+        beq     next
+        phx
+        longa
+        and     #$00ff
+        asl                             ; id x2
+        pha
+        asl
+        asl
+        asl
+        asl                             ; id x32
+        sec
+        sbc     1,s                     ; id x30
+        tax
+        pla
+        shorta
+        lda     f:ItemProp+12,x
+        plx
+        and     #$10
+        bne     out                     ; a worn piece carries it: vanilla
+next:   dex
+        bpl     slot
+        lda     #$10
+        trb     $d8                     ; the ladder's alone: no cut
+out:    plx
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ Golem's cover: only from a knight who can take the hit ]
+;
+; jsl from CoverEffect's True Knight walk (battle_main.asm), for each candidate
+; whose relic effects 4 carry the cover bit ($3c58 & $40), before
+; CheckCoverTarget.  Vanilla's cover has no gate on the knight's own HP, so a
+; frail or nearly dead knight still steps in front of the blow and can die.
+; Golem's signature (Ot6LadderTbl row 21, rung 5) grants the bit as a pure
+; upgrade (#534), so a knight who does not wear the True Knight relic covers
+; only at half its max HP or more and never while near fatal; one wearing the
+; relic keeps vanilla's cover (ITEM::TRUE_KNIGHT is the only item that
+; carries the bit).
+;
+; in: a16, x = the candidate's entity offset, index width either (CoverEffect
+; runs .i8: no index immediates, no index pushes), db=$7e.  out: carry set =
+; it may cover.  a clobbered; x/y kept.
+.proc Ot6KnightGate
+        .a16
+        php
+        shorta
+        lda     $3cd0,x                 ; relic 1
+        cmp     #ITEM::TRUE_KNIGHT
+        beq     yes
+        lda     $3cd1,x                 ; relic 2
+        cmp     #ITEM::TRUE_KNIGHT
+        beq     yes
+        longa
+        lda     $3ee4,x
+        bit     #$0200                  ; near fatal
+        bne     no
+        lda     $3bf4,x                 ; current HP x2 (HP < 10000: no carry out)
+        asl
+        cmp     $3c1c,x                 ; max HP
+        bcs     yes                     ; at half or more
+no:     plp
+        clc
+        rtl
+yes:    plp
+        sec
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ the signatures that are new code ]
 ;
 ; Five rung-5 effects have no vanilla bit (docs/design/esper-rework.md, the
@@ -1000,13 +1099,14 @@ Ot6LadderTbl:
         eff     0,0,0,0,$04,0,0,0,0,0
         stat    1,1,1,1
         eff     0,0,0,0,0,0,0,$18,0,0
-; 15 Ragnarok: Vig / Mag; max MP +25% (Minerva); Fight strikes four times
-;    (Offering)
+; 15 Ragnarok: Vig / Mag; max MP +25% (Minerva); vigor x1.5 (Hyper Wrist;
+;    #534: Offering's four strikes halved every physical hit, forced random
+;    targets and dropped criticals and weapon procs, so it was no pure upgrade)
         stat    1,0,0,0
         stat    0,0,0,1
         eff     0,0,0,0,$20,0,0,0,0,0
         stat    2,0,0,0
-        eff     0,0,0,0,0,0,0,$01,0,0
+        eff     0,0,0,0,0,0,$80,0,0,0
 ; 16 Kirin: Mag / Stm; immune to Poison; Regen (Cure Ring)
         stat    0,0,0,1
         stat    0,0,1,0

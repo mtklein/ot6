@@ -2927,6 +2927,8 @@ CoverEffect:
         lda     $3018,x
         bit     $f0
         beq     @129a
+        jsl     Ot6KnightGate           ; ot6 #534: Golem's ladder cover only
+        bcc     @129a                   ;   from a knight at half HP or more
         jsr     CheckCoverTarget
 @129a:  dex2
         bpl     @1288
@@ -6927,6 +6929,8 @@ UpdateEquipBattle:
         sta     $3b55,x     ; set mblock
         lda     $cf         ;
         trb     $d8
+        jsl     Ot6LadderGenji          ; ot6 #534: a Genji bit from the esper
+                                        ;   ladder alone takes no one-weapon cut
         lda     $bc
         sta     $3c6c,x     ; status 2 effects
         lda     $d4

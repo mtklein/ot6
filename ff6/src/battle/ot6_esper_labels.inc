@@ -80,7 +80,7 @@ Ot6RungLabelTbl:
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b5,$ff,$ff   ; Ragnarok 2: Mag.Pwr +1
         .byte   $8c,$a2,$a7,$9e,$ab,$af,$9a,$ff,$ff,$ff,$ff,$ff   ; Ragnarok 3: Minerva
         .byte   $95,$a2,$a0,$a8,$ab,$ff,$ff,$ff,$ca,$b6,$ff,$ff   ; Ragnarok 4: Vigor   +2
-        .byte   $8e,$9f,$9f,$9e,$ab,$a2,$a7,$a0,$ff,$ff,$ff,$ff   ; Ragnarok 5: Offering
+        .byte   $87,$b2,$a9,$9e,$ab,$ff,$96,$ab,$a2,$ac,$ad,$ff   ; Ragnarok 5: Hyper Wrist
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b5,$ff,$ff   ; Kirin 1: Mag.Pwr +1
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Kirin 2: Stamina +1
         .byte   $8d,$a8,$ff,$8f,$a8,$a2,$ac,$a8,$a7,$ff,$ff,$ff   ; Kirin 3: No Poison

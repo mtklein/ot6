@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "e18cddc49b52b5c8a878d6926e4c20e37357c7e5aa28c777f45189ad779ced16",
+  "sha256": "8a50363df8ebe05049ad089bebd908a2a9eeaffe345c53f2ee5ea1db69267c0a",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "e18cddc49b52b5c8a878d6926e4c20e37357c7e5aa28c777f45189ad779ced16",
-    "generator_sig": "545f4856b17ebd0d078a2569364a5690d9295942c8e5d6ea006416d5f84cd49c gen_minecart_platform_checkpoint",
+    "payload_sha256": "8a50363df8ebe05049ad089bebd908a2a9eeaffe345c53f2ee5ea1db69267c0a",
+    "generator_sig": "1b75bdeb2f6684f0919fede68ea10e76430911688f244befe2643e5849f57d20 gen_minecart_platform_checkpoint",
     "ancestors": [
       {
         "path": "build/states/minecart_entry.stamp",
-        "sha256": "2c06d0311e8b9ce84229f7f0b16b02f64a45f8cbb4ad7c6d31b2168eb7882f96"
+        "sha256": "2d112fb61b025f063a337cb104e82933b6f351f42f3b4067fcd0f8e14bd745dd"
       }
     ]
   }

@@ -79,7 +79,7 @@ SPEC = [
     ("Bahamut", "Mag", "Vig", eff("Red Cap", r9=0x04), eff("Hero Ring", r9=0x03)),
     ("Alexandr", "Stm", "Vig", eff("No Death", p1=S1["death"]), eff("Guard Ring", s3=0x40)),
     ("Crusader", "All", "All", eff("Red Cap", r9=0x04), eff("Gaunt+Genji", r12=0x18)),
-    ("Ragnarok", "Vig", "Mag", eff("Minerva", r9=0x20), eff("Offering", r12=0x01)),
+    ("Ragnarok", "Vig", "Mag", eff("Minerva", r9=0x20), eff("Hyper Wrist", r11=0x80)),
     ("Kirin", "Mag", "Stm", eff("No Poison", p1=S1["poison"]), eff("Cure Ring", s3=0x02)),
     ("ZoneSeek", "Mag", "Stm", eff("No Mute", p2=S2["mute"]), eff("Auto Shell", s3=0x20)),
     ("Carbunkl", "Stm", "Mag", eff("Barrier Ring", r13=0x01), eff("Facet")),

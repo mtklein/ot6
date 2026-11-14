@@ -563,6 +563,13 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "battle_espersigs":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    # #534: Crusader's signature, the second weapon in the menu and its
+    # swing, and the two-handed grip, against rank 4 from one snapshot
+    "battle_espercrusader":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    # #534: Golem's signature covers only from a knight at half HP or more
+    "battle_esperknight":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "battle_esperconductor":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "battle_esperconductorfight":
