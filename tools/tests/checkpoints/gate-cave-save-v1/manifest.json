@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "8219bf5987935608b4a4eb01636fc2903d35304217a7fc6793b2cdaef48fa8d3",
+  "sha256": "08343dad07c3ad72685d3b56b65d315fd22d95a4e421b7d63960198351e73320",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "8219bf5987935608b4a4eb01636fc2903d35304217a7fc6793b2cdaef48fa8d3",
-    "generator_sig": "de29903fee3208c4b427dfb27bead2ba1263020a307d8935015461c85cf619c9 gen_gate_cave_save build/checkpoints/water-rondo-v1/manifest.json build/checkpoints/water-rondo-v1/water-rondo.sram",
+    "payload_sha256": "08343dad07c3ad72685d3b56b65d315fd22d95a4e421b7d63960198351e73320",
+    "generator_sig": "f6de75835bfed6dd5874e02821e2686f576f384b25be8c74d480cf6ac314a260 gen_gate_cave_save build/checkpoints/water-rondo-v1/manifest.json build/checkpoints/water-rondo-v1/water-rondo.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/water-rondo-v1/manifest.json",
-        "sha256": "151770752b34130fc9c89051a3e679c1ba88397ecccd540210a5c4c3192e6f07"
+        "sha256": "96b082ce454c0fe13c87aac8f72a0207c43adbbcc991922c7beb0ec5d9c712d4"
       }
     ]
   }

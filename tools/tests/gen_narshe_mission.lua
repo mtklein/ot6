@@ -818,8 +818,23 @@ H.run({ maxFrames = 600000 }, {
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
     H.log("real Save UI wrote the narshe-mission checkpoint to slot 3")
-    H.assertExitContract("narshe-mission-v1")
     H.screenshot("step_fg_saved")
+  end),
+  -- out of the menu before the exit contract: its world tile ($1F60/$1F61 via H.worldX/Y) reads the menu's own
+  -- scratch while the menu module runs (the landing replay at 0441c086: "world x: expected 84, read 80; world y:
+  -- expected 34, read 10" inside the Save screen); the battery's own copy is checked as well
+  (function() local ph = 0
+    return H.withReset(H.driveUntil(function()
+      return H.readByte(0x59) == 0 and H.worldMode() and H.worldHasControl()
+    end, 1800, {
+      H.call(function() ph = (ph + 1) % 16; H.setPad(ph < 4 and { "b" } or {}) end),
+    }, "the menu closed: back on the world"), function() ph = 0 end)
+  end)(),
+  H.release(),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertSavedSlotWorld(84, 34, "narshe-mission-v1", 3)
+    H.assertExitContract("narshe-mission-v1")
   end),
 
   H.logStep(function()

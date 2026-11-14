@@ -20,3 +20,9 @@ have shields and weak points designed for them. In each area the party you
 have there carries a weapon that breaks them, and common monsters mostly
 have two shields instead of three to five, so a break lands while it still
 matters. Elemental weaknesses are unchanged.
+
+Three optional fights in the World of Balance now have their own shields and
+weak points instead of generic ones: the magitek guard at the Imperial Base,
+the ghost in a chest on the Phantom Train, and the giant in a chest on the
+Floating Continent. The giant in particular could not be broken by the usual
+landing party before; blades now work on it.

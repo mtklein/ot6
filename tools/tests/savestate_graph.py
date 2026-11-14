@@ -202,6 +202,10 @@ STATES = [
     # experiment on the commander fight replays 800 frames instead of 6,000.
     S("cyan_defence", gen="gen_sabin_camp", prev="sabin_camp",
       also=["camp_intro"]),
+    # camp_intro -> the Imperial Camp's monster box (Telstar, formation 61)
+    # and its two chests: a branch (#285, docs/design/wob-towns-boxes.md
+    # section 4).  Nothing boots it.
+    S("wob_camp_telstar", gen="gen_wob_camp_telstar", prev="camp_intro"),
     # gen_sabin_kefka: the LEO scene, the poisoning, both KEFKA
     # script-battles, the pursuit, and the handoff back to CYAN on the Doma
     # grounds.
@@ -248,6 +252,10 @@ STATES = [
     # leg never enters, hunted until each formation is won
     # (docs/design/wob-side-trips.md, #286): a branch.  Nothing boots it.
     S("wob_train_hunt", gen="gen_wob_train_hunt", prev="train_b68_entry"),
+    # train_b68_entry -> the rooms car (153) and its Specter monster box
+    # (formation 476) (#285, docs/design/wob-towns-boxes.md section 4).  A
+    # branch nothing boots.
+    S("wob_train_specter", gen="gen_wob_train_specter", prev="train_b68_entry"),
     # gen_sabin_falls: Baren Falls -- the jump, battle 18 mid-fall (RIZOPAS
     # surfaces in slot 5 off the piranhas' death script), SHADOW's exit, GAU
     # named on the Veldt shore.
@@ -314,6 +322,10 @@ STATES = [
     # Kohlingen choice -> the scripted crossing -> castle parked WEST ($010C).
     S("figaro_submerged", gen="gen_zozo1_submerge", prev="kefka_won",
       checkpoint="kefka-won-v1"),
+    # figaro_submerged -> Kohlingen, the town the route walks past: its
+    # chests, its store's stock, and SHADOW's hire at the inn (#284,
+    # docs/design/wob-towns-boxes.md section 3).  A branch nothing boots.
+    S("wob_kohlingen", gen="gen_wob_kohlingen", prev="figaro_submerged"),
     # gen_zozo2_arrival: out of the west castle, the long south-then-north
     # world hook around Zozo's mountain ring (177 steps), onto {22,92} ->
     # map 221's street.
@@ -394,6 +406,11 @@ STATES = [
     S("wob_south_hunt", gen="gen_wob_south_hunt", prev="blackjack",
       checkpoint="post-opera-v1", cutter="gen_post_opera_checkpoint",
       timeout=3600),
+    # blackjack -> the Imperial Base on foot while its guards still stand:
+    # formations 416 (Commando x4) and 417 (Mega Armor + ProtoArmor) won
+    # (#281, docs/design/wob-towns-boxes.md section 1).  A branch nothing
+    # boots.
+    S("wob_base_guards", gen="gen_wob_base_guards", prev="blackjack"),
     # gen_vector_sneak: the Returner sympathizer's choice dialog ($01F0) and
     # the FACING-GATED ledge on {43,38} -> control at {57,34}.
     S("vector_sneak", gen="gen_vector_sneak", prev="vector_entry"),
@@ -505,6 +522,11 @@ STATES = [
     # Re-cut by checkpoint_drift.py --recut.
     S("water_rondo", gen="gen_water_rondo", prev="narshe_mission",
       checkpoint="narshe-mission-v1", timeout=3600),
+    # narshe-mission-v1 -> the Blackjack to Jidoor's Auction House until
+    # Golem and ZoneSeek are bought (#284, docs/design/wob-towns-boxes.md
+    # section 3).  A branch nothing boots.
+    S("wob_auction", gen="gen_wob_auction", prev="narshe_mission",
+      checkpoint="narshe-mission-v1", timeout=3600),
     # ---- boundary G' -> boundary H -----------------------------------------
     # Step G'->H, whole in one generator (gen_narshe_mission's shape): cold-
     # boot the water-rondo-v1 checkpoint, seat TERRA / bench MOG in the
@@ -576,6 +598,11 @@ STATES = [
     # drift gate checks it like the rest.
     S("crescent_landing", gen="gen_voyage", prev="banquet_done",
       checkpoint="banquet-done-v1", saves="crescent-landing-v1", timeout=1800),
+    # banquet-done-v1 -> the Imperial Base's treasure room, the Emperor's
+    # reward (#281, docs/design/wob-towns-boxes.md section 2).  A branch
+    # nothing boots.
+    S("wob_base_treasure", gen="gen_wob_base_treasure", prev="banquet_done",
+      checkpoint="banquet-done-v1"),
 
     # ---- v0.13: docs/design/thamasa-route.md section 1, segments 1-2 ------
     # boundary K -> boundary L (issue #127, "the Thamasa wave"): the
@@ -708,6 +735,11 @@ STATES = [
     # checkpoint_drift.py --recut.
     S("fc_alcove", gen="gen_fc_alcove", prev="fc_landing",
       checkpoint="fc-landing-v1", timeout=3600),
+    # fc_landing -> SHADOW, the (44,11) floor switch and the Gigantos
+    # monster box (formation 170) at 394 (48,15) (#285, docs/design/
+    # wob-towns-boxes.md section 4).  A branch nothing boots.
+    S("wob_fc_gigantos", gen="gen_wob_fc_gigantos", prev="fc_landing",
+      timeout=3600),
 
     # boundary R -> the World of Ruin (the end of the World of Balance):
     # cold-Continue fc-alcove-v1, climb back to AtmaWeapon's plateau, beat

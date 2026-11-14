@@ -2202,6 +2202,27 @@ Ot6ShieldTbl:
         .byte   3, OT6_SLASH|OT6_PIERCE|OT6_SPECIAL ; naughty: a demon,
                                 ;   the pool's elite.  fire|bolt|holy
                                 ;   vanilla; absorbs ice
+        ; ---- the world of balance towns and boxes (docs/design/wob-
+        ; towns-boxes.md): the species only those side trips meet.  vanilla elements
+        ; stay; each row keys the party that can first reach the fight.
+        .word   $0102
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; mega armor: the imperial base's
+                                ;   magitek guard beside a protoarmor
+                                ;   (2, bludg).  the bigger suit has
+                                ;   joints a pike or a dagger finds, and
+                                ;   still dents.  bolt|water vanilla
+        .word   $0156
+        .byte   3, OT6_SLASH|OT6_SPECIAL ; specter: the phantom train's
+                                ;   boxed ghost.  cyan's blade cuts it,
+                                ;   and a spirit takes special (#347).
+                                ;   fire|holy vanilla (sabin's aurabolt)
+        .word   $00ae
+        .byte   5, OT6_SLASH|OT6_BLUDG ; gigantos: the floating
+                                ;   continent's boxed giant, 6000 hp: a
+                                ;   boss-grade gauge.  hamstring it or
+                                ;   break its bones; the landing party's
+                                ;   three blades hold the key.  poison
+                                ;   vanilla
         ; ---- the world of ruin: the solitary island to tzen's collapsing
         ; house (docs/design/route-wor-sabin.md section 8) ---------------
         ; Celes is alone to Tzen and holds slash (every sword; pierce only

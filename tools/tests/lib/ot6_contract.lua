@@ -478,6 +478,7 @@ M.contracts["terra-returned-v1"] = {
 -- active: seating her is step G->H's first act (the Blackjack swap room).
 M.contracts["narshe-mission-v1"] = {
   slot = 3,
+  world = { x = 84, y = 34 },     -- the Narshe exit spawn (the save tile; bootCheckpoint's boundary)
   ram = {
     { 0x1f60, 0xFF, 84, "world x (save-block cell $1f60): the Narshe exit spawn" },
     { 0x1f61, 0xFF, 34, "world y (save-block cell $1f61)" },
@@ -678,6 +679,7 @@ M.contracts["vector-crash-v1"] = {
 -- carry into every later step.
 M.contracts["banquet-done-v1"] = {
   slot = 3,
+  world = { x = 120, y = 188 },   -- the Vector exit (the save tile; bootCheckpoint's boundary)
   ram = {
     { 0x1f60, 0xFF, 120, "world x (save-block cell $1f60): the Vector exit" },
     { 0x1f61, 0xFF, 188, "world y (save-block cell $1f61)" },
