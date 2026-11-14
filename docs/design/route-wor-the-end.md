@@ -54,11 +54,12 @@ Evidence is under `build/attempts/wt/v040-the-end/`. Line numbers are into
    twice the member reaching for it fell first; moved up before the climb,
    with one Megalixir in flight at a time, the leg wins 48 of 48 again
    (27 distinct opening keys, 30 distinct Kefka keys: 5.4).
-8. **Kefka at 16 shields, the most of any boss, with the Megalixir at two
-   members under 35%.** On the line replayed for it he lost one key of both
-   grids at 16 (be20, twice) where 12 lost none; drinking the Megalixir when
-   two members stand under 35% of their HP, not three under 30%, wins all 48
-   runs (24 distinct opening keys, 26 distinct Kefka keys: 5.6).
+8. **Kefka at 16 shields is not yet every draw.** On the line replayed at
+   7080ab2b he lost one key at 16 (be20, twice) where 12 lost none, and
+   drinking the Megalixir when two members stand under 35% of their HP, not
+   three under 30%, won all 48 runs (5.6); on the line rebased onto main
+   (9d6b9b0f) the same leg at 16 loses one Kefka key that 12 wins (be30),
+   and both counts lose one third tier (5.7).
 
 ## 1. The climb
 
@@ -648,8 +649,44 @@ tier: "3 lady+sleeper: won 48, lost 0; distinct keys won 29, lost 0".
   lost 2; distinct keys won 26, lost 1") loses be20 as before: the third
   member is the one Ultima finds.
 
+### 5.7 On the line rebased onto main (#514)
+
+The branch rebased onto main (e3f989e4: the Death counters, the batched
+emulator) and replayed from power-on at 9d6b9b0f (`land2/land2.out`: "gate:
+GREEN -- ninja -k 0 -j16 exited 0"); every tracked save "none" against it
+(`land2/drift2_before.txt`, 70 keys and the two negatives), so the play to
+`wor-kt-plates-v1` (sha256 e59f809b) is main's own, and the order is
+"TERRA, CELES, STRAGO, RELM, CYAN, SHADOW, EDGAR, LOCKE, MOG, GOGO, SETZER,
+SABIN". Both grids from it, the leg as committed (the Megalixir at two
+under 35%):
+
+| arm | ROM | runs won | third tier lost (keys) | Kefka met / won (keys lost) | deaths in Kefka's tier |
+|---|---|---|---|---|---|
+| `g12` | 12 shields | 47 of 48 | 1 (be50) | 47 / 47 | 16 |
+| `g16` | 16 | 46 of 48 | 1 (be50) | 47 / 46 (be30) | 30 |
+
+Quoted: "4 Kefka: won 47, lost 0; distinct keys won 26, lost 0; deaths in
+the tier 16", "Kefka's battle: 48 runs; won 47, lost 1, other 0; distinct
+opening keys won 27, lost 1" (`air/tally_g12.txt`); "4 Kefka: won 46, lost
+1; distinct keys won 25, lost 1; deaths in the tier 30", "Kefka's battle:
+48 runs; won 46, lost 2, other 0; distinct opening keys won 26, lost 2"
+(`px13/tally_g16.txt`); both "3 lady+sleeper: won 47, lost 1".
+
+- **be30 at 16** (`g16_k0_s13`): the first Megalixir confirmed while STRAGO
+  fell from 1 HP, the second planned, and then his Special took CELES from
+  5,102 ("ONE ACTION from >= 80%"), RELM and CYAN from full; at 12 the same
+  draw "tier 4 Kefka WON after 19175 ticks, 4 deaths, key be30"
+  (`g12_k0_s13`). The four more shields keep him in his cycle longer, and
+  his Special, not Fallen One or Ultima, decides this one.
+- **be50** (`g16B_k0_s2`, `g12B_k0_s2`): the third tier lost at both counts
+  ("LOST after 24250 ticks, 8 deaths").
+
 ## 6. Not done
 
+- **Kefka at 16 on every draw** (#514): at 16 he loses one key on each of
+  the last two lines that 12 wins (be20, closed by the Megalixir at two
+  under 35%; be30, open), so 16 does not yet pass every draw; the decision
+  between 16 and 12 is the owner's (5.7).
 - **The third tier with STRAGO third.** On v0.42's capture the strongest
   first put STRAGO third and RELM fifth, and the lady and the sleeper took
   4 of 48 runs at either shield count (5.5); the replayed line puts RELM
