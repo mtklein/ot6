@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "831609f5221acfd5fd2ba98aee8d58246593d548e311f4d184187aaa25f1e533",
+  "sha256": "6cdadb2acfa3453c24d234543dfcb2ede6d8300f1cdab8b8d48374ef6ca1e975",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "831609f5221acfd5fd2ba98aee8d58246593d548e311f4d184187aaa25f1e533",
-    "generator_sig": "903b9755c5b348e9624ab8195bc0097083f6023ed2bde4cd669de14015689fe2 gen_wor_tomb build/checkpoints/wor-kohlingen-v1/manifest.json build/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram",
+    "payload_sha256": "6cdadb2acfa3453c24d234543dfcb2ede6d8300f1cdab8b8d48374ef6ca1e975",
+    "generator_sig": "e5138d5b4180d2164ee87c67ec844783990e5603ad044cbab5d4710b7cc39d04 gen_wor_tomb build/checkpoints/wor-kohlingen-v1/manifest.json build/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-kohlingen-v1/manifest.json",
-        "sha256": "182861e3b657bb39cff03f9b68a01e8132cad1563e752640114d5d0ce18c22a3"
+        "sha256": "4c30c8e3c9fc3d84b66ab397cbd5f8db2d12da9edf19bf4280d4b291f326a1d4"
       }
     ]
   }
