@@ -19,12 +19,12 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local NAMES = H.SPLIT_NAMES
-local CELES, RIBBON, WALL_RING = 6, 0xCA, 0xBB
+local CELES, RIBBON, WALL_RING, GENJI_GLOVE = 6, 0xCA, 0xBB, 0xD1
 local EDGAR, RELM, SETZER, GAU, UMARO = 4, 8, 9, 11, 13
 local BARRIER_RING, MEMENTO_RING = 0xB7, 0xDB
 -- a ward from the bag onto a relic slot that holds no Exp. Egg, Ribbon or Genji Glove (slot 5 when slot 4 does).
 -- A hard input (#480, asserted at the leg's boot: wardsHeld): the bag holds it, or the wearer wears it already
-local KEEP_RELIC = { [0xE4] = true, [0xCA] = true, [0xD1] = true }
+local KEEP_RELIC = { [0xE4] = true, [0xCA] = true, [GENJI_GLOVE] = true }
 local function ward(ch, item, what)
   return H.lazy(function()
     for s = 4, 5 do
@@ -252,7 +252,7 @@ H.run({ maxFrames = 3000000 }, {
     -- the Glove and the Economizer, and the Ribbon over the Glove left "gear back ... slot 1 item $13 ... 4 A presses
     -- on the target were not taken", build/attempts/wt/polish-kefka/px13/lab/attr_main_guardian)
     local r1, r2 = H.readByte(0x1600 + 37 * CELES + 0x23), H.readByte(0x1600 + 37 * CELES + 0x24)
-    local slot = (r2 == WALL_RING or r1 == 0xD1) and 5 or 4
+    local slot = (r2 == WALL_RING or r1 == GENJI_GLOVE) and 5 or 4
     return H.seqStep({
       H.keepGear(CELES, "the 292 Ribbon onto CELES", H.equipKit(CELES, { { slot, RIBBON } },
         { tag = "the 292 Ribbon onto CELES" })),

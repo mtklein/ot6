@@ -12789,21 +12789,13 @@ end
 -- (Kefka's Fallen One leaves all four at 1 HP), an actor with the Item row drinks the bag's Megalixir on the party in
 -- place of whatever it planned; one in flight is not doubled.  The option also opens the bag's Megalixir to the
 -- care lines (M.MEGALIXIR, Driver:bagHeals), which no other fight's options do.  `vs` (a species): only while a body
--- of it stands (a list: a body of any of them) -- Kefka's battle is four formations, and the care lines drank it in
--- the first ("party item $EF: 2 members inside their round", v040-the-end-3/lab/m_k0_s0, before Kefka loaded).
+-- of it stands -- Kefka's battle is four formations, and the care lines drank it in the first ("party item $EF: 2
+-- members inside their round", v040-the-end-3/lab/m_k0_s0, before Kefka loaded).
 function Driver:megalixirOpen()
   local o = self.opts.megalixir
   if not o then return false end
   if type(o) ~= "table" or not o.vs then return true end
-  for s = 0, 5 do
-    if monAlive(s) then
-      local sp = M.readWord(0x57C0 + s * 2)
-      if sp == o.vs then return true end
-      if type(o.vs) == "table" then
-        for _, v in ipairs(o.vs) do if sp == v then return true end end
-      end
-    end
-  end
+  for s = 0, 5 do if monAlive(s) and M.readWord(0x57C0 + s * 2) == o.vs then return true end end
   return false
 end
 function Driver:megalixirInFlight()

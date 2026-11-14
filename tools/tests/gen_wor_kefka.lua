@@ -61,8 +61,9 @@ end
 -- party drinks it when two members stand under 35% of their HP (Fallen One leaves all four at 1); the care lines
 -- may reach for it too.  At 16 shields (#514) the trigger at three under 30% lost key be20 twice: the second
 -- Megalixir was still on its way when his Ultima took three members at about a fifth of their HP
--- (route-wor-the-end.md 5.6, f16_k4_s4); two under 35% won all 48 runs of both grids (mxn2).  KEFKA_MEGALIXIR (a
--- lab's) replaces the trigger, false turns it off
+-- (route-wor-the-end.md 5.6, f16_k4_s4); two under 35% won all 48 runs of both grids on 7080ab2b's line (mxn2).
+-- On 9d6b9b0f's line (rebased onto main) it lost one key at 16, be30, which 12 wins: his Special, not Ultima
+-- (5.7; a known open key).  KEFKA_MEGALIXIR (a lab's) replaces the trigger, false turns it off
 if KEFKA_MEGALIXIR ~= nil then BOSS_FIGHT.megalixir = KEFKA_MEGALIXIR or nil
 elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 2, below = 0.35, vs = KEFKA } end
 -- The curers keep their last point through Kefka's break (opts.reserveBank): the break's burst emptied every bank,
