@@ -682,7 +682,10 @@ party faces: a jump pressed with the turn went back down onto $11's row,
 lab `n6`). Over 24 plays at 12 seed shifts from both captures (labs `n8`,
 `n9`) all 24 passed; the FakeMustache took 44 tries for its 24 passes
 (0.55 a try, 0-4 drops a pass), and over the 314 stretches the walk began
-the model priced 25.8 touches and 25 came. The bridge walks are allowed
+the model priced 25.8 touches and 25 came. Shifts 3, 7 and 11 (lab `n10`)
+replay their twins at 2, 6 and 10 exactly, the same stretches to the same
+final frame: the hunt before the bridge plays its battles alike there, so
+the field's frames match too, and they add no draws. The bridge walks are allowed
 14 tries: at the rate's 95% lower bound, 0.40, a play needs more than 14
 less than once in a thousand. Two other patience rules were tried and
 dropped: a bar at the stand's own 10th percentile took stretches at
