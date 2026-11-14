@@ -3,8 +3,9 @@
 -- after the opera) and walk the forests there that no story leg walks until every formation of each pool has been
 -- won (K.worldHunt, lib/ot6_field.lua: the pool asserted against the ROM's, the hunt bounded by the worst draws):
 -- the forest east of the save (world group 20: Bug, FossilFang) and the forest north-west of it (group 17: Ralph,
--- Wyvern, ChickenLip; group 18 by Maranda deals the same pool, so one walk wins both).  No leg boots what it leaves
--- (the state `wob_south_hunt`); gen_vector_entry goes on from the same save.
+-- Wyvern, ChickenLip; group 18 by Maranda deals the same pool, so one walk wins both), with an Amulet from Albrook's
+-- relic counter on each member no relic guards from the FossilFang's Zombie (wob-side-trips.md section 3, lesson 5).
+-- No leg boots what it leaves (the state `wob_south_hunt`); gen_vector_entry goes on from the same save.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
