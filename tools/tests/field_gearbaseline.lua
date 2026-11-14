@@ -179,7 +179,17 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(slot ~= nil, true, "6: the healer " .. healer.name .. " wears a Ribbon after case 5's dress")
     return H.keepGear(healer.ch, label, H.unequipRelics(healer.ch, { slot }, { tag = label }))
   end),
-  H.reservePrize(RIBBON, 1, "field_gearbaseline case 6: two Ribbons for three wearers"),
+  -- all but one held: the Ribbons the party owns (the line's count moves: four at f916b884, where two for three
+  -- let the mutant's dress land on a state the real rule also keeps), so the healer's is the only one in play
+  H.lazy(function()
+    local n = H.invCountOf(RIBBON)
+    for _, m in ipairs(members()) do
+      for s = 4, 5 do if rec(m.ch, 0x1F + s) == RIBBON then n = n + 1 end end
+    end
+    H.log(string.format("[gbtest] 6: the party owns %d Ribbon(s); %d held", n, n - 1))
+    H.assertEq(n >= 2, true, "precondition 6: two Ribbons or more, so one held leaves a choice")
+    return H.reservePrize(RIBBON, n - 1, "field_gearbaseline case 6: one Ribbon in play")
+  end),
   H.lazy(function()
     H.realHealer = H.gearHealer
     local realPlan = H.gearPrizePlan(members())
