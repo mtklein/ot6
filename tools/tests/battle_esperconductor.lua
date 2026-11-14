@@ -9,7 +9,9 @@
 -- shields or more; there EDGAR casts Bolt (unboosted) at it through the real menu (H.kitBattle) while the others
 -- Defend.  The property, read from every write to that monster's shield count ($3E38 + entity) during EDGAR's
 -- cast: the Bolt takes two shields where an unboosted weakness hit takes one.  A battle with no such monster is
--- fought out and the next taken, up to twelve.
+-- fought out and the next taken, within the battles that meet every slot of the zone's pool at 99%.  Then the
+-- negative, in the same battle: Ramuh's summon, a lightning hit that is not a Magic or X-Magic cast, takes the
+-- weakness's one shield and no more.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -18,7 +20,8 @@ local LIVE = 0x317C00
 local function seated(c) local b = H.readByte(0x1850 + c); return b ~= 0 and (b & 7) == H.readByte(0x1A6D) end
 local function pos(c) return (H.readByte(0x1850 + c) >> 3) & 3 end
 
-local A, B, tries, done = nil, nil, 0, false
+local A, B, tries, done, bolted = nil, nil, 0, false, false
+local BUDGET = nil
 local tgt, writes, plan = nil, {}, {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 
@@ -67,6 +70,12 @@ H.run({ maxFrames = 700000 }, {
       if B == nil and plain(x + d[1], y + d[2]) then B = { x + d[1], y + d[2] } end
     end
     H.assertEq(plain(x, y) and B ~= nil, true, "two plain tiles that roll random battles")
+    -- the budget from the zone's pool: the battles within which every slot comes up, at 99%
+    local pool = H.encounterPool(H.worldEncounterGroup(B[1], B[2]))
+    local pmin = 1
+    for _, sl in pairs(pool) do if sl.odds and sl.odds > 0 then pmin = math.min(pmin, sl.odds / 256) end end
+    BUDGET = math.ceil(math.log(0.01) / math.log(1 - pmin))
+    H.log(string.format("[conductor] the rarest slot %.3f: budget %d battles", pmin, BUDGET))
   end),
   H.driveUntil(function() return done end, 650000, {
     H.driveUntil(function() return H.battleLoadStarted() end, 60000, {
@@ -78,7 +87,7 @@ H.run({ maxFrames = 700000 }, {
     H.waitFrames(30),
     H.call(function()
       tries = tries + 1
-      H.assertEq(tries <= 12, true, "a shielded lightning-weak monster within twelve battles")
+      H.assertEq(tries <= BUDGET, true, string.format("a shielded lightning-weak monster within %d battles", BUDGET))
       pick()
     end),
     H.cond(function() return tgt ~= nil end,
@@ -95,8 +104,24 @@ H.run({ maxFrames = 700000 }, {
           end
           H.assertEq(tgt.sh0 - writes[#writes], 2, "EDGAR's Bolt on a lightning-weak monster took two shields "
             .. "(one for the weakness, one for Conductor)")
-          done, tgt = true, nil
+          bolted = true
+          -- the negative: Ramuh's summon is lightning too, but not a Magic or X-Magic cast, so it takes the
+          -- weakness's one shield and no more (from the Magic list's esper row, id = the esper)
+          tgt.sh1, writes = writes[#writes], {}
+          plan = { { who = EDGAR, cmd = CMD_MAGIC, spell = RAMUH, boost = 0 } }
         end),
+        H.cond(function() return bolted and tgt ~= nil and tgt.sh1 > 0 and H.battleLoadStarted() end, {
+          H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000 }),
+          H.waitUntilSoft(function() return #writes > 0 or not H.battleLoadStarted() end, 2400, "the summon lands"),
+          H.waitFrames(30),
+          H.call(function()
+            H.log(string.format("[conductor] slot %d's shield writes during the summon: %s", tgt.slot,
+              table.concat(writes, ",")))
+            H.assertEq(#writes > 0, true, "Ramuh's summon reached the lightning-weak monster")
+            H.assertEq(tgt.sh1 - writes[#writes], 1, "Ramuh's summon (lightning, not a Magic cast) took one shield")
+          end),
+        }, {}),
+        H.call(function() if bolted then done, tgt = true, nil end end),
         H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}) },
       { H.fightBattleByMenu(40000) }),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the map", 2),
