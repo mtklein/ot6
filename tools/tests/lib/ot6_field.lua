@@ -1032,11 +1032,18 @@ function M.navTo(txIn, tyIn, opts)
   local spareSet = {}
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   -- opts.avoid = { {x,y}, ... }: walkable tiles the plan must never route
-  -- through (one-way entrances mid-region); see M.bfsPath
-  local avoidSet = {}
-  for _, t in ipairs(opts.avoid or {}) do
-    avoidSet[((t[2] & 0xFF) << 8) | (t[1] & 0xFF)] = true
+  -- through (one-way entrances mid-region); see M.bfsPath.  A function
+  -- returning that list is read at each plan, as txIn/tyIn are (a step
+  -- built before the map it walks is known: T.trainLap)
+  local function avoidTiles()
+    local set, av = {}, opts.avoid
+    if type(av) == "function" then av = av() end
+    for _, t in ipairs(av or {}) do
+      set[((t[2] & 0xFF) << 8) | (t[1] & 0xFF)] = true
+    end
+    return set
   end
+  local avoidSet = type(opts.avoid) == "function" and {} or avoidTiles()
   M.navReset()
   local plan, idx = nil, 1
   local pend = nil          -- the in-flight/unverified step
@@ -1306,6 +1313,7 @@ function M.navTo(txIn, tyIn, opts)
       -- 7. (re)plan when we have no plan or it ran out
       if plan and idx > #plan then plan = nil end
       if not plan then
+        if type(opts.avoid) == "function" then avoidSet = avoidTiles() end
         plan = M.bfsPath(resolve(txIn), resolve(tyIn), NAV.blocked, avoidSet)
         if not plan then
           -- the party's z-level ($b2) as the model reads it can disagree
@@ -12549,7 +12557,7 @@ function M.kefkaTowerKit(K, fight)
           P.quietSaid = true
         end),
         M.navTo(function() return (wp == 1 and P or Q)[1] end, function() return (wp == 1 and P or Q)[2] end,
-          { maxFrames = 20000, playBattles = "tactical", fight = fight, avoid = P.avoid }),
+          { maxFrames = 20000, playBattles = "tactical", fight = fight, avoid = function() return P.avoid end }),
         M.call(function()
           M.assertEq(K.map(), P.m, what .. ": the lap stays on its map")
           wp = wp % 2 + 1
