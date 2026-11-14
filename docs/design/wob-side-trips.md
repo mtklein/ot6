@@ -155,6 +155,34 @@ What the labs taught:
    member falls in most meetings to the Meteo it casts as it dies (the death
    counter is not a turn; 2 to 5 deaths a hunt of three meetings), and the
    field care revives them.
+5. **The FossilFang's Bone needs a Zombie guard, and Albrook sells one.**
+   The southern forest's FossilFang (`$023`, AIScript::_35) casts Sand Storm
+   on its own turns and answers every Fight with it (wind, power 45: 160 to
+   200 a member at L19-20), and its Special, Bone (MonsterProp +$1F = $41:
+   no damage, status 1 bit 1), makes its target a Zombie. A Zombie's turns
+   are the engine's, no Fenix Down reaches it, and the Revivify that cures it
+   leaves the member at an eighth of its HP, under the next Sand Storm. Swept
+   from `post-opera-v1` on main's 88042db5 (seed shifts 0, 8, 20, 40, and 0
+   to 5 world encounters fled first), the leg wiped in 3 of 24 runs, every
+   death in the FossilFang's two formations (36 deaths in 19 of their 40
+   distinct battle keys, counted once a key): 18 Bones ("ONE ACTION from >=
+   80%" on 10 of them) and 18 Sand Storms, most on a member a cured Zombie
+   had left at an eighth. Two of the three wipes opened with a Bone on SABIN
+   at full HP. Only CELES's Ribbon guarded
+   the Zombie. Raising the field care to the pre-danger 0.9 alone did not
+   help (`f1/`: 15 deaths in 4 runs, 10 in one FossilFang pair). Albrook,
+   the door beside the save, sells the Amulet (relic shop 40 in map 330,
+   5000 GP; ItemProp +6 = $07: Dark, Zombie, Poison), so the leg buys one
+   for each member no relic guards, wears it for the forests in the slot
+   whose relic ranks lowest (EDGAR's second RunningShoes, LOCKE's Hero Ring,
+   SABIN's Atlas Armlet) as an area overlay, and puts those relics back
+   after the forests; the field care runs at the pre-danger 0.9 on the hunt
+   and before each walk. The same 24 cells after: 24 of 24 passed with 3
+   deaths (two in the Jokers' group 15 on the walk, one to a FossilFang's
+   Battle), none to the Bone or the Sand Storm (section 5). The overlay is the leg's own: the
+   relic rule ranks the Amulet a guard and would keep one on over EDGAR's
+   second RunningShoes, so the leg puts back what each Amulet displaced
+   rather than running the gear baseline, and asserts it.
 
 ## 4. What the other bodies here are
 
@@ -211,3 +239,29 @@ Under `build/attempts/wt/v043-wob-zones/`:
 - `lab2/`: the Intangir's shield counts and the battle_vanish and
   battle_ragedriver runs of this round; `lab/`: the first round's strategy runs
   (section 3); `replay/`: the first round's replay at 5c2357b9.
+
+Under `build/attempts/wt/v043-south-hunt/` (section 3, lesson 5): the south
+hunt from the tracked `post-opera-v1` (its re-cut at af00e01a), one cell per
+seed shift 0, 8, 20, 40 and 0 to 5 world encounters fled first beside the save
+(`mklab.py`'s burn), retries off; `battles.py` counts each battle key once.
+
+- `before/`: main's 88042db5, 24 runs: 21 "PASS", 3 "FAIL: GAME OVER fired"
+  (k1s8, k3s40, k5s8); 282 battles, 192 distinct keys; `battles.txt`: formation
+  139 "20 | 11 | 23 | 2", formation 140 "20 | 8 | 13 | 1" (distinct keys, keys
+  with a death, deaths, lost), every other formation 0 deaths.
+- `after/`: 08a6e674, the same 24 cells: 24 "PASS"; 300 battles, 198 distinct
+  keys; formation 139 "19 | 0 | 0 | 0", formation 140 "18 | 1 | 1 | 0", Joker
+  x3 (148, the walk) "34 | 2 | 2 | 0". Each run: "[shop] AMULET for each member
+  no relic guards: bought 3 x $B3 from shop 40 (Relics) row 5; gil 66828 ->
+  51828".
+- `f1/`: the care at 0.9 alone (no Amulets), four of `before/`'s cells with
+  deaths: 4 "PASS", 15 deaths, 10 of them in one FossilFang pair (k1s20). `f2/`:
+  the Amulets and the care, the same four cells, 0 deaths; its first cut ended
+  on the gear baseline (red: "the overlay Amulets is still on"), which is why the
+  leg puts the displaced relics back itself.
+- `mut/`: the negatives, each red at its assert: `noequip` (the Amulets bought,
+  never worn: "LOCKE wears a Zombie guard for the forests ...: got false"),
+  `norestore` (the displaced relics left off: "after the forests: LOCKE's relic
+  slot 5 holds what it held before the Amulet: got false"), `noshop` (the shop
+  asserted as 41: "the counter opened shop 40 ($0201) ...: got 40 ($28), want
+  41 ($29)").
