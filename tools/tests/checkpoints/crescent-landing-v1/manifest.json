@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "afc3c521a275d2257517397d31c0d3ed56f9880f7cd68aae3460a6aceeaf7211",
+  "sha256": "3a32ea7d4e3e348d9a31a102443cfff54cc439349a6ab10093f420271e621dee",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "afc3c521a275d2257517397d31c0d3ed56f9880f7cd68aae3460a6aceeaf7211",
-    "generator_sig": "3e9335cb01caeaf4a28b41143d38ca3a67a6a0df1c6fde79123d62a6df5821d7 gen_voyage build/checkpoints/banquet-done-v1/manifest.json build/checkpoints/banquet-done-v1/banquet-done.sram",
+    "payload_sha256": "3a32ea7d4e3e348d9a31a102443cfff54cc439349a6ab10093f420271e621dee",
+    "generator_sig": "97bd16c8e07d31a574ce9f2a9f7fd64c7e06ff699a69d6bd4da1d065de2cf38a gen_voyage build/checkpoints/banquet-done-v1/manifest.json build/checkpoints/banquet-done-v1/banquet-done.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/banquet-done-v1/manifest.json",
-        "sha256": "32e4dda3036148c37a9d9517caa8864a5bd41269402a28dc1c3a42cd529109ee"
+        "sha256": "e704870d8b1c0f3330ec62ebf694dc1b2a26e89afad84a1f5b5d216e9eba1057"
       }
     ]
   }
