@@ -67,15 +67,23 @@ do
     end
   end
 
+  -- A callback is handed the CPU address, not the WRAM offset: $7E/$7F:xxxx,
+  -- or the $0000-$1FFF mirror in the system banks.
+  local function wramOffset(addr)
+    local bank = addr >> 16
+    if bank == 0x7E or bank == 0x7F then return addr - 0x7E0000 end
+    return addr & 0x1FFF
+  end
   local function onRead(ram)
     local w = written[ram]
     return function(addr, value)
-      if not w[addr] then hit(ram, addr, value) end
+      local o = wramOffset(addr)
+      if not w[o] then hit(ram, o, value) end
     end
   end
   local function onWrite(ram)
     local w = written[ram]
-    return function(addr) w[addr] = true end
+    return function(addr) w[wramOffset(addr)] = true end
   end
 
   -- the WRAM port: WMADD ($2181-$2183) and WMDATA ($2180)
