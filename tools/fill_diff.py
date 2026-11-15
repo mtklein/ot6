@@ -2,6 +2,7 @@
 """fill_diff.py -- compare a fill run of the line with the zero-fill line.
 
     tools/fill_diff.py REF FILL [--states a,b] [--max-ranges N] [--json OUT]
+    tools/fill_diff.py --logs REF.log FILL.log...   # runs' logs only
     tools/fill_diff.py --selftest
 
 REF and FILL are tree roots: REF a tree whose build/ holds the line as the
@@ -510,9 +511,25 @@ def main():
     ap.add_argument("--max-ranges", type=int, default=12)
     ap.add_argument("--json")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--logs", nargs="+", metavar="LOG",
+                    help="compare run logs instead of trees: the first is the "
+                         "reference; each other gets its first play difference")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    if a.logs:
+        bad = False
+        for other in a.logs[1:]:
+            d = first_log_diff(a.logs[0], other)
+            if d is None:
+                print(f"{other}: no log")
+            elif d and d[0]:
+                bad = True
+                print(f"{other}: play parts at line {d[0]} ({d[3]} observation(s) differ)\n"
+                      f"      ref  {d[1][:200]}\n      fill {d[2][:200]}")
+            else:
+                print(f"{other}: same play" + (f" ({d[3]} observation(s) differ)" if d else ""))
+        return 1 if bad else 0
     if not (a.ref and a.fill):
         ap.error("REF and FILL are required")
     only = set(a.states.split(",")) if a.states else None
