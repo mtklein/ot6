@@ -2272,10 +2272,34 @@ def selftest() -> int:
 
 FILL_MARKER = "build/FILL_TREE"   # tools/fill_line.py writes it
 FILL_LUA = HERE / "poweron_fill.lua"
+RBW_LUA = HERE / "read_before_write.lua"
 FILL_REGIONS = ("wram", "sram", "vram", "oam", "cgram", "spc")
 
 
 def poweron_fill_prologue(root, env):
+    """The lines that fill RAM at power-on (lib/poweron_fill.lua) and watch
+    for reads of unwritten bytes (lib/read_before_write.lua, OT6_RBW=1), or
+    none: a run that declares neither, in a tree that is not a fill tree,
+    composes exactly as before either existed."""
+    want = env.get("OT6_POWERON_FILL", "")
+    rbw = env.get("OT6_RBW", "") == "1"
+    marker = Path(root) / FILL_MARKER
+    have = marker.read_text().strip() if marker.exists() else ""
+    if not want and not have and not rbw:
+        return []
+    if rbw and not have:
+        raise ValueError(f"OT6_RBW=1 in a tree that is not a fill tree (no "
+                         f"{FILL_MARKER}): instruments run in a lab tree, "
+                         f"tools/fill_line.py setup DIR --mode lab")
+    # a lab run of the instrument alone powers on as a plain run does
+    out = [] if (rbw and have == "lab" and not want) else _fill_lines(want, have, env)
+    if rbw:
+        sram = "false" if env.get("OT6_SRAM_CHECKPOINT") else "true"
+        out += [f"OT6_RBW_SRAM = {sram}\n", RBW_LUA.read_text()]
+    return out
+
+
+def _fill_lines(want, have, env):
     """The lines that fill RAM at power-on (lib/poweron_fill.lua), or none.
 
     OT6_POWERON_FILL=ones|alt|rand:<seed> declares the mode (`zero`, the
@@ -2287,11 +2311,6 @@ def poweron_fill_prologue(root, env):
     cannot make a plain run by a missing one.  A tree marked `lab` takes any
     declared mode, so runs under different fills can share it.  Raises ValueError on any
     mismatch."""
-    want = env.get("OT6_POWERON_FILL", "")
-    marker = Path(root) / FILL_MARKER
-    have = marker.read_text().strip() if marker.exists() else ""
-    if not want and not have:
-        return []
     if want and not have:
         raise ValueError(f"OT6_POWERON_FILL={want} in a tree that is not a "
                          f"fill tree (no {FILL_MARKER}); a fill run belongs "
