@@ -1,0 +1,12 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "battery.sram",
+  "slot": 3,
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "a0cb880100e2a12ebb99716d4fd331d0b008724778bc3f4713549f0018946f79",
+  "provenance": "v0.45 release zip ot6-v0.45.zip (sha256 796e3b5aeb70bbd6d9a550a01ed494db99d7a0c7f1c6d21eba7be03d65d0b179), saves/42 - The Falcon, after the Storm Dragon.srm, as published; a release artifact, not a capture",
+  "golden": {
+    "esper": "signed"
+  }
+}
