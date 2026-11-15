@@ -1,4 +1,4 @@
--- @suite savestate=moogle_entry slow
+-- @suite savestate=whelk_entry slow
 -- battle_hudclobber: a battle dialogue must never leave the under-enemy HUD
 -- drawing from blanked glyph tiles, which shows as junk over and around the
 -- enemies.
@@ -24,9 +24,15 @@
 -- the dialogue must have clobbered the tiles (tileDirty frames > 0),
 -- otherwise the hazard was never exercised.
 --
---   tools/tests/run.sh tools/tests/battle_hudclobber.lua   (needs moogle_entry.mss)
+-- The fight is the Whelk's (whelk_entry), whose opening dialogues are the ones battle_dlgmenu checks the font
+-- across.  It was the Narshe flashback's (moogle_entry) until v0.45, when the flashback soldiers became a
+-- cutscene body with no shields (break-coverage-wob.md section 18): that fight draws no HUD, so the positive
+-- control below could never hold there.
+--
+--   tools/tests/run.sh tools/tests/battle_hudclobber.lua   (needs whelk_entry.mss)
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/moogle_entry.mss.lua"
+local STATE = "build/states/whelk_entry.mss.lua"
+local WHELK = { [0x0134] = true }
 local VR, ROM = emu.memType.snesVideoRam, emu.memType.snesPrgRom
 
 -- OT6 glyph cells + their rom source: H.ot6FontCells, the one model of what
@@ -102,10 +108,20 @@ end
 
 H.run({ maxFrames=24000 }, {
   H.waitFrames(20), H.loadState(STATE), H.waitFrames(10),
-  H.driveUntil(function() return H.battleLoadStarted() end, 12000, {
-    H.hold({"up"}), H.waitFrames(12), H.release(), H.waitFrames(2),
-    H.pressButtons({"a"},4), H.waitFrames(6),
-  }, "the Narshe flashback fight starts"),
+  -- battle_dlgmenu's walk onto the Whelk's trigger
+  (function()
+    local aPhase = 0
+    return H.driveUntil(function() return H.battleLoadStarted() and H.formationHas(WHELK) end, 2200, {
+      H.call(function()
+        aPhase = (aPhase + 1) % 8
+        if H.battleLoadStarted() then H.setPad({}); return end
+        if H.dialogWaiting() then H.setPad(aPhase < 4 and { "a" } or {}); return end
+        if not H.hasControl() or not H.tileAligned() then H.setPad({}); return end
+        H.setPad(H.fieldY() <= 5 and { down = true } or { up = true })
+      end),
+    }, "the Whelk fight starts")
+  end)(),
+  H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 1200, "battle up", 10),
   H.waitFrames(120),
   H.call(function()
@@ -115,8 +131,8 @@ H.run({ maxFrames=24000 }, {
     H.assertEq(H.monstersPresent() > 0, true, "a live formation (enemies present)")
     armed = true
   end),
-  -- ride the fight, tapping A to advance Kefka's dialogue (which clobbers the
-  -- font), sampling the invariant every frame
+  -- ride the fight, tapping A to advance its dialogue (which clobbers the
+  -- font) and to fire the magitek beams, sampling the invariant every frame
   (function()
     local f=0
     return H.driveUntil(function() f=f+1; return f>5000 end, 5300, {
