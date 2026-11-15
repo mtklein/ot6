@@ -505,7 +505,8 @@ function M.requestLoadState(blob)
   if RUN ~= nil then RUN.goUnhandled = nil end
   -- the battle-end reading the lib holds is the old timeline's (#491)
   if M.traceOnLoad then M.traceOnLoad(M.loadedFrame == nil) end
-  M.battleHpSet = true               -- the loaded machine's HP table is its own
+  M.battleHpSet = true               -- the loaded machine's battle RAM is its own
+  M.battleCueSet.present, M.battleCueSet.lit = true, true
   M.loadedFrame = M.frame
   if M.forgetBattleEnd then M.forgetBattleEnd() end
   M.mpSpent = {}                     -- (the Economizer's proxy: this timeline's casts, #524)
@@ -820,8 +821,20 @@ end
 -- True while a battle is fully up and rendering.  A crashed battle load
 -- leaves the screen dark and fails this check.  emu.getState() is not
 -- used here: polling it is correlated with emulator crashes.
+-- The other two cues hold the power-on RAM, too, until the first battle
+-- writes them: a battle load starts (the HP table) a few frames before the
+-- monsters' present bits and the screen's brightness are set, and a random
+-- fill read as both (`battle 70 active` after 0 frames, the formation still
+-- $FFFF; build/attempts/wt/v046-fills-2/ifrit/).  So each counts once the
+-- game has written it since power-on, or a state load brought it.
+M.battleCueSet = { present = false, lit = false }
+emu.addMemoryCallback(function() M.battleCueSet.present = true end, emu.callbackType.write,
+  M.MONSTER_PRESENT, M.MONSTER_PRESENT, emu.cpuType.snes, emu.memType.snesWorkRam)
+emu.addMemoryCallback(function() M.battleCueSet.lit = true end, emu.callbackType.write,
+  0xE9F9, 0xE9F9, emu.cpuType.snes, emu.memType.snesWorkRam)
 function M.battleActive()
-  return M.battleLoadStarted() and M.monstersPresent() > 0 and M.battleScreenLit()
+  return M.battleLoadStarted() and M.battleCueSet.present and M.battleCueSet.lit
+    and M.monstersPresent() > 0 and M.battleScreenLit()
 end
 
 -- --------------------------------------------- absorbed-weapon guard --
