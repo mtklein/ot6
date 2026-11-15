@@ -10408,7 +10408,7 @@ function M.gearBaselineViolations(opts)
   local out = {}
   local function bad(fmt, ...) out[#out + 1] = string.format(fmt, ...) end
   local ms = M.gearBaselineMembers(true)
-  for name in pairs(M.gearOverlaysOpen) do bad("the overlay %s is still on", name) end
+  for _, name in ipairs(M.sortedKeys(M.gearOverlaysOpen)) do bad("the overlay %s is still on", name) end
   for _, m in ipairs(ms) do
     for s = 4, 5 do
       local cur = charByte(m.ch, 0x1F + s)
@@ -10621,7 +10621,7 @@ function M.gearBaseline(opts)
     M.call(function()
       -- an overlay closes only once it is off: its relics on no party's member, and an overlay of the weapon and
       -- armor slots by the gear rule's passes above (whose check is the assert's)
-      for name in pairs(M.gearOverlaysOpen) do
+      for _, name in ipairs(M.sortedKeys(M.gearOverlaysOpen)) do   -- (sorted: the lines below are logged)
         if M.GEAR_OVERLAYS[name].gear or not M.gearOverlayWorn(name) then
           M.log(string.format("[baseline] %s: the overlay %s comes off at the save", tag, name))
           M.gearOverlaysOpen[name] = nil

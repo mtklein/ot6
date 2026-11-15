@@ -323,7 +323,8 @@ local function checkEsper(tag, esper, deltas, grants, absents)
       H.assertEq(now[k], was[k] + d, string.format("[%s] %s %d -> %d (want %+d)",
         tag, k, was[k], now[k], d))
     end
-    for k, d in pairs(deltas) do
+    for _, k in ipairs(H.sortedKeys(deltas)) do   -- (sorted: the first failure named is the same every run)
+      local d = deltas[k]
       if d < 0 then
         H.assertEq(now[k] < was[k], true,
           string.format("[%s] %s really DROPPED (%d -> %d), the signed nibble "

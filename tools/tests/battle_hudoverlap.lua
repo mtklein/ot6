@@ -104,7 +104,8 @@ H.run({ maxFrames = 30000 }, {
     for _, a in ipairs(addrs) do
       local h = hits[a]
       H.log(string.format("$%06X: %d writes", a, h.count))
-      for pc, n in pairs(h.pcs) do
+      for _, pc in ipairs(H.sortedKeys(h.pcs)) do   -- (sorted: logged, and the FOREIGN list is read in order)
+        local n = h.pcs[pc]
         H.log(string.format("    %s x%d", pc, n))
         local bank = tonumber(pc:sub(1, 2), 16)
         if bank ~= 0xF0 and a >= NEW_LO and a <= NEW_HI then

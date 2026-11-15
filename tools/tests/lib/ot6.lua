@@ -185,6 +185,16 @@ local LIVE_IVL = 128
 -- this is seconds apart; measured in docs/TOOLING.md.
 M.HB_IVL = 1024
 
+-- A table's keys in sorted order, for a loop whose order can reach a verdict,
+-- a log line or a choice: Mesen's Lua seeds string hashing per run, so
+-- pairs() over string keys walks them in a different order each run.
+function M.sortedKeys(t)
+  local keys = {}
+  for k in pairs(t) do keys[#keys + 1] = k end
+  table.sort(keys)
+  return keys
+end
+
 -- ----------------------------------------------------------- progress --
 -- Script-level forward progress, the only thing run.sh's stall watch
 -- counts (owner, 2026-10-19: frames advancing is not progress; a game
@@ -237,7 +247,8 @@ function M.progressSample()
   local sw = 0
   for i = 0, 223 do sw = (sw * 31 + rb(0x1E80 + i)) % 4294967291 end
   f.bag, f.roster, f.hp, f.sw = bag, roster, hp, sw
-  for k, v in pairs(f) do
+  for _, k in ipairs(M.sortedKeys(f)) do     -- (sorted: the key named is the heartbeat's reason)
+    local v = f[k]
     if M.progLast[k] ~= nil and M.progLast[k] ~= v then
       M.progLast[k] = v
       M.progress(k)

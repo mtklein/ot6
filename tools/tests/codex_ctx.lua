@@ -792,6 +792,7 @@ local actions = {
       for k, n in pairs(atkSeen) do
         ac[#ac + 1] = string.format("%02x*%d", k, n)
       end
+      table.sort(sp); table.sort(ac)
       H.log(string.format("[ctx] battle %d done, taught %d byte(s) so far " ..
         "(species %s; atkclass %s)", fights, taughtN,
         table.concat(sp, " "), table.concat(ac, " ")))
