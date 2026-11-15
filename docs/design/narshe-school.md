@@ -117,7 +117,7 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Each hit on a weakness removes one shield. At zero it breaks: it can't act for a while and takes double damage until it recovers.
+> A hit on a weakness removes a shield. At zero it breaks: until it recovers, it can't act and takes double damage.
 >
 > *(next box)*
 >
