@@ -212,7 +212,7 @@ local function repaired(pre)
   local w = pre[0x1E1D] | (pre[0x1E1E] << 8)
   local bad = false
   if w ~= 0 then
-    if (w & 0xF007) ~= 0 then bad = true end
+    if (w & 0xF000) ~= 0 then bad = true end
     for k = 0, 2 do
       local t = (w >> (3 + 3 * k)) & 7
       if ((pre[0x1CF7] >> t) & 1) == 0 then bad = true end

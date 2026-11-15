@@ -150,7 +150,7 @@ vanilla leaves unused, and names the rest of that range as reserve. Address is i
 | $1E1D-$1E1E | 2 | OT6_LOADOUT | Cyan's Bushido loadout: a packed word, three bits per boost slot (slots 1/2/3 at bits 3-5/6-8/9-11), each a 0..7 SwdTech index. `$0000` = AUTO. | ot6_bushido.asm `Ot6BushidoTech` reads it in battle; ot6_loadout.asm `Ot6LoadoutAssign` writes a slot and `Ot6LoadoutInput` writes `$0000` to revert to AUTO; `Ot6LoadoutUnpack`/`Ot6LoadoutIsAuto`/`Ot6LoadoutSlotTech` read it in the field page. | v0.5 | `$0000` = AUTO. A non-zero word is decoded per slot and a slot naming an unlearned tech falls back to AUTO (`Ot6TechLearned`). |
 | $1E1F-$1E26 | 8 | OT6_RAGELOAD | Gau's 8-slot Rage loadout, one byte per slot: byte = rage id + 1, `$00` = unset. All eight `$00` = AUTO. | ot6_rage.asm `Ot6RageList` builds the battle Rage list from it; `Ot6RageSeed` writes the window on the first edit, `Ot6RageCycleCore`/`Ot6RageInput` write field edits; `Ot6RageSlot`/`Ot6RageIsAuto` read it. | v0.7 | all `$00` = AUTO. A byte naming an unknown or unlearned rage is dropped from the list. |
 | $1E27-$1E2B | 5 | OT6_LORELOAD | Strago's 5-slot Lore loadout, one byte per slot: byte = lore id + 1 (ids 0..23), `$00` = unset. All five `$00` = AUTO. | ot6_lore.asm `Ot6LoreMask`/`Ot6LoreMaskSet` build the battle Lore mask from it; `Ot6LoreSeed`, `Ot6LoreCycleCore`/`Ot6LoreInput` write it; `Ot6LoreSlot`/`Ot6LoreIsAuto` read it. | v0.13 | all `$00` = AUTO. A byte naming an unknown or unlearned lore is dropped from the mask. |
-| $1E2C-$1E2D | 2 | OT6_SAVESIG | The block's signature, `$5653` ('SV') when signed. | ot6_codex.asm `Ot6SaveSign` writes it at every save, before the checksum; `Ot6NewGameClear` zeroes it at New Game. | v0.45 | Signed means `$5653` here AND an `OT6_SAVEVER` of 1 through `OT6_SAVEVER_CUR`; a signed block keeps its version. Anything else is unsigned, and its first save zeroes `OT6_SAVERSV` and `OT6_SAVETAIL`, resets impossible loadout values (`Ot6RepairLoadouts`), then signs. |
+| $1E2C-$1E2D | 2 | OT6_SAVESIG | The block's signature, `$5653` ('SV') when signed. | ot6_codex.asm `Ot6SaveSign` writes it when it signs an unsigned block, at the save, before the checksum; `Ot6NewGameClear` zeroes it at New Game. | v0.45 | Signed means `$5653` here AND an `OT6_SAVEVER` of 1 through `OT6_SAVEVER_CUR`; a signed block keeps its version. Anything else is unsigned, and its first save zeroes `OT6_SAVERSV` and `OT6_SAVETAIL`, resets impossible loadout values (`Ot6RepairLoadouts`), then signs. |
 | $1E2E | 1 | OT6_SAVEVER | The layout version that signed the block (today 1). | `Ot6SaveSign` writes it with the signature, only when it signs an unsigned block. | v0.45 | 0, or past `OT6_SAVEVER_CUR`: the block is unsigned. |
 | $1E2F-$1E3F | 17 | OT6_SAVERSV | Reserved. | Zeroed by `Ot6SaveSign` when it first signs a block, and by `Ot6NewGameClear`. | v0.45 | Zero in a signed block; junk possible in an unsigned one. |
 | $1FF7-$1FFD | 7 | OT6_SAVETAIL | Reserved (vanilla's unused tail inside the checksum window). | Zeroed as `OT6_SAVERSV` is. | v0.45 | Zero in a signed block; junk possible in an unsigned one. |
@@ -180,16 +180,28 @@ field pages store only learned entries and learning is never undone, so a
 value no save can legitimately hold is reset, and every other value is
 kept:
 
-- the Bushido word goes to `$0000` (AUTO) when a bit outside its three
-  slots is set (bits 0-2, 12-15) or a slot names a SwdTech not learned
-  (`$1CF7`);
+- the Bushido word goes to `$0000` (AUTO) when a bit past its slots is set
+  (bits 12-15) or one of the three slots the battle reads (slots 1-3, bits
+  3-11) names a SwdTech not learned (`$1CF7`). Slot 0 (bits 0-2) is left
+  alone: the page's first edit out of AUTO seeds it on purpose, a mirror of
+  slot 1 that nothing reads (`Ot6LoadoutSeedWord`: `$0F64` at `$1CF7` =
+  `$BF`, `$0B1B` at `$3F`);
 - a Rage byte goes to `$00` (unset) when it names a rage not learned
   (`$1D2C`);
 - a Lore byte goes to `$00` when it is past `$18` (lore ids are 0..23) or
   names a lore not learned (`$1D29`).
 
 An all-unset Rage or Lore loadout is AUTO, so a save carried over from such
-a game fixes itself at its first save on v0.45 or later. The one junk value
+a game fixes itself at its first save on v0.45 or later. Every value the
+three pages can write is kept: `golden_saves.py`'s selftest models the
+pages' writers (`Ot6LoadoutSeedWord`, `Ot6LoadoutCycleCore`,
+`Ot6BushidoPick`; the Rage and Lore seeds and cycles) and the repair, and
+enumerates every Bushido word reachable from AUTO by the page's edits at
+each SwdTech set play leaves (techs learned in order, with and without
+Cleave: 1718 words), and every Rage and Lore byte at 200 learned sets; the
+repair keeps each one. (A `$1CF7` of `$80`, Cleave without Dispatch, which
+play never reaches, is the one state where a seeded word names an unlearned
+tech; there the repair resets it to AUTO, which is harmless.) The one junk value
 the repair cannot tell from a real one is a Rage byte `$FF` when Gau has
 learned rage 254 (Io): that byte stays until the player sets the loadout.
 Every save the harness makes was zero there all along, because the harness
@@ -409,10 +421,11 @@ codex and esper page's pads and tails, and in `$4000-$7FFF`.
 - `v0.44-sig-ver0` and `v0.44-sig-verFF` carry the signature with version
   0 or `$FF`: each must be treated as unsigned, so its first save zeroes the
   reserve and signs it version 1.
-- `v0.44-mixed` (from `wor-gau-v1`) carries a real manual Bushido word and
-  real Rage and Lore bytes beside impossible ones (an unlearned rage, a lore
-  byte `$19`, an unlearned lore, `$FF`): the first save resets exactly the
-  impossible ones.
+- `v0.44-mixed` (from `wor-gau-v1`, `$1CF7` = `$BF`) carries the Bushido
+  word the page seeds there (`$0F64`, slot 0 set) and real Rage and Lore
+  bytes beside impossible ones (an unlearned rage, a lore byte `$19`, an
+  unlearned lore, `$FF`): the first save resets exactly the impossible ones
+  and keeps the word.
 
 The New Game's first save is the play from power-on's first save
 (`world-narshe-v1`, `gen_worldmap`); `first_save_signed` checks that
@@ -425,7 +438,7 @@ reads the scrap and tail, then Continues a v0.44 save seating Gau
 bytes in its loadouts, and reads the lists a random battle builds: AUTO's
 eight rages, AUTO's five lores and the free row.
 
-Five mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
+Six mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
 routine returning at once, or a labelled seam rewritten) must go red:
 
 - without `Ot6SaveSign`, the junk save's first save is unsigned;
@@ -435,6 +448,8 @@ routine returning at once, or a labelled seam rewritten) must go red:
   into (`SlotAt`), the save over slot 1 leaves slot 1's page reserves
   junk;
 - without `Ot6RepairLoadouts`, `v0.44-mixed` keeps its impossible values;
+- with the Bushido mask back at `$F007` (`MaskAt`), `v0.44-mixed` loses its
+  seeded word `$0F64`;
 - without `Ot6NewGameClear`, Gau's Rage list comes up empty.
 
 At each release, after it is published, add its saves:

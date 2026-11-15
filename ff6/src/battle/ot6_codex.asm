@@ -324,8 +324,11 @@ SlotAt: lda     5,s             ; the destination slot (under the phx/phy)
 ; whose every slot names nothing).  The field pages store only learned
 ; entries, and learning is never undone, so these values cannot be
 ; legitimate and are reset:
-;   * the Bushido word, to $0000 (AUTO), when a bit outside its three slots
-;     (bits 0-2, 12-15) is set or a slot names a SwdTech not learned ($1cf7);
+;   * the Bushido word, to $0000 (AUTO), when a bit past its slots is set
+;     (bits 12-15) or one of the three slots the battle reads (slots 1-3,
+;     bits 3-11) names a SwdTech not learned ($1cf7).  Slot 0 (bits 0-2)
+;     is left alone: the page's first edit seeds it on purpose, a mirror of
+;     slot 1 (Ot6LoadoutSeedWord) that nothing reads;
 ;   * a Rage byte, to $00 (unset), when it names a rage not learned ($1d2c);
 ;   * a Lore byte, to $00, when it is past $18 (lore ids are 0..23) or
 ;     names a lore not learned ($1d29).
@@ -340,58 +343,58 @@ SlotAt: lda     5,s             ; the destination slot (under the phx/phy)
         phy
         ; --- Bushido
         lda     f:OT6_LOADOUT
-        beq     @rage           ; AUTO
-        bit     #$f007
-        bne     @bzero          ; a bit outside the three slots
+        beq     RRage           ; AUTO
+MaskAt: bit     #$f000          ; (mutant_rom.py's seam for this mask)
+        bne     RBzero          ; a bit past the three slots read (12-15)
         lsr
         lsr
         lsr                     ; slot 1 in bits 0-2
         ldy     #$0003
-@bslot: pha
+RBslot: pha
         and     #$0007
         tax
         shorta
         lda     f:Ot6RepairBit,x
         and     f:$7e1cf7       ; that SwdTech learned?
         longa
-        beq     @bpull          ; no: the word cannot be real
+        beq     RBpull          ; no: the word cannot be real
         pla
         lsr
         lsr
         lsr
         dey
-        bne     @bslot
-        bra     @rage
-@bpull: pla
-@bzero: lda     #$0000
+        bne     RBslot
+        bra     RRage
+RBpull: pla
+RBzero: lda     #$0000
         sta     f:OT6_LOADOUT
         ; --- Rage: eight bytes, id + 1
-@rage:  shorta
+RRage:  shorta
         ldx     #$0000
-@rslot: lda     f:OT6_RAGELOAD,x
-        beq     @rnext
+RRslot: lda     f:OT6_RAGELOAD,x
+        beq     RRnext
         dec     a               ; the rage id, 0..254
         jsr     RageLearned
-        bcs     @rnext
+        bcs     RRnext
         lda     #$00
         sta     f:OT6_RAGELOAD,x
-@rnext: inx
+RRnext: inx
         cpx     #OT6_RAGESLOTS
-        bcc     @rslot
+        bcc     RRslot
         ; --- Lore: five bytes, id + 1, ids 0..23
         ldx     #$0000
-@lslot: lda     f:OT6_LORELOAD,x
-        beq     @lnext
+RLslot: lda     f:OT6_LORELOAD,x
+        beq     RLnext
         cmp     #$19
-        bcs     @lzero          ; past lore 23
+        bcs     RLzero          ; past lore 23
         dec     a
         jsr     LoreLearned
-        bcs     @lnext
-@lzero: lda     #$00
+        bcs     RLnext
+RLzero: lda     #$00
         sta     f:OT6_LORELOAD,x
-@lnext: inx
+RLnext: inx
         cpx     #OT6_LORESLOTS
-        bcc     @lslot
+        bcc     RLslot
         ply
         plx
         plp

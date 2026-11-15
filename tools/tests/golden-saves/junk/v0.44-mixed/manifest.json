@@ -4,8 +4,8 @@
   "slot": 3,
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "ca5b2b4d498b601419d2ff4364f9aaee9bfec65fc925d51f2ed30c66afd9f6cc",
-  "provenance": "a synthetic fixture for the first signing, not a release save: golden-saves/v0.44/wor-gau-v1 with a real manual Bushido word $0E40, Rage bytes ['0C', '01', '0F', '00', 'FF', '00', '00', '00'] (learned, unlearned, learned, -, $FF) and Lore bytes ['04', '19', '01', '00', 'FF'] (learned, past $18, unlearned, -, $FF), and $FF in the reserve, the tail, every page's pads and tails and $4000-$7FFF (the junk is what an all-ones console leaves, measured in build/attempts/wt/v1-save-freeze/poweron_allones_newgame.log)",
+  "sha256": "4ba53ae6f72ea1af5859fb8e9cd7048381d559e6eb2c9eef58efd03978c128a8",
+  "provenance": "a synthetic fixture for the first signing, not a release save: golden-saves/v0.44/wor-gau-v1 with the Bushido word the page seeds at $1CF7 = $BF $0F64, Rage bytes ['0C', '01', '0F', '00', 'FF', '00', '00', '00'] (learned, unlearned, learned, -, $FF) and Lore bytes ['04', '19', '01', '00', 'FF'] (learned, past $18, unlearned, -, $FF), and $FF in the reserve, the tail, every page's pads and tails and $4000-$7FFF (the junk is what an all-ones console leaves, measured in build/attempts/wt/v1-save-freeze/poweron_allones_newgame.log)",
   "golden": {
     "esper": "signed"
   }
