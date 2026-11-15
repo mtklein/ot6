@@ -550,6 +550,18 @@ what it says only from a power-on (a head or a cut leg).
 `ninja` runs `fill_selftest` (the fence, the comparison and the report,
 without an emulator); the fill runs themselves are on demand.
 
+**Cost and cadence** (px13, 2026-11-15, `build/attempts/wt/v046-fills/`):
+the `legs` wave played 90 power-on legs in about 22 minutes at 12 at a
+time, 12,294 emulator-seconds; the serial `run` replayed the whole line, 154
+states, in 8,376 s on one emulator, about what a qualification's replay of
+the line costs. Worth running: the `legs` wave under `ones` at each release
+and whenever a change touches power-on, New Game, a save, a load, or battle
+or field initialisation; the serial line once a milestone, or when the wave
+finds something, since only it shows what a fill leaves in the saves. A
+divergence the wave finds is bisected with lab-tree runs of that one leg
+(`ones@wram:<half>`), confirmed with `OT6_RBW=1`, and then fixed in the ROM
+or waived with its evidence.
+
 ## Mesen facts the harness depends on
 
 - With no config file, Mesen ignores `--testrunner` and launches the GUI
