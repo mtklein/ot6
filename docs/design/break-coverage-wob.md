@@ -235,6 +235,172 @@ special like the pool's other magic bodies (Apokryphos, Misfit, Brainpan).
 It still drinks ice, which the party's Blizzards carry: the hit that chips
 it heals it.
 
+## The event fights (v0.45, sections 13-18)
+
+Authored 2026-11-14 (wt/v045-rows). The v0.45 design audit
+(`build/attempts/wt/design-audit/shield_coverage.txt`) listed 25 species in
+formations with no authored row. Fourteen are in formations the game deals:
+event battles a script calls, and one pool the route has not claimed. The
+other eleven are in none. Sections 13-17 design the fourteen; section 18
+classifies the rest. `battle_breakwob_events` checks every row and every
+party's key from the built ROM. `battle_breakwob_raft`,
+`battle_breakwob_raiders` and `battle_breakwob_siegfried` play the fights
+from the graph's captures and check each gauge and a break by the party.
+`tools/check_shield_rows.py` now holds the gate: every species in a reachable
+formation has a row. On main's table that count was 14
+(`build/attempts/wt/v045-rows/coverage-on-main.txt`).
+
+Hands are read from the tracked checkpoints' gear and the generators'
+seating: `sabin-done-v1` (TERRA's MithrilBlade, EDGAR's Mithril Pike,
+BANON's Punisher), `gen_narshe_battle`'s three squads, `banquet-done-v1` and
+`camp-escaped-v1`.
+
+## 13. The Lete River's raft (event battles 7 and 8)
+
+TERRA (MithrilBlade: slash; Fire), EDGAR (Mithril Pike: pierce; the Bio
+Blaster's poison), BANON (Punisher: bludg), and SABIN (fists: bludg;
+AuraBolt: holy) on the upper river. The upper ride's `if_rand` fights are
+battles 7 and 8. The lower ride from the hub (`gen_rapids`) forces battle 8:
+two Pterodons three times in four, or a Nautiloid, an Exocite and a
+Pterodon.
+
+| id | body | L | HP | vanilla weak | absorbs | floor | authored |
+|---|---|---|---|---|---|---|---|
+| `$022` Pterodon | a winged reptile | 12 | 380 | fire | — | 3 · pierce | **2** · slash\|pierce |
+| `$038` Nautiloid | a shell | 11 | 236 | fire\|bolt | water | 3 · pierce | **2** · pierce\|bludg |
+| `$039` Exocite | a crab | 11 | 196 | fire\|bolt | water | 3 · pierce | **2** · slash\|bludg |
+
+Lesson: each of the three weapon hands keys two of the three bodies, and
+TERRA's Fire keys all three. On the floor all three took only EDGAR's
+pike.
+
+## 14. The sparkle trap in Narshe's caves (map 49, battle 38)
+
+The same three (TERRA, EDGAR, BANON), in the block maze `gen_terra_clifftop`
+solves. Touching one of the eight sparkles (`NPCProp::_49`, `_cce486`)
+starts battle 38 and puts the party back at the maze's start. The line
+never touches one.
+
+| id | body | L | HP | vanilla weak | absorbs | floor | authored |
+|---|---|---|---|---|---|---|---|
+| `$060` Dark Side | a spirit | 13 | 255 | fire\|holy | poison | 3 · slash | **2** · slash\|special |
+| `$0B6` Spectre | a phantom that casts | 13 | 235 | fire\|holy | poison | 3 · slash | **2** · bludg\|special |
+| `$0CF` Rinn | a wisp | 11 | 110 | fire\|holy | poison | 3 · slash | **1** · pierce\|special |
+
+Lesson: each spirit takes one of the three weapon hands, TERRA's Fire takes
+them all, and the Bio Blaster heals them. Map 48 next door teaches the same
+thing with the Wild Rat. All three take special, like the train's spirits.
+Rinn is a pest at 110 HP and gets one shield. The sparkles stay in the maze
+after this visit, so any later party that walks it can trip the trap and
+meets the same three with its own hands.
+
+## 15. The Battle for Narshe's raiders (battles 22 and 23)
+
+Three squads: TERRA, EDGAR and CELES (blades: slash; pike and AutoCrossbow:
+pierce; Fire, Ice), CYAN and SABIN (katana: slash; fists: bludg; AuraBolt),
+LOCKE and GAU (knife: pierce; bare hands: bludg). Battle 22 is Trooper ×4,
+or one time in four Bounty Man and two Troopers. Battle 23 is Fidor and a
+Trooper, or one time in four a HeavyArmor and two Troopers. In every draw of
+the v0.45 lab, party 1's descent fought Fidor's formation three times
+(`build/attempts/wt/v045-rows/narshe-*.txt`).
+
+| id | body | L | HP | vanilla weak | absorbs | floor | authored |
+|---|---|---|---|---|---|---|---|
+| `$079` Bounty Man | hired muscle | 13 | 285 | fire | — | 3 · slash | **2** · slash\|pierce |
+| `$01C` Fidor | the troopers' war hound | 13 | 355 | fire | — | 3 · slash | **2** · slash\|pierce |
+
+Lesson: every raider takes the troopers' keys, so each squad's hands carry
+over from one wave to the next. The lab ran `gen_narshe_battle` unchanged
+at seed shifts 0-23 from the graph's `reunion_ready`. Every arm passed all 24
+runs, which were 6 distinct plays, each with three Fidor fights. Fidor's
+first draft was pierce|bludg, so that the swords would slide off it. On that
+ROM the descent broke Fidor with HP left in 2 of the 18 distinct fights,
+against 6 on main's floor row (3 · slash). The swords are most of party 1's
+blows. With the troopers' keys the descent breaks it in 6 of 18 again, and
+its fights are shorter: 1900 frames on average, against 2077 on main and
+2292 on the draft (`narshe-base.txt`, `narshe-after-pb.txt`,
+`narshe-after-sp.txt`, `summary.txt`).
+
+A squad that marches bare-handed (SABIN and GAU, if the player gives them
+no blade or spear) holds no key against Fidor, Bounty Man or the Troopers:
+fists are bludg and the troopers' line takes slash and pierce. That is
+accepted. The player picks the squads, and the canon squads each carry a
+blade or a knife.
+
+## 16. The banquet's sparring troopers (battle 30)
+
+The banquet runs before the roster is rewritten, so the bout is fought by
+`vector-crash-v1`'s party: TERRA (ThunderBlade: slash, bolt; Fire), LOCKE
+(MithrilKnife: pierce), EDGAR (Blizzard: slash, ice; AutoCrossbow: pierce;
+Bio Blaster: poison) and SABIN (Poison Claw: bludg, poison; Fire Dance,
+AuraBolt). During the banquet's free time a trooper offers a two-minute bout
+(`_cc8a47`). The canon banquet talks instead.
+
+| id | body | L | HP | vanilla weak | absorbs | floor | authored |
+|---|---|---|---|---|---|---|---|
+| `$0C2` Sp.Forces | the imperial elite | 21 | 700 | poison | — | 4 · pierce | **3** · slash\|pierce |
+
+The trooper line's keys, at a tank's three: three of them against a party
+whose blades and pierce hands all key it, in a timed bout.
+
+## 17. The Phantom Train: the vestibule car and Siegfried
+
+SABIN, CYAN and SHADOW, as section 6.
+
+| id | body | L | HP | vanilla weak | absorbs | floor | authored |
+|---|---|---|---|---|---|---|---|
+| `$00F` Over-Mind | a spirit | 13 | 390 | fire\|holy | poison | 3 · slash | **2** · slash\|special |
+| `$131` Siegfried | a braggart | 7 | 100 | — | — | 2 · slash | **1** · slash\|pierce\|bludg |
+
+Over-Mind is the vestibule car's own body (map 149, pool 71, with Hazer,
+Whisper and StillGoing), and it gets the train's spirit row. Siegfried is
+the boastful swordsman whose trap in the compartment car (map 153, (5,25),
+battle 109) the line walks past. He has 100 HP and is no boss
+(bosses-wob.md section 8). Any real blow kills him, so any weapon breaks him
+with its first blow, which fits the world's greatest swordsman. His opening
+flurry of eight blows is the whole fight, and it is often ended by SHADOW's
+Interceptor: the dog's counter (command $02, attack $FD) has no weapon class
+and chips nothing. In `battle_breakwob_siegfried`, played from the v045-rows
+branch's capture, it killed him from 100 HP on the flurry's last blow before
+any member's turn (`f4979 slot 0 ($131) hp 100 -> 0, shields 1, cmd $02 atk
+$FD`); on the v0.45 landing's capture a member's Fight killed and broke him
+(`f5945 slot 0 ($131) hp 100 -> 0, shields 0, cmd $00 atk $80`). So the
+suite asserts the break only when a member's weapon-class hit lands, and on a
+classless kill it is a gauge check.
+
+## 18. The bodies with no fight to design
+
+Each of these gets a 0-shield row, so the gap is closed on purpose and none
+of them draws a gauge. The three cutscene bodies sit in the table's
+"scripted set-pieces" block, beside the WoB Guardian and Tritoch. The other
+eleven sit under the label `Ot6ShieldTblUnreached`. `check_shield_rows.py`
+refuses a marker there whose species any reachable formation holds, so a
+later change that makes one reachable fails the build until the body gets a
+designed row.
+
+| id | body | formations | how it is reached | class |
+|---|---|---|---|---|
+| `$179` | flashback soldier | 485 (391, 496 unused) | `battle 115` (event_main.asm:102366): TERRA's magitek flashback; 1 HP, no action, beamed by the ride | cutscene body |
+| `$17A` | the esper Kefka fights | 392 (497, 498 unused) | `battle 97` (:76957): casts Fire 1-3 at Kefka, then `battle_event`, `end_battle` | cutscene body |
+| `$17B` | the battle-event runner | 384-386, 389, 393 (390, 510 unused) | `battle 121`, `122`, `123`, `105`, `127` (:46108, :46194, :44391, :76604, :33565): untargetable, plays the scene, ends the battle | cutscene body |
+| `$10F` | Umaro (a duplicate) | 443 | battle 74: no call site; the cave's Umaro is `$110` | unreachable |
+| `$11A` | Kefka (a duplicate) | 453, 562 | battle 83: no call site; 562 in no group; the final battle's Kefka is `$12A` | unreachable |
+| `$136` | Colossus | 461, 560 | battle 91: no call site; pool 66 only on maps 157 and 167 (Mobliz, Mt. Crescent), neither battle-enabled | unreachable |
+| `$137` | CzarDragon | 561 | in no group | unreachable |
+| `$13B` | B.Day Suit | 42 | in no group | unreachable |
+| `$16E` | (Terra's flashback AI) | 499 | battle 51: no call site | dummy |
+| `$170` | (Cyan at the camp) | 500 | battle 52: no call site | dummy |
+| `$172` | (Gau back from the Veldt) | 502 | battle 54: no call site; Gau's return runs on character AI `$0a` (battle_main.asm) | dummy |
+| `$177`, `$178` | (unused) | 508, 509 | battles 60, 61: no call site | dummy |
+| `$17F` | (unused) | 490-495 | in no group | dummy |
+
+"No call site" means no `battle N` in any event or vehicle script
+(event_cmd.inc's one macro emits $4c, $4d and $cf). No engine-coded
+battle names the group either (the magitek train's 41, 73 and 144, the
+airship's 93). No monster-in-a-box holds it, and no `change_battle` or
+CondBattle substitute reaches the formation. The check reads all of these
+from the tree.
+
 ## Evidence
 
 `build/attempts/wt/v043-wob-rows/rows/` (px13): the twelve suites PASS on
@@ -245,3 +411,18 @@ every row missing) and on one mutant ROM with a mutation per suite
 before this landing lists an unauthored species after. The landing's own
 replay claims world group 15 (`gate/audit.final.txt`), which added the
 Joker (section 9) and the ChickenLip (the side-zones branch's row).
+
+v0.45 (sections 13-18), `build/attempts/wt/v045-rows/` (px13). The graph's
+line was replayed on the branch's ROM from power-on to `reunion_ready`, with
+`wob_train_specter` beside it. The raft fights of `gen_scenario` and
+`gen_rapids` played the new rows, and every leg passed. The three play suites
+pass from those captures (`v045-rows-labs.tgz`, `suites/`), and each fails on
+main's ROM at its gauge check (`v045-base-labs.tgz`, `neg_*`: "got 3 ($3),
+want 2 ($2)" for the raft, "got 2 ($2), want 1 ($1)" for Siegfried).
+`battle_breakwob_events` fails on main's ROM with 132 mismatches
+(`suite_events_on_main_rom.log`). It also fails on a mutant that gives Fidor
+slash|pierce|bludg (`suite_events_mutant_fidor_slash.txt`); that mutant was
+made while Fidor's row was pierce|bludg. The `gen_moogle` sweep (shifts
+0-23, from `moogle_entry`; TERRA's flashback soldiers now draw no gauge) won
+the Marshal with the first squad in every distinct play: 6 of 6 on the
+branch, 7 of 7 on main (`moogle-after.txt`, `moogle-base.txt`).

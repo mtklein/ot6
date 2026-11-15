@@ -63,8 +63,11 @@ matrix larger.
 
 ## Break system
 
-**Data.** Each enemy gets `shield_max` (1–3 for trash, 4–12 for bosses;
-Kefka's 16 at the top of his tower is the one exception) and
+**Data.** Each enemy gets `shield_max`, one `Ot6ShieldTbl` row per species
+the game deals: 1–3 for trash (2 for most), 4–6 for the strongest commons
+and the monster-box guards, 4–12 for bosses, the Storm Drgn's 14 and Kefka's
+16 at the top of his tower above that, and 0 for a body that draws no gauge
+(a scripted set-piece, or a marker for a body no battle deals). It also gets
 two weakness bytes — one elemental (enemy records already store elemental
 weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 

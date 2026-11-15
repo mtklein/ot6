@@ -46,10 +46,10 @@
         clc                     ;   stack has none and survives an nmi
         adc     #$5d            ; attack id $5d + blitz index
         sta     $4005,x         ; wItemList::Index
-        jsl     Ot6CostFor      ; A(id) -> A(cost); preserves X and Y
-        jsl     Ot6PendPrice    ; ...x2.5 per pending boost (#219), the same
-                                ;   number Ot6KitRowCost draws and the cmd-$0a
-                                ;   charge takes
+        jsl     Ot6PendBlitzPrice ; A(id) -> A(cost), x2.5 per pending boost
+                                ;   (#219; flat for Mantra), the same number
+                                ;   Ot6KitRowCost draws and the cmd-$0a
+                                ;   charge takes; preserves X and Y
         sta     $4006,x         ; wItemList::Qty = MP cost
         inx
         inx
@@ -414,8 +414,7 @@
         cmp     #$00
         beq     @tools
         pla                     ; blitz
-        jsl     Ot6CostFor
-        jml     Ot6PendPrice
+        jml     Ot6PendBlitzPrice
 @tools: pla                     ; real tools: the drawn price, Overclock and all
         jml     Ot6PendToolPrice
 @setzer:

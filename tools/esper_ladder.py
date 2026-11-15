@@ -16,14 +16,17 @@ relic would set), or no bytes for the rungs that are new code (the
 signatures Conductor, Facet, Rebirth, Fenrir's Stop and Slow immunity and
 Sraphim's full revives, and Sraphim's rung 3, healing +25%: Ot6SeraphHeal).
 
-  python3 tools/esper_ladder.py --labels     write ff6/src/battle/ot6_esper_labels.inc
+  python3 tools/esper_ladder.py --labels     write ff6/src/battle/ot6_esper_labels.inc and ot6_esper_desc.inc
   python3 tools/esper_ladder.py              check build/ot6.sfc against SPEC
   python3 tools/esper_ladder.py --selftest   the check on the real ROM plus mutants
 
 The check reads Ot6LadderTbl (26 x 5 x 14 bytes: the ten effect bytes, then
 vigor, speed, stamina, mag.pwr points) and Ot6RungLabelTbl (26 x 5 x 12
 encoded tiles) at the addresses ff6/rom/ff6-en.dbg records, and requires both
-to equal what SPEC says, rung for rung.
+to equal what SPEC says, rung for rung.  It also reads the esper page's help lines (Ot6RungDescIdx,
+Ot6RungDescPtrs, Ot6RungDescStr, Ot6RungHaveStr: one description per rung, from DESC) and requires every label
+to have a description of one line that fits the help window, every label to name one effect, and the ROM's
+line for each rung to be its label's.
 """
 from __future__ import annotations
 
@@ -68,7 +71,7 @@ SPEC = [
      eff("Peace Ring", p2=S2["bserk"] | S2["muddle"])),
     ("Terrato", "Mag", "Stm", eff("Black Belt", r12=0x02), eff("Muscle Belt", r9=0x08)),
     ("Shoat", "Spd", "Stm", eff("No Petrify", p1=S1["petrify"]),
-     eff("No Death", p1=S1["death"], p2=S2["doom"])),
+     eff("NoDeath/Doom", p1=S1["death"], p2=S2["doom"])),
     ("Maduin", "Mag", "Stm", eff("Bard's Hat", r9=0x80), eff("Earring", r9=0x02)),
     ("Bismark", "Vig", "Stm", eff("MithrilGlove", r13=0x02), eff("Red Cap", r9=0x04)),
     ("Stray", "Mag", "Spd", eff("No Imp", p1=S1["imp"]), eff("Sneak Ring", r11=0x01)),
@@ -93,6 +96,80 @@ SPEC = [
     ("Phoenix", "Stm", "Spd", eff("No Doom/Zomb", p1=S1["zombie"], p2=S2["doom"]), eff("Rebirth")),
 ]
 assert len(SPEC) == SLOTS
+
+
+# What the esper page's help line says for the highlighted rung (DrawEsperDetailMenu's cursor on the rung
+# column, Ot6RungDescText): one line each, every label one effect.  Player words, FF3-US names; the line is
+# drawn in the menu's variable-width font and must fit DESC_WIDTH pixels (the help window's 28 tiles: the
+# widest vanilla description line, "Enemy becomes self-destructive", is 223).
+DESC = {
+    "Vigor   +1": "Raises Vigor by 1",
+    "Vigor   +2": "Raises Vigor by 2",
+    "Speed   +1": "Raises Speed by 1",
+    "Speed   +2": "Raises Speed by 2",
+    "Stamina +1": "Raises Stamina by 1",
+    "Stamina +2": "Raises Stamina by 2",
+    "Mag.Pwr +1": "Raises Mag.Pwr by 1",
+    "Mag.Pwr +2": "Raises Mag.Pwr by 2",
+    "All stats +1": "Raises all four stats by 1",
+    "No Dark": "Protects against Dark",
+    "No Seizure": "Protects against Seizure",
+    "No Sleep": "Protects against Sleep",
+    "No Petrify": "Protects against Petrify",
+    "No Imp": "Protects against Imp",
+    "No Poison": "Protects against Poison",
+    "No Mute": "Protects against Mute",
+    "No Muddle": "Protects against Muddle",
+    "No Zombie": "Protects against Zombie",
+    "No Berserk": "Protects against Berserk",
+    "No Death": "Protects against instant death",
+    "NoDeath/Doom": "Blocks instant death, Condemned",
+    "No Doom/Zomb": "Blocks Condemned and Zombie",
+    "No Stop/Slow": "Blocks Stop and Slow",
+    "Peace Ring": "Blocks Berserk and Muddle",
+    "Amulet": "Blocks Dark, Zombie and Poison",
+    "Jewel+Orb": "Blocks Dark, Petrify; MP +1/2",
+    "Green Beret": "Raises max HP by 1/8",
+    "Red Cap": "Raises max HP by 1/4",
+    "Muscle Belt": "Raises max HP by 1/2",
+    "Bard's Hat": "Raises max MP by 1/8",
+    "Minerva": "Raises max MP by 1/4",
+    "Atlas Armlet": "Raises Fight damage by 1/4",
+    "Earring": "Raises magic damage by 1/4",
+    "Hero Ring": "Fight and magic damage +1/4",
+    "Hyper Wrist": "Raises Vigor by half",
+    "Gold Hairpin": "Halves the MP spells cost",
+    "Black Belt": "Sometimes counters an attack",
+    "MithrilGlove": "Casts Safe when HP is low",
+    "Barrier Ring": "Casts Shell when HP is low",
+    "Sneak Ring": "Raises the success rate of Steal",
+    "Sprint Shoes": "Walks faster outside battle",
+    "Sniper Sight": "Fight always hits",
+    "Back Guard": "No back or pincer attacks",
+    "Gale Hairpin": "Raises preemptive attack rate",
+    "Cherub Down": "Float in every battle",
+    "RunningShoes": "Haste in every battle",
+    "Guard Ring": "Safe in every battle",
+    "Auto Shell": "Shell in every battle",
+    "Cure Ring": "Regen in every battle",
+    "Mirage Vest": "Starts every battle with Image",
+    "True Knight": "Covers weak allies while healthy",
+    "Gaunt+Genji": "Gauntlet and Genji Glove effects",
+    "Conductor": "Bolt spells break 1 more shield",
+    "Facet": "2 Boost Points at battle start",
+    "Heal +25%": "Healing done is 25% stronger",
+    "Full Revive": "Revives allies at full HP",
+    "Rebirth": "Starts every battle with Life 3",
+}
+# the help line's second line, under an unreached rung whose effect this character already holds from
+# another rung (Ot6RungDescText's cover test over the ladder's effect bytes).  The esper page's title window
+# ("Espers", top right) covers the help window's second line from about x = 176, so this line fits HAVE_WIDTH
+# (a first try, "Already held from another rank", ran under it: build/attempts/wt/v045-teach/shots/raw/
+# esperdetail_staged_held_rung3.png).
+HAVE = "Already held"
+HAVE_WIDTH = 150
+DESC_WIDTH = 223
+DESC_TABLES = ["big_symbols_en", "null_terminated_en", "text_en"]
 
 
 def stat_rung(which, n):
@@ -263,6 +340,139 @@ def write_labels():
     print("wrote", path)
 
 
+def desc_codec():
+    sys.path.insert(0, os.path.join(ROOT, "ff6", "tools"))
+    cwd = os.getcwd()
+    os.chdir(os.path.join(ROOT, "ff6"))
+    try:
+        import romtools as rt
+        return rt.TextCodec({"char_tables": DESC_TABLES})
+    finally:
+        os.chdir(cwd)
+
+
+def font_widths():
+    """FontWidth (ff6/src/gfx/font_gfx.asm, the English half): the menu's big text indexes it by letter code
+    - $60 (big_text.asm: sbc #$80, adc #$20)."""
+    src = open(os.path.join(ROOT, "ff6", "src", "gfx", "font_gfx.asm")).read()
+    blk = src[src.index("FontWidth:"):].split(".else")[0]
+    return [int(x) for line in re.findall(r"\.byte\s+(.*)", blk) for x in line.split(",")]
+
+
+def desc_bytes(dc, text):
+    b = list(dc.encode(text))
+    if not b or b[-1] != 0:
+        b.append(0)
+    return b
+
+
+def desc_width(dc, widths, text):
+    return sum(widths[x - 0x60] for x in desc_bytes(dc, text) if x >= 0x80)
+
+
+def desc_problems(dc, desc=None):
+    """What is wrong with DESC, before any ROM is read: a label in the ladder with no description, a label that
+    names two different effects (one description cannot serve both), a description over two lines or wider than
+    the help window."""
+    desc = DESC if desc is None else desc
+    widths = font_widths()
+    problems = []
+    seen = {}
+    for name, k, label, b, pts in rungs():
+        if label not in desc or not desc[label].strip():
+            problems.append("%s rung %d: the label %r has no description" % (name, k, label))
+        if label in seen and seen[label] != (b, pts):
+            problems.append("%s rung %d: the label %r names two effects (%s and %s)"
+                            % (name, k, label, seen[label], (b, pts)))
+        seen.setdefault(label, (b, pts))
+    relics = relic_bytes()
+    for name, k, label, b, pts in rungs():
+        key = label.lower()
+        if key in relics and relics[key] != b:
+            problems.append("%s rung %d: the label %r names a relic whose effect bytes are %s, not the rung's %s"
+                            % (name, k, label, relics[key], b))
+    for label, text in sorted(desc.items()) + [("(have)", HAVE)]:
+        if "{n}" in text:
+            problems.append("description %r is more than one line" % label)
+        w = desc_width(dc, widths, text)
+        limit = HAVE_WIDTH if label == "(have)" else DESC_WIDTH
+        if w > limit:
+            problems.append("description %r is %d pixels wide, over %d: %r" % (label, w, limit, text))
+    return problems
+
+
+def desc_table(dc):
+    """(the distinct descriptions in first-use order, [description index per rung])"""
+    order, idx = [], []
+    for name, k, label, b, pts in rungs():
+        t = DESC[label]
+        if t not in order:
+            order.append(t)
+        idx.append(order.index(t))
+    return order, idx
+
+
+def write_desc():
+    dc = desc_codec()
+    bad = desc_problems(dc)
+    if bad:
+        raise SystemExit("\n".join(bad))
+    order, idx = desc_table(dc)
+    lines = ["; generated by tools/esper_ladder.py --labels from its DESC (the esper page's",
+             "; help line for the highlighted rung); do not edit.",
+             "",
+             "; one description index per rung, 26 espers x 5 rungs (Ot6RungLabelTbl's order)",
+             "Ot6RungDescIdx:"]
+    rows = rungs()
+    for i in range(0, len(idx), 5):
+        lines.append("        .byte   " + ",".join("$%02x" % x for x in idx[i:i + 5]) + "   ; " + rows[i][0])
+    lines.append("        calc_size Ot6RungDescIdx")
+    lines.append(".assert sizeof_Ot6RungDescIdx = %d, error, \"Ot6RungDescIdx size\"" % (SLOTS * 5))
+    lines.append("")
+    lines.append("; each description's offset in Ot6RungDescStr")
+    lines.append("Ot6RungDescPtrs:")
+    off = 0
+    for t in order:
+        lines.append("        .word   $%04x   ; %s" % (off, t))
+        off += len(desc_bytes(dc, t))
+    lines.append("")
+    lines.append("; the descriptions, null-terminated, in the menu's description charset")
+    lines.append("Ot6RungDescStr:")
+    for t in order:
+        lines.append("        .byte   " + ",".join("$%02x" % x for x in desc_bytes(dc, t)) + "   ; " + t)
+    lines.append("")
+    lines.append("; the second line under a rung whose effect the character already holds")
+    lines.append("Ot6RungHaveStr:")
+    lines.append("        .byte   " + ",".join("$%02x" % x for x in desc_bytes(dc, HAVE)) + "   ; " + HAVE)
+    path = os.path.join(ROOT, "ff6", "src", "battle", "ot6_esper_desc.inc")
+    open(path, "w").write("\n".join(lines) + "\n")
+    print("wrote", path)
+
+
+def check_desc(rom, dbg_text, dc, desc=None):
+    """The ROM's help lines against DESC, rung for rung, and DESC's own rules (desc_problems)."""
+    desc = DESC if desc is None else desc
+    problems = desc_problems(dc, desc)
+    ti = rom_off(sym(dbg_text, "Ot6RungDescIdx"))
+    tp = rom_off(sym(dbg_text, "Ot6RungDescPtrs"))
+    ts = rom_off(sym(dbg_text, "Ot6RungDescStr"))
+    th = rom_off(sym(dbg_text, "Ot6RungHaveStr"))
+
+    def cstr(at):
+        e = rom.index(b"\0", at)
+        return list(rom[at:e + 1])
+    for i, (name, k, label, b, pts) in enumerate(rungs()):
+        if label not in desc:
+            continue
+        j = rom[ti + i]
+        off = rom[tp + 2 * j] | (rom[tp + 2 * j + 1] << 8)
+        if cstr(ts + off) != desc_bytes(dc, desc[label]):
+            problems.append("%s rung %d (%s): the help line is not %r" % (name, k, label, desc[label]))
+    if cstr(th) != desc_bytes(dc, HAVE):
+        problems.append("the 'already has' line is not %r" % HAVE)
+    return problems
+
+
 def sym(dbg_text, name):
     for line in dbg_text.splitlines():
         if 'name="%s"' % name in line and "type=lab" in line:
@@ -301,11 +511,13 @@ def main():
     a = ap.parse_args()
     if a.labels:
         write_labels()
+        write_desc()
         return 0
     rom = open(a.rom, "rb").read()
     dbg_text = open(a.dbg).read()
     c = codec()
-    problems = check(rom, dbg_text, c)
+    dc = desc_codec()
+    problems = check(rom, dbg_text, c) + check_desc(rom, dbg_text, dc)
     if a.selftest:
         if problems:
             print("\n".join(problems))
@@ -319,14 +531,58 @@ def main():
             ("Ifrit's rung 4 gives +1 vigor, not +2", t + (1 * 5 + 3) * REC + 10, 0x01, "Ifrit rung 4"),
             ("Phoenix's rung 3 label changes", lt + (25 * 5 + 2) * LABEL, 0x80, "Phoenix rung 3"),
         ]
+        ti = rom_off(sym(dbg_text, "Ot6RungDescIdx"))
+        ts = rom_off(sym(dbg_text, "Ot6RungDescStr"))
+        conductor = names.index("Ramuh") + 4      # Ramuh rung 5
+        facet_idx = rom[ti + names.index("Carbunkl") + 4]
+        mutants += [
+            ("Ramuh's signature shows Facet's help line", ti + conductor, facet_idx, "Ramuh rung 5 (Conductor)"),
+            ("the first help line's first letter changes", ts, rom[ts] ^ 0x01, "help line is not"),
+        ]
         bad = 0
         for what, off, val, needle in mutants:
             m = bytearray(rom)
             m[off] = val
-            got = check(bytes(m), dbg_text, c)
+            got = check(bytes(m), dbg_text, c) + check_desc(bytes(m), dbg_text, dc)
             ok = any(needle in p for p in got)
             print("mutant %-48s %s" % (what, "red" if ok else "MISSED"))
             bad += not ok
+        # DESC's own rules: a label left without a description, one too wide for the help window
+        for what, edit, needle in [
+            ("Rebirth's description is missing", lambda d: d.pop("Rebirth"), "'Rebirth' has no description"),
+            ("Facet's description runs past the window", lambda d: d.__setitem__("Facet", DESC["Facet"] + " for good"),
+             "'Facet' is"),
+        ]:
+            d = dict(DESC)
+            edit(d)
+            got = check_desc(rom, dbg_text, dc, d)
+            ok = any(needle in p for p in got)
+            print("mutant %-48s %s" % (what, "red" if ok else "MISSED"))
+            bad += not ok
+        global SPEC
+        # a label naming a relic carries that relic's bytes: Shoat's signature labelled "Safety Bit" (which
+        # blocks Death, Petrify and Zombie, not Condemned)
+        real_spec = SPEC
+        i = [r[0] for r in SPEC].index("Shoat")
+        SPEC = list(SPEC)
+        SPEC[i] = SPEC[i][:4] + (("Safety Bit",) + SPEC[i][4][1:],)
+        d = dict(DESC)
+        d["Safety Bit"] = DESC["NoDeath/Doom"]
+        got = desc_problems(dc, d)
+        SPEC = real_spec
+        ok = any("'Safety Bit' names a relic" in p for p in got)
+        print("mutant %-48s %s" % ("Shoat's signature labelled Safety Bit", "red" if ok else "MISSED"))
+        bad += not ok
+        # one label, one effect: Shoat's signature (Death and Condemned) labelled like Alexandr's rung 3 (Death)
+        real_spec = SPEC
+        i = [r[0] for r in SPEC].index("Shoat")
+        SPEC = list(SPEC)
+        SPEC[i] = SPEC[i][:4] + (("No Death",) + SPEC[i][4][1:],)
+        got = desc_problems(dc)
+        SPEC = real_spec
+        ok = any("'No Death' names two effects" in p for p in got)
+        print("mutant %-48s %s" % ("Shoat's signature labelled No Death", "red" if ok else "MISSED"))
+        bad += not ok
         # the doc is the table: a doc edit the ROM does not follow goes red
         global DOC
         import tempfile
@@ -354,7 +610,7 @@ def main():
         print("\n".join(problems))
         print("esper_ladder: %d problem(s)" % len(problems))
         return 1
-    print("esper_ladder: the ROM's 26 ladders (130 rungs) and their menu labels match the table")
+    print("esper_ladder: the ROM's 26 ladders (130 rungs), their menu labels and help lines match the table")
     return 0
 
 

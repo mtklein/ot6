@@ -1036,6 +1036,20 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         jsl     Ot6KeepBoost
         jmp     @keep
 @nottool:
+        cmp     #$0a            ; v0.45: a Blitz that moves no number by the
+        bne     @notblitz       ;   multiplier (Mantra: Ot6SpellNoNumber) buys
+        txa                     ;   nothing; a boost raised on the command
+        cmp     #$08            ;   window before the list opened is dropped,
+        jcs     @keep           ;   as a Lore's is.  It is priced flat
+        lda     $3a7b           ;   (Ot6BlitzPrice).  $3a7b is the attack id
+        cmp     #$08            ;   ($5d-$64); a raw index 0-7 is mapped
+        bcs     :+
+        adc     #$5d
+:       jsl     Ot6SpellNoNumber
+        jcc     @keep
+        jsl     Ot6KeepBoost
+        jmp     @keep
+@notblitz:
         cmp     #$1d            ; #469: a MagiTek beam that moves no number
         beq     @spsum          ;   (Confuser, X-fer) buys nothing either;
         cmp     #$19            ; #463: nor a summon that moves none (its
@@ -1346,7 +1360,10 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ; Ot6SpellNoBoost's last question on its own, for a caller to whom the
 ; Magic-gated rewards do not apply (Ot6SketchNoBoost: a sketch keeps command
 ; $0d, so no fold, no OT6 Break chips and no reach): a fraction of HP/MP
-; (MagicProp +$04 bit 7) or a power of 0.
+; (MagicProp +$04 bit 7), a power of 0, or an attacker special effect that
+; writes the number after the multiplier (v0.45: Revenge, Blow Fish, Pearl
+; Wind, Step Mine and Exploder took a boost and dealt their own number; so
+; did SABIN's Mantra, a Blitz).
 ; in: A = the attack id.  out: carry set = no number.  a8, either index
 ; width; preserves A, X and Y.
 .proc Ot6SpellNoNumber
@@ -1372,6 +1389,19 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         bmi     @none           ; a fraction of HP/MP
         lda     f:MagicProp+6,x
         beq     @none           ; no power: no number
+        lda     f:MagicProp+9,x ; an attacker special effect that sets the
+        cmp     #$19            ;   number itself, after CalcDmg's multiplier
+        beq     @none           ;   (DoAttackerEffect overwrites $11b0):
+        cmp     #$1a            ;   $19 Exploder (the caster's HP), $1a Blow
+        beq     @none           ;   Fish (1000), $1b Pearl Wind (the caster's
+        cmp     #$1b            ;   max HP), $1e Step Mine (the play clock),
+        beq     @none           ;   $3d Revenge (max HP less HP)
+        cmp     #$1e
+        beq     @none
+        cmp     #$3d
+        beq     @none
+        cmp     #$15            ; $15 Mantra (the caster's HP over the
+        beq     @none           ;   bodies it heals, AttackerEffect_15)
 @buys:  plx
         pla
         plp
@@ -1457,6 +1487,9 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;     $302c,y + 4, four bytes a row, the esper's row 0 skipped);
 ;   * the Item list ($0a): Ot6ItemNoBoost on the bag row under the cursor
 ;     ($2686, five bytes a row);
+;   * SABIN's Blitz list ($30 with $6168 = 1, the same shell and rows, each
+;     cell the blitz's attack id): Ot6SpellNoNumber on it (Mantra, whose
+;     special effect sets the heal after the multiplier);
 ;   * Edgar's Tools ($30 with $6168 = 0, the tools shell's real-tools mode):
 ;     Ot6ToolNoBoost on the tool under the cursor (#469: NoiseBlaster, Air
 ;     Anchor is not: it hits), the shell's own row arithmetic (_c18470:
@@ -1467,6 +1500,15 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;     cell (_c18491: row * 2 + column) + $83.  A cell empty for this rider
 ;     (DefaultMagitekAttackTbl's $ff) cannot be confirmed, so its answer
 ;     does not matter.
+;   * the Lore list ($1b): Ot6SpellNoBoost on the lore under the cursor
+;     (Condemned, Roulette, Big Guard, L.5 Doom, L.3 Muddle, Reflect???,
+;     ForceField, Dischord, Sour Mouth, Pep Up, Rippler: no power, or Pep
+;     Up's fraction; Revenge, Blow Fish, Pearl Wind, Step Mine, Exploder:
+;     their special effect sets the number after the multiplier), the row the confirm queues (UpdateMenuState_1b's
+;     _c183f7: scroll + cursor row, one column, four bytes a row from the
+;     caster's list at $216a = the list's own $208e + $dc, the esper's row
+;     and the 54 spells' before it; one row per lore, its byte the lore's
+;     number 0-23, whose attack id is that + $8b; $ff on a row not offered).
 ; Filch and Bestow buy shields and pips since #469, so the thief list
 ; refuses nothing.  Everywhere else (the command window, before the action is
 ; picked) R stands.
@@ -1486,13 +1528,16 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         cmp     #$0e
         jeq     @magic
         cmp     #$0a
-        beq     @item
+        jeq     @item
         cmp     #$2a
-        beq     @magitek
+        jeq     @magitek
+        cmp     #$1b
+        jeq     @lore
         cmp     #$30
         jne     @buys
         lda     $6168
-        jne     @buys           ; not the real-tools mode
+        cmp     #$02
+        jcs     @buys           ; bushido, thief, Setzer: not a tool or a blitz
         lda     $895f,x         ; scroll
         clc
         adc     $8967,x         ; + row
@@ -1508,10 +1553,18 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         tax
         pla
         shorta0
+        lda     $6168
+        bne     @blitz
         lda     $4005,x         ; the row's tool (item id)
         jsl     Ot6ToolNoBoost
-        bcs     @none
-        bra     @buys
+        jcs     @none
+        brl     @buys
+@blitz: lda     $4005,x         ; the row's blitz (its attack id, $5d-$64)
+        cmp     #$ff
+        jeq     @buys           ; an empty cell cannot be confirmed
+        jsl     Ot6SpellNoNumber
+        jcs     @none
+        brl     @buys
 @magitek:
         lda     $8943,x         ; row
         asl
@@ -1519,6 +1572,25 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         adc     $893f,x         ; + column: the cell
         clc
         adc     #$83            ; the beam's attack id (CmdAttackOffsetTbl)
+        jsl     Ot6SpellNoBoost
+        bcs     @none
+        bra     @buys
+@lore:  lda     $891f,x         ; scroll
+        clc
+        adc     $8927,x         ; + cursor row: the lore row (one column)
+        longa
+        and     #$00ff
+        asl
+        asl                     ; four bytes a row
+        clc
+        adc     $302c,y         ; the caster's list
+        tax
+        shorta0
+        lda     a:$00dc,x       ; the row's lore, 0-23 (the esper's row and
+        cmp     #$ff            ;   the 54 spells' rows come first: $dc
+        beq     @buys           ;   bytes); an empty row cannot be confirmed
+        clc
+        adc     #$8b            ; its attack id, the MagicProp record
         jsl     Ot6SpellNoBoost
         bcs     @none
         bra     @buys
@@ -2749,9 +2821,46 @@ OT6_LIFE3_ID = $35
         ; pending boost of.
         pla                     ; drop the parked cost (it is 0 for these)
         lda     $3a7b           ; the resolved id (attack id / tool item id)
-        jsl     Ot6CostFor      ; pure table scan: id -> cost in A
-        jsl     Ot6BoostPriceFor
+        jsl     Ot6BlitzPrice   ; the row's price at the pending boost
         plp
+        rtl
+.endproc
+
+; [ a Blitz's price for this caster ]
+; Ot6AbilityCostTbl's row, x2.5 per pending boost (Ot6BoostPriceFor), except
+; a blitz the multiplier never reaches (Mantra: Ot6SpellNoNumber), whose
+; boost buys nothing and which is flat at every boost, as NoiseBlaster is
+; (Ot6ToolPrice).  The list's drawn number, its grey and confirm
+; (Ot6BlitzListOpen, Ot6KitRowCost) and the charge (Ot6AbilityCost) all
+; come here.  in: A = the blitz's attack id, X = the caster's entity offset.
+; out: A = the price.  a8/i16, db=$7e; preserves X and Y.
+.proc Ot6BlitzPrice
+        .a8
+        .i16
+        jsl     Ot6SpellNoNumber
+        bcc     :+
+        jml     Ot6CostFor      ; flat: the row's base
+:       jsl     Ot6CostFor      ; the row's base
+        jml     Ot6BoostPriceFor        ; x2.5 per pending boost, capped at 99
+.endproc
+
+; [ the same, for the caster whose menu is open ($62ca) ]
+; in: A = the blitz's attack id.  out: A = price.  a8/i16, db=$7e;
+; preserves X and Y.
+.proc Ot6PendBlitzPrice
+        .a8
+        .i16
+        phx
+        pha
+        lda     $62ca           ; active caster slot
+        longa
+        and     #$0003
+        asl                     ; slot -> entity offset
+        tax
+        shorta0
+        pla
+        jsl     Ot6BlitzPrice
+        plx
         rtl
 .endproc
 

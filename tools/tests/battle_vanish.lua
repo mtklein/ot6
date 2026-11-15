@@ -222,7 +222,7 @@ H.run({ maxFrames = 90000 }, {
   --   b. a classless skill (Bio Blaster: Ot6WeapClassTbl $00, magic that lands on a Vanished body) is left as
   --      planned, and a classed one (AutoCrossbow: pierce, a steel blow that misses) is answered as a Fight is;
   --   c. Driver:absorbWeaponPlan: a Fight with a weapon whose element the aimed body absorbs is not a Fight (the
-  --      element and the absorb byte stubbed through M.weaponElement and M.monsterAbsorb, since no Kolts body
+  --      element and the live absorb byte stubbed through M.weaponElement and M.readByte, since no Kolts body
   --      absorbs the party's weapons); the same Fight is left alone with the stubs off (inert where nothing is
   --      absorbed) and with M.ABSORB_WEAPON_GUARD = false (the control arm).
   H.call(function()
@@ -252,14 +252,19 @@ H.run({ maxFrames = 90000 }, {
     for _, s in ipairs(standing) do setBit(ST1 + (4 + s) * 2, 0x10, false) end
     local fight = function() return { kind = "fight", row = 0, boostLeft = 0, aim = standing[1] } end
     H.assertEq(D:absorbWeaponPlan(0, fight()).kind, "fight", "4c. nothing absorbed: the Fight is left alone")
-    local we, ma = H.weaponElement, H.monsterAbsorb
+    -- (the absorb byte is the slot's live one, $3BCC + 8 + slot*2, #529: stubbed through H.readByte at those
+    -- addresses alone, every standing body absorbing, so there is no body to re-aim at)
+    local we, rb = H.weaponElement, H.readByte
     H.weaponElement = function() return 0x02 end
-    H.monsterAbsorb = function() return 0xFF end
+    H.readByte = function(a)
+      if a >= 0x3BD4 and a <= 0x3BDE and (a - 0x3BD4) % 2 == 0 then return 0xFF end
+      return rb(a)
+    end
     local a = D:absorbWeaponPlan(0, fight())
     H.ABSORB_WEAPON_GUARD = false
     local c = D:absorbWeaponPlan(0, fight())
     H.ABSORB_WEAPON_GUARD = nil
-    H.weaponElement, H.monsterAbsorb = we, ma
+    H.weaponElement, H.readByte = we, rb
     H.log(string.format("[test] 4c. absorbed: actor 0's Fight becomes %s (%s); guard off: %s", a.kind,
       tostring(a.reason), c.kind))
     H.assertEq(a.kind ~= "fight", true, "4c. a Fight whose weapon the body absorbs is not a Fight")

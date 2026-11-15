@@ -103,6 +103,30 @@ OT6_LOREROWS         = 5
 .assert (OT6_LORELOAD & $ffff) + OT6_LORESLOTS - 1 <= $1ffd, error, "lore loadout must sit inside the checksum window"
 .assert (OT6_LORELOAD & $ffff) = (OT6_RAGELOAD & $ffff) + OT6_RAGESLOTS, error, "lore loadout must follow the rage bytes without a gap"
 
+; The save-block signature (#389, docs/design/save-layout.md "Reserve and
+; the layout version"), in the next three bytes of the scrap.  Every save
+; writes it (Ot6SaveSign, before the checksum); the first save of an
+; unsigned block zeroes the rest of the scrap and the block's unused tail,
+; so a block signed with version N had its reserve zero when version N
+; wrote it.  A New Game zeroes the whole scrap and the tail
+; (Ot6NewGameClear): vanilla clears WRAM only to $11ff, so these bytes start
+; as whatever the console left there.
+OT6_SAVESIG          := $7e1e2c     ; word: OT6_SAVESIG_WORD when signed
+OT6_SAVEVER          := $7e1e2e     ; byte: the layout version that signed it
+OT6_SAVERSV          := $7e1e2f     ; the scrap's reserve, through $1e3f
+OT6_SAVERSV_LEN      = $11
+OT6_SAVETAIL         := $7e1ff7     ; vanilla's unused tail, through $1ffd
+OT6_SAVETAIL_LEN     = 7
+OT6_SAVESIG_WORD     = $5653        ; 'S','V' (bytes $53 $56)
+OT6_SAVEVER_CUR      = 1
+OT6_SCRAP_LEN        = $23          ; the whole scrap New Game clears, from OT6_LOADOUT
+.assert (OT6_SAVESIG & $ffff) = (OT6_LORELOAD & $ffff) + OT6_LORESLOTS, error, "the signature must follow the lore bytes without a gap"
+.assert OT6_SAVEVER = OT6_SAVESIG + 2, error, "the version byte follows the signature"
+.assert OT6_SAVERSV = OT6_SAVEVER + 1, error, "the reserve follows the version byte"
+.assert (OT6_SAVERSV & $ffff) + OT6_SAVERSV_LEN - 1 = $1e3f, error, "the reserve ends at the scrap's end"
+.assert (OT6_SAVETAIL & $ffff) + OT6_SAVETAIL_LEN - 1 = $1ffd, error, "the tail ends where the checksum window does"
+.assert (OT6_LOADOUT & $ffff) + OT6_SCRAP_LEN - 1 = $1e3f, error, "the scrap is $1e1d-$1e3f"
+
 ; Battle-only scratch. InitBattle clears through $3ed3.  The walkers use the
 ; interleaved even words.  ($3ecb held the once-a-battle divine flag until
 ; the owner's 2026-10-11 rule made a full 3-BP boost a divine's only gate;
@@ -188,17 +212,8 @@ OT6_PIPSLOT          := $ed6b   ; the character slot the live pip cell
 ; that.  Equality is the current, intended fit ($ed61 + 10 =
 ; $ed6b), so the bound is <=, not <.
 .assert OT6_WALLETCELLS + OT6_WALLET_W * 2 <= OT6_PIPSLOT, error, "OT6 wallet cells run into OT6_PIPSLOT"
-OT6_RAGETIER         := $ed73   ; the boost tier stored at Cmd_10 for the
-                                ;   whole trance (Slot's OT6_SLOTTIER pattern at
-                                ;   longer range: BP is spent once at the
-                                ;   Rage-start action but the tier must outlive
-                                ;   it).  lives in the measured-free shadow
-                                ;   tail, past InitBP's $70-byte clear.
-                                ;   Staleness is harmless for the same reason
-                                ;   as Slot's: it is read only while a RAGE
-                                ;   status is set, and
-                                ;   the only writer of that status (Cmd_10)
-                                ;   always rewrites the store first.
+; $ed73 held the one-byte OT6_RAGETIER until v0.45; it is free now (the tier is
+; per character, at the end of the shadow tail below).
 OT6_NUMCTR           := $ed71   ; last-seen damage-numeral thread counter
                                 ;   ($632e).  a change means GfxCmd_0b has
                                 ;   allocated a numeral (the damage frame)
@@ -349,11 +364,6 @@ OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
 .assert OT6_COVERPAID = OT6_NUMCTR + 1, error, "cover-earn flag must follow the numeral counter (both live past InitBP's shadow clear)"
 .assert OT6_COVERPAID > OT6_SHADOW + $70 - 1, error, "cover-earn flag must sit PAST InitBP's shadow clear (it is cleared by its own store)"
 .assert OT6_COVERPAID + 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
-.assert OT6_NUMCTR + 1 < OT6_RAGETIER, error, "OT6 rage tier overlaps the numeral counter"
-.assert OT6_RAGETIER >= OT6_SHADOW + $70, error, "OT6 rage tier must sit PAST InitBP's shadow clear (it is stored per trance, not per battle)"
-.assert OT6_RAGETIER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
-.assert OT6_COVERPAID <> OT6_RAGETIER, error, "cover-earn flag and rage tier collide"
-.assert OT6_PIPPEND > OT6_RAGETIER, error, "deferred-pip cell must not collide with the rage tier"
 .assert OT6_PIPPEND > OT6_SHADOW + $70 - 1, error, "deferred-pip cell must sit PAST InitBP's shadow clear (InitBP zeroes it explicitly)"
 .assert OT6_PIPPEND <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 .assert OT6_BRKLIVE > OT6_PIPPEND, error, "break-flash live flag must not collide with the deferred-pip cell"
@@ -396,7 +406,7 @@ OT6_WEAPSPELL        := $eda0
 ; clear then), before Ot6ActionEnd spends the pips at the end of that turn;
 ; Ot6BoostLevel hands it to Ot6BoostDmg on every dance step after, whose own
 ; turns carry no pending boost because a dancer never opens a menu.  The
-; OT6_RAGETIER shape at per-character range (Mog and a Gogo can both dance):
+; OT6_RAGETIER shape (Mog and a Gogo can both dance):
 ; read only while the DANCE status is set and the queued command is Dance,
 ; and the one writer of that status (Cmd_13's start) always records first,
 ; so a stale byte is never read and InitBP need not clear it.
@@ -583,5 +593,20 @@ OT6_HUDLEAD          := $ee2c   ; 12 bytes
 OT6_GREYLIVE         := $ee38
 .assert OT6_GREYLIVE = OT6_HUDLEAD + 12, error, "the grey painter's flag must follow the hud lead cells"
 .assert OT6_GREYLIVE <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+; The boost tier a Rage was started at, per character (4 characters, stride
+; 2, indexed by the rager's entity offset): Ot6RageTierStore writes it at the
+; start turn (Cmd_10 and FixPlayerAttack's cmd-$10 arm), Ot6RageCoin reads it
+; on every possessed turn after.  BP is spent once, at the start, but the tier
+; must outlive that action for the whole trance (Slot's OT6_SLOTTIER pattern
+; at longer range).  One byte served while Gau was the only rager; Gogo with
+; Rage in his commands raging beside him overwrote it, so whoever started last
+; set the coin for both (kit-gau.md section 10.7).  Past InitBP's clear on
+; purpose: it is read only while that rager's RAGE status is set, and the one
+; writer of that status (Cmd_10's start) always records first, so a stale
+; byte is never read (the OT6_DANCETIER contract).
+OT6_RAGETIER         := $ee39   ; 8 bytes (4 characters, stride 2)
+.assert OT6_RAGETIER = OT6_GREYLIVE + 1, error, "the rage tier must follow the grey painter's flag"
+.assert OT6_RAGETIER >= OT6_SHADOW + $70, error, "OT6 rage tier must sit PAST InitBP's shadow clear (it is stored per trance, not per battle)"
+.assert OT6_RAGETIER + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif

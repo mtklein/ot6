@@ -962,6 +962,276 @@ Ot6RungCostTbl:
 
 ; ------------------------------------------------------------------------------
 
+; [ the esper page's help line for a rung ]
+;
+; The esper detail page's cursor walks the rung column too (skills.asm,
+; GenjuDetailCursorProp); with it on a rung, the help window at the top shows
+; what the rung does: its description (Ot6RungDescIdx -> Ot6RungDescPtrs ->
+; Ot6RungDescStr, tools/esper_ladder.py's DESC).  Under a rung the character
+; has not reached whose effect bytes the character already holds from other
+; rungs it has reached (on any esper, this one's earlier rungs included), a
+; second line says so (Ot6RungHaveStr): the effect bytes of every other
+; reached rung OR'd together cover this rung's.  A stat rung, or a signature
+; that is new code (no bytes), is never "held": stats add, and each new
+; signature sits on one esper only.  A larger max HP or max MP boost covers a
+; smaller one (only the largest applies).  Gear is not counted: the line is
+; about where to tour next on the ladder.
+;
+; in: A (a8) = esper (GenjuProp order), X (i16) = rung 0-4, Y (i16) = actor.
+; Writes the string, its optional second line ($01 first) and the $00 end
+; to WMDATA (the caller has pointed WMADD at the help buffer, $7e9ec9).
+; a8/i16 in; every register and p preserved but A; rtl.
+
+; the frame, on the stack and addressed through the direct page
+RD_HELD  = 0            ; 10 bytes: the effect bytes the other reached rungs hold
+RD_REC   = 10           ; word: this rung's record, slot * 5 + rung
+RD_ROW   = 12           ; word: the actor's first counter (Ot6EsperRowOff)
+RD_S     = 14           ; word: slot loop
+RD_K     = 16           ; word: rung loop
+RD_RANK  = 18           ; word: the slot's rank
+RD_T     = 20           ; word: scratch
+RD_FRAME = 22
+RD_RUNG  = RD_FRAME     ; pushed by the entry: the rung,
+RD_ACTOR = RD_FRAME + 2 ;   the actor,
+RD_ESPER = RD_FRAME + 4 ;   and the esper
+
+.proc Ot6RungDescText
+        php
+        phd
+        longai
+        phx
+        phy
+        and     #$00ff
+        pha                     ; RD_ESPER
+        phy                     ; RD_ACTOR
+        phx                     ; RD_RUNG
+        tsc
+        sec
+        sbc     #RD_FRAME
+        tcs
+        inc
+        tcd                     ; dp 0 = the frame's first byte
+        lda     RD_ESPER
+        shorta
+        jsr     Ot6EsperSlot
+        longa
+        and     #$00ff
+        sta     RD_S
+        asl
+        asl
+        clc
+        adc     RD_S
+        clc
+        adc     RD_RUNG
+        sta     RD_REC
+; the description
+        tax
+        lda     f:Ot6RungDescIdx,x
+        and     #$00ff
+        asl
+        tax
+        lda     f:Ot6RungDescPtrs,x
+        tax
+        shorta
+@copy:  lda     f:Ot6RungDescStr,x
+        beq     @copied
+        sta     f:hWMDATA
+        inx
+        bra     @copy
+@copied:
+; reached, or nothing kept?  then no second line
+        longa
+        lda     f:OT6_ESPER_LIVE+OT6_ESPER_MAGIC
+        cmp     #OT6_ESPER_MAGIC_WORD
+        jne     @end
+        lda     RD_ACTOR
+        cmp     #OT6_ESPER_CHARS
+        jcs     @end
+        jsr     Ot6EsperRowOff
+        sta     RD_ROW
+        lda     RD_S
+        asl
+        clc
+        adc     RD_ROW
+        tax
+        lda     f:OT6_ESPER_LIVE+OT6_ESPER_CTR,x
+        jsr     Ot6EsperRankA
+        cmp     RD_RUNG
+        beq     :+                      ; rank = rung: not reached
+        jcs     @end                    ; rank > rung: reached, drawn white
+:       lda     RD_REC
+        jsr     @recoff
+        shorta
+        lda     f:Ot6LadderTbl+0,x
+        ora     f:Ot6LadderTbl+1,x
+        ora     f:Ot6LadderTbl+2,x
+        ora     f:Ot6LadderTbl+3,x
+        ora     f:Ot6LadderTbl+4,x
+        ora     f:Ot6LadderTbl+5,x
+        ora     f:Ot6LadderTbl+6,x
+        ora     f:Ot6LadderTbl+7,x
+        ora     f:Ot6LadderTbl+8,x
+        ora     f:Ot6LadderTbl+9,x
+        jeq     @end                    ; a stat rung or a new signature
+; OR every other reached rung's effect bytes into RD_HELD
+        longa
+        stz     RD_HELD+0
+        stz     RD_HELD+2
+        stz     RD_HELD+4
+        stz     RD_HELD+6
+        stz     RD_HELD+8
+        stz     RD_S
+@slot:  lda     RD_S
+        asl
+        clc
+        adc     RD_ROW
+        tax
+        lda     f:OT6_ESPER_LIVE+OT6_ESPER_CTR,x
+        jsr     Ot6EsperRankA
+        sta     RD_RANK
+        beq     @nexts
+        stz     RD_K
+@rung:  lda     RD_S
+        asl
+        asl
+        clc
+        adc     RD_S
+        clc
+        adc     RD_K
+        cmp     RD_REC
+        beq     @nextk
+        jsr     @recoff
+        shorta
+        lda     f:Ot6LadderTbl+0,x
+        tsb     RD_HELD+0
+        lda     f:Ot6LadderTbl+1,x
+        tsb     RD_HELD+1
+        lda     f:Ot6LadderTbl+2,x
+        tsb     RD_HELD+2
+        lda     f:Ot6LadderTbl+3,x
+        tsb     RD_HELD+3
+        lda     f:Ot6LadderTbl+4,x
+        tsb     RD_HELD+4
+        lda     f:Ot6LadderTbl+5,x
+        tsb     RD_HELD+5
+        lda     f:Ot6LadderTbl+6,x
+        tsb     RD_HELD+6
+        lda     f:Ot6LadderTbl+7,x
+        tsb     RD_HELD+7
+        lda     f:Ot6LadderTbl+8,x
+        tsb     RD_HELD+8
+        lda     f:Ot6LadderTbl+9,x
+        tsb     RD_HELD+9
+        longa
+@nextk: inc     RD_K
+        lda     RD_K
+        cmp     RD_RANK
+        bcc     @rung
+@nexts: inc     RD_S
+        lda     RD_S
+        cmp     #OT6_ESPER_SLOTS
+        bcc     @slot
+; a max HP or max MP boost: only the largest applies (CheckHPBoost reads the
+; bits largest-first), so a larger one held covers the smaller ones
+; (ItemProp +9: HP 1/8 $10, 1/4 $04, 1/2 $08; MP 1/8 $80, 1/4 $20, 1/2 $40)
+        shorta
+        lda     RD_HELD+4
+        bit     #$08
+        beq     :+
+        ora     #$14                    ; HP 1/2 covers 1/4 and 1/8
+:       bit     #$04
+        beq     :+
+        ora     #$10                    ; HP 1/4 covers 1/8
+:       bit     #$40
+        beq     :+
+        ora     #$a0                    ; MP 1/2 covers 1/4 and 1/8
+:       bit     #$20
+        beq     :+
+        ora     #$80                    ; MP 1/4 covers 1/8
+:       sta     RD_HELD+4
+        longa
+; covered?  each of this rung's bytes, less what is held, must be empty
+        lda     RD_REC
+        jsr     @recoff
+        shorta
+        lda     RD_HELD+0
+        eor     #$ff
+        and     f:Ot6LadderTbl+0,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+1
+        eor     #$ff
+        and     f:Ot6LadderTbl+1,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+2
+        eor     #$ff
+        and     f:Ot6LadderTbl+2,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+3
+        eor     #$ff
+        and     f:Ot6LadderTbl+3,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+4
+        eor     #$ff
+        and     f:Ot6LadderTbl+4,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+5
+        eor     #$ff
+        and     f:Ot6LadderTbl+5,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+6
+        eor     #$ff
+        and     f:Ot6LadderTbl+6,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+7
+        eor     #$ff
+        and     f:Ot6LadderTbl+7,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+8
+        eor     #$ff
+        and     f:Ot6LadderTbl+8,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     RD_HELD+9
+        eor     #$ff
+        and     f:Ot6LadderTbl+9,x
+        jne     @end                    ; a bit not held: nothing to say
+        lda     #$01                    ; the second line
+        sta     f:hWMDATA
+        ldx     #$0000
+@have:  lda     f:Ot6RungHaveStr,x
+        beq     @end
+        sta     f:hWMDATA
+        inx
+        bra     @have
+@end:   shorta
+        lda     #$00
+        sta     f:hWMDATA
+        longa
+        tsc
+        clc
+        adc     #RD_FRAME + 6
+        tcs
+        ply
+        plx
+        pld
+        plp
+        rtl
+
+; A (a16) = a rung record -> X = its offset in Ot6LadderTbl (record * 14).
+; Clobbers A (left a16); uses RD_T.
+@recoff:
+        asl
+        sta     RD_T
+        asl
+        asl
+        asl                             ; x16
+        sec
+        sbc     RD_T                    ; x14
+        tax
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ the ladder ]
 ;
 ; Ot6LadderTbl: 26 espers (counter-slot order: GenjuProp order with Odin and
@@ -1180,3 +1450,6 @@ Ot6LadderTbl:
 
 ; the menu labels for the rungs (tools/esper_ladder.py --labels)
         .include "ot6_esper_labels.inc"
+
+; the esper page's help lines for the rungs (tools/esper_ladder.py --labels)
+        .include "ot6_esper_desc.inc"

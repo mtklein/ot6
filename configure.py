@@ -436,6 +436,14 @@ TEST_ENV = {
     # snapshots; no write
     "battle_boostkeep": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # R refused on a Lore that moves no number (Ot6RowNoBoost's Lore arm):
+    # STRAGO taught one quiet lore before the walk (declared)
+    "battle_lorerefuse":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # a boost buys nothing on SABIN's Mantra: the Blitz list refuses R on
+    # it, a pending point is dropped and the price is flat; no write
+    "battle_mantrarefuse":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-sabin-v1",
     # #469: reach, Debilitator's steps and the last refusals, from one
     # battle's snapshots outside Kohlingen; no write
     "battle_boostreach": "OT6_TIMEOUT=3600 "
@@ -693,6 +701,9 @@ for f in glob("tools/tests/*.lua"):
     if attrs.split() == ["golden"]:
         golden_suite = f        # one edge per golden save, below
         continue
+    if attrs.split() == ["newgame"]:
+        newgame_suite = f       # its own edges, below the golden saves
+        continue
     # the emulator pin too: a test result is the emulator's as much as the
     # ROM's, so a new emulator re-runs every test, as it regenerates every state
     deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
@@ -755,7 +766,10 @@ for f in glob("tools/tests/*.lua"):
 # tools/tests/save_golden.lua; tools/golden_saves.py then holds the run's log
 # and the battery it left to the fixture file and to the battery map in
 # docs/design/save-layout.md.  The negative is a v0.44 save whose esper page
-# lost its signature: the check must refuse it.
+# lost its signature: the check must refuse it.  golden-saves/junk/ holds a
+# v0.44 save carrying the power-on junk an all-ones console leaves (in its
+# reserve and every page's): its first save must sign it and zero the
+# slot's reserves, and nothing else.
 GOLDEN_DIR = "tools/tests/golden-saves"
 golden_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
                  copy_if_changed_from(golden_suite), "tools/golden_saves.py",
@@ -765,6 +779,8 @@ golden_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.
     [copy_if_changed_from(h) for h in LIBS] + HARNESS
 golden_fixtures = [str(Path(m).parent)
                    for m in sorted(glob(f"{GOLDEN_DIR}/v*/*/manifest.json"))]
+golden_fixtures += [str(Path(m).parent)
+                    for m in sorted(glob(f"{GOLDEN_DIR}/junk/*/manifest.json"))]
 golden_fixtures.append(f"{GOLDEN_DIR}/negative/esper-unsigned-v0.44")
 golden_outs = []
 for fx in golden_fixtures:
@@ -774,6 +790,68 @@ for fx in golden_fixtures:
     w.edge([out], "sh", implicit=golden_common + [f"{fx}/manifest.json", f"{fx}/battery.sram"],
            cmd=f"nice tools/build/run_golden_save.sh {mode} {fx} {out}",
            desc=f"golden save {rel}", pool="side")
+    qual.append(out)
+    golden_outs.append(out)
+
+# The mutant ROMs (#389): the real build with one routine returning at once,
+# or a labelled seam rewritten (tools/build/mutant_rom.py; ff6-en.dbg still
+# describes them).  Each must turn its run red, for the reason named.
+MUTANTS = {
+    # no signing: the junk save's first save is unsigned
+    "nosign": ("Ot6SaveSign", "junk/v0.44-wor-cyan", "the saved block is signed"),
+    # the signature alone counts as signed: version 0 is kept, and its junk reserve
+    "sigonly": ("VerCheck=eaeaeaeaeaea", "junk/v0.44-sig-ver0", "with layout version 1"),
+    # the page reserves zeroed for the slot loaded, not the slot saved into
+    "srcpages": ("SlotAt=ad1f02", "junk/v0.44-wor-cyan", "saveas: slot 1's codex and esper page pads"),
+    # no loadout repair: impossible values survive the first signing
+    "norepair": ("Ot6RepairLoadouts", "junk/v0.44-mixed", "impossible loadout values are reset"),
+    # the Bushido mask counting slot 0 ($f007): the page's seeded word is lost
+    "mask0": ("MaskAt=8907f0", "junk/v0.44-mixed", "impossible loadout values are reset"),
+    # no New Game clear (battle_newgameloadouts, below)
+    "noclear": ("Ot6NewGameClear", None, None),
+}
+for name, (edit, fx, want) in MUTANTS.items():
+    w.edge([f"build/mutants/{name}.sfc"], "sh",
+           implicit=["tools/build/mutant_rom.py", "build/ot6.sfc", "ff6/rom/ff6-en.dbg"],
+           cmd=f"mkdir -p build/mutants && python3 tools/build/mutant_rom.py build/ot6.sfc "
+               f"ff6/rom/ff6-en.dbg build/mutants/{name}.sfc {edit}",
+           desc=f"mutant ROM {name}")
+    if fx is None:
+        continue
+    d = f"{GOLDEN_DIR}/{fx}"
+    out = f"build/results/golden/mutant_{name}.ok"
+    w.edge([out], "sh", implicit=golden_common + [f"build/mutants/{name}.sfc", f"{d}/manifest.json",
+                                                  f"{d}/battery.sram"],
+           cmd=f"OT6_ROM=build/mutants/{name}.sfc OT6_DBG=ff6/rom/ff6-en.dbg OT6_GOLDEN_TAG={name}_ "
+               f"nice tools/build/run_golden_save.sh redrun {d} {out} \"{want}\"",
+           desc=f"golden save {fx} on the mutant {name} (must go red)", pool="side")
+    qual.append(out)
+    golden_outs.append(out)
+
+
+
+# battle_newgameloadouts (#389): a New Game on an all-ones console, then the
+# battle lists its loadout bytes build, on a battery seating GAU and one
+# seating STRAGO; and on the mutant without Ot6NewGameClear, which must go
+# red.
+ng_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
+             copy_if_changed_from(newgame_suite), "tools/build/run_tagged_suite.sh"] + \
+    [copy_if_changed_from(h) for h in LIBS] + HARNESS
+for tag, fx, extra in (("newgame_gau", "v0.44/wor-gau-v1", ""),
+                       ("newgame_strago", "v0.44/wor-opera-v1", ""),
+                       ("newgame_noclear", "v0.44/wor-gau-v1", "red")):
+    d = f"{GOLDEN_DIR}/{fx}"
+    deps = ng_common + [f"{d}/manifest.json", f"{d}/battery.sram"]
+    env = f"OT6_RAM_POWERON=AllOnes OT6_SRAM_CHECKPOINT={d}"
+    tail = ""
+    if extra:
+        deps.append("build/mutants/noclear.sfc")
+        env += " OT6_ROM=build/mutants/noclear.sfc OT6_DBG=ff6/rom/ff6-en.dbg"
+        tail = " red \"Gau's Rage list\""
+    out = f"build/results/tagged/{tag}.ok"
+    w.edge([out], "sh", implicit=deps,
+           cmd=f"{env} nice tools/build/run_tagged_suite.sh {Path(newgame_suite).stem} {tag} {out}{tail}",
+           desc=f"suite {tag}", pool="side")
     qual.append(out)
     golden_outs.append(out)
 
@@ -792,6 +870,17 @@ check("golden_saves",
        "tools/savestate_party.py", "docs/design/save-layout.md",
        "tools/tests/lib/sram_checkpoint.py", f"{GOLDEN_DIR}/MANIFEST.json"]
       + [f"{fx}/{n}" for fx in golden_fixtures for n in ("manifest.json", "battery.sram")])
+# A New Game's first save (#389): the play from power-on saves for the first
+# time at world-narshe-v1 (gen_worldmap); that capture's slot is signed,
+# version 1, with its reserves zero and its loadouts AUTO.
+fs_key = "world-narshe-v1"
+check("first_save_signed",
+      f"python3 tools/golden_saves.py firstsave {sn.CAPTURE_DIR}/{fs_key}",
+      ["tools/golden_saves.py", "tools/check_save_layout.py", "docs/design/save-layout.md"]
+      + sn.capture_inputs(ROOT, fs_key))
+# #389: the next release's notes already carry the save line the cut checks
+check("notes_saves", "python3 tools/golden_saves.py notes docs/release-notes-next.md",
+      ["tools/golden_saves.py", "docs/release-notes-next.md", f"{GOLDEN_DIR}/MANIFEST.json"])
 # `ninja golden`: every golden save and the checks on the set and the layout
 w.edge(["golden"], "phony", golden_outs + ["build/checks/golden_saves.ok", "build/checks/save_layout.ok"])
 
@@ -836,12 +925,27 @@ check("break_coverage_ratchet", "python3 tools/audit_break_coverage.py",
 # One row per species (#157): Ot6SeedShields takes the FIRST match, so a
 # second Ot6ShieldTbl/Ot6ElemAddTbl row for a species is dead code that
 # reads as authored.  Source and the shipped ROM table must agree row for
-# row.
+# row.  And the coverage ratchet (v0.45): every species a reachable formation
+# holds (the pools, the event battles a script calls, the chests, the ai's
+# formation changes, the colosseum) has a row -- zero ride the generated
+# floor -- and the rows under Ot6ShieldTblUnreached, the 0-shield markers for
+# bodies no reachable formation holds, stay unreached.
 check("shield_rows",
       "python3 tools/check_shield_rows.py --selftest"
       " && python3 tools/check_shield_rows.py",
       ["tools/check_shield_rows.py", "build/ot6.sfc",
-       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm"])
+       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm",
+       "ff6/src/field/map_prop.dat", "ff6/src/field/sub_battle_group.dat",
+       "ff6/src/field/rand_battle_group.dat",
+       "ff6/src/field/world_battle_group.dat",
+       "ff6/src/field/event_battle_group.dat",
+       "ff6/src/field/trigger/treasure_prop.dat",
+       "ff6/src/battle/cond_battle.dat", "ff6/src/battle/battle_monsters.dat",
+       "ff6/src/battle/ai_script.asm", "ff6/src/world/train_script.asm",
+       "ff6/src/world/ctrl.asm", "ff6/src/field/event.asm",
+       "ff6/src/menu/colosseum.asm", "ff6/include/const.inc",
+       "ff6/src/battle/battle_main.asm"] + sorted(glob("ff6/src/event/*.asm"))
+      + glob("src/event/*.asm", "ff6"))
 check("break_reach", "python3 tools/check_break_reach.py",
       ["tools/check_break_reach.py", "ff6/src/battle/battle_main.asm"]
       + glob("src/battle/ot6_*.asm", "ff6"))
@@ -891,11 +995,15 @@ check("spell_grants",
 # are docs/design/esper-rework.md's table, parsed from the doc (relic effects
 # by the ItemProp bytes of the relic each cell names); the selftest's mutants
 # move one rung's bit, stat and label in the ROM and two cells in the doc.
+# The esper page's help lines (DESC) are checked too: a description for every
+# label, one line within the help window's width (FontWidth), one effect a
+# label; the mutants move a rung's line in the ROM and drop or widen one.
 check("esper_ladder",
       "python3 tools/esper_ladder.py --selftest"
       " && python3 tools/esper_ladder.py",
       ["tools/esper_ladder.py", "docs/design/esper-rework.md", "ff6/src/menu/item_prop_en.dat",
-       "ff6/src/text/item_name_en.json", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
+       "ff6/src/text/item_name_en.json", "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg",
+       copy_if_changed_from("build/ot6.sfc")])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.
@@ -1166,8 +1274,11 @@ w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
        cmd=f'mkdir -p "{rel_dir}" && tools/bin/flips --create --bps'
            f' "{BASE}" build/ot6.sfc "{bps}"',
        desc=f"bps patch v{VERSION}")
+# (the notes' save line names the oldest golden saves, never a layout: #389)
 w.edge([f"{rel_dir}/RELEASE_NOTES.md"], "sh", [notes, "VERSION"],
-       cmd=f'mkdir -p "{rel_dir}" && cp "{notes}" "{rel_dir}/RELEASE_NOTES.md"',
+       implicit=["tools/golden_saves.py", "tools/tests/golden-saves/MANIFEST.json"],
+       cmd=f'python3 tools/golden_saves.py notes "{notes}" && '
+           f'mkdir -p "{rel_dir}" && cp "{notes}" "{rel_dir}/RELEASE_NOTES.md"',
        desc="release notes")
 # saves/: every tracked checkpoint's battery save, named in story order,
 # and a README (tools/release_saves.py).  Staged without qualification;

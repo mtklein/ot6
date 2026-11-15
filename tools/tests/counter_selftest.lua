@@ -356,14 +356,16 @@ check("Fire is no Death answer",
 -- M.deathReach: a cast on the monster's own turn by its targeting byte; a
 -- counter on the one who struck (CheckRetal's preset $b8, which
 -- ChooseTarget keeps for $2C targeting, #528); Roulette's cursor either way
-local function reach(a, counter) return H.deathReach(rom:byte(MAGIC + a * 14 + 1), counter) end
+local function reach(a, counter)
+  return H.deathReach(rom:byte(MAGIC + a * 14 + 1), counter, rom:byte(MAGIC + a * 14 + 3))
+end
 check("L.5 Doom cast on its own turn reaches the whole party; Blaster and Doom the one who struck",
   "deathReach", "if (t & 0x01) == 0 and (t & 0x0C) ~= 0 then return \"party\" end", "",
   function()
     return reach(L5_DOOM) == "party" and reach(BLASTER) == "attacker" and reach(DOOM) == "attacker"
   end)
 check("as a counter, L.5 Doom reaches the one who struck alone",
-  "deathReach", "if counter then return \"attacker\" end", "",
+  "deathReach", "if ((f2 or 0) & 0x10) == 0 then return \"attacker\" end", "",
   function()
     return reach(L5_DOOM, true) == "attacker" and reach(BLASTER, true) == "attacker"
       and reach(DOOM, true) == "attacker"
@@ -371,6 +373,34 @@ check("as a counter, L.5 Doom reaches the one who struck alone",
 check("Roulette's cursor reaches any member, as a counter too",
   "deathReach", "if (t & 0x80) ~= 0 then return \"roulette\" end", "",
   function() return reach(ROULETTE) == "roulette" and reach(ROULETTE, true) == "roulette" end)
+
+-- #533 review: a counter whose spell carries MagicProp +2 bit $10 (random
+-- target) is Retargeted to its targeting's group; without it the preset $b8
+-- (the one who struck) is kept whatever the targeting byte says
+local SAND_STORM, MAGNITUDE8, QUARTR, ULTIMA, L4_FLARE = 0x69, 0xBC, 0x11, 0x14, 0x95
+check("as a counter, Sand Storm (+2 $50: random target) reaches the whole party",
+  "deathReach", "if (t & 0x0C) ~= 0 or (t & 0x20) ~= 0 then return \"party\" end", "",
+  function() return reach(SAND_STORM, true) == "party" end)
+check("as a counter, Magnitude8, Quartr, Ultima and L.4 Flare reach the one who struck (no random-target bit)",
+  "deathReach", "if ((f2 or 0) & 0x10) == 0 then return \"attacker\" end", "if false then end",
+  function()
+    return reach(MAGNITUDE8, true) == "attacker" and reach(QUARTR, true) == "attacker"
+      and reach(ULTIMA, true) == "attacker" and reach(L4_FLARE, true) == "attacker"
+  end)
+-- Retarget (@5937) picks the side before the group: a monster's $b8 starts
+-- on its own side, the ENEMY bit (+0 $40) turns it to the party and
+-- INIT_ALL ($0C = $04) takes both; a random-target answer with neither
+-- lands on the monsters and reaches no member
+local HARVESTER, KITTY = 0x68, 0x77
+assert(rom:byte(MAGIC + HARVESTER * 14 + 1) == 0x3E and rom:byte(MAGIC + HARVESTER * 14 + 3) & 0x10 ~= 0
+  and rom:byte(MAGIC + KITTY * 14 + 1) == 0x3E and rom:byte(MAGIC + KITTY * 14 + 3) & 0x10 ~= 0,
+  "Harvester and Kitty in MagicProp: +0 $3E (no ENEMY bit, INIT_HALF), +2 bit $10")
+check("as a counter, Harvester and Kitty (random target, no ENEMY bit) land on the monsters' own side; Sand Storm still the party",
+  "deathReach", 'if (t & 0x40) == 0 and (t & 0x0C) ~= 0x04 then return "none" end', "",
+  function()
+    return reach(HARVESTER, true) == "none" and reach(KITTY, true) == "none"
+      and reach(SAND_STORM, true) == "party"
+  end)
 
 print(string.format("counter_selftest: PASS -- %d assertions, each failed by its own mutant: %s",
   n, table.concat(checks, "; ")))

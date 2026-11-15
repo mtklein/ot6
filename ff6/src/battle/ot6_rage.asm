@@ -555,8 +555,11 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 ; Both are idempotent on the start turn: the pending byte is not consumed until
 ; Ot6ActionEnd, so the second call stores the same value the first did.
 ;
+; The store is per rager (OT6_RAGETIER,y, stride 2): a Gogo raging beside Gau
+; once shared one byte with him, so whoever started last set both coins.
+;
 ; entry: jsl from either site, a8, Y = attacker entity, db=$7e.  Index width is
-; not assumed; Y only ever indexes two absolute tables with an entity index.
+; not assumed; Y only ever indexes absolute tables with an entity index.
 ; clobbers A's low half only (a8), preserving B for FixPlayerAttack's xba.
 .proc Ot6RageTierStore
         .a8
@@ -567,7 +570,7 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
         cmp     #$04
         bcc     :+
         lda     #$03            ; (defensive: Ot6Boost already caps at 3)
-:       sta     f:$7e0000+OT6_RAGETIER
+:       sta     OT6_RAGETIER,y  ; this rager's own cell (db=$7e)
 @done:  rtl
 .endproc
 
@@ -612,7 +615,8 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
         .i16                    ;   widens to $00yy and sep #$10 truncates it
         phy                     ;   back, so either caller width works
         ;   stack from here: $01,s Ylo  $02,s Yhi  $03,s P  $04,s coin  $05,s A
-        lda     f:$7e0000+OT6_RAGETIER
+        tyx                     ; X = the rager (RandRage's own Y, $33a8,y)
+        lda     f:$7e0000+OT6_RAGETIER,x ; the tier this rager started at
         beq     @done           ; tier 0: vanilla's coin stands, no extra draw
         cmp     #$03
         bcc     @tilt

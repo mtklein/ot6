@@ -2891,7 +2891,14 @@ LoadGenjuDetailCursor:
 ; [ update cursor positions for esper details ]
 
 UpdateGenjuDetailCursor:
+.if LANG_EN
+        jsr     Ot6GenjuCursorBlocked
+        bcs     InitGenjuDetailCursor   ; up off rung 1, down off rung 5: no move, no sound
+.endif
 @5983:  jsr     MoveCursor
+.if LANG_EN
+        jsr     Ot6GenjuCursorClamp
+.endif
 
 InitGenjuDetailCursor:
 @5986:  ldy     #near GenjuDetailCursorPos
@@ -2899,6 +2906,69 @@ InitGenjuDetailCursor:
 
 ; ------------------------------------------------------------------------------
 
+.if LANG_EN
+; OT6: two columns, the spell rows (x = 0) and the ladder's five rungs (x = 1,
+; rows 1-5, the labels at col 16; Ot6GenjuCursorClamp keeps the cursor off
+; rows 0 and 6 there).  $4b = 2 * row + column, so it is 0 on the summon row
+; alone, as the A button's equip check reads it; the help line reads the row
+; from $4e (_c35b93).
+GenjuDetailCursorProp:
+        cursor_prop {0, 0}, {2, 7}, NO_X_WRAP
+
+GenjuDetailCursorPos:
+        cursor_pos {16, 112}
+        cursor_pos {112, 124}           ; (1, 0): never shown (clamped)
+        cursor_pos {24, 124}
+        cursor_pos {112, 124}
+        cursor_pos {24, 136}
+        cursor_pos {112, 136}
+        cursor_pos {24, 148}
+        cursor_pos {112, 148}
+        cursor_pos {24, 160}
+        cursor_pos {112, 160}
+        cursor_pos {24, 172}
+        cursor_pos {112, 172}
+        cursor_pos {24, 184}
+        cursor_pos {112, 172}           ; (1, 6): never shown (clamped)
+
+; carry set: on the rung column, up on rung 1 or down on rung 5, a move the
+; clamp would only undo (MoveCursor checks up first, then down, as here)
+Ot6GenjuCursorBlocked:
+        lda     $4d
+        beq     @no
+        lda     z0a+1
+        bit     #$08                    ; up
+        beq     @down
+        lda     $4e
+        cmp     #1
+        beq     @yes
+        bra     @no
+@down:  bit     #$04                    ; down
+        beq     @no
+        lda     $4e
+        cmp     #5
+        beq     @yes
+@no:    clc
+        rts
+@yes:   sec
+        rts
+
+; the rung column has rungs on rows 1-5 only (a right move from row 0 or 6
+; lands here)
+Ot6GenjuCursorClamp:
+        lda     $4d
+        beq     @done                   ; the spell column: every row
+        lda     $4e
+        bne     @low
+        lda     #1
+        sta     $4e
+        rts
+@low:   cmp     #6
+        bcc     @done
+        lda     #5
+        sta     $4e
+@done:  rts
+.else
 GenjuDetailCursorProp:
         cursor_prop {0, 0}, {1, 7}, NO_X_WRAP
 
@@ -2910,6 +2980,7 @@ GenjuDetailCursorPos:
         cursor_pos {24, 160}
         cursor_pos {24, 172}
         cursor_pos {24, 184}
+.endif
 
 ; ------------------------------------------------------------------------------
 
@@ -3362,8 +3433,17 @@ LoadGenjuProp:
 _c35b93:
 @5b93:  ldx     #$9ec9
         stx     hWMADDL
+.if LANG_EN
+        lda     $4d
+        beq     @spells
+        jmp     Ot6GenjuRungHelp        ; OT6: the cursor is on a rung
+@spells:
+        clr_a
+        lda     $4e                     ; the row (two columns: $4b = 2 * row)
+.else
         clr_a
         lda     $4b
+.endif
         tax
         lda     $7eab8d,x
         cmp     #$ff
@@ -3404,7 +3484,11 @@ _c35b93:
 ; [ load esper or magic description for esper menu ]
 
 GetGenjuDescPtr:
+.if LANG_EN
+        lda     $4e                     ; OT6: the row (see GenjuDetailCursorProp)
+.else
 @5bdb:  lda     $4b
+.endif
         beq     GetLoadGenjuAttackDescPtr
         cmp     #$06
         beq     GetGenjuBonusDescPtr
@@ -3579,6 +3663,28 @@ Ot6GenjuLabelOff:
         nop
         nop
         ldx     hRDMPYL
+        rts
+
+; The help line with the cursor on a rung (the detail page's second column,
+; rows 1-5 = rungs 0-4): Ot6RungDescText writes the rung's description, and
+; under an unreached rung whose effect the character already holds a second
+; line saying so, into the help buffer _c35b93 has pointed WMADD at.
+Ot6GenjuRungHelp:
+        lda     $4e
+        dec
+        longa
+        and     #$00ff
+        pha                             ; the rung
+        shorta
+        jsr     _c34edd                 ; Y = the character's record
+        lda     0,y                     ; the actor
+        longa
+        and     #$00ff
+        tay
+        plx
+        shorta
+        lda     z99
+        jsl     Ot6RungDescText
         rts
 
 ; Y := the BG1 screen-B tilemap cell for column 16 of tilemap row $f6: a rung

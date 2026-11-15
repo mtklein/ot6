@@ -71,7 +71,7 @@ the Empire's plates), which players could not follow.
 | Stronger spells: Fire → Fire 2 → Fire 3 and the other families, at the cast spell's MP; the Magic list previews | $026E | left (105) |
 | Skills that changed: MP on Blitz/Tools/SwdTech/Steal/Dance/Rage; SwdTech rows; Steal/Slot/Rage odds (Steal and Rage certain at 3); Shadow's break kill | $0276 | left (105), far corner |
 | Runic earns a Boost Point | $026F page 1 | left (105) |
-| Espers: spells only while equipped, stat changes while equipped, no level-up bonuses | $0274 pages 4-5 | hall (the magicite ghost) |
+| Espers: spells and the summon only while equipped; Magic Points from won battles, five ranks at 10/30/75/200/500, each rank's bonus kept for good; where to see it (the victory screen, the Esper's page under Skills) | $0274 pages 4-7 | hall (the magicite ghost) |
 | A practice fight | $025D page 2 | right (107), beside the monster chest |
 
 Not taught here (each is shown where it is used, or is a detail of one
@@ -221,11 +221,19 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> In OT6, the character who equips an Esper can cast its spells. Unequip it and the spells go too. Nothing is learned.
+> In OT6, whoever equips an Esper can cast its spells and summon it, but it never teaches them. Unequip it and both go.
 >
 > *(next box)*
 >
-> Many Espers also change their holder's stats while equipped. There are no stat bonuses at level up.
+> Members standing at a victory earn Magic Points with their Esper; at 10, 30, 75, 200 and 500 they rank up with it.
+>
+> *(next box)*
+>
+> Each rank gives that character a bonus: a stat or an ability. It is kept for good, whatever Esper is equipped later.
+>
+> *(next box)*
+>
+> The victory screen shows the points and any new rank. Under Skills, an Esper's page shows its ranks and what each one gives.
 
 Every claim was checked against the code (2026-09-28):
 
@@ -268,10 +276,18 @@ Every claim was checked against the code (2026-09-28):
 - Outside battle: `Ot6LevelUpHeal`; `Ot6DangerMulW = $0008` (half the
   encounter rate) and `Ot6RewardMulW = $0020` (double Exp. and GP, random
   battles only).
-- Espers: learn rates 0 and the while-worn spell grant
-  (`Ot6EsperSpellKnown`); `Ot6EsperStatTbl` ("Many" was
-  written when several Espers carried no stat change; since #418 every one
-  does, and "Many" is still true); the vanilla level-up bonus bytes are $ff.
+- Espers (rewritten for v0.44's ladder, 2026-11-14): learn rates 0 and the
+  while-worn spell grant (`Ot6EsperSpellKnown`; the summon is vanilla's,
+  pages 1-3); a won battle pays its Magic Points to each living seated
+  member's counter for the stone worn (`ot6_esper.asm`, plan A of
+  [esper-rework.md](esper-rework.md)); the rungs at 10 / 30 / 75 / 200 /
+  500 (`OT6_RUNG1`..`OT6_RUNG5`) hold stat points and relic-style or new
+  effects, folded into every equip recalculation whatever is worn
+  (`Ot6EsperFold`); the victory screen's "Got N Magic Point(s)" and
+  "reached rank" messages (`Ot6EsperMsg`) and the Skills > Espers page's
+  rank, points and rungs, with a line on what the highlighted rung does
+  (`DrawEsperDetailMenu`, `Ot6RungDescText`). The old pages said Espers
+  change stats while worn (`Ot6EsperStatTbl`, retired by the ladder).
 
 ## Kept vanilla (lesson still true)
 

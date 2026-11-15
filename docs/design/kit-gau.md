@@ -293,11 +293,12 @@ battle. This is the same problem Slot solves over a shorter span: Slot stores
 the spin's tier at the first A press (`Ot6SlotRig` → `OT6_SLOTTIER` at `$57ba`,
 `ot6_kits.asm:1490-1530`, `ot6_memory.inc:59-64`) so the charge and the reels
 can never disagree. Rage copies `OT6_BOOST_REVEALED,x` (capped 3) into
-**`OT6_RAGETIER`** (`$ed73` in the measured-free shadow past InitBP's clear, `ot6_memory.inc`; first planned as the `$57bb` spare of the same init-exempt strip).
+**`OT6_RAGETIER`** (since v0.45 eight bytes, one per character at stride 2, `$ee39` in the measured-free shadow past InitBP's clear, `ot6_memory.inc`; one byte at `$ed73` before that, first planned as the `$57bb` spare of the same init-exempt strip).
 Staleness is harmless for the same reason it is in Slot: the cell is read only
 while a RAGE status is set, and the only writer of that status (`Cmd_10`)
-always rewrites the flag first. One byte suffices while Gau is the only Rage
-user; a second user (Gogo, WoR) is when it widens to per-character (§10.7).
+always rewrites the flag first. Each rager has its own cell
+(`OT6_RAGETIER,y`, y the rager's entity offset, in both `Ot6RageTierStore` and
+`Ot6RageCoin`), so a Gogo raging beside Gau does not move Gau's coin (§10.7).
 
 **The flag is set at two sites, and both are required.** `RandRage` has
 two callers: `Cmd_10` (`battle_main.asm:3351`, before the `_c21554` tail fires
@@ -534,7 +535,7 @@ drawn at col 2 under a cursor at `x = 8` puts the sprite on the leading glyph.
 
 1. **`ot6_memory.inc`**: `OT6_RAGELOAD := $7e1e1f` (8 bytes) + asserts
    `>= $1600` and `+7 <= $1ffd` (the `OT6_LOADOUT` assert pair,
-   `ot6_memory.inc:38-40`, widened). `OT6_RAGETIER` (now `$ed73`, `ot6_memory.inc`) beside
+   `ot6_memory.inc:38-40`, widened). `OT6_RAGETIER` (now `$ee39`, 8 bytes, `ot6_memory.inc`) beside
    `OT6_SLOTTIER` with the same strip comment discipline.
 2. **F0, `ot6_kits.asm` (new strip beside the Bushido loadout)**:
    - `Ot6RageLearned` — bit test of rage id A against `$1d2c` (the
@@ -645,9 +646,21 @@ the turn count, or it asserts nothing.
    `battle_main.asm:14676-14678`; `LearnRage` skips index > 255,
    `:12336-12337`). Nothing usable is lost; this is noted so that nobody
    changes the encoding into a 2-byte slot.
-7. **A second simultaneous Rage user.** One `OT6_RAGETIER` byte; Gogo (WoR)
-   raging beside Gau would share it. The widen is mechanical (per-character
-   strip) and deferred to the stretch that fields Gogo.
+7. **A second simultaneous Rage user (fixed in v0.45).** `OT6_RAGETIER` was
+   one byte, and Gogo with Rage among his commands raging beside Gau shared
+   it: whoever started a Rage last set the coin for both, so Gau's 3-point
+   trance fell to 1/2 after an unboosted Gogo start, and an unboosted Gau got
+   certainty from a boosted Gogo. It is now per character (8 bytes, stride 2,
+   the `OT6_DANCETIER` shape), stored and read by the rager's entity offset.
+   `battle_rage` arm 7b plays it: Gau at 3 points, then a second rager at
+   1. Read from what `Ot6RageCoin` did, every one of Gau's later possessed
+   turns takes no draw and is the special, and every one of the second's
+   takes exactly tier 1's one draw. Two mutants are red there: one tier
+   written into every rager's cell (the old byte's behaviour), and the coin
+   reading cell 0 whoever rolls (build/attempts/wt/v045-teach/final2/). No
+   capture seats Gogo beside Gau (wor-gogo-v1 and wor-kt-factory-v1 hold Gau
+   in reserve), so the arm installs both ragers on battle_entry, as the rest
+   of that suite does.
 8. **Spending BP mid-trance.** A possessed Gau banks regen he cannot spend,
    because there is no menu and no confirm moment. This is a real cost of the
    possession, priced into §6's "3 BP is a full-bank decision".

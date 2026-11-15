@@ -197,7 +197,9 @@ local ACTOR, MSTATE = 0x62CA, 0x7BC2
 local ST_RAGE = 0x1E                 -- the rage window's battle menu state
 local CMD_RAGE = 0x10
 local GAU = 0x0B                     -- CHAR::GAU
-local RAGETIER = 0xED73              -- OT6_RAGETIER ($7eed73, ot6_memory.inc)
+local GOGO = 0x0C                    -- CHAR::GOGO (the second rager, arm 7b)
+local RAGETIER = H.sym("OT6_RAGETIER") & 0xFFFF  -- OT6_RAGETIER: 8 bytes, per character (stride 2)
+local function tierOf(s) return H.readByte(RAGETIER + s * 2) end   -- slot s's stored tier
 local PARTY = { 0, 1, 2 }
 local GUARDS = { 2, 3 }
 local function CURMP(s) return 0x3C08 + s * 2 end
@@ -243,6 +245,10 @@ local coinSummary
 local coins = {}        -- one entry per possessed turn
 local pinBe = nil       -- the $be seed to force at each Ot6RageCoin entry
 local cmd0 = CMD_RAGE                -- the one command Gau is installed with
+local wantSecond = false
+local SECOND_TIER = 1   -- arm 7b: the second rager starts at 1 point (one extra draw a roll), Gau at 3 (none)
+local second = nil      -- arm 7b: a second rager's slot, kept alive and pinned unboosted until it confirms
+local secondPin = true
 
 local function pinGau()
   for _, s in ipairs(PARTY) do
@@ -262,9 +268,17 @@ local function pinGau()
     if pinPend then H.writeByte(0x3E9D + actor * 2, pinPend) end
     if pinMp then H.writeWord(CURMP(actor), startMp) end
     for _, s in ipairs(PARTY) do
-      if s ~= actor then
+      if s ~= actor and s ~= second then
         H.writeByte(0x3EE4 + s * 2, H.readByte(0x3EE4 + s * 2) | 0x80)  -- wound
         H.writeWord(CURHP(s), 0)
+      end
+    end
+    if second then
+      H.writeByte(0x3ED8 + second * 2, GOGO)
+      H.writeByte(0x3EE4 + second * 2, H.readByte(0x3EE4 + second * 2) & 0x7F)  -- alive
+      if secondPin then
+        H.writeByte(0x3E9D + second * 2, SECOND_TIER)    -- its own boost, under Gau's
+        H.writeWord(CURMP(second), startMp)
       end
     end
   end
@@ -298,7 +312,7 @@ end
 -- open the rage window, put the cursor on entry 0, confirm.
 local function rageStart(tag)
   return {
-    H.driveUntil(function() return H.readByte(MSTATE) == ST_RAGE end, 1500, {
+    H.driveUntil(function() return H.readByte(MSTATE) == ST_RAGE and H.readByte(ACTOR) == actor end, 1500, {
       H.call(function() pinAll(); H.setPad({ "a" }) end),
       H.waitFrames(2),
       H.call(function() H.setPad({}) end),
@@ -323,6 +337,7 @@ local function trance(tag, setup, check)
     H.call(function()
       H.log("---- " .. tag .. " ----")
       actor, pinMp, pinPend, cmd0 = nil, true, 0, CMD_RAGE
+      second, secondPin, wantSecond = nil, true, false
       teach(KNOWN)
       loadout({ 33, 68 })
       setup()
@@ -333,6 +348,9 @@ local function trance(tag, setup, check)
     }, tag .. ": a battle menu opens"),
     H.call(function()
       actor = H.readByte(ACTOR)
+      if wantSecond then
+        for _, s in ipairs(PARTY) do if s ~= actor then second = s break end end
+      end
       pinAll()
       instrument()
       cmd10HitsReset()
@@ -359,7 +377,7 @@ add({
       "an UNBOOSTED trance costs a flat 8 at the start (the Dance rule, one "
       .. "price for both possess-verbs)")
     _G.__afterStart = left
-    _G.__tier0 = H.readByte(RAGETIER)
+    _G.__tier0 = tierOf(actor)
     H.assertEq(_G.__tier0, 0, "unboosted start stored tier 0")
   end),
   ride(300),
@@ -370,7 +388,7 @@ add({
       .. "without this count the free-turns claim below is vacuous", cmd10Hits))
     H.assertEq(mp(actor), _G.__afterStart,
       "every possessed turn after the start is FREE -- one payment, whole battle")
-    H.assertEq(H.readByte(RAGETIER), _G.__tier0,
+    H.assertEq(tierOf(actor), _G.__tier0,
       "the stored tier survived the mid-trance Cmd_10 re-entries")
     H.log("CHARGE: 8 once, then nothing -- and the tier store held")
   end),
@@ -408,8 +426,8 @@ add({
     H.call(function() H.setPad({}) end), H.waitFrames(6),
   }, "tier3: the RAGE status is set"),
   H.call(function()
-    H.assertEq(H.readByte(RAGETIER), 3,
-      "Cmd_10 stored the pending 3 into OT6_RAGETIER")
+    H.assertEq(tierOf(actor), 3,
+      "Cmd_10 stored the pending 3 into the rager's OT6_RAGETIER cell")
     H.log(string.format("tier3: MP %d -> %d after the boosted rage START "
       .. "(price %d, escalated would be %d)", _G.__t3mp, mp(actor),
       ragePrice(3), escalated(3)))
@@ -430,7 +448,7 @@ add({
     H.assertEq(cmd10Hits >= 3, true, string.format(
       "the trance actually took several turns (Cmd_10 re-entered %d times)",
       cmd10Hits))
-    H.assertEq(H.readByte(RAGETIER), 3,
+    H.assertEq(tierOf(actor), 3,
       "and it is STILL 3 after several possessed turns -- the mid-trance "
       .. "Cmd_10 re-entries did not re-store the consumed pending byte")
     H.assertEq(H.readByte(0x3E9D + actor * 2), 0,
@@ -455,6 +473,82 @@ add({
   end),
 })
 
+-- 7b. Two ragers, one tier each ---------------------------------------------
+-- Gau starts at 3 points; then a second rager (GOGO's id, the same Rage-only
+-- command list: Gogo with Rage among his commands) starts at 1 point while Gau
+-- is possessed.  OT6_RAGETIER was one byte until v0.45, so the later start
+-- overwrote the earlier: Gau's coin fell to 1/2 for the rest of the trance
+-- (kit-gau.md section 10.7).  Per character, each rager's possessed turns roll
+-- at the tier that rager started at, read from what the proc did: every one of
+-- Gau's takes no draw and is the special (tier 3), every one of the second's
+-- takes exactly one draw (tier 1's tilted coin).  Declared like the rest of this
+-- fixture (state_write_waivers.txt): the second rager is installed, not
+-- recruited -- no capture seats GOGO beside GAU (wor-gogo-v1 and
+-- wor-kt-factory-v1 seat GOGO with GAU in reserve).  Red on a ROM whose store
+-- writes the one tier into every rager's cell, and on one whose coin reads
+-- cell 0 whoever rolls (build/attempts/wt/v045-teach/final2/).
+add(trance("shared", function()
+  startMp = 50; pinPend = 3; wantSecond = true     -- the second is chosen once the actor is known
+end, function()
+  coins = {}; pinBe = nil
+  H.log(string.format("shared: GAU in slot %d at 3 points, the second rager (GOGO) in slot %d at %d", actor, second,
+    SECOND_TIER))
+end))
+add(rageStart("shared"))
+add({
+  H.call(function() pinMp = false; pinPend = nil end),
+  -- on to the second rager's window; it opens its rage window through tick's
+  -- A on the command window (Rage is its one command)
+  H.driveUntil(function() return H.readByte(MSTATE) == ST_RAGE and H.readByte(ACTOR) == second end, 4000, {
+    H.call(tick), H.waitFrames(3),
+    H.call(function() H.setPad({}) end), H.waitFrames(6),
+  }, "shared: the second rager's rage window opens"),
+  H.call(function()
+    pinAll()
+    H.writeByte(0x892B + second, 0)
+    H.writeByte(0x892F + second, 0)
+    H.writeByte(0x8933 + second, 0)
+  end),
+  H.waitFrames(2),
+  H.pressButtons({ "a" }, 4),
+  H.waitFrames(10),
+  H.call(function() secondPin = false end),
+  H.driveUntil(function() return raging(actor) and raging(second) end, 4000, {
+    H.call(tick), H.waitFrames(3),
+    H.call(function() H.setPad({}) end), H.waitFrames(6),
+  }, "shared: both ragers possessed"),
+  H.call(function()
+    H.log(string.format("shared: both possessed; tiers stored GAU %d, second %d", tierOf(actor), tierOf(second)))
+    coins = {}                          -- from here every roll comes after both starts
+  end),
+  ride(300),
+  H.call(function()
+    local mine, theirs = {}, {}
+    for _, e in ipairs(coins) do
+      if e.who == actor * 2 then mine[#mine + 1] = e elseif e.who == second * 2 then theirs[#theirs + 1] = e end
+    end
+    H.log(string.format("shared: %d rolls after both starts: GAU %d, second %d; tiers GAU %d, second %d",
+      #coins, #mine, #theirs, tierOf(actor), tierOf(second)))
+    for i, e in ipairs(coins) do
+      H.log(string.format("  shared roll %d: who=$%02X tier=%s draws=%d coin=%d", i, e.who or 0xFF,
+        tostring(e.tier), e.draws, e.coin))
+    end
+    H.assertEq(#mine >= 2 and #theirs >= 1, true, string.format(
+      "shared: both ragers rolled after both starts (GAU %d, second %d)", #mine, #theirs))
+    H.assertEq(#theirs >= 2, true, "shared: the second rager rolled at least twice")
+    H.assertEq(tierOf(actor), 3, "shared: GAU's stored tier is still 3 after the second rager's start at 1")
+    H.assertEq(tierOf(second), SECOND_TIER, "shared: the second rager's stored tier is its own")
+    for _, e in ipairs(mine) do
+      H.assertEq(e.coin, 1, "shared: every possessed turn of GAU's is the special -- his 3 points still buy it")
+      H.assertEq(e.draws, 0, "shared: and takes no roll (tier 3), whoever started last")
+    end
+    for _, e in ipairs(theirs) do
+      H.assertEq(e.draws, 1, "shared: every roll of the second rager's took exactly its tier-1 draw (not GAU's none)")
+    end
+    second = nil
+  end),
+})
+
 -- ====================== 8. The tier ladder's odds ===========================
 --   tier 1   the special unless draw < $40   -> $3f = Fight, $40 = special
 --   tier 2   the special unless draw < $10   -> $0f = Fight, $10 = special
@@ -472,7 +566,7 @@ local COINPROC = H.sym("Ot6RageCoin")
 local RANDRAGE = H.sym("RandRage")
 
 local psAtEntry, yAtEntry = nil, nil
-local drawsThisRoll, beAtRand, tierAtEntry = 0, nil, nil
+local drawsThisRoll, beAtRand, tierAtEntry, whoAtEntry = 0, nil, nil, nil
 local widthChecks = {}
 local instrumented = false
 
@@ -559,8 +653,9 @@ instrument = function()
   emu.addMemoryCallback(function()
     if pinBe then H.writeByte(0xBE, pinBe) end
     drawsThisRoll, beAtRand = 0, nil
-    tierAtEntry = H.readByte(RAGETIER)
     psAtEntry, yAtEntry = cpu()
+    whoAtEntry = yAtEntry & 0xFF        -- RandRage's Y: the rager's entity offset
+    tierAtEntry = H.readByte(RAGETIER + whoAtEntry)
   end, emu.callbackType.exec, COINPROC, COINPROC)
 
   emu.addMemoryCallback(function()
@@ -591,6 +686,7 @@ instrument = function()
       draws = drawsThisRoll,
       seed = beAtRand,
       tier = tierAtEntry,
+      who = whoAtEntry,
     }
   end, emu.callbackType.read, MONRAGE, MONRAGE + 0x1FF)
 end
@@ -634,7 +730,7 @@ local function tierArm(tag, pend, draw, wantCoin, why)
       H.call(function() H.setPad({}) end), H.waitFrames(6),
     }, tag .. ": the RAGE status is set"),
     H.call(function()
-      H.assertEq(H.readByte(RAGETIER), pend,
+      H.assertEq(tierOf(actor), pend,
         string.format("%s: Cmd_10 stored tier %d", tag, pend))
       H.assertEq(mp(actor), 50 - ragePrice(pend), string.format(
         "%s: the start paid the flat %d at boost %d -- not the %d a 2.5x "

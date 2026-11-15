@@ -34,9 +34,20 @@ Continue again.  This script holds that run to the fixture file:
         the release step: copy KEY's save (release_saves.py's name for it)
         out of the release zip's saves/ folder into golden-saves/VERSION/
         and record it in MANIFEST.json
-    golden_saves.py negative FIXTURE LOG BATTERY
-        a run whose check must FAIL (the corrupted fixture): exit 0 only
-        when check refuses it, naming the esper page
+    golden_saves.py negative FIXTURE LOG BATTERY [WANT]
+        a run whose check must FAIL (the corrupted fixture, or a mutant
+        ROM's run): exit 0 only when check refuses it with a problem naming
+        WANT (default "esper")
+    golden_saves.py firstsave CAPTURE_DIR
+        a New Game's first save (the play from power-on's world-narshe-v1
+        capture): its slot is signed $5653 version 1, its reserve, tail
+        and page reserves are zero, and its loadouts are AUTO
+    golden_saves.py notes NOTES.md
+        the release notes' save line: "Saves from vX.Y and later load in
+        this release", vX.Y the oldest release in the golden set, and no
+        "save layout" (a release's saves are named by what loads, never by
+        a layout: up to v0.30 that line only named the previous release,
+        and from then on it stayed at v0.29)
     golden_saves.py --selftest
         the check against in-memory mutants
 """
@@ -70,7 +81,8 @@ ESPER_MAGIC = 0x3145
 CTR, CTR_END = 0x0010, 0x0280
 # what a Continue of slot 3 and a save into it may touch (the battery map's
 # Written tokens; newgame and clear rows are not exercised)
-RUN_WRITES = {"save", "load", "title", "play"}
+RUN_WRITES = {"save", "load", "title", "play", "zero"}
+SIG, SIGWORD, SIGVER = 0x1E2C, 0x5653, 1
 DUMP = re.compile(r"^\[golden\] dump (\S+) (\S+) ([0-9A-F]{4}) ([0-9A-F]+)\s*$")
 
 
@@ -169,9 +181,10 @@ def compare(problems, what, want, got):
     problems.append(f"{what}: the file holds {want!r}, the run read {got!r}")
 
 
-def allowed_offsets(rows, slot):
-    """Battery offsets today's ROM may write in a Continue of `slot` and a save into it."""
-    scopes = {"shared", f"slot{slot}"}
+def allowed_offsets(rows, slot, also=()):
+    """Battery offsets today's ROM may write in a Continue of `slot` and a
+    save into it (and into each slot in `also`)."""
+    scopes = {"shared", f"slot{slot}"} | {f"slot{x}" for x in also}
     ok = bytearray(sc.SRAM_SIZE)
     for r in rows:
         if r["scope"] in scopes and r["written"] & RUN_WRITES:
@@ -180,17 +193,18 @@ def allowed_offsets(rows, slot):
     return ok
 
 
-def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows):
+def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows, also=()):
     """Problems (strings) for one run; empty = the save is compatible."""
     p = []
     f = fixture_bytes
     slot = f[0x1FF0]
     if slot not in SLOT_PTR:
         return [f"the fixture's battery names slot {slot} ($1FF0), not 1..3"]
-    for tag in ("load1", "load2"):
-        for what, n in (("wram", BLOCK), ("codex", 0x400), ("live", 0x400)):
-            if len(dumps.get(tag, {}).get(what, b"")) != n:
-                p.append(f"log: no complete {tag} {what} dump (the run stopped before it)")
+    for tag, what, n in (("load1", "wram", BLOCK), ("load1", "codex", 0x400), ("load1", "live", 0x400),
+                         ("save1", "slot", BLOCK),
+                         ("load2", "wram", BLOCK), ("load2", "codex", 0x400), ("load2", "live", 0x400)):
+        if len(dumps.get(tag, {}).get(what, b"")) != n:
+            p.append(f"log: no complete {tag} {what} dump (the run stopped before it)")
     if p:
         return p
     d1, d2 = dumps["load1"], dumps["load2"]
@@ -227,7 +241,7 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows):
         p.append(f"esper: unknown expectation {esper!r}")
 
     # 4. outside what today's ROM writes, the battery is the file's
-    ok = allowed_offsets(rows, slot)
+    ok = allowed_offsets(rows, slot, also)
     stray = [o for o in range(sc.SRAM_SIZE) if f[o] != after[o] and not ok[o]]
     if stray:
         spans = []
@@ -239,8 +253,23 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows):
         p.append("the battery changed outside the documented writes: " +
                  ", ".join("$%04X-$%04X" % tuple(s) for s in spans[:8]))
 
-    # 5. the round trip: what the save wrote, and the second load
+    # 5. the round trip: what the first save wrote, the second load, and the
+    # second save (the battery the run left)
+    s1 = dumps["save1"]["slot"]
     ablock = block_of(after, slot)
+    for name, blk in (("the first save", s1), ("the second save", ablock)):
+        if w16(blk, SIG - 0x1600) != SIGWORD or blk[SIG + 2 - 0x1600] != SIGVER:
+            p.append(f"{name}: the block is not signed $5653 version 1")
+        if any(blk[0x1E2F - 0x1600:0x1E40 - 0x1600]) or any(blk[0x1FF7 - 0x1600:0x1FFE - 0x1600]):
+            p.append(f"{name}: the reserve $1E2F-$1E3F or the tail $1FF7-$1FFD is not zero")
+    for r in rows:
+        for x in (slot,) + tuple(also):
+            if r["scope"] == f"slot{x}" and "zero" in r["written"] and any(after[r["start"]:r["end"] + 1]):
+                p.append(f"after the save, slot {x}'s reserve ${r['start']:04X}-${r['end']:04X} is not zero")
+    for x in also:      # a save over slot x: its codex magic and tables are the source's
+        src, dst = CODEX + (slot - 1) * 0x400, CODEX + (x - 1) * 0x400
+        if after[dst:dst + 2] + after[dst + 0x10:dst + 0x310] != after[src:src + 2] + after[src + 0x10:src + 0x310]:
+            p.append(f"after the save over slot {x}, its codex page is not slot {slot}'s")
     compare(p, "saved slot roster", roster_rows, roster_of_block(ablock))
     compare(p, "load2 roster", roster_rows, roster_of_block(d2["wram"]))
     # between the load and the save the field has run (a map's entry events
@@ -249,17 +278,19 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows):
     # byte for byte
     fa, f1 = facts(ablock), facts(fblock)
     compare(p, "saved slot", {k: f1[k] for k in STILL}, {k: fa[k] for k in STILL})
-    compare(p, "load2", fa, facts(d2["wram"]))
-    if d2["wram"] != ablock:
-        n = sum(1 for a, b in zip(d2["wram"], ablock) if a != b)
-        p.append(f"load2: the reloaded block differs from the slot the save wrote in {n} byte(s)")
+    compare(p, "first save", {k: f1[k] for k in STILL}, {k: facts(s1)[k] for k in STILL})
+    compare(p, "load2", facts(s1), facts(d2["wram"]))
+    if d2["wram"] != s1:
+        n = sum(1 for a, b in zip(d2["wram"], s1) if a != b)
+        p.append(f"load2: the reloaded block differs from the slot the first save wrote in {n} byte(s)")
     if w16(after, epage) != ESPER_MAGIC:
         p.append(f"after the save, slot {slot}'s esper page is unsigned")
     if after[epage + CTR:epage + CTR_END] != live:
         p.append("after the save, the slot's esper page is not the live page the load made")
     if d2["live"][CTR:CTR_END] != live:
         p.append("load2: the live esper page is not what was saved")
-    if d2["codex"] != d1["codex"]:
+    # (magic and tables; the pad and tail are the reserve a save zeroes)
+    if d2["codex"][:2] + d2["codex"][0x10:0x310] != d1["codex"][:2] + d1["codex"][0x10:0x310]:
         p.append("load2: the codex page changed across the round trip")
     return p
 
@@ -292,7 +323,9 @@ def check(fixture: Path, log: Path, battery: Path):
     if len(after) != sc.SRAM_SIZE:
         return [f"{battery}: {len(after)} bytes, not a 32 KiB battery"]
     dumps = parse_log(log.read_text(errors="replace"))
-    return check_run(f, roster_of_file(payload), g["esper"], dumps, after, doc_rows())
+    # a junk fixture's run also saves over slot 1 (save_golden.lua)
+    also = (1,) if "/junk/" in str(fixture) else ()
+    return check_run(f, roster_of_file(payload), g["esper"], dumps, after, doc_rows(), also)
 
 
 def verify():
@@ -371,6 +404,137 @@ def add(version, zpath, keys, esper):
     return 0
 
 
+NOTES_LINE = re.compile(r"^Saves from (v\d+\.\d+) and later load in this release\b", re.M)
+
+
+def notes_problems(text, oldest):
+    p = []
+    if re.search(r"save layout", text, re.I):
+        p.append('the notes name a "save layout"; say which saves load instead')
+    m = NOTES_LINE.search(text)
+    if not m:
+        p.append(f'no line "Saves from {oldest} and later load in this release"')
+    elif m.group(1) != oldest:
+        p.append(f"the notes say saves from {m.group(1)} load; the oldest golden saves are {oldest}'s")
+    return p
+
+
+def firstsave_problems(b, rows):
+    p = []
+    slot = b[0x1FF0]
+    if slot not in SLOT_PTR:
+        return [f"the battery names slot {slot} ($1FF0), not 1..3"]
+    blk = block_of(b, slot)
+    if w16(blk, SIG - 0x1600) != SIGWORD or blk[SIG + 2 - 0x1600] != SIGVER:
+        p.append(f"slot {slot} is not signed $5653 version 1 "
+                 f"(${w16(blk, SIG - 0x1600):04X}, version {blk[SIG + 2 - 0x1600]})")
+    if any(blk[0x1E2F - 0x1600:0x1E40 - 0x1600]) or any(blk[0x1FF7 - 0x1600:0x1FFE - 0x1600]):
+        p.append(f"slot {slot}'s reserve $1E2F-$1E3F or tail $1FF7-$1FFD is not zero")
+    if any(blk[0x1E1D - 0x1600:0x1E2C - 0x1600]):
+        p.append(f"slot {slot}'s loadouts $1E1D-$1E2B are not AUTO (zero)")
+    for r in rows:
+        if r["scope"] == f"slot{slot}" and "zero" in r["written"] and any(b[r["start"]:r["end"] + 1]):
+            p.append(f"slot {slot}'s page reserve ${r['start']:04X}-${r['end']:04X} is not zero")
+    return p
+
+
+# ------------------------------------------------- the loadout repair model --
+# Ot6RepairLoadouts (ot6_codex.asm) as Python, and the field pages' writers
+# (ot6_loadout.asm Ot6LoadoutSeedWord / Ot6LoadoutCycleCore and
+# ot6_bushido.asm Ot6BushidoPick; ot6_rage.asm and ot6_lore.asm's seed and
+# cycle), so the selftest can enumerate every value a page can write and
+# hold the repair to keeping each one.
+def _bit(L, t):
+    return (L >> t) & 1
+
+
+def repair_bushido(w, L):
+    """The word Ot6RepairLoadouts leaves, given $1CF7 = L."""
+    if w == 0:
+        return 0
+    if w & 0xF000:
+        return 0
+    for k in range(3):                      # slots 1-3, bits 3-11
+        if not _bit(L, (w >> (3 + 3 * k)) & 7):
+            return 0
+    return w
+
+
+def repair_byte(b, learned, limit):
+    """A Rage (limit None) or Lore (limit $18) byte after the repair."""
+    if b == 0:
+        return 0
+    if limit is not None and b > limit:
+        return 0
+    return b if (b - 1) in learned else 0
+
+
+def bushido_pick(slot, L):
+    """Ot6BushidoPick for the field (Ot6LoadoutAutoTech)."""
+    b = max(1, slot)
+    ceil = max(0, bin(L & 0x7F).count("1") - 1)
+    if L & 0x80:
+        if b >= 3:
+            return 7
+        base = max(0, ceil - 1)
+    else:
+        base = max(0, ceil - 2)
+    return min(base + b - 1, ceil)
+
+
+def _assign(w, slot, t):
+    return (w & ~(7 << (3 * slot)) & 0xFFFF) | ((t & 7) << (3 * slot))
+
+
+def bushido_seed(L):
+    w = 0
+    for slot in range(4):                   # slot 0 mirrors slot 1 (the clamp)
+        w = _assign(w, slot, bushido_pick(slot, L))
+    return w
+
+
+def bushido_cycle(w, row, delta, L):
+    if w == 0:
+        w = bushido_seed(L)
+    slot = row + 1
+    t = (w >> (3 * slot)) & 7
+    for _ in range(8):
+        t = (t + delta) & 7
+        if _bit(L, t) and (t != 7 or slot >= 3):
+            break
+    return _assign(w, slot, t)
+
+
+def bushido_reachable(L):
+    """Every word the Bushido page can leave, from AUTO, at $1CF7 = L."""
+    seen, todo = {0}, [0]
+    while todo:
+        w = todo.pop()
+        for nxt in [0] + [bushido_cycle(w, r, d, L) for r in range(3) for d in (1, 7)]:
+            if nxt not in seen:
+                seen.add(nxt)
+                todo.append(nxt)
+    return seen
+
+
+def plausible_swdtech_sets():
+    """$1CF7 as play leaves it: the level table teaches techs 0..6 in order
+    (Dispatch at level 1), and the Phantom Train farewell teaches Cleave
+    (bit 7) to a CYAN who already knows Dispatch.  ($80 alone, Cleave with no
+    Dispatch, is no state play reaches; there the seeded word names the
+    unlearned Dispatch in slots 1-2 and the repair would reset it to AUTO,
+    which is harmless.)"""
+    for k in range(8):
+        prefix = (1 << k) - 1
+        yield prefix
+        if k >= 1:
+            yield prefix | 0x80
+
+
+def oldest_golden():
+    return load_manifest()["sets"][0]["version"]
+
+
 # ----------------------------------------------------------------- selftest --
 def _synthetic():
     """A battery with slot 3 populated, signed pages, and a matching run."""
@@ -397,9 +561,13 @@ def _synthetic():
     after = bytearray(f)
     after[0x1FF1] = 9               # title seed (shared, title)
     after[b + 0x1863 - 0x1600] = 1  # play time moved (slot3, save)
+    after[b + SIG - 0x1600] = 0x53  # signed $5653, version 1
+    after[b + SIG + 1 - 0x1600] = 0x56
+    after[b + SIG + 2 - 0x1600] = 1
     def dumps(blk_after):
         return {"load1": {"wram": bytes(block_of(f, 3)), "codex": bytes(f[cp:cp + 0x400]),
                           "live": bytes(f[LIVE:LIVE + 0x400])},
+                "save1": {"slot": bytes(blk_after)},
                 "load2": {"wram": bytes(blk_after), "codex": bytes(f[cp:cp + 0x400]),
                           "live": bytes(f[LIVE:LIVE + 0x400])}}
     return f, after, dumps
@@ -423,9 +591,22 @@ def selftest():
         probs = check_run(bytes(fx or f), rr, esper, d, bytes(a), rows)
         assert any(want in x for x in probs), (want, probs)
 
-    # a write into slot 1, the codex tail, the reserve past $4000, $1E00
-    for o in (0x0005, CODEX + 0x800 + 0x310, 0x4000, 0x1E00, ESPER + 0x800 + 0x280):
+    # a write into slot 1, slot 1's codex tail, the reserve past $4000, $1E00,
+    # the live page's reserve
+    for o in (0x0005, CODEX + 0x310, 0x4000, 0x1E00, LIVE + 0x380):
         bad(mut_after=lambda a, o=o: a.__setitem__(o, 0xAA), want="outside the documented writes")
+    # the saved slot's own page reserves left non-zero
+    for o in (CODEX + 0x800 + 0x310, CODEX + 0x800 + 0x5, ESPER + 0x800 + 0x280, ESPER + 0x800 + 0x3FF):
+        bad(mut_after=lambda a, o=o: a.__setitem__(o, 0xAA), want="reserve $")
+    # the save did not sign the block
+    bad(mut_after=lambda a: a.__setitem__(SLOT_PTR[3] + SIG - 0x1600, 0), want="not signed $5653")
+    # the block's reserve or tail left non-zero by the save
+    for a0 in (0x1E2F, 0x1E3F, 0x1FF7, 0x1FFD):
+        bad(mut_after=lambda a, a0=a0: a.__setitem__(SLOT_PTR[3] + a0 - 0x1600, 0xFF), want="the tail $1FF7-$1FFD is not zero")
+    # the reload is not what the first save wrote
+    def rl(d):
+        w = bytearray(d["load2"]["wram"]); w[0x10] ^= 1; d["load2"]["wram"] = bytes(w)
+    bad(mut_dumps=rl, want="load2: the reloaded block differs")
     # a level misread at the load
     def lvl(d):
         w = bytearray(d["load1"]["wram"]); w[8] = 99; d["load1"]["wram"] = bytes(w)
@@ -462,7 +643,56 @@ def selftest():
         raise AssertionError("gap accepted")
     except GoldenError:
         pass
-    print("golden_saves selftest OK")
+    # every value the field pages can write survives the repair
+    words = 0
+    for L in plausible_swdtech_sets():
+        for w in bushido_reachable(L):
+            assert repair_bushido(w, L) == w, ("the repair resets a page-made Bushido word", hex(w), hex(L))
+            words += 1
+    assert bushido_seed(0xBF) == 0x0F64 and bushido_seed(0x3F) == 0x0B1B, \
+        (hex(bushido_seed(0xBF)), hex(bushido_seed(0x3F)))
+    assert repair_bushido(0x0F64, 0xBF) == 0x0F64 and repair_bushido(0x0B1B, 0x3F) == 0x0B1B
+    assert repair_bushido(0xFFFF, 0xBF) == 0                 # all-ones junk
+    assert repair_bushido(0x0F64 | 0x1000, 0xBF) == 0       # a bit past the slots
+    assert repair_bushido(0x0E00 | (5 << 6) | (4 << 3), 0x3F) == 0   # Cleave unlearned
+    import random
+    rng = random.Random(389)
+    for _ in range(200):
+        rl = {i for i in range(255) if rng.random() < rng.random()}
+        ll = {i for i in range(24) if rng.random() < 0.5}
+        for i in rl:                         # Ot6RageSeed / Ot6RageCycleCore store id + 1 of a learned rage
+            assert repair_byte(i + 1, rl, None) == i + 1
+        for i in ll:                         # Ot6LoreSeed / Ot6LoreCycleCore: a learned lore (id + 1)
+            assert repair_byte(i + 1, ll, 0x18) == i + 1
+        assert repair_byte(0, rl, None) == 0 and repair_byte(0, ll, 0x18) == 0   # Y: AUTO
+        if 254 not in rl:
+            assert repair_byte(0xFF, rl, None) == 0
+        assert repair_byte(0x19, ll, 0x18) == 0 and repair_byte(0xFF, ll, 0x18) == 0
+    # a New Game's first save
+    fsb = bytearray(after)
+    assert firstsave_problems(bytes(fsb), rows) == [], firstsave_problems(bytes(fsb), rows)
+    for o, want in ((SLOT_PTR[3] + SIG - 0x1600, "not signed"), (SLOT_PTR[3] + 0x1E30 - 0x1600, "reserve"),
+                    (SLOT_PTR[3] + 0x1E20 - 0x1600, "not AUTO"), (CODEX + 0x800 + 0x320, "page reserve")):
+        m = bytearray(fsb); m[o] ^= 0x5A
+        assert any(want in x for x in firstsave_problems(bytes(m), rows)), (want, firstsave_problems(bytes(m), rows))
+    # a save over slot 1: its reserves and its codex
+    a1 = bytearray(after)
+    a1[CODEX:CODEX + 0x400] = after[CODEX + 0x800:CODEX + 0xC00]
+    a1[ESPER:ESPER + 0x400] = after[ESPER + 0x800:ESPER + 0xC00]
+    d1 = dumps(block_of(a1, 3))
+    assert check_run(bytes(f), rr, "signed", d1, bytes(a1), rows, (1,)) == [], \
+        check_run(bytes(f), rr, "signed", d1, bytes(a1), rows, (1,))
+    m = bytearray(a1); m[CODEX + 0x312] = 0xFF
+    assert any("slot 1's reserve" in x for x in check_run(bytes(f), rr, "signed", d1, bytes(m), rows, (1,)))
+    m = bytearray(a1); m[CODEX + 0x20] ^= 1
+    assert any("not slot 3's" in x for x in check_run(bytes(f), rr, "signed", d1, bytes(m), rows, (1,)))
+    good = "## Saves\n\nSaves from v0.28 and later load in this release. A save from before v0.44...\n"
+    assert notes_problems(good, "v0.28") == [], notes_problems(good, "v0.28")
+    assert any("save layout" in x for x in notes_problems(good + "This release uses the v0.29 save layout.\n", "v0.28"))
+    assert any("no line" in x for x in notes_problems("## Saves\n\nOlder saves load.\n", "v0.28"))
+    assert any("oldest golden" in x for x in notes_problems(good.replace("v0.28", "v0.40"), "v0.28"))
+    print(f"golden_saves selftest OK ({words} page-made Bushido words over 15 SwdTech sets, "
+          f"and every page-made Rage and Lore byte over 200 learned sets, survive the repair)")
     return 0
 
 
@@ -472,18 +702,41 @@ def main(argv):
     try:
         if argv[:1] == ["verify"]:
             return verify()
+        if argv[:1] == ["notes"] and len(argv) == 2:
+            probs = notes_problems(Path(argv[1]).read_text(), oldest_golden())
+            for x in probs:
+                print(f"golden notes: FAIL {argv[1]}: {x}")
+            if probs:
+                return 1
+            print(f"golden notes: {argv[1]} says saves from {oldest_golden()} and later load")
+            return 0
+        if argv[:1] == ["firstsave"] and len(argv) == 2:
+            srams = sorted(Path(argv[1]).glob("*.sram"))
+            if len(srams) != 1:
+                print(f"golden firstsave: FAIL {argv[1]} holds {len(srams)} batteries, not one")
+                return 1
+            probs = firstsave_problems(srams[0].read_bytes(), doc_rows())
+            for x in probs:
+                print(f"golden firstsave: FAIL {srams[0]}: {x}")
+            if probs:
+                return 1
+            print(f"golden firstsave: {srams[0]}: the New Game's first save is signed $5653 version 1, its "
+                  f"reserves zero and its loadouts AUTO")
+            return 0
         if argv[:1] == ["list"]:
             for d in fixture_dirs():
                 print(d.relative_to(ROOT))
             return 0
-        if argv[:1] in (["check"], ["negative"]) and len(argv) == 4:
+        if (argv[:1] == ["check"] and len(argv) == 4) or (argv[:1] == ["negative"] and len(argv) in (4, 5)):
             fx, log, bat = Path(argv[1]), Path(argv[2]), Path(argv[3])
             probs = check(fx, log, bat)
             if argv[0] == "negative":
-                if any("esper" in x for x in probs):
-                    print(f"golden negative: refused as it must be: {probs[0]}")
+                want = argv[4] if len(argv) == 5 else "esper"
+                hit = [x for x in probs if want in x]
+                if hit:
+                    print(f"golden negative: refused as it must be: {hit[0]}")
                     return 0
-                print(f"golden negative: FAIL -- {fx} was not refused for its esper page: {probs}")
+                print(f"golden negative: FAIL -- {fx} was not refused for {want!r}: {probs}")
                 return 1
             for x in probs:
                 print(f"golden: FAIL {fx.relative_to(ROOT) if fx.is_absolute() else fx}: {x}")

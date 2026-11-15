@@ -1,0 +1,12 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "battery.sram",
+  "slot": 3,
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "405afdf4b0fad25c79706a673e7e8c65b62774a23cf1f4ecb302f84c16ba942e",
+  "provenance": "v0.44 release zip ot6-v0.44.zip (sha256 5452d89b49ce381dbeb875257ef36fb543eb5baff1b43a157a26a408b6f91ea7), saves/52 - By Duncan's house, after the Veldt cave and Gau's father.srm, as published; a release artifact, not a capture",
+  "golden": {
+    "esper": "signed"
+  }
+}

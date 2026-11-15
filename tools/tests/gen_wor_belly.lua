@@ -757,7 +757,15 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("wor", "on Triangle Island") end),
   -- the island's battles are the Zone Eater's, and a party that lets its Engulf take every member is
   -- carried inside (battle_main.asm @4807: $3EBC bit 7; world_start.asm @042b, VehicleEvent_05)
-  pace(function() return not H.worldMode() end, 12, "the island until the Zone Eater engulfs the party",
+  H.call(function()
+    -- the pacing below works between this tile and its neighbour, the island's own encounter tiles (#530)
+    H.assertEq(H.worldMode() and H.worldX() == ISLAND[1] and H.worldY() == ISLAND[2], true,
+      string.format("the Falcon landed on Triangle Island (%d,%d), on the world map (at (%d,%d), map %d)",
+        ISLAND[1], ISLAND[2], H.worldX(), H.worldY(), map()))
+  end),
+  -- ends off the world for the belly, not in a Tent the walk's care pitches after a battle on the island
+  -- (#522's H.offWorld, #528, #530)
+  pace(function() return H.offWorld() end, 12, "the island until the Zone Eater engulfs the party",
     { ZONE_EATER }),
   H.waitUntil(function() return map() == 276 and H.hasControl() and settled() end, 6000, "control in the belly", 5),
   H.call(function() say("story", "engulfed: the belly (276)") end),

@@ -54,7 +54,7 @@ WRAM_BANKS = (0x00, 0x7E)
 BATTERY = 0x8000
 
 SCOPES = {"slot1", "slot2", "slot3", "newgame", "shared"}
-WRITES = {"save", "load", "title", "play", "newgame", "clear", "never"}
+WRITES = {"save", "load", "title", "play", "newgame", "clear", "zero", "never"}
 
 # a save-block address cell: $16xx..$1Fxx, single or inclusive range.
 ADDR = r"\$(1[6-9A-Fa-f][0-9A-Fa-f]{2})"
@@ -305,6 +305,18 @@ def check_data(rows, scraps, syms):
     return problems
 
 
+def check_lengths(rows, allsyms):
+    """A field whose symbol has a `<symbol>_LEN` equate (the length the code
+    loops over) is documented at that width."""
+    problems = []
+    for r in rows:
+        n = allsyms.get(r["symbol"] + "_LEN")
+        if n is not None and n != r["width"]:
+            problems.append("%s:%d field %s is %d byte(s) in the doc, but the build's %s_LEN is %d"
+                            % (DOC, r["line"], r["symbol"], r["width"], r["symbol"], n))
+    return problems
+
+
 def eval_anchor(expr, allsyms, rom, rom_syms):
     """The battery offset an anchor names, or (None, why)."""
     m = re.match(r"^SRAMSlotPtrs\[([1-3])\]$", expr)
@@ -429,6 +441,7 @@ def check(repo, dbg_path, doc_path, rom_path):
     if rom is None:
         raise SystemExit("check_save_layout: no built ROM at %s" % rom_path)
     problems += check_data(rows, scraps, syms)
+    problems += check_lengths(rows, allsyms)
     problems += check_battery(brows, magic, allsyms, sram_symbols(dbg),
                               source_literals(os.path.join(repo, SRC)), rom, allsyms)
     return problems, rows, syms, brows
@@ -461,12 +474,15 @@ SELF_DOC = """\
 | $1E1D-$1E1E | 2 | OT6_LOADOUT | x |
 | $1E1F-$1E26 | 8 | `OT6_RAGELOAD` | x |
 | $1E27-$1E2B | 5 | OT6_LORELOAD | x |
+| $1E2F-$1E3F | 17 | OT6_SAVERSV | x |
 - Scrap `$1E1D-$1E3F` (35 bytes).
 """
 SELF_DBG = (
     'sym\tname="OT6_LOADOUT",val=0x7E1E1D,type=lab\n'
     'sym\tname="OT6_RAGELOAD",val=0x7E1E1F,type=lab\n'
     'sym\tname="OT6_LORELOAD",val=0x7E1E27,type=lab\n'
+    'sym\tname="OT6_SAVERSV",val=0x7E1E2F,type=lab\n'
+    'sym\tname="OT6_SAVERSV_LEN",val=0x11,type=equ\n'
     'sym\tname="OT6_CODEX_MAGIC",val=0x316000,type=lab\n'
     'sym\tname="OT6_ESPER_ROOT",val=0x317000,type=lab\n'
     'sym\tname="OT6_ESPER_LIVE",val=0x317C00,type=lab\n'
@@ -497,6 +513,7 @@ def _run_self(doc=SELF_DOC, dbg=SELF_DBG, rom=None, literals=()):
     brows, problems = parse_battery(doc)
     allsyms = parse_dbg_all(dbg)
     problems += check_data(rows, scraps, parse_dbg(dbg))
+    problems += check_lengths(rows, allsyms)
     problems += check_battery(brows, parse_magic(doc), allsyms, sram_symbols(dbg),
                               list(literals), rom, allsyms)
     return problems
@@ -507,7 +524,8 @@ def selftest():
     assert [(r["start"], r["end"], r["width"], r["symbol"]) for r in rows] == [
         (0x1E1D, 0x1E1E, 2, "OT6_LOADOUT"),
         (0x1E1F, 0x1E26, 8, "OT6_RAGELOAD"),
-        (0x1E27, 0x1E2B, 5, "OT6_LORELOAD")], rows
+        (0x1E27, 0x1E2B, 5, "OT6_LORELOAD"),
+        (0x1E2F, 0x1E3F, 17, "OT6_SAVERSV")], rows
     assert scraps == [(0x1E1D, 0x1E3F)], scraps
     brows, bp = parse_battery(SELF_DOC)
     assert bp == [] and len(brows) == 10, (bp, len(brows))
@@ -528,6 +546,8 @@ def selftest():
     red("overlap", doc=SELF_DOC.replace("| $1E27-$1E2B | 5 |", "| $1E26-$1E2A | 5 |"))
     red("outside every documented scrap", doc=SELF_DOC.replace("Scrap `$1E1D-$1E3F`", "Scrap `$1E1D-$1E26`"))
     red("width column says 3", doc=SELF_DOC.replace("| $1E1D-$1E1E | 2 |", "| $1E1D-$1E1E | 3 |"))
+    # a reserve the code zeroes over a different length than the doc says
+    red("OT6_SAVERSV_LEN is 16", dbg=SELF_DBG.replace("val=0x11,type=equ", "val=0x10,type=equ"))
     # battery map: the codex moved by a page in the build (the mutant ROM
     # whose save-touching address drifted from the frozen layout)
     red("anchor OT6_CODEX_MAGIC is battery $2400",

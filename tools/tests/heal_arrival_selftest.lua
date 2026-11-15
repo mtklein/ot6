@@ -366,17 +366,24 @@ do
   check(p.kind == "fight" and p.aimHard == 2 and said("Fight re-aimed: slot 1 is under Love Token") ~= nil,
     "the focus's slot 0 unreachable, its slot 1 guarded: re-aimed past 0 to slot 2, got " .. tostring(p.aimHard))
   _, p = barbe({ cmds = { 0x00, 0x0B, 0x01, 0xFF } })
-  check(p.kind == "fight" and said("no other body to swing at and no Magic row -- the Fight stands (#466)") ~= nil, "no Magic row and no other body: the Fight stands")
+  check(p.kind == "defend" and said("no other body to swing at and no Magic row -- Defend for the Fight (#531)") ~= nil,
+    "no Magic row and no other body: Defend, not a Fight into the bodyguard (#531), got " .. tostring(p.kind))
+  H.COVER_FIGHT_STANDS = true
+  _, p = barbe({ cmds = { 0x00, 0x0B, 0x01, 0xFF } })
+  check(p.kind == "fight" and said("no other body to swing at and no Magic row -- the Fight stands (#466)") ~= nil,
+    "M.COVER_FIGHT_STANDS (the control arm): the Fight stands, the rule before #531")
+  H.COVER_FIGHT_STANDS = nil
   local D = barbe()
   local cast = { kind = "magic", spell = 0x14 }
   check(D:coverPlan(0, cast) == cast, "a cast is not a Fight: left alone")
   check(D:coverPlan(0, { kind = "fight", ally = true, target = 1 }).ally, "an unmuddle hit on an ally is not re-aimed")
   -- muted by Barb-e's counter (build/attempts/wt/v036-driver/lab/dbg_new_k4_s7):
-  -- the bag's Mute cure on itself, else the Fight stands
+  -- the bag's Mute cure on itself, else Defend (#531)
   _, p = barbe({ mute = true, bag = { [4] = { 0xF5, 20 } } })
   check(p.kind == "item" and p.item == 0xF5 and p.target == 0, "muted: a Remedy on itself, got " .. tostring(p.kind))
   _, p = barbe({ mute = true })
-  check(p.kind == "fight" and said("the Magic row greyed -- the Fight stands") ~= nil, "muted, no cure: the Fight stands")
+  check(p.kind == "defend" and said("the Magic row greyed -- Defend for the Fight") ~= nil,
+    "muted, no cure: Defend (#531), got " .. tostring(p.kind))
   COVER_OFF = true
   _, p = barbe()
   check(p.kind == "fight", "COVER_OFF: the driver before #466 swings into the bodyguard")

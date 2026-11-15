@@ -17,7 +17,7 @@
 --   2. the price: GAU's battle MP ($3C08 + seat * 2) once his first possessed
 --      turn has resolved is his MP at the plan less 8: 8 once, nothing a turn
 --      (the battle MP, which a level-up at the battle's end cannot touch);
---   3. the tier: OT6_RAGETIER holds the plan's boost (Cmd_10
+--   3. the tier: GAU's OT6_RAGETIER cell (per character) holds the plan's boost (Cmd_10
 --      stores the pending pips, capped 3), so the coin the plan bought is
 --      the coin the trance rolls;
 -- The plan's absorb veto is logged at the plan (the "[rage] plan read"
@@ -112,7 +112,7 @@ H.run({ maxFrames = 900000 }, {
     -- (Cmd_10 writes both before it sets the bit)
     local gs = gauSlot()
     if b and inBattle and cur.tier == nil and gs ~= nil and raging(gs) then
-      cur.tier, cur.beast = H.readByte(RAGETIER), H.readByte(0x33A8 + gs * 2)
+      cur.tier, cur.beast = H.readByte(RAGETIER + gs * 2), H.readByte(0x33A8 + gs * 2)  -- his own cell
     end
     -- his battle MP on every live frame after the first possessed turn began (the fallback reading above)
     if b and inBattle and gs ~= nil and cur.cmd10 >= 2 and batMp(gs) ~= 0xFFFF then cur.bmpLast = batMp(gs) end

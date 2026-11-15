@@ -347,7 +347,7 @@ bytes, `ItemProp+5` to `+13`).
 | Ifrit | Fire, Drain | Vig / Stm | max HP +12.5% (Green Beret) | Fight deals more damage (Atlas Armlet) |
 | Shiva | Ice, Osmose, Shell | Mag / Spd | immune to Seizure | spells cost half MP (Gold Hairpin) |
 | Maduin | Fire, Ice, Bolt | Mag / Stm | max MP +12.5% (Bard's Hat) | spells deal more damage (Earrings) |
-| Shoat | Break, Doom | Spd / Stm | immune to Petrify | immune to Death and Doom (Safety Bit) |
+| Shoat | Break, Doom | Spd / Stm | immune to Petrify | immune to Death and Doom |
 | Phantom | Vanish, Demi | Spd / Mag | no back attacks (Back Guard) | Image at the start of every battle (Mirage Vest) |
 | Carbunkl | Rflect, Safe | Stm / Mag | Shell when HP is low (Barrier Ring) | †*Facet*: starts every battle with 2 boost points |
 | Bismark | Haste, Slow | Vig / Stm | Safe when HP is low (MithrilGlove) | max HP +25% (Red Cap) |
@@ -545,24 +545,22 @@ her Overcast sets; with the line's own ranks it won all four.
 
 The page under Skills > Espers shows the selected character's rank, Magic
 Points and next cost on the title row, and the five rungs as short labels,
-white once reached and grey until then. What it does not do yet, the
-remaining part of step 6:
+white once reached and grey until then. Since v0.45 the cursor walks the
+rung column too (`GenjuDetailCursorProp` {2, 7}: right from the spells, rows
+1-5), and the help window at the top shows what the highlighted rung does,
+one line from `Ot6RungDescStr` (`tools/esper_ladder.py`'s DESC: one
+description per label, every label one effect, so Shoat's signature is
+labelled "NoDeath/Doom", not Alexandr's "No Death", and a label that names
+a relic carries that relic's bytes). Under a rung the
+character has not reached whose effect bytes its other reached rungs already
+cover, on any stone and this one's earlier rungs included, a second line
+says "Already held" (`Ot6RungDescText`). Gear does not
+count, and neither does an HP or MP boost a larger one makes moot (the
+bits differ; the largest applies): the line is a bit-for-bit cover over the
+ladder alone. The Narshe school's magicite ghost teaches the ladder
+([narshe-school.md](narshe-school.md), $0274). What is left of step 6:
 
-- **Say what a rung does.** The labels name a relic ("Gold Hairpin") or an
-  immunity ("No Sleep"); the five new signatures (Conductor, Facet,
-  Rebirth, No Stop/Slow, Full Revive) and Sraphim's "Heal +25%" need a
-  sentence. Proposed: a cursor on the rung
-  rows (today the cursor walks only the spell rows, `GenjuDetailCursorProp`
-  {1, 7}) and the help line at the top of the screen showing the rung's
-  description, from a 130-entry text table beside `Ot6RungLabelTbl`.
-- **Mark "have".** An effect the character already holds (from gear or
-  another stone's rung) is marked so a player tours toward new ones, as the
-  table's notes say. The fold already computes it (`Ot6EsperFold`'s bits
-  for that character minus this rung's).
 - **The status page's list of kept bonuses** (optional, as the doc says).
-- **Teaching.** One Narshe school line in plain words: "A stone teaches its
-  wearer bonuses that stay. Every battle won pays Magic Points to the stone
-  each member wears; see Skills > Espers." (step 7).
 - **A wearing policy for the harness** (step 8): today the route equips
   stones for their spells only, so the ladder grows wherever the route's
   wearers happen to fight.

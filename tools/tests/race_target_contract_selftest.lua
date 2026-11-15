@@ -18,6 +18,7 @@ local function driver()
   d.focusReachable=function() return true end
   -- the counter rules read the ROM's AI scripts (counter_selftest covers them)
   d.counterAimPlan=function(_,_,plan) return plan end
+  d.counterPartyPlan=function(_,_,plan) return plan end
   return d
 end
 local function attack(d) return assert(d:racePlan(0,{kind='attack',target=1,boost=0,line={plan={kind='fight',row=0}}})) end

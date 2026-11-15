@@ -119,7 +119,7 @@ guidelines, a bug.
 | Magic: Float, Warp, Quick | refused |
 | X-Magic | each spell as its own; dropped only when neither buys anything |
 | Lore with a number | the multiplier |
-| Lore: Condemned, Roulette, Big Guard, L.5 Doom, L.3 Muddle, Reflect???, ForceField, Dischord, Sour Mouth, Pep Up, Rippler | dropped at the turn's end (no R refusal yet: the Lore window is not read) |
+| Lore: Condemned, Roulette, Big Guard, L.5 Doom, L.3 Muddle, Reflect???, ForceField, Dischord, Sour Mouth, Pep Up, Rippler; and Revenge, Blow Fish, Pearl Wind, Step Mine, Exploder, whose special effect writes the number after the multiplier (`DoAttackerEffect` runs after `CalcDmg`; `Ot6SpellNoNumber` reads MagicProp +9; until v0.45 a boost on them was spent for nothing) | refused (R on the Lore list's row, `Ot6RowNoBoost`; a boost raised on the command window before the lore was picked is dropped at the turn's end) |
 | Summon with a number | the multiplier |
 | Summon: Hope Song, Demon Eye, Cat Rain, Sonic Dive, Atom Edge, True Edge, Metamorph, Life Guard, Wall, Ruby Power, Fader, Earth Wall, Heal Horn, Moon Song, Rebirth | dropped (`Ot6QueueFold`) |
 | Def. | refused (`Ot6CmdNoBoost`) |
@@ -136,6 +136,7 @@ guidelines, a bug.
 | Master's Mark | the divine (Locke) |
 | SwdTech | the tech (the cursor row is the boost); Cleave at 3 (Cyan) |
 | Blitz | the multiplier; Bum Rush at 3 (Sabin) |
+| Blitz: Mantra, whose special effect writes the heal (SABIN's HP over the bodies) after the multiplier (`Ot6SpellNoNumber` reads its +9, $15; until v0.45 a boost on it cost the points and 2.5x the MP per point and healed what an unboosted one heals) | refused (R on the Blitz list's row, `Ot6RowNoBoost`; a boost raised on the command window before it was picked is dropped at the turn's end; its price is flat, `Ot6BlitzPrice`; battle_mantrarefuse) |
 | Tools with a number: AutoCrossbow, Bio Blaster, Flash, Drill, Chain Saw | the multiplier; Overclock at 3 (Edgar) |
 | Tools without one: NoiseBlaster | refused (#469) |
 | Air Anchor (power 128, pierce) | the multiplier |

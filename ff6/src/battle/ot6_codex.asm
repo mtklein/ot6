@@ -177,9 +177,285 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         lda     #OT6_CODEX_V2
         sta     f:OT6_CODEX_MAGIC+$0c00
         jsr     Ot6EsperNewGame ; #328: and no esper progress
+        jsr     Ot6NewGameClear ; #389: and no power-on junk in the scrap
         plp
         rtl
 .endproc
+
+; New Game: zero the save block's OT6 scrap ($1e1d-$1e3f: the three
+; loadouts, the signature and the reserve) and vanilla's unused tail
+; ($1ff7-$1ffd).  Vanilla clears WRAM only to $11ff (ClearRAM) and its New
+; Game names none of these bytes, so on a console or emulator whose RAM
+; powers on non-zero they held junk: all-$FF loadouts read as a manual Rage
+; and Lore loadout whose every slot names an unknown entry, and Gau and
+; Strago came up with empty lists.  Zero is AUTO and unsigned.
+; a/x widths saved.
+.proc Ot6NewGameClear
+        php
+        longi
+        shorta
+        phx
+        lda     #$00
+        ldx     #$0000
+@scrap: sta     f:OT6_LOADOUT,x
+        inx
+        cpx     #OT6_SCRAP_LEN
+        bcc     @scrap
+        ldx     #$0000
+@tail:  sta     f:OT6_SAVETAIL,x
+        inx
+        cpx     #OT6_SAVETAIL_LEN
+        bcc     @tail
+        plx
+        plp
+        rts
+.endproc
+
+; [ sign the save block, and keep the reserve zero ] (#389)
+;
+; Called by Ot6CodexSaveAs at the head of CopyGameDataToSRAM, before the
+; checksum and the copy, so the signature rides in the slot and is summed.
+; An unsigned block (a save from before this build, or a New Game's first
+; save) has the rest of the scrap ($1e2f-$1e3f) and the block's unused
+; tail ($1ff7-$1ffd) zeroed, then takes the signature and version; a
+; signed block is left as it is.  Every save also zeroes the destination
+; slot's codex and esper page reserves (each page's +$002-$00f, the codex
+; page past +$310 and the esper page past +$280): no build writes them, and
+; bank $31 is never cleared, so a battery can hold junk there.  So a slot a
+; signing build wrote holds zero in every reserve it owns.
+; A (a8) = destination slot 1..3.  a/x/y widths saved; A preserved; Y
+; clobbered.
+.proc Ot6SaveSign
+        php
+        longai
+        pha
+        phx
+        phy
+        ; signed = the signature AND a version this build knows (1..CUR): a
+        ; block whose signature is junk-matched or whose version byte is 0
+        ; or past ours is treated as unsigned and signed afresh.  A release
+        ; that raises OT6_SAVEVER_CUR handles a lower signed version here:
+        ; it sets up its new field first, then raises the byte.
+        lda     f:OT6_SAVESIG
+        cmp     #OT6_SAVESIG_WORD
+        bne     Sign
+        shorta
+        lda     f:OT6_SAVEVER
+VerCheck:                       ; (mutant_rom.py's seam for the version test)
+        beq     Sign
+        cmp     #OT6_SAVEVER_CUR+1
+        bcs     Sign
+        bra     Pages
+Sign:  jsr     Ot6RepairLoadouts
+        shorta
+        lda     #$00
+        ldx     #$0000
+@rsv:   sta     f:OT6_SAVERSV,x
+        inx
+        cpx     #OT6_SAVERSV_LEN
+        bcc     @rsv
+        ldx     #$0000
+@tail:  sta     f:OT6_SAVETAIL,x
+        inx
+        cpx     #OT6_SAVETAIL_LEN
+        bcc     @tail
+        lda     #OT6_SAVEVER_CUR
+        sta     f:OT6_SAVEVER
+        longa
+        lda     #OT6_SAVESIG_WORD
+        sta     f:OT6_SAVESIG
+Pages: longa
+SlotAt: lda     5,s             ; the destination slot (under the phx/phy)
+        nop                     ; (mutant_rom.py's seam: a 3-byte read here)
+        and     #$0003
+        beq     @done           ; not a slot: no pages
+        dec
+        xba
+        asl
+        asl                     ; (slot - 1) * $400
+        pha                     ; [1,s] the page offset
+        tax
+        lda     #$0000
+        ldy     #(OT6_CODEX - OT6_CODEX_MAGIC - 2) / 2
+@cpad:  sta     f:OT6_CODEX_MAGIC+2,x
+        inx
+        inx
+        dey
+        bne     @cpad
+        lda     1,s
+        tax
+        lda     #$0000
+        ldy     #(OT6_CODEX_STRIDE - OT6_CODEX_USED) / 2
+@ctail: sta     f:OT6_CODEX_ROOT+OT6_CODEX_USED,x
+        inx
+        inx
+        dey
+        bne     @ctail
+        lda     1,s
+        tax
+        lda     #$0000
+        ldy     #(OT6_ESPER_CTR - OT6_ESPER_MAGIC - 2) / 2
+@epad:  sta     f:OT6_ESPER_ROOT+OT6_ESPER_MAGIC+2,x
+        inx
+        inx
+        dey
+        bne     @epad
+        lda     1,s
+        tax
+        lda     #$0000
+        ldy     #(OT6_ESPER_STRIDE - OT6_ESPER_COPY) / 2
+@etail: sta     f:OT6_ESPER_ROOT+OT6_ESPER_COPY,x
+        inx
+        inx
+        dey
+        bne     @etail
+        pla                     ; drop the page offset
+@done:  ply
+        plx
+        pla
+        plp
+        rts
+.endproc
+
+; [ first signing: loadout values no save can hold go back to AUTO ] (#389)
+;
+; An unsigned block may carry a New Game's power-on junk in the three
+; loadouts (all-$FF under an all-ones fill, which read as manual loadouts
+; whose every slot names nothing).  The field pages store only learned
+; entries, and learning is never undone, so these values cannot be
+; legitimate and are reset:
+;   * the Bushido word, to $0000 (AUTO), when a bit past its slots is set
+;     (bits 12-15) or one of the three slots the battle reads (slots 1-3,
+;     bits 3-11) names a SwdTech not learned ($1cf7).  Slot 0 (bits 0-2)
+;     is left alone: the page's first edit seeds it on purpose, a mirror of
+;     slot 1 (Ot6LoadoutSeedWord) that nothing reads;
+;   * a Rage byte, to $00 (unset), when it names a rage not learned ($1d2c);
+;   * a Lore byte, to $00, when it is past $18 (lore ids are 0..23) or
+;     names a lore not learned ($1d29).
+; An all-unset Rage or Lore loadout is AUTO.  Every other value is left as
+; it is.  The one junk value this cannot tell from a real one is a Rage
+; byte $FF when Gau has learned rage 254.
+; Called from Ot6SaveSign's signing path only.  a/x/y widths saved.
+.proc Ot6RepairLoadouts
+        php
+        longai
+        phx
+        phy
+        ; --- Bushido
+        lda     f:OT6_LOADOUT
+        beq     RRage           ; AUTO
+MaskAt: bit     #$f000          ; (mutant_rom.py's seam for this mask)
+        bne     RBzero          ; a bit past the three slots read (12-15)
+        lsr
+        lsr
+        lsr                     ; slot 1 in bits 0-2
+        ldy     #$0003
+RBslot: pha
+        and     #$0007
+        tax
+        shorta
+        lda     f:Ot6RepairBit,x
+        and     f:$7e1cf7       ; that SwdTech learned?
+        longa
+        beq     RBpull          ; no: the word cannot be real
+        pla
+        lsr
+        lsr
+        lsr
+        dey
+        bne     RBslot
+        bra     RRage
+RBpull: pla
+RBzero: lda     #$0000
+        sta     f:OT6_LOADOUT
+        ; --- Rage: eight bytes, id + 1
+RRage:  shorta
+        ldx     #$0000
+RRslot: lda     f:OT6_RAGELOAD,x
+        beq     RRnext
+        dec     a               ; the rage id, 0..254
+        jsr     RageLearned
+        bcs     RRnext
+        lda     #$00
+        sta     f:OT6_RAGELOAD,x
+RRnext: inx
+        cpx     #OT6_RAGESLOTS
+        bcc     RRslot
+        ; --- Lore: five bytes, id + 1, ids 0..23
+        ldx     #$0000
+RLslot: lda     f:OT6_LORELOAD,x
+        beq     RLnext
+        cmp     #$19
+        bcs     RLzero          ; past lore 23
+        dec     a
+        jsr     LoreLearned
+        bcs     RLnext
+RLzero: lda     #$00
+        sta     f:OT6_LORELOAD,x
+RLnext: inx
+        cpx     #OT6_LORESLOTS
+        bcc     RLslot
+        ply
+        plx
+        plp
+        rts
+
+; a8/i16.  A = id.  out: carry = learned.  X preserved.
+RageLearned:
+        phx
+        pha                     ; [2,s] the id
+        and     #$07
+        longa
+        and     #$00ff
+        tax
+        shorta
+        lda     f:Ot6RepairBit,x
+        pha                     ; [1,s] its bit, [2,s] the id
+        lda     2,s
+        lsr
+        lsr
+        lsr
+        longa
+        and     #$001f
+        tax
+        shorta
+        lda     f:$7e1d2c,x
+        and     1,s
+        cmp     #$01            ; carry = the bit is set
+        pla
+        pla
+        plx
+        rts
+
+LoreLearned:
+        phx
+        pha
+        and     #$07
+        longa
+        and     #$00ff
+        tax
+        shorta
+        lda     f:Ot6RepairBit,x
+        pha
+        lda     2,s
+        lsr
+        lsr
+        lsr
+        longa
+        and     #$0003
+        tax
+        shorta
+        lda     f:$7e1d29,x
+        and     1,s
+        cmp     #$01
+        pla
+        pla
+        plx
+        rts
+.endproc
+
+Ot6RepairBit:
+        .byte   $01, $02, $04, $08, $10, $20, $40, $80
 
 ; Initialize/migrate the selected persistent page while the load menu owns the
 ; machine, before gameplay can enter a battle through a caller with narrower
@@ -236,6 +512,7 @@ copy:   lda     f:OT6_CODEX+(src),x
         shorta
         pha                     ; preserve destination for vanilla's stores
         jsr     Ot6EsperSaveAs  ; #328: live esper progress into the slot
+        jsr     Ot6SaveSign     ; #389: the block signed, the slot's reserves zero
         jsr     Ot6CodexActive  ; ensure source; X = source page
         lda     $01,s           ; destination slot
         cpx     #OT6_CODEX_TEMP
