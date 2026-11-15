@@ -8059,13 +8059,18 @@ end
 -- counter=true drops 4 (728 HP)"), "party" too for a spread the engine takes
 -- half the time ($20 alone: priced at its worst), else one member at random
 -- ("roulette").  (#533 review, build/attempts/wt/review-polish-driver-4/
--- magicprop_counter_reach.txt.)  A cast on the monster's own turn: "party"
+-- magicprop_counter_reach.txt.)  Retarget picks the side first (@5937): a
+-- monster's $b8 starts on its own side and only the ENEMY bit ($40) turns it
+-- to the party, INIT_ALL ($0C = $04) taking both; a random-target answer
+-- with neither lands on the monsters ("none": Harvester $68 and Kitty $77,
+-- +0 $3E, heal the caster's side).  A cast on the monster's own turn: "party"
 -- (no MANUAL bit and an initial group, all or one side: L.5 Doom's $6E lands
 -- on every member), else "attacker".  (#523)
 function M.deathReach(t, counter, f2)
   if (t & 0x80) ~= 0 then return "roulette" end
   if counter then
     if ((f2 or 0) & 0x10) == 0 then return "attacker" end
+    if (t & 0x40) == 0 and (t & 0x0C) ~= 0x04 then return "none" end
     if (t & 0x0C) ~= 0 or (t & 0x20) ~= 0 then return "party" end
     return "roulette"
   end
@@ -8176,8 +8181,9 @@ function Driver:deathAnswer(slot, e, a)
   -- land on any of them, the one who struck or a partner (#530: priced on the
   -- one who struck alone, a guarded actor read the Veteran's answer as safe
   -- while it could take the partner beside him)
-  local reach = { e }
   local r = M.answerReach(a)
+  if r == "none" then return nil end
+  local reach = { e }
   if r == "party" or r == "roulette" then
     local left = M.leftMask()
     for m = 0, 3 do
@@ -8193,6 +8199,7 @@ end
 function Driver:counterHit(slot, e, a, hp, noDeath)
   if not noDeath and self:deathAnswer(slot, e, a) == e then return hp end
   if a ~= 0xEE and a ~= 0xEF then
+    if M.answerReach(a) == "none" then return 0 end -- lands on the monsters' own side
     local r = (M.sym("MagicProp") & 0x3FFFFF) + a * 14
     local t = M.fixedTake(function(i) return M.readRomByte(r + i) end, hp, M.readWord(0x3C1C + e * 2))
     if t ~= nil then return t end
@@ -12629,11 +12636,13 @@ function Driver:dodgePlan(actor, plan)
   if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
   if aim == nil or not monAlive(aim) or dodger(aim) == nil then return plan end
   local why = dodger(aim)
+  local refused = {}
   for s = 0, 5 do
     if monAlive(s) and dodger(s) == nil then
       if plan.kind ~= "fight" then return plan end
       -- a Fight re-aims only where every guard would let it land (Driver:reaimOk, #533 review)
-      if self:reaimOk(actor, s, plan) then
+      if not self:reaimOk(actor, s, plan) then refused[#refused + 1] = tostring(s)
+      else
         M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under %s (every swing misses it); slot %d instead",
           self.tag or "fight", actor, aim, why, s))
         self:markRejected(plan, aim)
@@ -12644,6 +12653,10 @@ function Driver:dodgePlan(actor, plan)
       end
     end
   end
+  -- what the log says of the bodies left: all faded, or the ones that can be hit refused by the re-aim filter
+  local state = #refused == 0 and "every standing monster is under Vanish or Image"
+    or string.format("slot %d is under %s and the re-aim filter refuses every body a swing can hit (slot %s)",
+      aim, why, table.concat(refused, ", "))
   if plan.kind == "skill" then
     local cls = plan.cmd == BATTLE.CMD_TOOLS and M.weaponClass(plan.skill) or BATTLE.BLITZ_SHAPE[plan.skill].class
     if (cls or 0) == 0 then return plan end
@@ -12651,11 +12664,11 @@ function Driver:dodgePlan(actor, plan)
   if cmdRow(actor, BATTLE.CMD_MAGIC) then
     local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
     if line then
-      M.log(string.format("[%s] actor=%d every standing monster is under Vanish or Image: a cast (%s) for the "
-        .. "%s that would miss", self.tag or "fight", actor, line.kind, plan.kind == "fight" and "Fight" or "skill"))
+      M.log(string.format("[%s] actor=%d %s: a cast (%s) for the "
+        .. "%s that would miss", self.tag or "fight", actor, state, line.kind, plan.kind == "fight" and "Fight" or "skill"))
       return line
     end
-    local rv = why == "Vanish" and self:revealLine(actor, aim) or nil
+    local rv = why == "Vanish" and self:revealLine(actor, aim, #refused > 0 and state or nil) or nil
     if rv then return rv end
   end
   return plan
@@ -12669,8 +12682,9 @@ M.REVEAL_SPELLS = { 0x04, 0x1A, 0x10, 0x19, 0x03, 0x00, 0x01, 0x02 }
 -- at the Vanished slot `aim`.  The plan skips the cast guard's absorb half (vetoOk: the absorbed hit is the point),
 -- so it judges the other two halves itself, here: no reveal while any standing body holds an enemy Runic that would
 -- take the spell (Driver:runicSlot) or the spell is reflectable and a standing body is under Reflect (M.castVeto
--- with no element: the bounce would land on the party every turn).  nil when no reveal may go.
-function Driver:revealLine(actor, aim)
+-- with no element: the bounce would land on the party every turn).  nil when no reveal may go.  `state`, when
+-- given, is what the log says of the standing bodies (Driver:dodgePlan: the ones a swing can hit refused).
+function Driver:revealLine(actor, aim, state)
   local slots = activeSlots()
   for _, id in ipairs(M.REVEAL_SPELLS) do
     local cell, cost = spellCell(actor, id, true)
@@ -12678,8 +12692,9 @@ function Driver:revealLine(actor, aim)
       local rs = self:runicSlot(id)
       local s, why = M.castVeto(0, M.spellReflectable(id), slots)
       if rs == nil and s == nil then
-        M.log(string.format("[%s] actor=%d every standing monster is under Vanish and no spell would hurt it: "
-          .. "spell $%02X (%d MP) at slot %d to end the Vanish", self.tag or "fight", actor, id, cost or -1, aim))
+        M.log(string.format("[%s] actor=%d %s and no spell would hurt it: "
+          .. "spell $%02X (%d MP) at slot %d to end the Vanish", self.tag or "fight", actor,
+          state or "every standing monster is under Vanish", id, cost or -1, aim))
         return { kind = "magic", spell = id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0, aim = aim,
                  vetoOk = true, reason = "reveal" }
       end

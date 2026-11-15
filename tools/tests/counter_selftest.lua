@@ -387,6 +387,20 @@ check("as a counter, Magnitude8, Quartr, Ultima and L.4 Flare reach the one who 
     return reach(MAGNITUDE8, true) == "attacker" and reach(QUARTR, true) == "attacker"
       and reach(ULTIMA, true) == "attacker" and reach(L4_FLARE, true) == "attacker"
   end)
+-- Retarget (@5937) picks the side before the group: a monster's $b8 starts
+-- on its own side, the ENEMY bit (+0 $40) turns it to the party and
+-- INIT_ALL ($0C = $04) takes both; a random-target answer with neither
+-- lands on the monsters and reaches no member
+local HARVESTER, KITTY = 0x68, 0x77
+assert(rom:byte(MAGIC + HARVESTER * 14 + 1) == 0x3E and rom:byte(MAGIC + HARVESTER * 14 + 3) & 0x10 ~= 0
+  and rom:byte(MAGIC + KITTY * 14 + 1) == 0x3E and rom:byte(MAGIC + KITTY * 14 + 3) & 0x10 ~= 0,
+  "Harvester and Kitty in MagicProp: +0 $3E (no ENEMY bit, INIT_HALF), +2 bit $10")
+check("as a counter, Harvester and Kitty (random target, no ENEMY bit) land on the monsters' own side; Sand Storm still the party",
+  "deathReach", 'if (t & 0x40) == 0 and (t & 0x0C) ~= 0x04 then return "none" end', "",
+  function()
+    return reach(HARVESTER, true) == "none" and reach(KITTY, true) == "none"
+      and reach(SAND_STORM, true) == "party"
+  end)
 
 print(string.format("counter_selftest: PASS -- %d assertions, each failed by its own mutant: %s",
   n, table.concat(checks, "; ")))

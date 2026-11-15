@@ -365,12 +365,35 @@ check("the FossilFang re-aim skips a Vanished body for one that stands in reach"
     return p.kind == "fight" and p.aimHard == 2 and p.rejected[0] == true
   end)
 check("a Fight off a Vanished body skips a body whose answer kills the striker (Allo Ver's Doom)",
-  { { "      if self:reaimOk(actor, s, plan) then\n        M.log", "      if true then\n        M.log" } },
+  { { "      if not self:reaimOk(actor, s, plan) then refused[#refused + 1] = tostring(s)\n      else",
+      "      if false then\n      else" } },
   function(H)
     battle({ [0] = { QUIET, 3000 }, [1] = { ALLOVER, 100 }, [2] = { QUIET, 3000 } })
     w8(0x3EE4 + 4 * 2, 0x10)                          -- slot 0 Vanished
     local p = driver(H):dodgePlan(0, { kind = "fight", row = 0, aim = 0 })
     return p.kind == "fight" and p.aimHard == 2
+  end)
+check("when the re-aim filter refuses every body a swing can hit, the log says so, not that every body faded",
+  { { '#refused == 0 and "every standing monster is under Vanish or Image"',
+      'true and "every standing monster is under Vanish or Image"' } },
+  function(H)
+    local lines = {}
+    H.log = function(m) lines[#lines + 1] = m end
+    local function cast(mons)
+      battle(mons)
+      w8(0x3EE4 + 4 * 2, 0x10)                        -- slot 0 Vanished
+      local d = driver(H)
+      d.magicOnlyLine = function() return { kind = "magic", spell = FIRE } end
+      local p = d:dodgePlan(0, { kind = "fight", row = 0, aim = 0 })
+      return p.kind == "magic" and lines[#lines] or ""
+    end
+    -- slot 1 stands to be hit, but Allo Ver answers the striker with Doom
+    local refused = cast({ [0] = { QUIET, 3000 }, [1] = { ALLOVER, 100 } })
+    -- slot 0 the only body: it has faded
+    local faded = cast({ [0] = { QUIET, 3000 } })
+    return refused:find("the re-aim filter refuses every body a swing can hit (slot 1)", 1, true) ~= nil
+      and refused:find("every standing monster", 1, true) == nil
+      and faded:find("every standing monster is under Vanish or Image", 1, true) ~= nil
   end)
 
 print(string.format("counter_death_selftest: PASS -- %d cases, each failed by its own mutant: %s", n,
