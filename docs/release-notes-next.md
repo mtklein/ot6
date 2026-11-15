@@ -10,8 +10,8 @@ top rank now says it takes an extra shield only from an enemy weak to
 lightning. Tritoch's top rank says it raises maximum MP, and Maduin's top rank
 is named Earrings, after the item.
 
-The Narshe Beginner's House is up to date. It now says a broken enemy turns
-grey under a cracked shield, that a boosted Fight with two weapons lands two
+The Narshe Beginner's House is up to date. It now says a broken enemy's shield
+is drawn cracked, that a boosted Fight with two weapons lands two
 more hits per point, and that boosting a status spell such as Sleep or Mute
 spreads it to one more target per point.
 

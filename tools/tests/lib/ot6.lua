@@ -45,7 +45,7 @@
 local M = {}
 -- A lab lever (lib/compose.py's OT6_LEVERS, a comma list of names): true
 -- when this run was composed with `name` on, for an A/B arm of a rule
--- switch (M.WORST_LIFT_OFF and the like); nothing in the graph sets it.
+-- switch; nothing in the graph sets it.
 function M.lever(name)
   return type(OT6_LEVERS) == "string" and ("," .. OT6_LEVERS .. ","):find("," .. name .. ",", 1, true) ~= nil
 end
@@ -1447,20 +1447,6 @@ function M.itemChoice(o)
   local refused = {}
   local inside = cost > 0 and hp <= cost
   local KEPT = "no shop sells it: kept for a member inside the round"
-  -- The worst lift: a member inside the round takes the cheapest heal that
-  -- clears the round at its worst (o.worstCost, M.roundWorst) when the
-  -- round's own price leaves room for more (worstCost > cost) and one in
-  -- hand does, rather than the cheapest that only clears the price; else
-  -- the rules below.  M.WORST_LIFT_OFF is the driver before it.
-  local worst = o.worstCost or 0
-  if inside and not M.WORST_LIFT_OFF and worst > cost then
-    for _, it in ipairs(items) do
-      local eff = (o.maxhp or 0) > 0 and math.min(it.restore, math.max(0, o.maxhp - hp)) or it.restore
-      if hp + eff > worst then
-        return it, string.format("clears the round at its worst (%d + %d > %d)", hp, eff, worst), refused
-      end
-    end
-  end
   if o.owed then
     local any = nil
     for _, it in ipairs(items) do
@@ -1673,33 +1659,6 @@ function M.roundCost(o)
   local why = string.format("%d enemy action(s) inside %d ticks%s [%s]", actions, window,
     #parts > 0 and (": " .. table.concat(parts, " + ")) or "", table.concat(gauges, ", "))
   return cost, actions, why, rate, acts
-end
--- The same round with every action at its enemy's worst (M.roundCost's
--- input; no typical rest): what the next window takes if each action is
--- the largest its enemy has landed.  M.roundCost prices the second and
--- later actions of one enemy at its typical, the right price for whether
--- a member is inside the round, but not for which heal to pour in once
--- she is: the Veldt's White Dragon (AI script _36: three attack lines,
--- Pearl, Pearl, Pearl or nothing, one turn) left RELM at 1426/3758 under
--- "2 enemy action(s) inside 191 ticks: s0 2x (1176 worst + 1x289
--- typical)"; the Potion that lifted her over that 1465 put her at 1676,
--- and the dragon's next turn ran two Pearls on her (1245, then the 431
--- she had left), with an X-Potion in the bag (v0.45's qualification,
--- px13 ~/work/v045-qual/build/states/wor_veldt.log: "[death] f+5377
--- entity 2 char 8 from 431/3758 by slot 0 cmd $02 atk $0E").
-M.WORST_LIFT_OFF = M.lever("WORST_LIFT_OFF")
-function M.roundWorst(o)
-  local window, cost = o.window or 0, 0
-  for _, en in ipairs(o.enemies or {}) do
-    local n = 0
-    if en.eta ~= nil and window >= 0 and en.eta <= window then
-      n = 1
-      if en.period ~= nil and en.period > 0 then n = n + (window - en.eta) // en.period end
-    end
-    local each = en.worst or en.rom or o.fallback
-    if n > 0 and each ~= nil then cost = cost + n * each end
-  end
-  return cost
 end
 
 -- When a heal lands (#459).  A heal decided now takes effect some ticks
@@ -13639,8 +13598,7 @@ function Driver:makePlanRules(actor)
             local c, n, why, rate = M.roundCost({ window = window, enemies = enemies,
               fallback = fallback })
             price[e], priceWhy[e], priceRate[e] = c, why, rate
-            priceFoes[e] = { enemies = enemies, fallback = fallback,
-              worst = M.roundWorst({ window = window, enemies = enemies, fallback = fallback }) }
+            priceFoes[e] = { enemies = enemies, fallback = fallback }
             if e == actor then priceN = n end
           end
         end
@@ -15047,22 +15005,6 @@ function Driver:makePlanRules(actor)
       -- the heals priced for when they land (#459): each one offered on c,
       -- with its arrival and whether the actions due before it take c first
       local arrivals, anyLate = {}, false
-      -- The worst lift (M.itemChoice): inside the round, the bag's cheapest
-      -- heal that lands in time and clears the round at its worst
-      -- (M.roundWorst) goes before a cure that does not, the raise's
-      -- top-up included -- the Veldt's raise priced "469 + 3289 = 3758
-      -- clears the 1676 round", and the top-up cast was the 816 Cure
-      -- ("cure entity 2 (469/3758) with $2D ... the raise's top-up"),
-      -- which the dragon's Pearl beat (wor_veldt.log, v0.45).
-      local worstCost = priceFoes[c.e] and priceFoes[c.e].worst or 0
-      local bagWorst = nil
-      if not M.WORST_LIFT_OFF and row ~= nil and cost > 0 and c.hp <= cost and worstCost > cost then
-        for _, it in ipairs(self:bagHeals(c.e, c.hp)) do
-          local eff = math.min(it.restore, math.max(0, c.maxhp - c.hp))
-          if c.hp + eff > worstCost and lateHeal(c.e, "item", it.id) == nil
-             and (bagWorst == nil or it.gil < bagWorst.gil) then bagWorst = it end
-        end
-      end
       -- The cast, offered first.  A cure's magic_prop power scales with
       -- the caster's magic power and level, so unlike an item's +$14
       -- power byte there is no honest prior for what it restores.  The
@@ -15096,17 +15038,6 @@ function Driver:makePlanRules(actor)
               c.maxhp, spell)
             if said ~= self.healSaid then self.healSaid = said; M.log(said) end
             cell = nil
-          end
-          if cell ~= nil and bagWorst ~= nil then
-            local gain = self:castRestoreOf(spell, actor, c.e)
-            if c.hp + math.min(gain or 0, math.max(0, c.maxhp - c.hp)) <= worstCost then
-              local said = string.format("[%s] actor=%d no cure on entity %d (%d/%d): $%02X restores %s, "
-                .. "and the round at its worst takes %d; the bag's $%02X (+%d) clears it -- the bag instead",
-                self.tag or "fight", actor, c.e, c.hp, c.maxhp, spell, gain and tostring(gain) or "?",
-                worstCost, bagWorst.id, bagWorst.restore)
-              if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-              cell = nil
-            end
           end
           if cell ~= nil then
             local gain, src = self:castRestoreOf(spell, actor, c.e)
@@ -15196,7 +15127,6 @@ function Driver:makePlanRules(actor)
       if #heals > 0 then
         local cap = M.deathGil(c.maxhp)
         local it, why, refused = M.itemChoice({ hp = c.hp, maxhp = c.maxhp, roundCost = cost,
-          worstCost = worstCost,
           allies = allies, threshold = threshold, owed = self.topUpOwed[c.e] ~= nil,
           cap = cap, items = heals })
         if it then

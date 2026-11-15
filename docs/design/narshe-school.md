@@ -117,11 +117,11 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Each hit on a weakness removes one shield. At zero it breaks: it can't act for a while and takes double damage.
+> Each hit on a weakness removes one shield. At zero it breaks: it can't act for a while and takes double damage until it recovers.
 >
 > *(next box)*
 >
-> A broken monster turns grey, and its shield icon is drawn cracked. When it recovers, its shields come back.
+> A broken monster's shield icon is drawn cracked. When it recovers, its shields come back.
 
 **$0264 — weaknesses: the ? marks, elements and weapon types, the codex (middle room):**
 
