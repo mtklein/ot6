@@ -202,7 +202,9 @@ def compare_ram(ref, fil, region, mode, base=0, lo=0, hi=None, skip=()):
 # differ under a fill without the game reading anything: they are counted
 # as observations, not as the play.
 OBSERVATIONS = ("[ot6] [tiles] ",)
-NORM = [(re.compile(r"\(\d+ bytes\)"), "(N bytes)"),
+# a snapshot's size is its compressed bytes, which the unwritten RAM it
+# carries moves without the play moving
+NORM = [(re.compile(r"\b\d+ bytes\b"), "N bytes"),
         (re.compile(r"sha=[0-9a-f]+"), "sha=X"),
         (re.compile(r"\b\d+(\.\d+)?s wall\b"), "Ns wall")]
 
