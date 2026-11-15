@@ -482,7 +482,9 @@ add({
 -- draw), every one of the second's at 0.  Declared like the rest of this
 -- fixture (state_write_waivers.txt): the second rager is installed, not
 -- recruited -- no capture seats GOGO beside GAU (wor-gogo-v1 and
--- wor-kt-factory-v1 seat GOGO with GAU in reserve).
+-- wor-kt-factory-v1 seat GOGO with GAU in reserve).  Red on a ROM whose store
+-- writes the one tier into every rager's cell (build/attempts/wt/v045-teach/
+-- rage/shared_tier.log: GAU's first roll after the second start was Fight).
 add(trance("shared", function()
   startMp = 50; pinPend = 3; wantSecond = true     -- the second is chosen once the actor is known
 end, function()

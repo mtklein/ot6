@@ -654,8 +654,10 @@ the turn count, or it asserts nothing.
    the `OT6_DANCETIER` shape), stored and read by the rager's entity offset.
    `battle_rage` arm 7b plays it: Gau at 3 points, then a second rager
    unboosted; every one of Gau's later possessed turns is the special with no
-   draw, and the second's rolls read its own 0. With the one shared byte
-   restored the arm is red (build/attempts/wt/v045-teach/rage/). No capture
+   draw, and the second's rolls read its own 0. The mutant that writes one
+   tier into every rager's cell (one tier shared, the old byte's behaviour)
+   is red there: Gau's first possessed roll after Gogo's start came up Fight
+   at tier 0 (build/attempts/wt/v045-teach/rage/shared_tier.log). No capture
    seats Gogo beside Gau (wor-gogo-v1 and wor-kt-factory-v1 hold Gau in
    reserve), so the arm installs both ragers on battle_entry, as the rest of
    that suite does.

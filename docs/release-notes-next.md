@@ -15,3 +15,7 @@ rank says so. Shoat's top rank is now named "Safety Bit", since it blocks
 Condemned as well as instant death. On Strago's Lore list, the R Button no
 longer adds Boost Points to a Lore that a boost can't improve, such as
 Condemned, Roulette or Big Guard.
+
+When Gau and Gogo both use Rage in the same battle, each now keeps the odds
+his own Boost Points bought. Before, whoever started raging last set the odds
+for both.
