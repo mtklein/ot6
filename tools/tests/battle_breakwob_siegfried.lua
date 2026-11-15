@@ -9,8 +9,11 @@
 --
 -- Asserted from the engine's cells (gauge $3e40+2s, max $3e41+2s, broken timer $3e90+2s, species $57c0+2s):
 --   1. Siegfried opens with his authored gauge, 1 (the floor gave him 2 of slash alone);
---   2. when a member's weapon-class hit lands on him (a Fight, command $00, or a classed Blitz: Pummel, Suplex,
---      Bum Rush), he is broken by the fight's end (any weapon: CYAN's katana, SHADOW's blade, SABIN's fists).
+--   2. when a member's action drops his shield count (whatever the command: a Fight, a SwdTech, a Blitz, a Throw,
+--      a Jump), he is broken by the fight's end (any weapon: CYAN's katana, SHADOW's blade, SABIN's fists).  The
+--      key is the count falling, not a list of commands.  The negative: a Fight or a classed Blitz (Pummel,
+--      Suplex, Bum Rush) that hurts him while the count never falls fails ("took no shield"), which is what a row
+--      with no key shows.
 --      A kill with no weapon class asserts nothing about the break: on the capture's draw his flurry comes first,
 --      and SHADOW's Interceptor counters it (command $02, attack $FD, no weapon class, so no chip) and kills him
 --      from 100 HP before any member's turn; a classless spell or Blitz would do the same.  So on most draws this
@@ -23,7 +26,8 @@ local STATE = "build/states/wob_train_specter.mss.lua"
 local SIEGFRIED, ROW = 0x131, 1
 local SH_CUR, SH_MAX, BRK, SPECIES, PRESENT, MONHP = 0x3E40, 0x3E41, 0x3E90, 0x57C0, 0x3AA8, 0x3BFC
 local FIGHT = { tactical = true, boost = true, items = true, healPercent = 50 }
--- a hit with a weapon class: a Fight, or a Blitz the class table keys (Pummel, Suplex, Bum Rush)
+-- a hit that should take a shield from a keyed body: a Fight, or a Blitz the class table keys (Pummel, Suplex,
+-- Bum Rush).  Only the negative below uses it; the break assertion keys on the shield count itself.
 local function classed(cmd, atk)
   return cmd == 0x00 or (cmd == 0x0A and (atk == 0x5D or atk == 0x5F or atk == 0x64))
 end
@@ -48,8 +52,8 @@ local function watch()
       if r.open == 0 and H.readByte(SH_MAX + s * 2) ~= 0 then r.open = H.readByte(SH_MAX + s * 2) end
       local hp = H.readWord(MONHP + s * 2)
       if r.hp ~= nil and hp ~= r.hp then
-        if hp < r.hp and classed(H.readByte(0xB5), H.readByte(0xB6)) and r.classHit == nil then
-          r.classHit = H.frame
+        if hp < r.hp and classed(H.readByte(0xB5), H.readByte(0xB6)) and r.fightHit == nil then
+          r.fightHit = H.frame
         end
         if hp == 0 then
           r.byDog = H.readByte(0xB5) == 0x02 and (H.readByte(0xB6) == 0xFC or H.readByte(0xB6) == 0xFD)
@@ -60,6 +64,13 @@ local function watch()
           H.frame, s, r.sp, r.hp, hp, H.readByte(SH_CUR + s * 2), H.readByte(0xB5), H.readByte(0xB6)))
       end
       r.hp = hp
+      local sh = H.readByte(SH_CUR + s * 2)
+      if r.sh ~= nil and sh < r.sh and sh ~= 0xFF and r.classHit == nil then
+        r.classHit = H.frame
+        H.log(string.format("[siegfried] f%d slot %d ($%03X) shields %d -> %d, cmd $%02X atk $%02X", H.frame, s, r.sp,
+          r.sh, sh, H.readByte(0xB5), H.readByte(0xB6)))
+      end
+      r.sh = sh
       local t = H.readByte(BRK + s * 2)
       if r.broke == nil and t ~= 0 and t ~= 0xFF then
         r.broke = H.frame
@@ -142,10 +153,14 @@ H.run({ maxFrames = 80000 }, {
     for _, x in pairs(W.slots) do if x.sp == SIEGFRIED then r = x end end
     H.assertEq(r ~= nil, true, "battle 109 dealt Siegfried $131")
     H.assertEq(r.open, ROW, "Siegfried's gauge as he opens (his Ot6ShieldTbl row)")
-    if r.classHit ~= nil then
-      H.assertEq(r.broke ~= nil, true, string.format("a member's weapon-class hit "
-        .. "landed on Siegfried at f%d and broke him (broken at %s)", r.classHit, tostring(r.broke)))
-      H.log("[siegfried] the row holds in play: one shield, broken by a member's weapon")
+    if r.classHit ~= nil or r.broke ~= nil then
+      H.assertEq(r.broke ~= nil, true, string.format("a member's action dropped Siegfried's shield count at f%s "
+        .. "and broke him (broken at %s)", tostring(r.classHit), tostring(r.broke)))
+      H.log(string.format("[siegfried] the row holds in play: one shield, taken at f%s, broken at f%s",
+        tostring(r.classHit), tostring(r.broke)))
+    elseif r.fightHit ~= nil then
+      error(string.format("[siegfried] a member's Fight or classed Blitz hurt Siegfried at f%d and took no shield "
+        .. "(his row has no key for it)", r.fightHit), 0)
     else
       H.assertEq(r.broke == nil and r.killShields == ROW, true, string.format("no weapon-class hit landed: the "
         .. "classless kill left his one shield standing (killed by cmd %s)", r.byDog and "$02 atk $FD, Interceptor"
