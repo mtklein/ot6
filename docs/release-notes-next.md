@@ -21,6 +21,13 @@ blank, and Gau's Rage list or Strago's Lore list still comes up empty, set that
 loadout back to AUTO on its page in the Skills menu. New games are not
 affected.
 
+On emulators and consoles whose memory does not start out blank, a new game no
+longer depends on what that memory held: the steps to the first random battle,
+the event counters a few scenes keep, and the positions of characters off
+screen now start the same every time. A boosted Fight that switches to another
+enemy after its target falls also no longer behaves differently in the first
+battle after turning the console on.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44
