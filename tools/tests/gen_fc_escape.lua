@@ -380,6 +380,43 @@ local function nerapaAttempt(n)
   })
 end
 
+-- the statue path's walk (section 3): waypoints `wps` until `done()`, fighting what comes and taking any choice
+local function statuePath(wps, done, label)
+    local wi, t, wt, lastK, lastT = 1, 0, 0, -1, 0
+    -- any choice here takes row 0, pressed on phase 0-2; the check sits
+    -- above the battle branch, as it always has, so it is not battle-gated
+    local C = H.newChoice(0, { ready = "count", min = 1, inBattle = false,
+      press = function(ph) return ph < 3 end, tag = "statue path" })
+    return H.driveUntil(function() t = t + 1; return done() end, 60000, {
+      H.call(function()
+        if C.frame(t % 24) then return end
+        if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}); return end
+        if H.battleLoadStarted() or H.battleActive() then FA.frame(); return end
+        if not H.hasControl() then H.setPad({}); return end
+        local wp = wps[wi]
+        if not wp then H.setPad({}); return end
+        local dx, dy = wp[1] - H.fieldX(), wp[2] - H.fieldY()
+        wt = wt + 1
+        if (dx == 0 and dy == 0) or wt > 700 then wi, wt = wi + 1, 0; H.setPad({}); return end
+        local px = dx > 0 and "right" or "left"
+        local py = dy > 0 and "down" or "up"
+        local k = H.fieldX() * 256 + H.fieldY()
+        if k ~= lastK then lastK, lastT = k, t end
+        if t - lastT > 240 then
+          -- the y12-14 stairs are prop-3 tiles that only move on diagonal input
+          local alts = dy ~= 0
+            and { { [py] = true, left = true }, { [py] = true, right = true },
+                  { [py] = true }, { left = true }, { right = true } }
+            or { { [px] = true, up = true }, { [px] = true, down = true },
+                  { [px] = true }, { up = true }, { down = true } }
+          H.setPad(alts[(math.floor(t / 36) % #alts) + 1])
+          return
+        end
+        H.setPad(math.abs(dx) >= math.abs(dy) and { [px] = true } or { [py] = true })
+      end),
+    }, label)
+end
+
 H.run({ maxFrames = 600000, allowGameOver = true }, {
   -- ---- 0. cold Continue of Q -----------------------------------------------
   H.waitFrames(350),
@@ -553,42 +590,18 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   H.waitFrames(30),
 
   -- ---- 3. the statue path onto (60,11) -> map 393 --------------------------
-  (function()
-    local wps = { { 60, 14 }, { 60, 12 }, { 60, 11 } }
-    local wi, t, wt, lastK, lastT = 1, 0, 0, -1, 0
-    -- any choice here takes row 0, pressed on phase 0-2; the check sits
-    -- above the battle branch, as it always has, so it is not battle-gated
-    local C = H.newChoice(0, { ready = "count", min = 1, inBattle = false,
-      press = function(ph) return ph < 3 end, tag = "statue path" })
-    return H.driveUntil(function() t = t + 1; return mapIs(393) end, 60000, {
-      H.call(function()
-        if C.frame(t % 24) then return end
-        if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}); return end
-        if H.battleLoadStarted() or H.battleActive() then FA.frame(); return end
-        if not H.hasControl() then H.setPad({}); return end
-        local wp = wps[wi]
-        if not wp then H.setPad({}); return end
-        local dx, dy = wp[1] - H.fieldX(), wp[2] - H.fieldY()
-        wt = wt + 1
-        if (dx == 0 and dy == 0) or wt > 700 then wi, wt = wi + 1, 0; H.setPad({}); return end
-        local px = dx > 0 and "right" or "left"
-        local py = dy > 0 and "down" or "up"
-        local k = H.fieldX() * 256 + H.fieldY()
-        if k ~= lastK then lastK, lastT = k, t end
-        if t - lastT > 240 then
-          -- the y12-14 stairs are prop-3 tiles that only move on diagonal input
-          local alts = dy ~= 0
-            and { { [py] = true, left = true }, { [py] = true, right = true },
-                  { [py] = true }, { left = true }, { right = true } }
-            or { { [px] = true, up = true }, { [px] = true, down = true },
-                  { [px] = true }, { up = true }, { down = true } }
-          H.setPad(alts[(math.floor(t / 36) % #alts) + 1])
-          return
-        end
-        H.setPad(math.abs(dx) >= math.abs(dy) and { [px] = true } or { [py] = true })
-      end),
-    }, "statue scene -> map 393")
-  end)(),
+  -- In two legs, with care between: the path's random fights can leave a member near death (the v0.45 landing:
+  -- battle $0B9 left EDGAR at 107/1216, and escape_start shipped him so, audit_party_hp's NEAR FATAL), and map
+  -- 393's clock allows no menu, so the last stop is (60,12), the stair below the statue's trigger.
+  statuePath({ { 60, 14 }, { 60, 12 } }, function()
+    return mapIs(393) or (H.fieldX() == 60 and H.fieldY() == 12 and H.hasControl() and not H.dialogWaiting()
+      and not H.battleLoadStarted())
+  end, "the statue path -> (60,12)"),
+  H.cond(function() return not mapIs(393) and H.hasControl() and not H.dialogWaiting() end, {
+    H.fieldCare({ tag = "before the statue scene", threshold = 0.95 }),
+  }, {}),
+  H.release(),
+  statuePath({ { 60, 11 } }, function() return mapIs(393) end, "statue scene -> map 393"),
   (function()
     local calm = 0
     return H.driveUntil(function()
