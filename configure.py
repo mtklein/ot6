@@ -803,10 +803,6 @@ MUTANTS = {
     "sigonly": ("VerCheck=eaeaeaeaeaea", "junk/v0.44-sig-ver0", "with layout version 1"),
     # the page reserves zeroed for the slot loaded, not the slot saved into
     "srcpages": ("SlotAt=ad1f02", "junk/v0.44-wor-cyan", "saveas: slot 1's codex and esper page pads"),
-    # no loadout repair: impossible values survive the first signing
-    "norepair": ("Ot6RepairLoadouts", "junk/v0.44-mixed", "impossible loadout values are reset"),
-    # the Bushido mask counting slot 0 ($f007): the page's seeded word is lost
-    "mask0": ("MaskAt=8907f0", "junk/v0.44-mixed", "impossible loadout values are reset"),
     # no New Game clear (battle_newgameloadouts, below)
     "noclear": ("Ot6NewGameClear", None, None),
 }

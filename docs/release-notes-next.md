@@ -15,6 +15,12 @@ grey under a cracked shield, that a boosted Fight with two weapons lands two
 more hits per point, and that boosting a status spell such as Sleep or Mute
 spreads it to one more target per point.
 
+Saving no longer changes Gau's, Strago's or Cyan's loadouts. If a game was
+started before v0.45 on an emulator or console whose memory did not start out
+blank, and Gau's Rage list or Strago's Lore list still comes up empty, set that
+loadout back to AUTO on its page in the Skills menu. New games are not
+affected.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44
