@@ -150,8 +150,8 @@ vanilla leaves unused, and names the rest of that range as reserve. Address is i
 | $1E1D-$1E1E | 2 | OT6_LOADOUT | Cyan's Bushido loadout: a packed word, three bits per boost slot (slots 1/2/3 at bits 3-5/6-8/9-11), each a 0..7 SwdTech index. `$0000` = AUTO. | ot6_bushido.asm `Ot6BushidoTech` reads it in battle; ot6_loadout.asm `Ot6LoadoutAssign` writes a slot and `Ot6LoadoutInput` writes `$0000` to revert to AUTO; `Ot6LoadoutUnpack`/`Ot6LoadoutIsAuto`/`Ot6LoadoutSlotTech` read it in the field page. | v0.5 | `$0000` = AUTO. A non-zero word is decoded per slot and a slot naming an unlearned tech falls back to AUTO (`Ot6TechLearned`). |
 | $1E1F-$1E26 | 8 | OT6_RAGELOAD | Gau's 8-slot Rage loadout, one byte per slot: byte = rage id + 1, `$00` = unset. All eight `$00` = AUTO. | ot6_rage.asm `Ot6RageList` builds the battle Rage list from it; `Ot6RageSeed` writes the window on the first edit, `Ot6RageCycleCore`/`Ot6RageInput` write field edits; `Ot6RageSlot`/`Ot6RageIsAuto` read it. | v0.7 | all `$00` = AUTO. A byte naming an unknown or unlearned rage is dropped from the list. |
 | $1E27-$1E2B | 5 | OT6_LORELOAD | Strago's 5-slot Lore loadout, one byte per slot: byte = lore id + 1 (ids 0..23), `$00` = unset. All five `$00` = AUTO. | ot6_lore.asm `Ot6LoreMask`/`Ot6LoreMaskSet` build the battle Lore mask from it; `Ot6LoreSeed`, `Ot6LoreCycleCore`/`Ot6LoreInput` write it; `Ot6LoreSlot`/`Ot6LoreIsAuto` read it. | v0.13 | all `$00` = AUTO. A byte naming an unknown or unlearned lore is dropped from the mask. |
-| $1E2C-$1E2D | 2 | OT6_SAVESIG | The block's signature, `$5653` ('SV') when signed. | ot6_codex.asm `Ot6SaveSign` writes it at every save, before the checksum; `Ot6NewGameClear` zeroes it at New Game. | v0.45 | Anything else: unsigned. The first save zeroes `OT6_SAVERSV` and `OT6_SAVETAIL`, then signs. |
-| $1E2E | 1 | OT6_SAVEVER | The layout version that signed the block (today 1). | `Ot6SaveSign` writes it with the signature. | v0.45 | Read only when signed. |
+| $1E2C-$1E2D | 2 | OT6_SAVESIG | The block's signature, `$5653` ('SV') when signed. | ot6_codex.asm `Ot6SaveSign` writes it at every save, before the checksum; `Ot6NewGameClear` zeroes it at New Game. | v0.45 | Signed means `$5653` here AND an `OT6_SAVEVER` of 1 through `OT6_SAVEVER_CUR`; a signed block keeps its version. Anything else is unsigned, and its first save zeroes `OT6_SAVERSV` and `OT6_SAVETAIL`, resets impossible loadout values (`Ot6RepairLoadouts`), then signs. |
+| $1E2E | 1 | OT6_SAVEVER | The layout version that signed the block (today 1). | `Ot6SaveSign` writes it with the signature, only when it signs an unsigned block. | v0.45 | 0, or past `OT6_SAVEVER_CUR`: the block is unsigned. |
 | $1E2F-$1E3F | 17 | OT6_SAVERSV | Reserved. | Zeroed by `Ot6SaveSign` when it first signs a block, and by `Ot6NewGameClear`. | v0.45 | Zero in a signed block; junk possible in an unsigned one. |
 | $1FF7-$1FFD | 7 | OT6_SAVETAIL | Reserved (vanilla's unused tail inside the checksum window). | Zeroed as `OT6_SAVERSV` is. | v0.45 | Zero in a signed block; junk possible in an unsigned one. |
 
@@ -175,10 +175,25 @@ the player set the loadout or reset it to AUTO on its page
 the Bushido word reads `$FFFF` as Cleave in every slot (AUTO while Cleave
 is unlearned). Since v0.45 a New Game zeroes both ranges
 (`Ot6NewGameClear`), and the first save of an unsigned block zeroes the
-reserve and signs it. A save carried over from such a game keeps its junk
-loadouts (the signing leaves fields alone); resetting each to AUTO on its
-page clears it. Every save the harness makes was zero there all along,
-because the harness pins an all-zeros fill.
+reserve and the tail and repairs the loadouts (`Ot6RepairLoadouts`). The
+field pages store only learned entries and learning is never undone, so a
+value no save can legitimately hold is reset, and every other value is
+kept:
+
+- the Bushido word goes to `$0000` (AUTO) when a bit outside its three
+  slots is set (bits 0-2, 12-15) or a slot names a SwdTech not learned
+  (`$1CF7`);
+- a Rage byte goes to `$00` (unset) when it names a rage not learned
+  (`$1D2C`);
+- a Lore byte goes to `$00` when it is past `$18` (lore ids are 0..23) or
+  names a lore not learned (`$1D29`).
+
+An all-unset Rage or Lore loadout is AUTO, so a save carried over from such
+a game fixes itself at its first save on v0.45 or later. The one junk value
+the repair cannot tell from a real one is a Rage byte `$FF` when Gau has
+learned rage 254 (Io): that byte stays until the player sets the loadout.
+Every save the harness makes was zero there all along, because the harness
+pins an all-zeros fill.
 
 `$1E40-$1E7F` is vanilla's treasure bitfield and `$1E80-$1F5F` its event
 switches (all live game state); OT6 claims none of them.
@@ -265,15 +280,40 @@ Reserved space for v1.y:
 | Battery `$1E00-$1FEF`, `$1FF2-$1FF7` | 502 | Yes, in any battery the load menu has cleared (`ClearSRAM`) |
 | Battery `$4000-$7FFF` | 16384 | No: never written |
 
-The save block's signature is the layout version. Every save writes
-`$5653` and a version byte at `$1E2C-$1E2E`; the first signing of a block
-zeroes its reserve. A later release that adds a field to the reserve raises
-`OT6_SAVEVER_CUR`, reads the field only from a block signed with a version
-at least that high, treats every lower version (and an unsigned block) as
-"absent", and writes the field and its version at the next save. A signing
-build also zeroes the slot's codex and esper page reserves at every save,
-so a field there follows the same rule, keyed to the same signature (the
-release that claims such bytes stops zeroing them).
+The save block's signature is the layout version. A block is signed when
+`$1E2C-$1E2D` holds `$5653` and `$1E2E` holds a version from 1 through
+`OT6_SAVEVER_CUR`; a block with the signature but version 0, or a version
+past the build's own, is unsigned (junk can match two bytes, and a version
+this build does not know promises nothing it can check). A save signs only
+an unsigned block: it zeroes the reserve and the tail, repairs the
+loadouts, and writes the signature and `OT6_SAVEVER_CUR`. A signed block
+keeps its signature and its version through every later save of this
+build.
+
+A later release that adds a field to the reserve raises `OT6_SAVEVER_CUR`.
+It reads the field only from a block signed with a version at least that
+high and treats every lower version (and an unsigned block) as "absent".
+It handles a lower signed version in `Ot6SaveSign`: at the save, it first
+sets up the new field (its "absent" value, or whatever the field needs from
+the rest of the block), then raises the version byte, so no block ever
+claims a version whose fields it does not hold. A signing build also zeroes
+the destination slot's codex and esper page pads and tails at every save
+(the release that claims such bytes stops zeroing them).
+
+Rules for future fields elsewhere:
+
+- **A codex-page field** changes the codex page's magic (O8 to O9, with a
+  migration from O8 the way O7 migrates), not `OT6_SAVEVER`: the codex page
+  is written in place during play, before any save, so its own magic is
+  what says what it holds.
+- **A field in a shared battery range** (`$1E00-$1FEF`, `$1FF2-$1FF7`, the
+  live page's reserve) treats zero as absent: no slot signature covers it.
+- **A new signed page in `$4000-$7FFF`** uses a 32-bit magic, not 16-bit:
+  the range is never cleared, and a longer magic makes a junk match
+  negligible.
+- **OT6 events keep to parties 1-3.** `ChangeParty` writes the party's Z
+  level at `$1FF3 + party`; a party number past 3 would write into the
+  reserved tail `$1FF7-$1FFD`.
 
 `$4000-$7FFF`, the live page's reserve and the New-Game codex page's are
 never written, and banks `$31-$33` are never cleared, so they can hold
@@ -349,17 +389,35 @@ reading, gil, bag, map, tile, story switches), that its codex page and
 esper progress carry over (none for a save from before v0.44), saves into
 the same slot, reloads, and checks that the battery changed only inside the
 ranges the battery map says today's ROM writes. The run saves twice. The
-first save of a save from before v0.45 must sign it, zero its reserve, and
-change nothing else in the block but the play time, the timers and the
-checksum (read against the block at `CopyGameDataToSRAM`'s entry); the
-reload must read that save back byte for byte; the second save, of a signed
-block, must change only the play time, timers and checksum. A copy of a
-v0.44 save with its esper signature zeroed is the negative: the check must
-refuse it. `golden-saves/junk/v0.44-wor-cyan` is a v0.44 save carrying the
-`$FF` an all-ones console leaves in its reserve, in every page's pads and
-tails and in `$4000-$7FFF`: its first save must zero the block's reserve and
-slot 3's page reserves and leave the other slots' pages and `$4000-$7FFF` as
-they were.
+first save of a save from before v0.45 must sign it, zero its reserve and
+tail, reset impossible loadout values, and change nothing else in the block
+but the play time, the timers and the checksum (read against the block at
+`CopyGameDataToSRAM`'s entry); the reload must read that save back byte for
+byte; the second save, of a signed block, must change only the play time,
+timers and checksum. A copy of a v0.44 save with its esper signature zeroed
+is the negative: the check must refuse it.
+
+`golden-saves/junk/` holds synthetic saves built from v0.44 ones, carrying
+the `$FF` an all-ones console leaves: in the reserve and tail, in every
+codex and esper page's pads and tails, and in `$4000-$7FFF`.
+
+- `v0.44-wor-cyan` also has `$FF` loadouts: its first save repairs them to
+  AUTO and zeroes slot 3's reserves. The run then saves over slot 1 (Save
+  over another slot): slot 1's page pads and tails must be zero, its codex
+  magic and tables slot 3's and its esper page the live page; slot 3's
+  pages and `$4000-$7FFF` must be untouched.
+- `v0.44-sig-ver0` and `v0.44-sig-verFF` carry the signature with version
+  0 or `$FF`: each must be treated as unsigned, so its first save zeroes the
+  reserve and signs it version 1.
+- `v0.44-mixed` (from `wor-gau-v1`) carries a real manual Bushido word and
+  real Rage and Lore bytes beside impossible ones (an unlearned rage, a lore
+  byte `$19`, an unlearned lore, `$FF`): the first save resets exactly the
+  impossible ones.
+
+The New Game's first save is the play from power-on's first save
+(`world-narshe-v1`, `gen_worldmap`); `first_save_signed` checks that
+capture: signed `$5653` version 1, its reserve, tail and page reserves zero,
+its loadouts AUTO.
 
 `battle_newgameloadouts` starts a New Game under an all-ones power-on fill,
 reads the scrap and tail, then Continues a v0.44 save seating Gau
@@ -367,10 +425,17 @@ reads the scrap and tail, then Continues a v0.44 save seating Gau
 bytes in its loadouts, and reads the lists a random battle builds: AUTO's
 eight rages, AUTO's five lores and the free row.
 
-Two mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
-routine returning at once) must go red: without `Ot6SaveSign` the junk
-save's first save is unsigned, and without `Ot6NewGameClear` Gau's Rage list
-comes up empty.
+Five mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
+routine returning at once, or a labelled seam rewritten) must go red:
+
+- without `Ot6SaveSign`, the junk save's first save is unsigned;
+- with the version test gone (`VerCheck`), `v0.44-sig-ver0` passes for
+  signed: its version 0 stays, and its junk reserve with it;
+- reading the slot loaded (`wSaveSlotToLoad`) instead of the slot saved
+  into (`SlotAt`), the save over slot 1 leaves slot 1's page reserves
+  junk;
+- without `Ot6RepairLoadouts`, `v0.44-mixed` keeps its impossible values;
+- without `Ot6NewGameClear`, Gau's Rage list comes up empty.
 
 At each release, after it is published, add its saves:
 

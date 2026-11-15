@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""A mutant ROM for a negative: the named routines return at once.
+"""A mutant ROM for a negative.
 
-    mutant_rom.py IN.sfc DBG OUT.sfc PROC...
+    mutant_rom.py IN.sfc DBG OUT.sfc EDIT...
 
-Each PROC (a symbol in DBG, ff6-en.dbg) gets an `rts` ($60) as its first
-byte, so a routine called with jsr does nothing.  Only for the negatives
-that prove a suite notices the routine gone (#389: Ot6SaveSign,
-Ot6NewGameClear); every symbol stays where the real build put it, so the
-real ff6-en.dbg still describes the mutant.
+EDIT is PROC, which gets an `rts` ($60) as its first byte so a routine
+called with jsr does nothing, or SYMBOL=HEX, whose bytes at SYMBOL are
+replaced by HEX (a seam the source labels for this: Ot6SaveSign's VerCheck
+and SlotAt).  SYMBOL is a name in DBG (ff6-en.dbg).  Only for the
+negatives that prove a suite notices the change (#389); every symbol stays
+where the real build put it, so the real ff6-en.dbg still describes the
+mutant.
 """
 
 import re
@@ -21,14 +23,16 @@ def main(argv):
     src, dbg, out, procs = argv[0], argv[1], argv[2], argv[3:]
     rom = bytearray(open(src, "rb").read())
     text = open(dbg, encoding="utf-8").read()
-    for p in procs:
+    for e in procs:
+        p, _, hx = e.partition("=")
         m = re.search(r'\bname="%s",[^\n]*\bval=0x([0-9A-Fa-f]+)' % re.escape(p), text)
         if not m:
             print(f"mutant_rom: no symbol {p} in {dbg}")
             return 1
         off = int(m.group(1), 16) & 0x3FFFFF
-        print(f"mutant_rom: {p} at ROM ${off:06X}: ${rom[off]:02X} -> $60 (rts)")
-        rom[off] = 0x60
+        new = bytes.fromhex(hx) if hx else b"\x60"
+        print(f"mutant_rom: {p} at ROM ${off:06X}: {rom[off:off + len(new)].hex()} -> {new.hex()}")
+        rom[off:off + len(new)] = new
     open(out, "wb").write(rom)
     return 0
 

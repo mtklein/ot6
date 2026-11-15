@@ -793,27 +793,40 @@ for fx in golden_fixtures:
     qual.append(out)
     golden_outs.append(out)
 
-# The mutant ROMs (#389): the real build with one routine returning at once
-# (tools/build/mutant_rom.py; ff6-en.dbg still describes them).  Each must
-# turn its suite red, for the reason named: without Ot6SaveSign the junk
-# save's first save is unsigned; without Ot6NewGameClear a New Game on an
-# all-ones console gives Gau no Rage list.
-MUTANTS = {"nosign": "Ot6SaveSign", "noclear": "Ot6NewGameClear"}
-for name, proc in MUTANTS.items():
+# The mutant ROMs (#389): the real build with one routine returning at once,
+# or a labelled seam rewritten (tools/build/mutant_rom.py; ff6-en.dbg still
+# describes them).  Each must turn its run red, for the reason named.
+MUTANTS = {
+    # no signing: the junk save's first save is unsigned
+    "nosign": ("Ot6SaveSign", "junk/v0.44-wor-cyan", "the saved block is signed"),
+    # the signature alone counts as signed: version 0 is kept, and its junk reserve
+    "sigonly": ("VerCheck=eaeaeaeaeaea", "junk/v0.44-sig-ver0", "with layout version 1"),
+    # the page reserves zeroed for the slot loaded, not the slot saved into
+    "srcpages": ("SlotAt=ad1f02", "junk/v0.44-wor-cyan", "saveas: slot 1's codex and esper page pads"),
+    # no loadout repair: impossible values survive the first signing
+    "norepair": ("Ot6RepairLoadouts", "junk/v0.44-mixed", "impossible loadout values are reset"),
+    # no New Game clear (battle_newgameloadouts, below)
+    "noclear": ("Ot6NewGameClear", None, None),
+}
+for name, (edit, fx, want) in MUTANTS.items():
     w.edge([f"build/mutants/{name}.sfc"], "sh",
            implicit=["tools/build/mutant_rom.py", "build/ot6.sfc", "ff6/rom/ff6-en.dbg"],
            cmd=f"mkdir -p build/mutants && python3 tools/build/mutant_rom.py build/ot6.sfc "
-               f"ff6/rom/ff6-en.dbg build/mutants/{name}.sfc {proc}",
+               f"ff6/rom/ff6-en.dbg build/mutants/{name}.sfc {edit}",
            desc=f"mutant ROM {name}")
-junkfx = f"{GOLDEN_DIR}/junk/v0.44-wor-cyan"
-out = "build/results/golden/mutant_nosign.ok"
-w.edge([out], "sh", implicit=golden_common + ["build/mutants/nosign.sfc", f"{junkfx}/manifest.json",
-                                              f"{junkfx}/battery.sram"],
-       cmd=f"OT6_ROM=build/mutants/nosign.sfc OT6_DBG=ff6/rom/ff6-en.dbg OT6_GOLDEN_TAG=nosign_ "
-           f"nice tools/build/run_golden_save.sh redrun {junkfx} {out} 'the saved block is signed'",
-       desc="golden save on the mutant without Ot6SaveSign (must go red)", pool="side")
-qual.append(out)
-golden_outs.append(out)
+    if fx is None:
+        continue
+    d = f"{GOLDEN_DIR}/{fx}"
+    out = f"build/results/golden/mutant_{name}.ok"
+    w.edge([out], "sh", implicit=golden_common + [f"build/mutants/{name}.sfc", f"{d}/manifest.json",
+                                                  f"{d}/battery.sram"],
+           cmd=f"OT6_ROM=build/mutants/{name}.sfc OT6_DBG=ff6/rom/ff6-en.dbg OT6_GOLDEN_TAG={name}_ "
+               f"nice tools/build/run_golden_save.sh redrun {d} {out} \"{want}\"",
+           desc=f"golden save {fx} on the mutant {name} (must go red)", pool="side")
+    qual.append(out)
+    golden_outs.append(out)
+
+
 
 # battle_newgameloadouts (#389): a New Game on an all-ones console, then the
 # battle lists its loadout bytes build, on a battery seating GAU and one
@@ -855,6 +868,14 @@ check("golden_saves",
        "tools/savestate_party.py", "docs/design/save-layout.md",
        "tools/tests/lib/sram_checkpoint.py", f"{GOLDEN_DIR}/MANIFEST.json"]
       + [f"{fx}/{n}" for fx in golden_fixtures for n in ("manifest.json", "battery.sram")])
+# A New Game's first save (#389): the play from power-on saves for the first
+# time at world-narshe-v1 (gen_worldmap); that capture's slot is signed,
+# version 1, with its reserves zero and its loadouts AUTO.
+fs_key = "world-narshe-v1"
+check("first_save_signed",
+      f"python3 tools/golden_saves.py firstsave {sn.CAPTURE_DIR}/{fs_key}",
+      ["tools/golden_saves.py", "tools/check_save_layout.py", "docs/design/save-layout.md"]
+      + sn.capture_inputs(ROOT, fs_key))
 # #389: the next release's notes already carry the save line the cut checks
 check("notes_saves", "python3 tools/golden_saves.py notes docs/release-notes-next.md",
       ["tools/golden_saves.py", "docs/release-notes-next.md", f"{GOLDEN_DIR}/MANIFEST.json"])

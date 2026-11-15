@@ -230,9 +230,23 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         longai
         pha
         phx
+        phy
+        ; signed = the signature AND a version this build knows (1..CUR): a
+        ; block whose signature is junk-matched or whose version byte is 0
+        ; or past ours is treated as unsigned and signed afresh.  A release
+        ; that raises OT6_SAVEVER_CUR handles a lower signed version here:
+        ; it sets up its new field first, then raises the byte.
         lda     f:OT6_SAVESIG
         cmp     #OT6_SAVESIG_WORD
-        beq     @pages
+        bne     Sign
+        shorta
+        lda     f:OT6_SAVEVER
+VerCheck:                       ; (mutant_rom.py's seam for the version test)
+        beq     Sign
+        cmp     #OT6_SAVEVER_CUR+1
+        bcs     Sign
+        bra     Pages
+Sign:  jsr     Ot6RepairLoadouts
         shorta
         lda     #$00
         ldx     #$0000
@@ -250,8 +264,9 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         longa
         lda     #OT6_SAVESIG_WORD
         sta     f:OT6_SAVESIG
-@pages: longa
-        lda     3,s             ; the slot (under the phx)
+Pages: longa
+SlotAt: lda     5,s             ; the destination slot (under the phx/phy)
+        nop                     ; (mutant_rom.py's seam: a 3-byte read here)
         and     #$0003
         beq     @done           ; not a slot: no pages
         dec
@@ -295,11 +310,149 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         dey
         bne     @etail
         pla                     ; drop the page offset
-@done:  plx
+@done:  ply
+        plx
         pla
         plp
         rts
 .endproc
+
+; [ first signing: loadout values no save can hold go back to AUTO ] (#389)
+;
+; An unsigned block may carry a New Game's power-on junk in the three
+; loadouts (all-$FF under an all-ones fill, which read as manual loadouts
+; whose every slot names nothing).  The field pages store only learned
+; entries, and learning is never undone, so these values cannot be
+; legitimate and are reset:
+;   * the Bushido word, to $0000 (AUTO), when a bit outside its three slots
+;     (bits 0-2, 12-15) is set or a slot names a SwdTech not learned ($1cf7);
+;   * a Rage byte, to $00 (unset), when it names a rage not learned ($1d2c);
+;   * a Lore byte, to $00, when it is past $18 (lore ids are 0..23) or
+;     names a lore not learned ($1d29).
+; An all-unset Rage or Lore loadout is AUTO.  Every other value is left as
+; it is.  The one junk value this cannot tell from a real one is a Rage
+; byte $FF when Gau has learned rage 254.
+; Called from Ot6SaveSign's signing path only.  a/x/y widths saved.
+.proc Ot6RepairLoadouts
+        php
+        longai
+        phx
+        phy
+        ; --- Bushido
+        lda     f:OT6_LOADOUT
+        beq     @rage           ; AUTO
+        bit     #$f007
+        bne     @bzero          ; a bit outside the three slots
+        lsr
+        lsr
+        lsr                     ; slot 1 in bits 0-2
+        ldy     #$0003
+@bslot: pha
+        and     #$0007
+        tax
+        shorta
+        lda     f:Ot6RepairBit,x
+        and     f:$7e1cf7       ; that SwdTech learned?
+        longa
+        beq     @bpull          ; no: the word cannot be real
+        pla
+        lsr
+        lsr
+        lsr
+        dey
+        bne     @bslot
+        bra     @rage
+@bpull: pla
+@bzero: lda     #$0000
+        sta     f:OT6_LOADOUT
+        ; --- Rage: eight bytes, id + 1
+@rage:  shorta
+        ldx     #$0000
+@rslot: lda     f:OT6_RAGELOAD,x
+        beq     @rnext
+        dec     a               ; the rage id, 0..254
+        jsr     RageLearned
+        bcs     @rnext
+        lda     #$00
+        sta     f:OT6_RAGELOAD,x
+@rnext: inx
+        cpx     #OT6_RAGESLOTS
+        bcc     @rslot
+        ; --- Lore: five bytes, id + 1, ids 0..23
+        ldx     #$0000
+@lslot: lda     f:OT6_LORELOAD,x
+        beq     @lnext
+        cmp     #$19
+        bcs     @lzero          ; past lore 23
+        dec     a
+        jsr     LoreLearned
+        bcs     @lnext
+@lzero: lda     #$00
+        sta     f:OT6_LORELOAD,x
+@lnext: inx
+        cpx     #OT6_LORESLOTS
+        bcc     @lslot
+        ply
+        plx
+        plp
+        rts
+
+; a8/i16.  A = id.  out: carry = learned.  X preserved.
+RageLearned:
+        phx
+        pha                     ; [2,s] the id
+        and     #$07
+        longa
+        and     #$00ff
+        tax
+        shorta
+        lda     f:Ot6RepairBit,x
+        pha                     ; [1,s] its bit, [2,s] the id
+        lda     2,s
+        lsr
+        lsr
+        lsr
+        longa
+        and     #$001f
+        tax
+        shorta
+        lda     f:$7e1d2c,x
+        and     1,s
+        cmp     #$01            ; carry = the bit is set
+        pla
+        pla
+        plx
+        rts
+
+LoreLearned:
+        phx
+        pha
+        and     #$07
+        longa
+        and     #$00ff
+        tax
+        shorta
+        lda     f:Ot6RepairBit,x
+        pha
+        lda     2,s
+        lsr
+        lsr
+        lsr
+        longa
+        and     #$0003
+        tax
+        shorta
+        lda     f:$7e1d29,x
+        and     1,s
+        cmp     #$01
+        pla
+        pla
+        plx
+        rts
+.endproc
+
+Ot6RepairBit:
+        .byte   $01, $02, $04, $08, $10, $20, $40, $80
 
 ; Initialize/migrate the selected persistent page while the load menu owns the
 ; machine, before gameplay can enter a battle through a caller with narrower

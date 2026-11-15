@@ -24,13 +24,18 @@ mkdir -p build/golden "$(dirname "$ok")"
 log="build/golden/$n.log"
 srm="build/golden/$n.srm"
 rm -f "$srm" "$ok"
+# the ROM this run boots, by hash, so a log names the bytes it tested
+romsig="rom sha256 $(shasum -a 256 "${OT6_ROM:-build/ot6.sfc}" | cut -d' ' -f1) ${OT6_ROM:-build/ot6.sfc}"
 if [ "$mode" = redrun ]; then
   # the run itself must go red, its FAIL line naming `want`
   if OT6_WORKER="$n" OT6_SRAM_CHECKPOINT="$fx" \
      tools/tests/run.sh tools/tests/save_golden.lua "$log" >/dev/null 2>&1; then
+    echo "$romsig" >> "$log"
     echo "FAIL: golden save $fx passed on ${OT6_ROM:-build/ot6.sfc}; it must go red -- $log"
     exit 1
   fi
+  echo "$romsig" >> "$log"
+  echo "$romsig"
   line=$(grep -m1 '^\[ot6\] FAIL' "$log")
   case "$line" in
     *"$want"*) echo "golden negative: red as it must be: $line"; : > "$ok"; exit 0 ;;
@@ -41,6 +46,7 @@ fi
 if ! OT6_WORKER="$n" OT6_SRAM_CHECKPOINT="$fx" OT6_CAPTURE_SRM="$srm" \
      tools/tests/run.sh tools/tests/save_golden.lua "$log" >/dev/null 2>&1
 then
+  echo "$romsig" >> "$log"
   echo "FAIL: golden save $fx: the run failed -- $log"
   grep -E 'FAIL|assertEq|Error' "$log" | tail -5
   exit 1
@@ -51,6 +57,8 @@ else
   python3 tools/golden_saves.py check "$fx" "$log" "$srm" > "$log.check" 2>/dev/null
 fi
 rc=$?
+echo "$romsig" >> "$log"
+echo "$romsig" >> "$log.check"
 cat "$log.check"
 [ "$rc" -eq 0 ] || exit 1
 : > "$ok"

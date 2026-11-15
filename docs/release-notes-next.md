@@ -40,8 +40,9 @@ show a shield gauge.
 A new game no longer gives Gau an empty Rage list and Strago an empty Lore
 list on emulators and consoles whose memory does not start out blank. Their
 loadouts now start on AUTO, as they always did elsewhere. A game started that
-way on an earlier release keeps its empty loadouts; set each back to AUTO on
-its page in the Skills menu.
+way on an earlier release puts them right at its first save in this release.
+The one exception: if Gau already knows the Io rage, his Rage loadout may still
+need setting back to AUTO on its page in the Skills menu.
 
 ## Saves
 

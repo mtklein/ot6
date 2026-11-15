@@ -18,8 +18,12 @@ cd "$ROOT"
 mkdir -p build/results/tagged "$(dirname "$ok")"
 log="build/results/tagged/$tag.log"
 rm -f "$ok"
+# the ROM this run boots, by hash, so a log names the bytes it tested
+romsig="rom sha256 $(shasum -a 256 "${OT6_ROM:-build/ot6.sfc}" | cut -d' ' -f1) ${OT6_ROM:-build/ot6.sfc}"
 OT6_WORKER="$tag" tools/tests/run.sh "tools/tests/$t.lua" "$log" >/dev/null 2>&1
 rc=$?
+echo "$romsig" >> "$log"
+echo "$tag: $romsig"
 if [ "$mode" = red ]; then
   [ "$rc" -ne 0 ] || { echo "FAIL: $t ($tag) passed; it must go red -- $log"; exit 1; }
   line=$(grep -m1 '^\[ot6\] FAIL' "$log")
