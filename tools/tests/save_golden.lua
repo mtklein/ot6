@@ -51,6 +51,11 @@ local CTR, CTR_END = 0x0010, 0x0280               -- esper page: 12 actors x 26 
 -- build/attempts/wt/v1-save-freeze/), so a read after control would not be
 -- the load.
 local loaded, hooked = nil, false
+-- And the block a save is about to write, read at CopyGameDataToSRAM's
+-- entry, before Ot6SaveSign: what the save may change from it is the play
+-- time, the timers, the checksum, and (signing an unsigned block) the
+-- signature and the reserve.
+local presave = nil
 local function hook()
   if hooked then return end
   hooked = true
@@ -59,6 +64,19 @@ local function hook()
     loaded = {}
     for a = 0x1600, 0x1FFF do loaded[a] = H.readByte(a) end
   end, emu.callbackType.exec, at, at)
+  local sv = H.sym("CopyGameDataToSRAM")
+  emu.addMemoryCallback(function()
+    presave = {}
+    for a = 0x1600, 0x1FFF do presave[a] = H.readByte(a) end
+  end, emu.callbackType.exec, sv, sv)
+end
+local SIG, SIGWORD, VER = 0x1E2C, 0x5653, 1
+local function inRange(a, lo, hi) return a >= lo and a <= hi end
+local function saveSets(a) -- what CopyGameDataToSRAM itself writes into the block
+  return inRange(a, 0x1863, 0x1865) or inRange(a, 0x1FA8, 0x1FBF) or inRange(a, 0x1FFE, 0x1FFF)
+end
+local function signSets(a) -- what the first signing writes
+  return inRange(a, 0x1E2C, 0x1E3F) or inRange(a, 0x1FF7, 0x1FFD)
 end
 
 -- battery offset -> SNES address: four 8 KiB windows at $6000 of banks $30-$33
@@ -161,17 +179,45 @@ local function assertLive(tag, B)
   H.assertEq(bad, 0, tag .. ": the live esper page is " .. (signed and "the slot's page" or "empty"))
 end
 
-local function assertCodex(tag)
+local function assertCodex(tag, B)
   local page = CODEX + (slot - 1) * 0x400
   local bad, n = 0, 0
   for o = 0, 0x3FF do
-    if sram(page + o) ~= B0[page + o] then bad = bad + 1 end
+    if sram(page + o) ~= B[page + o] then bad = bad + 1 end
     if o >= 0x10 and o < 0x310 and sram(page + o) ~= 0 then n = n + 1 end
   end
   H.log(string.format("[golden] %s: slot %d's codex page holds %d revealed bytes, magic $%04X", tag, slot, n,
     sramW(page)))
   H.assertEq(sramW(page), CODEX_MAGIC, tag .. ": the slot's codex page is signed")
   H.assertEq(bad, 0, tag .. ": the slot's codex page is the one the battery held")
+end
+
+-- The block a save wrote against the block it was handed: signed, the
+-- reserve zero, and nothing else changed but the save's own bytes (and,
+-- the first time an unsigned block is signed, the signature and reserve).
+local function assertSaved(tag, B, firstSign)
+  H.assertEq(presave ~= nil, true, tag .. ": the save ran CopyGameDataToSRAM")
+  H.assertEq(slotByte(B, SIG) | (slotByte(B, SIG + 1) << 8), SIGWORD, tag .. ": the saved block is signed ($5653)")
+  H.assertEq(slotByte(B, SIG + 2), VER, tag .. ": ... with layout version 1")
+  local bad, junk = 0, 0
+  for a = 0x1600, 0x1FFF do
+    local was, now = presave[a], slotByte(B, a)
+    if inRange(a, 0x1E2F, 0x1E3F) or inRange(a, 0x1FF7, 0x1FFD) then
+      if now ~= 0 then junk = junk + 1 end
+    end
+    if was ~= now and not saveSets(a) and not (firstSign and signSets(a)) then
+      bad = bad + 1
+      if bad <= 8 then
+        H.log(string.format("[golden] %s: $%04X was %02X, the save wrote %02X", tag, a, was, now))
+      end
+    end
+  end
+  H.log(string.format("[golden] %s: %s; %d byte(s) changed beyond the save's own", tag,
+    firstSign and "the save signed an unsigned block" or "the block was signed already", bad))
+  H.assertEq(junk, 0, tag .. ": the reserve $1E2F-$1E3F and the tail $1FF7-$1FFD are zero")
+  H.assertEq(bad, 0, tag .. ": the save changed nothing in the block but play time, timers, checksum"
+    .. (firstSign and " and the signature and reserve" or ""))
+  presave = nil
 end
 
 local function readout(tag)
@@ -204,12 +250,14 @@ H.run({ maxFrames = 40000 }, {
   readout("load1"),
   H.call(function()
     assertBlock("load1", B0)
-    assertCodex("load1")
+    assertCodex("load1", B0)
     assertLive("load1", B0)
   end),
   H.saveGame({ slot = 3, baseline = false, tag = "the golden save's re-save" }),
   H.call(function()
     B1 = battery()
+    assertSaved("save1", B1, slotByte(B0, SIG) | (slotByte(B0, SIG + 1) << 8) ~= SIGWORD)
+    dump("save1", "slot", function(a) return slotByte(B1, a) end, 0x1600, 0x0A00)
     local page = ESPER + (slot - 1) * 0x400
     H.assertEq(bw(B1, page), ESPER_MAGIC, "after the save, slot " .. slot .. "'s esper page is signed")
     for o = CTR, CTR_END - 1 do
@@ -224,8 +272,13 @@ H.run({ maxFrames = 40000 }, {
   readout("load2"),
   H.call(function()
     assertBlock("load2", B1)
-    assertCodex("load2")
+    assertCodex("load2", B1)
     assertLive("load2", B1)
-    H.log("[golden] PASS: the save loaded, saved and loaded again")
+  end),
+  -- a signed save, saved again: nothing but the save's own bytes move
+  H.saveGame({ slot = 3, baseline = false, tag = "the signed save's re-save" }),
+  H.call(function()
+    assertSaved("save2", battery(), false)
+    H.log("[golden] PASS: the save loaded, was signed, loaded again and saved again")
   end),
 })

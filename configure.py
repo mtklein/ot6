@@ -701,6 +701,9 @@ for f in glob("tools/tests/*.lua"):
     if attrs.split() == ["golden"]:
         golden_suite = f        # one edge per golden save, below
         continue
+    if attrs.split() == ["newgame"]:
+        newgame_suite = f       # its own edges, below the golden saves
+        continue
     # the emulator pin too: a test result is the emulator's as much as the
     # ROM's, so a new emulator re-runs every test, as it regenerates every state
     deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
@@ -763,7 +766,10 @@ for f in glob("tools/tests/*.lua"):
 # tools/tests/save_golden.lua; tools/golden_saves.py then holds the run's log
 # and the battery it left to the fixture file and to the battery map in
 # docs/design/save-layout.md.  The negative is a v0.44 save whose esper page
-# lost its signature: the check must refuse it.
+# lost its signature: the check must refuse it.  golden-saves/junk/ holds a
+# v0.44 save carrying the power-on junk an all-ones console leaves (in its
+# reserve and every page's): its first save must sign it and zero the
+# slot's reserves, and nothing else.
 GOLDEN_DIR = "tools/tests/golden-saves"
 golden_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
                  copy_if_changed_from(golden_suite), "tools/golden_saves.py",
@@ -773,6 +779,8 @@ golden_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.
     [copy_if_changed_from(h) for h in LIBS] + HARNESS
 golden_fixtures = [str(Path(m).parent)
                    for m in sorted(glob(f"{GOLDEN_DIR}/v*/*/manifest.json"))]
+golden_fixtures += [str(Path(m).parent)
+                    for m in sorted(glob(f"{GOLDEN_DIR}/junk/*/manifest.json"))]
 golden_fixtures.append(f"{GOLDEN_DIR}/negative/esper-unsigned-v0.44")
 golden_outs = []
 for fx in golden_fixtures:
@@ -782,6 +790,53 @@ for fx in golden_fixtures:
     w.edge([out], "sh", implicit=golden_common + [f"{fx}/manifest.json", f"{fx}/battery.sram"],
            cmd=f"nice tools/build/run_golden_save.sh {mode} {fx} {out}",
            desc=f"golden save {rel}", pool="side")
+    qual.append(out)
+    golden_outs.append(out)
+
+# The mutant ROMs (#389): the real build with one routine returning at once
+# (tools/build/mutant_rom.py; ff6-en.dbg still describes them).  Each must
+# turn its suite red, for the reason named: without Ot6SaveSign the junk
+# save's first save is unsigned; without Ot6NewGameClear a New Game on an
+# all-ones console gives Gau no Rage list.
+MUTANTS = {"nosign": "Ot6SaveSign", "noclear": "Ot6NewGameClear"}
+for name, proc in MUTANTS.items():
+    w.edge([f"build/mutants/{name}.sfc"], "sh",
+           implicit=["tools/build/mutant_rom.py", "build/ot6.sfc", "ff6/rom/ff6-en.dbg"],
+           cmd=f"mkdir -p build/mutants && python3 tools/build/mutant_rom.py build/ot6.sfc "
+               f"ff6/rom/ff6-en.dbg build/mutants/{name}.sfc {proc}",
+           desc=f"mutant ROM {name}")
+junkfx = f"{GOLDEN_DIR}/junk/v0.44-wor-cyan"
+out = "build/results/golden/mutant_nosign.ok"
+w.edge([out], "sh", implicit=golden_common + ["build/mutants/nosign.sfc", f"{junkfx}/manifest.json",
+                                              f"{junkfx}/battery.sram"],
+       cmd=f"OT6_ROM=build/mutants/nosign.sfc OT6_DBG=ff6/rom/ff6-en.dbg OT6_GOLDEN_TAG=nosign_ "
+           f"nice tools/build/run_golden_save.sh redrun {junkfx} {out} 'the saved block is signed'",
+       desc="golden save on the mutant without Ot6SaveSign (must go red)", pool="side")
+qual.append(out)
+golden_outs.append(out)
+
+# battle_newgameloadouts (#389): a New Game on an all-ones console, then the
+# battle lists its loadout bytes build, on a battery seating GAU and one
+# seating STRAGO; and on the mutant without Ot6NewGameClear, which must go
+# red.
+ng_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
+             copy_if_changed_from(newgame_suite), "tools/build/run_tagged_suite.sh"] + \
+    [copy_if_changed_from(h) for h in LIBS] + HARNESS
+for tag, fx, extra in (("newgame_gau", "v0.44/wor-gau-v1", ""),
+                       ("newgame_strago", "v0.44/wor-opera-v1", ""),
+                       ("newgame_noclear", "v0.44/wor-gau-v1", "red")):
+    d = f"{GOLDEN_DIR}/{fx}"
+    deps = ng_common + [f"{d}/manifest.json", f"{d}/battery.sram"]
+    env = f"OT6_RAM_POWERON=AllOnes OT6_SRAM_CHECKPOINT={d}"
+    tail = ""
+    if extra:
+        deps.append("build/mutants/noclear.sfc")
+        env += " OT6_ROM=build/mutants/noclear.sfc OT6_DBG=ff6/rom/ff6-en.dbg"
+        tail = " red \"Gau's Rage list\""
+    out = f"build/results/tagged/{tag}.ok"
+    w.edge([out], "sh", implicit=deps,
+           cmd=f"{env} nice tools/build/run_tagged_suite.sh {Path(newgame_suite).stem} {tag} {out}{tail}",
+           desc=f"suite {tag}", pool="side")
     qual.append(out)
     golden_outs.append(out)
 
@@ -800,6 +855,9 @@ check("golden_saves",
        "tools/savestate_party.py", "docs/design/save-layout.md",
        "tools/tests/lib/sram_checkpoint.py", f"{GOLDEN_DIR}/MANIFEST.json"]
       + [f"{fx}/{n}" for fx in golden_fixtures for n in ("manifest.json", "battery.sram")])
+# #389: the next release's notes already carry the save line the cut checks
+check("notes_saves", "python3 tools/golden_saves.py notes docs/release-notes-next.md",
+      ["tools/golden_saves.py", "docs/release-notes-next.md", f"{GOLDEN_DIR}/MANIFEST.json"])
 # `ninja golden`: every golden save and the checks on the set and the layout
 w.edge(["golden"], "phony", golden_outs + ["build/checks/golden_saves.ok", "build/checks/save_layout.ok"])
 
@@ -1191,8 +1249,11 @@ w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
        cmd=f'mkdir -p "{rel_dir}" && tools/bin/flips --create --bps'
            f' "{BASE}" build/ot6.sfc "{bps}"',
        desc=f"bps patch v{VERSION}")
+# (the notes' save line names the oldest golden saves, never a layout: #389)
 w.edge([f"{rel_dir}/RELEASE_NOTES.md"], "sh", [notes, "VERSION"],
-       cmd=f'mkdir -p "{rel_dir}" && cp "{notes}" "{rel_dir}/RELEASE_NOTES.md"',
+       implicit=["tools/golden_saves.py", "tools/tests/golden-saves/MANIFEST.json"],
+       cmd=f'python3 tools/golden_saves.py notes "{notes}" && '
+           f'mkdir -p "{rel_dir}" && cp "{notes}" "{rel_dir}/RELEASE_NOTES.md"',
        desc="release notes")
 # saves/: every tracked checkpoint's battery save, named in story order,
 # and a README (tools/release_saves.py).  Staged without qualification;

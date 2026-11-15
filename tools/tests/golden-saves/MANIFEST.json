@@ -102,6 +102,16 @@
           "sha256": "ce1b87a6f8958e8fa67c6cea99927e89a6ecdde2f6befbdb867e27dfd4ebbf6d"
         },
         {
+          "key": "wor-gau-v1",
+          "file": "52 - By Duncan's house, after the Veldt cave and Gau's father.srm",
+          "sha256": "405afdf4b0fad25c79706a673e7e8c65b62774a23cf1f4ecb302f84c16ba942e"
+        },
+        {
+          "key": "wor-opera-v1",
+          "file": "56 - By the Opera House, after the Dirt Dragon and Doom Gaze.srm",
+          "sha256": "ef1d03bff9ebaf177bd8fbff3b084f98e0fb30e5e17fc8583678fd380b000011"
+        },
+        {
           "key": "wor-kt-plates-v1",
           "file": "70 - Kefka's Tower, two parties on the plates (before Kefka).srm",
           "sha256": "4cc997fbe0d6bc57e02a164114f1d8aec1fc5944dcd6a53a616c583ecff2ad38"

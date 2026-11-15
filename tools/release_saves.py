@@ -118,8 +118,8 @@ To use one:
    Final Fantasy III (USA).srm when the emulator applies the patch.
 3. Start the game, choose Continue on the title screen, and load slot 3.
 
-These saves are for this release's save layout. A save from a different
-release may not load correctly.
+A save from an earlier release loads in this one (saves from v0.28 on are
+tested); a save from a later release is not meant to load in an earlier one.
 """
 
 

@@ -34,9 +34,16 @@ Continue again.  This script holds that run to the fixture file:
         the release step: copy KEY's save (release_saves.py's name for it)
         out of the release zip's saves/ folder into golden-saves/VERSION/
         and record it in MANIFEST.json
-    golden_saves.py negative FIXTURE LOG BATTERY
-        a run whose check must FAIL (the corrupted fixture): exit 0 only
-        when check refuses it, naming the esper page
+    golden_saves.py negative FIXTURE LOG BATTERY [WANT]
+        a run whose check must FAIL (the corrupted fixture, or a mutant
+        ROM's run): exit 0 only when check refuses it with a problem naming
+        WANT (default "esper")
+    golden_saves.py notes NOTES.md
+        the release notes' save line: "Saves from vX.Y and later load in
+        this release", vX.Y the oldest release in the golden set, and no
+        "save layout" (a release's saves are named by what loads, never by
+        a layout: up to v0.30 that line only named the previous release,
+        and from then on it stayed at v0.29)
     golden_saves.py --selftest
         the check against in-memory mutants
 """
@@ -70,7 +77,8 @@ ESPER_MAGIC = 0x3145
 CTR, CTR_END = 0x0010, 0x0280
 # what a Continue of slot 3 and a save into it may touch (the battery map's
 # Written tokens; newgame and clear rows are not exercised)
-RUN_WRITES = {"save", "load", "title", "play"}
+RUN_WRITES = {"save", "load", "title", "play", "zero"}
+SIG, SIGWORD, SIGVER = 0x1E2C, 0x5653, 1
 DUMP = re.compile(r"^\[golden\] dump (\S+) (\S+) ([0-9A-F]{4}) ([0-9A-F]+)\s*$")
 
 
@@ -187,10 +195,11 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows):
     slot = f[0x1FF0]
     if slot not in SLOT_PTR:
         return [f"the fixture's battery names slot {slot} ($1FF0), not 1..3"]
-    for tag in ("load1", "load2"):
-        for what, n in (("wram", BLOCK), ("codex", 0x400), ("live", 0x400)):
-            if len(dumps.get(tag, {}).get(what, b"")) != n:
-                p.append(f"log: no complete {tag} {what} dump (the run stopped before it)")
+    for tag, what, n in (("load1", "wram", BLOCK), ("load1", "codex", 0x400), ("load1", "live", 0x400),
+                         ("save1", "slot", BLOCK),
+                         ("load2", "wram", BLOCK), ("load2", "codex", 0x400), ("load2", "live", 0x400)):
+        if len(dumps.get(tag, {}).get(what, b"")) != n:
+            p.append(f"log: no complete {tag} {what} dump (the run stopped before it)")
     if p:
         return p
     d1, d2 = dumps["load1"], dumps["load2"]
@@ -239,8 +248,18 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows):
         p.append("the battery changed outside the documented writes: " +
                  ", ".join("$%04X-$%04X" % tuple(s) for s in spans[:8]))
 
-    # 5. the round trip: what the save wrote, and the second load
+    # 5. the round trip: what the first save wrote, the second load, and the
+    # second save (the battery the run left)
+    s1 = dumps["save1"]["slot"]
     ablock = block_of(after, slot)
+    for name, blk in (("the first save", s1), ("the second save", ablock)):
+        if w16(blk, SIG - 0x1600) != SIGWORD or blk[SIG + 2 - 0x1600] != SIGVER:
+            p.append(f"{name}: the block is not signed $5653 version 1")
+        if any(blk[0x1E2F - 0x1600:0x1E40 - 0x1600]) or any(blk[0x1FF7 - 0x1600:0x1FFE - 0x1600]):
+            p.append(f"{name}: the reserve $1E2F-$1E3F or the tail $1FF7-$1FFD is not zero")
+    for r in rows:
+        if r["scope"] == f"slot{slot}" and "zero" in r["written"] and any(after[r["start"]:r["end"] + 1]):
+            p.append(f"after the save, slot {slot}'s reserve ${r['start']:04X}-${r['end']:04X} is not zero")
     compare(p, "saved slot roster", roster_rows, roster_of_block(ablock))
     compare(p, "load2 roster", roster_rows, roster_of_block(d2["wram"]))
     # between the load and the save the field has run (a map's entry events
@@ -249,17 +268,19 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows):
     # byte for byte
     fa, f1 = facts(ablock), facts(fblock)
     compare(p, "saved slot", {k: f1[k] for k in STILL}, {k: fa[k] for k in STILL})
-    compare(p, "load2", fa, facts(d2["wram"]))
-    if d2["wram"] != ablock:
-        n = sum(1 for a, b in zip(d2["wram"], ablock) if a != b)
-        p.append(f"load2: the reloaded block differs from the slot the save wrote in {n} byte(s)")
+    compare(p, "first save", {k: f1[k] for k in STILL}, {k: facts(s1)[k] for k in STILL})
+    compare(p, "load2", facts(s1), facts(d2["wram"]))
+    if d2["wram"] != s1:
+        n = sum(1 for a, b in zip(d2["wram"], s1) if a != b)
+        p.append(f"load2: the reloaded block differs from the slot the first save wrote in {n} byte(s)")
     if w16(after, epage) != ESPER_MAGIC:
         p.append(f"after the save, slot {slot}'s esper page is unsigned")
     if after[epage + CTR:epage + CTR_END] != live:
         p.append("after the save, the slot's esper page is not the live page the load made")
     if d2["live"][CTR:CTR_END] != live:
         p.append("load2: the live esper page is not what was saved")
-    if d2["codex"] != d1["codex"]:
+    # (magic and tables; the pad and tail are the reserve a save zeroes)
+    if d2["codex"][:2] + d2["codex"][0x10:0x310] != d1["codex"][:2] + d1["codex"][0x10:0x310]:
         p.append("load2: the codex page changed across the round trip")
     return p
 
@@ -371,6 +392,25 @@ def add(version, zpath, keys, esper):
     return 0
 
 
+NOTES_LINE = re.compile(r"^Saves from (v\d+\.\d+) and later load in this release\b", re.M)
+
+
+def notes_problems(text, oldest):
+    p = []
+    if re.search(r"save layout", text, re.I):
+        p.append('the notes name a "save layout"; say which saves load instead')
+    m = NOTES_LINE.search(text)
+    if not m:
+        p.append(f'no line "Saves from {oldest} and later load in this release"')
+    elif m.group(1) != oldest:
+        p.append(f"the notes say saves from {m.group(1)} load; the oldest golden saves are {oldest}'s")
+    return p
+
+
+def oldest_golden():
+    return load_manifest()["sets"][0]["version"]
+
+
 # ----------------------------------------------------------------- selftest --
 def _synthetic():
     """A battery with slot 3 populated, signed pages, and a matching run."""
@@ -397,9 +437,13 @@ def _synthetic():
     after = bytearray(f)
     after[0x1FF1] = 9               # title seed (shared, title)
     after[b + 0x1863 - 0x1600] = 1  # play time moved (slot3, save)
+    after[b + SIG - 0x1600] = 0x53  # signed $5653, version 1
+    after[b + SIG + 1 - 0x1600] = 0x56
+    after[b + SIG + 2 - 0x1600] = 1
     def dumps(blk_after):
         return {"load1": {"wram": bytes(block_of(f, 3)), "codex": bytes(f[cp:cp + 0x400]),
                           "live": bytes(f[LIVE:LIVE + 0x400])},
+                "save1": {"slot": bytes(blk_after)},
                 "load2": {"wram": bytes(blk_after), "codex": bytes(f[cp:cp + 0x400]),
                           "live": bytes(f[LIVE:LIVE + 0x400])}}
     return f, after, dumps
@@ -423,9 +467,22 @@ def selftest():
         probs = check_run(bytes(fx or f), rr, esper, d, bytes(a), rows)
         assert any(want in x for x in probs), (want, probs)
 
-    # a write into slot 1, the codex tail, the reserve past $4000, $1E00
-    for o in (0x0005, CODEX + 0x800 + 0x310, 0x4000, 0x1E00, ESPER + 0x800 + 0x280):
+    # a write into slot 1, slot 1's codex tail, the reserve past $4000, $1E00,
+    # the live page's reserve
+    for o in (0x0005, CODEX + 0x310, 0x4000, 0x1E00, LIVE + 0x380):
         bad(mut_after=lambda a, o=o: a.__setitem__(o, 0xAA), want="outside the documented writes")
+    # the saved slot's own page reserves left non-zero
+    for o in (CODEX + 0x800 + 0x310, CODEX + 0x800 + 0x5, ESPER + 0x800 + 0x280, ESPER + 0x800 + 0x3FF):
+        bad(mut_after=lambda a, o=o: a.__setitem__(o, 0xAA), want="reserve $")
+    # the save did not sign the block
+    bad(mut_after=lambda a: a.__setitem__(SLOT_PTR[3] + SIG - 0x1600, 0), want="not signed $5653")
+    # the block's reserve or tail left non-zero by the save
+    for a0 in (0x1E2F, 0x1E3F, 0x1FF7, 0x1FFD):
+        bad(mut_after=lambda a, a0=a0: a.__setitem__(SLOT_PTR[3] + a0 - 0x1600, 0xFF), want="the tail $1FF7-$1FFD is not zero")
+    # the reload is not what the first save wrote
+    def rl(d):
+        w = bytearray(d["load2"]["wram"]); w[0x10] ^= 1; d["load2"]["wram"] = bytes(w)
+    bad(mut_dumps=rl, want="load2: the reloaded block differs")
     # a level misread at the load
     def lvl(d):
         w = bytearray(d["load1"]["wram"]); w[8] = 99; d["load1"]["wram"] = bytes(w)
@@ -462,6 +519,11 @@ def selftest():
         raise AssertionError("gap accepted")
     except GoldenError:
         pass
+    good = "## Saves\n\nSaves from v0.28 and later load in this release. A save from before v0.44...\n"
+    assert notes_problems(good, "v0.28") == [], notes_problems(good, "v0.28")
+    assert any("save layout" in x for x in notes_problems(good + "This release uses the v0.29 save layout.\n", "v0.28"))
+    assert any("no line" in x for x in notes_problems("## Saves\n\nOlder saves load.\n", "v0.28"))
+    assert any("oldest golden" in x for x in notes_problems(good.replace("v0.28", "v0.40"), "v0.28"))
     print("golden_saves selftest OK")
     return 0
 
@@ -472,18 +534,28 @@ def main(argv):
     try:
         if argv[:1] == ["verify"]:
             return verify()
+        if argv[:1] == ["notes"] and len(argv) == 2:
+            probs = notes_problems(Path(argv[1]).read_text(), oldest_golden())
+            for x in probs:
+                print(f"golden notes: FAIL {argv[1]}: {x}")
+            if probs:
+                return 1
+            print(f"golden notes: {argv[1]} says saves from {oldest_golden()} and later load")
+            return 0
         if argv[:1] == ["list"]:
             for d in fixture_dirs():
                 print(d.relative_to(ROOT))
             return 0
-        if argv[:1] in (["check"], ["negative"]) and len(argv) == 4:
+        if (argv[:1] == ["check"] and len(argv) == 4) or (argv[:1] == ["negative"] and len(argv) in (4, 5)):
             fx, log, bat = Path(argv[1]), Path(argv[2]), Path(argv[3])
             probs = check(fx, log, bat)
             if argv[0] == "negative":
-                if any("esper" in x for x in probs):
-                    print(f"golden negative: refused as it must be: {probs[0]}")
+                want = argv[4] if len(argv) == 5 else "esper"
+                hit = [x for x in probs if want in x]
+                if hit:
+                    print(f"golden negative: refused as it must be: {hit[0]}")
                     return 0
-                print(f"golden negative: FAIL -- {fx} was not refused for its esper page: {probs}")
+                print(f"golden negative: FAIL -- {fx} was not refused for {want!r}: {probs}")
                 return 1
             for x in probs:
                 print(f"golden: FAIL {fx.relative_to(ROOT) if fx.is_absolute() else fx}: {x}")

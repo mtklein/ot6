@@ -177,8 +177,128 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         lda     #OT6_CODEX_V2
         sta     f:OT6_CODEX_MAGIC+$0c00
         jsr     Ot6EsperNewGame ; #328: and no esper progress
+        jsr     Ot6NewGameClear ; #389: and no power-on junk in the scrap
         plp
         rtl
+.endproc
+
+; New Game: zero the save block's OT6 scrap ($1e1d-$1e3f: the three
+; loadouts, the signature and the reserve) and vanilla's unused tail
+; ($1ff7-$1ffd).  Vanilla clears WRAM only to $11ff (ClearRAM) and its New
+; Game names none of these bytes, so on a console or emulator whose RAM
+; powers on non-zero they held junk: all-$FF loadouts read as a manual Rage
+; and Lore loadout whose every slot names an unknown entry, and Gau and
+; Strago came up with empty lists.  Zero is AUTO and unsigned.
+; a/x widths saved.
+.proc Ot6NewGameClear
+        php
+        longi
+        shorta
+        phx
+        lda     #$00
+        ldx     #$0000
+@scrap: sta     f:OT6_LOADOUT,x
+        inx
+        cpx     #OT6_SCRAP_LEN
+        bcc     @scrap
+        ldx     #$0000
+@tail:  sta     f:OT6_SAVETAIL,x
+        inx
+        cpx     #OT6_SAVETAIL_LEN
+        bcc     @tail
+        plx
+        plp
+        rts
+.endproc
+
+; [ sign the save block, and keep the reserve zero ] (#389)
+;
+; Called by Ot6CodexSaveAs at the head of CopyGameDataToSRAM, before the
+; checksum and the copy, so the signature rides in the slot and is summed.
+; An unsigned block (a save from before this build, or a New Game's first
+; save) has the rest of the scrap ($1e2f-$1e3f) and the block's unused
+; tail ($1ff7-$1ffd) zeroed, then takes the signature and version; a
+; signed block is left as it is.  Every save also zeroes the destination
+; slot's codex and esper page reserves (each page's +$002-$00f, the codex
+; page past +$310 and the esper page past +$280): no build writes them, and
+; bank $31 is never cleared, so a battery can hold junk there.  So a slot a
+; signing build wrote holds zero in every reserve it owns.
+; A (a8) = destination slot 1..3.  a/x/y widths saved; A preserved; Y
+; clobbered.
+.proc Ot6SaveSign
+        php
+        longai
+        pha
+        phx
+        lda     f:OT6_SAVESIG
+        cmp     #OT6_SAVESIG_WORD
+        beq     @pages
+        shorta
+        lda     #$00
+        ldx     #$0000
+@rsv:   sta     f:OT6_SAVERSV,x
+        inx
+        cpx     #OT6_SAVERSV_LEN
+        bcc     @rsv
+        ldx     #$0000
+@tail:  sta     f:OT6_SAVETAIL,x
+        inx
+        cpx     #OT6_SAVETAIL_LEN
+        bcc     @tail
+        lda     #OT6_SAVEVER_CUR
+        sta     f:OT6_SAVEVER
+        longa
+        lda     #OT6_SAVESIG_WORD
+        sta     f:OT6_SAVESIG
+@pages: longa
+        lda     3,s             ; the slot (under the phx)
+        and     #$0003
+        beq     @done           ; not a slot: no pages
+        dec
+        xba
+        asl
+        asl                     ; (slot - 1) * $400
+        pha                     ; [1,s] the page offset
+        tax
+        lda     #$0000
+        ldy     #(OT6_CODEX - OT6_CODEX_MAGIC - 2) / 2
+@cpad:  sta     f:OT6_CODEX_MAGIC+2,x
+        inx
+        inx
+        dey
+        bne     @cpad
+        lda     1,s
+        tax
+        lda     #$0000
+        ldy     #(OT6_CODEX_STRIDE - OT6_CODEX_USED) / 2
+@ctail: sta     f:OT6_CODEX_ROOT+OT6_CODEX_USED,x
+        inx
+        inx
+        dey
+        bne     @ctail
+        lda     1,s
+        tax
+        lda     #$0000
+        ldy     #(OT6_ESPER_CTR - OT6_ESPER_MAGIC - 2) / 2
+@epad:  sta     f:OT6_ESPER_ROOT+OT6_ESPER_MAGIC+2,x
+        inx
+        inx
+        dey
+        bne     @epad
+        lda     1,s
+        tax
+        lda     #$0000
+        ldy     #(OT6_ESPER_STRIDE - OT6_ESPER_COPY) / 2
+@etail: sta     f:OT6_ESPER_ROOT+OT6_ESPER_COPY,x
+        inx
+        inx
+        dey
+        bne     @etail
+        pla                     ; drop the page offset
+@done:  plx
+        pla
+        plp
+        rts
 .endproc
 
 ; Initialize/migrate the selected persistent page while the load menu owns the
@@ -236,6 +356,7 @@ copy:   lda     f:OT6_CODEX+(src),x
         shorta
         pha                     ; preserve destination for vanilla's stores
         jsr     Ot6EsperSaveAs  ; #328: live esper progress into the slot
+        jsr     Ot6SaveSign     ; #389: the block signed, the slot's reserves zero
         jsr     Ot6CodexActive  ; ensure source; X = source page
         lda     $01,s           ; destination slot
         cpx     #OT6_CODEX_TEMP

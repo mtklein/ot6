@@ -188,8 +188,13 @@ release is published:
   rests on invalid evidence. Its findings go to the owner verbatim. The
   critic is an optional extra look.
 - The release commit: `VERSION` bumped, the notes moved to
-  docs/release-notes-vX.Y.md with the previous release's title, how-to-play
-  and save sections (how-to-play names the zip's `saves/` folder), a fresh release-notes-next.md, README's current-release
+  docs/release-notes-vX.Y.md with the previous release's title and how-to-play
+  section (how-to-play names the zip's `saves/` folder) and its own Saves section,
+  whose line "Saves from vX.Y and later load in this release" names the oldest
+  golden saves and what older saves lack, never a "save layout"
+  (`golden_saves.py notes`, checked on release-notes-next.md by `ninja` and
+  on the cut by `ninja release`), a fresh release-notes-next.md that keeps that
+  Saves section, README's current-release
   line and tag link; branch `release/vX.Y` at it. The bump relinks only the
   ROM's two version fields (tools/build/rom_version.py); states bind to
   the ROM's identity with those masked, so it regenerates nothing.

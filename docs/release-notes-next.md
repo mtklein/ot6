@@ -36,3 +36,14 @@ for Narshe, Bounty Man and Fidor break to the same weapons as the troopers
 they march with. Siegfried's ambush on the Phantom Train breaks at the first
 blow. The troopers' sparring bout at the banquet has its own shields too. Cutscene battles no longer
 show a shield gauge.
+
+A new game no longer gives Gau an empty Rage list and Strago an empty Lore
+list on emulators and consoles whose memory does not start out blank. Their
+loadouts now start on AUTO, as they always did elsewhere. A game started that
+way on an earlier release keeps its empty loadouts; set each back to AUTO on
+its page in the Skills menu.
+
+## Saves
+
+Saves from v0.28 and later load in this release. A save from before v0.44
+starts with no esper progress.

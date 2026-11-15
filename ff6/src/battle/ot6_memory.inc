@@ -103,6 +103,30 @@ OT6_LOREROWS         = 5
 .assert (OT6_LORELOAD & $ffff) + OT6_LORESLOTS - 1 <= $1ffd, error, "lore loadout must sit inside the checksum window"
 .assert (OT6_LORELOAD & $ffff) = (OT6_RAGELOAD & $ffff) + OT6_RAGESLOTS, error, "lore loadout must follow the rage bytes without a gap"
 
+; The save-block signature (#389, docs/design/save-layout.md "Reserve and
+; the layout version"), in the next three bytes of the scrap.  Every save
+; writes it (Ot6SaveSign, before the checksum); the first save of an
+; unsigned block zeroes the rest of the scrap and the block's unused tail,
+; so a block signed with version N had its reserve zero when version N
+; wrote it.  A New Game zeroes the whole scrap and the tail
+; (Ot6NewGameClear): vanilla clears WRAM only to $11ff, so these bytes start
+; as whatever the console left there.
+OT6_SAVESIG          := $7e1e2c     ; word: OT6_SAVESIG_WORD when signed
+OT6_SAVEVER          := $7e1e2e     ; byte: the layout version that signed it
+OT6_SAVERSV          := $7e1e2f     ; the scrap's reserve, through $1e3f
+OT6_SAVERSV_LEN      = $11
+OT6_SAVETAIL         := $7e1ff7     ; vanilla's unused tail, through $1ffd
+OT6_SAVETAIL_LEN     = 7
+OT6_SAVESIG_WORD     = $5653        ; 'S','V' (bytes $53 $56)
+OT6_SAVEVER_CUR      = 1
+OT6_SCRAP_LEN        = $23          ; the whole scrap New Game clears, from OT6_LOADOUT
+.assert (OT6_SAVESIG & $ffff) = (OT6_LORELOAD & $ffff) + OT6_LORESLOTS, error, "the signature must follow the lore bytes without a gap"
+.assert OT6_SAVEVER = OT6_SAVESIG + 2, error, "the version byte follows the signature"
+.assert OT6_SAVERSV = OT6_SAVEVER + 1, error, "the reserve follows the version byte"
+.assert (OT6_SAVERSV & $ffff) + OT6_SAVERSV_LEN - 1 = $1e3f, error, "the reserve ends at the scrap's end"
+.assert (OT6_SAVETAIL & $ffff) + OT6_SAVETAIL_LEN - 1 = $1ffd, error, "the tail ends where the checksum window does"
+.assert (OT6_LOADOUT & $ffff) + OT6_SCRAP_LEN - 1 = $1e3f, error, "the scrap is $1e1d-$1e3f"
+
 ; Battle-only scratch. InitBattle clears through $3ed3.  The walkers use the
 ; interleaved even words.  ($3ecb held the once-a-battle divine flag until
 ; the owner's 2026-10-11 rule made a full 3-BP boost a divine's only gate;

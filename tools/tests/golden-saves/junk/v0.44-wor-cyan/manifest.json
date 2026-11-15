@@ -1,0 +1,12 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "battery.sram",
+  "slot": 3,
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "5673a66cb5b798a5f04633f355a88403061f7b6bfeca550777cf162f18bfb816",
+  "provenance": "golden-saves/v0.44/wor-cyan-v1 with the power-on junk an all-ones console leaves (measured, build/attempts/wt/v1-save-freeze/poweron_allones_newgame.log): $FF in slot 3's $1E1D-$1E3F and $1FF7-$1FFD (checksum recomputed), in every codex and esper page's pads and tails, and in $4000-$7FFF; a synthetic fixture for the first signing, not a release save",
+  "golden": {
+    "esper": "signed"
+  }
+}
