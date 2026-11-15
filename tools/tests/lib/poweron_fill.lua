@@ -63,34 +63,40 @@ do
   local cycles = emu.getCpuCycleCount(emu.cpuType.snes)
   local st = emu.getState()
   local pc = ((st["cpu.k"] or 0) << 16) | (st["cpu.pc"] or 0)
-  local done = {}
+  local done, readback = {}, {}
   for _, r in ipairs(regions) do
     local id, name, memtype, size = r[1], r[2], r[3], r[4]
     local sel = OT6_FILL_REGIONS[name]
-    if sel == true then
-      if mode == "ones" then
+    if sel then
+      -- sel is true (the whole RAM), or a lab bisection's {lo, hi} ranges:
+      -- only those offsets, or (except) all but them
+      local function filled(off)
+        if sel == true then return true end
+        for _, rr in ipairs(sel.ranges) do
+          if off >= rr[1] and off <= rr[2] then return not sel.except end
+        end
+        return sel.except
+      end
+      if sel == true and mode == "ones" then
         for off = 0, size - 1 do emu.write(off, 0xFF, memtype) end
       else
-        for off = 0, size - 1 do emu.write(off, value(id, off), memtype) end
-      end
-      done[#done + 1] = name
-    elseif sel then
-      -- a lab bisection: only these ranges ({lo, hi} pairs), or all but them
-      local function inside(off)
-        for _, r in ipairs(sel.ranges) do
-          if off >= r[1] and off <= r[2] then return true end
+        for off = 0, size - 1 do
+          if filled(off) then emu.write(off, value(id, off), memtype) end
         end
-        return false
       end
+      -- read it all back: a RAM the debugger cannot write would otherwise
+      -- pass for a fill that changed nothing
+      local bad = 0
       for off = 0, size - 1 do
-        if inside(off) ~= sel.except then emu.write(off, value(id, off), memtype) end
+        if filled(off) and emu.read(off, memtype) ~= value(id, off) then bad = bad + 1 end
       end
-      done[#done + 1] = name .. (sel.except and "~" or ":") .. sel.text
+      done[#done + 1] = sel == true and name or (name .. (sel.except and "~" or ":") .. sel.text)
+      readback[#readback + 1] = bad == 0 and (name .. " ok") or string.format("%s %d MISMATCHED", name, bad)
     end
   end
   local reset = emu.read(0xFFFC, mt.snesMemory) | (emu.read(0xFFFD, mt.snesMemory) << 8)
-  print(string.format("[fill] mode=%s seed=%d regions=%s at masterClock=%d cpuCycles=%d pc=%06X (reset vector $%04X)",
-    mode, seed, table.concat(done, ","), clock, cycles, pc, reset))
+  print(string.format("[fill] mode=%s seed=%d regions=%s at masterClock=%d cpuCycles=%d pc=%06X (reset vector $%04X); readback %s",
+    mode, seed, table.concat(done, ","), clock, cycles, pc, reset, table.concat(readback, ", ")))
   -- Mesen iterates its callback list while it calls one, so this one is
   -- never removed (removing it from inside itself would mutate that list);
   -- it reports once and then returns at once.
