@@ -626,7 +626,10 @@ out:    plx
 ; upgrade (#534), so a knight who does not wear the True Knight relic covers
 ; only at half its max HP or more and never while near fatal; one wearing the
 ; relic keeps vanilla's cover (ITEM::TRUE_KNIGHT is the only item that
-; carries the bit).
+; carries the bit).  A Rage (MonsterProp+30 bit 0, which the monster-property
+; loader ors into $3c58 as the same bit for Gau, battle_main.asm "true knight
+; effect (rage only ???)") is the other source of the cover bit; no Rage in
+; today's data sets it, and this gate would treat one like the signature's.
 ;
 ; in: a16, x = the candidate's entity offset, index width either (CoverEffect
 ; runs .i8: no index immediates, no index pushes), db=$7e.  out: carry set =
