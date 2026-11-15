@@ -2273,6 +2273,7 @@ def selftest() -> int:
 FILL_MARKER = "build/FILL_TREE"   # tools/fill_line.py writes it
 FILL_LUA = HERE / "poweron_fill.lua"
 RBW_LUA = HERE / "read_before_write.lua"
+WAIVERS_UNINIT = HERE.parent.parent / "uninit_waivers.txt"
 FILL_REGIONS = ("wram", "sram", "vram", "oam", "cgram", "spc")
 
 
@@ -2347,6 +2348,19 @@ def _fill_lines(want, have, env):
     mode, seed = (m.group(1), 0) if m.group(1) else ("rand", int(m.group(2)))
     if env.get("OT6_SRAM_CHECKPOINT"):
         sel.pop("sram", None)
+    # tools/uninit_waivers.txt's `fill` lines: offsets a whole-region fill
+    # leaves zero (reads already understood); a region given explicit
+    # ranges is a bisection and takes none
+    waived = {}
+    if WAIVERS_UNINIT.exists():
+        for raw in WAIVERS_UNINIT.read_text().splitlines():
+            f = raw.split(None, 3)
+            if len(f) >= 3 and f[0] == "fill":
+                lo, _, hi = f[2].partition("-")
+                waived.setdefault(f[1], []).append((int(lo, 16), int(hi or lo, 16)))
+    for k, spans in waived.items():
+        if sel.get(k) is True:
+            sel[k] = (True, spans, "waivers")
 
     def lua(v):
         if v is True:

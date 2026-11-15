@@ -81,6 +81,10 @@ def sync(args):
                          capture_output=True, text=True).stdout.strip()
     sh(["git", "-C", str(d), "fetch", "--quiet", str(ROOT), sha])
     sh(["git", "-C", str(d), "checkout", "--quiet", "--detach", sha])
+    # A fill run's states record nothing about the fill (its pattern, its
+    # waivers), so a moved fill tree replays from power-on: its states go.
+    for sub in ("states", "checkpoints", "ninja"):
+        shutil.rmtree(d / "build" / sub, ignore_errors=True)
     sh([sys.executable, "configure.py"], cwd=d, stdout=subprocess.DEVNULL)
 
 

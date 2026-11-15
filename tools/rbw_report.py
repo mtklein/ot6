@@ -12,9 +12,9 @@ and its operands, so the instruction is the one whose bytes end at or
 before pc (a DMA is charged to the store that started it).  The ROM's ca65
 debug file names the source line.
 
-tools/rbw_waivers.txt lists the reads proven benign, one per line:
+tools/uninit_waivers.txt lists the reads proven benign, one per line:
 
-    <file>:<line> <ram> <reason>
+    read <file>:<line> <ram> <reason>
 
 A waived line's reads are counted and not listed (--all lists them too).
 Exit status 1 when an unwaived read remains.
@@ -92,11 +92,9 @@ def load_waivers(path):
     if not path or not Path(path).exists():
         return out
     for raw in Path(path).read_text().splitlines():
-        line = raw.split("#", 1)[0].strip() if raw.lstrip().startswith("#") else raw.strip()
-        if not line:
-            continue
-        where, ram, reason = (line.split(None, 2) + ["", ""])[:3]
-        out[(where, ram)] = reason
+        f = raw.split(None, 3)
+        if len(f) == 4 and f[0] == "read":
+            out[(f[1], f[2])] = f[3]
     return out
 
 
@@ -168,7 +166,7 @@ def selftest():
                "[rbw] f30 sram $04000 pc $C00015 v=$FF",
                "[ot6] unrelated"]
         w = Path(t, "w.txt")
-        w.write_text("# comment\nsrc/a.asm:8 sram the magic check reads before it signs\n")
+        w.write_text("# comment\nfill wram 1F6E a fill line\nread src/a.asm:8 sram the magic check reads before it signs\n")
         lines = []
         o, wv = report(log, d, load_waivers(w), out=lines.append)
         check("reads group by source line", len(o) == 1 and o[0][0] == "src/a.asm:7")
@@ -183,7 +181,7 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("log", nargs="?")
     ap.add_argument("--dbg", default=str(ROOT / "ff6/rom/ff6-en.dbg"))
-    ap.add_argument("--waivers", default=str(ROOT / "tools/rbw_waivers.txt"))
+    ap.add_argument("--waivers", default=str(ROOT / "tools/uninit_waivers.txt"))
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()

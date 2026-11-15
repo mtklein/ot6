@@ -1,0 +1,18 @@
+# Uninitialised reads proven benign, for the power-on fill
+# (OT6_POWERON_FILL, lib/poweron_fill.lua) and the read-before-write
+# instrument (OT6_RBW, tools/rbw_report.py).  docs/TOOLING.md "Uninitialised
+# memory".
+#
+#   fill <region> <lo>[-<hi>] <reason>
+#       the fill leaves these offsets zero, so a read already understood
+#       does not move the play and hide what comes after it.  Each one names
+#       the instruction, what the value changes, and the evidence.
+#   read <file>:<line> <ram> <reason>
+#       tools/rbw_report.py counts this instruction's reads of unwritten
+#       bytes without listing them.
+#
+# A waiver is a finding, not a fix: each says why it is harmless, or why it
+# is left for the ROM's owner (the proposed fix is in the reason).
+
+fill wram 1F6E-1F6F the random-battle counter: vanilla adds each step to it (field/battle.asm:168, Ot6DangerStep's `adc a:$1f6e`, ot6_break.asm:485) and clears it only after a battle, and New Game never zeroes it, so the first random encounter after a New Game comes after a power-on-dependent number of steps (vanilla; on a Continue the slot's value loads). Fix: zero it in Ot6NewGameClear. build/attempts/wt/v046-fills/regions/gen_whelk_poweron_ones_wram_1F6E-1F6F.log
+fill wram E9DB the condemned-numeral counter (btlgfx_main.asm:41571 UpdateCondemnNum, `lda w7ee9db / and #$03`): its low bits pick which frame of four redraws a numeral, so its first value only moves which frames carry the redraw; that shifts the frame a later field event lands on (vanilla, cosmetic in origin; the first battle after power-on reads it unwritten). Fix: zero it where battle graphics init clears its block. build/attempts/wt/v046-fills/regions/gen_whelk_poweron_ones_wram_E9DB.log
