@@ -117,3 +117,6 @@
 
 ; the esper ladder (#328), appended for the same reason.
         .include "ot6_esper.asm"
+
+; dense ability lists (#541), appended for the same reason.
+        .include "ot6_dense.asm"

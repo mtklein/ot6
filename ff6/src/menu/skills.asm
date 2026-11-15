@@ -96,7 +96,12 @@ LoadMagicCursor:
 ; [ update cursor (magic) ]
 
 UpdateMagicCursor:
+.if LANG_EN
+@4b88:  jsr     Ot6MagicMoveDense       ; ot6 #541: the move, then kept on a
+                                        ;   listed spell (ot6_dense_menu.asm)
+.else
 @4b88:  jsr     MoveListCursor
+.endif
 
 InitMagicCursor:
 @4b8b:  ldy     #near MagicCursorPos
@@ -460,7 +465,11 @@ _c34d78:
 
 DrawMagicMenu:
 @4d7f:  jsr     ClearBG1ScreenA
+.if LANG_EN
+        jsr     Ot6MagicOrderDense      ; ot6 #541: packed (ot6_dense_menu.asm)
+.else
         jsr     CalcMagicOrder
+.endif
         jsr     DrawMagicList
         lda     #$2c
         sta     zTextColor

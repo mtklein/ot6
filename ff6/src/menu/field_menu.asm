@@ -2426,7 +2426,11 @@ MenuState_1a:
         sta     $9e
         lda     #$10
         tsb     z45
+.if LANG_EN
+        jsr     Ot6MagicOrderDense      ; ot6 #541: packed (ot6_dense_menu.asm)
+.else
         jsr     _c34f1c
+.endif
         jmp     DrawMagicList
 @2822:  lda     z08
         bit     #JOY_A
