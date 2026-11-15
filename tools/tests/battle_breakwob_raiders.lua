@@ -57,6 +57,7 @@ local function watch()
         H.log(string.format("[raiders] fight %d slot %d: species $%03X opens with %d of %d shield(s), %d hp", cur.n,
           s, r.sp, H.readByte(SH_CUR + s * 2), r.open, H.readWord(MONHP + s * 2)))
       end
+      if r.open == 0 and H.readByte(SH_MAX + s * 2) ~= 0 then r.open = H.readByte(SH_MAX + s * 2) end
       local t = H.readByte(BRK + s * 2)
       if r.broke == nil and t ~= 0 and t ~= 0xFF then
         r.broke = H.frame

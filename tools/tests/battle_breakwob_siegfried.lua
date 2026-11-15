@@ -36,6 +36,7 @@ local function watch()
         H.log(string.format("[siegfried] slot %d: species $%03X opens with %d of %d shield(s), %d hp", s, r.sp,
           H.readByte(SH_CUR + s * 2), r.open, H.readWord(MONHP + s * 2)))
       end
+      if r.open == 0 and H.readByte(SH_MAX + s * 2) ~= 0 then r.open = H.readByte(SH_MAX + s * 2) end
       local t = H.readByte(BRK + s * 2)
       if r.broke == nil and t ~= 0 and t ~= 0xFF then
         r.broke = H.frame
@@ -51,12 +52,14 @@ end
 -- car's $017E (_cba6bd/_cba6ca, event_main.asm:62592-62605): with it set, as the capture has it, (19,7) lands at
 -- (23,11) and (9,7) at (23,28), the box's compartment; with it clear, (19,7) lands at (8,28), the west
 -- compartment that holds (5,25).  The hallway's east door (26,8) clears it on the way out to the front cars
--- (_cba7b1 -> _cba7d9: map 141 (67,8)), and the front cars' passenger door (59,8) leads back in without setting it.
--- So: out of the box's compartment to the hallway, east to the front cars, back in, and through (19,7).
+-- (_cba7b1 -> _cba7d9: map 141 (67,8)), and the front cars' door at (75,8) leads back in at the hallway's west
+-- end without setting it (_cba65d); their passenger door (59,8) sets it again (_cba694; the first try of this
+-- suite went that way and landed at (23,11)).  So: out of the box's compartment to the hallway, east to the front
+-- cars, back in by (75,8), and through (19,7).
 local MAP_CARS, MAP_HALL = 141, 151
 local ROOM_EXITS = { { 23, 29 }, { 23, 12 }, { 8, 29 } }
 local HALL_TRIGGERS = { { 1, 8 }, { 1, 9 }, { 19, 7 }, { 9, 7 } }
-local CAR_DOORS = { { 91, 8 }, { 100, 8 }, { 109, 8 }, { 103, 8 }, { 116, 8 }, { 82, 8 }, { 75, 8 },
+local CAR_DOORS = { { 91, 8 }, { 100, 8 }, { 109, 8 }, { 103, 8 }, { 116, 8 }, { 82, 8 }, { 59, 8 },
   { 66, 8 }, { 38, 8 }, { 31, 7 }, { 48, 8 } }
 local ROOM_TRIGGERS = { { 23, 29 }, { 23, 12 }, { 8, 29 }, { 5, 25 }, { 8, 9 }, { 8, 12 } }
 local function settled() return H.hasControl() and H.tileAligned() and not H.battleLoadStarted() end
@@ -72,7 +75,6 @@ H.run({ maxFrames = 80000 }, {
   H.call(function()
     H.assertEq(map(), 153, "wob_train_specter stands in the compartment car (map 153)")
     H.assertEq((H.readByte(0x1E80 + (0x187 >> 3)) >> (0x187 & 7)) & 1, 0, "Siegfried's event has not run ($0187)")
-    emu.addEventCallback(watch, emu.eventType.startFrame)
   end),
   H.cond(function() return not onFoot() end, {
     H.lazy(function()
@@ -92,7 +94,7 @@ H.run({ maxFrames = 80000 }, {
       H.assertEq(sw17E(), 0, "the hallway's east door cleared $017E (_cba7d9)")
       H.log(string.format("[siegfried] the front cars at (%d,%d), $017E clear", H.fieldX(), H.fieldY()))
     end),
-    H.navTo(59, 8, { maxFrames = 8000, playBattles = "tactical", fight = FIGHT, avoid = CAR_DOORS,
+    H.navTo(75, 8, { maxFrames = 8000, playBattles = "tactical", fight = FIGHT, avoid = CAR_DOORS,
       arrive = function() return map() == MAP_HALL end }),
     arriveOn(MAP_HALL),
     H.navTo(19, 8, { maxFrames = 3000, avoid = HALL_TRIGGERS }),
@@ -104,7 +106,9 @@ H.run({ maxFrames = 80000 }, {
     H.assertEq(onFoot(), true, "(5,26), south of Siegfried's trigger, is on foot")
   end),
   H.navTo(5, 26, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = ROOM_TRIGGERS }),
-  -- step north onto the trigger (it fires facing up), then ride the event and the fight
+  -- step north onto the trigger (it fires facing up), then ride the event and the fight; the watcher arms here, so
+  -- the cars' random fights on the way are not read as his
+  H.call(function() emu.addEventCallback(watch, emu.eventType.startFrame) end),
   H.driveUntil(function() return H.eventRunning() or H.battleLoadStarted() end, 600, {
     H.call(function() H.setPad({ up = true }) end),
   }, "the step onto (5,25)"),
