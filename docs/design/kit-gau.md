@@ -652,15 +652,15 @@ the turn count, or it asserts nothing.
    trance fell to 1/2 after an unboosted Gogo start, and an unboosted Gau got
    certainty from a boosted Gogo. It is now per character (8 bytes, stride 2,
    the `OT6_DANCETIER` shape), stored and read by the rager's entity offset.
-   `battle_rage` arm 7b plays it: Gau at 3 points, then a second rager
-   unboosted; every one of Gau's later possessed turns is the special with no
-   draw, and the second's rolls read its own 0. The mutant that writes one
-   tier into every rager's cell (one tier shared, the old byte's behaviour)
-   is red there: Gau's first possessed roll after Gogo's start came up Fight
-   at tier 0 (build/attempts/wt/v045-teach/rage/shared_tier.log). No capture
-   seats Gogo beside Gau (wor-gogo-v1 and wor-kt-factory-v1 hold Gau in
-   reserve), so the arm installs both ragers on battle_entry, as the rest of
-   that suite does.
+   `battle_rage` arm 7b plays it: Gau at 3 points, then a second rager at
+   1. Read from what `Ot6RageCoin` did, every one of Gau's later possessed
+   turns takes no draw and is the special, and every one of the second's
+   takes exactly tier 1's one draw. Two mutants are red there: one tier
+   written into every rager's cell (the old byte's behaviour), and the coin
+   reading cell 0 whoever rolls (build/attempts/wt/v045-teach/final2/). No
+   capture seats Gogo beside Gau (wor-gogo-v1 and wor-kt-factory-v1 hold Gau
+   in reserve), so the arm installs both ragers on battle_entry, as the rest
+   of that suite does.
 8. **Spending BP mid-trance.** A possessed Gau banks regen he cannot spend,
    because there is no menu and no confirm moment. This is a real cost of the
    possession, priced into §6's "3 BP is a full-bank decision".

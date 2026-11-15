@@ -486,7 +486,7 @@ add({
 -- recruited -- no capture seats GOGO beside GAU (wor-gogo-v1 and
 -- wor-kt-factory-v1 seat GOGO with GAU in reserve).  Red on a ROM whose store
 -- writes the one tier into every rager's cell, and on one whose coin reads
--- cell 0 whoever rolls (build/attempts/wt/v045-teach/rage/).
+-- cell 0 whoever rolls (build/attempts/wt/v045-teach/final2/).
 add(trance("shared", function()
   startMp = 50; pinPend = 3; wantSecond = true     -- the second is chosen once the actor is known
 end, function()
