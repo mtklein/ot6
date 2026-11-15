@@ -505,6 +505,7 @@ function M.requestLoadState(blob)
   if RUN ~= nil then RUN.goUnhandled = nil end
   -- the battle-end reading the lib holds is the old timeline's (#491)
   if M.traceOnLoad then M.traceOnLoad(M.loadedFrame == nil) end
+  M.battleHpSet = true               -- the loaded machine's HP table is its own
   M.loadedFrame = M.frame
   if M.forgetBattleEnd then M.forgetBattleEnd() end
   M.mpSpent = {}                     -- (the Economizer's proxy: this timeline's casts, #524)
@@ -753,7 +754,17 @@ end
 -- (Tolerating any odd seat beside a live one read field garbage, species
 -- $5554, as a battle: qual3, six suites.)
 M.blsSeen = nil              -- the last frame this read a battle (a field: the chunk is at its local cap)
+-- The HP table is a battle's only once the game has written it since power-on
+-- (a battle, or the field's $FFFF fill) or a state load brought a machine
+-- that had: after a Continue and before the first battle it holds the
+-- power-on RAM, which a random fill can make read as a live party
+-- (`waitUntil 'battle 70 active' satisfied after 0 frames`, OT6_POWERON_FILL
+-- =rand:1).  On a zeroed console that RAM reads as no battle anyway.
+M.battleHpSet = false
+emu.addMemoryCallback(function() M.battleHpSet = true end, emu.callbackType.write,
+  M.BATTLE_HP, M.BATTLE_HP + 7, emu.cpuType.snes, emu.memType.snesWorkRam)
 function M.battleLoadStarted()
+  if not M.battleHpSet then return false end
   local anyLive, odd = false, false
   for i = 0, 3 do
     local hp = M.readWord(M.BATTLE_HP + i * 2)
