@@ -20,8 +20,9 @@
 -- written.  The WRAM port ($2180-$2183, CPU or DMA) writes WRAM without a
 -- WRAM address on the bus, so it is followed by hand.
 --
--- Each new (instruction, address) is printed once:
---   [rbw] f<frame> <ram> $<addr> read by $<pc> (value $<v>)
+-- Each new (address, instruction) is printed once, up to four instructions
+-- an address (tools/rbw_report.py groups them by source line):
+--   [rbw] f<frame> <ram> $<addr> pc $<pc> v=$<value>
 -- and a summary per 256-byte page at the end of each recut window that saw
 -- a hit.  `pc` is the CPU's program counter during the access (the
 -- instruction's own address or a few bytes past it), or the instruction
@@ -39,30 +40,37 @@ do
   if not live.sram then
     for a = 0, sizes.sram - 1 do written.sram[a] = true end
   end
-  local seen, hits, lines = {}, 0, 0
-  local MAX_LINES = 4000
+  local seen, pcs, hits, lines = {}, {}, 0, 0
+  local MAX_LINES = 20000
+  local PCS_PER_ADDR = 4
   local frame = 0
 
-  local function pcNow()
+  -- One line per new (address, instruction); past PCS_PER_ADDR
+  -- instructions an address is only counted, so a byte read every frame
+  -- does not pay emu.getState() every time.
+  local function hit(ram, addr, value, via)
+    hits = hits + 1
+    local akey = ram == "wram" and addr or (0x100000 + addr)
+    local n = pcs[akey] or 0
+    if n >= PCS_PER_ADDR then return end
     local st = emu.getState()
     frame = st["ppu.frameCount"] or frame
-    return ((st["cpu.k"] or 0) << 16) | (st["cpu.pc"] or 0)
+    local pc = ((st["cpu.k"] or 0) << 16) | (st["cpu.pc"] or 0)
+    local key = akey * 0x1000000 + pc
+    if seen[key] then return end
+    seen[key] = true
+    pcs[akey] = n + 1
+    if lines < MAX_LINES then
+      lines = lines + 1
+      print(string.format("[rbw] f%d %s $%05X pc $%06X v=$%02X%s",
+        frame, ram, addr, pc, value or 0, via or ""))
+    end
   end
 
   local function onRead(ram)
     local w = written[ram]
     return function(addr, value)
-      if w[addr] then return end
-      local pc = pcNow()
-      local key = ram .. addr .. ":" .. pc
-      hits = hits + 1
-      local n = (seen[key] or 0) + 1
-      seen[key] = n
-      if n == 1 and lines < MAX_LINES then
-        lines = lines + 1
-        print(string.format("[rbw] f%d %s $%05X read by $%06X (value $%02X)",
-          frame, ram, addr, pc, value or 0))
-      end
+      if not w[addr] then hit(ram, addr, value) end
     end
   end
   local function onWrite(ram)
@@ -82,24 +90,33 @@ do
     end
   end, cb.write, 0x2180, 0x2183)
   emu.addMemoryCallback(function(addr, value)
-    if not written.wram[wmadd] then
-      local pc = pcNow()
-      local key = "wram" .. wmadd .. ":" .. pc
-      local n = (seen[key] or 0) + 1
-      seen[key] = n
-      hits = hits + 1
-      if n == 1 and lines < MAX_LINES then
-        lines = lines + 1
-        print(string.format("[rbw] f%d wram $%05X read by $%06X (value $%02X) via WMDATA",
-          frame, wmadd, pc, value or 0))
-      end
-    end
+    if not written.wram[wmadd] then hit("wram", wmadd, value, " via WMDATA") end
     wmadd = (wmadd + 1) & 0x1FFFF
   end, cb.read, 0x2180, 0x2180)
 
+  -- the battery, by its CPU windows: banks $30-$33 (and $B0-$B3), $6000-$7FFF
+  -- map to battery $0000-$7FFF.  (A callback on the save-RAM memory type
+  -- never fired on this build, so the windows are watched as CPU addresses.)
+  if live.sram then
+    local ws = written.sram
+    for _, hi in ipairs({ 0x30, 0xB0 }) do
+      for k = 0, 3 do
+        local base = ((hi + k) << 16) | 0x6000
+        local off = k * 0x2000
+        emu.addMemoryCallback(function(addr, value)
+          local o = off + (addr - base)
+          if not ws[o] then hit("sram", o, value) end
+        end, cb.read, base, base + 0x1FFF)
+        emu.addMemoryCallback(function(addr)
+          ws[off + (addr - base)] = true
+        end, cb.write, base, base + 0x1FFF)
+      end
+    end
+  end
+
   local regs = {}      -- {ram, type, start, end, kind}
-  local readers = { wram = onRead("wram"), sram = onRead("sram") }
-  local writers = { wram = onWrite("wram"), sram = onWrite("sram") }
+  local readers = { wram = onRead("wram") }
+  local writers = { wram = onWrite("wram") }
 
   local function ranges(ram)
     local w, size = written[ram], sizes[ram]
@@ -133,7 +150,7 @@ do
       emu.removeMemoryCallback(r.ref, r.kind, r.s, r.e, emu.cpuType.snes, r.t)
     end
     regs = {}
-    for _, ram in ipairs({ "wram", "sram" }) do
+    for _, ram in ipairs({ "wram" }) do
       if live[ram] then
         local t = types[ram]
         local rs = ranges(ram)
