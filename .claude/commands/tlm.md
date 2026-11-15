@@ -199,6 +199,10 @@ release is published:
 - The annotated tag `vX.Y`, main, the release branch and the tag pushed;
   `gh release create` with both assets and the notes; `gh release view`
   shows both (Obtainium installs the APK from there).
+- The release's saves joined the golden set (`tools/golden_saves.py add vX.Y
+  <zip> <keys>`, docs/TOOLING.md), so every later release is tested against
+  them: save compatibility is the v1 family's contract (owner, 2026-11-15;
+  upgrades only, never downgrades).
 - After publication, advance main's VERSION to the next development version
   and identify it separately from the latest published release in README.
   Verify the splash, Config display and ROM header show that development
