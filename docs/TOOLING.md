@@ -198,6 +198,65 @@ Commit the new `golden-saves/vX.Y/` and `MANIFEST.json` on main with the
 version bump. A golden save that stops loading is a broken promise
 (save-layout.md "Compatibility policy"), not a fixture to re-cut.
 
+## The instruction booklet
+
+`python3 tools/manual/build.py` builds the player's manual, a half-letter
+booklet in the style of a 1994 cartridge booklet (#391), to
+`build/manual/ot6-manual.pdf` and copies it to the tracked
+`docs/manual/ot6-manual.pdf`, which README and docs/PLAYING.md link. With
+`--booklet` it also writes `docs/manual/ot6-manual-booklet.pdf`, the
+printer's version: two pages to a landscape letter sheet in saddle-stitch
+order, printed duplex (flip on the short edge), folded and stapled. Once that
+file is tracked, every build rewrites it. `--version X.Y` sets the version the
+cover prints (default: `VERSION`). `--png 1,9,16` also renders those pages to
+`build/manual/pages/`.
+
+Its text is `tools/manual/manual.html` (one `<section class="page">` per
+printed page) and `manual.css`; the Esper appendix is read from
+docs/PLAYING.md at build time. Every gameplay fact in it comes from
+PLAYING.md or the source, and each area tip carries its source in an HTML
+comment beside it. The build fails if a page runs off the bottom, if any text
+crosses the edge of the box that clips it (`checks.js`), or if the page count
+is not a multiple of four; `OT6_MANUAL_DRAFT=1` reports these and builds
+anyway, without touching docs/manual.
+
+**The tracked PDF is rebuilt and committed** whenever the manual's sources
+(`tools/manual/`) or docs/PLAYING.md change, and at each release with
+`--version X.Y`. `docs/manual/ot6-manual.stamp` records a hash of those inputs
+and of the PDFs; `python3 tools/manual/build.py --check` compares it with the
+tree, needs no browser, and is part of qualification
+(`build/checks/manual_pdf.ok`). It goes red when an input changed without a
+rebuild, or when a tracked PDF is not the file the stamp records. The version
+is recorded but not checked, so main's version bump after a release leaves
+the release's booklet standing.
+
+Building needs Pillow and a headless Chromium: `$OT6_CHROME`, a `chromium` or
+`google-chrome` on PATH, Chrome in /Applications, or Playwright's cache
+(`python3 -m pip install playwright && python3 -m playwright install
+chromium-headless-shell`, which is what the mbp has). The fonts are vendored
+under `tools/manual/fonts/` with their OFL licences; nothing is fetched at
+build time.
+
+The illustrations are emulator screenshots in `tools/manual/img/`, kept at
+256x224 (portraits cropped from the main menu) and scaled up with
+nearest-neighbour by the build. `python3 tools/manual/shots.py [-j N]
+[areas | <suite> | boss_shots | battle_shots | portrait_shots ...]` retakes
+them from the graph's own captures with `OT6_NO_PUBLISH=1`: the menu and
+battle shots from the suites that take them (run unmodified), the cover,
+Celes's and Mog's frames and the portraits from the manual's own scripts in
+`tools/manual/*.lua`, the area shots by loading each area's state. Take the
+placement claim first, and retake them when the screens they show change;
+then rebuild and commit.
+
+**At a release**, on the release commit, after `ninja release`:
+
+    python3 tools/manual/build.py --version X.Y --booklet
+    cp docs/manual/ot6-manual.pdf build/release/ot6-vX.Y-manual.pdf
+
+Commit docs/manual/ with the release, and attach `ot6-vX.Y-manual.pdf` to the
+GitHub release with the zip and the APK (`gh release create ...
+build/release/ot6-vX.Y-manual.pdf`, or `gh release upload vX.Y` afterwards).
+
 ## Installed pieces
 
 Homebrew pieces are in the root `Brewfile`; `brew bundle` installs them.

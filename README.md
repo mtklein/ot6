@@ -23,7 +23,8 @@ characters.
 
   ![A character's equipped Magicite](docs/img/magicite.png)
 
-See [the player's guide](docs/PLAYING.md) for how the game plays.
+See [the player's guide](docs/PLAYING.md) for how the game plays, or read the same in
+the [instruction booklet](docs/manual/ot6-manual.pdf), a printable PDF.
 
 ## Playing
 

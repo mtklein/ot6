@@ -6,7 +6,8 @@ guide is for someone who knows FF6 and has not played OT6. To patch the game,
 see the [README](../README.md).
 
 Narshe's Beginner's House teaches the basics in play. This guide covers the
-rest.
+rest. The same material, with pictures and tips for each area, is in the
+[instruction booklet](manual/ot6-manual.pdf), a printable PDF.
 
 ## What is different at a glance
 
