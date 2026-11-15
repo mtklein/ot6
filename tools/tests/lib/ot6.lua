@@ -43,6 +43,12 @@
 --    live; input is pushed from an inputPolled callback (see below).
 
 local M = {}
+-- A lab lever (lib/compose.py's OT6_LEVERS, a comma list of names): true
+-- when this run was composed with `name` on, for an A/B arm of a rule
+-- switch (M.WORST_LIFT_OFF and the like); nothing in the graph sets it.
+function M.lever(name)
+  return type(OT6_LEVERS) == "string" and ("," .. OT6_LEVERS .. ","):find("," .. name .. ",", 1, true) ~= nil
+end
 
 local seqStep -- forward declaration (defined in the step-runner section)
 
@@ -1681,7 +1687,7 @@ end
 -- she had left), with an X-Potion in the bag (v0.45's qualification,
 -- px13 ~/work/v045-qual/build/states/wor_veldt.log: "[death] f+5377
 -- entity 2 char 8 from 431/3758 by slot 0 cmd $02 atk $0E").
-M.WORST_LIFT_OFF = false
+M.WORST_LIFT_OFF = M.lever("WORST_LIFT_OFF")
 function M.roundWorst(o)
   local window, cost = o.window or 0, 0
   for _, en in ipairs(o.enemies or {}) do
