@@ -45,8 +45,9 @@ local function members()
   end
   return t
 end
--- the list row (0..23) holding lore attack id `id` ($8B + lore id) in slot s's battle list, the rows
--- UpdateMenuState_1b's confirm reads (_c183f7: the caster's list at $208e, rows 55.. after the esper and 54 spells)
+-- the list row (0..23) holding lore `id` (0..23; its attack id is id + $8B) in slot s's battle list, the rows
+-- UpdateMenuState_1b's confirm reads (_c183f7: the caster's list at $208e, rows 55.. after the esper and 54 spells;
+-- one row per lore, $FF where it is not offered)
 local function loreRow(s, id)
   local b = H.readWord(MLISTPTR + s * 2)
   if b < 0x2000 or b > 0x2600 then return nil end
@@ -134,9 +135,17 @@ H.run({ maxFrames = 60000 }, {
     for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == STRAGO then stragoS = s end end
     assert(stragoS, "STRAGO is seated in the battle")
     assert(cmdRow(stragoS, CMD_LORE), "STRAGO's battle list has Lore")
-    local q, w = loreRow(stragoS, 0x8B + quiet), loreRow(stragoS, 0x8B + AQUA)
+    local q, w = loreRow(stragoS, quiet), loreRow(stragoS, AQUA)
     H.log(string.format("[lorerefuse] STRAGO slot %d: the quiet lore on row %s, Aqua Rake on row %s",
       stragoS, tostring(q), tostring(w)))
+    if not (q and w) then
+      local b, t = H.readWord(MLISTPTR + stragoS * 2), {}
+      for row = 0, 78 do t[#t + 1] = string.format("%02X", H.readByte(b + row * 4)) end
+      H.log(string.format("[lorerefuse] STRAGO's list at $%04X: %s; learned %02X %02X %02X; slots %02X %02X %02X %02X %02X",
+        b, table.concat(t, " "), H.readByte(LOREBITS), H.readByte(LOREBITS + 1), H.readByte(LOREBITS + 2),
+        H.readByte(LORELOAD), H.readByte(LORELOAD + 1), H.readByte(LORELOAD + 2), H.readByte(LORELOAD + 3),
+        H.readByte(LORELOAD + 4)))
+    end
     assert(q and w, "both lores are offered in STRAGO's Lore window")
   end),
   (function()
@@ -177,7 +186,7 @@ H.run({ maxFrames = 60000 }, {
           phase = 0
           return
         end
-        local want = loreRow(stragoS, 0x8B + id)
+        local want = loreRow(stragoS, id)
         local cur = H.readByte(LSCROLL + stragoS) + H.readByte(LROW + stragoS)
         if cur ~= want then held = cur < want and "down" or "up"; return end
         res[id] = { before = pend(stragoS) }

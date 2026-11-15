@@ -1473,7 +1473,8 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;     Up's fraction), the row the confirm queues (UpdateMenuState_1b's
 ;     _c183f7: scroll + cursor row, one column, four bytes a row from the
 ;     caster's list at $216a = the list's own $208e + $dc, the esper's row
-;     and the 54 spells' before it; the row's byte is the lore's id $8b-$a2).
+;     and the 54 spells' before it; one row per lore, its byte the lore's
+;     number 0-23, whose attack id is that + $8b; $ff on a row not offered).
 ; Filch and Bestow buy shields and pips since #469, so the thief list
 ; refuses nothing.  Everywhere else (the command window, before the action is
 ; picked) R stands.
@@ -1519,8 +1520,8 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         shorta0
         lda     $4005,x         ; the row's tool (item id)
         jsl     Ot6ToolNoBoost
-        bcs     @none
-        bra     @buys
+        jcs     @none
+        brl     @buys
 @magitek:
         lda     $8943,x         ; row
         asl
@@ -1542,8 +1543,12 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         adc     $302c,y         ; the caster's list
         tax
         shorta0
-        lda     a:$00dc,x       ; the lore's id (the esper's row and 54
-        jsl     Ot6SpellNoBoost ;   spells' rows come first: $dc bytes)
+        lda     a:$00dc,x       ; the row's lore, 0-23 (the esper's row and
+        cmp     #$ff            ;   the 54 spells' rows come first: $dc
+        beq     @buys           ;   bytes); an empty row cannot be confirmed
+        clc
+        adc     #$8b            ; its attack id, the MagicProp record
+        jsl     Ot6SpellNoBoost
         bcs     @none
         bra     @buys
 @item:  lda     $8947,x         ; scroll
