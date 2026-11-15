@@ -9,7 +9,7 @@
 --
 --   OT6_FILL_MODE   "ones" | "alt" | "rand"
 --   OT6_FILL_SEED   integer (rand only; 0 otherwise)
---   OT6_FILL_REGIONS the RAMs to fill, a set of wram, sram, vram, oam,
+--   OT6_FILL_REGIONS the RAMs to fill, a set of wram, sram, vram, oam, dsp,
 --                   cgram, spc (default wram and sram); a region may
 --                   instead map to {ranges = {{lo, hi}...}, except = bool,
 --                   text = ...} to fill only those offsets, or all but them
@@ -58,6 +58,7 @@ do
     {4, "oam",   mt.snesSpriteRam, 0x220},
     {5, "cgram", mt.snesCgRam,     0x200},
     {6, "spc",   mt.spcRam,        0x10000},
+    {7, "dsp",   mt.spcDspRegisters, 0x80},   -- the S-DSP register file
   }
   local clock = emu.getMasterClock()
   local cycles = emu.getCpuCycleCount(emu.cpuType.snes)

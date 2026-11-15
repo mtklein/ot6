@@ -2274,7 +2274,7 @@ FILL_MARKER = "build/FILL_TREE"   # tools/fill_line.py writes it
 FILL_LUA = HERE / "poweron_fill.lua"
 RBW_LUA = HERE / "read_before_write.lua"
 WAIVERS_UNINIT = HERE.parent.parent / "uninit_waivers.txt"
-FILL_REGIONS = ("wram", "sram", "vram", "oam", "cgram", "spc")
+FILL_REGIONS = ("wram", "sram", "vram", "oam", "cgram", "spc", "dsp")
 
 
 def poweron_fill_prologue(root, env):

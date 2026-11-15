@@ -43,7 +43,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LAYOUT = ROOT / "docs/design/save-layout.md"
-REGION_ID = {"wram": 1, "sram": 2, "vram": 3, "oam": 4, "cgram": 5, "spc": 6}
+REGION_ID = {"wram": 1, "sram": 2, "vram": 3, "oam": 4, "cgram": 5, "spc": 6, "dsp": 7}
 FIELDS = {"wram": "memoryManager.workRam", "sram": "cart.saveRam"}
 BLOCK = (0x1600, 0x2000)
 
