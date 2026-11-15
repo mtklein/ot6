@@ -942,7 +942,9 @@ check("shield_rows",
        "ff6/src/field/trigger/treasure_prop.dat",
        "ff6/src/battle/cond_battle.dat", "ff6/src/battle/battle_monsters.dat",
        "ff6/src/battle/ai_script.asm", "ff6/src/world/train_script.asm",
-       "ff6/src/world/ctrl.asm", "ff6/src/field/event.asm"]
+       "ff6/src/world/ctrl.asm", "ff6/src/field/event.asm",
+       "ff6/src/menu/colosseum.asm", "ff6/include/const.inc",
+       "ff6/src/battle/battle_main.asm"] + sorted(glob("ff6/src/event/*.asm"))
       + glob("src/event/*.asm", "ff6"))
 check("break_reach", "python3 tools/check_break_reach.py",
       ["tools/check_break_reach.py", "ff6/src/battle/battle_main.asm"]

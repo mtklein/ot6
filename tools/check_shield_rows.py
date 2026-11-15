@@ -120,8 +120,13 @@ def rom_shield_rows(rom: bytes):
 #     train's ride, world/train_script.asm `lda #$00NN ; event battle`; the
 #     World of Ruin airship's Doom Gaze, world/ctrl.asm `ldx #$0174`);
 #   - a formation an ai script changes to (`change_battle N`);
-#   - the colosseum's two (field/event.asm `ldx #$023f` / `#$023e`);
-#   - CondBattle's substitute for a reachable formation (battle_main.asm).
+#   - the colosseum's two (field/event.asm `ldx #$023f` / `#$023e`), and the
+#     opponent the colosseum puts in them: ColosseumProp's monster for each
+#     wager (menu/colosseum.asm `make_colosseum_prop`, a blank row the default
+#     CHUPON_COLOSSEUM), held as a species, not a formation;
+#   - CondBattle's substitute for a reachable formation (battle_main.asm);
+#   - the final battle's next tier (battle_main.asm FinalBattleIDTbl: each
+#     word's formation, once reached, leads to the next word's).
 # The Veldt only re-deals formations already met (battle_main.asm $1ddd).
 DATS = {k: "ff6/src/" + v for k, v in {
     "props": "field/map_prop.dat", "sbg": "field/sub_battle_group.dat",
@@ -133,6 +138,9 @@ AI_ASM = "ff6/src/battle/ai_script.asm"
 TRAIN_ASM = "ff6/src/world/train_script.asm"
 WORLD_CTRL_ASM = "ff6/src/world/ctrl.asm"
 FIELD_EVENT_ASM = "ff6/src/field/event.asm"
+COLOSSEUM_ASM = "ff6/src/menu/colosseum.asm"
+CONST_INC = "ff6/include/const.inc"
+BATTLE_MAIN_ASM = "ff6/src/battle/battle_main.asm"
 UNREACHED_LABEL = "Ot6ShieldTblUnreached"
 
 
@@ -171,7 +179,45 @@ def read_sources(root: str) -> dict:
     src["engine"] = engine
     src["colosseum"] = {int(m.group(1), 16) for m in
                         re.finditer(r"ldx\s+#\$([0-9a-fA-F]{4})\s*;[^\n]*colosseum battle", text(FIELD_EVENT_ASM))}
+    src["colosseum_prop"] = colosseum_opponents(text(COLOSSEUM_ASM), monster_ids(text(CONST_INC)))
+    src["final"] = final_battle_ids(text(BATTLE_MAIN_ASM))
     return src
+
+
+def monster_ids(text: str) -> dict:
+    """const.inc's MONSTER enum: name -> species id (its `;= $NNNN` comments)."""
+    m = re.search(r"^\.enum MONSTER\n(.*?)^\.endenum", text, re.M | re.S)
+    assert m, "no .enum MONSTER in " + CONST_INC
+    return {n: int(v, 16) for n, v in re.findall(r"^\s*(\w+)\s*;=\s*\$([0-9a-fA-F]+)", m.group(1), re.M)}
+
+
+def colosseum_opponents(text: str, ids: dict) -> dict:
+    """{species: [wager row, ...]}: ColosseumProp's monster for each wager, in
+    the order of the table (a blank make_colosseum_prop is CHUPON_COLOSSEUM, the
+    macro's default)."""
+    start = text.index("\nColosseumProp:")
+    out = {}
+    row = 0
+    for line in text[start + 1:].splitlines()[1:]:
+        code = line.split(";", 1)[0].strip()
+        if not code:
+            continue
+        if not code.startswith("make_colosseum_prop"):
+            break
+        args = code[len("make_colosseum_prop"):].strip()
+        name = args.split(",")[0].strip() if args else "CHUPON_COLOSSEUM"
+        assert name in ids, "ColosseumProp row %d: monster %s is not in the MONSTER enum" % (row, name)
+        out.setdefault(ids[name], []).append(row)
+        row += 1
+    assert row == 256, "ColosseumProp has %d rows, not one per item (256)" % row
+    return out
+
+
+def final_battle_ids(text: str) -> list[int]:
+    """FinalBattleIDTbl's words: each formation, once reached, leads to the next."""
+    m = re.search(r"^FinalBattleIDTbl:\s*\n(?:@\w+:)?\s*\.word\s+([^\n;]+)", text, re.M)
+    assert m, "no FinalBattleIDTbl in " + BATTLE_MAIN_ASM
+    return [int(w.strip().lstrip("$"), 16) for w in m.group(1).split(",")]
 
 
 def reachable_formations(src: dict) -> dict:
@@ -214,6 +260,10 @@ def reachable_formations(src: dict) -> dict:
         a, b = cond[i] | (cond[i + 1] << 8), cond[i + 2] | (cond[i + 3] << 8)
         if a and a in out:
             add(b, "CondBattle's substitute for formation %d" % a)
+    final = src["final"]
+    for a, b in zip(final, final[1:]):
+        if a in out:
+            add(b, "the final battle's tier after formation %d (FinalBattleIDTbl)" % a)
     return out
 
 
@@ -240,27 +290,30 @@ def coverage_problems(src: dict, rows, unreached: set[int]):
     row; every marker row is a 0-shield row for a species none holds."""
     reach = reachable_formations(src)
     bm = src["bm"]
-    held = {}
+    held = {}      # species -> [how the game deals it, ...]
     for f in sorted(reach):
         for sp in sorted(set(formation_species(bm, f))):
-            held.setdefault(sp, []).append(f)
-    authored = {sp: sh for sp, sh, _, _ in rows}
+            held.setdefault(sp, []).append("formation %d holds it (%s)" % (f, reach[f][0]))
+    if 0x23F in reach:
+        for sp, wagers in sorted(src.get("colosseum_prop", {}).items()):
+            held.setdefault(sp, []).append("the colosseum deals it for %d wager(s), item %d first"
+                                           % (len(wagers), wagers[0]))
+    authored = {sp: (sh, mask) for sp, sh, mask, _ in rows}
     problems = []
     for sp in sorted(held):
         if sp not in authored:
-            f = held[sp][0]
-            problems.append("species $%03X has no Ot6ShieldTbl row, but formation %d holds it (%s)%s: "
+            problems.append("species $%03X has no Ot6ShieldTbl row, but %s%s: "
                             "it rides the generated floor; author its row"
-                            % (sp, f, reach[f][0], "" if len(held[sp]) == 1
-                               else " and %d other reachable formation(s)" % (len(held[sp]) - 1)))
+                            % (sp, held[sp][0], "" if len(held[sp]) == 1
+                               else " and %d other way(s)" % (len(held[sp]) - 1)))
     for sp in sorted(unreached):
         if sp in held:
-            f = held[sp][0]
-            problems.append("species $%03X sits under %s, but formation %d holds it (%s): a reachable body "
-                            "needs a designed row" % (sp, UNREACHED_LABEL, f, reach[f][0]))
-        if authored.get(sp, 0) != 0:
-            problems.append("species $%03X sits under %s with %d shields: a marker row is 0, $00"
-                            % (sp, UNREACHED_LABEL, authored[sp]))
+            problems.append("species $%03X sits under %s, but %s: a reachable body "
+                            "needs a designed row" % (sp, UNREACHED_LABEL, held[sp][0]))
+        sh, mask = authored.get(sp, (0, 0))
+        if sh != 0 or mask != 0:
+            problems.append("species $%03X sits under %s with %d shields and class $%02X: a marker row is 0, $00"
+                            % (sp, UNREACHED_LABEL, sh, mask))
     summary = ("%d reachable formations hold %d species, %d without an authored row; %d marker rows under %s"
                % (len(reach), len(held), len([s for s in held if s not in authored]), len(unreached),
                   UNREACHED_LABEL))
@@ -340,6 +393,9 @@ def coverage_selftest(root: str) -> int:
     # pass every species as unreached)
     assert 0x29 in src["engine"] and 0x90 in src["engine"] and 93 in src["engine"], src["engine"]
     assert src["colosseum"] == {0x23E, 0x23F}, src["colosseum"]
+    assert src["colosseum_prop"].get(0x40) and src["colosseum_prop"].get(0x7D) == [4], \
+        "the ColosseumProp parse: CHUPON_COLOSSEUM's default rows, WART_PUCK for the ThiefKnife"
+    assert src["final"][:2] == [0x1D7, 0x200] and len(src["final"]) == 4, src["final"]
     assert {424, 512, 513, 514} <= src["ai"], src["ai"]
     assert 109 in src["called"] and 22 in src["called"], "the event parse lost battles 22/109"
     assert any("monster-in-a-box" in w for w in reach.get(476, [])), "the chest parse lost formation 476"
@@ -360,6 +416,38 @@ def coverage_selftest(root: str) -> int:
     # 3. a marker row given shields
     refused("marker with shields", [(sp, 2 if sp == 0x10F else sh, m, l) for sp, sh, m, l in rows],
             unreached, src, "species $10F sits under Ot6ShieldTblUnreached with 2 shields")
+    refused("marker with a class", [(sp, sh, 0x02 if sp == 0x10F else m, l) for sp, sh, m, l in rows],
+            unreached, src, "species $10F sits under Ot6ShieldTblUnreached with 0 shields and class $02")
+    # a marker made reachable: a formation holding the marker body $10F, dealt
+    # by a monster-in-a-box chest, an ai script's change_battle, or the final
+    # battle's chain; and a marker body the colosseum deals for a wager
+    bm = src["bm"]
+    holder = next((f for f in range(len(bm) // 15) if 0x10F in formation_species(bm, f)), None)
+    assert holder is not None and holder not in reach, "a formation holds $10F and none is reached"
+    chests = bytearray(src["chests"])
+    boxed = {chests[i + 4] for i in range(0, len(chests) - 4, 5) if chests[i + 3] & 0x20}
+    g = next(g for g in range(len(src["ebg"]) // 4)
+             if g not in src["called"] and g not in src["engine"] and g not in boxed)
+    ebg = bytearray(src["ebg"])
+    ebg[g * 4:g * 4 + 4] = bytes([holder & 0xFF, holder >> 8, holder & 0xFF, holder >> 8])
+    i = next(i for i in range(0, len(chests) - 4, 5) if chests[i + 3] & 0x20)
+    chests[i + 4] = g
+    refused("marker in a chest", rows, unreached, dict(src, ebg=bytes(ebg), chests=bytes(chests)),
+            "species $10F sits under Ot6ShieldTblUnreached, but formation %d holds it (event battle %d "
+            "(a monster-in-a-box))" % (holder, g))
+    refused("marker by change_battle", rows, unreached, dict(src, ai=src["ai"] | {holder}),
+            "species $10F sits under Ot6ShieldTblUnreached, but formation %d holds it (an ai script's "
+            "change_battle)" % holder)
+    refused("marker past the final battle", rows, unreached, dict(src, final=src["final"] + [holder]),
+            "species $10F sits under Ot6ShieldTblUnreached, but formation %d holds it (the final battle's tier"
+            % holder)
+    # the colosseum's ids are a byte, so its mutant files a low species as a
+    # marker and deals it nowhere but the colosseum: every formation dropped
+    colo = dict(src, colosseum_prop={0x7D: [4]}, called={}, engine={}, ai=set(),
+                chests=bytes(len(src["chests"])), props=bytes(len(src["props"])),
+                wbg=bytes([0xFF]) * len(src["wbg"]), final=[])
+    refused("marker in the colosseum", [(0x7D, 0, 0, 0)], {0x7D}, colo,
+            "species $07D sits under Ot6ShieldTblUnreached, but the colosseum deals it for 1 wager(s), item 4")
     # 4. a reachability mutant: battle 109's call gone, Siegfried's row gone,
     # and the gate must then stay green (the body is unreached, not missed)
     msrc = dict(src)

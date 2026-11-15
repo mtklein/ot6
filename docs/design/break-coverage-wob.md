@@ -290,7 +290,9 @@ never touches one.
 Lesson: each spirit takes one of the three weapon hands, TERRA's Fire takes
 them all, and the Bio Blaster heals them. Map 48 next door teaches the same
 thing with the Wild Rat. All three take special, like the train's spirits.
-Rinn is a pest at 110 HP and gets one shield.
+Rinn is a pest at 110 HP and gets one shield. The sparkles stay in the maze
+after this visit, so any later party that walks it can trip the trap and
+meets the same three with its own hands.
 
 ## 15. The Battle for Narshe's raiders (battles 22 and 23)
 
@@ -319,18 +321,27 @@ its fights are shorter: 1900 frames on average, against 2077 on main and
 2292 on the draft (`narshe-base.txt`, `narshe-after-pb.txt`,
 `narshe-after-sp.txt`, `summary.txt`).
 
+A squad that marches bare-handed (SABIN and GAU, if the player gives them
+no blade or spear) holds no key against Fidor, Bounty Man or the Troopers:
+fists are bludg and the troopers' line takes slash and pierce. That is
+accepted. The player picks the squads, and the canon squads each carry a
+blade or a knife.
+
 ## 16. The banquet's sparring troopers (battle 30)
 
-TERRA (Break Blade: slash; Fire) and LOCKE (ThunderBlade: slash, bolt), from
-`banquet-done-v1`. During the banquet's free time a trooper offers a
-two-minute bout (`_cc8a47`). The canon banquet talks instead.
+The banquet runs before the roster is rewritten, so the bout is fought by
+`vector-crash-v1`'s party: TERRA (ThunderBlade: slash, bolt; Fire), LOCKE
+(MithrilKnife: pierce), EDGAR (Blizzard: slash, ice; AutoCrossbow: pierce;
+Bio Blaster: poison) and SABIN (Poison Claw: bludg, poison; Fire Dance,
+AuraBolt). During the banquet's free time a trooper offers a two-minute bout
+(`_cc8a47`). The canon banquet talks instead.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
 | `$0C2` Sp.Forces | the imperial elite | 21 | 700 | poison | — | 4 · pierce | **3** · slash\|pierce |
 
-The trooper line's keys, at a tank's three: three of them against two
-blades in a timed bout.
+The trooper line's keys, at a tank's three: three of them against a party
+whose blades and pierce hands all key it, in a timed bout.
 
 ## 17. The Phantom Train: the vestibule car and Siegfried
 

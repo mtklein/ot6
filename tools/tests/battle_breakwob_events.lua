@@ -53,7 +53,9 @@ local P = {
   squad1 = { "TERRA, EDGAR, CELES", { TERRA, EDGAR, { "CELES", SLASH, ICE } } },
   squad2 = { "CYAN, SABIN", { { "CYAN", SLASH, 0 }, SABIN } },
   squad3 = { "LOCKE, GAU", { { "LOCKE", PIERCE, 0 }, { "GAU", BLUDG, 0 } } },
-  banquet = { "TERRA, LOCKE", { { "TERRA", SLASH, FIRE }, { "LOCKE", SLASH, BOLT } } },
+  -- battle 30 is fought during the banquet, before the roster rewrite, by vector-crash-v1's party
+  banquet = { "TERRA, LOCKE, EDGAR, SABIN", { { "TERRA", SLASH, FIRE | BOLT }, { "LOCKE", PIERCE, 0 },
+    { "EDGAR", SLASH | PIERCE, ICE | POISON }, { "SABIN", BLUDG, FIRE | HOLY | POISON } } },
   train = { "SABIN, CYAN, SHADOW", { SABIN, { "CYAN", SLASH, 0 }, { "SHADOW", PIERCE, 0 } } },
 }
 -- the fights: { label, "event", { event battle groups } | "map", map, its SubBattleGroup, parties, species dealt }
