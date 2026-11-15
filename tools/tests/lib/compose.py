@@ -2270,6 +2270,46 @@ def selftest() -> int:
     return 0 if ok else 1
 
 
+FILL_MARKER = "build/FILL_TREE"   # tools/fill_line.py writes it
+FILL_LUA = HERE / "poweron_fill.lua"
+
+
+def poweron_fill_prologue(root, env):
+    """The lines that fill RAM at power-on (lib/poweron_fill.lua), or none.
+
+    OT6_POWERON_FILL=ones|alt|rand:<seed> declares the mode (`zero`, the
+    reference, composes exactly as a plain run).  It is honoured
+    only in a fill tree, one whose build/FILL_TREE names the same mode
+    (tools/fill_line.py makes it): a fill run's states are not the line's
+    and must never stand in for them, so the mode cannot switch on in a
+    qualification tree by a stray environment variable, and a fill tree
+    cannot make a plain run by a missing one.  Raises ValueError on any
+    mismatch."""
+    want = env.get("OT6_POWERON_FILL", "")
+    marker = Path(root) / FILL_MARKER
+    have = marker.read_text().strip() if marker.exists() else ""
+    if not want and not have:
+        return []
+    if want and not have:
+        raise ValueError(f"OT6_POWERON_FILL={want} in a tree that is not a "
+                         f"fill tree (no {FILL_MARKER}); a fill run belongs "
+                         f"in its own tree: tools/fill_line.py --help")
+    if have and want != have:
+        raise ValueError(f"this is a fill tree ({FILL_MARKER}: {have!r}) and "
+                         f"OT6_POWERON_FILL is {want!r}; every run here must "
+                         f"declare OT6_POWERON_FILL={have}")
+    if want == "zero":
+        return []      # the reference tree: fenced like a fill, filled by nothing
+    m = re.fullmatch(r"(ones|alt)|rand:(\d{1,9})", want)
+    if not m:
+        raise ValueError(f"OT6_POWERON_FILL={want!r}: expected ones, alt, "
+                         f"rand:<seed> or zero")
+    mode, seed = (m.group(1), 0) if m.group(1) else ("rand", int(m.group(2)))
+    sram = "false" if env.get("OT6_SRAM_CHECKPOINT") else "true"
+    return [f'OT6_FILL_MODE = "{mode}"\n', f"OT6_FILL_SEED = {seed}\n",
+            f"OT6_FILL_SRAM = {sram}\n", FILL_LUA.read_text()]
+
+
 def main() -> int:
     if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
         return selftest()
@@ -2355,6 +2395,14 @@ def main() -> int:
     lib_alias = any(w.startswith("tools/tests/lib/") for w in waived_files)
 
     preamble = [MARKER + "\n"]
+    # The power-on fill (OT6_POWERON_FILL, lib/poweron_fill.lua): first,
+    # ahead of everything else the script runs, so it lands before the
+    # game's first instruction.  Absent from every normal run's script.
+    try:
+        preamble += poweron_fill_prologue(ROOT, os.environ)
+    except ValueError as why:
+        print(f"error: {why}")
+        return 1
     # Coverage flag.  Mesen's Lua sandbox blocks os.getenv
     # (AllowIoOsAccess=false), so a runtime toggle cannot be read from the
     # environment inside a script; inject it as a global the way OT6_SYMS and
