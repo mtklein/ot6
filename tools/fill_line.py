@@ -224,6 +224,12 @@ def selftest(_args=None):
         check("a fill tree's own mode fills, the fill code first after its globals",
               isinstance(got, list) and got[0] == 'OT6_FILL_MODE = "rand"\n'
               and "OT6_FILL_SEED = 9\n" in got and "emu.write" in got[-1])
+        # (a waiver of its own: the tree's file may hold none)
+        real = compose.WAIVERS_UNINIT
+        compose.WAIVERS_UNINIT = Path(t, "waivers.txt")
+        compose.WAIVERS_UNINIT.write_text("fill wram 1F6E-1F6F a test waiver\n")
+        got = prologue(fill, {"OT6_POWERON_FILL": "rand:9"})
+        compose.WAIVERS_UNINIT = real
         check("the waivers' offsets are left zero in a whole-region fill",
               isinstance(got, list) and "except = true" in got[2] and "0x1F6E" in got[2])
         got = prologue(fill, {"OT6_POWERON_FILL": "rand:9",
