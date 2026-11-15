@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
-"""Build the OT6 instruction booklet: build/manual/ot6-manual.pdf.
+"""Build the OT6 instruction booklet: build/manual/ot6-manual.pdf, copied to
+docs/manual/ot6-manual.pdf (tracked) with docs/manual/ot6-manual.stamp.
 
     python3 tools/manual/build.py                 # the PDF
+    python3 tools/manual/build.py --booklet       # and the printer's 2-up version
+    python3 tools/manual/build.py --version 0.47  # the version the cover prints
     python3 tools/manual/build.py --png 1,5,9     # and PNG renders of those pages
                                                   #   (build/manual/pages/page-NN.png)
+    python3 tools/manual/build.py --check         # is the tracked PDF today's?
+                                                  #   (no browser; qualification runs it)
+
+The stamp records a hash of the booklet's inputs (INPUTS below) and of the
+PDFs written from them.  --check fails when either no longer matches the
+tree: a source or docs/PLAYING.md changed without a rebuild, or a tracked PDF
+was replaced by hand.  The version is recorded but not checked, so main's
+version bump after a release does not stale the release's booklet.  Once
+docs/manual/ot6-manual-booklet.pdf is tracked, every build rewrites it too.
 
 Sources, all in tools/manual/: manual.html (the text, one <section
 class="page"> per printed page), manual.css, fonts/ (OFL fonts, vendored),
@@ -36,6 +48,61 @@ SRC = ROOT / "tools" / "manual"
 OUT = ROOT / "build" / "manual"
 SCALE = 4            # 256x224 -> 1024x896, nearest-neighbour
 PAGE_PX = (528, 816)  # 5.5in x 8.5in at 96 px/in
+DOCS = ROOT / "docs" / "manual"
+STAMP = DOCS / "ot6-manual.stamp"
+INPUTS = ["tools/manual/manual.html", "tools/manual/manual.css", "tools/manual/checks.js",
+          "tools/manual/build.py", "tools/manual/fonts/*", "tools/manual/img/*.png",
+          "docs/PLAYING.md"]
+
+
+def sha256(path):
+    import hashlib
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def inputs_hash():
+    import hashlib
+    h = hashlib.sha256()
+    files = sorted({f for pat in INPUTS for f in glob.glob(str(ROOT / pat))})
+    for f in files:
+        h.update(f"{Path(f).relative_to(ROOT)}\0{sha256(f)}\n".encode())
+    return h.hexdigest(), len(files)
+
+
+def read_stamp():
+    out = {}
+    if STAMP.exists():
+        for line in STAMP.read_text().splitlines():
+            if line and not line.startswith("#"):
+                k, _, v = line.partition(" ")
+                out[k] = v.strip()
+    return out
+
+
+def check():
+    """The tracked PDFs against today's inputs; no browser."""
+    st = read_stamp()
+    fix = ("rebuild with `python3 tools/manual/build.py` (`--version X.Y` at a release) "
+           "and commit docs/manual/")
+    if not st:
+        sys.exit(f"build.py --check: no {STAMP.relative_to(ROOT)}; {fix}")
+    now, n = inputs_hash()
+    bad = []
+    if st.get("inputs") != now:
+        bad.append(f"the booklet's {n} input files changed since the tracked PDF was built "
+                   f"(stamp {st.get('inputs', '?')[:12]}, tree {now[:12]})")
+    for key, name in (("pdf", "ot6-manual.pdf"), ("booklet", "ot6-manual-booklet.pdf")):
+        f = DOCS / name
+        if key in st and not f.exists():
+            bad.append(f"docs/manual/{name} is missing")
+        elif key in st and sha256(f) != st[key]:
+            bad.append(f"docs/manual/{name} is not the file the stamp records")
+        elif key not in st and f.exists():
+            bad.append(f"docs/manual/{name} is not in the stamp")
+    if bad:
+        sys.exit("build.py --check: " + "; ".join(bad) + f".\n  {fix}")
+    print(f"build.py --check: docs/manual is today's ({n} inputs, {now[:12]}; "
+          f"v{st.get('version', '?')})")
 
 
 def find_chrome():
@@ -138,29 +205,6 @@ def paginate(text):
     return text, len(pages)
 
 
-OVERFLOW_JS = """
-<script>
-window.addEventListener('load', () => {
-  const bad = [];
-  document.querySelectorAll('.page').forEach(p => {
-    const b = p.querySelector('.body') || p;
-    const kids = b.querySelectorAll('*');
-    let over = b.scrollHeight > b.clientHeight + 1 || b.scrollWidth > b.clientWidth + 1;
-    if (over) bad.push(p.dataset.n);
-  });
-  document.body.setAttribute('data-overflow', bad.join(','));
-  const m = location.hash.match(/^#only=(\\d+)$/);
-  if (m) {
-    document.body.classList.add('only');
-    document.querySelectorAll('.page').forEach(p => {
-      if (p.dataset.n === m[1]) p.classList.add('shown');
-    });
-  }
-});
-</script>
-"""
-
-
 def chrome(binary, *args):
     with tempfile.TemporaryDirectory() as prof:
         cmd = [binary, "--headless", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
@@ -173,11 +217,45 @@ def chrome(binary, *args):
         return r.stdout
 
 
+def impose(text, npages):
+    """The printer's version: each letter-size landscape sheet carries two pages, in
+    saddle-stitch order, so the stack printed duplex (flip on the short edge), folded
+    and stapled reads 1..n."""
+    pages = re.findall(r'<section class="page.*?</section>', text, re.S)
+    assert len(pages) == npages
+    sheets = []
+    for s in range(npages // 4):
+        for left, right in ((npages - 2 * s, 2 * s + 1), (2 * s + 2, npages - 2 * s - 1)):
+            sheets.append(f'<div class="sheet">{pages[left - 1]}{pages[right - 1]}</div>')
+    head = text[:text.index("<body")]
+    style = ("<style>@page { size: 11in 8.5in; margin: 0; }"
+             " .sheet { display: flex; width: 11in; height: 8.5in; overflow: hidden;"
+             " break-after: page; page-break-after: always; }"
+             " .sheet:last-child { break-after: auto; page-break-after: auto; }"
+             " .sheet .page { margin: 0; flex: none; break-after: auto; page-break-after: auto; }"
+             "</style>")
+    return head.replace("</head>", style + "</head>") + "<body>" + "".join(sheets) + "</body></html>"
+
+
+def pdf_pages(path):
+    return len(re.findall(rb"/Type\s*/Page\b", path.read_bytes()))
+
+
 def main():
     ap = argparse.ArgumentParser(description="Build the OT6 instruction booklet PDF.")
+    ap.add_argument("--version", help="the version the cover prints (default: VERSION)")
+    ap.add_argument("--booklet", action="store_true",
+                    help="also write the printer's version: two pages per letter sheet, "
+                         "saddle-stitch order (ot6-manual-booklet.pdf beside the PDF)")
     ap.add_argument("--png", default="", help="comma-separated page numbers to render as PNG")
     ap.add_argument("--out", default=str(OUT / "ot6-manual.pdf"))
+    ap.add_argument("--check", action="store_true",
+                    help="check docs/manual's PDFs against today's inputs (no browser) and exit")
     a = ap.parse_args()
+    if a.check:
+        return check()
+    a.booklet = a.booklet or (DOCS / "ot6-manual-booklet.pdf").exists()
+    draft = bool(os.environ.get("OT6_MANUAL_DRAFT"))
 
     binary = find_chrome()
     site = OUT / "site"
@@ -188,38 +266,69 @@ def main():
     scale_images(site / "img")
 
     text = (SRC / "manual.html").read_text()
-    version = (ROOT / "VERSION").read_text().strip()
+    version = a.version or (ROOT / "VERSION").read_text().strip()
+    if not re.fullmatch(r"\d+\.\d+", version):
+        sys.exit(f"build.py: version '{version}' is not X.Y")
     text = text.replace("{{version}}", html.escape(version))
     e1, e2 = esper_tables()
     text = text.replace("<!--ESPERS1-->", e1).replace("<!--ESPERS2-->", e2)
     text, npages = paginate(text)
-    text = text.replace("</body>", OVERFLOW_JS + "</body>")
+    paged = text
+    checks = (SRC / "checks.js").read_text()
+    text = text.replace("</body>", f"<script>\n{checks}</script>\n</body>")
     index = site / "index.html"
     index.write_text(text)
     url = index.resolve().as_uri()
 
     dom = chrome(binary, "--dump-dom", url)
-    m = re.search(r'<body[^>]*data-overflow="([^"]*)"', dom)
+    m = re.search(r'<body[^>]*data-layout="([^"]*)"', dom)
     if m is None:
-        sys.exit("build.py: the overflow check did not run (no data-overflow on <body>)")
-    if m.group(1) and os.environ.get("OT6_MANUAL_DRAFT"):
-        print(f"build.py: DRAFT: content overflows page(s) {m.group(1)}")
-    elif m.group(1):
-        sys.exit(f"build.py: content overflows page(s) {m.group(1)}; shorten or split them")
-    if npages % 4 and not os.environ.get("OT6_MANUAL_DRAFT"):
-        sys.exit(f"build.py: {npages} pages; a folded booklet needs a multiple of four "
-                 f"(add or remove a notes page)")
+        sys.exit("build.py: the layout check did not run (no data-layout on <body>)")
+    problems = html.unescape(m.group(1))
+    if problems:
+        if not draft:
+            sys.exit("build.py: layout fails (page: what):\n  " + problems.replace("; ", "\n  "))
+        print("build.py: DRAFT: layout fails:\n  " + problems.replace("; ", "\n  "))
+    if npages % 4:
+        msg = (f"build.py: {npages} pages; a folded booklet needs a multiple of four "
+               f"(add or remove a notes page)")
+        if not draft:
+            sys.exit(msg)
+        print("DRAFT: " + msg)
 
     pdf = Path(a.out)
     pdf.parent.mkdir(parents=True, exist_ok=True)
     chrome(binary, "--no-pdf-header-footer", "--generate-pdf-document-outline",
            f"--print-to-pdf={pdf}", url)
-    data = pdf.read_bytes()
-    got = len(re.findall(rb"/Type\s*/Page\b", data))
+    got = pdf_pages(pdf)
     if got != npages:
         sys.exit(f"build.py: the PDF has {got} pages, the source {npages}: a page broke in two")
-    print(f"build.py: {pdf.relative_to(ROOT) if pdf.is_relative_to(ROOT) else pdf}: "
-          f"{npages} pages, {len(data) // 1024} KB (chromium: {binary})")
+    rel = lambda p: p.relative_to(ROOT) if p.is_relative_to(ROOT) else p
+    print(f"build.py: {rel(pdf)}: {npages} pages, v{version}, {pdf.stat().st_size // 1024} KB "
+          f"(chromium: {binary})")
+
+    if a.booklet and npages % 4 == 0:
+        bk = site / "booklet.html"
+        bk.write_text(impose(paged, npages))
+        bpdf = pdf.with_name(pdf.stem + "-booklet.pdf")
+        chrome(binary, "--no-pdf-header-footer", f"--print-to-pdf={bpdf}", bk.resolve().as_uri())
+        got = pdf_pages(bpdf)
+        if got != npages // 2:
+            sys.exit(f"build.py: the booklet PDF has {got} sheet sides, expected {npages // 2}")
+        print(f"build.py: {rel(bpdf)}: {got} letter sheet sides, saddle-stitch order "
+              f"(print duplex, flip on the short edge)")
+
+    if not draft:
+        DOCS.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(pdf, DOCS / "ot6-manual.pdf")
+        lines = ["# written by tools/manual/build.py; `build.py --check` compares it with the tree",
+                 f"inputs {inputs_hash()[0]}", f"version {version}",
+                 f"pdf {sha256(DOCS / 'ot6-manual.pdf')}"]
+        if a.booklet:
+            shutil.copyfile(bpdf, DOCS / "ot6-manual-booklet.pdf")
+            lines.append(f"booklet {sha256(DOCS / 'ot6-manual-booklet.pdf')}")
+        STAMP.write_text("\n".join(lines) + "\n")
+        print("build.py: wrote docs/manual/ (commit it)")
 
     if a.png:
         pages_dir = OUT / "pages"
@@ -228,7 +337,7 @@ def main():
             png = pages_dir / f"page-{n:02d}.png"
             chrome(binary, f"--window-size={PAGE_PX[0]},{PAGE_PX[1]}",
                    "--force-device-scale-factor=2", f"--screenshot={png}", f"{url}#only={n}")
-            print(f"build.py: {png.relative_to(ROOT)}")
+            print(f"build.py: {rel(png)}")
 
 
 if __name__ == "__main__":

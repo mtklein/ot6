@@ -881,6 +881,13 @@ check("first_save_signed",
 # #389: the next release's notes already carry the save line the cut checks
 check("notes_saves", "python3 tools/golden_saves.py notes docs/release-notes-next.md",
       ["tools/golden_saves.py", "docs/release-notes-next.md", f"{GOLDEN_DIR}/MANIFEST.json"])
+# #391: the tracked instruction booklet (docs/manual) was built from today's
+# sources; a hash comparison, no browser (tools/manual/build.py --check)
+check("manual_pdf", "python3 tools/manual/build.py --check",
+      ["tools/manual/build.py", "tools/manual/manual.html", "tools/manual/manual.css",
+       "tools/manual/checks.js", "docs/PLAYING.md", "docs/manual/ot6-manual.stamp"]
+      + glob("tools/manual/fonts/*") + glob("tools/manual/img/*.png")
+      + glob("docs/manual/*.pdf"))
 # `ninja golden`: every golden save and the checks on the set and the layout
 w.edge(["golden"], "phony", golden_outs + ["build/checks/golden_saves.ok", "build/checks/save_layout.ok"])
 

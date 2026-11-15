@@ -34,7 +34,7 @@ body {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
   font-variant-numeric: lining-nums;
-  hyphens: auto;
+  hyphens: manual;   /* no automatic breaks: a bad one ("likeli-er") reads worse than a ragged edge */
 }
 @media print { html, body { background: none; } }
 
@@ -91,8 +91,8 @@ h1 + .sub {
   text-transform: uppercase; color: var(--ink); margin-bottom: 0.12in;
 }
 h2 {
-  font-family: var(--narrow); font-variant: small-caps; text-transform: lowercase;
-  font-size: 13pt; letter-spacing: 0.08em; color: var(--blue);
+  font-family: var(--narrow); text-transform: uppercase;
+  font-size: 10.5pt; letter-spacing: 0.1em; color: var(--blue);
   border-bottom: 1.2pt solid var(--blue); padding-bottom: 1pt;
   margin: 0.12in 0 0.06in;
 }
@@ -101,7 +101,7 @@ h3 {
   font-family: var(--narrow); font-size: 9pt; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--ink); margin: 0.09in 0 0.03in;
 }
-p { margin: 0 0 0.065in; text-align: justify; }
+p { margin: 0 0 0.065in; text-align: left; text-wrap: pretty; }
 .lede { font-size: 11.2pt; line-height: 1.3; }
 .lede::first-letter {
   font-family: var(--display); font-weight: 700; color: var(--blue);
@@ -230,7 +230,7 @@ tr.ult td.k::after { content: " \2605"; color: var(--blue); }
   font-family: var(--narrow); font-size: 7.6pt; letter-spacing: 0.15em; text-transform: uppercase;
   background: var(--ink); color: var(--paper); padding: 2pt 5pt 1.5pt;
 }
-.charhead .arms { font-family: var(--narrow); font-size: 8pt; color: var(--blue); margin-left: auto; font-style: italic; }
+.charhead .arms { font-family: var(--narrow); font-size: 8pt; color: var(--blue); margin-left: auto; font-style: italic; padding-right: 0.3em; }
 .char p, .char li { font-size: 9.6pt; }
 
 /* --------------------------------------------------------------- tips -- */
@@ -273,3 +273,26 @@ table.log tr:nth-child(even) td { background: none; }
 
 table.espers { font-size: 7.5pt; line-height: 1.15; hyphens: manual; }
 table.espers td { padding: 1.3pt 3pt; }
+
+/* the round 2 pieces: portraits beside the names, the cover's tagline */
+.charhead { align-items: center; }
+.charhead .portrait { height: 0.5in; width: auto; image-rendering: pixelated; border: 1.2pt solid var(--ink); }
+.cover .art { width: 4.1in; }
+.cover .tagline {
+  font-family: var(--display); font-size: 11.5pt; line-height: 1.4; text-align: center;
+  letter-spacing: 0.04em; margin-top: 0.22in;
+}
+.cover .cover-orn { color: var(--paper); margin: 0.12in 0 0; }
+figcaption { hyphens: none; }
+
+/* the annotated battle screen */
+.annotated .shotwrap { position: relative; width: 3.9in; margin: 0.05in auto 0.1in; }
+.mk {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 0.2in; height: 0.2in; border-radius: 50%; background: var(--paper); color: var(--blue);
+  border: 1.5pt solid var(--blue); font-family: var(--narrow); font-weight: 700; font-size: 8pt;
+  text-align: center; line-height: 0.17in; box-shadow: 1pt 1pt 0 var(--ink);
+}
+ol.keys { padding-left: 0.22in; }
+ol.keys li { margin-bottom: 0.05in; }
+ol.keys li::marker { font-family: var(--narrow); font-weight: 700; color: var(--blue); }
