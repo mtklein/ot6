@@ -7,8 +7,10 @@ touches vanilla behavior where a pillar requires it.
 
 ## Pillars
 
-1. **Distinct characters.** Every character is one job: exactly 8 active
-   skills (the 8th is a divine-tier finisher) plus up to 4 passives. There is
+1. **Distinct characters.** Every character is one job: up to 8 active
+   skills, the 8th a divine-tier finisher where the job has a natural one
+   (a character whose kit is one verb, or a varied set with no best member
+   such as Strago's Lores or Mog's Dances, needs none; owner, 2026-11-15). There is
    no universal magic pool, and nobody learns everything. Each character's
    vanilla signature (Slots, Steal, Runic, Sketch, Rage, the first
    Tool/Blitz/SwdTech/Dance…) is skill #1, free, from the moment they
@@ -57,7 +59,8 @@ matrix larger.
 
 ## Break system
 
-**Data.** Each enemy gets `shield_max` (1–3 for trash, 4–12 for bosses) and
+**Data.** Each enemy gets `shield_max` (1–3 for trash, 4–12 for bosses;
+Kefka's 16 at the top of his tower is the one exception) and
 two weakness bytes — one elemental (enemy records already store elemental
 weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 
@@ -307,9 +310,10 @@ magicite.
 
 ## Skill learning
 
-Planned, not in the game: no JP exists (esper learn rates are all zero,
-and a battle's magic points feed only vanilla's morph gauge, which
-nothing reads since #427). The plan: magic AP
+Set aside (owner, 2026-11-15): the game keeps the mix it grew into --
+some abilities learned naturally, some found, some unlocked by wearing
+espers -- and no JP purchase is planned. A battle's Magic Points buy esper
+ranks (esper-rework.md). The old plan, kept for the record: magic AP
 is rebadged as JP. Skill #1 — the signature — is free and known on
 join. The remaining seven are bought in any order at escalating costs
 (e.g. 80/200/450/800/1400/2200; divine: 3000 and requires the other seven).
