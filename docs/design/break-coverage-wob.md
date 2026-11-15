@@ -360,10 +360,13 @@ battle 109) the line walks past. He has 100 HP and is no boss
 with its first blow, which fits the world's greatest swordsman. His opening
 flurry of eight blows is the whole fight, and it is often ended by SHADOW's
 Interceptor: the dog's counter (command $02, attack $FD) has no weapon class
-and chips nothing. In `battle_breakwob_siegfried`, played from the graph's
-capture, it killed him from 100 HP on the flurry's last blow before any
-member's turn (`f4979 slot 0 ($131) hp 100 -> 0, shields 1, cmd $02 atk
-$FD`), so on that draw the suite sees his gauge and no break.
+and chips nothing. In `battle_breakwob_siegfried`, played from the v045-rows
+branch's capture, it killed him from 100 HP on the flurry's last blow before
+any member's turn (`f4979 slot 0 ($131) hp 100 -> 0, shields 1, cmd $02 atk
+$FD`); on the v0.45 landing's capture a member's Fight killed and broke him
+(`f5945 slot 0 ($131) hp 100 -> 0, shields 0, cmd $00 atk $80`). So the
+suite asserts the break only when a member's weapon-class hit lands, and on a
+classless kill it is a gauge check.
 
 ## 18. The bodies with no fight to design
 
