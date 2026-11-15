@@ -425,7 +425,7 @@ H.run({ maxFrames = 60000 }, {
     local e, PROC = nil, H.sym("Ot6RungDescText")
     local tEntry, spans, armed = nil, {}, false
     local cf0, f0
-    local function sl() local st = emu.getState(); return (st["ppu.frameCount"] or 0) * 262 + (st["ppu.scanline"] or 0) end
+    local function sl() return emu.getState()["ppu.scanline"] or 0 end   -- a span past the frame's end wraps: mod 262
     return H.seqStep({
       H.call(function()
         e = owned[1]
@@ -446,7 +446,7 @@ H.run({ maxFrames = 60000 }, {
         H.assertEq(ret ~= nil, true, "found Ot6RungDescText's epilogue (ply plx pld plp rtl)")
         emu.addMemoryCallback(function() if armed then tEntry = sl() end end, emu.callbackType.exec, PROC, PROC)
         emu.addMemoryCallback(function()
-          if armed and tEntry then spans[#spans + 1] = sl() - tEntry; tEntry = nil end
+          if armed and tEntry then spans[#spans + 1] = (sl() - tEntry) % 262; tEntry = nil end
         end, emu.callbackType.exec, ret, ret)
         H.log(string.format("[detail] perf: every ladder slot at 500 but esper %d's (0); Ot6RungDescText %06X, rtl %06X",
           e, PROC, ret))
