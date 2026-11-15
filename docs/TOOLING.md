@@ -532,6 +532,95 @@ CUTTER_TIMEOUT comment), unloaded about 500, so the loaded figures are the
 ones to size from: the longest gap was 20 s, and 120 s is six times that. The
 retired caps could not have passed the relm run (3327 s against a 600 s default).
 
+## Uninitialised memory: the power-on fill
+
+The harness powers on with every RAM zeroed (`pin_test_saves.py`), so the
+line can never see the game read memory it never wrote; v0.45's junk
+Rage and Lore loadouts on an all-ones console were that class. The line is
+deterministic, so replaying it with the RAMs filled with something else at
+power-on must change nothing a player or a save can see; anything that does
+change is a read of unwritten memory.
+
+**The fill.** `OT6_POWERON_FILL=ones|alt|rand:<seed>` (optionally
+`@wram,sram,vram,oam,cgram,spc,dsp`; the default is `wram,sram`) makes
+compose.py put `tools/tests/lib/poweron_fill.lua` at the very top of the
+composed script. Its main chunk runs while the CPU is held before its first
+instruction (TestRunner pauses, loads the ROM, breaks the CPU, loads the
+script, then resumes), and every fill run's log proves it: `[fill] ...
+cpuCycles=0 pc=00FF00 (reset vector $FF00); readback wram ok, ...` and
+`[fill] first instruction at $FF00: ... wram[$0000]=FF`. With every RAM
+filled `ones`, gen_whelk_poweron's emulated machine at whelk_entry is byte
+for byte the one Mesen's own `RamPowerOnState=AllOnes` makes, except the
+APU's: the SPC700 has run about nine cycles of its boot ROM by the time
+the script loads, so its RAM and the S-DSP registers are filled a few
+cycles late (the play is still identical;
+`build/attempts/wt/v046-fills/xcheck/`). A battery handed to the run
+(`OT6_SRAM_CHECKPOINT`) is not filled: its never-written ranges already hold
+the fill of the run that saved it. `rand` is a hash of the seed, the RAM and
+the offset, so `tools/fill_diff.py` knows what every byte held at power-on.
+
+**The fence.** A fill run's states are not the line's. compose.py honours
+`OT6_POWERON_FILL` only in a fill tree, a clone whose `build/FILL_TREE`
+names the mode (`tools/fill_line.py setup`), and there refuses any run that
+does not declare it; in any other tree a declared fill is an error, and a
+plain run composes byte for byte as before (all 465 scripts in
+`tools/tests`, `build/attempts/wt/v046-fills/identity/`). A clone is not a
+worktree, so `worktree-setup.sh` never seeds from it. `zero` marks a
+reference tree that fills nothing; `lab` a tree where each run declares its
+own mode, and a lab mode may fill only some offsets (`ones@wram:1D54+E900-EEFF`)
+or all but some (`ones@wram~1F6E`) to bisect a divergence.
+
+**Waivers.** `tools/uninit_waivers.txt`: a `fill` line names offsets a
+whole-RAM fill leaves zero, a read already understood (each with its
+instruction, its effect, the proposed fix and the evidence), so the
+comparison can go on past it; a `read` line is an instruction
+`rbw_report.py` counts but does not list.
+
+**Commands.**
+
+    python3 tools/fill_line.py setup ~/work/ot6-fills/ones --mode ones
+    python3 tools/fill_line.py run ~/work/ot6-fills/ones      # the line, serial
+    python3 tools/fill_line.py legs ~/work/ot6-fills/ones --ref . --jobs 12
+    python3 tools/fill_diff.py . ~/work/ot6-fills/ones        # the comparison
+    python3 tools/fill_diff.py --logs REF.log FILL.log...     # runs' logs only
+    OT6_RBW=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/gen_kolts.lua X.log   # in a lab tree
+    python3 tools/rbw_report.py X.log
+
+`run` replays the line from power-on (detach it: `setsid nohup
+systemd-inhibit --what=idle --who=ot6 --why=fills ... &`), logs to
+`build/fill-run.log` and writes `build/FILL_DONE`. `legs` plays each run
+that powers on (the head and every cut leg) alone, Continuing the
+reference's capture under the fill, in parallel, and compares its log with
+the reference's: a fill reaches the game only at a power-on, so this finds
+every power-on's divergence in one wave; the serial run adds what the fill
+leaves in the saves. `fill_diff.py` compares every state and capture of two
+trees: where the play first parts (the first differing `[ot6]` line; the
+harness's own `[tiles]` readings are counted apart), and every differing
+byte of WRAM and the battery, split into unwritten (zero in the reference,
+the fill pattern in the fill run: no code wrote it), checksum, and computed
+from unwritten bytes. The battery is compared outside save-layout.md's
+`never` rows and the pages of slots the reference never saved, read from the
+doc's table. The instrument `OT6_RBW=1` (`lib/read_before_write.lua`) keeps a
+written-since-power-on bit per WRAM and battery byte and logs each
+instruction that reads an unwritten one; `rbw_report.py` names its source
+line from the ROM's debug file. It costs about 3-5x a plain run and means
+what it says only from a power-on (a head or a cut leg).
+
+`ninja` runs `fill_selftest` (the fence, the comparison and the report,
+without an emulator); the fill runs themselves are on demand.
+
+**Cost and cadence** (px13, 2026-11-15, `build/attempts/wt/v046-fills/`):
+the `legs` wave played 90 power-on legs in about 22 minutes at 12 at a
+time, 12,294 emulator-seconds; the serial `run` replayed the whole line, 154
+states, in 8,376 s on one emulator, about what a qualification's replay of
+the line costs. Worth running: the `legs` wave under `ones` at each release
+and whenever a change touches power-on, New Game, a save, a load, or battle
+or field initialisation; the serial line once a milestone, or when the wave
+finds something, since only it shows what a fill leaves in the saves. A
+divergence the wave finds is bisected with lab-tree runs of that one leg
+(`ones@wram:<half>`), confirmed with `OT6_RBW=1`, and then fixed in the ROM
+or waived with its evidence.
+
 ## Mesen facts the harness depends on
 
 - With no config file, Mesen ignores `--testrunner` and launches the GUI

@@ -2270,6 +2270,110 @@ def selftest() -> int:
     return 0 if ok else 1
 
 
+FILL_MARKER = "build/FILL_TREE"   # tools/fill_line.py writes it
+FILL_LUA = HERE / "poweron_fill.lua"
+RBW_LUA = HERE / "read_before_write.lua"
+WAIVERS_UNINIT = HERE.parent.parent / "uninit_waivers.txt"
+FILL_REGIONS = ("wram", "sram", "vram", "oam", "cgram", "spc", "dsp")
+
+
+def poweron_fill_prologue(root, env):
+    """The lines that fill RAM at power-on (lib/poweron_fill.lua) and watch
+    for reads of unwritten bytes (lib/read_before_write.lua, OT6_RBW=1), or
+    none: a run that declares neither, in a tree that is not a fill tree,
+    composes exactly as before either existed."""
+    want = env.get("OT6_POWERON_FILL", "")
+    rbw = env.get("OT6_RBW", "") == "1"
+    marker = Path(root) / FILL_MARKER
+    have = marker.read_text().strip() if marker.exists() else ""
+    if not want and not have and not rbw:
+        return []
+    if rbw and not have:
+        raise ValueError(f"OT6_RBW=1 in a tree that is not a fill tree (no "
+                         f"{FILL_MARKER}): instruments run in a lab tree, "
+                         f"tools/fill_line.py setup DIR --mode lab")
+    # a lab run of the instrument alone powers on as a plain run does
+    out = [] if (rbw and have == "lab" and not want) else _fill_lines(want, have, env)
+    if rbw:
+        sram = "false" if env.get("OT6_SRAM_CHECKPOINT") else "true"
+        out += [f"OT6_RBW_SRAM = {sram}\n", RBW_LUA.read_text()]
+    return out
+
+
+def _fill_lines(want, have, env):
+    """The lines that fill RAM at power-on (lib/poweron_fill.lua), or none.
+
+    OT6_POWERON_FILL=ones|alt|rand:<seed> declares the mode (`zero`, the
+    reference, composes exactly as a plain run).  It is honoured
+    only in a fill tree, one whose build/FILL_TREE names the same mode
+    (tools/fill_line.py makes it): a fill run's states are not the line's
+    and must never stand in for them, so the mode cannot switch on in a
+    qualification tree by a stray environment variable, and a fill tree
+    cannot make a plain run by a missing one.  A tree marked `lab` takes any
+    declared mode, so runs under different fills can share it.  Raises ValueError on any
+    mismatch."""
+    if want and not have:
+        raise ValueError(f"OT6_POWERON_FILL={want} in a tree that is not a "
+                         f"fill tree (no {FILL_MARKER}); a fill run belongs "
+                         f"in its own tree: tools/fill_line.py --help")
+    if have == "lab" and want:
+        pass           # a lab tree: any declared mode, one per run
+    elif have and want != have:
+        raise ValueError(f"this is a fill tree ({FILL_MARKER}: {have!r}) and "
+                         f"OT6_POWERON_FILL is {want!r}; every run here must "
+                         f"declare OT6_POWERON_FILL={have}")
+    if want == "zero":
+        return []      # the reference tree: fenced like a fill, filled by nothing
+    m = re.fullmatch(r"(?:(ones|alt)|rand:(\d{1,9}))(?:@([a-z0-9,:~+-]+))?", want, re.I)
+    sel = {}
+    for tok in ((m.group(3) or "wram,sram").split(",") if m else []):
+        r = re.fullmatch(r"([a-z]+)(?:([:~])((?:[0-9A-F]+(?:-[0-9A-F]+)?\+?)+))?", tok, re.I)
+        if not r or r.group(1) not in FILL_REGIONS:
+            sel = None
+            break
+        if r.group(2):
+            spans = []
+            for part in filter(None, r.group(3).split("+")):
+                lo, _, hi = part.partition("-")
+                spans.append((int(lo, 16), int(hi or lo, 16)))
+            sel[r.group(1)] = (r.group(2) == "~", spans, r.group(3))
+        else:
+            sel[r.group(1)] = True
+    if not m or not sel:
+        raise ValueError(f"OT6_POWERON_FILL={want!r}: expected ones, alt, "
+                         f"rand:<seed> or zero, optionally @ a comma list of "
+                         f"{','.join(FILL_REGIONS)} (default wram,sram), each "
+                         f"optionally :<lo-hi+...> (only those offsets, hex) "
+                         f"or ~<lo-hi+...> (all but them)")
+    mode, seed = (m.group(1), 0) if m.group(1) else ("rand", int(m.group(2)))
+    if env.get("OT6_SRAM_CHECKPOINT"):
+        sel.pop("sram", None)
+    # tools/uninit_waivers.txt's `fill` lines: offsets a whole-region fill
+    # leaves zero (reads already understood); a region given explicit
+    # ranges is a bisection and takes none
+    waived = {}
+    if WAIVERS_UNINIT.exists():
+        for raw in WAIVERS_UNINIT.read_text().splitlines():
+            f = raw.split(None, 3)
+            if len(f) >= 3 and f[0] == "fill":
+                lo, _, hi = f[2].partition("-")
+                waived.setdefault(f[1], []).append((int(lo, 16), int(hi or lo, 16)))
+    for k, spans in waived.items():
+        if sel.get(k) is True:
+            sel[k] = (True, spans, "waivers")
+
+    def lua(v):
+        if v is True:
+            return "true"
+        exc, spans, text = v
+        return ("{except = %s, text = \"%s\", ranges = {%s}}"
+                % ("true" if exc else "false", text,
+                   ", ".join("{0x%X, 0x%X}" % ab for ab in spans)))
+    return [f'OT6_FILL_MODE = "{mode.lower()}"\n', f"OT6_FILL_SEED = {seed}\n",
+            "OT6_FILL_REGIONS = {%s}\n" % ", ".join(f"{k} = {lua(v)}" for k, v in sel.items()),
+            FILL_LUA.read_text()]
+
+
 def main() -> int:
     if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
         return selftest()
@@ -2355,6 +2459,14 @@ def main() -> int:
     lib_alias = any(w.startswith("tools/tests/lib/") for w in waived_files)
 
     preamble = [MARKER + "\n"]
+    # The power-on fill (OT6_POWERON_FILL, lib/poweron_fill.lua): first,
+    # ahead of everything else the script runs, so it lands before the
+    # game's first instruction.  Absent from every normal run's script.
+    try:
+        preamble += poweron_fill_prologue(ROOT, os.environ)
+    except ValueError as why:
+        print(f"error: {why}")
+        return 1
     # Coverage flag.  Mesen's Lua sandbox blocks os.getenv
     # (AllowIoOsAccess=false), so a runtime toggle cannot be read from the
     # environment inside a script; inject it as a global the way OT6_SYMS and
