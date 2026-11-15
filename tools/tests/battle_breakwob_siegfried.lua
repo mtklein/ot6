@@ -38,6 +38,13 @@ local function watch()
           H.readByte(SH_CUR + s * 2), r.open, H.readWord(MONHP + s * 2)))
       end
       if r.open == 0 and H.readByte(SH_MAX + s * 2) ~= 0 then r.open = H.readByte(SH_MAX + s * 2) end
+      local hp = H.readWord(MONHP + s * 2)
+      if r.hp ~= nil and hp ~= r.hp then
+        -- what took it: the command and attack being executed ($b5, $b6)
+        H.log(string.format("[siegfried] f%d slot %d ($%03X) hp %d -> %d, shields %d, cmd $%02X atk $%02X",
+          H.frame, s, r.sp, r.hp, hp, H.readByte(SH_CUR + s * 2), H.readByte(0xB5), H.readByte(0xB6)))
+      end
+      r.hp = hp
       local t = H.readByte(BRK + s * 2)
       if r.broke == nil and t ~= 0 and t ~= 0xFF then
         r.broke = H.frame
