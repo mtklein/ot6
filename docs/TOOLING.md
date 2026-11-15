@@ -198,6 +198,45 @@ Commit the new `golden-saves/vX.Y/` and `MANIFEST.json` on main with the
 version bump. A golden save that stops loading is a broken promise
 (save-layout.md "Compatibility policy"), not a fixture to re-cut.
 
+## The instruction booklet
+
+`python3 tools/manual/build.py` writes `build/manual/ot6-manual.pdf`: the
+player's manual as a half-letter booklet in the style of a 1994 cartridge
+booklet (#391). Its text is `tools/manual/manual.html` (one `<section
+class="page">` per printed page) and `manual.css`; the Esper appendix is read
+from docs/PLAYING.md at build time. Every gameplay fact in it comes from
+PLAYING.md or the source, and each area tip carries its source in an HTML
+comment beside it. `--png 1,9,16` also renders those pages to
+`build/manual/pages/`. The build fails if a page's content overflows it or if
+the page count is not a multiple of four; `OT6_MANUAL_DRAFT=1` reports both
+and builds anyway, for work in progress.
+
+It needs Pillow and a headless Chromium: `$OT6_CHROME`, a `chromium` or
+`google-chrome` on PATH, Chrome in /Applications, or Playwright's cache
+(`python3 -m pip install playwright && python3 -m playwright install
+chromium-headless-shell`, which is what the mbp has). The fonts are vendored
+under `tools/manual/fonts/` with their OFL licences; nothing is fetched at
+build time. Qualification does not build the booklet, because not every
+machine has a browser; it is a release step.
+
+The illustrations are emulator screenshots in `tools/manual/img/`, kept at
+256x224 and scaled up with nearest-neighbour by the build.
+`python3 tools/manual/shots.py [-j N] [areas | <suite>...]` retakes them from
+the graph's own captures with `OT6_NO_PUBLISH=1`: the menu and battle shots
+from the suites that take them (run unmodified), the area shots by loading
+each area's state. Take the placement claim first, and retake them when the
+screens they show change.
+
+**At a release**, on the release commit (the cover prints `VERSION`), after
+`ninja release`:
+
+    python3 tools/manual/build.py
+    cp build/manual/ot6-manual.pdf build/release/ot6-vX.Y-manual.pdf
+
+and attach `ot6-vX.Y-manual.pdf` to the GitHub release with the zip and the
+APK (`gh release create ... build/release/ot6-vX.Y-manual.pdf`, or `gh
+release upload vX.Y` afterwards).
+
 ## Installed pieces
 
 Homebrew pieces are in the root `Brewfile`; `brew bundle` installs them.

@@ -1,0 +1,275 @@
+/* OT6 instruction booklet: half-letter pages, two inks (black and a royal
+   blue), the way a 1994 cartridge booklet was printed.  Every page is a
+   fixed-size <section class="page">; build.py fails the build if any
+   page's content overflows it. */
+
+@font-face { font-family: "Cinzel"; src: url("fonts/Cinzel.ttf"); font-weight: 400 900; }
+@font-face { font-family: "Crimson Pro"; src: url("fonts/CrimsonPro.ttf"); font-weight: 200 900; font-style: normal; }
+@font-face { font-family: "Crimson Pro"; src: url("fonts/CrimsonPro-Italic.ttf"); font-weight: 200 900; font-style: italic; }
+@font-face { font-family: "Archivo Narrow"; src: url("fonts/ArchivoNarrow.ttf"); font-weight: 400 700; }
+@font-face { font-family: "Press Start 2P"; src: url("fonts/PressStart2P.ttf"); }
+
+:root {
+  --ink: #16161d;
+  --blue: #23408e;          /* the second ink */
+  --blue-tint: #e6ebf6;     /* a 12% screen of it, for boxes */
+  --blue-mid: #b9c5e4;
+  --paper: #ffffff;
+  --page-w: 5.5in;
+  --page-h: 8.5in;
+  --serif: "Crimson Pro", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --display: "Cinzel", "Trajan Pro", "Times New Roman", serif;
+  --narrow: "Archivo Narrow", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --pixel: "Press Start 2P", "Courier New", monospace;
+}
+
+@page { size: 5.5in 8.5in; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #8a8a8a; }
+body {
+  font-family: var(--serif);
+  font-size: 10.2pt;
+  line-height: 1.28;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  font-variant-numeric: lining-nums;
+  hyphens: auto;
+}
+@media print { html, body { background: none; } }
+
+/* ------------------------------------------------------------ the page -- */
+.page {
+  position: relative;
+  width: var(--page-w);
+  height: var(--page-h);
+  margin: 0 auto 0.25in;
+  padding: 0.55in 0.5in 0.62in 0.5in;
+  background: var(--paper);
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+  counter-increment: page;
+}
+@media print { .page { margin: 0; } }
+.page:last-child { page-break-after: auto; break-after: auto; }
+.body { position: relative; height: 100%; overflow: hidden; }
+.foot { position: absolute; left: 0; right: 0; bottom: 0; }
+
+/* the running head: section name in small caps, a rule in the blue ink */
+.runhead {
+  position: absolute; top: 0.25in; left: 0.5in; right: 0.5in;
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--narrow); font-size: 7pt; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--blue);
+  border-bottom: 0.75pt solid var(--blue); padding-bottom: 2pt;
+}
+.runhead .mark { font-family: var(--display); letter-spacing: 0.05em; font-weight: 700; }
+
+/* the folio: page number in a little lozenge, centred */
+.folio {
+  position: absolute; bottom: 0.26in; left: 0; right: 0; text-align: center;
+  font-family: var(--narrow); font-size: 8pt; font-weight: 700; color: var(--paper);
+}
+.folio span {
+  display: inline-block; min-width: 0.34in; padding: 1.5pt 6pt;
+  background: var(--blue); border-radius: 7pt;
+}
+.folio::before, .folio::after {
+  content: ""; display: inline-block; width: 1.2in; height: 0;
+  border-top: 0.75pt solid var(--blue); vertical-align: middle; margin: 0 6pt;
+}
+
+/* ------------------------------------------------------------- headings -- */
+h1, h2, h3, h4 { margin: 0; font-weight: 700; }
+h1 {
+  font-family: var(--display); font-size: 21pt; line-height: 1.05;
+  color: var(--blue); letter-spacing: 0.02em; margin: 0.06in 0 0.05in;
+}
+h1 + .sub {
+  font-family: var(--narrow); font-size: 8pt; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--ink); margin-bottom: 0.12in;
+}
+h2 {
+  font-family: var(--narrow); font-variant: small-caps; text-transform: lowercase;
+  font-size: 13pt; letter-spacing: 0.08em; color: var(--blue);
+  border-bottom: 1.2pt solid var(--blue); padding-bottom: 1pt;
+  margin: 0.12in 0 0.06in;
+}
+h2:first-child { margin-top: 0.02in; }
+h3 {
+  font-family: var(--narrow); font-size: 9pt; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink); margin: 0.09in 0 0.03in;
+}
+p { margin: 0 0 0.065in; text-align: justify; }
+.lede { font-size: 11.2pt; line-height: 1.3; }
+.lede::first-letter {
+  font-family: var(--display); font-weight: 700; color: var(--blue);
+  float: left; font-size: 34pt; line-height: 0.85; padding: 2pt 4pt 0 0;
+}
+em { font-style: italic; }
+b, strong { font-weight: 700; }
+.sc { font-variant: small-caps; letter-spacing: 0.04em; }
+.btn {
+  display: inline-block; font-family: var(--narrow); font-weight: 700; font-size: 7.5pt;
+  line-height: 1; color: var(--paper); background: var(--ink);
+  border-radius: 50%; width: 1.45em; height: 1.45em; text-align: center;
+  padding-top: 0.24em; vertical-align: 0.05em;
+}
+.btn.sh { border-radius: 3pt; width: auto; padding: 0.24em 0.4em 0; }
+.btn.pad { border-radius: 2pt; width: auto; padding: 0.24em 0.4em 0; background: var(--blue); }
+
+ul, ol { margin: 0 0 0.07in; padding-left: 0.17in; }
+li { margin: 0 0 0.025in; }
+ul li::marker { color: var(--blue); content: "\25C6  "; font-size: 7pt; }
+
+/* --------------------------------------------------------------- boxes -- */
+.tip {
+  position: relative; border: 1.2pt solid var(--blue); background: var(--blue-tint);
+  padding: 0.09in 0.11in 0.05in 0.11in; margin: 0.08in 0 0.09in; border-radius: 3pt;
+}
+.tip::before {
+  content: attr(data-label); position: absolute; top: -0.075in; left: 0.1in;
+  font-family: var(--pixel); font-size: 5.5pt; letter-spacing: 0.04em;
+  background: var(--blue); color: var(--paper); padding: 2.5pt 4pt 2pt;
+}
+.tip p:last-child, .tip ul:last-child { margin-bottom: 0.03in; }
+.note {
+  border-top: 0.75pt solid var(--blue); border-bottom: 0.75pt solid var(--blue);
+  padding: 0.05in 0; margin: 0.08in 0; font-size: 9.3pt; font-style: italic;
+}
+.warn {
+  border: 1.6pt double var(--ink); padding: 0.07in 0.1in; margin: 0.08in 0;
+  font-size: 9.3pt;
+}
+.warn h3 { margin-top: 0; }
+
+/* ---------------------------------------------------------- the frames -- */
+figure { margin: 0.06in 0 0.08in; }
+.shot {
+  display: block; width: 100%; height: auto;
+  border: 2pt solid var(--ink); outline: 0.75pt solid var(--blue); outline-offset: 1.5pt;
+  image-rendering: pixelated;
+}
+figcaption {
+  font-family: var(--narrow); font-size: 7.4pt; line-height: 1.25;
+  color: var(--ink); margin-top: 0.05in; text-align: left;
+}
+figcaption::before { content: "\25B2  "; color: var(--blue); font-size: 6pt; }
+.fig-right { float: right; width: 2.05in; margin: 0.02in 0 0.06in 0.14in; }
+.fig-left { float: left; width: 2.05in; margin: 0.02in 0.14in 0.06in 0; }
+.fig-half { width: 2.25in; }
+.pair { display: flex; gap: 0.14in; }
+.pair figure { flex: 1; min-width: 0; }
+.clear { clear: both; }
+
+/* -------------------------------------------------------------- tables -- */
+table { border-collapse: collapse; width: 100%; margin: 0.04in 0 0.09in; font-size: 8.6pt; line-height: 1.2; }
+th {
+  font-family: var(--narrow); font-size: 7pt; letter-spacing: 0.1em; text-transform: uppercase;
+  text-align: left; color: var(--paper); background: var(--blue); padding: 2.5pt 4pt;
+}
+td { padding: 2pt 4pt; vertical-align: top; border-bottom: 0.5pt solid var(--blue-mid); }
+tr:nth-child(even) td { background: #f3f5fb; }
+td.n, th.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.k { font-weight: 700; white-space: nowrap; }
+table.compact { font-size: 7.9pt; }
+table.compact td { padding: 1.4pt 3.5pt; }
+tr.ult td { background: var(--blue-tint); font-weight: 600; }
+tr.ult td.k::after { content: " \2605"; color: var(--blue); }
+
+/* ------------------------------------------------------------ the cover -- */
+.page.cover { padding: 0; background: var(--blue); color: var(--paper); counter-increment: none; }
+.cover .frame {
+  position: absolute; inset: 0.22in; border: 2.5pt solid var(--paper);
+  outline: 0.75pt solid var(--paper); outline-offset: -6pt;
+  display: flex; flex-direction: column; align-items: center; padding: 0.38in 0.36in 0.3in;
+}
+.cover .band {
+  font-family: var(--narrow); font-size: 7.5pt; letter-spacing: 0.35em; text-transform: uppercase;
+  border-top: 0.75pt solid var(--paper); border-bottom: 0.75pt solid var(--paper);
+  padding: 3pt 0; width: 100%; text-align: center;
+}
+.cover .title {
+  font-family: var(--display); font-weight: 900; font-size: 74pt; line-height: 0.95;
+  letter-spacing: 0.04em; margin: 0.26in 0 0.02in; text-shadow: 3pt 3pt 0 var(--ink);
+}
+.cover .subtitle {
+  font-family: var(--display); font-size: 12pt; letter-spacing: 0.12em; text-align: center;
+  line-height: 1.35; margin-bottom: 0.24in;
+}
+.cover .art { width: 3.6in; border: 3pt solid var(--paper); box-shadow: 4pt 4pt 0 var(--ink); }
+.cover .art img { display: block; width: 100%; image-rendering: pixelated; }
+.cover .booklet {
+  margin-top: auto; font-family: var(--pixel); font-size: 8pt; letter-spacing: 0.1em;
+  background: var(--paper); color: var(--blue); padding: 6pt 10pt 5pt;
+}
+.cover .fine { font-family: var(--narrow); font-size: 6.5pt; letter-spacing: 0.12em; margin-top: 0.12in; opacity: 0.9; text-transform: uppercase; }
+
+.page.back { background: var(--blue); color: var(--paper); counter-increment: none; padding: 0; }
+.back .frame { position: absolute; inset: 0.22in; border: 2.5pt solid var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0.4in; }
+.back .title { font-family: var(--display); font-weight: 900; font-size: 34pt; text-shadow: 2pt 2pt 0 var(--ink); }
+.back p { text-align: center; font-size: 9.5pt; max-width: 3.4in; }
+.back .art { width: 2.4in; margin: 0.18in 0; border: 2.5pt solid var(--paper); }
+.back .art img { display: block; width: 100%; image-rendering: pixelated; }
+
+/* ------------------------------------------------------- contents page -- */
+.toc { list-style: none; padding: 0; margin: 0.1in 0 0; }
+.toc li { display: flex; align-items: baseline; margin: 0 0 0.065in; font-size: 11pt; }
+.toc li.sub { padding-left: 0.18in; font-size: 9.6pt; margin-bottom: 0.035in; }
+.toc li .dots { flex: 1; border-bottom: 1pt dotted var(--blue); margin: 0 4pt; transform: translateY(-3pt); }
+.toc li .pg { font-family: var(--narrow); font-weight: 700; color: var(--blue); }
+.toc li.part { font-family: var(--narrow); font-size: 7.5pt; letter-spacing: 0.2em; text-transform: uppercase; color: var(--blue); margin-top: 0.1in; }
+
+/* ---------------------------------------------------- character pages -- */
+.char { margin-bottom: 0.08in; }
+.char + .char { border-top: 1.5pt solid var(--blue); padding-top: 0.08in; }
+.charhead { display: flex; align-items: baseline; gap: 0.1in; margin-bottom: 0.04in; }
+.charhead .name { font-family: var(--display); font-weight: 700; font-size: 17pt; color: var(--blue); }
+.charhead .job {
+  font-family: var(--narrow); font-size: 7.6pt; letter-spacing: 0.15em; text-transform: uppercase;
+  background: var(--ink); color: var(--paper); padding: 2pt 5pt 1.5pt;
+}
+.charhead .arms { font-family: var(--narrow); font-size: 8pt; color: var(--blue); margin-left: auto; font-style: italic; }
+.char p, .char li { font-size: 9.6pt; }
+
+/* --------------------------------------------------------------- tips -- */
+.area { margin: 0 0 0.075in; break-inside: avoid; }
+.area h3 { color: var(--blue); font-size: 9.6pt; margin: 0.06in 0 0.02in; border-bottom: 0.5pt solid var(--blue-mid); }
+.area p { font-size: 9.2pt; margin-bottom: 0.03in; }
+.area .boss { padding-left: 0.12in; position: relative; }
+.area .boss::before { content: "\25C6"; position: absolute; left: 0; color: var(--blue); font-size: 8pt; }
+.kw { font-family: var(--narrow); font-weight: 700; font-size: 8.4pt; letter-spacing: 0.02em; }
+
+/* -------------------------------------------------------------- notes -- */
+.lines { position: absolute; top: 0.75in; bottom: 0; left: 0; right: 0; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 0.27in, var(--blue-mid) 0.27in, var(--blue-mid) calc(0.27in + 0.6pt)); margin-top: 0.05in; }
+
+/* ---------------------------------------------------- the controller -- */
+.pad { width: 100%; margin: 0.04in 0 0.06in; }
+.pad text { font-family: var(--narrow); }
+
+/* ----------------------------------------------- precautions styling -- */
+.precautions ol { padding-left: 0.2in; }
+.precautions li { margin-bottom: 0.06in; }
+.precautions li::marker { font-family: var(--narrow); font-weight: 700; color: var(--blue); }
+.stamp {
+  display: inline-block; border: 1.5pt solid var(--blue); color: var(--blue);
+  font-family: var(--pixel); font-size: 6pt; padding: 4pt 6pt 3pt; transform: rotate(-3deg);
+}
+.cols2 { column-count: 2; column-gap: 0.18in; }
+.cols2 > * { break-inside: avoid; }
+.small { font-size: 8.8pt; }
+.center { text-align: center; }
+.ornament { text-align: center; color: var(--blue); font-size: 10pt; letter-spacing: 0.5em; margin: 0.06in 0; }
+
+/* screen-only: one page alone, for PNG renders (#only=N) */
+body.only .page { display: none; margin: 0; }
+body.only .page.shown { display: block; }
+body.only { background: #fff; }
+
+table.log td { height: 0.24in; border-bottom: 0.6pt solid var(--blue-mid); border-right: 0.6pt solid var(--blue-mid); }
+table.log td:last-child { border-right: none; }
+table.log tr:nth-child(even) td { background: none; }
+
+table.espers { font-size: 7.5pt; line-height: 1.15; hyphens: manual; }
+table.espers td { padding: 1.3pt 3pt; }
