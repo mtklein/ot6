@@ -38,59 +38,59 @@ Ot6RungDescPtrs:
         .word   $0014   ; Raises Mag.Pwr by 1
         .word   $0028   ; Protects against Dark
         .word   $003e   ; Raises Stamina by 2
-        .word   $0052   ; Bolt spells break 1 more shield
-        .word   $0072   ; Raises Vigor by 1
-        .word   $0084   ; Raises max HP by 1/8
-        .word   $0099   ; Raises Vigor by 2
-        .word   $00ab   ; Raises Fight damage by 1/4
-        .word   $00c6   ; Raises Speed by 1
-        .word   $00d8   ; Protects against Seizure
-        .word   $00f1   ; Raises Mag.Pwr by 2
-        .word   $0105   ; Halves the MP spells cost
-        .word   $011f   ; Protects against Sleep
-        .word   $0136   ; Raises Speed by 2
-        .word   $0148   ; Blocks Berserk and Muddle
-        .word   $0162   ; Sometimes counters an attack
-        .word   $017f   ; Raises max HP by 1/2
-        .word   $0194   ; Protects against Petrify
-        .word   $01ad   ; Blocks instant death, Condemned
-        .word   $01cd   ; Raises max MP by 1/8
-        .word   $01e2   ; Raises magic damage by 1/4
-        .word   $01fd   ; Casts Safe when HP is low
-        .word   $0217   ; Raises max HP by 1/4
-        .word   $022c   ; Protects against Imp
-        .word   $0241   ; Raises the success rate of Steal
-        .word   $0262   ; Walks faster outside battle
-        .word   $027e   ; Float in every battle
-        .word   $0294   ; Blocks Dark, Petrify; MP +1/2
-        .word   $02b2   ; Fight always hits
-        .word   $02c4   ; Haste in every battle
-        .word   $02da   ; Fight and magic damage +1/4
-        .word   $02f6   ; Protects against instant death
-        .word   $0315   ; Safe in every battle
-        .word   $032a   ; Raises all four stats by 1
-        .word   $0345   ; Gauntlet and Genji Glove effects
-        .word   $0366   ; Raises max MP by 1/4
-        .word   $037b   ; Raises Vigor by half
-        .word   $0390   ; Protects against Poison
-        .word   $03a8   ; Regen in every battle
-        .word   $03be   ; Protects against Mute
-        .word   $03d4   ; Shell in every battle
-        .word   $03ea   ; Casts Shell when HP is low
-        .word   $0405   ; 2 Boost Points at battle start
-        .word   $0424   ; No back or pincer attacks
-        .word   $043e   ; Starts every battle with Image
-        .word   $045d   ; Healing done is 25% stronger
-        .word   $047a   ; Revives allies at full HP
-        .word   $0494   ; Protects against Muddle
-        .word   $04ac   ; Covers weak allies while healthy
-        .word   $04cd   ; Protects against Zombie
-        .word   $04e5   ; Blocks Dark, Zombie and Poison
-        .word   $0504   ; Raises preemptive attack rate
-        .word   $0522   ; Blocks Stop and Slow
-        .word   $0537   ; Protects against Berserk
-        .word   $0550   ; Blocks Condemned and Zombie
-        .word   $056c   ; Starts every battle with Life 3
+        .word   $0052   ; Bolt spells cut 2 shields if weak
+        .word   $0074   ; Raises Vigor by 1
+        .word   $0086   ; Raises max HP by 1/8
+        .word   $009b   ; Raises Vigor by 2
+        .word   $00ad   ; Raises Fight damage by 1/4
+        .word   $00c8   ; Raises Speed by 1
+        .word   $00da   ; Protects against Seizure
+        .word   $00f3   ; Raises Mag.Pwr by 2
+        .word   $0107   ; Halves the MP spells cost
+        .word   $0121   ; Protects against Sleep
+        .word   $0138   ; Raises Speed by 2
+        .word   $014a   ; Blocks Berserk and Muddle
+        .word   $0164   ; Sometimes counters an attack
+        .word   $0181   ; Raises max HP by 1/2
+        .word   $0196   ; Protects against Petrify
+        .word   $01af   ; Blocks instant death, Condemned
+        .word   $01cf   ; Raises max MP by 1/8
+        .word   $01e4   ; Raises magic damage by 1/4
+        .word   $01ff   ; Casts Safe when HP is low
+        .word   $0219   ; Raises max HP by 1/4
+        .word   $022e   ; Protects against Imp
+        .word   $0243   ; Raises the success rate of Steal
+        .word   $0264   ; Walks faster outside battle
+        .word   $0280   ; Float in every battle
+        .word   $0296   ; No Dark or Petrify; max MP +1/2
+        .word   $02b6   ; Fight always hits
+        .word   $02c8   ; Haste in every battle
+        .word   $02de   ; Fight and magic damage +1/4
+        .word   $02fa   ; Protects against instant death
+        .word   $0319   ; Safe in every battle
+        .word   $032e   ; Raises all four stats by 1
+        .word   $0349   ; Gauntlet and Genji Glove effects
+        .word   $036a   ; Raises max MP by 1/4
+        .word   $037f   ; Raises Vigor by half
+        .word   $0394   ; Protects against Poison
+        .word   $03ac   ; Regen in every battle
+        .word   $03c2   ; Protects against Mute
+        .word   $03d8   ; Shell in every battle
+        .word   $03ee   ; Casts Shell when HP is low
+        .word   $0409   ; 2 Boost Points at battle start
+        .word   $0428   ; No back or pincer attacks
+        .word   $0442   ; Starts every battle with Image
+        .word   $0461   ; Healing done is 25% stronger
+        .word   $047e   ; Revives allies at full HP
+        .word   $0498   ; Protects against Muddle
+        .word   $04b0   ; Covers weak allies while healthy
+        .word   $04d1   ; Protects against Zombie
+        .word   $04e9   ; Blocks Dark, Zombie and Poison
+        .word   $0508   ; Raises preemptive attack rate
+        .word   $0526   ; Blocks Stop and Slow
+        .word   $053b   ; Protects against Berserk
+        .word   $0554   ; Blocks Condemned and Zombie
+        .word   $0570   ; Starts every battle with Life 3
 
 ; the descriptions, null-terminated, in the menu's description charset
 Ot6RungDescStr:
@@ -98,7 +98,7 @@ Ot6RungDescStr:
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$9b,$b2,$ff,$b5,$00   ; Raises Mag.Pwr by 1
         .byte   $8f,$ab,$a8,$ad,$9e,$9c,$ad,$ac,$ff,$9a,$a0,$9a,$a2,$a7,$ac,$ad,$ff,$83,$9a,$ab,$a4,$00   ; Protects against Dark
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$9b,$b2,$ff,$b6,$00   ; Raises Stamina by 2
-        .byte   $81,$a8,$a5,$ad,$ff,$ac,$a9,$9e,$a5,$a5,$ac,$ff,$9b,$ab,$9e,$9a,$a4,$ff,$b5,$ff,$a6,$a8,$ab,$9e,$ff,$ac,$a1,$a2,$9e,$a5,$9d,$00   ; Bolt spells break 1 more shield
+        .byte   $81,$a8,$a5,$ad,$ff,$ac,$a9,$9e,$a5,$a5,$ac,$ff,$9c,$ae,$ad,$ff,$b6,$ff,$ac,$a1,$a2,$9e,$a5,$9d,$ac,$ff,$a2,$9f,$ff,$b0,$9e,$9a,$a4,$00   ; Bolt spells cut 2 shields if weak
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$95,$a2,$a0,$a8,$ab,$ff,$9b,$b2,$ff,$b5,$00   ; Raises Vigor by 1
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$a6,$9a,$b1,$ff,$87,$8f,$ff,$9b,$b2,$ff,$b5,$c0,$bc,$00   ; Raises max HP by 1/8
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$95,$a2,$a0,$a8,$ab,$ff,$9b,$b2,$ff,$b6,$00   ; Raises Vigor by 2
@@ -122,7 +122,7 @@ Ot6RungDescStr:
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$ad,$a1,$9e,$ff,$ac,$ae,$9c,$9c,$9e,$ac,$ac,$ff,$ab,$9a,$ad,$9e,$ff,$a8,$9f,$ff,$92,$ad,$9e,$9a,$a5,$00   ; Raises the success rate of Steal
         .byte   $96,$9a,$a5,$a4,$ac,$ff,$9f,$9a,$ac,$ad,$9e,$ab,$ff,$a8,$ae,$ad,$ac,$a2,$9d,$9e,$ff,$9b,$9a,$ad,$ad,$a5,$9e,$00   ; Walks faster outside battle
         .byte   $85,$a5,$a8,$9a,$ad,$ff,$a2,$a7,$ff,$9e,$af,$9e,$ab,$b2,$ff,$9b,$9a,$ad,$ad,$a5,$9e,$00   ; Float in every battle
-        .byte   $81,$a5,$a8,$9c,$a4,$ac,$ff,$83,$9a,$ab,$a4,$c6,$ff,$8f,$9e,$ad,$ab,$a2,$9f,$b2,$c8,$ff,$8c,$8f,$ff,$ca,$b5,$c0,$b6,$00   ; Blocks Dark, Petrify; MP +1/2
+        .byte   $8d,$a8,$ff,$83,$9a,$ab,$a4,$ff,$a8,$ab,$ff,$8f,$9e,$ad,$ab,$a2,$9f,$b2,$c8,$ff,$a6,$9a,$b1,$ff,$8c,$8f,$ff,$ca,$b5,$c0,$b6,$00   ; No Dark or Petrify; max MP +1/2
         .byte   $85,$a2,$a0,$a1,$ad,$ff,$9a,$a5,$b0,$9a,$b2,$ac,$ff,$a1,$a2,$ad,$ac,$00   ; Fight always hits
         .byte   $87,$9a,$ac,$ad,$9e,$ff,$a2,$a7,$ff,$9e,$af,$9e,$ab,$b2,$ff,$9b,$9a,$ad,$ad,$a5,$9e,$00   ; Haste in every battle
         .byte   $85,$a2,$a0,$a1,$ad,$ff,$9a,$a7,$9d,$ff,$a6,$9a,$a0,$a2,$9c,$ff,$9d,$9a,$a6,$9a,$a0,$9e,$ff,$ca,$b5,$c0,$b8,$00   ; Fight and magic damage +1/4
