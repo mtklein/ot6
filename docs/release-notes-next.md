@@ -25,3 +25,14 @@ picking it is kept rather than spent, and it costs the same MP at any boost.
 When Gau and Gogo both use Rage in the same battle, each now keeps the odds
 his own Boost Points bought. Before, whoever started raging last set the odds
 for both.
+
+The last World of Balance monsters that still had placeholder shields now
+have designed ones. On the Lete River raft, each of your three weapons
+breaks two of the three monsters, and Terra's Fire breaks all of them. The
+three ghosts in the sparkle trap in Narshe's caves each give way to a
+different one of the party's weapons, and all three to Terra's Fire. The
+Phantom Train's Over-Mind breaks like the train's other ghosts. In the Battle
+for Narshe, Fidor shrugs off swords but gives way to spears, crossbows and
+fists. Siegfried's ambush on the Phantom Train and the troopers' sparring
+bout at the banquet also have their own shields. Cutscene battles no longer
+show a shield gauge.

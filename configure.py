@@ -844,12 +844,25 @@ check("break_coverage_ratchet", "python3 tools/audit_break_coverage.py",
 # One row per species (#157): Ot6SeedShields takes the FIRST match, so a
 # second Ot6ShieldTbl/Ot6ElemAddTbl row for a species is dead code that
 # reads as authored.  Source and the shipped ROM table must agree row for
-# row.
+# row.  And the coverage ratchet (v0.45): every species a reachable formation
+# holds (the pools, the event battles a script calls, the chests, the ai's
+# formation changes, the colosseum) has a row -- zero ride the generated
+# floor -- and the rows under Ot6ShieldTblUnreached, the 0-shield markers for
+# bodies no reachable formation holds, stay unreached.
 check("shield_rows",
       "python3 tools/check_shield_rows.py --selftest"
       " && python3 tools/check_shield_rows.py",
       ["tools/check_shield_rows.py", "build/ot6.sfc",
-       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm"])
+       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm",
+       "ff6/src/field/map_prop.dat", "ff6/src/field/sub_battle_group.dat",
+       "ff6/src/field/rand_battle_group.dat",
+       "ff6/src/field/world_battle_group.dat",
+       "ff6/src/field/event_battle_group.dat",
+       "ff6/src/field/trigger/treasure_prop.dat",
+       "ff6/src/battle/cond_battle.dat", "ff6/src/battle/battle_monsters.dat",
+       "ff6/src/battle/ai_script.asm", "ff6/src/world/train_script.asm",
+       "ff6/src/world/ctrl.asm", "ff6/src/field/event.asm"]
+      + glob("src/event/*.asm", "ff6"))
 check("break_reach", "python3 tools/check_break_reach.py",
       ["tools/check_break_reach.py", "ff6/src/battle/battle_main.asm"]
       + glob("src/battle/ot6_*.asm", "ff6"))

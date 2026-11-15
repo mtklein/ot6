@@ -446,6 +446,14 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
   (+$2ad9 = `$21`). Specter gets **no authored row**: vanilla's fire
   and holy are both usable keys here (Shadow's Fire Skean and Sabin's
   AuraBolt, the same two the break story above uses).
+- **Siegfried is a duel, not a boss (v0.45).** The boastful swordsman
+  whose trap waits in the compartment car (`$131`, battle 109, map 153's
+  (5,25); the line walks past it) has 100 HP and no vanilla weakness. A
+  boss's four shields would mean the break lands on a corpse, so his row is
+  a duel's two, slash and pierce: CYAN's katana and SHADOW's blade, the keys
+  of his Colosseum double (`$037`). His opening flurry of eight blows is the
+  fight. break-coverage-wob.md section 17 has the row;
+  `battle_breakwob_siegfried` plays it from the graph's capture.
 
 ### 9. Rizopas, after the Piranha school — Baren Falls (Sabin + Cyan)
 
@@ -1192,6 +1200,7 @@ at all) is the second lever and is outside this lab.
 | Guardian (Vector) | invincible in the WoB — its script says come back later, and the silent HUD says so up front (confirm its WoB palace encounter at data entry) |
 | Kefka ×2 (Imperial Camp) | no monster entity at all — formation 504 is empty and the fight runs on character AI `$04`; see 6 above |
 | Chupon's Sneeze, Vargas's finish | in their blocks above: scripts beat state |
+| TERRA's magitek flashback (battle 115), the esper Kefka fights (battle 97), and the battle-event runner (battles 105, 121-123, 127) | cutscenes played on the battle engine: a 1-HP soldier with no action, a body that casts and ends the battle itself, and an untargetable one that plays the scene. Each has a 0-shield row (v0.45; break-coverage-wob.md section 18) |
 
 ## Poison-bit audit
 
