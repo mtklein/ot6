@@ -130,7 +130,7 @@ end
 -- One leg of the corridor with its battles fought and NO care on the walk,
 -- ending early when `stop` says so.
 local legN = 0
-local function leg(stop)
+local function leg(stop, fight)
   legN = legN + 1
   local t = (legN % 2 == 1) and NORTH or SOUTH
   if H.worldX() == t[1] and H.worldY() == t[2] then
@@ -140,7 +140,7 @@ local function leg(stop)
     H.logStep(string.format("[emptybag] leg %d -> (%d,%d), battles fought, no care on the walk",
       legN, t[1], t[2])),
     H.worldNavTo(t[1], t[2],
-      { maxFrames = 20000, playBattles = "tactical", care = false,
+      { maxFrames = 20000, playBattles = "tactical", care = false, fight = fight,
         arrive = stop }),
     H.release(),
   }
@@ -183,6 +183,27 @@ end
 -- the start bound the rounds.
 local LEGS_PER_STOP = 48
 local drinkN = 0
+-- A drain battle takes its hits before it ends (#536): the party Defends
+-- (the fight driver's opts.holdFor, battle_ragedriver's and battle_doom's
+-- staging) while every member standing in the battle is at max HP, and
+-- the fight goes on as the driver plays it once somebody is short.  Fought
+-- out at once, a battle often wounds nobody: the #533 landing's replay
+-- (wt/polish-driver-3) met six such in a row in round 13 and its 48 legs
+-- ran out ("a battle left somebody short of max HP within 48 legs: got
+-- false"), where rounds before it took 1 to 4 battles.  So the round's
+-- precondition is made by play and the 48-leg bound is left as it was.
+-- The fight table's functions are live options (H.fightDriverFor calls each
+-- as fn(tag, memo) every frame and stores what it returns), so holdFor
+-- returns the predicate.
+local function wholeInBattle()
+  for e = 0, 3 do
+    local hp, mx = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+    if mx > 0 and hp > 0 and hp ~= 0xFFFF and hp < mx then return false end
+  end
+  return true
+end
+local function holdWhole() return wholeInBattle() end
+local DRAIN_FIGHT = { holdFor = function() return holdWhole end }
 local function drainTonics()
   local legB, before, budget = 0, 0, nil
   local function stop() return battles > legB and missing() and settled() end
@@ -192,7 +213,7 @@ local function drainTonics()
     before = H.invCountOf(TONIC)
     return {
       H.repeatN(LEGS_PER_STOP, {
-        H.cond(function() return not stop() end, { fresh(function() return leg(stop) end) }, {}),
+        H.cond(function() return not stop() end, { fresh(function() return leg(stop, DRAIN_FIGHT) end) }, {}),
       }),
       H.call(function()
         H.assertEq(stop(), true, string.format("drain round %d: a battle left somebody short "
@@ -204,9 +225,12 @@ local function drainTonics()
       -- party 240 hp and 0 mp short, ... (1 tonic + 0 potion = 50 gil))",
       -- build/attempts/wt/v026-field/final2/emptybag.log), which is the
       -- right call in play and no drink here
-      H.fieldCare({ tag = "drinking the Tonics down " .. drinkN,
-        threshold = 1.0, magic = false, reserve = { [POTION] = 99 },
-        tent = false, tincture = false }),
+      -- (EMPTYBAG_DRAIN_CARE_OFF, a global a negative sets: the round takes
+      -- no care stop, and the suite's property below must go red)
+      EMPTYBAG_DRAIN_CARE_OFF and H.call(function() H.log("[drain] NEGATIVE: no care stop this round") end)
+        or H.fieldCare({ tag = "drinking the Tonics down " .. drinkN,
+          threshold = 1.0, magic = false, reserve = { [POTION] = 99 },
+          tent = false, tincture = false }),
       H.call(function()
         roster("drain " .. drinkN)
         H.assertEq(H.invCountOf(TONIC) < before, true, string.format("drain round %d "
