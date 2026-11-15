@@ -16,6 +16,7 @@ declare the same mode.  Nothing in a fill tree is qualification evidence.
     tools/fill_line.py setup DIR --mode ones|alt|rand:<seed>|zero
     tools/fill_line.py run DIR [--until STATE] [TARGET...]
     tools/fill_line.py sync DIR          # move DIR to this tree's commit
+    tools/fill_line.py legs DIR --ref TREE [--jobs N]   # each power-on leg alone
     tools/fill_line.py --selftest        # the fence, without an emulator
 
 A mode may name the RAMs it fills after an @ (ones@wram,sram,spc; the
@@ -126,6 +127,67 @@ def run(args):
     return rc
 
 
+def power_on_legs(root):
+    """The line's runs that power on: the head (no prev) and every cut leg
+    (a Continue of a capture), as (state, generator, checkpoint key or
+    None)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "savestate_graph", Path(root) / "tools/tests/savestate_graph.py")
+    g = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(g)
+    return [(s["state"], s["gen"], s["checkpoint"]) for s in g.STATES
+            if s["gen"] and (s["checkpoint"] or not s["prev"])]
+
+
+def legs(args):
+    """Every power-on leg alone, each Continuing the REFERENCE's capture
+    under this tree's fill, in parallel: a wave that finds what a fill
+    changes at each power-on without waiting for the line (a leg booted
+    from a savestate powers on with the saved machine, so the fill cannot
+    reach it; the serial `run` covers those, and what the fill leaves in
+    the saves)."""
+    import concurrent.futures as cf
+    sys.path.insert(0, str(ROOT / "tools"))
+    import fill_diff
+    d = Path(args.dir).resolve()
+    ref = Path(args.ref).resolve()
+    mode = (d / MARKER).read_text().strip()
+    out = d / "build" / "legs"
+    out.mkdir(parents=True, exist_ok=True)
+    todo = [x for x in power_on_legs(d) if not args.only or x[0] in args.only.split(",")]
+
+    def one(leg):
+        state, gen, key = leg
+        env = dict(os.environ, OT6_POWERON_FILL=mode, OT6_NO_PUBLISH="1",
+                   OT6_WORKER=f"fill-{state}")
+        env.pop("OT6_SRAM_CHECKPOINT", None)
+        if key:
+            env["OT6_SRAM_CHECKPOINT"] = str(ref / "build/checkpoints" / key)
+        log = out / f"{state}.log"
+        t0 = time.time()
+        rc = subprocess.run(["sh", "tools/tests/run.sh", f"tools/tests/{gen}.lua", str(log)],
+                            cwd=d, env=env, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL).returncode
+        dl = fill_diff.first_log_diff(ref / "build/states" / f"{state}.log", log)
+        if dl is None:
+            what = "no log to compare"
+        elif dl and dl[0]:
+            what = f"PLAY PARTS at line {dl[0]}\n      ref  {dl[1][:200]}\n      fill {dl[2][:200]}"
+        else:
+            what = "same play" + (f" ({dl[3]} observation(s) differ)" if dl else "")
+        return f"{state} ({gen}{', ' + key if key else ''}) rc={rc} {time.time() - t0:.0f}s: {what}"
+
+    with cf.ThreadPoolExecutor(args.jobs) as ex, open(out / "summary.txt", "a") as f:
+        f.write(f"[legs] {time.strftime('%Y-%m-%d %H:%M:%S')} mode={mode} ref={ref} "
+                f"{len(todo)} leg(s), {args.jobs} at a time\n")
+        for line in ex.map(one, todo):
+            print(line, flush=True)
+            f.write(line + "\n")
+            f.flush()
+    (d / "build" / "LEGS_DONE").write_text("done\n")
+
+
 def selftest(_args=None):
     """The fence and the grammar, with no emulator: compose.py's prologue
     in a plain tree, a fill tree and a lab tree."""
@@ -197,12 +259,17 @@ def main():
     s.add_argument("--mode", required=True)
     y = sub.add_parser("sync")
     y.add_argument("dir")
+    g = sub.add_parser("legs")
+    g.add_argument("dir")
+    g.add_argument("--ref", required=True, help="tree whose build/checkpoints and build/states logs are the line's")
+    g.add_argument("--jobs", type=int, default=4)
+    g.add_argument("--only", help="comma list of states")
     r = sub.add_parser("run")
     r.add_argument("dir")
     r.add_argument("--until")
     r.add_argument("targets", nargs="*")
     args = ap.parse_args()
-    return {"setup": setup, "sync": sync, "run": run}[args.cmd](args)
+    return {"setup": setup, "sync": sync, "run": run, "legs": legs}[args.cmd](args)
 
 
 if __name__ == "__main__":
