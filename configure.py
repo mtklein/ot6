@@ -1302,10 +1302,13 @@ w.edge([saves_readme], "sh", implicit=saves_inputs,
        desc="release saves")
 release_zip = f"build/release/ot6-v{VERSION}.zip"
 w.edge([release_zip], "sh",
-       [bps, f"{rel_dir}/RELEASE_NOTES.md", saves_readme],
+       [bps, f"{rel_dir}/RELEASE_NOTES.md", saves_readme,
+        "docs/manual/ot6-manual.pdf", "build/checks/manual_pdf.ok"],
        cmd=f'rm -f "{release_zip}" && cd build/release &&'
            f' zip -q -j "ot6-v{VERSION}.zip" "ot6-v{VERSION}/{BASE[:-4]}.bps"'
            f' "ot6-v{VERSION}/RELEASE_NOTES.md"'
+           # the instruction booklet (#391; owner, 2026-11-15: in every release)
+           f' ../../docs/manual/ot6-manual.pdf'
            f' && cd "ot6-v{VERSION}" && zip -q -D "../ot6-v{VERSION}.zip"'
            f' saves/*.srm saves/README.txt',
        desc=f"release zip v{VERSION}")
