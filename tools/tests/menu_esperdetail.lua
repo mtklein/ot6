@@ -26,7 +26,8 @@
 -- 200/500".  Then the "already held" branch is staged the same way: an owned stone whose five rungs cover an
 -- unreached effect rung of another owned stone (Unicorn's Amulet covers Ramuh's Dark, Kirin's Poison) is set
 -- to 500 and the other stone's page revisited, which must show the second line on that rung.  Those writes
--- are mechanism expedients for the drawing, not play.
+-- are mechanism expedients for the drawing, not play.  Case 5 is red on a ROM whose help line reads the next
+-- rung's description and on one that never draws the second line (build/attempts/wt/v045-teach/mutants/).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

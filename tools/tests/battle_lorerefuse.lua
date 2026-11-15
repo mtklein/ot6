@@ -14,6 +14,10 @@
 -- the quiet lore (pending stays 0), then once on Aqua Rake, which moves a number (pending goes to 1).  Both
 -- lores are chosen off the ROM as Ot6SpellNoBoost reads them (MagicProp +4 bit 7, +6).
 --
+-- Red with the Lore arm switched off (the R raised the boost: "got 1 ($1), want 0"), and it found the arm's
+-- first draft reading the row's byte as an attack id when it is the lore's number:
+-- build/attempts/wt/v045-teach/mutants/ (lore_arm_off), final/.
+--
 -- DECLARED EXPEDIENT (tools/state_write_waivers.txt).  The route's STRAGO knows no quiet lore at fire-out, so
 -- before the walk the suite teaches him the first one ($1D29 bit) and loads it into his first lore slot
 -- (OT6_LORELOAD $1E27, id + 1; the free row, Aqua Rake, is offered beside any loadout), and makes sure Aqua
