@@ -135,12 +135,13 @@ H.run({ maxFrames = 60000 }, {
     local order = nil     -- the rows to press R on, in turn, then the confirm
     local phase = 0
     local waitUntil = 0
-    return H.driveUntil(function() return r.confirmed ~= nil end, 30000, {
+    return H.driveUntil(function() return r.confirmed ~= nil and H.frame >= r.confirmed + 12 end, 30000, {
       H.call(function()
         tick = tick + 1
         local ph = tick % 12
         if ph ~= 0 then H.setPad((held and ph < 6) and { [held] = true } or {}) return end
         held = nil
+        if r.confirmed then H.setPad({}) return end   -- the A held for the confirm is released
         if H.readByte(MENU) == 0 then H.setPad({}) return end
         local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
         if a ~= sabinS then held = defendPress(st); H.setPad({}) return end
