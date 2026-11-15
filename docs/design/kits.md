@@ -113,7 +113,7 @@ kept, #461, and a copy on a boss strips its four shields too).
 | Mog | (open: none of his dances stands above the others, owner 2026-10-26, #478) | — | no |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
 | Strago | Study | his Scan at 3 BP: reads every enemy and learns every lore any monster present could cast, 99 MP | yes (`ot6_analyze.asm`) |
-| Gau | (open, kit-gau.md) | at 3 BP | no |
+| Gau | (none: a varied set of rages needs no divine, owner 2026-11-15; kit-gau.md §9) | — | no |
 
 Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
 (Fire at 3 BP, after her World of Ruin return; see Terra below).  `$3ecb`,

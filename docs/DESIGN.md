@@ -10,43 +10,47 @@ touches vanilla behavior where a pillar requires it.
 1. **Distinct characters.** Every character is one job: up to 8 active
    skills, the 8th a divine-tier finisher where the job has a natural one
    (a character whose kit is one verb, or a varied set with no best member
-   such as Strago's Lores or Mog's Dances, needs none; owner, 2026-11-15). There is
+   such as Mog's Dances or Gau's Rages, needs none; owner, 2026-11-15). There is
    no universal magic pool, and nobody learns everything. Each character's
    vanilla signature (Slots, Steal, Runic, Sketch, Rage, the first
    Tool/Blitz/SwdTech/Dance…) is skill #1, free, from the moment they
    join. The divine slot holds a *new* top-end ability for that character,
    never the signature itself.
-2. **Shields and weaknesses.** Every enemy has shields and a hidden weakness
-   set (elements + weapon classes). Chip shields by hitting weaknesses; at 0
+2. **Shields and weaknesses.** Nearly every enemy has shields and a hidden
+   weakness set (elements + weapon classes); eleven authored rows have none
+   and draw no gauge, where the fight is not a break fight (the Whelk's and
+   Presenter's shells, Chadarnook, the Magic Urn, the Zone Eater, Tritoch). Chip shields by hitting weaknesses; at 0
    the enemy Breaks, loses its turn, and takes double damage.
 3. **Boost Points.** Start each battle with 1, +1 at the end of each
    action, bank up to 5, spend up to 3 to boost an action. A boosted action
    earns no BP.
-4. **Magicite are second jobs.** Equipping a magicite grants its spells
-   *while equipped*; no spell is taught permanently. What a character keeps
-   is the esper's ladder: Magic Points from battles won wearing it buy five
-   ranks of stat points and relic-style effects ([esper-rework.md](design/esper-rework.md),
-   plan A, built in v0.44). One copy
+4. **Magicite are second jobs.** Equipping a magicite grants its spells and
+   its summon *while equipped*; no spell is taught permanently. What a
+   character keeps is the esper's ladder: Magic Points from battles won
+   wearing it buy five ranks of stat points and relic-style effects, kept for
+   good ([esper-rework.md](design/esper-rework.md), built in v0.44). One copy
    of each magicite exists, so kitting the party is a puzzle, the same way
-   Octopath allows one shrine license at a time.
+   Octopath allows one shrine license at a time. Gau can wear espers; Umaro
+   and Gogo cannot.
 
 ## The cast as jobs
 
 | Character | Job read | Weapon class | Element lean | 8-skill kit |
 |---|---|---|---|---|
 | Terra | Mage | Sword | Fire | 8 spells; divine: Trance (Morph at a full boost); Ultima is Fire's fourth fold |
-| Locke | Thief | Dagger | Wind | Steal grows into a full thief kit: Steal, Mug, armor/attack corrode |
-| Edgar | Machinist | Spear | Lightning | the 8 Tools, verbatim |
-| Sabin | Monk | Claw | Fire/Holy | the 8 Blitzes, selected from a menu |
-| Cyan | Samurai | Katana | — | the 8 SwdTech, priced in BP (see below) |
-| Celes | Rune Knight | Sword | Ice/Holy | Runic from the start (signature) + spells (see below) |
-| Gau | Beast Tamer | Fangs (innate) | Earth | Rage learned without limit on the Veldt, 8 equipped (see below) |
+| Locke | Thief | Dagger | — | Steal, Filch, Bestow, Mug, Trickshot, Dismantle, Appraise; divine: Master's Mark |
+| Edgar | Machinist | Spear | — | seven Tools, learned by acquisition; divine: Overclock. Air Anchor is a findable extra |
+| Sabin | Monk | Claw | Fire/Holy/Wind | the 8 Blitzes, selected from a menu |
+| Cyan | Samurai | Katana | Wind | the 8 SwdTech, priced in BP (see below) |
+| Celes | Rune Knight | Sword | Ice | Runic from the start (signature) + spells (see below) |
+| Gau | Beast Tamer | Fangs (innate) | varies by rage | Rage learned without limit on the Veldt, 8 equipped (see below); no divine (a varied set needs none; owner, 2026-11-15) |
 | Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
-| Strago | Scholar | Rod | Fire/Ice/Lightning | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; Bserk, learned by watching a monster inflict Berserk (kits.md) |
+| Strago | Scholar | Rod | varies by lore | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; divine: Study, his Scan at a full boost, which learns every lore the monsters present could cast; Bserk, learned by watching a monster inflict Berserk (kits.md) |
 | Relm | Painter | Brush | — | Sketch stays as signature |
-| Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature) over the eight throwing items, learned by acquisition as Edgar's Tools are: three stars, three skeans (pierce and an element), the smoke (Image) and the exit (Vanish), whose boost buys reach (kits.md "Shadow"); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
+| Shadow | Assassin | Dagger (thrown) | Fire/Water/Lightning (the skeans) | Throw (signature) over the eight throwing items, learned by acquisition as Edgar's Tools are: three stars, three skeans (pierce and an element), the smoke (Image) and the exit (Vanish), whose boost buys reach (kits.md "Shadow"); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim; no divine for now (kits.md "Divines") |
-| Umaro / Gogo | Berserker / Mime | — | — | bonus characters; Gogo has access to every job and masters none |
+| Umaro | Berserker | Club, fists | Ice | takes no orders; four arms (Fight, Charge, Throw, Storm); divine: Storm, ice on every enemy, on a dump of all three points (kits.md "Umaro") |
+| Gogo | Mime | — | — | bonus character; has access to every job and masters none |
 
 **Break classes (4):** Slash (swords, katanas, claws), Pierce (spears,
 daggers, thrown edges, bolts, darts), Bludgeon (fists, staves, rods, flails,
@@ -66,12 +70,14 @@ weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 
 **Chip.** Any damaging hit that matches a weakness removes 1 shield, and a
 multi-hit action chips per hit (one boosted Fight chips four shields off one
-guard — `multi-hit.md` §1, `probe_multihit.lua`, deleted in b18643d7). Multi-hit is deliberately
+guard; `multi-hit.md` §1). A few takes ignore weakness: the Break spell,
+Filch, each of Bum Rush's four blows, Cleave's four on a death-immune body.
+Ramuh's Conductor adds a second shield to a lightning hit that already
+matched. Multi-hit is deliberately
 scarce: `tools/audit_multihit.py` (which exits nonzero if it goes stale)
 enumerates **six** multi-hit abilities in the whole game, spread over the
 three physical kits. Cyan's are vanilla's — Quadra Slam ×4 and Quadra Slice ×4
-(`MagicProp $58`/`$5b` effect `$32`, `AttackerEffect_32` at
-`battle_main.asm:10794-10796`) and Empowerer ×2. Sabin's Pummel ×2 and Bum
+(`MagicProp $58`/`$5b` effect `$32`, `AttackerEffect_32`) and Empowerer ×2. Sabin's Pummel ×2 and Bum
 Rush ×4 and Edgar's Drill ×2 come from `Ot6HitCountTbl`
 (`ff6/src/battle/ot6_hitcount.asm`), which adds to the same `$3a70` counter;
 each of those three has its power divided by its hit count, so the extra hits
@@ -93,8 +99,8 @@ battle time — for an on-stage monster (`probe_ifritbreak.lua`, deleted).
 
 **Shielded resistance.** While an enemy still has shields and is not broken it
 takes reduced damage (×0.5), so the swing from shielded to broken is ×4, and
-×4 on-weakness too rather than ×2: vanilla's weakness ×2 (`asl $f0` at
-`battle_main.asm:1899`) lands before `Ot6HitJoin` (`:1901`) applies the
+×4 on-weakness too rather than ×2: vanilla's weakness ×2 (`asl $f0` in
+`CalcTargetDmg`) lands before `Ot6HitJoin` applies the
 shielded/broken factor, so the two stack. The full range against an
 unbroken-unweak baseline is 8 (broken+weak) : 4 (broken) : 2 (shielded+weak)
 : 1. The published 4:2:1 damage-per-BP measurement samples the
@@ -136,15 +142,19 @@ Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
   capped at 5, unless that action was boosted (Octopath's no-regen rule).
   Every character opens a battle with 1 BP (`Ot6InitBP`).
 - Spend up to 3 BP when confirming an action. Attack: +1 hit per BP. Skills:
-  potency tier per BP. Buffs/debuffs: duration per BP.
+  potency tier per BP. Single-target statuses and cures: one more body per BP.
+  Def., Row, Leap and Possess take no boost.
 - Enemies don't have BP, same asymmetry as Octopath: bosses get shields and
   telegraphs, players get the economy.
 - Boosting also costs MP, when the boost is buying damage. A boosted
   ability pays `max(base, min(99, floor(base × 2.5^boost + 0.5)))`
   (`Ot6BoostPriceFor`) — x1 / x2.5 / x6.25 / x15.625, capped at 99 and never
-  below the base — so a boost is a trade of two currencies rather than a free
-  multiplier. The rule is one test: **a price escalates exactly when the
-  boost multiplies the action.** So Fight and Capture stay free (the boost
+  below the base. Where the boost buys more of the same (the reach spells,
+  Debilitator's weaknesses, Filch's shields) each point is its own use and
+  the price is `base × (1 + boost)`, capped the same (`Ot6PerPointPrice`).
+  So a boost is a trade of two currencies rather than a free
+  multiplier. The multiplier's rule is one test: **a price escalates by
+  x2.5 exactly when the boost multiplies the action.** So Fight and Capture stay free (the boost
   buys swings), tier-family magic and SwdTech are unchanged (the boost
   already buys a dearer tier), and the chance verbs — **Steal, Rage and
   Slot** — stay flat at every level, because their boost buys certainty
@@ -171,8 +181,8 @@ losing the power curve, and it gives boosting a use on every kit rather than
 only on attackers.
 
 **The canon rule: on damage verbs boost multiplies; on chance verbs boost
-guarantees.** A verb that rolls dice — Steal, Dance, and their family (Sketch,
-Slot, Rage) — has no "potency" to tier, so BP buys *certainty* instead,
+guarantees.** A verb that rolls dice — Steal, Dance, and their family (Slot,
+Rage) — has no "potency" to tier, so BP buys *certainty* instead,
 expressed in that verb's own vocabulary. Each point narrows the gamble and the
 full 3-BP spend removes it. **Steal is the shipped example**
 (Locke): 0 BP is vanilla to the byte, with the level roll, the 1/8 rare slot,
@@ -198,12 +208,19 @@ the dance's magnitude, which never began. MP scales with magnitude; BP
 pays for certainty. The ladder and its derivation are in design/kits.md
 (Mog).
 
-**The third category: on reactive verbs, boost buys duration.** A verb that
-does not act but *waits* — Runic, and every reactive verb after it — has
-neither a potency to tier nor a die to load. What it has is a window, so BP
-buys window. This follows from a rule already stated above: *buffs/debuffs get
-duration per BP*, and a stance is a buff cast on the situation. **Runic is the
-shipped example**: 1/2/3 BP buys 1/2/3 of Celes's own turns during which the
+Sketch is neither: it takes the boost of whatever it drew. A sketched attack
+with a number multiplies; one with none drops the boost once the brush has
+drawn it (boost-rewards.md).
+
+**The third category: on reactive verbs, boost buys duration.** The three
+families are potency (the multiplier or the tier), certainty (the chance
+verbs) and reach or duration. Fourteen single-target status spells and cures
+buy reach: a point covers one more body (`ot6_reach.asm`; boost-rewards.md),
+and Shadow's smoke and exit do the same. A verb that does not act but *waits*
+— Runic, and every reactive verb after it — has neither a potency to tier nor
+a die to load. What it has is a window, so BP buys window; Morph's boost buys
+a longer span in the same way. A stance is a buff cast on the situation.
+**Runic is the shipped example**: 1/2/3 BP buys 1/2/3 of Celes's own turns during which the
 stance stands and **she acts normally**.
 
 Those two halves are one lever and not two tiers, which is worth stating
@@ -229,7 +246,7 @@ vanilla, is deleted. The 8 techniques are priced in BP:
 
 | # | Tech | BP |
 |---|---|---|
-| 1 | Dispatch | 0 |
+| 1 | Dispatch | 1 |
 | 2 | Retort (counter stance) | 1 |
 | 3 | Slash | 1 |
 | 4 | Quadra Slam (4 hits — strips four shields) | 2 |
@@ -262,8 +279,9 @@ Cleave is in the ladder as the divine: tech 7 is only ever the window's
 a random SwdTech (Muddle, Charm, the Colosseum) stops short of it
 (`Ot6RandBushidoTop`), and its effect is decided in `Ot6Oblivion`
 (`ot6_divine.asm`), hooked after `ChooseTarget` in `CalcAttackEffect`,
-because the target does not exist when the command is entered: Death on a
-killable body, a power-255 cut on a death-immune one.
+because the target does not exist when the command is entered: it
+strikes every enemy: Death on each killable body, and on a death-immune one
+four shields lost and a power-255 cut.
 Mapping, consequences, and the reasoning: design/kits.md.
 
 **Celes converts defense into economy.** Runic still swallows the next spell;
@@ -296,17 +314,20 @@ per-character and does not need global rounds.
 
 ## Magicite as sub-jobs
 
-Equipping a magicite grants, only while equipped:
-- its spell/skill list (castable through the same boost-tier rules),
-- its passives, one of them a stat bump — a fixed, constant upgrade, never
-  a per-level bonus — learned for keeps by carrying the esper long enough
-  (the one deliberate exception to while-equipped: design/magicite.md),
-- its summon, vanilla's once-per-battle summon (not a kit divine: the kit
-  divines' one gate is a full 3-BP boost, design/kits.md).
+While worn, a magicite grants its spells (castable through the same
+boost-tier rules) and its summon, vanilla's once-per-battle summon (not a kit
+divine: the kit divines' one gate is a full 3-BP boost, design/kits.md).
+Nothing else is rented: the old while-worn stat package is gone.
 
-Vanilla esper records already store a spell list with learn rates; we reuse
-the list and ignore the rates. Uniqueness needs no code: there is one of each
-magicite.
+What stays is the ladder (v0.44, esper-rework.md). Each won battle that pays
+Magic Points gives them to every living seated member for the esper that
+member wears; random battles pay double, the bench earns none. Five ranks, at
+10, 30, 75, 200 and 500: two stat points, a small effect such as an
+immunity, two more points, and a relic-tier signature. A rank once reached
+stays with that character whatever they wear later. Odin and Raiden share
+one count. Vanilla's learn rates are all zero and are ignored. Uniqueness
+needs no code: there is one of each magicite. Gau can wear espers and earns
+ranks; Umaro and Gogo cannot.
 
 ## Skill learning
 

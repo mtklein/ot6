@@ -8,65 +8,36 @@
 
 Scope: the espers; the World of Balance roster, then the World of Ruin's
 twelve (last section). Locked ✦. Pillar (DESIGN.md ✦):
-equipping a magicite grants its kit *while equipped*. Spells are
-never taught permanently, level-up stat bonuses are deleted, one
-copy of each exists, and summon = vanilla's once-per-battle summon (not a kit
-divine). One proposed later exception below is that **passives may be
-learned**; that system is not implemented, and the while-equipped
-spell/stat model is canon.
+equipping a magicite grants its spells and summon *while equipped*. Spells
+are never taught permanently, level-up stat bonuses are deleted, one copy of
+each exists, and summon = vanilla's once-per-battle summon (not a kit
+divine). What a character keeps is the ladder in
+[esper-rework.md](esper-rework.md). The passives, permits and battle-count
+learning this file once proposed were never built and are replaced by the
+ladder; the repository history has the old text.
 
 ## What one magicite carries
-
-Five slots, all data-table work:
 
 1. **Spells** — 2–3 *base-tier* spells (boost folds the tiers, so a
    Ramuh bearer with 2 BP already casts Bolt 3). They are available
    only while the magicite is equipped.
-2. **Stat passive** — a fixed, constant stat bump (+magic, +speed…)
-   that behaves like the passive below: active while
-   equipped, and learnable ✦. Vanilla's per-level bonuses stay
-   deleted.  What ships today is the while-equipped half: an equipped
-   esper adds its signed vigor/speed/stamina/magic deltas (-7..+7,
-   `Ot6EsperStatTbl`, applied by `Ot6EsperStatMod` in
-   `UpdateEquipBattle`); the learnable half is not built. It follows
-   Octopath's Support-Skill shape: a large bump that does not
-   compound. Octopath sizes these at about +50 on a 999-scale stat;
-   the roster tables below give the packages as built, in FF6's
-   ranges, and #328 (v1.0) reviews every one.
-3. **Passive** — active while equipped, and **teachable ✦**: carry
-   the esper long enough and its passives are learned. They join
-   the character's permanent passive pool and can be slotted even
-   with a different esper equipped. This is Octopath's job+subjob
-   passive mix-and-match expressed through espers, so a character's
-   passive pool records which espers they have carried.
-   - **Learning meter**: a fixed count of *battles fought while
-     equipped*, which makes it a deed like dances and lores rather
-     than a level. Minor espers ~15 battles, major ones ~25. The
-     count is stored **per esper, party-wide ✦-leaning**, not per
-     character: one copy of each esper exists, so which character
-     carried it barely matters, and party-wide storage keeps the
-     save format simple.
-   - Passive slots per character stay capped (up to 4, DESIGN.md),
-     so learning more passives widens the player's choice without
-     raising total power. Stat passives compete for those same
-     slots, which is what stops the bonuses compounding.
-4. **Weapon permit** — at most one extra weapon class in the equip
-   menu (see weapon-classes.md; battle code never checks it). Kept
-   spare ✦: it is a development knob rather than a pillar.
-5. **Summon** — the summon, vanilla's once per battle ✦ (not a kit
+2. **Summon** — the summon, vanilla's once per battle ✦ (not a kit
    divine: those are gated by a full 3-BP boost, kits.md).
+3. **A ladder** — five ranks of kept bonuses, earned in Magic Points
+   per character (esper-rework.md). The stat columns below are what the
+   ladder's first and second stats were taken from.
 
 Sub-job check: a magicite should read as a *job* rather than a bag
-of spells. Its spells, passives, and permit should fit one theme,
-and the passives are the part of that job the character keeps.
+of spells. Its spells and ladder should fit one theme.
 
 ## The WoB roster
 
 **Ifrit and Shiva** are built; `docs/design/magicite-ifrit-shiva.md` is the
 authority for both, alongside the data in `ff6/src/menu/genju_prop.asm` and
 `Ot6EsperStatTbl` (`ff6/src/battle/ot6_progression.asm`). For every other
-row, the Spells and Stat columns are built (below) and the Passive and
-Permit columns describe the *proposed* system, not the shipped one.
+row, the Spells and Stat columns are built (below). **The Passive and Permit
+columns were never built** and are superseded by the ladder
+(esper-rework.md); read them only as the themes the stones were given.
 
 | Esper | Source | Spells (base) | Stat vig/spd/stm/mag | Passive | Permit | Notes |
 |---|---|---|---|---|---|---|
@@ -93,11 +64,10 @@ The **Spells** column ships for every row (#305): each stone grants exactly
 its listed spells (the tube room's six are also held to
 `magicite-tube-six.md` §11), except Golem, whose "Protect-alike" names no FF6
 spell, so it grants Safe alone. `tools/check_spell_grants.py` checks this on
-the built ROM. The **Stat** column ships for every row too: it is
-`Ot6EsperStatTbl`'s row (vigor, speed, stamina, mag.pwr; vigor reads
-doubled in battle), and the same script checks it against the built ROM. The
-Passive and Permit columns of every row but Ifrit's and Shiva's are still
-proposals.
+the built ROM. The **Stat** column is `Ot6EsperStatTbl`'s row (vigor, speed,
+stamina, mag.pwr; vigor reads doubled in battle), checked by the same script;
+since v0.44 it is the record of the old while-worn package, not a bonus that
+applies.
 
 The World of Ruin stones grant the lists in the last section's table
 (#327), checked the same way.
@@ -107,19 +77,16 @@ The World of Ruin stones grant the lists in the last section's table
   ghost thief; Edgar+Golem = the siege engine; Sabin+Ifrit = the
   fire fist). The one-copy rule ✦ makes those choices exclusive, so
   the party has to divide the espers between characters.
-- Espers granting *permits* stay rare (3 in WoB) so that a
-  multi-weapon character reads as a deliberate build.
 - The summon tier ✦: the summon does not replace the character's own
   divine. Both exist: the summon is vanilla's, once per battle; the kit
   divine's one gate is a full 3-BP boost (kits.md "Divines").
 
 ## Learning summary
 
-Spells, permits, summons: while-equipped, never learned ✦.
-Passives, including the stat bump: learned by battles-carried
-(above). That is the one form of esper permanence, and it replaces
-vanilla's stat-bonus grind with collecting passives. Character
-passives (kits.md) and esper passives share the same slots.
+Spells and summons: while-equipped, never learned ✦. The one form of
+permanence is the ladder: Magic Points from battles won wearing the esper buy
+five ranks, kept for good (esper-rework.md). The battle-count passives
+proposed here were not built.
 
 ## Berserk
 
@@ -219,9 +186,9 @@ twelve are World of Ruin rewards. Each is planned the way
 `magicite-ifrit-shiva.md` and `magicite-tube-six.md` plan theirs: one job
 per stone, one to three **base-tier** spells (nothing in `Ot6FoldTbl`'s
 second or third column: Fire 2/3, Ice 2/3, Bolt 2/3, Bio, Cure 2/3, Life 2/3,
-Slow 2, Haste2), a while-worn stat package in `Ot6EsperStatTbl`'s four signed
-nibbles, and the vanilla summon kept as the summon, unchanged. There is no
-passive or permit channel, so none is planned.
+Slow 2, Haste2), a stat package in `Ot6EsperStatTbl`'s four signed
+nibbles (the ladder's source since v0.44), and the vanilla summon kept as the
+summon, unchanged. There is no passive or permit channel, so none is planned.
 
 **What ships.** The Spells column and the stat column (#418):
 `Ot6EsperStatTbl`'s rows for these twelve are the packages below, and

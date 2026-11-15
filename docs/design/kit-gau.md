@@ -383,8 +383,7 @@ Leap's learn step is already certain: the leap needs ≥2 present characters and
 the Veldt (`TargetEffect_54`, `battle_main.asm:9719-9735`; Veldt flag `$11e4`,
 `:14016-14020`), and the end-of-battle event learns **every** species present,
 no roll (`BattleEnd_02`→`BattleEnd_05`→`LearnRage`, `:12172-12186`,
-`:12334-12348`). Leap ships vanilla; boosting it spends BP for no effect, the
-same known gap as Break and Doom.
+`:12334-12348`). Leap ships vanilla and refuses the boost (`Ot6CmdNoBoost`).
 
 ---
 
@@ -639,9 +638,8 @@ the turn count, or it asserts nothing.
    rage window without new draw code for 255 values); rejected with the flat
    rule (§5) before the display question arises.
 5. **Boost on Leap.** No roll exists in the leap-learn path to
-   convert (§6.3), so a 3-BP Leap spends for nothing and joins Break/Doom in
-   the known chance-verb gap (magicite-tube-six.md §13.4) until the
-   return roll is located.
+   convert (§6.3), so Leap refuses the boost (`Ot6CmdNoBoost`,
+   boost-rewards.md) rather than spend it for nothing.
 6. **Rage id 255.** The +1 byte encoding tops out at id 254, which is
    vanilla's own ceiling (`InitSkills` stops at `$fe`,
    `battle_main.asm:14676-14678`; `LearnRage` skips index > 255,
@@ -653,9 +651,8 @@ the turn count, or it asserts nothing.
 8. **Spending BP mid-trance.** A possessed Gau banks regen he cannot spend,
    because there is no menu and no confirm moment. This is a real cost of the
    possession, priced into §6's "3 BP is a full-bank decision".
-9. **Gau's divine.** The 8 slots are all rages; the kit-slot-8-divine
-   convention every other kit follows has no home here yet, and `kits.md`'s
-   open question (a capstone beast vs an upgraded slot) stays open. Whatever
-   it becomes, its one gate is a full 3-BP boost (kits.md "Divines").
-   Recorded here so the omission is a decision rather than an oversight.
+9. **Gau has no divine** (owner, 2026-11-15). The 8 slots are all rages, a
+   varied set with no best member, so the kit-slot-8-divine convention does
+   not apply to him (kits.md "Divines"). Recorded here so the omission is a
+   decision rather than an oversight.
 
