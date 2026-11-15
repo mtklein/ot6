@@ -534,10 +534,10 @@ H.run({ maxFrames = 20000 }, {
 
     local PRICE = jsl(H.sym("Ot6BoostPriceFor"))
     local acLo = romOfs(H.sym("Ot6AbilityCost"))
-    local acHi = romOfs(H.sym("Ot6CostFor"))     -- the next proc in the file
+    local acHi = romOfs(H.sym("Ot6BlitzPrice"))  -- the next proc in the file
     H.assertEq(acHi > acLo, true,
-      "Ot6CostFor still follows Ot6AbilityCost, so [Ot6AbilityCost, "
-      .. "Ot6CostFor) is exactly the proc's own bytes")
+      "Ot6BlitzPrice still follows Ot6AbilityCost, so [Ot6AbilityCost, "
+      .. "Ot6BlitzPrice) is exactly the proc's own bytes")
 
     local escalating = sites(acLo, acHi, PRICE)
     local function armEscalates(leaf)
@@ -580,20 +580,42 @@ H.run({ maxFrames = 20000 }, {
       .. "makes this pair the test of the rule rather than of a habit")
 
     local cHit, cN = armEscalates("Ot6CostFor")
-    H.assertEq(cN, 2,
-      "two Ot6CostFor calls in Ot6AbilityCost: @swdtech and @boosted")
-    H.assertEq(cHit, 1,
-      "exactly one of them escalates -- @boosted (blitz $0a / tools $09, "
-      .. "outside the gate); @swdtech ($07, inside it) does not")
+    H.assertEq(cN, 1,
+      "one Ot6CostFor call in Ot6AbilityCost: @swdtech (@boosted's blitz row is "
+      .. "priced by its leaf, Ot6BlitzPrice, as @tools' by Ot6ToolPrice)")
+    H.assertEq(cHit, 0,
+      "@swdtech ($07, inside Ot6BoostDmg's gate) does not escalate")
+    local _ = H.sym("Ot6BlitzPrice")   -- (named literally, so compose resolves it)
+    local bN = #sites(acLo, acHi, jsl(H.sym("Ot6BlitzPrice")))
+    H.assertEq(bN, 1, "one Ot6BlitzPrice call in Ot6AbilityCost (the @boosted arm, blitz $0a)")
 
-    H.assertEq(#escalating, 2,
-      "Ot6AbilityCost reaches the escalation from exactly 2 of its arms, "
-      .. "@dance and @boosted.  That count IS the design rule: a verb's price "
-      .. "escalates exactly when Ot6BoostDmg multiplies it, and #219's four "
-      .. "call sites became two when the owner exempted the chance verbs")
-    H.log(string.format("Ot6AbilityCost: %d escalating arms (dance %d/%d, "
-      .. "boosted %d/%d); steal %d/%d, rage %d/%d and slot %d/%d flat",
-      #escalating, dHit, dN, cHit, cN, sHit, sN, rHit, rN, zHit, zN))
+    H.assertEq(#escalating, 1,
+      "Ot6AbilityCost reaches the escalation directly from exactly 1 of its arms, "
+      .. "@dance, and @boosted through Ot6BlitzPrice (below).  That count IS the design "
+      .. "rule: a verb's price escalates exactly when Ot6BoostDmg multiplies it, and "
+      .. "#219's four call sites became two when the owner exempted the chance verbs")
+    -- Ot6BlitzPrice: the blitz row escalates (Ot6CostFor then a tail jump to
+    -- Ot6BoostPriceFor), except a blitz the multiplier never reaches
+    -- (Ot6SpellNoNumber: Mantra), which tail-jumps a flat Ot6CostFor
+    local function jmlb(addr)
+      return { 0x5c, addr & 0xff, (addr >> 8) & 0xff, (addr >> 16) & 0xff }
+    end
+    local bpLo, bpHi = romOfs(H.sym("Ot6BlitzPrice")), romOfs(H.sym("Ot6PendBlitzPrice"))
+    H.assertEq(bpHi > bpLo, true, "Ot6PendBlitzPrice follows Ot6BlitzPrice")
+    local _ = H.sym("Ot6SpellNoNumber")
+    H.assertEq(#sites(bpLo, bpHi, jsl(H.sym("Ot6SpellNoNumber"))), 1,
+      "Ot6BlitzPrice asks Ot6SpellNoNumber once (the Mantra exemption)")
+    local esc = 0
+    for _, o in ipairs(sites(bpLo, bpHi, jsl(H.sym("Ot6CostFor")))) do
+      if matches(o + 4, jmlb(H.sym("Ot6BoostPriceFor"))) then esc = esc + 1 end
+    end
+    H.assertEq(esc, 1, "Ot6BlitzPrice escalates the blitz row (jsl Ot6CostFor / jml Ot6BoostPriceFor)")
+    H.assertEq(#sites(bpLo, bpHi, jmlb(H.sym("Ot6CostFor"))), 1,
+      "Ot6BlitzPrice's Mantra arm is the flat row price (jml Ot6CostFor)")
+    H.log(string.format("Ot6AbilityCost: %d escalating arm (dance %d/%d), boosted "
+      .. "through Ot6BlitzPrice (%d escalation, 1 flat arm); swdtech %d/%d, steal %d/%d, "
+      .. "rage %d/%d and slot %d/%d flat",
+      #escalating, dHit, dN, esc, cHit, cN, sHit, sN, rHit, rN, zHit, zN))
 
     -- The drawn price has to make the same split, or the menu and the charge
     -- disagree.  Ot6KitRowCost's thief arm is now one flat tail-call, so the
@@ -603,11 +625,15 @@ H.run({ maxFrames = 20000 }, {
       return { 0x5c, addr & 0xff, (addr >> 8) & 0xff, (addr >> 16) & 0xff }
     end
     local PEND_J, PEND_L = jsl(H.sym("Ot6PendPrice")), jml(H.sym("Ot6PendPrice"))
+    local _ = H.sym("Ot6PendBlitzPrice")
+    local BLITZ_L = jml(H.sym("Ot6PendBlitzPrice"))
     local krLo, krHi = romOfs(H.sym("Ot6KitRowCost")),
                        romOfs(H.sym("Ot6BushidoRowGrey"))
     local krN = #sites(krLo, krHi, PEND_J) + #sites(krLo, krHi, PEND_L)
+      + #sites(krLo, krHi, BLITZ_L)
     H.assertEq(krN, 1,
-      "Ot6KitRowCost draws exactly one escalating ladder (blitz).  SwdTech "
+      "Ot6KitRowCost draws exactly one escalating ladder (blitz, through "
+      .. "Ot6PendBlitzPrice, Ot6BlitzPrice's menu twin).  SwdTech "
       .. "never did, and the thief arm no longer does: all three thief rows "
       .. "take one flat tail-call now, so there is no dead per-row branch")
     local tlLo, tlHi = romOfs(H.sym("Ot6ThiefListOpen")),
