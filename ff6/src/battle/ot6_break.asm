@@ -1525,7 +1525,8 @@ done:   rts
         cmp     f:$7e0000+OT6_MULCTR
         beq     @pop
         sta     f:$7e0000+OT6_MULCTR
-        lda     #$01
+        lda     #$02            ; (bit 1: the multi-target kind)
+        ora     $01,s
         sta     $01,s
 @pop:   lda     OT6_SCRIPTBUSY
         beq     @done           ; no script running: events wait for theirs
@@ -1546,10 +1547,14 @@ done:   rts
         jsr     Ot6EvAt
         lda     OT6_EVQ,x
         cmp     OT6_SCR_IDX
-        bcc     @land           ; an earlier command's numeral: past
+        bcc     @land           ; an earlier command's numeral: past.  a
+                                ;   single numeral's closing inc is the last
+                                ;   thing GfxCmd_0b does, so by the first
+                                ;   tick that sees it the engine has moved on
         bne     @arm            ; a later command's: not yet
-        lda     $01,s           ; the running command's: once it shows
-        beq     @arm
+        lda     $01,s           ; the running command's: only GfxCmd_03 shows
+        and     #$02            ;   its numerals while it runs (it bumps its
+        beq     @arm            ;   counter first, then waits them out)
 @land:  jsr     Ot6EvApply
         jsr     Ot6EvNext
         lda     #$01

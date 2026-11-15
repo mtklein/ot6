@@ -68,11 +68,16 @@ local function arm()
     local s = st[x >> 1]
     s.owed = false                         -- active again (3)
     if H.readByte(0xB5) == 0x12 then return end
-    if pend(x >> 1) > 0 and not s.begun then
-      H.log(string.format("[bpdisplay] f%d slot %d begins: command %02X, queued %04X, pending %d, bank %d",
-        H.frame, x >> 1, H.readByte(0xB5), H.readWord(0x3A7C), pend(x >> 1), bank(x >> 1)))
+    s.sync = true
+    if not s.begun then
+      -- (a pending boost an action raises for itself, Bestow's point or
+      -- Umaro's dump, is spent by an action already begun)
       s.begun, s.beginF, s.arrowsIn, s.pipsIn = true, H.frame, 0, 0
-      W.begins = W.begins + 1
+      if pend(x >> 1) > 0 then
+        H.log(string.format("[bpdisplay] f%d slot %d begins: command %02X, queued %04X, pending %d, bank %d",
+          H.frame, x >> 1, H.readByte(0xB5), H.readWord(0x3A7C), pend(x >> 1), bank(x >> 1)))
+        W.begins = W.begins + 1
+      end
     end
   end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"))
   -- an action ends: the bank is charged or earns here
@@ -87,8 +92,16 @@ local function arm()
   end, emu.callbackType.exec, H.sym("Ot6ActionEnd"))
 end
 
+local loadedSeen = nil
 local function sample()
   if not watching or not H.battleActive() then return end
+  -- a restored snapshot (a host that branches) puts the game somewhere this
+  -- model has not followed: each row waits for its character's next window
+  -- or action before it is judged again
+  if H.loadedFrame ~= loadedSeen then
+    loadedSeen = H.loadedFrame
+    for c = 0, 3 do st[c].begun, st[c].owed, st[c].sync, st[c].endAt = false, false, false, nil end
+  end
   W.frames = W.frames + 1
   for c = 0, 3 do
     local s = st[c]
@@ -98,7 +111,10 @@ local function sample()
     end
     s.lb, s.lp = b, p
   end
-  if H.readByte(0x7BCA) ~= 0 then st[H.readByte(0x62CA) & 3].owed = false end   -- (3)
+  if H.readByte(0x7BCA) ~= 0 then
+    local a = st[H.readByte(0x62CA) & 3]
+    a.owed, a.sync = false, true            -- (3)
+  end
   for c = 0, 3 do
     local s = st[c]
     if s.endAt and H.frame >= s.endAt + 3 then   -- Ot6ActionEnd has run (its charge or regen in)
@@ -141,7 +157,7 @@ local function sample()
         want = "p" .. math.max(0, b - (s.owed and 1 or 0))
       end
       if got:sub(1, 1) ~= "?" then s.seen = true end
-      if s.seen then
+      if s.seen and s.sync ~= false then
         if got == want or got == alt then
           s.mism = 0
           if s.begun and p > 0 then
