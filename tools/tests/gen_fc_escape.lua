@@ -380,7 +380,9 @@ local function nerapaAttempt(n)
   })
 end
 
--- the statue path's walk (section 3): waypoints `wps` until `done()`, fighting what comes and taking any choice
+-- the statue path's walk (section 3): waypoints `wps` until `done()`, fighting what comes and taking any choice;
+-- statueFought is set when a fight opens on the way
+local statueFought = false
 local function statuePath(wps, done, label)
     local wi, t, wt, lastK, lastT = 1, 0, 0, -1, 0
     -- any choice here takes row 0, pressed on phase 0-2; the check sits
@@ -391,7 +393,7 @@ local function statuePath(wps, done, label)
       H.call(function()
         if C.frame(t % 24) then return end
         if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}); return end
-        if H.battleLoadStarted() or H.battleActive() then FA.frame(); return end
+        if H.battleLoadStarted() or H.battleActive() then statueFought = true; FA.frame(); return end
         if not H.hasControl() then H.setPad({}); return end
         local wp = wps[wi]
         if not wp then H.setPad({}); return end
@@ -590,17 +592,24 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   H.waitFrames(30),
 
   -- ---- 3. the statue path onto (60,11) -> map 393 --------------------------
-  -- In two legs, with care between: the path's random fights can leave a member near death (the v0.45 landing:
-  -- battle $0B9 left EDGAR at 107/1216, and escape_start shipped him so, audit_party_hp's NEAR FATAL), and map
-  -- 393's clock allows no menu, so the last stop is (60,12), the stair below the statue's trigger.
-  statuePath({ { 60, 14 }, { 60, 12 } }, function()
-    return mapIs(393) or (H.fieldX() == 60 and H.fieldY() == 12 and H.hasControl() and not H.dialogWaiting()
-      and not H.battleLoadStarted())
-  end, "the statue path -> (60,12)"),
-  H.cond(function() return not mapIs(393) and H.hasControl() and not H.dialogWaiting() end, {
-    H.fieldCare({ tag = "before the statue scene", threshold = 0.95 }),
-  }, {}),
-  H.release(),
+  -- With care after each fight on the way: the path's random fights can leave a member near death (the v0.45
+  -- landing: battle $0B9, on the stairs below the statue, left EDGAR at 107/1216, and escape_start shipped him so,
+  -- audit_party_hp's NEAR FATAL), and map 393's clock allows no menu.  A fight ends the walk; the party has the
+  -- field back before the statue's trigger, so care runs there and the walk goes on (four fights at most, then
+  -- the walk runs through).
+  H.call(function() statueFought = false end),
+  H.repeatN(4, {
+    H.cond(function() return not mapIs(393) end, {
+      statuePath({ { 60, 14 }, { 60, 12 }, { 60, 11 } }, function()
+        return mapIs(393) or (statueFought and H.hasControl() and not H.dialogWaiting() and not H.battleLoadStarted())
+      end, "the statue path (to its next fight or map 393)"),
+      H.cond(function() return not mapIs(393) end, {
+        H.call(function() statueFought = false end),
+        H.fieldCare({ tag = "after a fight on the statue path", threshold = 0.95 }),
+        H.release(),
+      }, {}),
+    }, {}),
+  }),
   statuePath({ { 60, 11 } }, function() return mapIs(393) end, "statue scene -> map 393"),
   (function()
     local calm = 0
