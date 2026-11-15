@@ -440,6 +440,10 @@ TEST_ENV = {
     # STRAGO taught one quiet lore before the walk (declared)
     "battle_lorerefuse":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # a boost buys nothing on SABIN's Mantra: the Blitz list refuses R on
+    # it, a pending point is dropped and the price is flat; no write
+    "battle_mantrarefuse":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-sabin-v1",
     # #469: reach, Debilitator's steps and the last refusals, from one
     # battle's snapshots outside Kohlingen; no write
     "battle_boostreach": "OT6_TIMEOUT=3600 "
