@@ -18,7 +18,7 @@ CODE_EXT_INC = 1
 .global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
 .global Ot6WeaponSpellQueued, Ot6WeaponSpellPass
 .global Ot6CodexSaveAs          ; copy slot-local weakness knowledge on Save As
-.global Ot6CodexNewGame, Ot6CodexLoaded
+.global Ot6CodexNewGame, Ot6CodexLoaded, Ot6PowerOnClear
 .global Ot6BushidoTier
 .global Ot6Oblivion              ; divine: Cleave, instant death or the heavy cut
 .global Ot6Assassinate           ; divine: Shadow, a 3-BP hit kills a Broken non-boss

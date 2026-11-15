@@ -222,7 +222,8 @@ None is moved or re-encoded.
   and airship positions, which an event sets before use), `$1F6E-$1F6F`
   (the random-battle counter), `$1FA8-$1FBF` (unused), `$1FC2-$1FD1`
   (event variables 0-7) and `$1FD3-$1FF2` (the objects' saved positions).
-  Each is zeroed at New Game; zero is the value vanilla assumes, and no
+  Each is zeroed at New Game, and at power-on before the field's first
+  init (`Ot6PowerOnClear`); zero is the value vanilla assumes, and no
   field's meaning changes. A save from an older release keeps what it
   holds there.
   Nothing in the battery's slots is written. (Measured on an all-ones power-on

@@ -239,6 +239,20 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         rts
 .endproc
 
+; At power-on, before the field's first init: the reset path runs InitNewGame
+; and loads the starting map, which reads the objects' saved positions
+; ($1fd3-$1ff2, obj.asm:3437) before a New Game or a Continue writes them,
+; and a Continue does not reload the objects from the block, so the junk
+; stayed on the off-screen characters (gen_wob_airship_hunt under the
+; all-ones fill: "party 1 ... at map 3 (255,255)").  The same zeroing as a
+; New Game's; a Continue then loads the slot over all of it.
+.proc Ot6PowerOnClear
+        php
+        jsr     Ot6NewGameClear
+        plp
+        rtl
+.endproc
+
 ; (start, length) per range, a length of 0 ends the list
 Ot6NewGameZero:
         .word   $1e70
