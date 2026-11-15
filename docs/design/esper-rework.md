@@ -553,7 +553,7 @@ description per label, every label one effect, so Shoat's signature is
 labelled "Safety Bit", not Alexandr's "No Death"). Under a rung the
 character has not reached whose effect bytes its other reached rungs already
 cover, on any stone and this one's earlier rungs included, a second line
-says "Already held from another rank" (`Ot6RungDescText`). Gear does not
+says "Already held" (`Ot6RungDescText`). Gear does not
 count, and neither does an HP or MP boost a larger one makes moot (the
 bits differ; the largest applies): the line is a bit-for-bit cover over the
 ladder alone. The Narshe school's magicite ghost teaches the ladder

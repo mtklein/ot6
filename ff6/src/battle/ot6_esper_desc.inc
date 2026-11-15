@@ -154,4 +154,4 @@ Ot6RungDescStr:
 
 ; the second line under a rung whose effect the character already holds
 Ot6RungHaveStr:
-        .byte   $80,$a5,$ab,$9e,$9a,$9d,$b2,$ff,$a1,$9e,$a5,$9d,$ff,$9f,$ab,$a8,$a6,$ff,$9a,$a7,$a8,$ad,$a1,$9e,$ab,$ff,$ab,$9a,$a7,$a4,$00   ; Already held from another rank
+        .byte   $80,$a5,$ab,$9e,$9a,$9d,$b2,$ff,$a1,$9e,$a5,$9d,$00   ; Already held

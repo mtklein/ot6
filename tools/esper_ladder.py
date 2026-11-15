@@ -162,8 +162,12 @@ DESC = {
     "Rebirth": "Starts every battle with Life 3",
 }
 # the help line's second line, under an unreached rung whose effect this character already holds from
-# another rung (Ot6RungDescText's cover test over the ladder's effect bytes)
-HAVE = "Already held from another rank"
+# another rung (Ot6RungDescText's cover test over the ladder's effect bytes).  The esper page's title window
+# ("Espers", top right) covers the help window's second line from about x = 176, so this line fits HAVE_WIDTH
+# (a first try, "Already held from another rank", ran under it: build/attempts/wt/v045-teach/shots/raw/
+# esperdetail_staged_held_rung3.png).
+HAVE = "Already held"
+HAVE_WIDTH = 150
 DESC_WIDTH = 223
 DESC_TABLES = ["big_symbols_en", "null_terminated_en", "text_en"]
 
@@ -385,8 +389,9 @@ def desc_problems(dc, desc=None):
         if "{n}" in text:
             problems.append("description %r is more than one line" % label)
         w = desc_width(dc, widths, text)
-        if w > DESC_WIDTH:
-            problems.append("description %r is %d pixels wide, over %d: %r" % (label, w, DESC_WIDTH, text))
+        limit = HAVE_WIDTH if label == "(have)" else DESC_WIDTH
+        if w > limit:
+            problems.append("description %r is %d pixels wide, over %d: %r" % (label, w, limit, text))
     return problems
 
 
