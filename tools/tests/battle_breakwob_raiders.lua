@@ -48,7 +48,7 @@ local function watch()
     fights[#fights + 1] = cur
   end
   for s = 0, 5 do
-    if (H.readByte(PRESENT + s * 2) & 1) == 1 then
+    if (H.readByte(PRESENT + s * 2) & 1) == 1 and H.readWord(SPECIES + s * 2) ~= 0xFFFF then
       local r = cur.slots[s]
       if r == nil then
         r = { sp = H.readWord(SPECIES + s * 2), open = H.readByte(SH_MAX + s * 2) }

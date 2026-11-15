@@ -32,7 +32,7 @@ local function watch()
   if W.done then return end
   if H.monstersPresent() == 0 then return end
   for s = 0, 5 do
-    if (H.readByte(PRESENT + s * 2) & 1) == 1 then
+    if (H.readByte(PRESENT + s * 2) & 1) == 1 and H.readWord(SPECIES + s * 2) ~= 0xFFFF then
       local r = W.slots[s]
       if r == nil then
         r = { sp = H.readWord(SPECIES + s * 2), open = H.readByte(SH_MAX + s * 2),
