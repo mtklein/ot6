@@ -29,6 +29,17 @@
 --      (no second Pummel) inside the same window as 6.  A Broken monster's
 --      counters are refused (Ot6MayAct); this one ends the battle, so it is
 --      exempt (Ot6RetalStory / Ot6AISkip, ot6_break.asm).
+--   8. the break plays with its hits (#539).  Every frame of the fight
+--      before the branches, and of branch (a), the gauge each monster's
+--      HUD line draws is read beside its live state, the damage numerals
+--      (and whom they are on), the end of each battle script and the break
+--      cleave.  Every change the line shows was computed at damage calc, so
+--      it may show only once a numeral on that monster has appeared since
+--      (or, for a take with no numeral, the script has ended): v0.45 drew
+--      it two to five frames after calc, hundreds before the hit.  And in
+--      (a) the Pummel's two hits show one at a time: 2, then 1 on the first
+--      hit's numeral, then the broken shield on the second's, with the
+--      cleave on that frame, not on the first's.
 
 -- BioBlaster's targeting byte is $6a = ONE_SIDE|INIT_GROUP|MULTI_TARGET|
 -- ENEMY without $01 MANUAL, so it aims at monster group A (the two Ipoohs)
@@ -406,6 +417,85 @@ end
 local nBefore = 0                       -- gauge-write count before a chip
 local phase2Req, phase2Blob = nil, nil  -- SABIN's first menu, for 7
 
+-- 8: the break as the screen has it (#539).  Read only.
+local TW = { on = false }
+local function twReset()
+  TW.hud, TW.live, TW.ch, TW.liveCh, TW.num, TW.ends, TW.sfx = {}, {}, {}, {}, {}, {}, {}
+  TW.ctr, TW.mul, TW.busy = nil, nil, nil
+end
+twReset()
+local function twHud(s)
+  if (H.readByte(0x3AA8 + s * 2) & 1) == 0 then return "off" end
+  if H.readWord(0xECF1 + s * 14) == 0 then return "off" end
+  local lead = H.readWord(0xEE2C + s * 2)
+  if (lead >> 8) == H.HUD_BROKEN_ATTR then return "B" end
+  if (lead & 0xFF) ~= 0x71 then return "-" end
+  return tostring(H.readByte(0xEDC0 + s))
+end
+local function twLive(s)
+  if (H.readByte(0x3EEC + s * 2) & 0xC2) ~= 0 then return "-" end
+  if H.readByte(0x3E90 + s * 2) ~= 0 then return "B" end
+  return tostring(H.readByte(0x3E40 + s * 2))
+end
+local function twSample()
+  if not TW.on or not H.battleActive() then return end
+  for s = 0, 5 do
+    local g, l = twHud(s), twLive(s)
+    if TW.hud[s] ~= nil and g ~= TW.hud[s] then
+      TW.ch[#TW.ch + 1] = { f = H.frame, s = s, old = TW.hud[s], new = g }
+    end
+    if TW.live[s] ~= nil and l ~= TW.live[s] then
+      TW.liveCh[#TW.liveCh + 1] = { f = H.frame, s = s, new = l }
+    end
+    TW.hud[s], TW.live[s] = g, l
+  end
+  local c = H.readByte(0x632E)
+  if TW.ctr ~= nil and c ~= TW.ctr and c ~= 0 then
+    TW.num[#TW.num + 1] = { f = H.frame, t = H.readByte(0x631E + ((c - 1) & 3)) }
+  end
+  TW.ctr = c
+  local m = H.readByte(0x7B3D)
+  if TW.mul ~= nil and m ~= TW.mul and m ~= 0 then TW.num[#TW.num + 1] = { f = H.frame, t = -1 } end
+  TW.mul = m
+  local b = H.readByte(0x57BF)
+  if TW.busy == 1 and b == 0 then TW.ends[#TW.ends + 1] = H.frame end
+  TW.busy = b
+end
+local function twArm()
+  emu.addEventCallback(twSample, emu.eventType.startFrame)
+  emu.addMemoryCallback(function(_, v)
+    if TW.on and v ~= 0 and H.readByte(0xE9E9) == 0xBE then TW.sfx[#TW.sfx + 1] = H.frame end
+  end, emu.callbackType.write, 0x7EE9EC, 0x7EE9EC)
+end
+-- every change a line drew waited for a numeral on that monster (or the
+-- script's end) after the change was computed
+local function twCheck(tag)
+  local n, bad = 0, {}
+  for _, c in ipairs(TW.ch) do
+    local recovery = c.old == "B" and c.new ~= "-" and c.new ~= "off"
+    if c.new ~= "off" and c.old ~= "off" and not recovery then
+      local lf
+      for _, l in ipairs(TW.liveCh) do
+        if l.s == c.s and l.new == c.new and l.f <= c.f then lf = l.f end
+      end
+      if lf then
+        n = n + 1
+        local ok = false
+        for _, u in ipairs(TW.num) do
+          if u.f >= lf and u.f <= c.f and (u.t == 4 + c.s or u.t == -1) then ok = true end
+        end
+        for _, e in ipairs(TW.ends) do if e >= lf and e <= c.f then ok = true end end
+        H.log(string.format("[%s] line s%d %s->%s drawn f%d, computed f%d%s", tag, c.s, c.old, c.new,
+          c.f, lf, ok and "" or ": BEFORE ITS HIT SHOWED"))
+        if not ok then bad[#bad + 1] = string.format("s%d %s->%s f%d (computed f%d)", c.s, c.old, c.new, c.f, lf) end
+      end
+    end
+  end
+  H.assertEq(n > 0, true, tag .. ": the HUD lines drew gauge changes to check")
+  H.assertEq(#bad, 0, tag .. ": no line drew a change before a numeral on its monster showed it (#539): "
+    .. table.concat(bad, "; "))
+end
+
 -- 7: one branch off the phase-two snapshot.  SABIN AuraBolts while VARGAS
 -- is unbroken and above `to` shields, then Pummels once and holds; the
 -- battle must tear down to that one Pummel's counter.
@@ -419,6 +509,8 @@ local function brokenBranch(tag, to, wantBrokenAtHit)
     H.waitFrames(2),
     H.call(function()
       H.checkReq(req, tag .. ": phase-two snapshot restore")
+      twReset()
+      TW.on = true
       brPummels, brEvents = {}, {}
       for k in pairs(healBusy) do healBusy[k] = nil end
       resetM()
@@ -460,6 +552,35 @@ local function brokenBranch(tag, to, wantBrokenAtHit)
         brk(), shields()))
       H.assertEq(brk() > 0, true, tag .. ": VARGAS is Broken when the " ..
         "Pummel's counter is decided")
+    end),
+    -- 8: the Pummel's hits on screen, one at a time
+    H.waitUntil(function() return TW.hud[vSlot] == "B" or not H.battleLoadStarted() end, 1200,
+      tag .. ": VARGAS's line shows the broken shield", 1),
+    H.waitFrames(4),
+    H.call(function()
+      TW.on = false
+      twCheck(tag)
+      if wantBrokenAtHit then return end
+      local seq, nums = {}, {}
+      for _, c in ipairs(TW.ch) do
+        if c.s == vSlot and c.f >= pummelF then seq[#seq + 1] = c end
+      end
+      for _, u in ipairs(TW.num) do
+        if u.f >= pummelF and u.t == 4 + vSlot then nums[#nums + 1] = u.f end
+      end
+      local t = {}
+      for _, c in ipairs(seq) do t[#t + 1] = string.format("%s->%s@f%d", c.old, c.new, c.f) end
+      H.log(string.format("[%s] VARGAS's line after the Pummel: %s; numerals on him at %s; cleave at %s",
+        tag, table.concat(t, " "), table.concat(nums, ","), table.concat(TW.sfx, ",")))
+      H.assertEq(#seq >= 2 and seq[1].old == "2" and seq[1].new == "1" and seq[2].old == "1"
+        and seq[2].new == "B", true, tag .. ": the line steps 2, 1, broken: each hit shows its own shield")
+      H.assertEq(#nums >= 2, true, tag .. ": the Pummel's two numerals on VARGAS")
+      H.assertEq(seq[1].f >= nums[1] and seq[1].f < nums[2], true,
+        tag .. ": the first shield goes with the first hit's numeral")
+      H.assertEq(seq[2].f >= nums[2], true, tag .. ": the break shows with the second hit's numeral, not before")
+      H.assertEq(#TW.sfx, 1, tag .. ": one cleave")
+      H.assertEq(TW.sfx[1] >= nums[2] and TW.sfx[1] <= seq[2].f + 2, true,
+        tag .. ": the cleave sounds with the breaking hit's numeral, not the first hit's")
     end),
     -- The finish is the counter's battle_event $09.  Unbroken it runs
     -- 602-847 frames after the Pummel executes (probe, main and
@@ -516,6 +637,7 @@ H.run({ maxFrames = 45000 }, {
   }, "the VARGAS scene reaches battle 66"),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 3000, "battle up", 10),
+  H.call(function() twArm(); TW.on = true end),
   H.waitFrames(120),
 
   -- ===================================================================== --
@@ -696,6 +818,8 @@ H.run({ maxFrames = 45000 }, {
       "and exactly ONE gauge write in all of phase one: the BioBlaster's")
     snap("phase two")
     H.screenshot("vargas_phase2")
+    TW.on = false
+    twCheck("phases one and two")
     phase2Req = H.requestSaveState()      -- 7 branches from this frame
   end),
   H.waitFrames(2),

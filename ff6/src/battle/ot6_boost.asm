@@ -52,6 +52,13 @@
         sta     f:$7e0000+OT6_BLUESEEN  ; nor a Berserk Strago saw last battle
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
+        sta     f:$7e0000+OT6_BPMARK    ; nor a boost display's marks (#540)
+        sta     f:$7e0000+OT6_BPDEFER
+        sta     f:$7e0000+OT6_PIPDIRTY
+        sta     f:$7e0000+OT6_PIPLIVE
+        sta     f:$7e0000+OT6_HOLD      ; nor a held gauge (#539)
+        sta     f:$7e0000+OT6_EVHEAD    ;   or its events
+        sta     f:$7e0000+OT6_EVTAIL
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
                                 ;   this one" flag (#236): it would hand the
                                 ;   first uncontrolled swing of this battle a
@@ -170,13 +177,20 @@
         shorta0
         .a8
         .i16
-        jsr     Ot6RevealCommit ; any reveal this action banked and no
-                                ;   numeral displayed (a 0-damage or
-                                ;   numeral-less script) commits no later
-                                ;   than the action's own end
+        jsr     Ot6ShowFlush    ; any reveal or gauge this action banked
+                                ;   and no numeral displayed (a 0-damage or
+                                ;   numeral-less script) shows no later
+                                ;   than the action's own end (#539)
+        lda     #$00            ; #542: a breaking take whose hit never
+        sta     OT6_HITBRK      ;   landed (a missed Cleave cut) is not
+                                ;   carried into the next action
         txa                     ; width-neutral character test
         cmp     #$08
         jcs     done            ; monsters have no bp
+        lda     f:Ot6CharBitTbl,x       ; #540: the action is over, so a
+        eor     #$ff                    ;   pending boost raised from here on
+        and     f:$7e0000+OT6_BPMARK    ;   is for the next one
+        sta     f:$7e0000+OT6_BPMARK
         longa                   ; #236: where this actor stands as its OWN
         lda     $3bf4,x         ;   turn ends is the line a later hit is
         sta     f:$7e0000+OT6_HPMARK,x  ;   measured against.  Drawn on both
@@ -318,6 +332,13 @@
         bcs     done            ; capped at 5
         inc
         sta     OT6_BP_CLASS,x
+        lda     f:Ot6CharBitTbl,x       ; #540: shown when this character is
+        asl                             ;   active again (its window, or its
+        asl                             ;   next turn's head)
+        asl
+        asl
+        ora     f:$7e0000+OT6_BPMARK
+        sta     f:$7e0000+OT6_BPMARK
         jsr     Ot6BankMoved    ; same on the regen arm.  the two arms are
                                 ;   marked separately, and not at `done`,
                                 ;   because `done` is also where a monster and
@@ -332,6 +353,69 @@
         ; issued no numeral at all, or a $ffff "hide numerals" one, the same
         ; hole Ot6RevealCommit is called at the top of this proc to plug.
 done:   jsr     Ot6PipPending
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #540: the turn's action begins ]
+
+; jsl from ExecCmd's head (battle_main.asm), every path into it: the turn
+; loop, an immediate action and a character's counter list; x = the actor's
+; entity offset.  A counterattack ($b1 bit 0, the flag _c22163 sets) is no
+; action of the character's, and a boost raised in its open window is not
+; for it (Ot6AssassinateGate's reading), so it changes nothing here.
+; Otherwise, for a character, its turn has come, so the point its last turn
+; earned shows now (OT6_BPMARK's owed bit).  With an action to run ($b5 is
+; not $12, the CmdNoEffect an emptied command list runs as, Ot6NoActionMark's
+; case) its pending points show as spent from here
+; (OT6_BPMARK's begun bit), unless the action will buy nothing with them: an
+; Item whose use the boost never moves (Ot6ItemNoBoost) or a spell turn
+; Ot6QueueFold found no reward in (OT6_SPELLNONE), whose points
+; Ot6ActionEnd keeps, so their arrows stay up until then.  The display
+; only: the bank and the pending boost are Ot6ActionEnd's to charge.
+; a8, either index width, db=$7e.  preserves a/x/y/p.  rtl.
+.proc Ot6BpBegin
+        .a8
+        php
+        rep     #$10
+        .i16
+        phx
+        pha
+        txa
+        cmp     #$08
+        bcs     @out            ; a monster: no boost
+        lda     $b1
+        lsr
+        bcs     @out            ; a counterattack: not its own action
+        lda     f:Ot6CharBitTbl,x
+        asl
+        asl
+        asl
+        asl
+        eor     #$ff
+        and     f:$7e0000+OT6_BPMARK
+        sta     f:$7e0000+OT6_BPMARK    ; its earned point shows
+        lda     $b5
+        cmp     #$12
+        beq     @out            ; no action to run this turn (CmdNoEffect)
+        lda     OT6_BOOST_REVEALED,x
+        beq     @begin
+        lda     $3a7c           ; the queued command
+        cmp     #$01            ; Item
+        bne     @spell
+        lda     $3a7d           ; the item
+        jsl     Ot6ItemNoBoost
+        bcs     @out            ; kept at its end: the arrows stay
+@spell: lda     $3018,x
+        and     f:$7e0000+OT6_SPELLNONE
+        bne     @out            ; kept at its end: the arrows stay
+@begin: lda     f:Ot6CharBitTbl,x
+        ora     f:$7e0000+OT6_BPMARK
+        sta     f:$7e0000+OT6_BPMARK
+@out:   pla
+        plx
         plp
         rtl
 .endproc
@@ -461,6 +545,9 @@ done:   jsr     Ot6PipPending
         bcs     done            ; the bank cap holds; an absorb never wraps
         inc
         sta     OT6_BP_CLASS,y
+        lda     $3018,y             ; #540: the point shows when the spell
+        ora     f:$7e0000+OT6_BPDEFER   ;   it ate visibly lands (the numeral,
+        sta     f:$7e0000+OT6_BPDEFER   ;   or the script's end)
         lda     $3018,y         ; flag: paid this round.  set only when a pip
         ora     f:$7e0000+OT6_RUNICPAID  ;   was really banked, so a capped-away
         sta     f:$7e0000+OT6_RUNICPAID  ;   earn at 5 bp costs nothing:

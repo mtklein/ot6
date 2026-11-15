@@ -136,6 +136,10 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
                                      ;   clear, so this is also their only
                                      ;   power-on clear
         sta     OT6_DEBIL-8,y        ; nor a Debilitator's added weakness
+        jsr     Ot6HitBit            ; nor a held gauge (#539) or a breaking-
+        trb     OT6_HOLD             ;   hit mark (#542) on the body this
+        jsr     Ot6HitBit            ;   slot held before the reload
+        trb     OT6_HITBRK
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa
@@ -611,7 +615,8 @@ scale24:
         bcs     merge           ; message index for the lowest new element
         inc     $3401
         bra     @bit
-merge:  pla                     ; bank the matched weaknesses as pending:
+merge:  jsr     Ot6Hold         ; #539: the gauge shows this hit with its hit
+        pla                     ; bank the matched weaknesses as pending:
         ora     OT6_RVPEND_ELEM-8,y     ;   the on-screen reveal must land on
         sta     OT6_RVPEND_ELEM-8,y     ;   the damage frame, and this runs at
                                 ;   damage calc, frames earlier.
@@ -655,17 +660,16 @@ merge:  pla                     ; bank the matched weaknesses as pending:
         bne     done
         lda     #OT6_BREAK_TICKS
         sta     OT6_BROKEN_TICKS,y         ; shields down: break
-        lda     #$ff                       ; bank the flash as pending;
-        sta     OT6_BRKTICK-8,y            ;   see Ot6BreakArm.  width-
-                                           ;   agnostic (abs,y in both index
-                                           ;   widths), like every other store
-                                           ;   in this proc but the codex one
+        jsr     Ot6HitBroke                ; #542: this hit is judged shielded
+                                           ; (the flash and the cleave come
+                                           ;   with the hit's numeral: #539,
+                                           ;   Ot6EvApply)
 done:   rtl
 .endproc
 
 ; ------------------------------------------------------------------------------
 
-; [ every landed hit: weapon-class chip, Shadow's divine, then broken double ]
+; [ every landed hit: weapon-class chip, Shadow's divine, then the factor ]
 
 ; replaces the bare broken-double jsl at the elemental join @0c1e, so it
 ; runs for every damaging hit against every target, including hits whose
@@ -677,8 +681,10 @@ done:   rtl
 ;
 ; the assassinate gate comes after the class chip (and after Ot6Chip's
 ; element chip, one call earlier at @0c0e) so a hit that empties the last
-; shield reads its own break: Shadow's breaking hit is his kill, once per
-; battle (Ot6AssassinateGate, ot6_divine.asm).
+; shield reads its own break: Shadow's breaking hit is his kill
+; (Ot6AssassinateGate, ot6_divine.asm).  The damage factor is judged on the
+; state before the hit (#542): the breaking hit is halved as a shielded hit
+; (OT6_HITBRK), and only hits on a body already Broken are doubled.
 
 .proc Ot6HitJoin
         .a8
@@ -794,7 +800,8 @@ done:   rts
         bcs     merge           ; message index for the matched class
         inc     $3401
         bra     @bit
-merge:  lda     OT6_SCR_BIT     ; bank the matched class as pending:
+merge:  jsr     Ot6Hold         ; #539: the gauge shows this hit with its hit
+        lda     OT6_SCR_BIT     ; bank the matched class as pending:
         ora     OT6_RVPEND_CLS-8,y      ;   committed to the revealed byte on
         sta     OT6_RVPEND_CLS-8,y      ;   the damage frame, like the elements
         ; learn it forever, like the elements (join already pinned i16)
@@ -819,8 +826,7 @@ merge:  lda     OT6_SCR_BIT     ; bank the matched class as pending:
         bne     done
         lda     #OT6_BREAK_TICKS
         sta     OT6_BROKEN_TICKS,y         ; shields down: break
-        lda     #$ff                       ; flash pending (see Ot6BreakArm)
-        sta     OT6_BRKTICK-8,y
+        jsr     Ot6HitBroke                ; #542: this hit is judged shielded
 done:   rts
 .endproc
 
@@ -831,10 +837,12 @@ done:   rts
 ; the chips above run at damage calc, inside CalcAttackEffect's per-target
 ; loop; the damage the player sees lands when GfxCmd_0b allocates its
 ; numeral thread, hundreds of frames later.  so the chips bank into
-; OT6_RVPEND_* and this walker moves pending into the revealed bytes:
-;   - called from GfxCmd_0b's entry (C1 shim), the damage frame proper;
-;   - and from Ot6ActionEnd, the backstop for numeral-less actions, so
-;     pending never outlives the action that banked it.
+; OT6_RVPEND_*.  each hit's numeral shows the weaknesses pending as its pass
+; left them (#539: Ot6NumQueued's event, Ot6EvApply), and this walker moves
+; whatever is still pending into the revealed bytes at the end of the
+; script or the action (Ot6ShowFlush), the backstop for numeral-less
+; actions (Scan, a take with no damage), so pending never outlives the
+; action that banked it.
 ; the codex is per-species, so the commit writes every same-species slot's
 ; revealed byte in the same pass, and all siblings' icons appear on one
 ; frame.
@@ -854,29 +862,13 @@ done:   rts
         plb
         ldy     #$0000          ; source monster slot offset 0,2..10
 @src:   lda     OT6_RVPEND_ELEM,y
-        ora     OT6_RVPEND_CLS,y
-        beq     @next           ; nothing pending for this slot
-        ldx     #$0000          ; sibling slot offset
-@sib:   longa
-        lda     OT6_SPECIES,x
-        cmp     OT6_SPECIES,y
-        shorta                  ; plain SEP #$20; shorta0's `tdc` sets Z
-                                ;   from D and would wipe the compare
-        bne     @skip
-        lda     OT6_RVPEND_ELEM,y
-        ora     $3e91,x         ; revealed elements (OT6_REVEALED_ELEM + 8)
-        sta     $3e91,x
+        xba
         lda     OT6_RVPEND_CLS,y
-        ora     $3ea5,x         ; revealed classes (OT6_BOOST_REVEALED + 8)
-        sta     $3ea5,x
-@skip:  inx
-        inx
-        cpx     #$000c
-        bcc     @sib
+        jsr     Ot6RevealSibs   ; nothing pending: a no-op
         lda     #$00
         sta     OT6_RVPEND_ELEM,y
         sta     OT6_RVPEND_CLS,y
-@next:  iny
+        iny
         iny
         cpy     #$000c
         bcc     @src
@@ -894,12 +886,369 @@ done:   rts
 
 ; ------------------------------------------------------------------------------
 
+; [ #539: weaknesses revealed on every monster of a species ]
+;
+; y = the source monster's slot offset (0,2..10), a = class bits, b = element
+; bits.  ORs them into the revealed bytes of every slot whose species is
+; y's: the codex is per species, so all siblings' icons appear on one
+; frame.  Absent slots are written too when their species matches:
+; harmless (their hud lines are disabled) and cheaper than a presence test.
+; a8/i16, db=$7e.  preserves x/y; clobbers a (b = 0).
+.proc Ot6RevealSibs
+        .a8
+        .i16
+        phx
+        pha                     ; [$02,s] classes
+        xba
+        pha                     ; [$01,s] elements
+        ora     $02,s
+        beq     @out            ; nothing to reveal
+        ldx     #$0000          ; sibling slot offset
+@sib:   longa
+        lda     OT6_SPECIES,x
+        cmp     OT6_SPECIES,y
+        shorta                  ; plain SEP #$20; shorta0's `tdc` sets Z
+                                ;   from D and would wipe the compare
+        bne     @skip
+        lda     $01,s
+        ora     $3e91,x         ; revealed elements (OT6_REVEALED_ELEM + 8)
+        sta     $3e91,x
+        lda     $02,s
+        ora     $3ea5,x         ; revealed classes (OT6_BOOST_REVEALED + 8)
+        sta     $3ea5,x
+@skip:  inx
+        inx
+        cpx     #$000c
+        bcc     @sib
+@out:   pla
+        pla
+        plx
+        tdc                     ; b = 0
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #539: the gauge as the player has seen it ]
+;
+; See OT6_HOLD in ot6_memory.inc.  Ot6Hold runs at a take's first touch of
+; a monster in an action, before the shields move: it holds the slot's
+; gauge at the state it found, unless the slot is already held.  The chips
+; call it where they bank a reveal (Ot6Chip, Ot6ClassChip: a reveal on a
+; shieldless body is held too) and Ot6TakeShields before each shield.
+; a8, either index width; y = entity offset ($08-$12).  db=$7e.  preserves
+; x/y; clobbers a (b = 0).
+.proc Ot6Hold
+        .a8
+        jsr     Ot6HitBit
+        and     OT6_HOLD
+        bne     @held           ; held already: it shows an earlier hit
+        jsr     Ot6HitBit
+        tsb     OT6_HOLD
+        jsr     Ot6LiveGauge
+        sta     OT6_SHOWN-8,y
+@held:  rts
+.endproc
+
+; y = entity offset ($08-$12) -> a = its live gauge: $80 broken, else the
+; shield count.  a8, either index width.  preserves x/y.
+.proc Ot6LiveGauge
+        .a8
+        lda     OT6_BROKEN_TICKS,y
+        beq     :+
+        lda     #$80
+        bra     @dead
+:       lda     OT6_SHIELD_CUR,y
+@dead:  pha
+        lda     $3ee4,y         ; status 1: wound/petrify ($c2) adds $40
+        and     #$c2
+        beq     :+
+        pla
+        ora     #$40
+        rts
+:       pla
+        rts
+.endproc
+
+; [ the HUD's gauge read ]  y = slot offset (0,2..10) -> a = the gauge to
+; draw: $80 broken, else the count (0 = shieldless), with $40 for a dead or
+; petrified body, whose line draws empty.  The held gauge while the slot is
+; held, else the live one.  a8/i16, db=$7e.  preserves x/y.
+.proc Ot6ShownGauge
+        .a8
+        .i16
+        phx
+        longa
+        tya
+        lsr
+        tax
+        shorta0
+        lda     f:Ot6HitBitTbl,x
+        plx
+        and     OT6_HOLD
+        beq     @live
+        lda     OT6_SHOWN,y
+        rts
+@live:  lda     $3eec,y         ; monster status 1: wound/petrify ($c2, the
+        bit     #$c2            ;   hud's own dead test)
+        beq     :+
+        lda     #$40            ; (the line draws empty: the rest is moot)
+        rts
+:       lda     $3e90,y         ; OT6_BROKEN_TICKS + 8
+        beq     :+
+        lda     #$80
+        rts
+:       lda     $3e40,y         ; OT6_SHIELD_CUR + 8
+        rts
+.endproc
+
+; [ a numeral is queued: note what it shows a held monster ]
+;
+; jsl from ShowDmgNumerals (battle_main.asm), once per single-target
+; numeral command, just before it joins the battle-script queue; x = the
+; target's entity offset.  For a held monster, push the event: the queue
+; offset the command takes ($3a72), and the gauge and pending reveals as
+; this pass left them.  Any widths, db any.  Preserves a/x/y/p.  rtl.
+.proc Ot6NumQueued
+        php
+        rep     #$30
+        .a16
+        .i16
+        pha
+        phx
+        phy
+        phb
+        shorta0
+        lda     #$7e
+        pha
+        plb
+        txa
+        cmp     #$08
+        bcc     @out            ; a character's numeral
+        longa
+        txa
+        and     #$00ff
+        tay
+        shorta0
+        jsr     Ot6Hold         ; a blow that kills shows with its numeral
+        jsr     Ot6EvPush
+@out:   plb
+        rep     #$30
+        ply
+        plx
+        pla
+        plp
+        rtl
+.endproc
+
+; jsl from ShowDmgNumeralsMulti, before its one command for five or more
+; targets is queued: an event for every held monster with a numeral in it
+; ($33d0 not $ffff).  Any widths, db any.  Preserves a/x/y/p.  rtl.
+.proc Ot6NumQueuedMulti
+        php
+        rep     #$30
+        .a16
+        .i16
+        pha
+        phx
+        phy
+        phb
+        shorta0
+        lda     #$7e
+        pha
+        plb
+        ldy     #$0008
+@t:     longa
+        lda     $33d0,y
+        inc     a
+        shorta                  ; (sep keeps the 16-bit z)
+        beq     @next           ; $ffff: no numeral for this monster
+        lda     $3aa8,y         ; present
+        lsr
+        bcc     @next
+        jsr     Ot6Hold
+        jsr     Ot6EvPush
+@next:  iny
+        iny
+        cpy     #$0014
+        bcc     @t
+        plb
+        rep     #$30
+        ply
+        plx
+        pla
+        plp
+        rtl
+.endproc
+
+; push one event for y (entity offset).  a8/i16, db=$7e.  preserves y;
+; clobbers a/x.  A full ring drops the event (the flush still shows it).
+.proc Ot6EvPush
+        .a8
+        .i16
+        lda     OT6_EVTAIL
+        inc     a
+        cmp     #OT6_EVN
+        bcc     :+
+        lda     #$00
+:       cmp     OT6_EVHEAD
+        beq     @full
+        pha                     ; the next tail
+        lda     OT6_EVTAIL
+        jsr     Ot6EvAt
+        lda     $3a72           ; the offset this numeral command takes
+        sta     OT6_EVQ,x
+        tya
+        sec
+        sbc     #$08
+        sta     OT6_EVQ+1,x     ; slot offset
+        jsr     Ot6LiveGauge
+        pha
+        longa
+        lda     $3bf4,y         ; hp: the pass's damage is applied, its
+        shorta                  ;   death not yet marked (UpdateStatus)
+        bne     :+
+        pla
+        ora     #$40            ; this blow kills it
+        pha
+:       pla
+        sta     OT6_EVQ+2,x
+        lda     OT6_RVPEND_ELEM-8,y
+        sta     OT6_EVQ+3,x
+        lda     OT6_RVPEND_CLS-8,y
+        sta     OT6_EVQ+4,x
+        pla
+        sta     OT6_EVTAIL
+@full:  rts
+.endproc
+
+; a = ring index -> x = its byte offset (index * OT6_EVLEN).  a8/i16.
+; clobbers a (b = 0); preserves y.
+.proc Ot6EvAt
+        .a8
+        .i16
+        longa
+        and     #$00ff
+        pha
+        asl
+        asl
+        clc
+        adc     $01,s           ; * 5
+        tax
+        pla
+        shorta0
+        rts
+.endproc
+.assert OT6_EVLEN = 5, error, "Ot6EvAt multiplies by five"
+
+; advance the ring's head.  a8/i16, db=$7e.  clobbers a.
+.proc Ot6EvNext
+        .a8
+        lda     OT6_EVHEAD
+        inc     a
+        cmp     #OT6_EVN
+        bcc     :+
+        lda     #$00
+:       sta     OT6_EVHEAD
+        rts
+.endproc
+
+; [ show one event: its hit has landed ]
+;
+; x = the event's byte offset.  The slot's held gauge takes the event's; a
+; gauge that turns broken here banks the break flash and its cleave
+; (OT6_BRKTICK = $ff, which the caller's Ot6BreakArm fires); its pending
+; weaknesses are revealed on every monster of the species.
+; a8/i16, db=$7e.  preserves x/y; clobbers a.
+.proc Ot6EvApply
+        .a8
+        .i16
+        phy
+        lda     OT6_EVQ+1,x
+        longa
+        and     #$00ff
+        tay                     ; slot offset
+        shorta0
+        lda     OT6_SHOWN,y
+        pha                     ; the gauge shown before this hit
+        lda     OT6_EVQ+2,x
+        sta     OT6_SHOWN,y
+        bpl     @kept           ; not broken after it
+        pla
+        pha
+        bmi     @kept           ; broken before it too
+        lda     #$ff
+        sta     OT6_BRKTICK,y   ; this hit broke it: the flash and the cleave
+@kept:  pla
+        lda     OT6_EVQ+3,x
+        xba
+        lda     OT6_EVQ+4,x
+        jsr     Ot6RevealSibs
+        ply
+        rts
+.endproc
+
+; [ the script is over: show everything, release the gauges ]
+;
+; From the end of every battle script (Ot6ScriptEnd_ext) and every action
+; (Ot6ActionEnd): the events left (a hit with no numeral, a ring that
+; filled) are shown in order, a held gauge whose monster broke without a
+; numeral to show it (OT6's Break, Filch) banks its flash, the holds go,
+; and Ot6RevealCommit commits what is still pending and fires the flashes.
+; a8/i16, db=$7e.  preserves x/y; clobbers a.
+.proc Ot6ShowFlush
+        .a8
+        .i16
+        phx
+        phy
+@ev:    lda     OT6_EVHEAD
+        cmp     OT6_EVTAIL
+        beq     @rel
+        jsr     Ot6EvAt
+        jsr     Ot6EvApply
+        jsr     Ot6EvNext
+        bra     @ev
+@rel:   lda     OT6_HOLD
+        beq     @commit
+        ldy     #$0000
+@slot:  phy
+        longa
+        tya
+        lsr
+        tax
+        shorta0
+        lda     f:Ot6HitBitTbl,x
+        ply
+        and     OT6_HOLD
+        beq     @next
+        lda     $3e90,y         ; broken now (OT6_BROKEN_TICKS + 8)
+        beq     @next
+        lda     OT6_SHOWN,y
+        bmi     @next           ; and shown broken already
+        lda     #$ff
+        sta     OT6_BRKTICK,y
+@next:  iny
+        iny
+        cpy     #$000c
+        bcc     @slot
+        lda     #$00
+        sta     OT6_HOLD
+@commit:
+        jsr     Ot6RevealCommit
+        ply
+        plx
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ the break moment: fire every pending monster's break, sound it once ]
 ;
 ; The chips above empty the gauge inside CalcAttackEffect's per-target
 ; loop, at damage calc, well before the damage frame the player sees.
-; The chips bank $ff in OT6_BRKTICK and this proc converts pending into a
-; live flash on the damage frame.
+; The numeral of the hit that broke it banks $ff in OT6_BRKTICK (#539,
+; Ot6EvApply; a take with no numeral, at the script's end, Ot6ShowFlush) and
+; this proc converts pending into a live flash on that frame.
 ;
 ; The cleave is not conditional on the flash.  Ot6BreakStart returns
 ; carry for "a break happened at this monster", which is a weaker
@@ -909,9 +1258,8 @@ done:   rts
 ;
 ; The sound is once per pass, not once per slot: two monsters broken by
 ; the same action share one cleave, and a multi-hit action cannot
-; double it either, because a chip only banks pending when
-; OT6_BROKEN_TICKS is still zero, so hits 2..n of a combo find the
-; target already broken and bank nothing.
+; double it either: only the event whose gauge turns broken banks the
+; flash, and the hits after it find the gauge broken already.
 ;
 ; The sfx id $be is vanilla's Odin/Raiden cleave (btlgfx_main.asm:26049-
 ; 26055, the only site that plays it), queued by writing PlayAnimSfx's
@@ -1163,14 +1511,55 @@ done:   rts
 .proc Ot6RevealPoll
         .a8
         .i16
-        lda     f:$7e0000+$632e         ; damage-numeral thread counter
+        lda     #$00
+        pha                     ; [$01,s] a numeral appeared this tick
+        lda     f:$7e0000+$632e ; single-target numeral counter
         cmp     f:$7e0000+OT6_NUMCTR
-        beq     @done                   ; no numeral since last tick
+        beq     @multi
         sta     f:$7e0000+OT6_NUMCTR
-        jsr     Ot6RevealCommit
-        sec                             ; the numeral frame, reported
-        rts
-@done:  clc
+        cmp     #$00            ; GfxCmd_0b's opening `and #$03` turns 4 into
+        beq     @multi          ;   0 before it draws: only its closing inc,
+        lda     #$01            ;   to 1..4, is a numeral appearing
+        sta     $01,s
+@multi: lda     f:$7e0000+$7b3d ; multi-target numeral counter (GfxCmd_03)
+        cmp     f:$7e0000+OT6_MULCTR
+        beq     @pop
+        sta     f:$7e0000+OT6_MULCTR
+        lda     #$01
+        sta     $01,s
+@pop:   lda     OT6_SCRIPTBUSY
+        beq     @done           ; no script running: events wait for theirs
+        longa
+        lda     a:$0076         ; the script engine's command pointer (dp $76,
+        sec                     ;   BtlGfx_04 walks it up from $2d6e)
+        sbc     #$2d6e
+        cmp     #$0100
+        bcc     :+
+        lda     #$00ff
+:       shorta
+        sta     OT6_SCR_IDX     ; the command running now
+        lda     #$00
+        sta     OT6_SCR_IDX+1   ; did a hit land this tick?
+@ev:    lda     OT6_EVHEAD
+        cmp     OT6_EVTAIL
+        beq     @arm
+        jsr     Ot6EvAt
+        lda     OT6_EVQ,x
+        cmp     OT6_SCR_IDX
+        bcc     @land           ; an earlier command's numeral: past
+        bne     @arm            ; a later command's: not yet
+        lda     $01,s           ; the running command's: once it shows
+        beq     @arm
+@land:  jsr     Ot6EvApply
+        jsr     Ot6EvNext
+        lda     #$01
+        sta     OT6_SCR_IDX+1
+        bra     @ev
+@arm:   lda     OT6_SCR_IDX+1
+        beq     @done
+        jsr     Ot6BreakArm     ; a break shown this tick: its flash and cleave
+@done:  pla
+        cmp     #$01            ; carry set: a numeral appeared this tick
         rts
 .endproc
 
@@ -1190,6 +1579,10 @@ done:   rts
         tya                     ; entity offset, width-neutral test
         cmp     #$08
         bcc     done
+        jsr     Ot6HitBit
+        and     OT6_HITBRK
+        bne     broke           ; #542: this hit broke it, so it landed on a
+                                ;   shielded body: no double
         lda     OT6_BROKEN_TICKS,y
         beq     done            ; not broken
         lda     $f2             ; heal bit only; the whole-byte gate let
@@ -1200,6 +1593,48 @@ done:   rts
         asl     $f0
         rol     $f1
 done:   rtl
+broke:  trb     OT6_HITBRK      ; judged: the next hit lands on a broken body
+        rtl
+.endproc
+
+; [ #542: the breaking-hit mask (OT6_HITBRK, ot6_memory.inc) ]
+
+; Ot6HitBit: y = a monster's entity offset ($08-$12) -> a = its slot's bit.
+; a8, either index width; clears b (clr_a); preserves x/y.
+.proc Ot6HitBit
+        .a8
+        phx
+        clr_a                   ; b = 0, so the 16-bit tax below is clean
+        tya
+        sec
+        sbc     #$08
+        lsr                     ; monster slot 0-5
+        tax
+        lda     f:Ot6HitBitTbl,x
+        plx
+        rts
+.endproc
+
+Ot6HitBitTbl:
+        .byte   $01,$02,$04,$08,$10,$20
+
+; Ot6HitBroke: the take that just emptied y's last shield marks it, so the
+; damage tail judges that hit shielded.  a8, either index width; preserves
+; x/y; clobbers a (b = 0).
+.proc Ot6HitBroke
+        .a8
+        jsr     Ot6HitBit
+        tsb     OT6_HITBRK
+        rts
+.endproc
+
+; Ot6HitUnbroke: a take that is no hit (OT6's Break, Filch) has no damage to
+; judge, so its mark goes at once.  Same contract.
+.proc Ot6HitUnbroke
+        .a8
+        jsr     Ot6HitBit
+        trb     OT6_HITBRK
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -1218,9 +1653,11 @@ done:   rtl
 ;     (authored 0 rows: whelk shell, tritoch, formula 0s) and broken
 ;     monsters both sit at 0 and pass through untouched; shields==0
 ;     means no shield system rather than "attenuate"
-;   - the breaking hit itself is not attenuated: both chip procs run
-;     before this tail, so its read of OT6_SHIELD_CUR already sees 0 with the
-;     broken timer up, and Ot6BrokenDmg doubles it instead
+;   - the breaking hit is attenuated too (#542): both chip procs run
+;     before this tail, so OT6_SHIELD_CUR already reads 0, but the take
+;     that emptied it marked the slot in OT6_HITBRK (Ot6HitBroke), and a
+;     marked hit landed on a shielded body; Ot6BrokenDmg withholds its
+;     double and clears the mark
 ;   - resolved heals pass through (the $f2 bit-0 discipline, same as
 ;     the chip gates and the broken double: absorbs and undead drain
 ;     reversals must never shrink)
@@ -1247,8 +1684,11 @@ Ot6ShieldedMulW:
         cmp     #$08
         bcc     done            ; characters carry no shields
         lda     OT6_SHIELD_CUR,y
-        beq     done            ; 0 = broken or shieldless: no attenuation
-        lda     $f2             ; resolved heal bit only (chip-gate rule)
+        bne     @held           ; shields up: attenuate
+        jsr     Ot6HitBit       ; 0: broken or shieldless, unless this very
+        and     OT6_HITBRK      ;   hit took the last one (#542): it landed
+        beq     done            ;   on a shielded body
+@held:  lda     $f2             ; resolved heal bit only (chip-gate rule)
         lsr
         bcs     done
         lda     f:Ot6ShieldedMulW

@@ -3142,7 +3142,8 @@ deal_sub:
 
 ExecCmd:
 _dispatcher:
-@13d3:  phx
+@13d3:  jsl     Ot6BpBegin      ; ot6 #540: a character's action begins
+        phx
         php
         jsr     InitGfxScript
         lda     #$10
@@ -16781,6 +16782,7 @@ ShowDmgNumerals:
         beq     @63ae       ; branch if target didn't take damage
         dec
         sta     $3a2a
+        jsl     Ot6NumQueued            ; ot6 #539: what this numeral shows
         txa
         lsr
         xba
@@ -16798,6 +16800,7 @@ ShowDmgNumeralsMulti:
 @63b4:  bcc     @63da
         php
         shorta
+        jsl     Ot6NumQueuedMulti       ; ot6 #539: what these numerals show
         lda     #$03        ; battle script command $03 (multiple damage numerals)
         jsr     _c2629b       ; add battle script command to queue
         lda     $3a34       ; number of targets

@@ -495,6 +495,7 @@ Ot6ThiefBanner:
         and     #$03            ; the points (Ot6Boost caps the spend at 3)
         inc     a               ; one shield, and one more a point
         jsr     Ot6TakeShields  ; the last one taken breaks the body
+        jsr     Ot6HitUnbroke   ; #542: a Filch is no hit, so no damage to judge
 @bank:  ; --- the chip landed: Locke keeps the first as a boost point ---
         lda     OT6_BP_CLASS,x
         cmp     #$05

@@ -39,6 +39,7 @@ local sfx = {}                  -- one entry per queued animation sfx
 local ecWrites = {}             -- EVERY write to the enable byte, zeroes too:
 local hpWrites = {}             -- damage-CALC frames
 local pendF, armF, offF = {}, {}, {}
+local breakF = {}               -- the frame each guard's broken timer went up (damage calc)
 local prevTick, eatenF = {}, {}          -- the frame a PENDING byte was consumed
 local white   = { [1] = {}, [2] = {} }   -- our-flash frames on palette 3
 local foreign = { [1] = 0, [2] = 0 }     -- palette 3 with no flash of ours
@@ -76,6 +77,7 @@ local function sample()
   local anyLive = false
   for g = 1, 2 do
     local t = tick(g)
+    if H.readByte(BROKEN + G[g]) ~= 0 and not breakF[g] then breakF[g] = H.frame end
     if t == 0xFF and not pendF[g] then pendF[g] = H.frame end
     if prevTick[g] == 0xFF and t ~= 0xFF and not eatenF[g] then
       eatenF[g] = H.frame          -- Ot6BreakStart looked at this slot HERE,
@@ -120,7 +122,7 @@ end
 
 local function resetWatch()
   sfx, hpWrites, ecWrites = {}, {}, {}
-  pendF, armF, offF = {}, {}, {}
+  pendF, armF, offF, breakF = {}, {}, {}, {}
   prevTick, eatenF = {}, {}
   white = { [1] = {}, [2] = {} }
   foreign = { [1] = 0, [2] = 0 }
@@ -282,13 +284,15 @@ H.run({ maxFrames = 60000 }, {
         i, s.f, s.id, s.cmd, s.pan))
     end
 
-    -- 1. the frame
-    H.assertEq(pendF[b] ~= nil, true,
-      "the chip banked the flash as PENDING ($FF) when the gauge emptied")
+    -- 1. the frame.  Since #539 the chip banks nothing: the hit's numeral
+    -- shows the break (Ot6EvApply banks the flash and Ot6BreakArm fires it on
+    -- the same tick), so the pending byte is not seen between frames.
+    H.assertEq(breakF[b] ~= nil, true,
+      "the chip broke the guard at damage calc (its broken timer went up)")
     H.assertEq(#hpWrites > 0, true, "damage landed")
-    H.assertEq(armF[b] > pendF[b], true,
-      "the flash arms strictly AFTER it was banked -- it is deferred to the "
-      .. "damage frame, not fired at the chip hundreds of frames earlier")
+    H.assertEq(armF[b] > breakF[b], true,
+      "the flash arms strictly AFTER the break was computed -- it is deferred to "
+      .. "the damage frame, not fired at the chip hundreds of frames earlier")
     local onNumeral = false
     for _, f in ipairs(numeralF) do
       if armF[b] - f >= -2 and armF[b] - f <= 12 then onNumeral = true end
@@ -504,16 +508,24 @@ H.run({ maxFrames = 60000 }, {
     -- shields on the sibling puts that out of reach of the tail frames.
     H.writeByte(SHIELD + G[o], 6)
     pinLab()
-    H.writeWord(MONHP + G[b], 450)
     H.vars.tgtX = H.readByte(MONX + G[b])
-    H.log(string.format("phase 5: guard %d hp -> 450, hp pin LIFTED on it "
-      .. "(screen x %02X); sibling %d stays pinned", b, H.vars.tgtX, o))
+    H.vars.low = false
+    H.log(string.format("phase 5: guard %d keeps its pinned hp until one shield is "
+      .. "left (screen x %02X); sibling %d stays pinned", b, H.vars.tgtX, o))
     watch = true
   end),
   H.driveUntil(function()
-    pinLab(H.vars.tgt)                       -- pin the sibling ONLY
     local b = H.vars.tgt
-    return H.readWord(MONHP + G[b]) == 0 and eatenF[b] ~= nil
+    -- the breaking hit is a shielded hit since #542, about the chip's size,
+    -- so the target's HP goes to 1 once one shield is left: the hit that
+    -- takes it is the one that kills, whatever it deals
+    if not H.vars.low and H.readByte(SHIELD + G[b]) == 1 then
+      H.writeWord(MONHP + G[b], 1)
+      H.vars.low = true
+      H.log(string.format("phase 5: guard %d at one shield f%d: hp -> 1, its pin lifted", b, H.frame))
+    end
+    pinLab(H.vars.low and H.vars.tgt or nil) -- the target too, until then
+    return H.readWord(MONHP + G[b]) == 0 and #breakSfx() > 0
   end, 14000, {
     H.call(function() if H.readByte(0x7bca) ~= 0 then H.setPad({ "a" }) end end),
     H.waitFrames(4),
@@ -544,7 +556,7 @@ H.run({ maxFrames = 60000 }, {
     end
 
     -- the coincidence happened
-    H.assertEq(pendF[b] ~= nil, true, "the gauge emptied: a flash was banked")
+    H.assertEq(breakF[b] ~= nil, true, "the gauge emptied: the guard broke")
     H.assertEq(H.readWord(MONHP + G[b]), 0,
       "and the breaking blow left the monster at zero hp")
     H.assertEq(H.readByte(BROKEN + G[b]) ~= 0, true,
@@ -561,10 +573,14 @@ H.run({ maxFrames = 60000 }, {
       string.format("the break still CLEAVES when its blow also kills -- one "
         .. "$%02X queued (%d)", BREAK_SFX, #hits))
     H.assertEq(hits[1].cmd, 0x18, "queued as spc command $18 (play game sfx)")
-    H.assertEq(math.abs(hits[1].f - eatenF[b]) <= 4, true,
-      string.format("on the frame the pending byte was consumed -- still the "
-        .. "damage frame, not damage calc (sfx f%d, consumed f%s)",
-        hits[1].f, tostring(eatenF[b])))
+    local onNum = false
+    for _, f in ipairs(numeralF) do
+      if hits[1].f - f >= -2 and hits[1].f - f <= 12 then onNum = true end
+    end
+    H.assertEq(onNum and hits[1].f > breakF[b], true,
+      string.format("on a damage-numeral frame after the break was computed -- "
+        .. "the damage frame, not damage calc (sfx f%d, break computed f%s)",
+        hits[1].f, tostring(breakF[b])))
     H.assertEq(hits[1].pan, H.vars.tgtX,
       "panned to the broken monster's screen x, as on the surviving path")
 
