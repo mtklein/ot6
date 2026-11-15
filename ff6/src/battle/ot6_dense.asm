@@ -53,13 +53,14 @@
 ; reader, never drew them for a Muddled caster).  Preserves a/x/y and P.
 .proc Ot6PackSpellList
         php
-        rep     #$10
+        rep     #$30            ; save all of a: vanilla left its high byte
+        .a16                    ;   alone here, and its callers may lean on it
         .i16
-        sep     #$20
-        .a8
         pha
         phx
         phy
+        sep     #$20
+        .a8
         rep     #$20
         .a16
         lda     $302c,x         ; the caster's list (row 0, the esper's)
@@ -84,11 +85,14 @@
         tyx                     ; both cursors stand at row 55, the lores
         lda     #24
         jsr     PackRows
+        rep     #$30
+        .a16
         ply
         plx
         pla
         plp
         rtl
+        .a8
 
 ; in: x = y = the first row, a = the row count; a8/i16.  out: a = the rows
 ; kept; x = y = one past the segment's last row.
@@ -352,6 +356,11 @@ OT6_LIST_RAGE  = 4
 @done:  pla                     ; the top
         plx                     ; drop c and n
         ply
+        rep     #$20            ; b = 0: btlgfx's `tax` after these splices
+        .a16                    ;   moves all of a (_c18414: `lda w7e62ca /
+        and     #$00ff          ;   asl / tax`), and vanilla left b clear
+        sep     #$20
+        .a8
         rts
 
 ColsTbl:
@@ -428,7 +437,7 @@ ot6_dense_list "Rage",  OT6_LIST_RAGE,  $892b
         .i16
         cmp     #0
         bne     :+
-        sec                     ; no scroll: no bar
+        sec                     ; no scroll: no bar (b is 0: Ot6ListClamp)
         rtl
 :       sta     $36
         rep     #$20
@@ -445,8 +454,10 @@ ot6_dense_list "Rage",  OT6_LIST_RAGE,  $892b
         .a16
         lda     f:hRDDIVL
         sta     $2e
+        lda     #$0000          ; b = 0 (Ot6ListClamp's note)
         sep     #$20
         .a8
+        lda     $36
         clc
         rtl
 .endproc
