@@ -973,8 +973,9 @@ Ot6RungCostTbl:
 ; second line says so (Ot6RungHaveStr): the effect bytes of every other
 ; reached rung OR'd together cover this rung's.  A stat rung, or a signature
 ; that is new code (no bytes), is never "held": stats add, and each new
-; signature sits on one esper only.  Gear is not counted: the line is about
-; where to tour next on the ladder.
+; signature sits on one esper only.  A larger max HP or max MP boost covers a
+; smaller one (only the largest applies).  Gear is not counted: the line is
+; about where to tour next on the ladder.
 ;
 ; in: A (a8) = esper (GenjuProp order), X (i16) = rung 0-4, Y (i16) = actor.
 ; Writes the string, its optional second line ($01 first) and the $00 end
@@ -1130,6 +1131,25 @@ RD_ESPER = RD_FRAME + 4 ;   and the esper
         lda     RD_S
         cmp     #OT6_ESPER_SLOTS
         bcc     @slot
+; a max HP or max MP boost: only the largest applies (CheckHPBoost reads the
+; bits largest-first), so a larger one held covers the smaller ones
+; (ItemProp +9: HP 1/8 $10, 1/4 $04, 1/2 $08; MP 1/8 $80, 1/4 $20, 1/2 $40)
+        shorta
+        lda     RD_HELD+4
+        bit     #$08
+        beq     :+
+        ora     #$14                    ; HP 1/2 covers 1/4 and 1/8
+:       bit     #$04
+        beq     :+
+        ora     #$10                    ; HP 1/4 covers 1/8
+:       bit     #$40
+        beq     :+
+        ora     #$a0                    ; MP 1/2 covers 1/4 and 1/8
+:       bit     #$20
+        beq     :+
+        ora     #$80                    ; MP 1/4 covers 1/8
+:       sta     RD_HELD+4
+        longa
 ; covered?  each of this rung's bytes, less what is held, must be empty
         lda     RD_REC
         jsr     @recoff

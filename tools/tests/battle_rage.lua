@@ -246,6 +246,7 @@ local coins = {}        -- one entry per possessed turn
 local pinBe = nil       -- the $be seed to force at each Ot6RageCoin entry
 local cmd0 = CMD_RAGE                -- the one command Gau is installed with
 local wantSecond = false
+local SECOND_TIER = 1   -- arm 7b: the second rager starts at 1 point (one extra draw a roll), Gau at 3 (none)
 local second = nil      -- arm 7b: a second rager's slot, kept alive and pinned unboosted until it confirms
 local secondPin = true
 
@@ -276,7 +277,7 @@ local function pinGau()
       H.writeByte(0x3ED8 + second * 2, GOGO)
       H.writeByte(0x3EE4 + second * 2, H.readByte(0x3EE4 + second * 2) & 0x7F)  -- alive
       if secondPin then
-        H.writeByte(0x3E9D + second * 2, 0)              -- unboosted
+        H.writeByte(0x3E9D + second * 2, SECOND_TIER)    -- its own boost, under Gau's
         H.writeWord(CURMP(second), startMp)
       end
     end
@@ -474,22 +475,24 @@ add({
 
 -- 7b. Two ragers, one tier each ---------------------------------------------
 -- Gau starts at 3 points; then a second rager (GOGO's id, the same Rage-only
--- command list: Gogo with Rage among his commands) starts unboosted while Gau
+-- command list: Gogo with Rage among his commands) starts at 1 point while Gau
 -- is possessed.  OT6_RAGETIER was one byte until v0.45, so the later start
 -- overwrote the earlier: Gau's coin fell to 1/2 for the rest of the trance
 -- (kit-gau.md section 10.7).  Per character, each rager's possessed turns roll
--- at the tier that rager started at: every one of Gau's at 3 (the special, no
--- draw), every one of the second's at 0.  Declared like the rest of this
+-- at the tier that rager started at, read from what the proc did: every one of
+-- Gau's takes no draw and is the special (tier 3), every one of the second's
+-- takes exactly one draw (tier 1's tilted coin).  Declared like the rest of this
 -- fixture (state_write_waivers.txt): the second rager is installed, not
 -- recruited -- no capture seats GOGO beside GAU (wor-gogo-v1 and
 -- wor-kt-factory-v1 seat GOGO with GAU in reserve).  Red on a ROM whose store
--- writes the one tier into every rager's cell (build/attempts/wt/v045-teach/
--- rage/shared_tier.log: GAU's first roll after the second start was Fight).
+-- writes the one tier into every rager's cell, and on one whose coin reads
+-- cell 0 whoever rolls (build/attempts/wt/v045-teach/rage/).
 add(trance("shared", function()
   startMp = 50; pinPend = 3; wantSecond = true     -- the second is chosen once the actor is known
 end, function()
   coins = {}; pinBe = nil
-  H.log(string.format("shared: GAU in slot %d at 3 points, the second rager (GOGO) in slot %d", actor, second))
+  H.log(string.format("shared: GAU in slot %d at 3 points, the second rager (GOGO) in slot %d at %d", actor, second,
+    SECOND_TIER))
 end))
 add(rageStart("shared"))
 add({
@@ -532,14 +535,15 @@ add({
     end
     H.assertEq(#mine >= 2 and #theirs >= 1, true, string.format(
       "shared: both ragers rolled after both starts (GAU %d, second %d)", #mine, #theirs))
+    H.assertEq(#theirs >= 2, true, "shared: the second rager rolled at least twice")
     H.assertEq(tierOf(actor), 3, "shared: GAU's stored tier is still 3 after the second rager's unboosted start")
-    H.assertEq(tierOf(second), 0, "shared: the second rager's stored tier is its own 0")
+    H.assertEq(tierOf(second), SECOND_TIER, "shared: the second rager's stored tier is its own")
     for _, e in ipairs(mine) do
       H.assertEq(e.coin, 1, "shared: every possessed turn of GAU's is the special -- his 3 points still buy it")
       H.assertEq(e.draws, 0, "shared: and takes no roll (tier 3), whoever started last")
     end
     for _, e in ipairs(theirs) do
-      H.assertEq(e.tier, 0, "shared: the second rager's rolls read its own tier 0, not GAU's 3")
+      H.assertEq(e.draws, 1, "shared: every roll of the second rager's took exactly its tier-1 draw (not GAU's none)")
     end
     second = nil
   end),

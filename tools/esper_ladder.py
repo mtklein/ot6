@@ -71,7 +71,7 @@ SPEC = [
      eff("Peace Ring", p2=S2["bserk"] | S2["muddle"])),
     ("Terrato", "Mag", "Stm", eff("Black Belt", r12=0x02), eff("Muscle Belt", r9=0x08)),
     ("Shoat", "Spd", "Stm", eff("No Petrify", p1=S1["petrify"]),
-     eff("Safety Bit", p1=S1["death"], p2=S2["doom"])),
+     eff("NoDeath/Doom", p1=S1["death"], p2=S2["doom"])),
     ("Maduin", "Mag", "Stm", eff("Bard's Hat", r9=0x80), eff("Earring", r9=0x02)),
     ("Bismark", "Vig", "Stm", eff("MithrilGlove", r13=0x02), eff("Red Cap", r9=0x04)),
     ("Stray", "Mag", "Spd", eff("No Imp", p1=S1["imp"]), eff("Sneak Ring", r11=0x01)),
@@ -123,7 +123,7 @@ DESC = {
     "No Zombie": "Protects against Zombie",
     "No Berserk": "Protects against Berserk",
     "No Death": "Protects against instant death",
-    "Safety Bit": "Blocks instant death, Condemned",
+    "NoDeath/Doom": "Blocks instant death, Condemned",
     "No Doom/Zomb": "Blocks Condemned and Zombie",
     "No Stop/Slow": "Blocks Stop and Slow",
     "Peace Ring": "Blocks Berserk and Muddle",
@@ -138,7 +138,7 @@ DESC = {
     "Earring": "Raises magic damage by 1/4",
     "Hero Ring": "Fight and magic damage +1/4",
     "Hyper Wrist": "Raises Vigor by half",
-    "Gold Hairpin": "Halves MP consumed",
+    "Gold Hairpin": "Halves the MP spells cost",
     "Black Belt": "Sometimes counters an attack",
     "MithrilGlove": "Casts Safe when HP is low",
     "Barrier Ring": "Casts Shell when HP is low",
@@ -385,6 +385,12 @@ def desc_problems(dc, desc=None):
             problems.append("%s rung %d: the label %r names two effects (%s and %s)"
                             % (name, k, label, seen[label], (b, pts)))
         seen.setdefault(label, (b, pts))
+    relics = relic_bytes()
+    for name, k, label, b, pts in rungs():
+        key = label.lower()
+        if key in relics and relics[key] != b:
+            problems.append("%s rung %d: the label %r names a relic whose effect bytes are %s, not the rung's %s"
+                            % (name, k, label, relics[key], b))
     for label, text in sorted(desc.items()) + [("(have)", HAVE)]:
         if "{n}" in text:
             problems.append("description %r is more than one line" % label)
@@ -553,8 +559,21 @@ def main():
             ok = any(needle in p for p in got)
             print("mutant %-48s %s" % (what, "red" if ok else "MISSED"))
             bad += not ok
-        # one label, one effect: Shoat's signature (Death and Condemned) labelled like Alexandr's rung 3 (Death)
         global SPEC
+        # a label naming a relic carries that relic's bytes: Shoat's signature labelled "Safety Bit" (which
+        # blocks Death, Petrify and Zombie, not Condemned)
+        real_spec = SPEC
+        i = [r[0] for r in SPEC].index("Shoat")
+        SPEC = list(SPEC)
+        SPEC[i] = SPEC[i][:4] + (("Safety Bit",) + SPEC[i][4][1:],)
+        d = dict(DESC)
+        d["Safety Bit"] = DESC["NoDeath/Doom"]
+        got = desc_problems(dc, d)
+        SPEC = real_spec
+        ok = any("'Safety Bit' names a relic" in p for p in got)
+        print("mutant %-48s %s" % ("Shoat's signature labelled Safety Bit", "red" if ok else "MISSED"))
+        bad += not ok
+        # one label, one effect: Shoat's signature (Death and Condemned) labelled like Alexandr's rung 3 (Death)
         real_spec = SPEC
         i = [r[0] for r in SPEC].index("Shoat")
         SPEC = list(SPEC)

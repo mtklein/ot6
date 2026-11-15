@@ -347,7 +347,7 @@ bytes, `ItemProp+5` to `+13`).
 | Ifrit | Fire, Drain | Vig / Stm | max HP +12.5% (Green Beret) | Fight deals more damage (Atlas Armlet) |
 | Shiva | Ice, Osmose, Shell | Mag / Spd | immune to Seizure | spells cost half MP (Gold Hairpin) |
 | Maduin | Fire, Ice, Bolt | Mag / Stm | max MP +12.5% (Bard's Hat) | spells deal more damage (Earrings) |
-| Shoat | Break, Doom | Spd / Stm | immune to Petrify | immune to Death and Doom (Safety Bit) |
+| Shoat | Break, Doom | Spd / Stm | immune to Petrify | immune to Death and Doom |
 | Phantom | Vanish, Demi | Spd / Mag | no back attacks (Back Guard) | Image at the start of every battle (Mirage Vest) |
 | Carbunkl | Rflect, Safe | Stm / Mag | Shell when HP is low (Barrier Ring) | †*Facet*: starts every battle with 2 boost points |
 | Bismark | Haste, Slow | Vig / Stm | Safe when HP is low (MithrilGlove) | max HP +25% (Red Cap) |
@@ -550,7 +550,8 @@ rung column too (`GenjuDetailCursorProp` {2, 7}: right from the spells, rows
 1-5), and the help window at the top shows what the highlighted rung does,
 one line from `Ot6RungDescStr` (`tools/esper_ladder.py`'s DESC: one
 description per label, every label one effect, so Shoat's signature is
-labelled "Safety Bit", not Alexandr's "No Death"). Under a rung the
+labelled "NoDeath/Doom", not Alexandr's "No Death", and a label that names
+a relic carries that relic's bytes). Under a rung the
 character has not reached whose effect bytes its other reached rungs already
 cover, on any stone and this one's earlier rungs included, a second line
 says "Already held" (`Ot6RungDescText`). Gear does not

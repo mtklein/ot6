@@ -221,11 +221,11 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> In OT6, whoever equips an Esper can cast its spells and summon it. Unequip it and both go. Spells are never learned.
+> In OT6, whoever equips an Esper can cast its spells and summon it, but it never teaches them. Unequip it and both go.
 >
 > *(next box)*
 >
-> A won battle gives Magic Points to the Esper each member has equipped. At 10, 30, 75, 200 and 500 points, it ranks up.
+> Members standing at a victory earn Magic Points with their Esper; at 10, 30, 75, 200 and 500 they rank up with it.
 >
 > *(next box)*
 >

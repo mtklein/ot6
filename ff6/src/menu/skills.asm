@@ -2891,6 +2891,10 @@ LoadGenjuDetailCursor:
 ; [ update cursor positions for esper details ]
 
 UpdateGenjuDetailCursor:
+.if LANG_EN
+        jsr     Ot6GenjuCursorBlocked
+        bcs     InitGenjuDetailCursor   ; up off rung 1, down off rung 5: no move, no sound
+.endif
 @5983:  jsr     MoveCursor
 .if LANG_EN
         jsr     Ot6GenjuCursorClamp
@@ -2927,7 +2931,30 @@ GenjuDetailCursorPos:
         cursor_pos {24, 184}
         cursor_pos {112, 172}           ; (1, 6): never shown (clamped)
 
-; the rung column has rungs on rows 1-5 only
+; carry set: on the rung column, up on rung 1 or down on rung 5, a move the
+; clamp would only undo (MoveCursor checks up first, then down, as here)
+Ot6GenjuCursorBlocked:
+        lda     $4d
+        beq     @no
+        lda     z0a+1
+        bit     #$08                    ; up
+        beq     @down
+        lda     $4e
+        cmp     #1
+        beq     @yes
+        bra     @no
+@down:  bit     #$04                    ; down
+        beq     @no
+        lda     $4e
+        cmp     #5
+        beq     @yes
+@no:    clc
+        rts
+@yes:   sec
+        rts
+
+; the rung column has rungs on rows 1-5 only (a right move from row 0 or 6
+; lands here)
 Ot6GenjuCursorClamp:
         lda     $4d
         beq     @done                   ; the spell column: every row

@@ -46,51 +46,51 @@ Ot6RungDescPtrs:
         .word   $00c6   ; Raises Speed by 1
         .word   $00d8   ; Protects against Seizure
         .word   $00f1   ; Raises Mag.Pwr by 2
-        .word   $0105   ; Halves MP consumed
-        .word   $0118   ; Protects against Sleep
-        .word   $012f   ; Raises Speed by 2
-        .word   $0141   ; Blocks Berserk and Muddle
-        .word   $015b   ; Sometimes counters an attack
-        .word   $0178   ; Raises max HP by 1/2
-        .word   $018d   ; Protects against Petrify
-        .word   $01a6   ; Blocks instant death, Condemned
-        .word   $01c6   ; Raises max MP by 1/8
-        .word   $01db   ; Raises magic damage by 1/4
-        .word   $01f6   ; Casts Safe when HP is low
-        .word   $0210   ; Raises max HP by 1/4
-        .word   $0225   ; Protects against Imp
-        .word   $023a   ; Raises the success rate of Steal
-        .word   $025b   ; Walks faster outside battle
-        .word   $0277   ; Float in every battle
-        .word   $028d   ; Blocks Dark, Petrify; MP +1/2
-        .word   $02ab   ; Fight always hits
-        .word   $02bd   ; Haste in every battle
-        .word   $02d3   ; Fight and magic damage +1/4
-        .word   $02ef   ; Protects against instant death
-        .word   $030e   ; Safe in every battle
-        .word   $0323   ; Raises all four stats by 1
-        .word   $033e   ; Gauntlet and Genji Glove effects
-        .word   $035f   ; Raises max MP by 1/4
-        .word   $0374   ; Raises Vigor by half
-        .word   $0389   ; Protects against Poison
-        .word   $03a1   ; Regen in every battle
-        .word   $03b7   ; Protects against Mute
-        .word   $03cd   ; Shell in every battle
-        .word   $03e3   ; Casts Shell when HP is low
-        .word   $03fe   ; 2 Boost Points at battle start
-        .word   $041d   ; No back or pincer attacks
-        .word   $0437   ; Starts every battle with Image
-        .word   $0456   ; Healing done is 25% stronger
-        .word   $0473   ; Revives allies at full HP
-        .word   $048d   ; Protects against Muddle
-        .word   $04a5   ; Covers weak allies while healthy
-        .word   $04c6   ; Protects against Zombie
-        .word   $04de   ; Blocks Dark, Zombie and Poison
-        .word   $04fd   ; Raises preemptive attack rate
-        .word   $051b   ; Blocks Stop and Slow
-        .word   $0530   ; Protects against Berserk
-        .word   $0549   ; Blocks Condemned and Zombie
-        .word   $0565   ; Starts every battle with Life 3
+        .word   $0105   ; Halves the MP spells cost
+        .word   $011f   ; Protects against Sleep
+        .word   $0136   ; Raises Speed by 2
+        .word   $0148   ; Blocks Berserk and Muddle
+        .word   $0162   ; Sometimes counters an attack
+        .word   $017f   ; Raises max HP by 1/2
+        .word   $0194   ; Protects against Petrify
+        .word   $01ad   ; Blocks instant death, Condemned
+        .word   $01cd   ; Raises max MP by 1/8
+        .word   $01e2   ; Raises magic damage by 1/4
+        .word   $01fd   ; Casts Safe when HP is low
+        .word   $0217   ; Raises max HP by 1/4
+        .word   $022c   ; Protects against Imp
+        .word   $0241   ; Raises the success rate of Steal
+        .word   $0262   ; Walks faster outside battle
+        .word   $027e   ; Float in every battle
+        .word   $0294   ; Blocks Dark, Petrify; MP +1/2
+        .word   $02b2   ; Fight always hits
+        .word   $02c4   ; Haste in every battle
+        .word   $02da   ; Fight and magic damage +1/4
+        .word   $02f6   ; Protects against instant death
+        .word   $0315   ; Safe in every battle
+        .word   $032a   ; Raises all four stats by 1
+        .word   $0345   ; Gauntlet and Genji Glove effects
+        .word   $0366   ; Raises max MP by 1/4
+        .word   $037b   ; Raises Vigor by half
+        .word   $0390   ; Protects against Poison
+        .word   $03a8   ; Regen in every battle
+        .word   $03be   ; Protects against Mute
+        .word   $03d4   ; Shell in every battle
+        .word   $03ea   ; Casts Shell when HP is low
+        .word   $0405   ; 2 Boost Points at battle start
+        .word   $0424   ; No back or pincer attacks
+        .word   $043e   ; Starts every battle with Image
+        .word   $045d   ; Healing done is 25% stronger
+        .word   $047a   ; Revives allies at full HP
+        .word   $0494   ; Protects against Muddle
+        .word   $04ac   ; Covers weak allies while healthy
+        .word   $04cd   ; Protects against Zombie
+        .word   $04e5   ; Blocks Dark, Zombie and Poison
+        .word   $0504   ; Raises preemptive attack rate
+        .word   $0522   ; Blocks Stop and Slow
+        .word   $0537   ; Protects against Berserk
+        .word   $0550   ; Blocks Condemned and Zombie
+        .word   $056c   ; Starts every battle with Life 3
 
 ; the descriptions, null-terminated, in the menu's description charset
 Ot6RungDescStr:
@@ -106,7 +106,7 @@ Ot6RungDescStr:
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$92,$a9,$9e,$9e,$9d,$ff,$9b,$b2,$ff,$b5,$00   ; Raises Speed by 1
         .byte   $8f,$ab,$a8,$ad,$9e,$9c,$ad,$ac,$ff,$9a,$a0,$9a,$a2,$a7,$ac,$ad,$ff,$92,$9e,$a2,$b3,$ae,$ab,$9e,$00   ; Protects against Seizure
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$9b,$b2,$ff,$b6,$00   ; Raises Mag.Pwr by 2
-        .byte   $87,$9a,$a5,$af,$9e,$ac,$ff,$8c,$8f,$ff,$9c,$a8,$a7,$ac,$ae,$a6,$9e,$9d,$00   ; Halves MP consumed
+        .byte   $87,$9a,$a5,$af,$9e,$ac,$ff,$ad,$a1,$9e,$ff,$8c,$8f,$ff,$ac,$a9,$9e,$a5,$a5,$ac,$ff,$9c,$a8,$ac,$ad,$00   ; Halves the MP spells cost
         .byte   $8f,$ab,$a8,$ad,$9e,$9c,$ad,$ac,$ff,$9a,$a0,$9a,$a2,$a7,$ac,$ad,$ff,$92,$a5,$9e,$9e,$a9,$00   ; Protects against Sleep
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$92,$a9,$9e,$9e,$9d,$ff,$9b,$b2,$ff,$b6,$00   ; Raises Speed by 2
         .byte   $81,$a5,$a8,$9c,$a4,$ac,$ff,$81,$9e,$ab,$ac,$9e,$ab,$a4,$ff,$9a,$a7,$9d,$ff,$8c,$ae,$9d,$9d,$a5,$9e,$00   ; Blocks Berserk and Muddle

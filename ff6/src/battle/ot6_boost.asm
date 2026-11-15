@@ -1346,7 +1346,9 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ; Ot6SpellNoBoost's last question on its own, for a caller to whom the
 ; Magic-gated rewards do not apply (Ot6SketchNoBoost: a sketch keeps command
 ; $0d, so no fold, no OT6 Break chips and no reach): a fraction of HP/MP
-; (MagicProp +$04 bit 7) or a power of 0.
+; (MagicProp +$04 bit 7), a power of 0, or an attacker special effect that
+; writes the number after the multiplier (v0.45: Revenge, Blow Fish, Pearl
+; Wind, Step Mine and Exploder took a boost and dealt their own number).
 ; in: A = the attack id.  out: carry set = no number.  a8, either index
 ; width; preserves A, X and Y.
 .proc Ot6SpellNoNumber
@@ -1372,6 +1374,17 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         bmi     @none           ; a fraction of HP/MP
         lda     f:MagicProp+6,x
         beq     @none           ; no power: no number
+        lda     f:MagicProp+9,x ; an attacker special effect that sets the
+        cmp     #$19            ;   number itself, after CalcDmg's multiplier
+        beq     @none           ;   (DoAttackerEffect overwrites $11b0):
+        cmp     #$1a            ;   $19 Exploder (the caster's HP), $1a Blow
+        beq     @none           ;   Fish (1000), $1b Pearl Wind (the caster's
+        cmp     #$1b            ;   max HP), $1e Step Mine (the play clock),
+        beq     @none           ;   $3d Revenge (max HP less HP)
+        cmp     #$1e
+        beq     @none
+        cmp     #$3d
+        beq     @none
 @buys:  plx
         pla
         plp
@@ -1470,7 +1483,8 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;   * the Lore list ($1b): Ot6SpellNoBoost on the lore under the cursor
 ;     (Condemned, Roulette, Big Guard, L.5 Doom, L.3 Muddle, Reflect???,
 ;     ForceField, Dischord, Sour Mouth, Pep Up, Rippler: no power, or Pep
-;     Up's fraction), the row the confirm queues (UpdateMenuState_1b's
+;     Up's fraction; Revenge, Blow Fish, Pearl Wind, Step Mine, Exploder:
+;     their special effect sets the number after the multiplier), the row the confirm queues (UpdateMenuState_1b's
 ;     _c183f7: scroll + cursor row, one column, four bytes a row from the
 ;     caster's list at $216a = the list's own $208e + $dc, the esper's row
 ;     and the 54 spells' before it; one row per lore, its byte the lore's
