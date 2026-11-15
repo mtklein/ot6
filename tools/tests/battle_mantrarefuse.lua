@@ -1,8 +1,8 @@
 -- @suite
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- battle_mantrarefuse.lua -- a boost buys nothing on SABIN's Mantra, so the Blitz list refuses it (boost-rewards.md,
--- "Every player action today"; Ot6SpellNoNumber's $15, Ot6RowNoBoost's Blitz arm, Ot6BlitzPrice and Ot6ActionEnd's
--- Blitz arm, ot6_boost.asm).
+-- "Every player action today"; Ot6SpellNoNumber's $15, Ot6RowNoBoost's Blitz arm, Ot6BlitzPrice and
+-- Ot6QueueFold's Blitz arm, which drops a boost raised before the pick when the action is queued, ot6_boost.asm).
 --
 -- Boots wor-sabin-v1 by cold Continue (configure.py TEST_ENV).  By hand:
 --   OT6_SRAM_CHECKPOINT=build/checkpoints/wor-sabin-v1 \
@@ -16,9 +16,12 @@
 -- that point pending.  An exec callback on AttackerEffect_15 reads the heal as the effect gets it (the multiplied
 -- number) and as it leaves (HP / bodies).  Asserted: the heal is SABIN's HP over the bodies (the boost reached
 -- nothing), the point raised on Pummel is dropped rather than charged (the bank keeps it), and the MP charged is
--- the row's flat price.
+-- the row's flat price.  Then the bank is read after SABIN's Ot6ActionEnd (an exec callback, as
+-- battle_sketchboost does) and must be min(5, bank + 1): the regen pip alone, the point not charged.
 --
--- Red on the mutant ROM with Mantra's line taken out of Ot6SpellNoNumber, the rules before this change (R raised
+-- Red on the mutant ROMs (tools in build/attempts/wt/v046-suites/): one per arm, each alone -- R refused on the row
+-- (Ot6RowNoBoost's jsl Ot6SpellNoNumber made `clc`), the queue-time drop (Ot6QueueFold's, same), the flat price
+-- (Ot6BlitzPrice's, same).  And earlier, on the ROM with Mantra's line taken out of Ot6SpellNoNumber, the rules before this change (R raised
 -- the boost on Mantra; the heal reached the effect doubled, 30, and left as SABIN's HP, 1315, so the point bought
 -- nothing; the turn charged 40 MP, 2.5x): build/attempts/wt/v045-land/mantra/.
 -- No write: the Continue's SABIN knows Mantra (L23; asserted).
@@ -100,6 +103,12 @@ H.run({ maxFrames = 60000 }, {
     emu.addMemoryCallback(function()
       heals[#heals + 1] = { enter = H.readWord(0x11B0) }
     end, emu.callbackType.exec, entry, entry)
+    local ae = H.sym("Ot6ActionEnd")
+    emu.addMemoryCallback(function()
+      if r.confirmed and r.endF == nil and sabinS and (emu.getState()["cpu.x"] & 0xFF) == sabinS * 2 then
+        r.endF = H.frame
+      end
+    end, emu.callbackType.exec, ae, ae)
     emu.addMemoryCallback(function()
       local h = heals[#heals]
       if h == nil then return end
@@ -191,22 +200,28 @@ H.run({ maxFrames = 60000 }, {
   end)(),
   H.waitUntil(function() return #heals > 0 and heals[#heals].leave ~= nil end, 3000, "Mantra's effect ran", 5),
   H.waitUntil(function() return pend(sabinS) == 0 end, 1800, "the point pending on Mantra settled (dropped or charged)", 5),
+  H.waitUntil(function()
+    if r.endF and r.bankEnd == nil and H.frame >= r.endF + 6 then r.bankEnd = bank(sabinS) end
+    return r.bankEnd ~= nil
+  end, 1800, "SABIN's Ot6ActionEnd ran and the bank settled", 5),
   H.waitFrames(60),
   H.call(function()
     H.screenshot("mantrarefuse_after")
     local h = heals[1]
-    local mp1, bank2 = H.readWord(MPCUR + sabinS * 2), bank(sabinS)
+    local mp1 = H.readWord(MPCUR + sabinS * 2)
     local base = H.abilityCost(MANTRA)
     H.log(string.format("[mantrarefuse] Mantra: $11b0 %d as the effect got it, %d as it left (SABIN HP %d over %d "
-      .. "bodies less himself); MP %d -> %d (row base %d); bank %d -> %d, pending now %d", h.enter, h.leave, h.hp,
-      h.bodies, r.mp0, mp1, base, r.bank1, bank2, pend(sabinS)))
+      .. "bodies less himself); MP %d -> %d (row base %d); bank %d -> %d at Ot6ActionEnd+6 (f%s), pending now %d", h.enter, h.leave, h.hp,
+      h.bodies, r.mp0, mp1, base, r.bank1, r.bankEnd, tostring(r.endF), pend(sabinS)))
     H.assertEq(h.leave, h.hp // math.max(1, h.bodies - 1),
       "Mantra heals SABIN's HP over the bodies it heals, whatever the boost (AttackerEffect_15 writes it last)")
     H.assertEq(r[MANTRA], 0, "R on Mantra raises no boost (Ot6RowNoBoost's Blitz arm refuses it)")
     H.assertEq(r[PUMMEL], 1, "R on Pummel, which moves a number, raises the boost to 1")
     H.assertEq(r.pend, 1, "Mantra was confirmed with the point raised on Pummel pending")
     H.assertEq(r.mp0 - mp1, base, "the turn charged Mantra's flat price, not 2.5x for the point (Ot6BlitzPrice)")
-    H.assertEq(bank2, r.bank1, "the point pending on Mantra was dropped, not charged (Ot6ActionEnd's Blitz arm)")
-    H.log("[mantrarefuse] PASS: R refused on Mantra, taken on Pummel; a pending point on Mantra kept and its price flat")
+    H.assertEq(r.bankEnd, math.min(5, r.bank1 + 1), string.format("after SABIN's Ot6ActionEnd the bank is min(5, %d + 1): "
+      .. "the point pending on Mantra was dropped when the action was queued (Ot6QueueFold's Blitz arm), not charged, "
+      .. "and the turn's regen pip earned", r.bank1))
+    H.log("[mantrarefuse] PASS: R refused on Mantra, taken on Pummel; a pending point on Mantra dropped at the queue and its price flat")
   end),
 })

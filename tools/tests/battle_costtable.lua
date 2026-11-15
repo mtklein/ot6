@@ -413,13 +413,35 @@ H.run({ maxFrames = 20000 }, {
     -- boost buys certainty across a spread of outcomes rather than
     -- magnitude, which the BP already pays for.  Step 4c reads that split
     -- back off the ROM rather than trusting this table.
-    local rows = {}
+    --
+    -- A Blitz is flat or escalating by Ot6SpellNoNumber's rules (ot6_boost.asm), read here off the MagicProp record
+    -- (stride 14) rather than declared: +4 bit 7 set (a fraction of HP/MP), +6 == 0 (no power), or +9 one of
+    -- the attacker special effects that write the number after the multiplier ($15 Mantra, $19 Exploder, $1a Blow
+    -- Fish, $1b Pearl Wind, $1e Step Mine, $3d Revenge) leaves the boost nothing to buy, and Ot6BlitzPrice then
+    -- charges the row's base at every boost.  Exactly one Blitz, Mantra, is flat.
+    local NO_NUMBER_FX = { [0x15] = true, [0x19] = true, [0x1a] = true, [0x1b] = true, [0x1e] = true,
+                           [0x3d] = true }
+    local mpb = romOfs(H.sym("MagicProp"))
+    local function noNumber(id)
+      local rec = mpb + id * MAGIC_PROP_REC
+      return (H.readRomByte(rec + 4) & 0x80) ~= 0 or H.readRomByte(rec + 6) == 0
+          or NO_NUMBER_FX[H.readRomByte(rec + 9)] == true
+    end
+    local rows, blitzFlat = {}, {}
     for _, kit in ipairs({ { "Blitz", BLITZ, true }, { "SwdTech", SWDTECH, false },
                            { "Tools", TOOLS, true } }) do
       for _, r in ipairs(kit[2]) do
-        rows[#rows + 1] = { kit[1], r[3], r[1], nil, kit[3] }
+        local escalates = kit[3]
+        if kit[1] == "Blitz" then
+          escalates = not noNumber(r[1])
+          if not escalates then blitzFlat[#blitzFlat + 1] = r[3] end
+        end
+        rows[#rows + 1] = { kit[1], r[3], r[1], nil, escalates }
       end
     end
+    H.assertEq(table.concat(blitzFlat, ","), "Mantra", string.format(
+      "exactly one Blitz is flat by Ot6SpellNoNumber's rules (MagicProp +4/+6/+9), and it is Mantra; found %d: %s",
+      #blitzFlat, table.concat(blitzFlat, ",")))
     rows[#rows + 1] = { "Steal", "Steal", nil, steal, false }
     rows[#rows + 1] = { "Possess", "Dance", nil, dance, true }
     rows[#rows + 1] = { "Possess", "Rage", nil, rage, false }
@@ -433,6 +455,8 @@ H.run({ maxFrames = 20000 }, {
       end
     end
     local WHYFLAT = {
+      Mantra  = "its special effect ($15) writes the heal after the multiplier, so a boost buys nothing "
+             .. "(Ot6SpellNoNumber) and Ot6BlitzPrice charges the base",
       SwdTech = "its boost bought the row, and the row is charged at its "
              .. "own price (cmd $07 is in Ot6BoostDmg's gate)",
       Steal   = "cmd $05 is in Ot6BoostDmg's gate: the boost buys the "
@@ -474,7 +498,8 @@ H.run({ maxFrames = 20000 }, {
           .. "there at every boost (#219, ruling 1: accepted, not a bug)")
       end
     end
-    H.assertEq(exempt, 10, "ten rows are exempt from the escalation")
+    H.assertEq(exempt, 11, "eleven rows are exempt from the escalation (eight SwdTech, Steal, Rage, Mantra)")
+    H.assertEq(flatKinds.Mantra, 1, "Mantra is the one flat Blitz: its boost buys nothing (Ot6SpellNoNumber)")
     H.assertEq(flatKinds.SwdTech, 8, "the eight SwdTech rows are flat")
     H.assertEq(flatKinds.Steal, 1,
       "Steal is flat -- the chance-verb exemption, and NOT merely unasserted: "
