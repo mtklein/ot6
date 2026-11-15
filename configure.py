@@ -690,6 +690,9 @@ for f in glob("tools/tests/*.lua"):
     t = Path(f).stem
     suite_tests.append(t)
     attrs = m.group(1)
+    if attrs.split() == ["golden"]:
+        golden_suite = f        # one edge per golden save, below
+        continue
     # the emulator pin too: a test result is the emulator's as much as the
     # ROM's, so a new emulator re-runs every test, as it regenerates every state
     deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
@@ -745,6 +748,35 @@ for f in glob("tools/tests/*.lua"):
     else:
         quick.append(f"build/results/suite/{t}.ok")
 
+# ------------------------------------------------------------ golden saves --
+# #389: every release's saves must load on every later v1 build.  Each golden
+# save (tools/tests/golden-saves/<version>/<key>, MANIFEST.json) is Continued,
+# read out, saved into its slot, and Continued again on today's ROM by
+# tools/tests/save_golden.lua; tools/golden_saves.py then holds the run's log
+# and the battery it left to the fixture file and to the battery map in
+# docs/design/save-layout.md.  The negative is a v0.44 save whose esper page
+# lost its signature: the check must refuse it.
+GOLDEN_DIR = "tools/tests/golden-saves"
+golden_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
+                 copy_if_changed_from(golden_suite), "tools/golden_saves.py",
+                 "tools/check_save_layout.py", "tools/roster.py", "tools/savestate_party.py",
+                 "docs/design/save-layout.md", "tools/build/run_golden_save.sh",
+                 f"{GOLDEN_DIR}/MANIFEST.json"] + \
+    [copy_if_changed_from(h) for h in LIBS] + HARNESS
+golden_fixtures = [str(Path(m).parent)
+                   for m in sorted(glob(f"{GOLDEN_DIR}/v*/*/manifest.json"))]
+golden_fixtures.append(f"{GOLDEN_DIR}/negative/esper-unsigned-v0.44")
+golden_outs = []
+for fx in golden_fixtures:
+    rel = fx[len(GOLDEN_DIR) + 1:]
+    mode = "negative" if rel.startswith("negative/") else "check"
+    out = f"build/results/golden/{rel.replace('/', '_')}.ok"
+    w.edge([out], "sh", implicit=golden_common + [f"{fx}/manifest.json", f"{fx}/battery.sram"],
+           cmd=f"nice tools/build/run_golden_save.sh {mode} {fx} {out}",
+           desc=f"golden save {rel}", pool="side")
+    qual.append(out)
+    golden_outs.append(out)
+
 # ------------------------------------------------------------------ checks --
 def check(name, cmd, deps, desc=None):
     out = f"build/checks/{name}.ok"
@@ -752,6 +784,16 @@ def check(name, cmd, deps, desc=None):
            cmd=f"{cmd} && mkdir -p build/checks && touch {out}",
            desc=desc or name)
     qual.append(out)
+
+
+check("golden_saves",
+      "python3 tools/golden_saves.py --selftest && python3 tools/golden_saves.py verify",
+      ["tools/golden_saves.py", "tools/check_save_layout.py", "tools/roster.py",
+       "tools/savestate_party.py", "docs/design/save-layout.md",
+       "tools/tests/lib/sram_checkpoint.py", f"{GOLDEN_DIR}/MANIFEST.json"]
+      + [f"{fx}/{n}" for fx in golden_fixtures for n in ("manifest.json", "battery.sram")])
+# `ninja golden`: every golden save and the checks on the set and the layout
+w.edge(["golden"], "phony", golden_outs + ["build/checks/golden_saves.ok", "build/checks/save_layout.ok"])
 
 
 test_luas = glob("tools/tests/*.lua") + glob("tools/tests/lib/*.lua")
@@ -809,12 +851,17 @@ check("break_reach", "python3 tools/check_break_reach.py",
 # sits outside the free scrap.  Reads the assembled addresses from ff6-en.dbg,
 # co-emitted with the ROM, so the copy_if_changed edge re-runs it when the ROM
 # changes.
+# #389: and the whole battery is: the battery map's rows tile it, each
+# row's anchor is where the build puts that range, every OT6 SRAM symbol and
+# every literal SRAM address in the source lands in a range the map says is
+# written, the magic words are the assembled ones, and the vanilla save code
+# still copies, sums and clears what the map assumes.
 check("save_layout",
       "python3 tools/check_save_layout.py --selftest"
-      " && python3 tools/check_save_layout.py",
+      " && python3 tools/check_save_layout.py --rom build/ot6.sfc",
       ["tools/check_save_layout.py", "docs/design/save-layout.md",
-       "ff6/src/battle/ot6_memory.inc",
-       copy_if_changed_from("build/ot6.sfc")])
+       copy_if_changed_from("build/ot6.sfc")]
+      + glob("src/**/*.asm", "ff6") + glob("src/**/*.inc", "ff6"))
 # #305: the natural magic and the Esper spell lists are the planned ones
 # (kits.md, magicite.md, magicite-tube-six.md), and none grants a higher
 # spell tier (guidelines.md, "Stronger spells come from boosting, never from

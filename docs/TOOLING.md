@@ -184,6 +184,20 @@ zip holds every one, 32768 bytes, with the tracked SHA-256, slot 3's
 checksum valid by the ROM's own rule, and nothing else under `saves/`.
 `python3 tools/release_saves.py list` prints the names.
 
+Once a release is published, its saves join the golden set
+(`tools/tests/golden-saves/`, docs/design/save-layout.md "Golden saves"),
+which qualification Continues on every later ROM (`ninja golden`, one
+`build/results/golden/*.ok` per save):
+
+    gh release download vX.Y -p '*.zip' -D /tmp/ot6-vX.Y
+    python3 tools/golden_saves.py add vX.Y /tmp/ot6-vX.Y/ot6-vX.Y.zip \
+        kolts-summit-v1 esper-mtn-save-v1 wor-cyan-v1 wor-kt-plates-v1
+    python3 configure.py && ninja golden
+
+Commit the new `golden-saves/vX.Y/` and `MANIFEST.json` on main with the
+version bump. A golden save that stops loading is a broken promise
+(save-layout.md "Compatibility policy"), not a fixture to re-cut.
+
 ## Installed pieces
 
 Homebrew pieces are in the root `Brewfile`; `brew bundle` installs them.

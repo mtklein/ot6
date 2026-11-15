@@ -1,0 +1,112 @@
+{
+  "schema": "ot6.golden-saves/v1",
+  "sets": [
+    {
+      "version": "v0.28",
+      "zip": "ot6-v0.28.zip",
+      "zip_sha256": "863b77c1929ea644dc81232476a4d8f087202dfee6b741216663252517d449d7",
+      "esper": "none",
+      "fixtures": [
+        {
+          "key": "kolts-summit-v1",
+          "file": "03 - Mt. Kolts, summit save point.srm",
+          "sha256": "38e27b54eba22fceae9785efdb0f496a2ff3661bc4368703551323be284dd5ec"
+        },
+        {
+          "key": "esper-mtn-save-v1",
+          "file": "23 - Esper Mountain, save point.srm",
+          "sha256": "dd87353667c4b27d85c59c7379784fa1d36599cd55f73013bec6b1aad501c148"
+        },
+        {
+          "key": "wor-cyan-v1",
+          "file": "41 - The Falcon, after the Storm Dragon.srm",
+          "sha256": "ef2ee613630f7483bd9f5a07d866313f673fe1596c53cfbe5e9b3f64647db7fc"
+        }
+      ]
+    },
+    {
+      "version": "v0.40",
+      "zip": "ot6-v0.40.zip",
+      "zip_sha256": "550dfeb82c59f8f561d8c05967259f419f143df38f44b86eac3b03dd6bcf8f41",
+      "esper": "none",
+      "fixtures": [
+        {
+          "key": "kolts-summit-v1",
+          "file": "03 - Mt. Kolts, summit save point.srm",
+          "sha256": "b7d98a7baa986f787395b7ea5a52885a4c0934f33bf7ca05f769c41946e2ae43"
+        },
+        {
+          "key": "esper-mtn-save-v1",
+          "file": "24 - Esper Mountain, save point.srm",
+          "sha256": "f1a9ac322f2973bf7ec9f45917167b2c954122cecaac25cfc4c29345a67000d5"
+        },
+        {
+          "key": "wor-cyan-v1",
+          "file": "42 - The Falcon, after the Storm Dragon.srm",
+          "sha256": "ed956bb227f272f48303945f979d905ab778799040f15fbaf0a1f21fd0451f22"
+        },
+        {
+          "key": "wor-kt-plates-v1",
+          "file": "70 - Kefka's Tower, two parties on the plates (before Kefka).srm",
+          "sha256": "214d1cc75fd3abb6634c431a5426278ba284e969c905ed3d597f66fc28ff2e7b"
+        }
+      ]
+    },
+    {
+      "version": "v0.43",
+      "zip": "ot6-v0.43.zip",
+      "zip_sha256": "5ec8bfa328aad2c7bd3f1b603f9fccb20a05e2b3dab4113b8b49a1d8092a49aa",
+      "esper": "none",
+      "fixtures": [
+        {
+          "key": "kolts-summit-v1",
+          "file": "03 - Mt. Kolts, summit save point.srm",
+          "sha256": "c6ff921d7a7f895654ba7f92e30c4c654d408f68f4856049d19ae6bf81d7ad54"
+        },
+        {
+          "key": "esper-mtn-save-v1",
+          "file": "24 - Esper Mountain, save point.srm",
+          "sha256": "6428761663b71e0cc0d750f744f41c205deeb12c46aa5a4f071b5fe15c0096da"
+        },
+        {
+          "key": "wor-cyan-v1",
+          "file": "42 - The Falcon, after the Storm Dragon.srm",
+          "sha256": "b4a2b8ffc5841105be8874ede2dd82c37082a023ab8c0db13923c63fe7251f08"
+        },
+        {
+          "key": "wor-kt-plates-v1",
+          "file": "70 - Kefka's Tower, two parties on the plates (before Kefka).srm",
+          "sha256": "941538cf2024709ce577ec46862b6834019dfe66248fd724f48a6091af1c6bf3"
+        }
+      ]
+    },
+    {
+      "version": "v0.44",
+      "zip": "ot6-v0.44.zip",
+      "zip_sha256": "5452d89b49ce381dbeb875257ef36fb543eb5baff1b43a157a26a408b6f91ea7",
+      "esper": "signed",
+      "fixtures": [
+        {
+          "key": "kolts-summit-v1",
+          "file": "03 - Mt. Kolts, summit save point.srm",
+          "sha256": "6e9348535c7c5bd9e7090581670531f08f620a992591e8a879eb58314eef8a80"
+        },
+        {
+          "key": "esper-mtn-save-v1",
+          "file": "24 - Esper Mountain, save point.srm",
+          "sha256": "b5b890cbc743f71de08798238bc171f5dfe515152da054cbca3496de7ab5a2f2"
+        },
+        {
+          "key": "wor-cyan-v1",
+          "file": "42 - The Falcon, after the Storm Dragon.srm",
+          "sha256": "ce1b87a6f8958e8fa67c6cea99927e89a6ecdde2f6befbdb867e27dfd4ebbf6d"
+        },
+        {
+          "key": "wor-kt-plates-v1",
+          "file": "70 - Kefka's Tower, two parties on the plates (before Kefka).srm",
+          "sha256": "4cc997fbe0d6bc57e02a164114f1d8aec1fc5944dcd6a53a616c583ecff2ad38"
+        }
+      ]
+    }
+  ]
+}
