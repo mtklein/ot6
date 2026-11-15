@@ -78,7 +78,7 @@ are wrong (`ClearSRAM`, battery `$0000-$1FFF` only), `never` never.
 | $1400-$1DFF | 2560 | slot3 | Slot 3, the same | SRAMSlotPtrs[3] | save, clear | as slot 1 |
 | $1E00-$1FEF | 496 | shared | Unused by vanilla and OT6 | - | clear | Zero in any battery the game has validated |
 | $1FF0 | 1 | shared | The slot last saved (the load menu's first cursor) | - | save, clear | 0 on a fresh battery: the cursor starts on slot 1 |
-| $1FF1 | 1 | shared | Random seed: the title adds 1, an event adds 13, a load seeds the five encounter counters from it | - | title, play, clear | Any value is valid |
+| $1FF1 | 1 | shared | Random seed: the load menu adds 1 as it starts (`GameLoadMenu`) and 13 as it closes (`EventCmd_ab`), which seeds `$1F6D` and the five encounter counters | - | title, clear | Any value is valid |
 | $1FF2-$1FF7 | 6 | shared | Unused | - | clear | Zero in any battery the game has validated |
 | $1FF8-$1FFF | 8 | shared | Validity words: `$E41B` four times (`ValidateSRAM`); none matching means the battery is cleared and a New Game starts | - | save, clear | Cleared: all three slots read empty |
 | $2000-$2001 | 2 | slot1 | Codex page, slot 1: magic (`$384F` O8; `$374F` O7 is the pre-v0.5 global codex) | OT6_CODEX_MAGIC | load, play, save | Any other value: the page is zeroed and signed before use, so the codex starts empty; O7 is cloned into all three slots once |
@@ -155,11 +155,19 @@ Neither is guaranteed zero. Vanilla's power-on clear (`ClearRAM`,
 the fields it names, so these bytes start as whatever the console or
 emulator left in RAM. Under an all-ones power-on fill a New Game leaves
 `$FF` in all of `$1E1D-$1E3F` and `$1FF7-$1FFD`
-(`build/attempts/wt/v1-save-freeze/poweron_allones.log`), and every save of
-that game carries them. Every save the harness makes is zero there because
+(`build/attempts/wt/v1-save-freeze/poweron_allones_newgame.log`), and every
+save of that game carries them until the player edits a loadout. Every save the harness makes is zero there because
 the harness pins an all-zeros fill. So a new field here must either read
-any byte value sensibly, as the three loadouts do, or wait for the layout
-signature proposed under "Reserve and the layout version".
+any byte value sensibly or wait for the layout signature proposed under
+"Reserve and the layout version".
+
+The three loadouts already meet such junk. The Bushido word reads `$FFFF`
+as Cleave in every slot, and as AUTO while Cleave is unlearned. The Rage
+and Lore loadouts read all-`$FF` bytes as a manual loadout whose every slot
+names an unknown entry, so in such a game Gau's Rage list and Strago's
+Lore list (but for the free row) are empty until the player sets the
+loadout or resets it to AUTO on its page (read from `Ot6RageList` and
+`Ot6LoreMask`; not measured in play).
 
 `$1E40-$1E7F` is vanilla's treasure bitfield and `$1E80-$1F5F` its event
 switches (all live game state); OT6 claims none of them.
@@ -186,13 +194,18 @@ None is moved or re-encoded.
 
 ## Who writes what, and when
 
-- **Power-on and the title.** The title adds 1 to the seed `$1FF1`. If the
+- **The title.** Start opens the load menu (`EventCmd_ab`, `GameLoadMenu`),
+  which adds 1 to the seed `$1FF1` and 13 more as it closes. If the
   validity words are wrong, `ClearSRAM` zeroes battery `$0000-$1FFF` (the
   slots and bank `$30`'s tail; banks `$31-$33` are not cleared) and the
-  game goes to a New Game.
+  menu ends at once in a New Game, with no slot list shown.
 - **New Game.** `Ot6CodexNewGame` zeroes and signs the New-Game codex page
   `$2C00` and `Ot6EsperNewGame` clears and signs the live esper page
-  `$3C00`. Nothing in a slot is written.
+  `$3C00`. Nothing in a slot is written. (Measured on an all-ones power-on
+  fill: `GameLoadMenu`, `CheckSRAM`, `ClearSRAM` and `Ot6CodexNewGame` each
+  ran once, battery `$1E00` read 0 and both pages were signed afterwards,
+  while bank `$31`'s slot pages and `$4000` still read `$FF`;
+  `build/attempts/wt/v1-save-freeze/poweron_allones_newgame.log`.)
 - **Continue** (title). The load menu copies the slot into WRAM `$1600`,
   the confirm runs `Ot6EsperContinue`, which copies the slot's esper page
   into the live page if signed and clears the live page if not.
@@ -201,8 +214,7 @@ None is moved or re-encoded.
   migrated, and the esper copy runs as on a Continue.
 - **Battle and field.** Reveals write the active codex page in place
   (slot 1-3, or the New-Game page before the first save); a victory adds
-  Magic Points to the live esper page and sets its pending lines; an event
-  adds 13 to `$1FF1`.
+  Magic Points to the live esper page and sets its pending lines.
 - **Save.** `CopyGameDataToSRAM`: `Ot6CodexSaveAs` copies the live esper
   page into the destination slot's esper page (signed), and copies the
   active codex page into the destination's when they differ (Save over
