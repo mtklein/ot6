@@ -113,6 +113,7 @@ kept, #461, and a copy on a boss strips its four shields too).
 | Mog | (open: none of his dances stands above the others, owner 2026-10-26, #478) | — | no |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
 | Strago | Study | his Scan at 3 BP: reads every enemy and learns every lore any monster present could cast, 99 MP | yes (`ot6_analyze.asm`) |
+| Relm | Masterpiece | every other ally's next boosted action counts one point higher, 99 MP (kit-relm.md) | no (designed, #538) |
 | Gau | (none: a varied set of rages needs no divine, owner 2026-11-15; kit-gau.md §9) | — | no |
 
 Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
@@ -1415,7 +1416,11 @@ player prunes the kit all game. Same model, different collection verbs:
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —
-  the full owner ruling is in `vanilla-destructive-bugs.md`).
+  the full owner ruling is in `vanilla-destructive-bugs.md`).  **Designed,
+  not built** (#538): the party's supporter, a list behind Sketch of
+  Portrait, Tint, Varnish, Still Life, Underpainting, Gesture and the divine
+  Masterpiece, learned by story beats and level.
+  [kit-relm.md](kit-relm.md) is the canonical Relm document.
 
 ## The World of Ruin: Espers and the magic-only tower (#384)
 
