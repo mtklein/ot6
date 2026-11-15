@@ -222,6 +222,6 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(r.bankEnd, math.min(5, r.bank1 + 1), string.format("after SABIN's Ot6ActionEnd the bank is min(5, %d + 1): "
       .. "the point pending on Mantra was dropped when the action was queued (Ot6QueueFold's Blitz arm), not charged, "
       .. "and the turn's regen pip earned", r.bank1))
-    H.log("[mantrarefuse] PASS: R refused on Mantra, taken on Pummel; a pending point on Mantra kept and its price flat")
+    H.log("[mantrarefuse] PASS: R refused on Mantra, taken on Pummel; a pending point on Mantra dropped at the queue and its price flat")
   end),
 })
