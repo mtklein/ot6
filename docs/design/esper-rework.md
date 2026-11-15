@@ -296,7 +296,7 @@ What this says:
 - So any ladder that fits these numbers has the shape the proposal wants:
   the World of Balance is the grand tour (small bonuses from many stones),
   and the World of Ruin is where a character masters a few.
-- Gau, Umaro and Gogo never wear espers (vanilla), and the bench earns
+- Umaro and Gogo never wear espers (vanilla; Gau can), and the bench earns
   nothing (vanilla pays only the battle's party).
 
 ## Plan A — spells while worn, a ladder for keeps (recommended)
