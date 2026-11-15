@@ -15,8 +15,11 @@ declare the same mode.  Nothing in a fill tree is qualification evidence.
 
     tools/fill_line.py setup DIR --mode ones|alt|rand:<seed>|zero
     tools/fill_line.py run DIR [--until STATE] [TARGET...]
+    tools/fill_line.py sync DIR          # move DIR to this tree's commit
 
-`zero` is the reference: a fresh replay with no fill, fenced the same way
+A mode may name the RAMs it fills after an @ (ones@wram,sram,spc; the
+default is wram,sram).  `lab` marks a tree for experiments: each run there
+declares its own mode.  `zero` is the reference: a fresh replay with no fill, fenced the same way
 (the proof that the fill machinery leaves a plain run's bytes alone).  `run`
 replays the line up to --until (default: the whole line, `chain`) in DIR
 with OT6_POWERON_FILL set, logs to DIR/build/fill-run.log and writes
@@ -37,7 +40,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ROM = "Final Fantasy III (USA).sfc"
 MARKER = "build/FILL_TREE"
-MODE_RE = r"ones|alt|rand:\d{1,9}|zero"
+MODE_RE = r"(ones|alt|rand:\d{1,9})(@[a-z,]+)?|zero|lab"
 
 
 def sh(cmd, **kw):
@@ -66,6 +69,19 @@ def setup(args):
     sh([sys.executable, "configure.py"], cwd=d, stdout=subprocess.DEVNULL)
     print(f"fill tree {d}: mode {args.mode}, commit {sha[:12]}, no seeded "
           f"states (the line replays from power-on)")
+
+
+def sync(args):
+    """Move a fill tree to this tree's commit (its states then go stale
+    and replay, as anywhere)."""
+    d = Path(args.dir).resolve()
+    if not (d / MARKER).exists():
+        sys.exit(f"{d} is not a fill tree (no {MARKER})")
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+                         capture_output=True, text=True).stdout.strip()
+    sh(["git", "-C", str(d), "fetch", "--quiet", str(ROOT), sha])
+    sh(["git", "-C", str(d), "checkout", "--quiet", "--detach", sha])
+    sh([sys.executable, "configure.py"], cwd=d, stdout=subprocess.DEVNULL)
 
 
 def run(args):
@@ -100,12 +116,14 @@ def main():
     s = sub.add_parser("setup")
     s.add_argument("dir")
     s.add_argument("--mode", required=True)
+    y = sub.add_parser("sync")
+    y.add_argument("dir")
     r = sub.add_parser("run")
     r.add_argument("dir")
     r.add_argument("--until")
     r.add_argument("targets", nargs="*")
     args = ap.parse_args()
-    return setup(args) if args.cmd == "setup" else run(args)
+    return {"setup": setup, "sync": sync, "run": run}[args.cmd](args)
 
 
 if __name__ == "__main__":

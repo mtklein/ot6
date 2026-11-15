@@ -9,11 +9,12 @@
 --
 --   OT6_FILL_MODE   "ones" | "alt" | "rand"
 --   OT6_FILL_SEED   integer (rand only; 0 otherwise)
---   OT6_FILL_SRAM   true when no battery was handed to the run (no
---                   OT6_SRAM_CHECKPOINT): the battery then powers on as the
---                   fill too.  With a battery, Mesen loaded it over SRAM and
---                   it is left alone: its never-written ranges already carry
---                   the fill of the run that saved it.
+--   OT6_FILL_REGIONS the RAMs to fill, a set of wram, sram, vram, oam,
+--                   cgram, spc (default wram and sram).  sram is dropped
+--                   when a battery was handed to the run
+--                   (OT6_SRAM_CHECKPOINT): Mesen loaded it over SRAM, and its
+--                   never-written ranges already carry the fill of the run
+--                   that saved it.
 --
 -- Why a Lua write and not Mesen's Snes.RamPowerOnState: that setting offers
 -- AllZeros, AllOnes and an unseeded Random only.  The write lands before the
@@ -62,7 +63,7 @@ do
   local done = {}
   for _, r in ipairs(regions) do
     local id, name, memtype, size = r[1], r[2], r[3], r[4]
-    if name ~= "sram" or OT6_FILL_SRAM then
+    if OT6_FILL_REGIONS[name] then
       if mode == "ones" then
         for off = 0, size - 1 do emu.write(off, 0xFF, memtype) end
       else

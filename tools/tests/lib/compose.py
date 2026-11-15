@@ -2272,6 +2272,7 @@ def selftest() -> int:
 
 FILL_MARKER = "build/FILL_TREE"   # tools/fill_line.py writes it
 FILL_LUA = HERE / "poweron_fill.lua"
+FILL_REGIONS = ("wram", "sram", "vram", "oam", "cgram", "spc")
 
 
 def poweron_fill_prologue(root, env):
@@ -2283,7 +2284,8 @@ def poweron_fill_prologue(root, env):
     (tools/fill_line.py makes it): a fill run's states are not the line's
     and must never stand in for them, so the mode cannot switch on in a
     qualification tree by a stray environment variable, and a fill tree
-    cannot make a plain run by a missing one.  Raises ValueError on any
+    cannot make a plain run by a missing one.  A tree marked `lab` takes any
+    declared mode, so runs under different fills can share it.  Raises ValueError on any
     mismatch."""
     want = env.get("OT6_POWERON_FILL", "")
     marker = Path(root) / FILL_MARKER
@@ -2294,20 +2296,26 @@ def poweron_fill_prologue(root, env):
         raise ValueError(f"OT6_POWERON_FILL={want} in a tree that is not a "
                          f"fill tree (no {FILL_MARKER}); a fill run belongs "
                          f"in its own tree: tools/fill_line.py --help")
-    if have and want != have:
+    if have == "lab" and want:
+        pass           # a lab tree: any declared mode, one per run
+    elif have and want != have:
         raise ValueError(f"this is a fill tree ({FILL_MARKER}: {have!r}) and "
                          f"OT6_POWERON_FILL is {want!r}; every run here must "
                          f"declare OT6_POWERON_FILL={have}")
     if want == "zero":
         return []      # the reference tree: fenced like a fill, filled by nothing
-    m = re.fullmatch(r"(ones|alt)|rand:(\d{1,9})", want)
-    if not m:
+    m = re.fullmatch(r"(?:(ones|alt)|rand:(\d{1,9}))(?:@([a-z,]+))?", want)
+    regions = (m.group(3) or "wram,sram").split(",") if m else []
+    if not m or not regions or not set(regions) <= set(FILL_REGIONS):
         raise ValueError(f"OT6_POWERON_FILL={want!r}: expected ones, alt, "
-                         f"rand:<seed> or zero")
+                         f"rand:<seed> or zero, optionally @ a comma list of "
+                         f"{','.join(FILL_REGIONS)} (default wram,sram)")
     mode, seed = (m.group(1), 0) if m.group(1) else ("rand", int(m.group(2)))
-    sram = "false" if env.get("OT6_SRAM_CHECKPOINT") else "true"
+    if env.get("OT6_SRAM_CHECKPOINT"):
+        regions = [r for r in regions if r != "sram"]
     return [f'OT6_FILL_MODE = "{mode}"\n', f"OT6_FILL_SEED = {seed}\n",
-            f"OT6_FILL_SRAM = {sram}\n", FILL_LUA.read_text()]
+            "OT6_FILL_REGIONS = {%s}\n" % ", ".join(f"{r} = true" for r in regions),
+            FILL_LUA.read_text()]
 
 
 def main() -> int:
