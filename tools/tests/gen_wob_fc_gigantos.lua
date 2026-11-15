@@ -133,7 +133,7 @@ H.run({ maxFrames = 400000 }, {
   H.call(function()
     FIGHT.locke = false
     if H.lever("GIGA_HOLD_OFF") then return end
-    FIGHT.holdFor = function(_, actor)
+    local function hold(_, actor)
       if H.readByte(0x3E9C + actor * 2) >= 3 then return false end
       for e = 0, 3 do
         local hp, mx = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
@@ -141,6 +141,8 @@ H.run({ maxFrames = 400000 }, {
       end
       return true
     end
+    -- (a function in FIGHT is a live option, H.fightDriverFor: it returns the option's value)
+    FIGHT.holdFor = function() return hold end
   end),
   K.monsterBox({ x = 48, y = 15, bit = 95, form = 170, species = 0x0AE, what = "the Gigantos box (394 (48,15))",
     avoid = AVOID, done = function(line) won = line end }),
