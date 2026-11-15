@@ -3507,6 +3507,67 @@ Ot6ShieldTbl:
                                 ;   every hand finds him, and the most
                                 ;   shields of any boss (storm drgn 14).
                                 ;   no weakness vanilla; nulls poison
+        ; ---- the world of balance: the event fights the design audit
+        ; found on the floor (docs/design/break-coverage-wob.md sections
+        ; 13-17; battle_breakwob_events checks them in the ROM).  Vanilla
+        ; elements stay; the house curve as above.
+        ; -- the lete river's raft (event battles 7 and 8): terra's
+        ; blade, edgar's pike, banon's rod (and sabin's fists upstream);
+        ; each hand keys two of the three, terra's fire all three --
+        .word   $0022
+        .byte   2, OT6_SLASH|OT6_PIERCE ; pterodon: a winged reptile; a
+                                ;   blade or a point.  fire vanilla
+        .word   $0038
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; nautiloid: a shell; a point in
+                                ;   its mouth or a rod on the shell.
+                                ;   fire|bolt vanilla; absorbs water
+        .word   $0039
+        .byte   2, OT6_SLASH|OT6_BLUDG ; exocite: a crab; the legs cut
+                                ;   and the carapace cracks.  fire|bolt
+                                ;   vanilla; absorbs water
+        ; -- the narshe caves' sparkle trap (map 49, battle 38): the same
+        ; three; one spirit to each hand, terra's fire to all, and the
+        ; bio blaster heals them --
+        .word   $0060
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; dark side: a spirit, the
+                                ;   train's spirit row.  fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $00b6
+        .byte   2, OT6_BLUDG|OT6_SPECIAL ; spectre: a phantom that casts
+                                ;   fire, ice and bolt; banon's rod.
+                                ;   fire|holy vanilla; absorbs poison
+        .word   $00cf
+        .byte   1, OT6_PIERCE|OT6_SPECIAL ; rinn: a 110-hp wisp, a pest's
+                                ;   one shield; edgar's pike.  fire|holy
+                                ;   vanilla; absorbs poison
+        ; -- the battle for narshe's raiders (battles 22 and 23): three
+        ; squads, terra/edgar/celes, cyan/sabin, locke/gau --
+        .word   $0079
+        .byte   2, OT6_SLASH|OT6_PIERCE ; bounty man: hired muscle in the
+                                ;   troopers' file, their keys.  fire
+                                ;   vanilla
+        .word   $001c
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; fidor: a war hound, the
+                                ;   doberman's point and a blow; the
+                                ;   swords slide off.  fire vanilla
+        ; -- the banquet's sparring troopers (battle 30): terra and
+        ; locke's blades --
+        .word   $00c2
+        .byte   3, OT6_SLASH|OT6_PIERCE ; sp forces: the imperial elite,
+                                ;   a tank's three; the trooper line's
+                                ;   keys.  poison vanilla
+        ; -- the phantom train: sabin, cyan, shadow --
+        .word   $000f
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; over-mind: a spirit of the
+                                ;   vestibule car (map 149), as hazer and
+                                ;   whisper.  fire|holy vanilla; absorbs
+                                ;   poison
+        .word   $0131
+        .byte   2, OT6_SLASH|OT6_PIERCE ; siegfried (the train's, battle
+                                ;   109): a 100-hp duellist, so a duel's
+                                ;   two, not a boss's four; steel
+                                ;   answers steel, as his colosseum
+                                ;   double ($0037).  no weakness vanilla
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian (the wob's: battle 75)
@@ -3514,6 +3575,47 @@ Ot6ShieldTbl:
         .byte   0, $00          ; tritoch
         .word   $0115
         .byte   0, $00          ; tritoch
+        .word   $0179
+        .byte   0, $00          ; flashback soldier (battle 115, terra's
+                                ;   magitek flashback): 1 hp, no action
+        .word   $017a
+        .byte   0, $00          ; the esper kefka fights (battle 97): a
+                                ;   cutscene that casts and ends itself
+        .word   $017b
+        .byte   0, $00          ; the battle-event runner (battles 105,
+                                ;   121, 122, 123, 127): untargetable,
+                                ;   plays a cutscene and ends the battle
+        ; ---- bodies no formation the game deals holds: no event script
+        ; calls their event battle, no battle-enabled pool or world sector
+        ; holds their formation, and no ai script or chest reaches it.
+        ; Rows here close the gap on purpose; tools/check_shield_rows.py
+        ; refuses one whose species a reachable formation holds, and
+        ; break-coverage-wob.md lists the evidence per species.
+Ot6ShieldTblUnreached:
+        .word   $010f
+        .byte   0, $00          ; umaro (battle 74; the fight is $0110)
+        .word   $011a
+        .byte   0, $00          ; kefka (battle 83, formation 562; the
+                                ;   final battle's is $012a)
+        .word   $0136
+        .byte   0, $00          ; colossus (battle 91; pool 66 only on
+                                ;   maps 157 and 167, no random battles)
+        .word   $0137
+        .byte   0, $00          ; czardragon (formation 561)
+        .word   $013b
+        .byte   0, $00          ; b.day suit (formation 42)
+        .word   $016e
+        .byte   0, $00          ; (terra's flashback ai; battle 51)
+        .word   $0170
+        .byte   0, $00          ; (cyan at the camp; battle 52)
+        .word   $0172
+        .byte   0, $00          ; (gau from the veldt; battle 54)
+        .word   $0177
+        .byte   0, $00          ; (unused; battle 60)
+        .word   $0178
+        .byte   0, $00          ; (unused; battle 61)
+        .word   $017f
+        .byte   0, $00          ; (unused; formations 490-495)
         .word   $ffff
 
 ; break-floor class table: one class byte per species (0..383), directly
