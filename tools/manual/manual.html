@@ -1,0 +1,1163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OT6 Instruction Booklet</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<!--
+  The OT6 instruction booklet.  One <section class="page"> per printed
+  page; tools/manual/build.py numbers them, fills the page references and
+  the version, and fails if a page overflows.  Every gameplay fact here comes
+  from docs/PLAYING.md or was checked against the source; each area tip
+  names its sources in a comment beside it.
+-->
+
+<!-- ================================================================ cover -->
+<section class="page cover">
+  <div class="frame">
+    <div class="band">A Final Fantasy III adventure &middot; Super NES</div>
+    <div class="title">OT6</div>
+    <div class="subtitle">The world of Final Fantasy III<br>with the battles of Octopath Traveler</div>
+    <div class="art"><img src="img/cover.png" alt="Ultros at the opera: a piercing hit finds his second weakness"></div>
+    <div class="tagline">Every monster has a weak spot.<br>Find it, knock its shields down,<br>and strike while it&rsquo;s broken.</div>
+    <div class="ornament cover-orn">&#9670; &#9670; &#9670;</div>
+    <div class="booklet">INSTRUCTION BOOKLET</div>
+    <div class="fine">Version {{version}} &middot; A fan-made patch &middot; Not for sale</div>
+  </div>
+</section>
+
+<!-- ========================================================= precautions -->
+<section class="page precautions">
+  <div class="runhead"><span>Before you play</span><span class="mark">OT6</span></div>
+  <div class="body">
+    <p class="small" style="margin-top:0.05in">Thank you for patching <b>OT6</b>. Please read this booklet before you
+    start your adventure, and keep it nearby. Your party will thank you.</p>
+    <h2>Precautions</h2>
+    <ol>
+      <li><b>This booklet goes with a patch, not a cartridge.</b> You need your own copy of Final Fantasy III (USA),
+        version 1.0. OT6 does not include the game.</li>
+      <li><b>Save before you Sketch.</b> Relm's Sketch still has the bug it had in 1994: a Sketch that misses can scramble
+        your items or even a save file.</li>
+      <li><b>Back up your save file</b> before you try one of the saves that come with OT6. Copying one in replaces your
+        own save file.</li>
+      <li><b>Keep saves moving forward.</b> Saves from OT6 v0.28 and later load in this version. A save made in a newer
+        version is not meant to load in an older one.</li>
+      <li><b>Take a break</b> of ten minutes or so every hour, even if a monster has only one shield left. It will still
+        have one shield when you come back.</li>
+      <li><b>Do not blow into the patch file.</b> It has never helped.</li>
+    </ol>
+    <div class="warn">
+      <h3>About OT6</h3>
+      <p style="margin:0">OT6 is a fan-made modification. It is not made, sold or endorsed by the companies that made
+      Final Fantasy III or Octopath Traveler. The story, world and characters belong to the original game; the new
+      battle rules are OT6's. OT6's code is MIT licensed, and its patch is GPL v3.</p>
+    </div>
+    <p class="center foot"><span class="stamp">SAVE OFTEN &#9733; BREAK SHIELDS</span></p>
+  </div>
+</section>
+
+<!-- ============================================================ contents -->
+<section class="page" id="p-contents">
+  <div class="runhead"><span>Contents</span><span class="mark">OT6</span></div>
+  <div class="body">
+    <h1>Contents</h1>
+    <ul class="toc">
+      <li class="part">Getting started</li>
+      <li>Before you begin<span class="dots"></span><span class="pg">{{page:p-begin}}</span></li>
+      <li>Controls<span class="dots"></span><span class="pg">{{page:p-controls}}</span></li>
+      <li>The story so far<span class="dots"></span><span class="pg">{{page:p-story}}</span></li>
+      <li class="part">How OT6 plays</li>
+      <li>OT6 at a glance<span class="dots"></span><span class="pg">{{page:p-glance}}</span></li>
+      <li>The battle screen<span class="dots"></span><span class="pg">{{page:p-screen}}</span></li>
+      <li>Shields, weaknesses and Break<span class="dots"></span><span class="pg">{{page:p-shields}}</span></li>
+      <li>Boost Points<span class="dots"></span><span class="pg">{{page:p-boost}}</span></li>
+      <li>Espers and their ranks<span class="dots"></span><span class="pg">{{page:p-espers}}</span></li>
+      <li>Battles, Exp. and things you can miss<span class="dots"></span><span class="pg">{{page:p-encounters}}</span></li>
+      <li class="part">The characters</li>
+      <li>Fourteen heroes and their kits<span class="dots"></span><span class="pg">{{page:p-chars}}</span></li>
+      <li class="part">The journey</li>
+      <li>Tips, area by area<span class="dots"></span><span class="pg">{{page:p-tips}}</span></li>
+      <li class="sub">The World of Balance<span class="dots"></span><span class="pg">{{page:p-tips}}</span></li>
+      <li class="sub">The World of Ruin<span class="dots"></span><span class="pg">{{page:p-tips-wor}}</span></li>
+      <li class="part">Appendix</li>
+      <li>Every Esper<span class="dots"></span><span class="pg">{{page:p-esper-table}}</span></li>
+      <li>Notes<span class="dots"></span><span class="pg">{{page:p-notes}}</span></li>
+    </ul>
+    <div class="ornament foot">&#9670; &#9670; &#9670;</div>
+  </div>
+</section>
+
+<!-- ==================================================== before you begin -->
+<section class="page" id="p-begin">
+  <div class="runhead"><span>Getting started</span><span class="mark">OT6</span></div>
+  <div class="body">
+    <h1>Before you begin</h1>
+    <div class="sub">What you need and how to start</div>
+    <p>OT6 comes as a patch for the Super NES game Final Fantasy III (USA), version 1.0. You need your own copy of
+    that game as a ROM file, the one whose SHA-1 is</p>
+    <p class="center"><span class="kw">4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7</span></p>
+    <h2>On a computer</h2>
+    <p>Unzip the release, <span class="kw">ot6-vX.Y.zip</span>. Put <span class="kw">Final Fantasy III (USA).bps</span>
+    beside your ROM and open the ROM in your emulator. Mesen, bsnes, Snes9x and other emulators that understand BPS
+    patches apply it as the game loads, without changing your ROM. Otherwise, apply the patch with a BPS patcher such
+    as Flips or beat.</p>
+    <h2>On Android</h2>
+    <p>Install <span class="kw">ot6-vX.Y.apk</span>, the OT6 Patcher, and choose the folder that holds your ROM. It
+    finds the ROM, applies the patch and writes <span class="kw">OT6.sfc</span> beside it. After an update it does this
+    again.</p>
+    <h2>The saves in the box</h2>
+    <p>The release zip has a <span class="kw">saves</span> folder: saves at points through the story, from Narshe to
+    the World of Ruin, in story order. Each is in slot 3. To use one:</p>
+    <ol>
+      <li>Back up your own save file.</li>
+      <li>Copy the <span class="kw">.srm</span> next to the patched ROM and name it after the ROM:
+        <span class="kw">OT6.srm</span> for the Android patcher, or <span class="kw">Final Fantasy III (USA).srm</span>
+        when an emulator applies the patch.</li>
+      <li>Start the game, choose Continue, and load slot 3.</li>
+    </ol>
+    <div class="tip" data-label="GOOD TO KNOW">
+      <p>A save from before v0.44 loads with no Esper progress. Everything else in it carries over.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ controls -->
+<section class="page" id="p-controls">
+  <div class="runhead"><span>Getting started</span><span class="mark">Controls</span></div>
+  <div class="body">
+    <h1>Controls</h1>
+    <div class="sub">The Super NES Controller</div>
+    <svg class="pad" viewBox="0 0 460 262" xmlns="http://www.w3.org/2000/svg" aria-label="A Super NES controller">
+      <!-- shoulders -->
+      <path d="M100 82 Q104 54 152 52 L196 52 Q204 52 205 62 L205 76 Z" fill="#b9c5e4" stroke="#16161d" stroke-width="2"/>
+      <path d="M360 82 Q356 54 308 52 L264 52 Q256 52 255 62 L255 76 Z" fill="#b9c5e4" stroke="#16161d" stroke-width="2"/>
+      <text x="160" y="68" font-size="12" font-weight="700" text-anchor="middle" fill="#16161d">L</text>
+      <text x="300" y="68" font-size="12" font-weight="700" text-anchor="middle" fill="#16161d">R</text>
+      <!-- body -->
+      <path d="M152 72 L308 72 A68 68 0 1 1 308 208 L152 208 A68 68 0 1 1 152 72 Z" fill="#e6ebf6" stroke="#16161d" stroke-width="2.5"/>
+      <!-- control pad -->
+      <g transform="translate(148 140)" fill="#16161d">
+        <rect x="-10" y="-32" width="20" height="64" rx="3"/>
+        <rect x="-32" y="-10" width="64" height="20" rx="3"/>
+        <circle r="6" fill="#3a3a48"/>
+      </g>
+      <!-- select / start -->
+      <rect x="198" y="150" width="24" height="8" rx="4" fill="#16161d" transform="rotate(-28 210 154)"/>
+      <rect x="238" y="150" width="24" height="8" rx="4" fill="#16161d" transform="rotate(-28 250 154)"/>
+      <text x="210" y="176" font-size="7" text-anchor="middle" fill="#16161d" letter-spacing="1">SELECT</text>
+      <text x="250" y="176" font-size="7" text-anchor="middle" fill="#16161d" letter-spacing="1">START</text>
+      <!-- face buttons -->
+      <circle cx="312" cy="140" r="52" fill="#b9c5e4" stroke="#16161d" stroke-width="1"/>
+      <g font-size="12" font-weight="700" text-anchor="middle">
+        <circle cx="312" cy="110" r="14" fill="#23408e"/><text x="312" y="114.5" fill="#fff">X</text>
+        <circle cx="342" cy="140" r="14" fill="#16161d"/><text x="342" y="144.5" fill="#fff">A</text>
+        <circle cx="312" cy="170" r="14" fill="#16161d"/><text x="312" y="174.5" fill="#fff">B</text>
+        <circle cx="282" cy="140" r="14" fill="#23408e"/><text x="282" y="144.5" fill="#fff">Y</text>
+      </g>
+      <!-- leader lines -->
+      <g stroke="#23408e" stroke-width="1" fill="none">
+        <path d="M150 56 V24 H8"/>
+        <path d="M310 56 V24 H452"/>
+        <path d="M322 99 L352 66 H452"/>
+        <path d="M356 140 H452"/>
+        <path d="M322 181 L352 216 H452"/>
+        <path d="M148 174 V240 H8"/>
+        <path d="M282 154 V240 H230"/>
+      </g>
+      <g font-size="10" fill="#16161d">
+        <text x="8" y="19">L: take back a Boost Point</text>
+        <text x="452" y="19" text-anchor="end">R: add a Boost Point</text>
+        <text x="452" y="61" text-anchor="end">X: Main Menu</text>
+        <text x="452" y="135" text-anchor="end">A: confirm</text>
+        <text x="452" y="211" text-anchor="end">B: cancel</text>
+        <text x="8" y="235">Control Pad: move, choose</text>
+        <text x="230" y="235">X or Y in battle: next fighter</text>
+      </g>
+    </svg>
+    <p class="center small" style="color:var(--blue);font-style:italic;margin-top:-0.04in">In battle, hold L and R together to run from some fights.</p>
+    <h2>Walking around</h2>
+    <p>Move with the <span class="btn pad">+</span> Control Pad. Choose with the <span class="btn">A</span> Button:
+    talk to people, open chests and check things. Cancel a choice with the <span class="btn">B</span> Button. Open the
+    Main Menu with the <span class="btn">X</span> Button; Skills, Equip, Relic and Config are there, and so is Save,
+    when you stand on a save point or on the world map.</p>
+    <h2>In battle</h2>
+    <p>When a character's meter is full, their command window opens. Choose with <span class="btn">A</span>, back
+    out with <span class="btn">B</span>. The next page has the rest, including the two buttons OT6 gives new
+    jobs.</p>
+  </div>
+</section>
+
+<section class="page" id="p-controls-battle">
+  <div class="runhead"><span>Getting started</span><span class="mark">Controls</span></div>
+  <div class="body">
+    <h2>The R and L Buttons: boosting</h2>
+    <figure class="fig-right"><img class="shot" src="img/boost.png" alt="">
+      <figcaption>Two arrows after VICKS: two Boost Points are pending on his next command.</figcaption></figure>
+    <p>This is the button you will press most in OT6. While you choose a command, press <span class="btn sh">R</span>
+    to put a Boost Point on it: up to three, and never more than the character has. Arrows after the name show how many
+    are pending, and the character glows. Press <span class="btn sh">L</span> to take one back.</p>
+    <p>The points are spent when the action happens. If the action you pick cannot use a boost, the R Button does
+    nothing, or the pending points are dropped before they cost anything.</p>
+    <p>In the Magic list, the R Button also shows you what the boost buys: the spell's name and price change as you
+    press it. Fire becomes Fire 2, then Fire 3.</p>
+    <div class="clear"></div>
+    <h2>Other battle buttons</h2>
+    <table class="compact">
+      <tr><th style="width:1.15in">Button</th><th>In battle</th></tr>
+      <tr><td class="k">A</td><td>Choose a command, a spell, an item or a target.</td></tr>
+      <tr><td class="k">B</td><td>Back out of a list or a target choice.</td></tr>
+      <tr><td class="k">X or Y</td><td>Pass the turn to the next character who is ready.</td></tr>
+      <tr><td class="k">R</td><td>Add a Boost Point to the command you are choosing.</td></tr>
+      <tr><td class="k">L</td><td>Take a pending Boost Point back.</td></tr>
+      <tr><td class="k">L and R, held</td><td>Run away. Some battles can't be escaped.</td></tr>
+      <tr><td class="k">Left / Right</td><td>On the command window: Row or Def. (Defense halves damage until your next command.)</td></tr>
+      <tr><td class="k">Up, in Magic</td><td>The equipped Esper. Summon it with A, once a battle.</td></tr>
+    </table>
+    <div class="tip" data-label="TIP">
+      <p>Pick <b>Wait</b> as the Battle Mode under Config, and time stops while you are choosing spells and items.
+      There is a lot to read in an OT6 battle; Wait gives you time to read it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= the story -->
+<section class="page" id="p-story">
+  <div class="runhead"><span>Getting started</span><span class="mark">The story so far</span></div>
+  <div class="body">
+    <h1>The Story So Far</h1>
+    <div class="sub">A world that lost its magic</div>
+    <p class="lede">A thousand years ago, the War of the Magi scorched the world. When it ended, magic was gone,
+    and people learned to live with steel, steam and gunpowder instead.</p>
+    <p>Now magic is stirring again. The Gestahlian Empire has found a way to bring back a little of the old power
+    and to build it into its machines. Its soldiers ride to war in Magitek armor, walking engines that shoot fire,
+    ice and lightning. Town by town, the Empire is taking the continent.</p>
+    <p>In the north lies Narshe, a mining town that has kept its independence through the winter and the war. Its
+    miners have dug something out of the ice deep in the mines: a creature frozen since the old war. People call it
+    an Esper.</p>
+    <p>The Empire wants it. On a snowy night, three soldiers in Magitek armor march on Narshe. Two of them are
+    veterans named Vicks and Wedge. The third is a young woman who does not seem to know where she is, or why she
+    is there.</p>
+    <p>That is where your story begins.</p>
+    <div class="ornament">&#9670; &#9670; &#9670;</div>
+    <h2>What OT6 changes</h2>
+    <p>The story, the world, the towns and the dungeons are the ones you remember. What is new is the way battles
+    work: monsters carry shields and hidden weaknesses, and your heroes save up Boost Points to make one action
+    count. The pages that follow explain it all, and the Beginner&rsquo;s House in Narshe teaches the basics in the
+    game itself.</p>
+  </div>
+</section>
+
+<!-- ============================================================= glance -->
+<section class="page" id="p-glance">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">At a glance</span></div>
+  <div class="body">
+    <h1>OT6 at a Glance</h1>
+    <div class="sub">For players who know Final Fantasy III</div>
+    <ul>
+      <li><b>Shields and weaknesses.</b> Enemies have shields and hidden weaknesses. Hitting a weakness removes a
+        shield. At zero shields an enemy is broken: it loses its turns and takes double damage.</li>
+      <li><b>Boost Points.</b> Each character has Boost Points. Pressing the R Button while choosing a command spends
+        points to make an action stronger, surer, wider or longer.</li>
+      <li><b>One job, one kit.</b> Every character has one job and a kit of up to eight skills. Most skills cost MP,
+        including Blitz, Tools, SwdTech, Steal, Dance and Rage.</li>
+      <li><b>Espers lend.</b> Spells you cast with an Esper equipped are lent, not learned. The Esper also gives
+        lasting bonuses, earned with Magic Points.</li>
+      <li><b>Fewer, richer battles.</b> Random battles come half as often and pay double Exp. and GP. A level-up
+        fully restores HP and MP.</li>
+      <li><b>Everything else is Final Fantasy III:</b> the story, the dungeons, the commands, and the old bugs.</li>
+    </ul>
+    <h2>The Beginner's House</h2>
+    <div class="pair">
+      <figure><img class="shot" src="img/school_door.png" alt="">
+        <figcaption>The Beginner's House in Narshe teaches what OT6 changes.</figcaption></figure>
+      <figure><img class="shot" src="img/school.png" alt="">
+        <figcaption>Each advisor explains one rule, in plain words.</figcaption></figure>
+    </div>
+    <p>The school in Narshe has been rewritten for OT6. Its advisors explain shields and weaknesses, Boost Points,
+    stronger spells, the skills that work differently, and how Espers are worn. A chest beside the right-hand room
+    holds a practice fight.</p>
+  </div>
+</section>
+
+<section class="page" id="p-screen">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">The battle screen</span></div>
+  <div class="body">
+    <h1>The Battle Screen</h1>
+    <div class="sub">What the new marks mean</div>
+    <figure class="annotated"><div class="shotwrap"><img class="shot" src="img/aura.png" alt=""><span class="mk" style="left:22%;top:41%">1</span><span class="mk" style="left:37%;top:41%">2</span><span class="mk" style="left:19%;top:55%">3</span><span class="mk" style="left:61.5%;top:69%">4</span><span class="mk" style="left:41.2%;top:85.4%">5</span><span class="mk" style="left:83%;top:40%">6</span></div></figure>
+    <ol class="keys">
+      <li><b>Shields left.</b> The number beside the shield icon. While it is above zero, the monster takes half
+        damage.</li>
+      <li><b>A weakness you have found.</b> Its icon: an element, or a weapon type.</li>
+      <li><b>A weakness not yet found.</b> A grey question mark. Hit it with the right thing and it turns into an
+        icon, for every monster of that kind, for good.</li>
+      <li><b>The bank.</b> The dots after a name are the Boost Points that character holds, up to five.</li>
+      <li><b>A boost on the way.</b> Arrows after the name show the points put on the command being chosen.</li>
+      <li><b>The glow.</b> A character with a boost pending lights up, so you can see who is about to spend.</li>
+    </ol>
+    <p class="small"><i>The next pages explain each of these. If a monster ever has no line at all, it simply has
+    no shields, which is its own kind of honesty.</i></p>
+  </div>
+</section>
+
+<!-- ============================================================ shields -->
+<section class="page" id="p-shields">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">Shields</span></div>
+  <div class="body">
+    <h1>Shields &amp; Weaknesses</h1>
+    <div class="sub">Find the weak spot, knock the shields down</div>
+    <figure class="fig-right"><img class="shot" src="img/shields_whelk.png" alt="">
+      <figcaption>The Whelk's head: four shields, and two weaknesses not yet found.</figcaption></figure>
+    <h2>Reading the display</h2>
+    <p>Under each enemy is one line. First comes a shield icon and a number: how many shields the enemy has left.
+    Then there is one cell for each weakness. A grey <b>?</b> is a weakness you have not found yet. Once you hit it,
+    the cell shows the icon of the element or weapon type.</p>
+    <p>A few enemies have no shields and show no line.</p>
+    <div class="clear"></div>
+    <h2>Taking shields</h2>
+    <figure class="fig-left"><img class="shot" src="img/shields.png" alt="">
+      <figcaption>A found weakness shows its icon. This guard is down to one shield.</figcaption></figure>
+    <p>While an enemy has shields it takes half damage. Each hit that matches a weakness removes one shield. A hit
+    that matches both an element and a weapon type removes two, and an attack that strikes several times removes a
+    shield per hit.</p>
+    <p>A weakness you find is remembered for every enemy of that kind, in later battles and in your save. Scan
+    reveals all of a kind's weaknesses at once.</p>
+    <div class="clear"></div>
+    <div class="tip" data-label="NO WEAKNESS NEEDED">
+      <p>A few attacks take shields whatever the enemy is weak to: the <b>Break</b> spell, Locke's <b>Filch</b>,
+      Sabin's <b>Bum Rush</b>, and Cyan's <b>Cleave</b> on a boss.</p>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">Weapons &amp; Break</span></div>
+  <div class="body">
+    <h2>Weapon types</h2>
+    <p>A weapon's icon shows its type, and Fight uses the type of the weapon in hand.</p>
+    <table>
+      <tr><th style="width:1.05in">Type</th><th>Weapons</th></tr>
+      <tr><td class="k">Slashing</td><td>swords, katanas, claws</td></tr>
+      <tr><td class="k">Piercing</td><td>spears, daggers, thrown blades, bolts, darts, fangs</td></tr>
+      <tr><td class="k">Bludgeoning</td><td>fists, staves, rods, flails, boomerangs</td></tr>
+      <tr><td class="k">Special</td><td>dice, cards, brushes</td></tr>
+    </table>
+    <p>Skills have a type of their own: a Blitz keeps its type whatever Sabin wears, and Edgar's Chain Saw is
+    slashing. A weapon with an element hits the weapon's type and its element at once.</p>
+    <h2>Elements</h2>
+    <p>Fire, ice, lightning, wind, earth, water, holy and poison. A spell hits the weakness of its element, and the
+    Magic list shows each spell's element as an icon. A hit on an elemental weakness also does the usual extra
+    damage.</p>
+    <h2>Break!</h2>
+    <figure class="fig-right"><img class="shot" src="img/break.png" alt="">
+      <figcaption>Broken: the Whelk's head turns grey and a beam lands for 764.</figcaption></figure>
+    <p>When the last shield falls, the enemy breaks. Its shield icon shows broken and its sprite turns grey. It
+    cannot act for a while, and it takes double damage.</p>
+    <p>When it recovers, its shields come back. So plan the break: strip the shields, then hit hard while it is
+    down.</p>
+    <div class="clear"></div>
+    <div class="tip" data-label="TIP">
+      <p>Bring a spread of weapon types. Each hero's weapon is a key for some lock, and a party that holds slashing,
+      piercing and bludgeoning, plus a spell or two, rarely meets a monster it can't break.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================== boost -->
+<section class="page" id="p-boost">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">Boost Points</span></div>
+  <div class="body">
+    <h1>Boost Points</h1>
+    <div class="sub">Save up, then make one action count</div>
+    <h2>Earning</h2>
+    <ul>
+      <li>Every character starts a battle with 1 Boost Point (BP).</li>
+      <li>A character gains 1 BP after each action, up to 5. An action that was boosted earns none.</li>
+    </ul>
+    <h2>Spending</h2>
+    <ul>
+      <li>The R Button puts up to 3 points on the command you are choosing, and the L Button takes one back
+        (page {{page:p-controls-battle}}).</li>
+      <li>The points are spent when the action happens.</li>
+      <li>A Mimic copies the action but pays nothing, and the boost buys what it buys on the copied action.</li>
+    </ul>
+    <div class="clear"></div>
+    <h2>Ultimates</h2>
+    <p>Some characters have an <b>ultimate</b>, offered only at 3 BP. It can be used again whenever the bank holds
+    three. Each hero's page says what theirs is.</p>
+    <div class="tip" data-label="TIP">
+      <p>Unbroken enemies take about half damage, and everyone starts with one point. A one-point boosted Fight is a
+      good habit in random battles: the extra swing makes up for the shields.</p>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">Boost Points</span></div>
+  <div class="body">
+    <h2>What a point buys</h2>
+    <table class="compact">
+      <tr><th style="width:0.95in">Kind</th><th style="width:1.45in">Examples</th><th>A point buys</th></tr>
+      <tr><td class="k">Fight</td><td>Fight, Mug, Capture</td><td>one more hit with a weapon in hand. With the Genji Glove and two weapons, both hands swing again. No MP.</td></tr>
+      <tr><td class="k">Spell families</td><td>Fire, Ice, Bolt, Poison, Cure, Life, Slow, Haste</td><td>the next spell of the line: one point casts Fire 2, two points Fire 3. A third adds nothing. You pay the MP of the spell cast.</td></tr>
+      <tr><td class="k">Damage or healing</td><td>Blitz, Tools, Lores, Dances, Esper summons, Drain, Pearl, Quake, Merton, Ultima, items that heal a number</td><td>double damage for 1 point, 4&times; for 2, 8&times; for 3</td></tr>
+      <tr><td class="k">Chance</td><td>Steal, Slot, Rage, a Dance's start</td><td>better odds; the third point removes the gamble</td></tr>
+      <tr><td class="k">Duration</td><td>Runic, Morph</td><td>more of the character's own turns, or more time</td></tr>
+      <tr><td class="k">Reach</td><td>Safe, Shell, Rflect, Vanish (on your party), Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle, Stop, Imp, Dispel; Shadow's smoke and exit</td><td>one more target per point</td></tr>
+      <tr><td class="k">Shields</td><td>the Break spell, Filch</td><td>one more shield per point</td></tr>
+      <tr><td class="k">Steps</td><td>Dismantle, Debilitator</td><td>one more application per point</td></tr>
+      <tr><td class="k">Reading</td><td>Scan, Appraise</td><td>every enemy at one point or more</td></tr>
+      <tr><td class="k">SwdTech</td><td>Cyan's techs</td><td>the tech itself (see Cyan)</td></tr>
+    </table>
+    <p class="small">Reach spells cover as many bodies as there are points, skipping anyone the spell would not
+    change. Each point costs the spell's MP again, even if nobody is left for it.</p>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">Boost Points</span></div>
+  <div class="body">
+    <h2>What a boost costs in MP</h2>
+    <ul>
+      <li>An action whose damage or healing is multiplied pays 2.5 times its MP per point: 1 point 2.5&times;,
+        2 points about 6&times;, 3 points about 16&times;. The price never goes above 99 and never below the unboosted
+        price.</li>
+      <li>Fight, Capture, Steal, Rage and Slot are not charged extra for a boost. Spells that move up a tier and
+        SwdTech pay for the tier or tech you get.</li>
+      <li>Reach spells, Debilitator and Filch pay their base price once per point used.</li>
+      <li>The Magic list shows the name and price of the spell as you press R. Skills you cannot pay for are
+        greyed.</li>
+    </ul>
+    <h2>Actions that take no boost</h2>
+    <p class="small">On these, R does nothing, or a boost raised earlier is dropped before it costs anything:</p>
+    <ul class="small">
+      <li>Def., Row, Leap, Revert, Control and Possess;</li>
+      <li>spells with no damage or healing number to raise: Doom, X-Zone, Demi, Quartr, W Wind, Float, Warp and
+        Quick;</li>
+      <li>items that heal a fraction or cure a status: Fenix Down, X-Potion, X-Ether, Elixir, Megalixir, Tent,
+        Sleeping Bag, Antidote, Eyedrop, Soft, Remedy, Green Cherry, Echo Screen, Smoke Bomb and Warp Stone, and the
+        Gravity Rod used as an item;</li>
+      <li>Lores with no number: Condemned, Roulette, Big Guard, L.5 Doom, L.3 Muddle, Reflect???, ForceField,
+        Dischord, Sour Mouth, Pep Up and Rippler; and Revenge, Blow Fish, Pearl Wind, Step Mine and Exploder, whose
+        damage is set by something else;</li>
+      <li>summons with no damage number, such as Hope Song and Life Guard;</li>
+      <li>Edgar's NoiseBlaster, Sabin's Mantra, and MagiTek Confuser and X-fer.</li>
+    </ul>
+    <p class="small">A Sketch that draws an attack with no number to raise drops the boost.</p>
+  </div>
+</section>
+
+<!-- ============================================================= espers -->
+<section class="page" id="p-espers">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">Espers</span></div>
+  <div class="body">
+    <h1>Espers &amp; Ranks</h1>
+    <div class="sub">Magicite that lends its power</div>
+    <p>Equip an Esper under Skills, then Espers. While it is equipped, the wearer can cast its spells and summon it
+    once a battle: in battle, open Magic and press up on the Control Pad. Take the Esper off and both go. Nobody
+    learns the spells. An Esper no longer raises or lowers stats while worn.</p>
+    <div class="pair">
+      <figure><img class="shot" src="img/esper_page.png" alt="">
+        <figcaption>Ramuh's page for TERRA: rank 2, and 59 of the 75 Magic Points rank 3 needs.</figcaption></figure>
+      <figure><img class="shot" src="img/esper_rank.png" alt="">
+        <figcaption>With the cursor on a rank, the top line says what it gives.</figcaption></figure>
+    </div>
+    <h2>Magic Points and ranks</h2>
+    <ul class="small">
+      <li>A won battle that pays Magic Points gives them to each living party member, for the Esper that member
+        wears. Random battles pay double. A few story battles pay none. Characters outside the party earn
+        nothing.</li>
+      <li>Each Esper has five ranks per character, at 10, 30, 75, 200 and 500 Magic Points. Ranks 1, 2 and 4 are stat
+        points; ranks 3 and 5 are effects. Once reached, a rank stays with that character whatever they wear
+        later.</li>
+      <li>The victory screen shows the points and any new rank. An Esper's page shows the selected character's rank,
+        points and what each rank gives. Move the cursor right onto the ranks to read each one. A rank whose effect
+        the character already has from another rank says &ldquo;Already held&rdquo;. Max HP and max MP bonuses do not
+        add up; the largest applies.</li>
+      <li>Odin and Raiden share one count. Umaro and Gogo cannot wear Espers.</li>
+    </ul>
+    <p class="small">Boosting a spell lent by an Esper works as for any spell: Fire becomes Fire 2 and Fire 3. Every
+    Esper's spells and ranks are in the table at the back of this booklet, page {{page:p-esper-table}}.</p>
+  </div>
+</section>
+
+<!-- ========================================================= encounters -->
+<section class="page" id="p-encounters">
+  <div class="runhead"><span>How OT6 plays</span><span class="mark">Battles &amp; secrets</span></div>
+  <div class="body">
+    <h2>Battles, Exp. and GP</h2>
+    <ul>
+      <li>Random battles come half as often.</li>
+      <li>Random battles pay double Exp. and GP, so a stretch of walking pays about what it always did. Event and
+        boss battles pay as before.</li>
+      <li>A level-up fully restores HP and MP.</li>
+      <li>The Cursed Shield counts a won random battle twice toward becoming the Paladin Shield.</li>
+    </ul>
+    <h2>Things you can miss</h2>
+    <ul class="small">
+      <li><b>Mog's Water Rondo.</b> Mog learns it by fighting underwater. In the World of Balance that is the Serpent
+        Trench, reached from Crescent Mountain on the Veldt. Mog must be in the party.</li>
+      <li><b>Mog or the Gold Hairpin.</b> Mog is recruited during the Lone Wolf chase near Narshe. The wolf's ledge
+        holds the Gold Hairpin. Only one of the two can be taken.</li>
+      <li><b>Shadow.</b> On the Floating Continent, choose &ldquo;Wait!!&rdquo; at the ledge until Shadow arrives. If
+        you jump before he does, he is gone for the rest of the game.</li>
+      <li><b>Umaro</b> joins in the World of Ruin only if Mog is in your active party when you reach the Narshe
+        cliffs.</li>
+      <li><b>Optional Espers.</b> Sraphim (a man in the woods near Tzen), Golem and ZoneSeek (the Jidoor
+        auction).</li>
+      <li><b>Gau's rages and Strago's lores</b> are learned only by meeting the monster. Gau learns a rage by Leaping
+        into the Veldt and returning. Strago learns a lore by being in the battle when a monster casts it.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========================================================= characters -->
+<section class="page" id="p-chars">
+  <div class="runhead"><span>The characters</span><span class="mark">Terra</span></div>
+  <div class="body">
+    <h1>The Characters</h1>
+    <div class="sub">Fourteen heroes, fourteen kits</div>
+    <p class="small">Skills come from each character's own way of learning, as in Final Fantasy III. Prices are in
+    MP. Every character's first skill is theirs from the day they join. A <span style="color:var(--blue)">&#9733;</span>
+    marks an ultimate, offered only at 3 BP.</p>
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_terra.png" alt=""><span class="name">Terra</span><span class="job">Mage</span><span class="arms">sword &middot; fire</span></div>
+      <ul>
+        <li><b>Spells by level.</b> Fire and Cure from the start; Drain at 12, Life at 18, Break at 24, Pearl at 30,
+          Merton at 33. Boost turns Fire into Fire 2 and Fire 3, Cure into Cure 2 and 3, and Life into Life 2 and
+          3.</li>
+        <li><b>Break</b> takes no damage and sets no status. It removes one shield, plus one per point (four at 3 BP),
+          ignoring weakness. It costs 25 MP at any boost.</li>
+        <li><b>Morph</b> is learned in Zozo. Each point adds time to it.</li>
+        <li><b>&#9733; Trance.</b> Morph at 3 BP lasts until the battle ends or she reverts.</li>
+        <li><b>Ultima.</b> After Terra returns in the World of Ruin (Mobliz), casting Fire with 3 BP casts Ultima, for
+          80 MP.</li>
+        <li><b>Economizer.</b> Won at the Colosseum with the Gem Box. Every spell its wearer casts costs 1 MP at any
+          boost.</li>
+      </ul>
+      <div class="tip" data-label="TIP"><p>The Break spell ignores weakness. At 3 BP it takes four shields for 25 MP,
+      which makes Terra the answer to a boss nobody holds a key for.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Celes</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_celes.png" alt=""><span class="name">Celes</span><span class="job">Rune Knight</span><span class="arms">sword &middot; ice</span></div>
+      <figure class="fig-right" style="width:2.2in"><img class="shot" src="img/celes.png" alt="">
+        <figcaption>Runic sits right under Fight in Celes&rsquo;s commands.</figcaption></figure>
+      <ul>
+        <li><b>Spells by level.</b> Ice from the start; Cure at 4, Imp at 13, Scan at 18, Safe at 22, Haste at 32.</li>
+        <li><b>Runic</b> is hers from the start. It absorbs the next spell as MP and gives Celes 1 BP. As always, it
+          also absorbs spells her allies cast. Boosted, it stays up for 1, 2 or 3 of her turns, and she acts normally
+          in them. The BP from absorbing is limited to one per round.</li>
+        <li><b>&#9733; RunicBlade</b>, learned in the Magitek factory when Celes turns on Kefka. Runic with 3 BP also
+          sends each absorbed spell back at its caster.</li>
+      </ul>
+      <div class="clear"></div>
+      <div class="tip" data-label="TIP">
+        <p>Runic drinks your own side's spells too, healing included. While it is up, heal with items, or let it
+        lapse first. Pointed the other way, a boss that leans on spells feeds Celes MP, and a Boost Point a round, while
+        Runic lasts.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Locke</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_locke.png" alt=""><span class="name">Locke</span><span class="job">Thief</span><span class="arms">dagger</span></div>
+      <figure class="fig-right"><img class="shot" src="img/locke.png" alt="">
+        <figcaption>Locke's kit lives behind Steal. Locked rows open as the story goes on.</figcaption></figure>
+      <p>Steal by boost: with 0 points it is the Steal you know. One point makes the steal likelier and the rare item
+      likelier. Two points make both a lot likelier. Three points always succeed and take the rare item if there is
+      one, the common item if not. A boost never makes up an item the enemy lacks.</p>
+      <p>Only the first shield Filch takes becomes a point for Locke.</p>
+      <div class="clear"></div>
+      <table class="compact">
+        <tr><th style="width:0.85in">Skill</th><th class="n" style="width:0.55in">MP</th><th>Effect</th><th style="width:1.2in">Learned</th></tr>
+        <tr><td class="k">Steal</td><td class="n">4</td><td>steals; a boost makes it likelier</td><td>from the start</td></tr>
+        <tr><td class="k">Filch</td><td class="n">6 a shield</td><td>takes a shield, ignoring weakness, and turns it into 1 BP for Locke</td><td>from the start</td></tr>
+        <tr><td class="k">Bestow</td><td class="n">5</td><td>gives an ally the BP pending (1 to 3)</td><td>from the start</td></tr>
+        <tr><td class="k">Mug</td><td class="n">4</td><td>a Fight whose hits each steal; a boost adds hits</td><td>South Figaro escape</td></tr>
+        <tr><td class="k">Trickshot</td><td class="n">4</td><td>a thrown coin that ignores defense; a boost multiplies it</td><td>Lete River</td></tr>
+        <tr><td class="k">Dismantle</td><td class="n">8</td><td>corrodes defense, then stabs; a boost corrodes more</td><td>Sealed Gate</td></tr>
+        <tr><td class="k">Appraise</td><td class="n">3</td><td>reads one enemy's weaknesses; a boost reads all</td><td>Thamasa, after Strago joins</td></tr>
+        <tr class="ult"><td class="k">Master's Mark</td><td class="n">99</td><td>robs and reads every enemy (3 BP)</td><td>Floating Continent</td></tr>
+      </table>
+      <figure class="fig-left" style="width:2.0in"><img class="shot" src="img/mastersmark.png" alt="">
+        <figcaption>Master's Mark: every enemy robbed and read in one turn.</figcaption></figure>
+      <div class="tip" data-label="TIP" style="display:flow-root;margin-top:0.12in">
+        <p>Filch is a key that fits every lock. When nobody in the party holds an enemy's weakness, Locke can still
+        take its shields, and earn a point doing it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Edgar</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_edgar.png" alt=""><span class="name">Edgar</span><span class="job">Machinist</span><span class="arms">spear</span></div>
+      <figure class="fig-right"><img class="shot" src="img/edgar.png" alt="">
+        <figcaption>The Tools list shows each Tool's price in MP.</figcaption></figure>
+      <p>Tools are found or bought, as they always were, and cost MP each use. Each has a weapon type or an
+      element of its own, listed below.</p>
+      <p><b>Debilitator</b> gives an enemy a new weakness and shows it; a boost adds one more per point.</p>
+      <div class="clear"></div>
+      <table class="compact">
+        <tr><th style="width:1.0in">Tool</th><th class="n" style="width:0.5in">MP</th><th>Where</th></tr>
+        <tr><td class="k">AutoCrossbow</td><td class="n">4</td><td>from the start. Pierces every enemy once.</td></tr>
+        <tr><td class="k">NoiseBlaster</td><td class="n">6</td><td>Figaro shop. Takes no boost.</td></tr>
+        <tr><td class="k">Bio Blaster</td><td class="n">8</td><td>Figaro shop. Poison.</td></tr>
+        <tr><td class="k">Flash</td><td class="n">6</td><td>Figaro's tool merchant and South Figaro's shop</td></tr>
+        <tr><td class="k">Drill</td><td class="n">16</td><td>Figaro Castle, after the sand dive. Two hits, piercing.</td></tr>
+        <tr><td class="k">Chain Saw</td><td class="n">18</td><td>a chest in Zozo. Slashing.</td></tr>
+        <tr><td class="k">Debilitator</td><td class="n">10</td><td>Vector's weapon shop, during the banquet</td></tr>
+        <tr class="ult"><td class="k">Overclock</td><td class="n">to 99</td><td>Magitek factory, after the Espers' scene</td></tr>
+      </table>
+      <p><b>&#9733; Overclock:</b> a Tool boosted with 3 BP fires twice, each time at 8&times;. It costs both firings,
+      up to 99 MP.</p>
+      <div class="tip" data-label="TIP">
+        <p>The AutoCrossbow strikes every enemy once, so against a pack that is weak to piercing it takes a shield from
+        each of them. And when nobody holds the key to a monster, the Debilitator makes one: give it a weakness your
+        party can hit, then hit it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Sabin</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_sabin.png" alt=""><span class="name">Sabin</span><span class="job">Monk</span><span class="arms">fists</span></div>
+      <figure class="fig-right"><img class="shot" src="img/sabin.png" alt="">
+        <figcaption>Every Blitz with its element or type icon and its price.</figcaption></figure>
+      <p>Blitzes are chosen from a list; there are no button codes to enter. Sabin learns them by level.</p>
+      <p>Fists are bludgeoning. Claws make his Fight slashing; his Blitzes keep their own type.</p>
+      <div class="clear"></div>
+      <table class="compact">
+        <tr><th style="width:1.1in">Blitz</th><th class="n" style="width:0.5in">MP</th><th>Level</th></tr>
+        <tr><td class="k">Pummel</td><td class="n">4</td><td>from the start. Two hits.</td></tr>
+        <tr><td class="k">Aura Bolt</td><td class="n">10</td><td>6. Holy.</td></tr>
+        <tr><td class="k">Suplex</td><td class="n">13</td><td>10</td></tr>
+        <tr><td class="k">Fire Dance</td><td class="n">17</td><td>15. Fire.</td></tr>
+        <tr><td class="k">Mantra</td><td class="n">16</td><td>23. Takes no boost.</td></tr>
+        <tr><td class="k">Air Blade</td><td class="n">28</td><td>30. Wind.</td></tr>
+        <tr><td class="k">Spiraler</td><td class="n">50</td><td>42</td></tr>
+        <tr class="ult"><td class="k">Bum Rush</td><td class="n">99</td><td>70, or from Duncan</td></tr>
+      </table>
+      <p><b>&#9733; Bum Rush</b> is offered only at 3 BP. It is four blows, each at 8&times;. Each blow removes a
+      shield whatever the enemy is weak to.</p>
+      <div class="tip" data-label="TIP">
+        <p>A Blitz keeps its own element and type, so Sabin carries several keys at once: holy in Aura Bolt, fire in
+        Fire Dance, wind in Air Blade. Learn which monsters fear which, and pick the Blitz to match.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Cyan</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_cyan.png" alt=""><span class="name">Cyan</span><span class="job">Samurai</span><span class="arms">katana</span></div>
+      <figure class="fig-right"><img class="shot" src="img/cyan.png" alt="">
+        <figcaption>The SwdTech page: which techs sit in the 1, 2 and 3 BP slots.</figcaption></figure>
+      <p>The charge gauge is gone. SwdTech opens a list of three techs, for 1, 2 and 3 BP. The three are Cyan's best
+      learned techs, weakest first, so the list moves up as he learns more.</p>
+      <p>In the field menu, Skills, then SwdTech, lets you pick which techs sit in the three slots, or return them to
+      automatic.</p>
+      <div class="clear"></div>
+      <table class="compact">
+        <tr><th style="width:1.1in">Tech</th><th class="n" style="width:0.5in">MP</th><th>Level</th></tr>
+        <tr><td class="k">Dispatch</td><td class="n">4</td><td>from the start</td></tr>
+        <tr><td class="k">Retort</td><td class="n">10</td><td>6. A counter stance.</td></tr>
+        <tr><td class="k">Slash</td><td class="n">13</td><td>12</td></tr>
+        <tr><td class="k">Quadra Slam</td><td class="n">16</td><td>15. Four slashing hits.</td></tr>
+        <tr><td class="k">Empowerer</td><td class="n">18</td><td>24. Drains; two hits.</td></tr>
+        <tr><td class="k">Stunner</td><td class="n">28</td><td>34. Hits all enemies.</td></tr>
+        <tr><td class="k">Quadra Slice</td><td class="n">50</td><td>44. Four wind hits.</td></tr>
+        <tr class="ult"><td class="k">Cleave</td><td class="n">99</td><td>the Phantom Train farewell</td></tr>
+      </table>
+      <p><b>&#9733; Cleave</b> is the 3 BP slot once learned. It strikes every enemy: each one that can die, dies. A
+      boss loses four shields and takes a very heavy cut.</p>
+      <div class="tip" data-label="TIP">
+        <p>Because the slots follow Boost Points, Cyan wants a full bank. Let him bank points in easy rounds, and spend
+        all three when it matters.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Setzer &middot; Gau</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_setzer.png" alt=""><span class="name">Setzer</span><span class="job">Gambler</span><span class="arms">cards &middot; dice</span></div>
+      <figure class="fig-right" style="width:1.7in"><img class="shot" src="img/setzer.png" alt="">
+        <figcaption>Slot opens a short list of Setzer's games.</figcaption></figure>
+      <p>Slot opens a short list. Coin Toss and Hired Help take Gil, not MP. Each hire walks in as a different
+      figure.</p>
+      <p>Cards and dice hit the special type. Spirits, cursed and magical bodies and some bosses can be weak to it, so
+      Setzer is worth bringing where they gather.</p>
+      <div class="clear"></div>
+      <table class="compact">
+        <tr><th style="width:0.85in">Skill</th><th style="width:0.85in">Cost</th><th>Effect</th></tr>
+        <tr><td class="k">Slot</td><td>free</td><td>the reels. Boost: 1 point removes the rigged miss; 2 points tilt the reels your way; 3 points guarantee a triple of the icon you stop first.</td></tr>
+        <tr><td class="k">Coin Toss</td><td>level &times; 30 Gil</td><td>throws Gil at every enemy. A boost adds a toss per point.</td></tr>
+        <tr><td class="k">Hired Help</td><td>level &times; 50 Gil</td><td>one hired blow that uses the type the target is weak to. A boost adds a hire per point.</td></tr>
+        <tr class="ult"><td class="k">Jackpot</td><td>99 MP</td><td>throws the Fixed Dice twice at one enemy (3 BP). Each roll lands a triple, and a low roll does little. Learned when Setzer rejoins in the World of Ruin, at Kohlingen.</td></tr>
+      </table>
+    </div>
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_gau.png" alt=""><span class="name">Gau</span><span class="job">Beast Tamer</span><span class="arms">fangs</span></div>
+      <figure class="fig-right" style="width:1.7in"><img class="shot" src="img/gau.png" alt="">
+        <figcaption>Skills, then Rage: the eight rages Gau takes into battle.</figcaption></figure>
+      <ul>
+        <li><b>Rage.</b> Gau learns rages on the Veldt, without limit. Under Skills, then Rage, you choose the eight
+          he can use in battle.</li>
+        <li>Choosing a rage costs 8 MP once, and he stays possessed for the battle. On each turn the beast either
+          attacks or uses its special, half the time each.</li>
+        <li><b>Boost</b> changes the odds of the special: 3 in 4 with 1 point, 15 in 16 with 2, every turn with 3. It
+          adds no damage.</li>
+        <li><b>Leap.</b> On the Veldt, Leap replaces Fight. It is free and takes no boost.</li>
+        <li>Gau can wear Espers. He has no ultimate.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Strago &middot; Relm</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_strago.png" alt=""><span class="name">Strago</span><span class="job">Scholar</span><span class="arms">rod</span></div>
+      <figure class="fig-right" style="width:1.6in"><img class="shot" src="img/strago.png" alt="">
+        <figcaption>Strago&rsquo;s Lore list in battle, with each lore&rsquo;s price.</figcaption></figure>
+      <ul>
+        <li><b>Lore.</b> Strago learns lores by watching monsters cast them, and he equips five of them, chosen under
+          Skills, then Lore. Aqua Rake, once learned, is in his Lore list every battle in addition to the five.</li>
+        <li><b>Scan</b> is his from the day he joins, for 3 MP. It marks every weakness of a kind of monster, not only
+          one. A boost reads every enemy.</li>
+        <li><b>&#9733; Study.</b> Scan with 3 BP costs 99 MP and teaches Strago every lore any monster in the battle
+          could cast, learned at the victory.</li>
+        <li><b>Bserk.</b> He learns it the first time a monster berserks someone while he is in the battle and
+          standing at the end. The Insecares on Esper Mountain and the L.50 Magic in the Fanatics' Tower can teach
+          it.</li>
+        <li>Pearl Wind can be learned from the Sprinters in the wood west of the plain north-west of Jidoor. Strago
+          learns GrandTrain from Hidon at Ebot's Rock.</li>
+      </ul>
+    </div>
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_relm.png" alt=""><span class="name">Relm</span><span class="job">Painter</span><span class="arms">brush</span></div>
+      <p>Sketch is her skill. A boost applies to whatever the sketch draws: it multiplies an attack with a number, and
+      is dropped if the attack has none. Brushes hit the special type.</p>
+      <div class="warn"><p style="margin:0"><b>Save before you Sketch.</b> A missed Sketch can still corrupt your
+      inventory or a save, as it always could.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Shadow</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_shadow.png" alt=""><span class="name">Shadow</span><span class="job">Assassin</span><span class="arms">thrown blades</span></div>
+      <figure class="fig-right"><img class="shot" src="img/shadow.png" alt="">
+        <figcaption>Assassinate: the hit that breaks an enemy kills it.</figcaption></figure>
+      <p>Shadow's skill is Throw. He throws the item you pick, and it is used up. A boost multiplies a damaging
+      throw.</p>
+      <p>A boosted smoke or exit covers one more ally per point, so 3 points cover a party of four. Anyone who throws
+      one gets this.</p>
+      <div class="clear"></div>
+      <table class="compact">
+        <tr><th style="width:1.35in">Item</th><th style="width:1.3in">Where</th><th>Effect</th></tr>
+        <tr><td class="k">Shuriken, Ninja Star</td><td>Thamasa weapon shop, World of Ruin</td><td>piercing</td></tr>
+        <tr><td class="k">Tack Star</td><td>Colosseum</td><td>piercing</td></tr>
+        <tr><td class="k">Fire Skean, Water Edge, Bolt Edge</td><td>Maranda weapon shop</td><td>piercing and the element, to every enemy</td></tr>
+        <tr><td class="k">Shadow Edge</td><td>Maranda weapon shop</td><td>casts Image on the thrower</td></tr>
+        <tr><td class="k">Inviz Edge</td><td>Maranda weapon shop</td><td>casts Vanish on the thrower</td></tr>
+      </table>
+      <p><b>&#9733; Assassinate.</b> With 3 BP, a hit of his that breaks an enemy kills it, and so does a hit on an
+      enemy that is already broken. A boss is only broken.</p>
+      <p>Interceptor blocks and counters physical attacks half the time, as it always did.</p>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>The characters</span><span class="mark">Mog &middot; Umaro &middot; Gogo</span></div>
+  <div class="body">
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_mog.png" alt=""><span class="name">Mog</span><span class="job">Dancer</span><span class="arms">spear</span></div>
+      <figure class="fig-right" style="width:1.6in"><img class="shot" src="img/mog.png" alt="">
+        <figcaption>Mog&rsquo;s Dance list, each Dance at 8 MP unboosted.</figcaption></figure>
+      <p class="small">Mog learns his eight Dances by fighting on each dance's terrain. Dances cost 8 MP, 20 with 1
+      point, 50 with 2 and 99 with 3, and a boost multiplies every step. Off its own terrain a Dance may stumble: it
+      fails half the time. 1 point cuts that to one in four, 2 points to one in 16, and 3 points to never. A stumble
+      costs no MP, but the points are spent. Mog has no ultimate.</p>
+      <table class="compact">
+        <tr><th>Dance</th><th>Terrain</th><th>Dance</th><th>Terrain</th></tr>
+        <tr><td class="k">Wind Song</td><td>plains, the Veldt</td><td class="k">Earth Blues</td><td>mountains</td></tr>
+        <tr><td class="k">Forest Suite</td><td>forests</td><td class="k">Water Rondo</td><td>underwater</td></tr>
+        <tr><td class="k">Desert Aria</td><td>deserts</td><td class="k">Dusk Requium</td><td>caves</td></tr>
+        <tr><td class="k">Love Sonata</td><td>towns, buildings</td><td class="k">Snowman Jazz</td><td>snowfields</td></tr>
+      </table>
+    </div>
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_umaro.png" alt=""><span class="name">Umaro</span><span class="job">Berserker</span><span class="arms">club &middot; fists</span></div>
+      <p class="small">Umaro takes no orders. Each turn he picks Fight, Charge, Throw (with the Rage Ring) or Storm (with
+      the Blizzard Orb). His Fight, Charge and Throw are bludgeoning, and Storm is ice on every enemy. Umaro banks a
+      point each turn, and when he has been hurt, he spends the bank on his next action. With 3 points he always
+      Storms, with or without the Blizzard Orb, at 8&times;. He has no MP and cannot wear Espers.</p>
+    </div>
+    <div class="char">
+      <div class="charhead"><img class="portrait" src="img/portrait_gogo.png" alt=""><span class="name">Gogo</span><span class="job">Mime</span></div>
+      <p class="small">Gogo joins in the Zone Eater. His Mimic is free, and a boost buys what it buys on the action he
+      copies. Where it would buy nothing, the points are kept. Gogo cannot wear Espers.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================== tips -->
+<!-- Area tips: each line names its sources (docs/design and the shield tables) in the comment after it. -->
+<section class="page" id="p-tips">
+  <div class="runhead"><span>The journey &middot; World of Balance</span><span class="mark">Tips</span></div>
+  <div class="body">
+    <h1>Tips, Area by Area</h1>
+    <div class="sub">The World of Balance</div>
+    <p class="small">For each place: what breaks the monsters you meet there, then a word on its bosses
+    (marked <span style="color:var(--blue)">&#9670;</span>). &ldquo;Breaks to&rdquo; names the weapon types and elements
+    that take a shield. A boss's shield count is how many hits on a weakness it takes to break it.</p>
+    <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_narshe.png" alt="">
+      <figcaption>Narshe, the mining town in the snow.</figcaption></figure>
+    <div class="area"><h3>Narshe</h3>
+      <p>Guards and Lobos break to piercing, and Lobos also to fire. In the mines, Were-Rats and Repo Men break to slashing or piercing (fire for Were-Rats, poison for Repo Men). A Vaporite has one shield and breaks to fire, holy, piercing or bludgeoning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2002, ff6/src/battle/ot6_hud.asm:2004, ff6/src/battle/ot6_hud.asm:3088, ff6/src/battle/ot6_hud.asm:3101, ff6/src/battle/ot6_hud.asm:2411; sub_battle_group.dat maps 42 and 50 (group 58); docs/design/break-coverage-wob.md:33-42 -->
+      <p class="boss"><b>Whelk.</b> Hit the head, never the shell. The head has four shields and breaks to piercing or fire; the shell shows no shield line and answers with MegaVolt.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2006, ff6/src/battle/ot6_hud.asm:2008, ff6/src/battle/ot6_break.asm:216 (head + fire), ff6/src/battle/monster_prop.dat species $134; docs/design/bosses-wob.md:137-156 -->
+      <p class="boss"><b>Marshal.</b> Four shields; piercing or poison breaks him, and his Lobos (three shields) break to piercing or fire. The moogles' spears pierce too. Send in a healthy squad, Mog's if you can.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2014, ff6/src/battle/ot6_hud.asm:2004, ff6/src/battle/monster_prop.dat species $064; docs/design/bosses-wob.md:167-175 -->
+      <p class="boss"><b>Kefka (the Narshe defense).</b> Six shields; slashing, piercing, fire or poison breaks him. Arrive holding Boost Points and break him first. His Troopers and Riders break to slashing or piercing.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2050, ff6/src/battle/ot6_break.asm:226 (poison|fire add), ff6/src/battle/ot6_hud.asm:2097, ff6/src/battle/ot6_hud.asm:2101; docs/design/bosses-wob.md:650-676; the Ice 2 wind-up is from the doc only: UNVERIFIED in source -->
+    </div>
+    <div class="area"><h3>Figaro Castle and the South Figaro cave</h3>
+      <p>In the cave, Bleary, Crawly and Hornet are all weak to fire, so Terra's Fire breaks any of them; Bleary also takes piercing, Crawly slashing or bludgeoning, Hornet (one shield) slashing or piercing. On the plains, Rhinotaurs, Rhodoxes and Grease Monks take poison and piercing.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2439, ff6/src/battle/ot6_hud.asm:2441, ff6/src/battle/ot6_hud.asm:2443, sub_battle_group.dat map 72 (group 59); ff6/src/battle/ot6_hud.asm:2426, ff6/src/battle/ot6_hud.asm:2430, ff6/src/battle/ot6_hud.asm:2433, world_battle_group.dat groups 3 and 5; ff6/src/battle/ot6_break.asm:238-240 -->
+    </div>
+    <div class="area"><h3>South Figaro</h3>
+      <p>Commanders and Vector Pups take slashing or piercing (poison for Commanders, fire for Pups). In the cave, Trilobiters take piercing or bludgeoning and Primordites slashing, bludgeoning or lightning. A Gold Bear has three shields and takes slashing or bludgeoning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2452, ff6/src/battle/ot6_hud.asm:2456, ff6/src/battle/ot6_hud.asm:2462, ff6/src/battle/ot6_hud.asm:2459, ff6/src/battle/ot6_hud.asm:2465; sub_battle_group.dat map 87 (group 65), maps 69 and 70 (group 122); docs/design/break-coverage-wob.md:90-106 -->
+      <p class="boss"><b>TunnelArmr.</b> Five shields; piercing (Locke's daggers, Mug), ice, lightning and water break it.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2048, ff6/src/battle/ot6_break.asm:228 (ice add), ff6/src/battle/monster_prop.dat species $104 (weak bolt|water); docs/design/bosses-wob.md:314-343; "Runic absorbs Magnitude8" is from the doc only: UNVERIFIED in source -->
+    </div>
+  </div>
+</section>
+<section class="page">
+  <div class="runhead"><span>The journey &middot; World of Balance</span><span class="mark">Tips</span></div>
+  <div class="body">
+    <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_lete.png" alt="">
+      <figcaption>The Lete River.</figcaption></figure>
+    <div class="area"><h3>Mt. Kolts</h3>
+      <p>Tuskers show no weapon weakness; break them with fire or poison. Triliums take slashing, piercing or fire; Cirpiuses piercing or poison; Brawlers slashing or ice.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2033, ff6/src/battle/ot6_break.asm:232 (Tusker poison add), ff6/src/battle/ot6_hud.asm:2446, ff6/src/battle/ot6_hud.asm:2311, ff6/src/battle/ot6_break.asm:230, ff6/src/battle/ot6_hud.asm:2022; sub_battle_group.dat maps 96-102 (groups 61-64); docs/design/break-coverage-wob.md:78-88 -->
+      <p class="boss"><b>Vargas.</b> Five shields; bludgeoning, holy and poison break him. Sabin's Pummel and Aura Bolt are the keys. His two Ipoohs break to slashing or fire.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2042, ff6/src/battle/ot6_break.asm:218 (holy add), ff6/src/battle/ot6_hud.asm:2044 (Ipooh), ff6/src/battle/monster_prop.dat species $103; docs/design/bosses-wob.md:200-285 (the Bio Blaster targeting is a doc measurement: UNVERIFIED in source) -->
+    </div>
+    <div class="area"><h3>The Lete River</h3>
+      <p>On the raft, fire breaks Pterodons, Nautiloids and Exocites alike; Pterodons also take slashing or piercing, Nautiloids piercing or bludgeoning, Exocites slashing or bludgeoning. The passage toward Narshe holds 1st Class guards (piercing, bludgeoning, poison) and Wild Rats (slashing, piercing, fire).</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3517, ff6/src/battle/ot6_hud.asm:3520, ff6/src/battle/ot6_hud.asm:3524, ff6/src/battle/ot6_hud.asm:2480, ff6/src/battle/ot6_hud.asm:2483; docs/design/break-coverage-wob.md:125-138, 258-275; the mapping of map 48 to this area is UNVERIFIED (the doc calls it "Narshe's back way with Banon") -->
+      <p class="boss"><b>Ultros (Lete River).</b> Five shields; fire, lightning, slashing and piercing break him, and he absorbs water.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2046, ff6/src/battle/monster_prop.dat species $12c (weak fire|bolt, absorbs water); docs/design/bosses-wob.md:288-306 -->
+    </div>
+    <div class="area"><h3>The Imperial Camp and Doma</h3>
+      <p>Soldiers break to slashing or piercing; Templars to piercing or lightning. At Doma, Leaders take slashing, and Grunts and Cadets slashing or bludgeoning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2078, ff6/src/battle/ot6_hud.asm:2082, ff6/src/battle/ot6_break.asm:224, ff6/src/battle/ot6_hud.asm:2085, ff6/src/battle/ot6_hud.asm:2088, ff6/src/battle/ot6_hud.asm:2091; docs/design/bosses-wob.md:677-740 -->
+      <p class="boss"><b>Telstar.</b> Four shields; bludgeoning, lightning and water (Bolt Edge) break it. Its Dobermans have two shields (piercing, fire). Break Telstar early and keep it down.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2055, ff6/src/battle/ot6_hud.asm:2057, ff6/src/battle/monster_prop.dat species $044 (weak bolt|water); docs/design/bosses-wob.md:380-391 (the radio call is from the doc only: UNVERIFIED in source) -->
+    </div>
+    <div class="area"><h3>The Phantom Forest and Train</h3>
+      <p>In the forest, Ghosts take slashing or special and Poplium slashing or piercing; both fear fire and holy. On the train, Hazers, Whispers and Over-Minds take slashing or special, StillGoing slashing or bludgeoning, Bombs slashing, bludgeoning, ice or water. Holy breaks all but the Bombs.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3117, ff6/src/battle/ot6_hud.asm:3122, ff6/src/battle/ot6_hud.asm:2470, ff6/src/battle/ot6_hud.asm:2472, ff6/src/battle/ot6_hud.asm:3565, ff6/src/battle/ot6_hud.asm:2475, ff6/src/battle/ot6_hud.asm:3114; sub_battle_group.dat maps 130-135 (groups 68, 69), maps 141-152 (groups 70-76) -->
+      <p class="boss"><b>Ghost Train.</b> Four shields; bludgeoning, fire, lightning and holy break it, and it absorbs poison, so leave Bio Blaster alone. A Suplex that lands ends the fight outright.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2059, ff6/src/battle/monster_prop.dat species $106 (weak fire|bolt|holy, absorbs poison), ff6/src/battle/ot6_break.asm:698-740 (Ot6SuplexTrain); docs/design/bosses-wob.md:393-440 -->
+    </div>
+  </div>
+</section>
+<section class="page">
+  <div class="runhead"><span>The journey &middot; World of Balance</span><span class="mark">Tips</span></div>
+  <div class="body">
+    <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_zozo.png" alt="">
+      <figcaption>Zozo, where it always rains.</figcaption></figure>
+    <div class="area"><h3>Baren Falls and the Veldt</h3>
+      <p>Piranhas have one shield (slashing, bludgeoning, lightning). On the Veldt, early monsters such as Stray Cats and Beakors take slashing or piercing, Rhobites slashing or bludgeoning, CrassHoppers piercing or bludgeoning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2063, ff6/src/battle/ot6_hud.asm:3106, ff6/src/battle/ot6_hud.asm:3109, ff6/src/battle/ot6_hud.asm:3120, ff6/src/battle/ot6_hud.asm:3111; docs/design/route-wor-gau.md:132-155. UNVERIFIED which monsters the World of Balance Veldt deals: it draws from Gau's rage list, not a pool; these are the bodies the doc lists for the early Veldt -->
+      <p class="boss"><b>Rizopas.</b> Four shields; slashing, bludgeoning and lightning break it, and it absorbs water.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2061, ff6/src/battle/monster_prop.dat species $155 (weak bolt, absorbs water); docs/design/bosses-wob.md:459-520 (El Nino damage is a doc measurement) -->
+    </div>
+    <div class="area"><h3>The Serpent Trench</h3>
+      <p>Anguiforms take slashing (or lightning); Actaneons and Aspiks take bludgeoning or fire. All three absorb water.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2120, ff6/src/battle/ot6_hud.asm:2122, ff6/src/battle/ot6_hud.asm:2124, ff6/src/battle/monster_prop.dat species $03a, $05e, $059 (absorb water); docs/design/bosses-wob.md:743-765; "Nikeah has no fights": no pool found for it in sub_battle_group.dat, UNVERIFIED by name -->
+    </div>
+    <div class="area"><h3>Zozo</h3>
+      <p>Poison (Bio Blaster) breaks every common body here. HadesGigas take bludgeoning, Gabbldegaks piercing, Harvesters and SlamDancers slashing or piercing. A lone SlamDancer casts a tier-2 spell every turn, so break it first.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2315, ff6/src/battle/ot6_hud.asm:2320, ff6/src/battle/ot6_hud.asm:2323, ff6/src/battle/ot6_hud.asm:2325; sub_battle_group.dat maps 221 and 225; docs/design/zozo-street.md:21-47 (the lone SlamDancer's spell loop is from the doc, not re-read in the AI script) -->
+      <p class="boss"><b>Dadaluma.</b> Six shields; piercing, bludgeoning and poison break him. His Iron Fists (two shields) join at half health: clear them with the AutoCrossbow, and break him while he crouches to jump.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2138, ff6/src/battle/ot6_hud.asm:2140, ff6/src/battle/monster_prop.dat species $107 (weak poison); docs/design/bosses-wob.md:786-801 -->
+    </div>
+    <div class="area"><h3>The Opera House</h3>
+      <p>In the rafters, Sewer Rats and Vermin have two shields and break to piercing or bludgeoning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2147, ff6/src/battle/ot6_hud.asm:2149, comment ff6/src/battle/ot6_hud.asm:2142-2146 -->
+      <p class="boss"><b>Ultros (opera stage).</b> Six shields; fire, lightning, slashing and piercing break him, and he absorbs water.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2151, ff6/src/battle/monster_prop.dat species $12d (weak fire|bolt, absorbs water); docs/design/bosses-wob.md:805-820 -->
+    </div>
+    <div class="area"><h3>Vector: the Magitek Research Facility</h3>
+      <p>The machines (Garm, Commando, ProtoArmor, Pipsqueak, Trapper, Chaser) mostly break to piercing or bludgeoning and to lightning or water. Flan takes bludgeoning or fire. Rhinox takes only bludgeoning; Gobbler slashing or piercing.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2178, ff6/src/battle/ot6_hud.asm:2185, ff6/src/battle/ot6_hud.asm:2190, ff6/src/battle/ot6_hud.asm:2194, ff6/src/battle/ot6_hud.asm:2206, ff6/src/battle/ot6_hud.asm:2210, ff6/src/battle/ot6_hud.asm:2198, ff6/src/battle/ot6_hud.asm:2218, ff6/src/battle/ot6_hud.asm:2214; docs/design/break-coverage-vector.md:237-258, 475-500 -->
+      <p class="boss"><b>Ifrit and Shiva.</b> Ifrit: six shields, weak to ice and piercing, absorbs fire. Shiva: six shields, weak to fire and slashing, absorbs ice. Change elements when they swap.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2153, ff6/src/battle/ot6_hud.asm:2155, ff6/src/battle/monster_prop.dat species $108, $109; docs/design/bosses-wob.md:822-851 -->
+      <p class="boss"><b>Number 024.</b> Seven shields; slashing or piercing always breaks it. Its elemental wall keeps changing, so rely on weapons rather than spells.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2157, ff6/src/battle/monster_prop.dat species $10a (no fixed weakness); docs/design/bosses-wob.md:853-872 -->
+      <p class="boss"><b>Number 128.</b> Seven shields; piercing, lightning and water break it, and it absorbs ice. Its two blades have three shields each (slashing, lightning) and grow back.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2160, ff6/src/battle/ot6_break.asm:254 (bolt|water add), ff6/src/battle/ot6_hud.asm:2162, ff6/src/battle/ot6_hud.asm:2164, ff6/src/battle/monster_prop.dat species $10b (absorbs ice); docs/design/bosses-wob.md:874-907 -->
+      <p class="boss"><b>Left and Right Cranes.</b> Six shields each; both break to piercing and water. The Right Crane also takes lightning and absorbs fire; the Left absorbs lightning. A wrong element heals the one you hit.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2166, ff6/src/battle/ot6_hud.asm:2168, ff6/src/battle/monster_prop.dat species $10d, $10e; docs/design/bosses-wob.md:909-937 -->
+    </div>
+  </div>
+</section>
+<section class="page">
+  <div class="runhead"><span>The journey &middot; World of Balance</span><span class="mark">Tips</span></div>
+  <div class="body">
+    <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_fc.png" alt="">
+      <figcaption>The Floating Continent.</figcaption></figure>
+    <div class="area"><h3>Esper Mountain and Thamasa</h3>
+      <p>On the mountain, Mandrakes and Slurms take fire, Insecares fire or wind; Adamanchyts have five shields (piercing, bludgeoning). Near Thamasa, Cephalers take lightning, Chimeras and Baskervors poison.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2526, ff6/src/battle/ot6_hud.asm:2541, ff6/src/battle/ot6_hud.asm:2529, ff6/src/battle/ot6_hud.asm:2534, ff6/src/battle/ot6_hud.asm:2514, ff6/src/battle/ot6_hud.asm:2517, ff6/src/battle/ot6_hud.asm:2520, ff6/src/battle/ot6_break.asm:244-246; docs/design/break-coverage-wob.md:180-221, docs/design/wob-side-trips.md:105-113 (the Adamanchyt sneeze is a lab finding in the doc: UNVERIFIED in source) -->
+      <p class="boss"><b>Ultros (Esper Mountain).</b> Seven shields; fire, lightning, slashing and piercing break him. The fight ends by script, so a break does not change the outcome; do not burn Boost Points on it.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2249, ff6/src/battle/monster_prop.dat species $12e; docs/design/bosses-wob.md:941-952 -->
+      <p class="boss"><b>FlameEater.</b> Seven shields; ice, water and piercing break it, and it absorbs fire, so keep Fire off it. Its Balloons have one shield and explode: clear them with a spell that hits all.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2251, ff6/src/battle/ot6_hud.asm:2253, ff6/src/battle/ot6_break.asm:260 (water add), ff6/src/battle/monster_prop.dat species $116 (weak ice, absorbs fire); docs/design/bosses-wob.md:956-980 -->
+    </div>
+    <div class="area"><h3>The Cave to the Sealed Gate</h3>
+      <p>Holy breaks every body here but the Coelecite, and ice breaks Apparites and Coelecites. Fire breaks only the Zombone and is absorbed by the others, so do not open with it. Ing (three shields) take piercing or bludgeoning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2340, ff6/src/battle/ot6_hud.asm:2344, ff6/src/battle/ot6_hud.asm:2349, ff6/src/battle/ot6_hud.asm:2351, ff6/src/battle/ot6_hud.asm:2355; ff6/src/battle/monster_prop.dat species $06e, $0e5, $0b3, $048, $082 (weak and absorb bytes); docs/design/break-coverage-gate.md:15-24 -->
+    </div>
+    <div class="area"><h3>The Floating Continent</h3>
+      <p>Behemoths and Dragons take slashing or piercing (Behemoth ice, Dragon lightning). Apokryphoses, Misfits and Brainpans also take special. A Naughty has three shields and breaks to fire, lightning, holy, slashing, piercing or special.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2257, ff6/src/battle/ot6_hud.asm:2259, ff6/src/battle/ot6_hud.asm:2265, ff6/src/battle/ot6_hud.asm:2267, ff6/src/battle/ot6_hud.asm:2274, ff6/src/battle/ot6_hud.asm:2545; sub_battle_group.dat maps 393 and 394 (groups 123, 112); docs/design/break-coverage-wob.md:223-236 -->
+      <p class="boss"><b>Air Force.</b> Eight shields; piercing, lightning and water break it. Once both pods fall, a Speck absorbs spells: any weapon breaks its one shield.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2286, ff6/src/battle/ot6_hud.asm:2288, ff6/src/battle/ot6_hud.asm:2290, ff6/src/battle/ot6_hud.asm:2292, ff6/src/battle/monster_prop.dat species $113; docs/design/bosses-wob.md:1027-1056 (the Launcher cancel is from the doc only: UNVERIFIED in source) -->
+      <p class="boss"><b>AtmaWeapon.</b> Eleven shields; fire, ice, lightning, slashing and piercing all work. Bank Boost Points, break it, then spend them while it is down.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2295, ff6/src/battle/ot6_break.asm:252 (fire|ice|bolt add), docs/design/bosses-wob.md:1059-1081 (the Flare Star wind-up is from the doc only: UNVERIFIED in source) -->
+      <p class="boss"><b>Ultros and Chupon (airship deck).</b> Ultros has seven shields (fire, lightning, poison, slashing, piercing), Chupon four (ice, water, bludgeoning). Spend banked Boost Points early: Chupon's Sneeze removes a character.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2282, ff6/src/battle/ot6_break.asm:262, ff6/src/battle/ot6_hud.asm:2284, ff6/src/battle/monster_prop.dat species $168, $12f; docs/design/bosses-wob.md:983-1025 -->
+      <p class="boss"><b>Nerapa.</b> Five shields; ice, lightning, holy, slashing and piercing break it. It absorbs fire.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2298, ff6/src/battle/monster_prop.dat species $118 (absorbs fire); docs/design/bosses-wob.md:1083-1130 (Reflect is a doc measurement) -->
+    </div>
+  </div>
+</section>
+<section class="page" id="p-tips-wor">
+  <div class="runhead"><span>The journey &middot; World of Ruin</span><span class="mark">Tips</span></div>
+  <div class="body">
+    <h1>The World of Ruin</h1>
+    <div class="sub">The main places, in a likely order</div>
+    <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_tomb.png" alt="">
+      <figcaption>Inside Darill's Tomb.</figcaption></figure>
+    <div class="area"><h3>Solitary Island</h3>
+      <p>Peepers and EarthGuards have one shield and break to slashing; Peepers also to ice or water, EarthGuards to water. A Black Drgn has four shields and breaks to slashing, fire or holy.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2581, ff6/src/battle/ot6_hud.asm:2585, ff6/src/battle/ot6_hud.asm:2589; world_battle_group.dat groups 29 and 30; docs/design/wor-coverage.md:105-107 -->
+    </div>
+    <div class="area"><h3>Albrook, Tzen and Mobliz</h3>
+      <p>Tzen's desert deals EarthGuards, Peepers and Black Drgns as on the island. On Mobliz's plain, Buffalax take bludgeoning; Delta Bugs piercing or bludgeoning; Bloompires slashing or fire; Lizards slashing, piercing or ice.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2585, ff6/src/battle/ot6_hud.asm:2650, ff6/src/battle/ot6_hud.asm:2657, ff6/src/battle/ot6_hud.asm:2642, ff6/src/battle/ot6_hud.asm:2654; world_battle_group.dat groups 36-39; docs/design/wor-coverage.md:105-142. Albrook's own pool is UNVERIFIED (not identified) -->
+      <p class="boss"><b>Phunbaba.</b> Weak to poison; absorbs lightning, so Bolt only heals him. Bludgeoning and special break him; the last meeting also takes slashing.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2799, ff6/src/battle/ot6_hud.asm:2805, ff6/src/battle/ot6_hud.asm:2810, ff6/src/battle/monster_prop.dat species $16b, $16d (weak poison, absorbs bolt); ff6/src/battle/ot6_hud.asm:2785-2794 comments -->
+    </div>
+    <div class="area"><h3>Nikeah, South Figaro and Figaro Castle</h3>
+      <p>The South Figaro cellar deals Commanders and Vector Pups as before. In the castle, Humptys and Crullers take bludgeoning (fire, holy); NeckHunters slashing, piercing or special; Drops piercing or bludgeoning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2452, ff6/src/battle/ot6_hud.asm:2456, ff6/src/battle/ot6_hud.asm:2677, ff6/src/battle/ot6_hud.asm:2680, ff6/src/battle/ot6_hud.asm:2684, ff6/src/battle/ot6_hud.asm:2689, ff6/src/battle/ot6_hud.asm:2695; sub_battle_group.dat maps 53, 62-64, 90, 92 (groups 137-140); docs/design/wor-coverage.md:289-292 -->
+      <p class="boss"><b>The four Tentacles.</b> Five shields each, and each absorbs different elements (fire; ice and water; lightning and water; earth and water), so use weapons: each breaks to two of slashing, piercing and bludgeoning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2702, ff6/src/battle/ot6_hud.asm:2705, ff6/src/battle/ot6_hud.asm:2708, ff6/src/battle/ot6_hud.asm:2711, ff6/src/battle/monster_prop.dat species $11b, $13c, $13d, $13e (absorb bytes: fire; ice|water; bolt|water; earth|water); formation 454 in battle_monsters.dat; docs/design/wor-coverage.md:396 -->
+    </div>
+    <div class="area"><h3>Zozo and Mt. Zozo</h3>
+      <p>Zozo's town pool is as in the World of Balance (poison breaks it). On Mt. Zozo, slashing breaks all five bodies: Punisher, Scrapper, Borras (four shields), Luridan, Ursus. Cyan's Stunner hits the whole pack.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2850, ff6/src/battle/ot6_hud.asm:2852, ff6/src/battle/ot6_hud.asm:2847, ff6/src/battle/ot6_hud.asm:2843, ff6/src/battle/ot6_hud.asm:2856; sub_battle_group.dat maps 176, 177, 179; ff6/src/battle/ot6_hud.asm:2830-2835 comment -->
+      <p class="boss"><b>Storm Drgn (optional).</b> Fourteen shields; slashing, piercing and lightning break it. It absorbs wind, so skip Air Blade and Quadra Slice.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2859, ff6/src/battle/monster_prop.dat species $14b (weak bolt, absorbs wind) -->
+    </div>
+    <div class="area"><h3>Kohlingen and Darill's Tomb</h3>
+      <p>Kohlingen has no fights. In the tomb, Orogs, Power Demons and Osteosaurs break to fire, holy or special; Exorays to slashing or piercing; Mad Oscars to slashing or fire.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2751, ff6/src/battle/ot6_hud.asm:2761, ff6/src/battle/ot6_hud.asm:2756, ff6/src/battle/ot6_hud.asm:2769, ff6/src/battle/ot6_hud.asm:2765; sub_battle_group.dat maps 298-300; docs/design/wor-coverage.md:225, 289-290 -->
+      <p class="boss"><b>Dullahan.</b> Ten shields; piercing, bludgeoning, special and fire break it, and it absorbs ice. Setzer's cards and dice count as special.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2774, ff6/src/battle/monster_prop.dat species $11c (weak fire, absorbs ice); ff6/src/battle/ot6_hud.asm:2760-2780 comment -->
+    </div>
+  </div>
+</section>
+<section class="page">
+  <div class="runhead"><span>The journey &middot; World of Ruin</span><span class="mark">Tips</span></div>
+  <div class="body">
+    <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_owzer.png" alt="">
+      <figcaption>Owzer's House, by night.</figcaption></figure>
+    <div class="area"><h3>Owzer's House, Jidoor</h3>
+      <p>Vindr have one shield and dodge blades; use fire. Wild Cats (one shield, in fours) take slashing, piercing or fire. SoulDancers take slashing, special or poison; Crushers take fire, piercing or bludgeoning, not blades.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2939, ff6/src/battle/ot6_hud.asm:2949, ff6/src/battle/ot6_hud.asm:2943, ff6/src/battle/ot6_hud.asm:2946; sub_battle_group.dat map 207 (group 157) -->
+      <p class="boss"><b>Chadarnook.</b> One half of the fight shows no shield line; do not attack it. The other half has six shields and breaks to slashing, piercing, fire or holy; it absorbs lightning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2962, ff6/src/battle/ot6_hud.asm:2965, ff6/src/battle/monster_prop.dat species $148 (weak fire|holy, absorbs bolt) -->
+      <p class="boss"><b>Still Life.</b> Four shields; slashing, special and fire break it. The Dahling paintings cast Ice 2 and Bolt 2, which Celes's Runic can absorb.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2959, ff6/src/battle/ot6_hud.asm:2952, ff6/src/battle/ot6_hud.asm:2950-2956 comments (Runic note is a source comment, not re-measured) -->
+    </div>
+    <div class="area"><h3>Doma Castle</h3>
+      <p>Rain Men take bludgeoning or special; Pan Doras bludgeoning, special, fire or holy; Samurai slashing or piercing; Barb-e slashing or special; Suriander slashing, bludgeoning or holy; Parasites slashing or fire. Holy breaks Rain Men, Pan Doras and Suriander.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3228, ff6/src/battle/ot6_hud.asm:3225, ff6/src/battle/ot6_hud.asm:3231, ff6/src/battle/ot6_hud.asm:3215, ff6/src/battle/ot6_hud.asm:3235, ff6/src/battle/ot6_hud.asm:3223; sub_battle_group.dat maps 125, 126, 144, 317-322; docs/design/wor-coverage.md:312-316 -->
+      <p class="boss"><b>Curley, Larry and Moe.</b> Four shields each. Curley: slashing, special, ice, water; absorbs fire. Larry: piercing, bludgeoning, fire; absorbs ice. Moe: slashing, bludgeoning; absorbs lightning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3253, ff6/src/battle/ot6_hud.asm:3256, ff6/src/battle/ot6_hud.asm:3259, ff6/src/battle/monster_prop.dat species $11f, $120, $121 -->
+      <p class="boss"><b>Wrexsoul.</b> Six shields; slashing, special and ice break it. It absorbs fire and holy. Its SoulSavers (two shields) take special or ice.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3262, ff6/src/battle/ot6_hud.asm:3265, ff6/src/battle/monster_prop.dat species $122 (weak ice, absorbs fire|holy) -->
+    </div>
+    <div class="area"><h3>Ebot's Rock</h3>
+      <p>Every body here breaks to bludgeoning, so Strago's rod always works. Opinicus, Displayer and Hipocampus also take fire or holy; Eland lightning; Cluck ice; Slatter holy; Warlock lightning or poison.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3179, ff6/src/battle/ot6_hud.asm:3176, ff6/src/battle/ot6_hud.asm:3173, ff6/src/battle/ot6_hud.asm:3171, ff6/src/battle/ot6_hud.asm:3168, ff6/src/battle/ot6_hud.asm:3165, ff6/src/battle/ot6_hud.asm:3162; sub_battle_group.dat maps 404 and 405 -->
+      <p class="boss"><b>Hidon.</b> Six shields; piercing, bludgeoning, fire, holy and earth break it, and it absorbs poison. Among its Hidonites, one drinks every element (use weapons) and one is weak to all of them.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3182, ff6/src/battle/ot6_hud.asm:3185, ff6/src/battle/ot6_hud.asm:3188, ff6/src/battle/ot6_hud.asm:3191, ff6/src/battle/ot6_hud.asm:3194, ff6/src/battle/monster_prop.dat species $123 -->
+    </div>
+  </div>
+</section>
+<section class="page">
+  <div class="runhead"><span>The journey &middot; World of Ruin</span><span class="mark">Tips</span></div>
+  <div class="body">
+    <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_wor_narshe.png" alt="">
+      <figcaption>Narshe, years later.</figcaption></figure>
+    <div class="area"><h3>Narshe and its cliffs</h3>
+      <p>In the mines and on the cliffs, Wizards break to slashing, piercing, special, lightning or poison; Psychots to piercing, special or ice; Red Wolves to slashing or piercing. In Umaro's cave, Ceritops take piercing or bludgeoning, Anemones slashing, Kiwoks slashing, piercing or ice.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2879, ff6/src/battle/ot6_hud.asm:2885, ff6/src/battle/ot6_hud.asm:2870, ff6/src/battle/ot6_hud.asm:2898, ff6/src/battle/ot6_hud.asm:2901, ff6/src/battle/ot6_hud.asm:2896; sub_battle_group.dat maps 34-38 and 281-283; docs/design/wor-coverage.md:305-312. Maps 32, 33, 36 are not named by wor-coverage.md: UNVERIFIED -->
+      <p class="boss"><b>Umaro.</b> Six shields; slashing or piercing breaks him; fire and poison hit his weakness and ice heals him.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2914, ff6/src/battle/monster_prop.dat species $110 (weak fire|poison, absorbs ice) -->
+      <p class="boss"><b>Tritoch.</b> Ten shields; slashing and piercing chip it despite its defense, and fire burns it. Ice heals it.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2918, ff6/src/battle/monster_prop.dat species $144 (weak fire, absorbs ice) -->
+      <p class="boss"><b>Ice Dragon (optional).</b> Six shields; piercing, bludgeoning and fire break it, and ice heals it. Mog's spear is the piercing key.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2925, ff6/src/battle/monster_prop.dat species $149 -->
+    </div>
+    <div class="area"><h3>The Fanatics' Tower</h3>
+      <p>Only magic works inside. Fire and holy break L.10 and L.50 Magic; poison breaks L.30 and L.80; lightning L.40; fire L.60. L.20 and L.70 Magic carry Reflect, but Quake still reaches them, and both break to earth. L.90 Magic has no shields and takes full damage. The Magic Urn heals you and leaves.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:2982-3004 (Ot6ShieldTbl, the tower rows); ff6/src/battle/ot6_break.asm:206-211 (L.20 and L.70 + earth); docs/design/route-wor-thamasa.md:221-238 (section 4.2) -->
+      <p class="boss"><b>MagiMaster.</b> Eight shields. His one weakness changes as his wall changes; read it, or use the Break spell, which needs no weakness.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3009-3010; docs/design/route-wor-thamasa.md:236 -->
+      <p class="boss"><b>White Drgn (optional).</b> Six shields and no weakness at all: the Break spell is the only key.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3005-3007; docs/design/route-wor-thamasa.md:235 -->
+    </div>
+    <div class="area"><h3>The Colosseum</h3>
+      <p>A Colosseum fight runs itself: your fighter acts alone and takes no orders, and a win pays no Exp. Choose the fighter and the gear well. If Shadow is waiting there, wager the Striker.</p>
+      <!-- src: docs/design/route-wor-colosseum.md:28-49 (findings 1-4); docs/PLAYING.md "Things you can miss" (Shadow at the Colosseum) -->
+    </div>
+  </div>
+</section>
+<section class="page">
+  <div class="runhead"><span>The journey &middot; World of Ruin</span><span class="mark">Tips</span></div>
+  <div class="body">
+    <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_phoenix.png" alt="">
+      <figcaption>Phoenix Cave.</figcaption></figure>
+    <div class="area"><h3>Phoenix Cave</h3>
+      <p>Most of the cave is weak to ice and absorbs fire. Without ice, use holy on Trixters, Phase and Necromancrs, piercing on Aquilas and Parasouls, bludgeoning on Uroburos and Chaos Drgns.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3022, ff6/src/battle/ot6_hud.asm:3026, ff6/src/battle/ot6_hud.asm:3029, ff6/src/battle/ot6_hud.asm:3033, ff6/src/battle/ot6_hud.asm:3036, ff6/src/battle/ot6_hud.asm:3039, ff6/src/battle/ot6_hud.asm:3042, ff6/src/battle/ot6_hud.asm:3045, ff6/src/battle/ot6_break.asm:212 (Phase + holy); ff6/src/battle/ot6_hud.asm:3011-3020 comments; sub_battle_group.dat maps 313 and 315 -->
+      <p class="boss"><b>Red Dragon (optional).</b> Six shields; piercing, ice and water break it, and it absorbs fire. Mog's spear is the piercing key.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3048, ff6/src/battle/monster_prop.dat species $153 (weak ice|water, absorbs fire) -->
+    </div>
+    <div class="area"><h3>Ancient Castle</h3>
+      <p>A katana (slashing) breaks every body: Goblin, Figaliz, Enuo, Boxed Set and Lethal Wpn. Holy hits Goblins, Enuo and Boxed Sets.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3273-3282, sub_battle_group.dat maps 401, 406, 407; ff6/src/battle/ot6_hud.asm:3268-3272 comment (reflect and high magic defense: a source comment, not re-measured: UNVERIFIED) -->
+      <p class="boss"><b>Blue Drgn (optional).</b> Six shields; slashing, piercing and lightning break it, and it absorbs water.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3285, ff6/src/battle/monster_prop.dat species $152 (weak bolt, absorbs water) -->
+    </div>
+    <div class="area"><h3>Kefka's Tower</h3>
+      <p>Machines (Dueller, Fortis, Junk, IronHitman, Innoc, Scullion, Prometheus, Sky Base) break to piercing or bludgeoning and to lightning or water. Ghosts and casters (Dark Force, Didalos, Madam, Hemophyte, Vectagoyle) break to special; most also to holy.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3360-3425 (the tower's rows); sub_battle_group.dat maps 287-355, 409, 410 -->
+      <p class="boss"><b>Doom, Goddess and Poltrgeist (statues).</b> Ten, eight and eight shields. Doom: slashing, special, holy; absorbs ice and poison. Goddess: piercing, special; absorbs lightning and holy. Poltrgeist: bludgeoning, special, poison; absorbs fire and wind.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3443, ff6/src/battle/ot6_hud.asm:3447, ff6/src/battle/ot6_hud.asm:3450, ff6/src/battle/monster_prop.dat species $127, $128, $129 -->
+      <p class="boss"><b>Guardian.</b> Ten shields; piercing, bludgeoning, lightning and water break it.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3438, ff6/src/battle/monster_prop.dat species $112 (weak bolt|water) -->
+      <p class="boss"><b>Inferno, Striker and Rough.</b> Inferno: six shields; lightning, piercing, bludgeoning; absorbs fire. Striker: fire, slashing, piercing; absorbs ice. Rough: ice, slashing, bludgeoning; absorbs lightning.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3428, ff6/src/battle/ot6_hud.asm:3432, ff6/src/battle/ot6_hud.asm:3435, ff6/src/battle/monster_prop.dat species $10c, $142, $141 -->
+      <p class="boss"><b>Atma.</b> Ten shields; slashing or piercing breaks it. It absorbs poison, wind, holy, earth and water.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3454, ff6/src/battle/monster_prop.dat species $17d (absorb byte) -->
+      <p class="boss"><b>Gold Drgn and Skull Drgn.</b> Six shields each. Gold: slashing, piercing, water; absorbs lightning. Skull: bludgeoning, special, fire, holy; absorbs poison.</p>
+      <!-- src: ff6/src/battle/ot6_hud.asm:3458, ff6/src/battle/ot6_hud.asm:3462, ff6/src/battle/monster_prop.dat species $150, $151 -->
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== esper table -->
+<section class="page" id="p-esper-table">
+  <div class="runhead"><span>Appendix</span><span class="mark">Every Esper</span></div>
+  <div class="body">
+    <h1>Every Esper</h1>
+    <div class="sub">Spells while worn, and the five ranks (Magic Points needed)</div>
+    <!--ESPERS1-->
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>Appendix</span><span class="mark">Every Esper</span></div>
+  <div class="body">
+    <!--ESPERS2-->
+    <ul class="small">
+      <li>Ramuh's top rank adds a shield when a lightning spell hits an enemy weak to lightning.</li>
+      <li>Crusader's top rank gives the Gauntlet's two-handed grip and the Genji Glove's second weapon, with neither
+        worn, and without the Genji Glove's damage penalty on a single weapon.</li>
+      <li>Sraphim's healing bonus covers Cure, Life, a Blitz, Lore or Dance that heals, healing items, and Regen ticks
+        the wearer receives. It does not cover MP.</li>
+      <li>Sraphim, Golem and ZoneSeek are optional.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= notes -->
+<section class="page" id="p-notes">
+  <div class="runhead"><span>Notes</span><span class="mark">OT6</span></div>
+  <div class="body">
+    <h1>Notes</h1>
+    <div class="sub">Weaknesses found, rages wanted, where you left the airship</div>
+    <div class="lines"></div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>Notes</span><span class="mark">OT6</span></div>
+  <div class="body">
+    <h1>More Notes</h1>
+    <div class="sub">More room. Strago learns a lot of lores.</div>
+    <div class="lines"></div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="runhead"><span>Notes</span><span class="mark">OT6</span></div>
+  <div class="body">
+    <h1>Weakness Log</h1>
+    <div class="sub">The game remembers what you find. So can you.</div>
+    <table class="log"><tr><th style="width:1.6in">Monster</th><th style="width:1.3in">Where</th><th>Breaks to</th></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr></table>
+  </div>
+</section>
+
+
+<!-- ========================================================== back cover -->
+<section class="page back">
+  <div class="frame">
+    <div class="title">OT6</div>
+    <div class="art"><img src="img/area_narshe.png" alt=""></div>
+    <p>Find the weakness. Break the shield. Boost, and strike.</p>
+    <p class="small"><i>The monsters would like their shields back. Please do not return them.</i></p>
+    <p class="small">OT6 is a fan-made patch for Final Fantasy III (USA) 1.0. You need your own copy of the game.</p>
+    <p class="small" style="font-family:var(--pixel);font-size:6.5pt;margin-top:0.2in">VERSION {{version}}</p>
+  </div>
+</section>
+</body>
+</html>

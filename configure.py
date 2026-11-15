@@ -877,6 +877,13 @@ check("first_save_signed",
 # #389: the next release's notes already carry the save line the cut checks
 check("notes_saves", "python3 tools/golden_saves.py notes docs/release-notes-next.md",
       ["tools/golden_saves.py", "docs/release-notes-next.md", f"{GOLDEN_DIR}/MANIFEST.json"])
+# #391: the tracked instruction booklet (docs/manual) was built from today's
+# sources; a hash comparison, no browser (tools/manual/build.py --check)
+check("manual_pdf", "python3 tools/manual/build.py --check",
+      ["tools/manual/build.py", "tools/manual/manual.html", "tools/manual/manual.css",
+       "tools/manual/checks.js", "docs/PLAYING.md", "docs/manual/ot6-manual.stamp"]
+      + glob("tools/manual/fonts/*") + glob("tools/manual/img/*.png")
+      + glob("docs/manual/*.pdf"))
 # `ninja golden`: every golden save and the checks on the set and the layout
 w.edge(["golden"], "phony", golden_outs + ["build/checks/golden_saves.ok", "build/checks/save_layout.ok"])
 
@@ -898,6 +905,16 @@ check("rom_version_selftest", "python3 tools/build/rom_version.py selftest",
       + glob("tools/char_table/*_en.json", "ff6"))
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])
+# The power-on fill (docs/TOOLING.md "Uninitialised memory"): its fence, its
+# comparison and its report, without an emulator.  The fill runs themselves
+# are on demand, in trees of their own.
+check("fill_selftest",
+      "python3 tools/fill_line.py --selftest && python3 tools/fill_diff.py --selftest"
+      " && python3 tools/rbw_report.py --selftest",
+      ["tools/fill_line.py", "tools/fill_diff.py", "tools/rbw_report.py",
+       "tools/tests/lib/compose.py", "tools/tests/lib/poweron_fill.lua",
+       "tools/tests/lib/read_before_write.lua", "tools/uninit_waivers.txt",
+       "docs/design/save-layout.md"])
 check("verdict_selftest", "sh tools/tests/run.sh --verdict-selftest",
       ["tools/tests/run.sh"])
 check("boss_rows", "python3 tools/check_boss_rows.py",
@@ -1291,10 +1308,13 @@ w.edge([saves_readme], "sh", implicit=saves_inputs,
        desc="release saves")
 release_zip = f"build/release/ot6-v{VERSION}.zip"
 w.edge([release_zip], "sh",
-       [bps, f"{rel_dir}/RELEASE_NOTES.md", saves_readme],
+       [bps, f"{rel_dir}/RELEASE_NOTES.md", saves_readme,
+        "docs/manual/ot6-manual.pdf", "build/checks/manual_pdf.ok"],
        cmd=f'rm -f "{release_zip}" && cd build/release &&'
            f' zip -q -j "ot6-v{VERSION}.zip" "ot6-v{VERSION}/{BASE[:-4]}.bps"'
            f' "ot6-v{VERSION}/RELEASE_NOTES.md"'
+           # the instruction booklet (#391; owner, 2026-11-15: in every release)
+           f' ../../docs/manual/ot6-manual.pdf'
            f' && cd "ot6-v{VERSION}" && zip -q -D "../ot6-v{VERSION}.zip"'
            f' saves/*.srm saves/README.txt',
        desc=f"release zip v{VERSION}")
