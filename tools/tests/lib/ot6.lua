@@ -7359,10 +7359,12 @@ end
 -- and chips nothing (the Intangir absorbs every element, and EDGAR's Blizzard and SABIN's Poison Claw Fought it 137
 -- times for 0, build/attempts/wt/v043-wob-zones/lab/intangir2_s16.log key be74).  The absorb byte is the slot's
 -- live record ($3BCC, the byte the cast guard's activeSlots reads and the engine's damage step reads), not the
--- species' ROM byte: it follows whatever changes a body's elements in battle (#529).
-function M.absorbedHand(slot, item)
+-- species' ROM byte: it follows whatever changes a body's elements in battle (#529).  `rom` true reads the
+-- species' ROM byte instead (MonsterProp +23, M.monsterAbsorb): the guard before #529, M.ABSORB_REAIM = false.
+function M.absorbedHand(slot, item, rom)
   local e = M.weaponElement(item)
   if e == 0 or slot == nil then return false end
+  if rom then return (M.monsterAbsorb(M.readWord(0x57C0 + slot * 2)) & e) ~= 0 end
   return (M.readByte(0x3BCC + 8 + slot * 2) & e) ~= 0
 end
 
@@ -8042,20 +8044,42 @@ function M.deathLands(byteAt, guard, level)
   return true
 end
 -- Whom a monster's spell reaches, from its targeting byte (+0; const.inc's
--- TARGET flags) and whether it is a counter: "roulette" (bit 7, the random
--- cursor: any member, the one who struck among them), else for a counter
--- "attacker": CheckRetal presets the targets ($b8) to the one who struck,
--- and ChooseTarget keeps a preset $b8 for any targeting with a $2C bit
--- (`lda $bb / bit #$2c / bne @58f6`) and picks one of its bits for the
--- rest, so a counter L.5 Doom lands on the attacker alone (#528).  A cast
--- on the monster's own turn: "party" (no MANUAL bit and an initial group,
--- all or one side: L.5 Doom's $6E lands on every member), else "attacker".
--- (#523)
-function M.deathReach(t, counter)
+-- TARGET flags), its flags byte (+2, `f2`) and whether it is a counter:
+-- "roulette" (targeting bit 7, the random cursor: any member, the one who
+-- struck among them).  A counter: CheckRetal presets the targets ($b8) to
+-- the one who struck, and ChooseTarget keeps a preset $b8 for any
+-- targeting with a $2C bit (`lda $bb / bit #$2c / bne @58f6`), so a counter
+-- L.5 Doom, Magnitude8, Quartr, Ultima or L.4 Flare lands on the attacker
+-- alone (#528) -- unless the spell's +2 bit $10 (random target) is set:
+-- InitTarget copies it to $ba bit $40 (`and #$10 / asl2 / tsb $ba`), and
+-- ChooseTarget then Retargets from scratch whatever was preset (`bit #$40 /
+-- bne @58b9`), so the answer reaches the targeting's own group: "party"
+-- for an initial group ($0C: Sand Storm $69 +2 $50, Launcher $CD, Surge $74;
+-- measured, #533: "[ledger-trace] ... cmd $02 atk $69 $B1=$01 $B8=$04 ...
+-- counter=true drops 4 (728 HP)"), "party" too for a spread the engine takes
+-- half the time ($20 alone: priced at its worst), else one member at random
+-- ("roulette").  (#533 review, build/attempts/wt/review-polish-driver-4/
+-- magicprop_counter_reach.txt.)  A cast on the monster's own turn: "party"
+-- (no MANUAL bit and an initial group, all or one side: L.5 Doom's $6E lands
+-- on every member), else "attacker".  (#523)
+function M.deathReach(t, counter, f2)
   if (t & 0x80) ~= 0 then return "roulette" end
-  if counter then return "attacker" end
+  if counter then
+    if ((f2 or 0) & 0x10) == 0 then return "attacker" end
+    if (t & 0x0C) ~= 0 or (t & 0x20) ~= 0 then return "party" end
+    return "roulette"
+  end
   if (t & 0x01) == 0 and (t & 0x0C) ~= 0 then return "party" end
   return "attacker"
+end
+-- Whom a monster's counter answer `a` (a MagicProp attack) reaches: M.deathReach
+-- on its record, as a counter.  The one rule the Death pricing (Driver:deathAnswer)
+-- and the damage pricing (M.answerSpreads, Driver:counterPartyTake) share.  Battle
+-- and the Special ($EE, $EF) reach the one who struck.
+function M.answerReach(a)
+  if a == nil or a >= 0xEE then return "attacker" end
+  local r = (M.sym("MagicProp") & 0x3FFFFF) + a * 14
+  return M.deathReach(M.readRomByte(r), true, M.readRomByte(r + 2))
 end
 -- The class of monster action (cmd, atk) from slot `slot` (M.attackClass on
 -- the ROM's record, the Special's byte read live), nil for a Fight, an item
@@ -8153,7 +8177,7 @@ function Driver:deathAnswer(slot, e, a)
   -- one who struck alone, a guarded actor read the Veteran's answer as safe
   -- while it could take the partner beside him)
   local reach = { e }
-  local r = M.deathReach(b(0), true)
+  local r = M.answerReach(a)
   if r == "party" or r == "roulette" then
     local left = M.leftMask()
     for m = 0, 3 do
@@ -8508,7 +8532,7 @@ function Driver:counterAimPlan(actor, plan)
           end
         end
         kills[s] = which
-      elseif not unknown and dodger == nil and self:focusReachable(s) then
+      elseif not unknown and dodger == nil and self:reaimOk(actor, s, plan, { counter = false }) then
         local mhp = M.readWord(BATTLE.MON_HP + s * 2)
         if best == nil or top < bestTake or (top == bestTake and mhp < bestHp) then
           best, bestTake, bestHp = s, top, mhp
@@ -8537,6 +8561,7 @@ function Driver:counterAimPlan(actor, plan)
   M.log(string.format("[%s] actor=%d Fight re-aimed: %s answer%s a Fight with %d or more against %d HP, or a "
     .. "Death; slot %d instead, whose answer takes up to %d (#503, #523)", self.tag or "fight", actor,
     table.concat(ks, ", "), #ks == 1 and "s" or "", hp, hp, best, bestTake))
+  for s in pairs(kills) do self:markRejected(plan, s) end
   plan.aim, plan.aimHard = best, best
   -- a scored command's contract names the new body, so its trace expects it (#523)
   local tc = plan.targetContract
@@ -8544,20 +8569,12 @@ function Driver:counterAimPlan(actor, plan)
   return plan
 end
 
--- Whether a monster answer `a` reaches the whole party (#533): a spell whose
--- targeting byte (MagicProp +0) spreads over a side (no MANUAL bit, an
--- initial group: M.deathReach's "party" test for a cast on the monster's own
--- turn).  Measured on the FossilFang (formations 139 and 140, AIScript::_35
--- `if_cmd FIGHT / attack SAND_STORM`): its counter Sand Storm
--- ($69, targeting $7E) answered a Fight on every member, "[ledger-trace]
--- slot 0 seq 60 cmd $02 atk $69 $B1=$01 $B8=$04 party=$4 counter=true drops 4
--- (728 HP)" (build/attempts/wt/polish-driver-3/probe_ff/), though the queued
--- target ($B8) held the one who struck.  Battle and the Special ($EE, $EF)
--- reach the one who struck.
+-- Whether a monster answer `a` reaches the whole party (#533): M.answerReach's
+-- "party" (a spell whose +2 random-target bit sends a counter through Retarget
+-- to its targeting's group: the FossilFang's Sand Storm).  A counter without
+-- that bit lands on the one who struck, whatever its targeting byte says.
 function M.answerSpreads(a)
-  if a == nil or a >= 0xEE then return false end
-  local t = M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + a * 14)
-  return (t & 0x80) == 0 and (t & 0x01) == 0 and (t & 0x0C) ~= 0
+  return M.answerReach(a) == "party"
 end
 -- What slot `slot`'s answer to `use` (struck by party entity `e`) can take
 -- off the party (#533): for each answer, its take on every member it reaches
@@ -8576,7 +8593,7 @@ function Driver:counterPartyTake(slot, e, use)
   if w.monsters == nil then
     local n = 0
     for s = 0, 5 do if monAlive(s) then n = n + 1 end end
-    w.monsters = n
+    w.monsters = n - (w.dies == true and 1 or 0)
   end
   local left = M.leftMask()
   local best, which, wide = 0, nil, false
@@ -8604,8 +8621,9 @@ end
 -- wins out: the hand's other verb (Driver:handVerb: the tool, the Blitz),
 -- else the actor's magic line (Driver:magicOnlyLine), each priced the same
 -- way on the bodies it lands on; else the Fight re-aims (aimHard) at a
--- standing body whose answer to a Fight reaches the party for less, the
--- kill order's first, else the least HP.  With none of them the Fight
+-- body the shared re-aim filter passes (Driver:reaimOk) whose answer to a
+-- Fight reaches the party for less, the kill order's first, else the least
+-- HP.  With none of them the Fight
 -- stands.  A finishing blow (plan.reason "finish") stands: the kill ends
 -- the body's answers.  M.COUNTER_PARTY_OFF turns it off, the control arm.
 function Driver:counterPartyPlan(actor, plan)
@@ -8656,7 +8674,7 @@ function Driver:counterPartyPlan(actor, plan)
   -- (the least HP among equals)
   local draw = {}
   for s = 0, 5 do
-    if s ~= aim and monAlive(s) and self:focusReachable(s) then
+    if s ~= aim and self:reaimOk(actor, s, plan) then
       local d = self:counterPartyTake(s, actor, fightUse)
       if d < price then draw[s] = d end
     end
@@ -8678,6 +8696,7 @@ function Driver:counterPartyPlan(actor, plan)
     M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d ($%03X) answers a Fight with $%02X on the whole party, "
       .. "up to %d HP in all; slot %d instead, whose answer draws %d (#533)", self.tag or "fight", actor, aim,
       M.readWord(M.FORMATION + aim * 2), which, price, best, bestD))
+    self:markRejected(plan, aim)
     plan.aim, plan.aimHard = best, best
     local tc = plan.targetContract
     if tc ~= nil and not tc.all then plan.targetContract = { chars = 0, monsters = 1 << best, all = false } end
@@ -12606,17 +12625,23 @@ function Driver:dodgePlan(actor, plan)
   local function dodger(s)
     return M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
   end
-  local aim = plan.aim
+  local aim = plan.kind == "fight" and self:fightAimOf(plan) or plan.aim
   if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
   if aim == nil or not monAlive(aim) or dodger(aim) == nil then return plan end
   local why = dodger(aim)
   for s = 0, 5 do
     if monAlive(s) and dodger(s) == nil then
       if plan.kind ~= "fight" then return plan end
-      M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under %s (every swing misses it); slot %d instead",
-        self.tag or "fight", actor, aim, why, s))
-      plan.aim = s
-      return plan
+      -- a Fight re-aims only where every guard would let it land (Driver:reaimOk, #533 review)
+      if self:reaimOk(actor, s, plan) then
+        M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under %s (every swing misses it); slot %d instead",
+          self.tag or "fight", actor, aim, why, s))
+        self:markRejected(plan, aim)
+        plan.aim, plan.aimHard = s, s
+        local tc = plan.targetContract
+        if tc ~= nil and not tc.all then plan.targetContract = { chars = 0, monsters = 1 << s, all = false } end
+        return plan
+      end
     end
   end
   if plan.kind == "skill" then
@@ -12707,29 +12732,35 @@ end
 -- Intangir absorbs every element, and EDGAR's Blizzard (ice) and SABIN's Poison Claw (poison) Fought it 137 times
 -- for 0 in one meeting (build/attempts/wt/v043-wob-zones/lab/intangir2_s16.log, key be74).  A person who sees the
 -- blow heal it swings at another body when one stands whose element the hands land on (#529): the Fight re-aims
--- (aimHard, so a kill order does not steer it back) at the kill order's first such standing, reachable body that
--- no Vanish, Image or Love Token keeps the swing off, else at the least HP among them.  With no such body, the
+-- (aimHard, so a kill order does not steer it back) at the kill order's first body the shared re-aim filter passes
+-- (Driver:reaimOk), else at the least HP among them.  With no such body, the
 -- hand's other verb: EDGAR's tool and SABIN's Pummel (each when the bag or the pool pays for it at the base), else
 -- the magic line, else the no-line turn, else the window handed on.  The body judged is the one the executor will
 -- steer to (Driver:fightAimOf), and its absorb byte is the slot's live one (M.absorbedHand).  A hand that holds no
 -- element, or a target that absorbs none of them, leaves the plan alone, so it is inert wherever no body absorbs
 -- the party's weapons.  M.ABSORB_WEAPON_GUARD = false turns it off, the control arm; M.ABSORB_REAIM = false keeps
--- the guard and drops the re-aim (the verb change alone, the guard before #529).
+-- the guard before #529 whole (its aim, the ROM's absorb byte, no re-aim).
 function Driver:absorbWeaponPlan(actor, plan)
   if plan == nil or plan.kind ~= "fight" or plan.ally or M.ABSORB_WEAPON_GUARD == false then return plan end
   -- the hands are ROM reads; a pure-Lua selftest's stage carries no symbols (race_target_contract_selftest), and
   -- there is no element to weigh
   if type(OT6_SYMS) ~= "table" or OT6_SYMS.ItemProp == nil then return plan end
-  local aim = self:fightAimOf(plan)
+  -- M.ABSORB_REAIM = false is the guard before #529 whole: the plan's aim (else the first standing body), the
+  -- species' ROM absorb byte, and no re-aim
+  local before = M.ABSORB_REAIM == false
+  local aim
+  if before then
+    aim = plan.aim
+    if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
+  else
+    aim = self:fightAimOf(plan)
+  end
   if aim == nil then return plan end
   local r, l = handsOf(actor)
-  local function absorbs(s) return M.absorbedHand(s, r) and (l == nil or M.absorbedHand(s, l)) end
+  local function absorbs(s) return M.absorbedHand(s, r, before) and (l == nil or M.absorbedHand(s, l, before)) end
   if not absorbs(aim) then return plan end
-  if M.ABSORB_REAIM ~= false then
-    local function open(s)
-      return monAlive(s) and not absorbs(s) and self:focusReachable(s) and M.loveGuardOf(s) == nil
-        and M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) }) == nil
-    end
+  if not before then
+    local function open(s) return self:reaimOk(actor, s, plan) end
     local best = nil
     for _, e in ipairs(M.focusSlots(self:focusList() or {})) do
       if best == nil and open(e.slot) then best = e.slot end
@@ -12746,6 +12777,7 @@ function Driver:absorbWeaponPlan(actor, plan)
       M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d (species $%03X) absorbs the hand's element ($%02X), "
         .. "so the blow heals it; slot %d (species $%03X) instead (#529)", self.tag or "fight", actor, aim,
         M.readWord(0x57C0 + aim * 2), M.weaponElement(r), best, M.readWord(0x57C0 + best * 2)))
+      self:markRejected(plan, aim)
       plan.aim, plan.aimHard = best, best
       local tc = plan.targetContract
       if tc ~= nil and not tc.all then plan.targetContract = { chars = 0, monsters = 1 << best, all = false } end
@@ -12767,6 +12799,24 @@ function Driver:absorbWeaponPlan(actor, plan)
   end
   return self:noLineItem(actor, "the hand's weapon is absorbed and there is no other verb")
     or { kind = "switch", reason = "absorb_weapon" }
+end
+-- A damaging verb party entity `actor` has that Love Token's cover does not take (Driver:coverPlan): the hand's
+-- other verb (Driver:handVerb), else SETZER's Coin Toss at the base -- under his own policy's gates
+-- (Driver:setzerLine's: not opts.setzer = false or SETZER_POLICY_OFF, not o.coin = false, gil only in an event
+-- battle unless o.gilInRandoms, and the purse above o.gilFloor after the toss) -- else nil.
+function Driver:coverVerb(actor)
+  local alt = self:handVerb(actor, "love_token")
+  if alt ~= nil then return alt end
+  local o = self.opts.setzer
+  if o == false or SETZER_POLICY_OFF or M.readByte(BATTLE.BCHID + actor * 2) ~= 9 then return nil end
+  o = type(o) == "table" and o or {}
+  local row = cmdRow(actor, BATTLE.CMD_SLOT)
+  if row == nil or self.skillDead[BATTLE.CMD_SLOT] or o.coin == false then return nil end
+  if M.readByte(M.RANDBTL) ~= 0 and not o.gilInRandoms then return nil end
+  local gil = M.readWord(0x1860) + M.readByte(0x1862) * 65536
+  if gil - M.setzerGil(M.readByte(0x3B18 + actor * 2), 30, 0) < (o.gilFloor or 20000) then return nil end
+  return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.COIN, row = row, boostLeft = 0,
+           reason = "love_token" }
 end
 -- The verb beside the Fight that a member's kit swings without the Fight's hands (absorbWeaponPlan's and
 -- coverPlan's): EDGAR's tool (character $04, or $0C) when the bag holds it, SABIN's Pummel when the pool pays for
@@ -12847,6 +12897,40 @@ function Driver:fightAimOf(plan)
   if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
   return aim
 end
+-- Whether a Fight (or Capture) by party entity `actor` may be re-aimed at monster slot `s` (#533 review): the one
+-- filter every guard's re-aim reads (counterAimPlan, counterPartyPlan, absorbWeaponPlan, dodgePlan, coverPlan), so
+-- no guard sends the blow where another would turn it away.  The body stands and the cursor can reach it
+-- (focusReachable); no Vanish or Image takes the swing (M.dodges); no Love Token sends it to a party member
+-- (M.loveGuardOf); the hands land on it (no hand whose element it absorbs, M.absorbedHand, where the ROM's item
+-- records are loaded); its answer to a Fight does not kill the striker, by damage or a Death (Driver:counterWorst,
+-- where its AI scripts are; `o.counter == false` skips that one, for counterAimPlan, which has just priced it);
+-- and no guard has already turned this plan off it (plan.rejected, which Driver:markRejected keeps).
+function Driver:reaimOk(actor, s, plan, o)
+  if not monAlive(s) or not self:focusReachable(s) then return false end
+  if plan ~= nil and plan.rejected ~= nil and plan.rejected[s] then return false end
+  if M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) }) ~= nil then
+    return false
+  end
+  if M.loveGuardOf(s) ~= nil then return false end
+  if type(OT6_SYMS) == "table" and OT6_SYMS.ItemProp ~= nil then
+    local r, l = handsOf(actor)
+    if M.absorbedHand(s, r) and (l == nil or M.absorbedHand(s, l)) then return false end
+  end
+  if not (o and o.counter == false) and pcall(M.sym, "AIScriptPtrs") then
+    local hp = M.readWord(0x3BF4 + actor * 2)
+    if hp > 0 then
+      local top, _, _, _, killed = self:counterWorst(s, actor, { cmd = BATTLE.CMD_FIGHT }, hp, self:mayKill(actor, s))
+      if killed ~= nil or top >= hp then return false end
+    end
+  end
+  return true
+end
+-- A guard turning `plan` off body `s` records it, so no later guard re-aims there (Driver:reaimOk).
+function Driver:markRejected(plan, s)
+  if s == nil then return end
+  plan.rejected = plan.rejected or {}
+  plan.rejected[s] = true
+end
 -- A Fight aimed at a body under Love Token lands on the bodyguard (#466): a
 -- person sees the member step in and swings at another body, or, when
 -- every standing body is so guarded, casts (Driver:magicOnlyLine).  With
@@ -12862,11 +12946,12 @@ function Driver:coverPlan(actor, plan)
   local guard = M.loveGuardOf(aim)
   if guard == nil then return plan end
   for s = 0, 5 do
-    if monAlive(s) and M.loveGuardOf(s) == nil and self:focusReachable(s) then
+    if self:reaimOk(actor, s, plan) then
       M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under Love Token (entity %d takes "
         .. "every Fight on it); slot %d instead (#466)", self.tag or "fight", actor, aim, guard, s))
       -- aimHard: the executor steers to it over any kill order; a scored
       -- command's contract names the new body, so its trace expects it
+      self:markRejected(plan, aim)
       plan.aim, plan.aimHard = s, s
       if tc ~= nil and not tc.all then plan.targetContract = { chars = 0, monsters = 1 << s, all = false } end
       return plan
@@ -12919,17 +13004,31 @@ function Driver:coverPlan(actor, plan)
   -- The Fight would land on a party member (#531: SETZER Fought the Goddess while the token turned his blows on
   -- himself, and died to them, build/attempts/wt/boost-rewards-4/labs god_main_s132 and s174).  A person makes no
   -- such swing: a verb the cover does not take (it takes an attack that can critical, the Fight, Capture and
-  -- Umaro's, and nothing else) -- the hand's other verb (Driver:handVerb), SETZER's Coin Toss at the base when the
-  -- purse pays above his gil floor (GP Rain's effect, not a blow) -- else Defend, which banks a point for the turn
-  -- the token ends.
-  local alt = self:handVerb(actor, "love_token")
-  if alt == nil and M.readByte(BATTLE.BCHID + actor * 2) == 9 and cmdRow(actor, BATTLE.CMD_SLOT)
-     and not self.skillDead[BATTLE.CMD_SLOT] then
-    local o = type(self.opts.setzer) == "table" and self.opts.setzer or {}
-    local gil = M.readWord(0x1860) + M.readByte(0x1862) * 65536
-    if gil - M.setzerGil(M.readByte(0x3B18 + actor * 2), 30, 0) >= (o.gilFloor or 20000) then
-      alt = { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.COIN, row = cmdRow(actor, BATTLE.CMD_SLOT),
-              boostLeft = 0, reason = "love_token" }
+  -- Umaro's, and nothing else) -- the actor's other verb (Driver:coverVerb: the hand's tool or Blitz, SETZER's Coin
+  -- Toss under his own policy's gates) -- else Defend, which banks a point for the turn the token ends, while
+  -- another standing member has a damaging verb the token does not catch (a cast, or that member's own other
+  -- verb).  With none in the whole party a Defend would stall the fight forever, so the Fight stands, as before
+  -- #531: the token ends when its bodyguard falls (#533 review).
+  local alt = self:coverVerb(actor)
+  if alt == nil then
+    local other = nil
+    for m = 0, 3 do
+      if other == nil and m ~= actor and M.readWord(0x3BF4 + m * 2) > 0 and M.readWord(0x3BF4 + m * 2) ~= 0xFFFF
+         and (M.leftMask() >> m) & 1 == 0 and denied(m) == nil then
+        if self:coverVerb(m) ~= nil or (cmdRow(m, BATTLE.CMD_MAGIC) and self:magicOnlyLine(m, 0) ~= nil) then
+          other = m
+        end
+      end
+    end
+    if other == nil then
+      local key = "cover:" .. actor .. ":" .. why .. ":stands"
+      if not self.statusSaid[key] then
+        self.statusSaid[key] = true
+        M.log(string.format("[%s] actor=%d: slot %d is under Love Token and its Fight lands on %s; no other body to "
+          .. "swing at and %s, and no member has a verb the token does not catch -- the Fight stands (#466, #531)",
+          self.tag or "fight", actor, aim, whom, why))
+      end
+      return plan
     end
   end
   local key = string.format("cover:%d:%d:%s:%s", actor, guard, why, alt and alt.reason or "defend")

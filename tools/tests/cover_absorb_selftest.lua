@@ -84,6 +84,7 @@ local function battle(ch, mons, o)
   for s, m in pairs(mons) do
     w16(0x57C0 + s * 2, m[1]); w16(0x3BFC + s * 2, m[2]); w8(0x3AA8 + s * 2, 1)
     w8(0x336C + 8 + s * 2, m.guard or 0xFF)
+    w8(0x322D + 8 + s * 2, rom:byte(MONPROP + m[1] * 32 + 0x1F + 1))
     w8(0x3BCC + 8 + s * 2, m.absorb or rom:byte(MONPROP + m[1] * 32 + 23 + 1))
   end
   -- gil ($1860-$1862)
@@ -113,31 +114,72 @@ assert(rom:byte(MONPROP + QUIET * 32 + 23 + 1) == 0, "precondition: species $00D
 local function fight(aim) return { kind = "fight", row = 0, boostLeft = 0, aim = aim } end
 
 -- ---- #531: Love Token ---------------------------------------------------------------
+-- TERRA (entity 1) has a cast ready unless `castless`: a damaging verb the token does not catch, so a Defend
+-- waits on something (the stall guard, #533 review)
+local function castFor(d, castless)
+  w8(0x202E + 12 + 3, 0x02)          -- entity 1's Magic row
+  d.magicOnlyLine = function(_, m) if m == 1 and not castless then return { kind = "magic", spell = 0x00 } end end
+  return d
+end
+local SETZER_FLOOR = 20000 + 46 * 30     -- the floor plus one toss at level 46 (M.setzerGil: 30 a level)
 local FIGHT_STANDS = { { 'return alt or { kind = "defend", reason = "love_token" }', "return plan" } }
 check("SETZER under his own Love Token (he guards the lone body), the purse above his floor: Coin Toss, not the Fight",
   FIGHT_STANDS,
   function(H)
     battle(SETZER, { [0] = { QUIET, 9000, guard = 0x00 } }, { gil = 60000 })
-    local p = driver(H):coverPlan(0, fight(0))
+    local p = castFor(driver(H)):coverPlan(0, fight(0))
     return p.kind == "skill" and p.cmd == 0x0F and p.skill == 0x59 and p.boostLeft == 0
   end)
-check("SETZER with the purse at his floor: Defend (no Coin Toss, no Fight into himself)",
-  { { "if gil - M.setzerGil(M.readByte(0x3B18 + actor * 2), 30, 0) >= (o.gilFloor or 20000) then", "if true then" } },
+check("the Coin Toss threshold: the purse at exactly the floor plus a toss tosses, one gil under Defends",
+  { { "if gil - M.setzerGil(M.readByte(0x3B18 + actor * 2), 30, 0) < (o.gilFloor or 20000) then return nil end",
+      "if gil - M.setzerGil(M.readByte(0x3B18 + actor * 2), 30, 0) <= (o.gilFloor or 20000) then return nil end" } },
   function(H)
-    battle(SETZER, { [0] = { QUIET, 9000, guard = 0x00 } }, { gil = 20000 })
-    local p = driver(H):coverPlan(0, fight(0))
-    return p.kind == "defend"
+    battle(SETZER, { [0] = { QUIET, 9000, guard = 0x00 } }, { gil = SETZER_FLOOR })
+    local p = castFor(driver(H)):coverPlan(0, fight(0))
+    if not (p.kind == "skill" and p.skill == 0x59) then return false end
+    battle(SETZER, { [0] = { QUIET, 9000, guard = 0x00 } }, { gil = SETZER_FLOOR - 1 })
+    return castFor(driver(H)):coverPlan(0, fight(0)).kind == "defend"
+  end)
+check("SETZER's Coin Toss honours his policy's o.coin = false: Defend",
+  { { "if row == nil or self.skillDead[BATTLE.CMD_SLOT] or o.coin == false then return nil end",
+      "if row == nil or self.skillDead[BATTLE.CMD_SLOT] then return nil end" } },
+  function(H)
+    battle(SETZER, { [0] = { QUIET, 9000, guard = 0x00 } }, { gil = 60000 })
+    local d = castFor(driver(H)); d.opts.setzer = { coin = false }
+    return d:coverPlan(0, fight(0)).kind == "defend"
+  end)
+check("no gil in a random battle unless o.gilInRandoms: Defend there, Coin Toss with the lever",
+  { { "if M.readByte(M.RANDBTL) ~= 0 and not o.gilInRandoms then return nil end", "" } },
+  function(H)
+    battle(SETZER, { [0] = { QUIET, 9000, guard = 0x00 } }, { gil = 60000 })
+    w8(0x57BD, 1)                                   -- a random battle (M.RANDBTL)
+    if castFor(driver(H)):coverPlan(0, fight(0)).kind ~= "defend" then return false end
+    local d = castFor(driver(H)); d.opts.setzer = { gilInRandoms = true }
+    return d:coverPlan(0, fight(0)).skill == 0x59
   end)
 check("EDGAR whose blows the token turns on TERRA: his tool, not the Fight",
-  { { 'local alt = self:handVerb(actor, "love_token")', "local alt = nil" } },
+  { { 'local alt = self:handVerb(actor, "love_token")\n  if alt ~= nil then return alt end', "local alt = nil" } },
   function(H)
     battle(EDGAR, { [0] = { QUIET, 9000, guard = 0x02 } }, { cmds = { 0x00, 0x01, 0x09, 0xFF } })
     w8(0x2686, 0xAA); w8(0x2686 + 3, 5)    -- AutoCrossbow x5 in the battle bag
     local p = driver(H):coverPlan(0, fight(0))
     return p.kind == "skill" and p.cmd == 0x09 and p.skill == 0xAA and p.reason == "love_token"
   end)
+check("a member with no verb the token misses (TERRA, Fight and Item only) Defends while a partner can cast",
+  { { "    if other == nil then\n      local key", "    if true then\n      local key" } },
+  function(H)
+    battle(TERRA, { [0] = { QUIET, 9000, guard = 0x00 } }, { cmds = { 0x00, 0x01, 0xFF, 0xFF } })
+    return castFor(driver(H)):coverPlan(0, fight(0)).kind == "defend"
+  end)
+check("with no member holding such a verb the Fight stands (a Defend would stall the fight)",
+  { { "    if other == nil then\n      local key", "    if false then\n      local key" } },
+  function(H)
+    battle(TERRA, { [0] = { QUIET, 9000, guard = 0x00 } }, { cmds = { 0x00, 0x01, 0xFF, 0xFF } })
+    local p = castFor(driver(H), true):coverPlan(0, fight(0))
+    return p.kind == "fight" and p.aimHard == nil
+  end)
 check("the Fight still goes to another standing body without the token (#466, kept)",
-  { { "plan.aim, plan.aimHard = s, s\n      if tc ~= nil", "plan.aim, plan.aimHard = aim, nil\n      if tc ~= nil" } },
+  { { "self:markRejected(plan, aim)\n      plan.aim, plan.aimHard = s, s", "plan.aim, plan.aimHard = aim, nil" } },
   function(H)
     battle(SETZER, { [0] = { QUIET, 9000, guard = 0x00 }, [1] = { QUIET, 9000 } }, { gil = 60000 })
     local p = driver(H):coverPlan(0, fight(0))
@@ -145,10 +187,10 @@ check("the Fight still goes to another standing body without the token (#466, ke
   end)
 
 -- ---- #529: the absorbed weapon ------------------------------------------------------
--- entity 0 (EDGAR) swings item $0E (ice) in his main hand
-local function iceHand() w8(0x1600 + 37 * EDGAR + 0x1F, ICE_WEAPON); w8(0x1600 + 37 * EDGAR + 0x20, 0xFF) end
+-- entity 0 (EDGAR) swings item `w` (default $0E, ice) in his main hand
+local function iceHand(w) w8(0x1600 + 37 * EDGAR + 0x1F, w or ICE_WEAPON); w8(0x1600 + 37 * EDGAR + 0x20, 0xFF) end
 check("a Fight at a body that absorbs the hand's ice re-aims at the body beside it that does not",
-  { { "if M.ABSORB_REAIM ~= false then", "if false then" } },
+  { { "  if not before then\n", "  if false then\n" } },
   function(H)
     battle(EDGAR, { [0] = { QUIET, 9000, absorb = 0x02 }, [1] = { QUIET, 9000 } })
     iceHand()
@@ -156,26 +198,34 @@ check("a Fight at a body that absorbs the hand's ice re-aims at the body beside 
     return p.kind == "fight" and p.aimHard == 1 and p.aim == 1
   end)
 check("the absorb byte is the slot's live one: a body whose ROM absorbs nothing but whose live record drinks ice",
-  { { "return (M.readByte(0x3BCC + 8 + slot * 2) & e) ~= 0",
-      "return (M.monsterAbsorb(M.readWord(0x57C0 + slot * 2)) & e) ~= 0" } },
+  { { "  return (M.readByte(0x3BCC + 8 + slot * 2) & e) ~= 0\nend",
+      "  return (M.monsterAbsorb(M.readWord(0x57C0 + slot * 2)) & e) ~= 0\nend" } },
   function(H)
     battle(EDGAR, { [0] = { QUIET, 9000, absorb = 0x02 } })
     iceHand()
-    -- no other body: the hand's other verb (no Tools row here) falls to the no-line turn or the window handed on
-    local p = driver(H):absorbWeaponPlan(0, fight(0))
-    return p.kind ~= "fight"
+    return driver(H):absorbWeaponPlan(0, fight(0)).kind ~= "fight"
   end)
 check("and a body whose live record absorbs nothing takes the Fight, whatever its species' ROM byte",
-  { { "return (M.readByte(0x3BCC + 8 + slot * 2) & e) ~= 0", "return true" } },
+  { { "  return (M.readByte(0x3BCC + 8 + slot * 2) & e) ~= 0\nend", "  return true\nend" } },
   function(H)
     battle(EDGAR, { [0] = { QUIET, 9000, absorb = 0x00 } })
     iceHand()
     local p = driver(H):absorbWeaponPlan(0, fight(0))
     return p.kind == "fight" and p.aimHard == nil
   end)
+check("M.ABSORB_REAIM = false is the guard before #529 whole: the species' ROM byte (the FossilFang drinks poison)",
+  { { "local function absorbs(s) return M.absorbedHand(s, r, before) and (l == nil or M.absorbedHand(s, l, before)) end",
+      "local function absorbs(s) return M.absorbedHand(s, r) and (l == nil or M.absorbedHand(s, l)) end" } },
+  function(H)
+    battle(EDGAR, { [0] = { 0x023, 9000, absorb = 0x00 }, [1] = { QUIET, 9000 } })
+    iceHand(0x38)                                  -- a weapon whose element is $08 (poison)
+    H.ABSORB_REAIM = false
+    local p = driver(H):absorbWeaponPlan(0, fight(0))
+    H.ABSORB_REAIM = nil
+    return p.kind ~= "fight"
+  end)
 check("the re-aim judges the body the executor steers to (the kill order's first), not the plan's aim",
-  { { "local aim = self:fightAimOf(plan)\n  if aim == nil then return plan end\n  local r, l = handsOf(actor)",
-      "local aim = plan.aim\n  if aim == nil then return plan end\n  local r, l = handsOf(actor)" } },
+  { { "  else\n    aim = self:fightAimOf(plan)\n  end", "  else\n    aim = plan.aim\n  end" } },
   function(H)
     battle(EDGAR, { [0] = { QUIET, 9000, absorb = 0x02 }, [1] = { QUIET, 9000 } })
     iceHand()
@@ -183,6 +233,54 @@ check("the re-aim judges the body the executor steers to (the kill order's first
     d.focusList = function() return { { slot = 0 } } end
     local p = d:absorbWeaponPlan(0, fight(1))
     return p.kind == "fight" and p.aimHard == 1
+  end)
+
+-- ---- the shared re-aim filter (Driver:reaimOk, #533 review) -------------------------
+local ALLOVER = 0x0BB          -- answers any hit with Doom
+local function vanish(s) w8(0x3EE4 + (4 + s) * 2, 0x10) end
+local function image(s) w8(0x3EE5 + (4 + s) * 2, 0x04) end
+check("the absorb re-aim skips a Vanished body and a body under Image",
+  { { "  if M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) }) ~= nil then\n    return false\n  end\n  if M.loveGuardOf(s) ~= nil then return false end",
+      "  if M.loveGuardOf(s) ~= nil then return false end" } },
+  function(H)
+    battle(EDGAR, { [0] = { QUIET, 9000, absorb = 0x02 }, [1] = { QUIET, 100 }, [2] = { QUIET, 200 }, [3] = { QUIET, 9000 } })
+    vanish(1); image(2); iceHand()
+    local p = driver(H):absorbWeaponPlan(0, fight(0))
+    return p.kind == "fight" and p.aimHard == 3
+  end)
+check("the absorb re-aim skips a body under Love Token",
+  { { "  if M.loveGuardOf(s) ~= nil then return false end\n  if type(OT6_SYMS)", "  if type(OT6_SYMS)" } },
+  function(H)
+    battle(EDGAR, { [0] = { QUIET, 9000, absorb = 0x02 }, [1] = { QUIET, 100, guard = 0x02 }, [2] = { QUIET, 9000 } })
+    iceHand()
+    local p = driver(H):absorbWeaponPlan(0, fight(0))
+    return p.kind == "fight" and p.aimHard == 2
+  end)
+check("the absorb re-aim skips a body whose answer to a Fight kills the striker (Allo Ver's Doom)",
+  { { "      if killed ~= nil or top >= hp then return false end", "" } },
+  function(H)
+    battle(EDGAR, { [0] = { QUIET, 9000, absorb = 0x02 }, [1] = { ALLOVER, 100 }, [2] = { QUIET, 9000 } })
+    iceHand()
+    local p = driver(H):absorbWeaponPlan(0, fight(0))
+    return p.kind == "fight" and p.aimHard == 2
+  end)
+check("no guard re-aims onto a body an earlier guard turned the plan off (plan.rejected)",
+  { { "  if plan ~= nil and plan.rejected ~= nil and plan.rejected[s] then return false end\n", "" } },
+  function(H)
+    battle(EDGAR, { [0] = { QUIET, 9000, absorb = 0x02 }, [1] = { QUIET, 100 }, [2] = { QUIET, 9000 } })
+    iceHand()
+    local f = fight(0); f.rejected = { [1] = true }
+    local p = driver(H):absorbWeaponPlan(0, f)
+    return p.kind == "fight" and p.aimHard == 2 and p.rejected[0] == true
+  end)
+check("the Love Token re-aim reads the same filter: it skips a body whose element the hand drinks",
+  { { "    if self:reaimOk(actor, s, plan) then\n      M.log(string.format(\"[%s] actor=%d Fight re-aimed: slot %d is under Love Token",
+      "    if monAlive(s) and M.loveGuardOf(s) == nil then\n      M.log(string.format(\"[%s] actor=%d Fight re-aimed: slot %d is under Love Token" } },
+  function(H)
+    battle(EDGAR, { [0] = { QUIET, 9000, guard = 0x02 }, [1] = { QUIET, 9000, absorb = 0x02 }, [2] = { QUIET, 9000 } })
+    iceHand()
+    local p = driver(H):coverPlan(0, fight(0))
+    return p.kind == "fight" and p.aimHard == 2
   end)
 
 print(string.format("cover_absorb_selftest: PASS -- %d cases, each failed by its own mutant: %s", n,

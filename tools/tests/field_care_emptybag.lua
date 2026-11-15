@@ -193,8 +193,17 @@ local drinkN = 0
 -- false"), where rounds before it took 1 to 4 battles.  So the round's
 -- precondition is made by play and the 48-leg bound is left as it was.
 -- The fight table's functions are live options (H.fightDriverFor calls each
--- as fn(tag, memo) every frame and stores what it returns), so holdFor
--- returns the predicate.
+-- as fn(tag, memo) every frame and stores what it returns, memo emptied as
+-- each battle ends), so holdFor returns the predicate.
+-- The hold is bounded (#533 review): a formation that cannot wound the
+-- party would be Defended against forever.  The bound is one enemy round
+-- in the party's turns, read off the engine's clock when the battle's
+-- first hold is asked: in the time the slowest standing monster's gauge
+-- takes to fill (65536 / its ATB constant, $3AC8,x), each standing member
+-- takes const_m / const_slowest turns, so the party takes their sum
+-- (rounded up) before every monster has had its turn.  Past that many held
+-- turns with nobody short, the fight is played out as the driver plays it
+-- and the round goes on to its 48-leg assert.
 local function wholeInBattle()
   for e = 0, 3 do
     local hp, mx = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
@@ -202,8 +211,45 @@ local function wholeInBattle()
   end
   return true
 end
-local function holdWhole() return wholeInBattle() end
-local DRAIN_FIGHT = { holdFor = function() return holdWhole end }
+-- party turns in one enemy round (above); nil when no gauge can be read
+local function roundTurns()
+  local slowest = nil
+  for s = 0, 5 do
+    local x = 8 + s * 2
+    local c = H.readWord(0x3AC8 + x)
+    if H.readWord(0x3BFC + s * 2) > 0 and (H.readByte(0x3AA8 + s * 2) & 1) ~= 0 and c > 0
+       and (slowest == nil or c < slowest) then
+      slowest = c
+    end
+  end
+  if slowest == nil then return nil end
+  local sum = 0
+  for e = 0, 3 do
+    local hp = H.readWord(0x3BF4 + e * 2)
+    if hp > 0 and hp ~= 0xFFFF and H.readWord(0x3C1C + e * 2) > 0 then sum = sum + H.readWord(0x3AC8 + e * 2) / slowest end
+  end
+  return math.ceil(sum)
+end
+local DRAIN_FIGHT = { holdFor = function(_, memo)
+  return function()
+    if not wholeInBattle() then return false end
+    if memo.bound == nil then
+      memo.bound, memo.held = roundTurns() or 0, 0
+      H.log(string.format("[drain] the party holds (Defends) until somebody is short of max HP, for at most %d of its "
+        .. "turns (one enemy round on the engine's clock)", memo.bound))
+    end
+    if memo.held >= memo.bound then
+      if not memo.said then
+        memo.said = true
+        H.log(string.format("[drain] %d held turns and nobody is short: the hold ends, the fight is played out",
+          memo.held))
+      end
+      return false
+    end
+    memo.held = memo.held + 1
+    return true
+  end
+end }
 local function drainTonics()
   local legB, before, budget = 0, 0, nil
   local function stop() return battles > legB and missing() and settled() end

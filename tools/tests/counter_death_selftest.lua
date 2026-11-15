@@ -154,9 +154,9 @@ local function lone5(H)
   return p.aimHard == nil and p.aim == 0
 end
 check("a lone Apokryphos's counter L.5 Doom kills the actor at level 40, not a partner at 40 (deathAnswer asks a counter's reach)",
-  { { 'local r = M.deathReach(b(0), true)', 'local r = M.deathReach(b(0))' } }, lone5)
+  { { 'return M.deathReach(M.readRomByte(r), true, M.readRomByte(r + 2))', 'return M.deathReach(M.readRomByte(r))' } }, lone5)
 check("a lone Apokryphos's counter L.5 Doom kills the actor at level 40, not a partner at 40 (M.deathReach's counter rule)",
-  { { 'if counter then return "attacker" end', "" } }, lone5)
+  { { 'if ((f2 or 0) & 0x10) == 0 then return "attacker" end', "if false then end" } }, lone5)
 check("a dying Coelecite beside one other body answers with Magnitude8 (if_num_monsters 1 on the bodies the hit leaves)",
   { { "if u.monsters == nil then u.monsters = n - (u.dies == true and 1 or 0) end",
       "if u.monsters == nil then u.monsters = n end" } },
@@ -314,8 +314,11 @@ check("a Fight at the FossilFang re-aims at the body beside it that answers a Fi
     local p = driver(H):counterPartyPlan(0, { kind = "fight", row = 0, aim = 0 })
     return p.kind == "fight" and p.aimHard == 1 and p.aim == 1
   end)
-check("an answer on the one who struck alone is no party-wide counter (M.answerSpreads reads the targeting)",
-  { { "return (t & 0x80) == 0 and (t & 0x01) == 0 and (t & 0x0C) ~= 0", "return true" } },
+-- the rule before the #533 review: the targeting byte alone (a spread group, no MANUAL bit, no Roulette)
+local TARGETING_ONLY = { { 'return M.answerReach(a) == "party"', [[local t = M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + a * 14)
+  return a < 0xEE and (t & 0x80) == 0 and (t & 0x01) == 0 and (t & 0x0C) ~= 0]] } }
+check("an answer on the one who struck alone is no party-wide counter (M.answerSpreads reads the reach)",
+  { { 'return M.answerReach(a) == "party"', "return true" } },
   function(H)
     -- the Phase answers any hit with Blow Fish, which reaches the one who struck
     battle({ [0] = { PHASE, 7000 }, [1] = { QUIET, 3000 } }, fourAt19())
@@ -338,6 +341,36 @@ check("a killing blow at the FossilFang stands (the kill ends its answers)",
     battle({ [0] = { FOSSIL, 300 }, [1] = { QUIET, 3000 } }, fourAt19())
     local p = driver(H):counterPartyPlan(0, { kind = "fight", row = 0, aim = 0, reason = "finish" })
     return p.aimHard == nil and p.aim == 0
+  end)
+
+-- #533 review: Magnitude8 ($BC, the dying Coelecite's) and Quartr ($11, the
+-- Necromancer's) carry no random-target bit, so as counters they land on the
+-- one who struck: neither is a party-wide answer
+check("a Magnitude8 counter is no party-wide answer (the preset $b8 is kept)", TARGETING_ONLY,
+  function(H)
+    battle({ [0] = { COELECITE, 400 }, [1] = { QUIET, 5000 } }, fourAt19())
+    local _, a, wide = driver(H):counterPartyTake(0, 0, { cmd = 0x00, dies = true })
+    return not H.answerSpreads(0xBC) and not wide and a == 0xBC
+  end)
+check("a Quartr counter is no party-wide answer", TARGETING_ONLY,
+  function(H) return not H.answerSpreads(0x11) and H.answerSpreads(0x69) end)
+
+-- the shared re-aim filter (Driver:reaimOk, #533 review) in the counter and Vanish guards
+check("the FossilFang re-aim skips a Vanished body for one that stands in reach",
+  { { "    if s ~= aim and self:reaimOk(actor, s, plan) then", "    if s ~= aim and monAlive(s) and self:focusReachable(s) then" } },
+  function(H)
+    battle({ [0] = { FOSSIL, 3000 }, [1] = { QUIET, 100 }, [2] = { QUIET, 3000 } }, fourAt19())
+    w8(0x3EE4 + (4 + 1) * 2, 0x10)                    -- slot 1 Vanished
+    local p = driver(H):counterPartyPlan(0, { kind = "fight", row = 0, aim = 0 })
+    return p.kind == "fight" and p.aimHard == 2 and p.rejected[0] == true
+  end)
+check("a Fight off a Vanished body skips a body whose answer kills the striker (Allo Ver's Doom)",
+  { { "      if self:reaimOk(actor, s, plan) then\n        M.log", "      if true then\n        M.log" } },
+  function(H)
+    battle({ [0] = { QUIET, 3000 }, [1] = { ALLOVER, 100 }, [2] = { QUIET, 3000 } })
+    w8(0x3EE4 + 4 * 2, 0x10)                          -- slot 0 Vanished
+    local p = driver(H):dodgePlan(0, { kind = "fight", row = 0, aim = 0 })
+    return p.kind == "fight" and p.aimHard == 2
   end)
 
 print(string.format("counter_death_selftest: PASS -- %d cases, each failed by its own mutant: %s", n,
