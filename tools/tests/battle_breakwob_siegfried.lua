@@ -9,8 +9,11 @@
 --
 -- Asserted from the engine's cells (gauge $3e40+2s, max $3e41+2s, broken timer $3e90+2s, species $57c0+2s):
 --   1. Siegfried opens with his authored gauge, 1 (the floor gave him 2 of slash alone);
---   2. the party breaks him (any weapon: CYAN's katana, SHADOW's blade, SABIN's fists), on the blow that kills
---      him or before;
+--   2. a member's weapon breaks him (any weapon: CYAN's katana, SHADOW's blade, SABIN's fists), on the blow that
+--      kills him or before, when a member's action lands on him at all.  On the capture's draw none does: his
+--      flurry comes first, and SHADOW's Interceptor counters it (command $02, attack $FD, no weapon class, so no
+--      chip) and kills him from 100 HP before any member's turn.  The suite asserts that account exactly when it
+--      happens (the HP change, the command and the gauge it leaves), and the break whenever a member's hit lands;
 --   3. the fight is won (a wipe raises).
 -- Nothing writes emulated state.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -40,6 +43,10 @@ local function watch()
       if r.open == 0 and H.readByte(SH_MAX + s * 2) ~= 0 then r.open = H.readByte(SH_MAX + s * 2) end
       local hp = H.readWord(MONHP + s * 2)
       if r.hp ~= nil and hp ~= r.hp then
+        if hp == 0 then
+          r.byDog = H.readByte(0xB5) == 0x02 and (H.readByte(0xB6) == 0xFC or H.readByte(0xB6) == 0xFD)
+          r.killShields = H.readByte(SH_CUR + s * 2)
+        end
         -- what took it: the command and attack being executed ($b5, $b6)
         H.log(string.format("[siegfried] f%d slot %d ($%03X) hp %d -> %d, shields %d, cmd $%02X atk $%02X",
           H.frame, s, r.sp, r.hp, hp, H.readByte(SH_CUR + s * 2), H.readByte(0xB5), H.readByte(0xB6)))
@@ -127,7 +134,14 @@ H.run({ maxFrames = 80000 }, {
     for _, x in pairs(W.slots) do if x.sp == SIEGFRIED then r = x end end
     H.assertEq(r ~= nil, true, "battle 109 dealt Siegfried $131")
     H.assertEq(r.open, ROW, "Siegfried's gauge as he opens (his Ot6ShieldTbl row)")
-    H.assertEq(r.broke ~= nil, true, "the party broke Siegfried")
-    H.log("[siegfried] the row holds in play: two shields, broken by the party")
+    if r.byDog then
+      H.assertEq(r.broke == nil and r.killShields == ROW, true, "Interceptor's classless counter killed him and "
+        .. "left his one shield standing")
+      H.log("[siegfried] the gauge holds in play; the break was not served on this draw: Interceptor's counter "
+        .. "(cmd $02 atk $FD) killed him before any member's turn")
+    else
+      H.assertEq(r.broke ~= nil, true, "a member's weapon broke Siegfried")
+      H.log("[siegfried] the row holds in play: one shield, broken by the party")
+    end
   end),
 })

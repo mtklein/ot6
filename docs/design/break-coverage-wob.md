@@ -341,10 +341,14 @@ Over-Mind is the vestibule car's own body (map 149, pool 71, with Hazer,
 Whisper and StillGoing), and it gets the train's spirit row. Siegfried is
 the boastful swordsman whose trap in the compartment car (map 153, (5,25),
 battle 109) the line walks past. He has 100 HP and is no boss
-(bosses-wob.md section 8). Any weapon breaks him with its first blow, which
-fits the world's greatest swordsman. At two shields of slash and pierce, the
-party's first hit in `battle_breakwob_siegfried` killed him with his gauge
-untouched. His opening flurry of eight blows is the whole fight.
+(bosses-wob.md section 8). Any real blow kills him, so any weapon breaks him
+with its first blow, which fits the world's greatest swordsman. His opening
+flurry of eight blows is the whole fight, and it is often ended by SHADOW's
+Interceptor: the dog's counter (command $02, attack $FD) has no weapon class
+and chips nothing. In `battle_breakwob_siegfried`, played from the graph's
+capture, it killed him from 100 HP on the flurry's last blow before any
+member's turn (`f4979 slot 0 ($131) hp 100 -> 0, shields 1, cmd $02 atk
+$FD`), so on that draw the suite sees his gauge and no break.
 
 ## 18. The bodies with no fight to design
 

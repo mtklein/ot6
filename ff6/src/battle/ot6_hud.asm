@@ -3569,10 +3569,10 @@ Ot6ShieldTbl:
         .word   $0131
         .byte   1, OT6_SLASH|OT6_PIERCE|OT6_BLUDG ; siegfried (the
                                 ;   train's, battle 109): a 100-hp
-                                ;   braggart, not a boss; the first blow
-                                ;   of any weapon breaks him (at two
-                                ;   shields the party's first hit killed
-                                ;   him unbroken).  no weakness vanilla
+                                ;   braggart, not a boss; any real blow
+                                ;   kills him, so the first blow of any
+                                ;   weapon breaks him.  no weakness
+                                ;   vanilla
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian (the wob's: battle 75)
