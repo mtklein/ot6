@@ -108,12 +108,6 @@ def state_fields(raw, names):
     return out
 
 
-def read_state(path):
-    raw = machine_stream(Path(path).read_bytes())
-    f = state_fields(raw or b"", FIELDS.values())
-    return {k: f.get(v) for k, v in FIELDS.items()}
-
-
 # ------------------------------------------------------------------ the doc
 def layout_rows(text):
     """The battery map's rows: (start, end, scope, holds, written)."""
@@ -155,21 +149,58 @@ def ranges(addrs, gap=0):
     return out
 
 
-def compare_ram(ref, fil, region, mode, base=0, lo=0, hi=None, skip=()):
-    """(fill-shaped count, [(start, end)] of the other differences)."""
+SLOT_BASES = (0x0000, 0x0A00, 0x1400)   # battery offsets of slots 1-3
+SLOT_SIZE = 0x0A00                    # WRAM $1600-$1FFF
+CHECKSUM = 0x09FE                     # the slot's checksum word, +$9FE
+
+
+def source_of(region, off):
+    """Where a byte's power-on value came from: a battery byte inside a
+    save slot is the save block's WRAM byte the save copied there."""
+    if region == "sram":
+        for base in SLOT_BASES:
+            if base <= off < base + SLOT_SIZE:
+                return "wram", 0x1600 + off - base
+    return region, off
+
+
+def classify(ref, fil, region, mode, lo=0, hi=None, skip=()):
+    """Split the bytes where `fil` differs from `ref` into
+    unwritten: zero in REF and the fill pattern in FILL (for a battery slot,
+               the pattern of the save-block byte the save copied): no code
+               wrote it in either run;
+    checksum:  a slot's checksum word, which follows the bytes it sums;
+    computed:  anything else: a value some code derived from a byte it read
+               unwritten (or a play that went another way)."""
     hi = len(ref) if hi is None else hi
-    shaped, other = 0, []
     kind, seed, regions = mode
+    out = {"unwritten": [], "checksum": [], "computed": []}
     for a in range(lo, hi):
         if ref[a] == fil[a] or any(s <= a <= e for s, e, _ in skip):
             continue
-        if region in regions and ref[a] == 0 and fil[a] == fill_value(kind, seed, region, a):
-            shaped += 1
+        src, off = source_of(region, a)
+        if src in regions and ref[a] == 0 and fil[a] == fill_value(kind, seed, src, off):
+            out["unwritten"].append(a)
+        elif region == "sram" and any(a - b in (CHECKSUM, CHECKSUM + 1) for b in SLOT_BASES):
+            out["checksum"].append(a)
+        elif region == "wram" and a in (0x1FFE, 0x1FFF):
+            out["checksum"].append(a)
         else:
-            other.append(a + base)
-    return shaped, ranges(other)
+            out["computed"].append(a)
+    return {k: ranges(v) for k, v in out.items()}
 
 
+def compare_ram(ref, fil, region, mode, base=0, lo=0, hi=None, skip=()):
+    """(unwritten byte count, computed ranges): classify(), summed."""
+    c = classify(ref, fil, region, mode, lo, hi, skip)
+    return sum(b - a + 1 for a, b in c["unwritten"]), c["computed"]
+
+
+# The harness's own readings of memory the game has not set up yet (the
+# map and object tiles it lists at a boot, before the game has loaded a map)
+# differ under a fill without the game reading anything: they are counted
+# as observations, not as the play.
+OBSERVATIONS = ("[ot6] [tiles] ",)
 NORM = [(re.compile(r"\(\d+ bytes\)"), "(N bytes)"),
         (re.compile(r"sha=[0-9a-f]+"), "sha=X"),
         (re.compile(r"\b\d+(\.\d+)?s wall\b"), "Ns wall")]
@@ -192,16 +223,24 @@ def ot6_lines(path):
 
 
 def first_log_diff(ref_log, fil_log):
+    """(line number, ref, fill, observations differing) of the first [ot6]
+    line that differs outside the harness's observations; False when none
+    does; None when a log is missing."""
     a, b = ot6_lines(ref_log), ot6_lines(fil_log)
     if a is None or b is None:
         return None
-    for i, (x, y) in enumerate(zip(a, b)):
+    obs = sum(1 for x, y in zip(a, b) if x != y and x.startswith(OBSERVATIONS))
+    pa = [(i, x) for i, x in enumerate(a) if not x.startswith(OBSERVATIONS)]
+    pb = [(i, x) for i, x in enumerate(b) if not x.startswith(OBSERVATIONS)]
+    for (i, x), (_, y) in zip(pa, pb):
         if x != y:
-            return i + 1, x, y
-    if len(a) != len(b):
-        i = min(len(a), len(b))
-        return i + 1, a[i] if i < len(a) else "<end>", b[i] if i < len(b) else "<end>"
-    return False
+            return i + 1, x, y, obs
+    if len(pa) != len(pb):
+        k = min(len(pa), len(pb))
+        return (pa[k][0] + 1 if k < len(pa) else len(a) + 1,
+                pa[k][1] if k < len(pa) else "<end>",
+                pb[k][1] if k < len(pb) else "<end>", obs)
+    return (0, "", "", obs) if obs else False
 
 
 def fmt_ranges(rs, n):
@@ -234,13 +273,31 @@ def capture(root, key):
     return srams[0].read_bytes() if srams else None
 
 
+def describe(c, n, what):
+    parts = []
+    if c["computed"]:
+        parts.append(f"{what} computed from unwritten bytes at {fmt_ranges(c['computed'], n)}")
+    if c["unwritten"]:
+        k = sum(b - a + 1 for a, b in c["unwritten"])
+        parts.append(f"{what} unwritten ({k} byte(s)) at {fmt_ranges(c['unwritten'], n)}")
+    if c["checksum"]:
+        parts.append(f"{what} checksum follows")
+    return parts
+
+
 def diff_trees(ref, fil, only=None, max_ranges=12, out=print):
+    """Compare every state and capture both trees hold; returns (report,
+    bad), bad when the play or a computed byte differs.  Unwritten bytes of
+    the save block and of the battery's slots are findings too (no code
+    wrote them, and a save carries them), listed but not counted as bad."""
     marker = Path(fil) / "build/FILL_TREE"
     mode = parse_mode(marker.read_text()) if marker.exists() else None
     if mode is None:
         mode = ("ones", 0, set())   # a zero or lab tree: nothing is fill-shaped
     rows = layout_rows(LAYOUT.read_text())
     report, bad = [], False
+    persisted = set()
+    first_play = None
     for name in graph_states(ref):
         if only and name.lstrip("@") not in only:
             continue
@@ -249,56 +306,67 @@ def diff_trees(ref, fil, only=None, max_ranges=12, out=print):
             r, f = capture(ref, key), capture(fil, key)
             if r is None or f is None:
                 continue
-            skip = excluded_ranges(rows, r)
-            shaped, other = compare_ram(r, f, "sram", mode, skip=skip)
-            ent = {"capture": key, "sram_fill_shaped": shaped,
-                   "sram_other": other}
-            line = f"capture {key}: "
-            if other:
-                bad = True
-                line += f"battery differs at {fmt_ranges(other, max_ranges)}"
-            else:
-                line += "battery matches outside the never-written ranges"
-            if shaped:
-                line += f" ({shaped} byte(s) hold the fill pattern)"
-            out(line)
-            report.append(ent)
+            c = classify(r, f, "sram", mode, skip=excluded_ranges(rows, r))
+            bad |= bool(c["computed"])
+            for a, b in c["unwritten"]:
+                persisted.update(source_of("sram", x)[1] for x in range(a, b + 1)
+                                 if source_of("sram", x)[0] == "wram")
+            parts = describe(c, max_ranges, "battery")
+            out(f"capture {key}: " + ("; ".join(parts) if parts else
+                                       "battery matches outside the never-written ranges"))
+            report.append({"capture": key, **{f"sram_{k}": v for k, v in c.items()}})
             continue
         rs, fs = (Path(t) / "build/states" / f"{name}.mss" for t in (ref, fil))
         if not (rs.exists() and fs.exists()):
             continue
         ent = {"state": name}
-        d = first_log_diff(rs.with_suffix(".log"), fs.with_suffix(".log"))
-        if d:
-            ent["play"] = {"line": d[0], "ref": d[1], "fill": d[2]}
-        r, f = read_state(rs), read_state(fs)
+        rm, fm = (machine_stream(p.read_bytes()) for p in (rs, fs))
+        ent["machine_identical"] = rm == fm
         parts = []
-        if d:
+        d = first_log_diff(rs.with_suffix(".log"), fs.with_suffix(".log"))
+        if d and d[0]:
             bad = True
+            first_play = first_play or name
+            ent["play"] = {"line": d[0], "ref": d[1], "fill": d[2]}
             parts.append(f"play parts at log line {d[0]}:\n      ref  {d[1][:160]}\n      fill {d[2][:160]}")
-        if r["wram"] and f["wram"]:
-            _, blk = compare_ram(r["wram"], f["wram"], "wram", mode, lo=BLOCK[0], hi=BLOCK[1])
-            # the save block holds nothing never written: every difference counts
-            blk = ranges([a for a in range(*BLOCK) if r["wram"][a] != f["wram"][a]])
-            shaped, other = compare_ram(r["wram"], f["wram"], "wram", mode)
-            other = [x for x in other if not (BLOCK[0] <= x[0] and x[1] < BLOCK[1])]
-            ent.update(block=blk, wram_fill_shaped=shaped, wram_other=other)
-            if blk:
-                bad = True
-                parts.append(f"save block differs at {fmt_ranges(blk, max_ranges)}")
-            if other:
-                bad = True
-                parts.append(f"wram differs (not fill-shaped) at {fmt_ranges(other, max_ranges)}")
-            parts.append(f"{shaped} wram byte(s) hold the fill pattern")
-        if r["sram"] and f["sram"]:
-            skip = excluded_ranges(rows, r["sram"])
-            shaped, other = compare_ram(r["sram"], f["sram"], "sram", mode, skip=skip)
-            ent.update(sram_fill_shaped=shaped, sram_other=other)
-            if other:
-                bad = True
-                parts.append(f"battery differs at {fmt_ranges(other, max_ranges)}")
-        out(f"state {name}: " + ("; ".join(parts) if parts else "identical"))
+        if d:
+            ent["observations"] = d[3]
+            if d[3]:
+                parts.append(f"{d[3]} harness observation line(s) differ")
+        r = state_fields(rm or b"", FIELDS.values())
+        f = state_fields(fm or b"", FIELDS.values())
+        rw, fw = r.get(FIELDS["wram"]), f.get(FIELDS["wram"])
+        if rw and fw:
+            blk = classify(rw, fw, "wram", mode, *BLOCK)
+            rest = classify(rw, fw, "wram", mode)
+            rest["computed"] = [x for x in rest["computed"]
+                                if not (BLOCK[0] <= x[0] and x[1] < BLOCK[1])]
+            ent.update({f"block_{k}": v for k, v in blk.items()})
+            ent["wram_computed"] = rest["computed"]
+            ent["wram_unwritten"] = sum(b - a + 1 for a, b in rest["unwritten"])
+            bad |= bool(blk["computed"] or rest["computed"])
+            for a, b in blk["unwritten"]:
+                persisted.update(range(a, b + 1))
+            parts += describe(blk, max_ranges, "save block")
+            if rest["computed"]:
+                parts.append(f"wram computed from unwritten bytes at {fmt_ranges(rest['computed'], max_ranges)}")
+            parts.append(f"{ent['wram_unwritten']} wram byte(s) unwritten")
+        rsr, fsr = r.get(FIELDS["sram"]), f.get(FIELDS["sram"])
+        if rsr and fsr:
+            c = classify(rsr, fsr, "sram", mode, skip=excluded_ranges(rows, rsr))
+            ent.update({f"sram_{k}": v for k, v in c.items()})
+            bad |= bool(c["computed"])
+            if c["computed"]:
+                parts.append(f"battery computed from unwritten bytes at {fmt_ranges(c['computed'], max_ranges)}")
+        if ent["machine_identical"]:
+            parts = ["machine identical"]
+        out(f"state {name}: " + "; ".join(parts))
         report.append(ent)
+    if persisted:
+        out("save-block bytes no code wrote, carried by the saves: "
+            + fmt_ranges(ranges(sorted(persisted)), 64))
+    if first_play:
+        out(f"the play first parts in {first_play}")
     return report, bad
 
 
@@ -379,7 +447,7 @@ def selftest():
         lines = []
         rep, bad = diff_trees(ref, fil, out=lines.append)
         check("never-written bytes alone are not a divergence", not bad)
-        check("they are counted", rep[0].get("wram_fill_shaped") == 16)
+        check("they are counted", rep[0].get("wram_unwritten") == 16)
         check("blob sizes are masked in the logs", "play" not in rep[0])
         # now a computed difference and a play difference
         wb = bytearray(wf)
@@ -397,11 +465,38 @@ def selftest():
         b = next(e for e in rep if e.get("state") == "b")
         k = next(e for e in rep if e.get("capture") == "k1")
         check("a computed difference is a divergence", bad)
-        check("the save block difference is named", b["block"] == [[0x1650, 0x1650]])
-        check("the other WRAM difference is named", [0x7000, 0x7000] in b["wram_other"])
+        check("the save block difference is named", b["block_computed"] == [[0x1650, 0x1650]])
+        check("the other WRAM difference is named", [0x7000, 0x7000] in b["wram_computed"])
         check("the play difference is named with its line", b.get("play", {}).get("line") == 3)
         check("the capture's slot and saved page differences are named",
-              k["sram_other"] == [[0x1450, 0x1450], [0x2810, 0x2810]])
+              k["sram_computed"] == [[0x1450, 0x1450], [0x2810, 0x2810]])
+        # an unwritten save-block byte the save copied into slot 3, and the
+        # checksum that follows it
+        sc = bytearray(s0)
+        sc[0x1400 + 0x0870] = fill_value("rand", 3, "wram", 0x1E70)
+        sc[0x1400 + CHECKSUM] = 0x44
+        (fil / "build/checkpoints/k1/k1.sram").write_bytes(bytes(sc))
+        wc = bytearray(w0)
+        wc[0x1E70] = fill_value("rand", 3, "wram", 0x1E70)
+        (fil / "build/states/b.mss").write_bytes(mss(wc, s0))
+        (fil / "build/states/b.log").write_text(log)
+        lines = []
+        rep, bad = diff_trees(ref, fil, out=lines.append)
+        k = next(e for e in rep if e.get("capture") == "k1")
+        b = next(e for e in rep if e.get("state") == "b")
+        check("a slot byte holding its save-block byte's pattern is unwritten",
+              k["sram_unwritten"] == [[0x1C70, 0x1C70]] and not k["sram_computed"])
+        check("the slot checksum is set apart", k["sram_checksum"] == [[0x1DFE, 0x1DFE]])
+        check("an unwritten save-block byte is a finding, not a divergence",
+              b["block_unwritten"] == [[0x1E70, 0x1E70]] and not bad)
+        check("the report names the bytes the saves carry",
+              any("carried by the saves: $01E70" in x for x in lines))
+        # a harness observation alone is not the play
+        (fil / "build/states/b.log").write_text("[ot6] [tiles] map=511\n" + log)
+        (ref / "build/states/b.log").write_text("[ot6] [tiles] map=0\n" + log)
+        rep, bad = diff_trees(ref, fil, out=[].append)
+        b = next(e for e in rep if e.get("state") == "b")
+        check("a differing [tiles] line is an observation", "play" not in b and b["observations"] == 1)
     print("fill_diff selftest: " + ("OK" if not fails else f"{len(fails)} FAILURE(S)"))
     return 1 if fails else 0
 

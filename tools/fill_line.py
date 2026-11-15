@@ -16,6 +16,7 @@ declare the same mode.  Nothing in a fill tree is qualification evidence.
     tools/fill_line.py setup DIR --mode ones|alt|rand:<seed>|zero
     tools/fill_line.py run DIR [--until STATE] [TARGET...]
     tools/fill_line.py sync DIR          # move DIR to this tree's commit
+    tools/fill_line.py --selftest        # the fence, without an emulator
 
 A mode may name the RAMs it fills after an @ (ones@wram,sram,spc; the
 default is wram,sram).  `lab` marks a tree for experiments: each run there
@@ -40,7 +41,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ROM = "Final Fantasy III (USA).sfc"
 MARKER = "build/FILL_TREE"
-MODE_RE = r"(ones|alt|rand:\d{1,9})(@[a-z,]+)?|zero|lab"
+sys.path.insert(0, str(ROOT / "tools/tests/lib"))
+import compose  # noqa: E402  (the fence and the mode's grammar live there)
+
+
+def valid_mode(mode):
+    if mode in ("zero", "lab"):
+        return True
+    try:
+        compose._fill_lines(mode, "lab", {})
+        return True
+    except ValueError:
+        return False
 
 
 def sh(cmd, **kw):
@@ -50,8 +62,9 @@ def sh(cmd, **kw):
 
 def setup(args):
     d = Path(args.dir).resolve()
-    if not re.fullmatch(MODE_RE, args.mode):
-        sys.exit(f"--mode {args.mode!r}: expected ones, alt, rand:<seed> or zero")
+    if not valid_mode(args.mode):
+        sys.exit(f"--mode {args.mode!r}: expected ones, alt, rand:<seed>, "
+                 f"zero or lab (compose.py's OT6_POWERON_FILL grammar)")
     if d.exists():
         sys.exit(f"{d} exists; a fill tree starts empty (remove it first)")
     sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
@@ -113,7 +126,69 @@ def run(args):
     return rc
 
 
+def selftest(_args=None):
+    """The fence and the grammar, with no emulator: compose.py's prologue
+    in a plain tree, a fill tree and a lab tree."""
+    import tempfile
+    fails = []
+
+    def check(what, ok):
+        print(("  pass  " if ok else "  FAIL  ") + what)
+        if not ok:
+            fails.append(what)
+
+    def prologue(tree, env):
+        try:
+            return compose.poweron_fill_prologue(tree, env)
+        except ValueError as why:
+            return why
+
+    with tempfile.TemporaryDirectory() as t:
+        plain, fill, lab = (Path(t, n) for n in ("plain", "fill", "lab"))
+        for d, mark in ((plain, None), (fill, "rand:9"), (lab, "lab")):
+            (d / "build").mkdir(parents=True)
+            if mark:
+                (d / MARKER).write_text(mark + "\n")
+        check("a plain run in a plain tree composes nothing extra", prologue(plain, {}) == [])
+        check("a fill declared in a plain tree is refused",
+              isinstance(prologue(plain, {"OT6_POWERON_FILL": "ones"}), ValueError))
+        check("the read-before-write instrument is refused in a plain tree",
+              isinstance(prologue(plain, {"OT6_RBW": "1"}), ValueError))
+        check("a fill tree refuses a run that declares no fill",
+              isinstance(prologue(fill, {}), ValueError))
+        check("a fill tree refuses another mode",
+              isinstance(prologue(fill, {"OT6_POWERON_FILL": "ones"}), ValueError))
+        got = prologue(fill, {"OT6_POWERON_FILL": "rand:9"})
+        check("a fill tree's own mode fills, the fill code first after its globals",
+              isinstance(got, list) and got[0] == 'OT6_FILL_MODE = "rand"\n'
+              and "OT6_FILL_SEED = 9\n" in got and "emu.write" in got[-1])
+        check("the waivers' offsets are left zero in a whole-region fill",
+              isinstance(got, list) and "except = true" in got[2] and "0x1F6E" in got[2])
+        got = prologue(fill, {"OT6_POWERON_FILL": "rand:9",
+                              "OT6_SRAM_CHECKPOINT": "build/checkpoints/x"})
+        check("a run handed a battery does not fill the battery",
+              isinstance(got, list) and "sram" not in got[2])
+        got = prologue(lab, {"OT6_POWERON_FILL": "alt@wram:1D54+1FD3-1FF2"})
+        check("a lab tree takes any mode, and a bisection's ranges",
+              isinstance(got, list) and "{0x1D54, 0x1D54}, {0x1FD3, 0x1FF2}" in got[2])
+        got = prologue(lab, {"OT6_RBW": "1"})
+        check("a lab run of the instrument alone fills nothing",
+              isinstance(got, list) and len(got) == 2 and "OT6_RBW_SRAM = true" in got[0])
+        check("a malformed mode is refused",
+              isinstance(prologue(lab, {"OT6_POWERON_FILL": "ones@bogus"}), ValueError))
+        zero = Path(t, "zero")
+        (zero / "build").mkdir(parents=True)
+        (zero / MARKER).write_text("zero\n")
+        check("the zero reference composes exactly as a plain run",
+              prologue(zero, {"OT6_POWERON_FILL": "zero"}) == [])
+    check("valid_mode agrees with compose", valid_mode("rand:3@wram,spc") and not valid_mode("twos"))
+    print("fill_line selftest: " + ("OK" if not fails else f"{len(fails)} FAILURE(S)"))
+    return 1 if fails else 0
+
+
 def main():
+    if sys.argv[1:] == ["--selftest"]:
+        return selftest()
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)

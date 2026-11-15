@@ -902,6 +902,16 @@ check("rom_version_selftest", "python3 tools/build/rom_version.py selftest",
       + glob("tools/char_table/*_en.json", "ff6"))
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])
+# The power-on fill (docs/TOOLING.md "Uninitialised memory"): its fence, its
+# comparison and its report, without an emulator.  The fill runs themselves
+# are on demand, in trees of their own.
+check("fill_selftest",
+      "python3 tools/fill_line.py --selftest && python3 tools/fill_diff.py --selftest"
+      " && python3 tools/rbw_report.py --selftest",
+      ["tools/fill_line.py", "tools/fill_diff.py", "tools/rbw_report.py",
+       "tools/tests/lib/compose.py", "tools/tests/lib/poweron_fill.lua",
+       "tools/tests/lib/read_before_write.lua", "tools/uninit_waivers.txt",
+       "docs/design/save-layout.md"])
 check("verdict_selftest", "sh tools/tests/run.sh --verdict-selftest",
       ["tools/tests/run.sh"])
 check("boss_rows", "python3 tools/check_boss_rows.py",
