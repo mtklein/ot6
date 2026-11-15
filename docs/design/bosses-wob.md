@@ -449,10 +449,10 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
 - **Siegfried is a duel, not a boss (v0.45).** The boastful swordsman
   whose trap waits in the compartment car (`$131`, battle 109, map 153's
   (5,25); the line walks past it) has 100 HP and no vanilla weakness. A
-  boss's four shields would mean the break lands on a corpse, so his row is
-  a duel's two, slash and pierce: CYAN's katana and SHADOW's blade, the keys
-  of his Colosseum double (`$037`). His opening flurry of eight blows is the
-  fight. break-coverage-wob.md section 17 has the row;
+  boss's four shields would mean the break lands on a corpse. At two, the
+  party's first hit killed him unbroken. His row is one shield that any
+  weapon breaks, a braggart's gauge. His opening flurry of eight blows is
+  the fight. break-coverage-wob.md section 17 has the row;
   `battle_breakwob_siegfried` plays it from the graph's capture.
 
 ### 9. Rizopas, after the Piranha school — Baren Falls (Sabin + Cyan)

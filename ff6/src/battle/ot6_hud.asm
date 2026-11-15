@@ -3541,15 +3541,19 @@ Ot6ShieldTbl:
                                 ;   one shield; edgar's pike.  fire|holy
                                 ;   vanilla; absorbs poison
         ; -- the battle for narshe's raiders (battles 22 and 23): three
-        ; squads, terra/edgar/celes, cyan/sabin, locke/gau --
+        ; squads, terra/edgar/celes, cyan/sabin, locke/gau; every raider
+        ; takes the troopers' keys --
         .word   $0079
         .byte   2, OT6_SLASH|OT6_PIERCE ; bounty man: hired muscle in the
                                 ;   troopers' file, their keys.  fire
                                 ;   vanilla
         .word   $001c
-        .byte   2, OT6_PIERCE|OT6_BLUDG ; fidor: a war hound, the
-                                ;   doberman's point and a blow; the
-                                ;   swords slide off.  fire vanilla
+        .byte   2, OT6_SLASH|OT6_PIERCE ; fidor: the troopers' war hound,
+                                ;   a beast's hide (the tiger's keys).
+                                ;   pierce|bludg let party 1's swords
+                                ;   slide off: the v0.45 lab's descent
+                                ;   broke it alive in 8 of 72 fights,
+                                ;   the floor's 3 slash 24.  fire vanilla
         ; -- the banquet's sparring troopers (battle 30): terra and
         ; locke's blades --
         .word   $00c2
@@ -3563,11 +3567,12 @@ Ot6ShieldTbl:
                                 ;   whisper.  fire|holy vanilla; absorbs
                                 ;   poison
         .word   $0131
-        .byte   2, OT6_SLASH|OT6_PIERCE ; siegfried (the train's, battle
-                                ;   109): a 100-hp duellist, so a duel's
-                                ;   two, not a boss's four; steel
-                                ;   answers steel, as his colosseum
-                                ;   double ($0037).  no weakness vanilla
+        .byte   1, OT6_SLASH|OT6_PIERCE|OT6_BLUDG ; siegfried (the
+                                ;   train's, battle 109): a 100-hp
+                                ;   braggart, not a boss; the first blow
+                                ;   of any weapon breaks him (at two
+                                ;   shields the party's first hit killed
+                                ;   him unbroken).  no weakness vanilla
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian (the wob's: battle 75)

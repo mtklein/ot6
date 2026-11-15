@@ -305,12 +305,15 @@ the v0.45 lab, party 1's descent fought Fidor's formation three times
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
 | `$079` Bounty Man | hired muscle | 13 | 285 | fire | — | 3 · slash | **2** · slash\|pierce |
-| `$01C` Fidor | a war hound | 13 | 355 | fire | — | 3 · slash | **2** · pierce\|bludg |
+| `$01C` Fidor | the troopers' war hound | 13 | 355 | fire | — | 3 · slash | **2** · slash\|pierce |
 
-Lesson: Bounty Man marches with the troopers and takes their keys. Fidor
-takes the Doberman's point and a blow, and the swords slide off. Party 1's
-answer is EDGAR's crossbow, which also hits the Trooper beside it, or
-TERRA's Fire.
+Lesson: every raider takes the troopers' keys, so each squad's hands carry
+over from one wave to the next. Fidor's first draft was pierce|bludg, so
+that the swords would slide off it. On that ROM, party 1's descent met
+Fidor three times in each of the lab's 24 draws and broke it with HP left
+in 8 of the 72 fights. On main's floor row (3 · slash) it broke it in 24
+(`narshe-after-pb.txt`, `narshe-base.txt`). The swords are most of party
+1's blows, so the row gives them back.
 
 ## 16. The banquet's sparring troopers (battle 30)
 
@@ -332,15 +335,16 @@ SABIN, CYAN and SHADOW, as section 6.
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
 | `$00F` Over-Mind | a spirit | 13 | 390 | fire\|holy | poison | 3 · slash | **2** · slash\|special |
-| `$131` Siegfried | a duellist | 7 | 100 | — | — | 2 · slash | **2** · slash\|pierce |
+| `$131` Siegfried | a braggart | 7 | 100 | — | — | 2 · slash | **1** · slash\|pierce\|bludg |
 
 Over-Mind is the vestibule car's own body (map 149, pool 71, with Hazer,
 Whisper and StillGoing), and it gets the train's spirit row. Siegfried is
 the boastful swordsman whose trap in the compartment car (map 153, (5,25),
-battle 109) the line walks past. He has 100 HP, so he gets a duel's two
-shields rather than a boss's four (bosses-wob.md section 8). Steel answers
-steel, as with his Colosseum double (`$037`): CYAN's katana and SHADOW's
-blade. His opening flurry of eight blows is the fight.
+battle 109) the line walks past. He has 100 HP and is no boss
+(bosses-wob.md section 8). Any weapon breaks him with its first blow, which
+fits the world's greatest swordsman. At two shields of slash and pierce, the
+party's first hit in `battle_breakwob_siegfried` killed him with his gauge
+untouched. His opening flurry of eight blows is the whole fight.
 
 ## 18. The bodies with no fight to design
 

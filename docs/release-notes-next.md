@@ -32,7 +32,7 @@ breaks two of the three monsters, and Terra's Fire breaks all of them. The
 three ghosts in the sparkle trap in Narshe's caves each give way to a
 different one of the party's weapons, and all three to Terra's Fire. The
 Phantom Train's Over-Mind breaks like the train's other ghosts. In the Battle
-for Narshe, Fidor shrugs off swords but gives way to spears, crossbows and
-fists. Siegfried's ambush on the Phantom Train and the troopers' sparring
-bout at the banquet also have their own shields. Cutscene battles no longer
+for Narshe, Bounty Man and Fidor break to the same weapons as the troopers
+they march with. Siegfried's ambush on the Phantom Train breaks at the first
+blow. The troopers' sparring bout at the banquet has its own shields too. Cutscene battles no longer
 show a shield gauge.

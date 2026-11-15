@@ -12,7 +12,8 @@
 -- (build/attempts/wt/v045-rows/).  Asserted from the engine's cells (gauge $3e40+2s, max $3e41+2s, broken timer
 -- $3e90+2s, species $57c0+2s):
 --   1. Fidor or Bounty Man opens with its authored gauge, 2 (the floor gave both 3);
---   2. the party breaks one of them (EDGAR's crossbow and pike are Fidor's point; TERRA's Fire its vanilla weakness);
+--   2. the party breaks one of them (the blades and EDGAR's crossbow and pike; TERRA's Fire is their vanilla
+--      weakness);
 --   3. the fight is won (a wipe raises).
 -- Nothing writes emulated state.
 local H = dofile("tools/tests/lib/ot6.lua")

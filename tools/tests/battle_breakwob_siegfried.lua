@@ -8,14 +8,15 @@
 -- the design; battle_breakwob_events checks the row as ROM bytes.
 --
 -- Asserted from the engine's cells (gauge $3e40+2s, max $3e41+2s, broken timer $3e90+2s, species $57c0+2s):
---   1. Siegfried opens with his authored gauge, 2 (the floor gave him 2 of slash alone);
---   2. the party breaks him (CYAN's katana, SHADOW's blade: slash and pierce);
+--   1. Siegfried opens with his authored gauge, 1 (the floor gave him 2 of slash alone);
+--   2. the party breaks him (any weapon: CYAN's katana, SHADOW's blade, SABIN's fists), on the blow that kills
+--      him or before;
 --   3. the fight is won (a wipe raises).
 -- Nothing writes emulated state.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/wob_train_specter.mss.lua"
 
-local SIEGFRIED, ROW = 0x131, 2
+local SIEGFRIED, ROW = 0x131, 1
 local SH_CUR, SH_MAX, BRK, SPECIES, PRESENT, MONHP = 0x3E40, 0x3E41, 0x3E90, 0x57C0, 0x3AA8, 0x3BFC
 local FIGHT = { tactical = true, boost = true, items = true, healPercent = 50 }
 local function map() return H.mapId() & 0x1FF end

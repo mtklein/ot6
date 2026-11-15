@@ -10,7 +10,8 @@
 --      EventBattleGroup; map 149's pool) has an authored row and a key for each party that meets it there;
 --   3. the cutscene bodies and the unreached markers are 0-shield rows (no gauge);
 --   4. the lessons: on the raft each hand keys two of the three and TERRA's Fire all three; in the sparkle trap one
---      spirit to each hand, Fire to all, and poison heals them; FIDOR turns the blades of the swords.
+--      spirit to each hand, Fire to all, and poison heals them; the raiders take the troopers' keys; any weapon
+--      breaks Siegfried.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -26,10 +27,10 @@ local WANT = {
   [0x0B6] = { "Spectre", 2, BLUDG | SPECIAL, FIRE | HOLY, POISON },
   [0x0CF] = { "Rinn", 1, PIERCE | SPECIAL, FIRE | HOLY, POISON },
   [0x079] = { "Bounty Man", 2, SLASH | PIERCE, FIRE, 0 },
-  [0x01C] = { "Fidor", 2, PIERCE | BLUDG, FIRE, 0 },
+  [0x01C] = { "Fidor", 2, SLASH | PIERCE, FIRE, 0 },
   [0x0C2] = { "Sp.Forces", 3, SLASH | PIERCE, POISON, 0 },
   [0x00F] = { "Over-Mind", 2, SLASH | SPECIAL, FIRE | HOLY, POISON },
-  [0x131] = { "Siegfried", 2, SLASH | PIERCE, 0, 0 },
+  [0x131] = { "Siegfried", 1, SLASH | PIERCE | BLUDG, 0, 0 },
 }
 -- 0-shield rows: the cutscene bodies a called battle deals, and the markers for bodies no reachable formation holds
 -- (tools/check_shield_rows.py proves the second list unreached; break-coverage-wob.md section 18 has the evidence)
@@ -211,8 +212,14 @@ H.run({ maxFrames = 600 }, {
         problem("the trap: $%03X should be fire-weak and drink poison", sp)
       end
     end
-    if (classOf(0x01C) & SLASH) ~= 0 then problem("Fidor: the swords should slide off its hide") end
-    H.log("the lessons: the raft splits its hands two-and-two, the trap one spirit to each hand, Fidor turns swords")
+    for _, sp in ipairs({ 0x079, 0x01C }) do
+      if classOf(sp) ~= classOf(0x065) then
+        problem("$%03X: a raider should take the troopers' keys ($%02X), not $%02X", sp, classOf(0x065), classOf(sp))
+      end
+    end
+    if classOf(0x131) ~= (SLASH | PIERCE | BLUDG) then problem("Siegfried: every weapon hand should break him") end
+    H.log("the lessons: the raft splits its hands two-and-two, the trap one spirit to each hand, the raiders take "
+      .. "the troopers' keys, any weapon breaks Siegfried")
     H.assertEq(#problems, 0, "WoB event-fight break row mismatches")
     H.log("WoB event-fight break rows verified against the built ROM")
   end),
