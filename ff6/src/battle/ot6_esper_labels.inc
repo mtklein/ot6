@@ -30,7 +30,7 @@ Ot6RungLabelTbl:
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Shoat 2: Stamina +1
         .byte   $8d,$a8,$ff,$8f,$9e,$ad,$ab,$a2,$9f,$b2,$ff,$ff   ; Shoat 3: No Petrify
         .byte   $92,$a9,$9e,$9e,$9d,$ff,$ff,$ff,$ca,$b6,$ff,$ff   ; Shoat 4: Speed   +2
-        .byte   $8d,$a8,$ff,$83,$9e,$9a,$ad,$a1,$ff,$ff,$ff,$ff   ; Shoat 5: No Death
+        .byte   $92,$9a,$9f,$9e,$ad,$b2,$ff,$81,$a2,$ad,$ff,$ff   ; Shoat 5: Safety Bit
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b5,$ff,$ff   ; Maduin 1: Mag.Pwr +1
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Maduin 2: Stamina +1
         .byte   $81,$9a,$ab,$9d,$c3,$ac,$ff,$87,$9a,$ad,$ff,$ff   ; Maduin 3: Bard's Hat

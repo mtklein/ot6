@@ -84691,8 +84691,10 @@ _cc36b1:
                 ; To use an Esper it must be equipped. Choose “Skills” from the menu, then select “Espers.”
                 ; During battle, select Magic, and press up on the Control Pad. Press the A Button to use the Esper.
                 ; Remember, an Esper can only be used once per battle.
-                ; In OT6, the character who equips an Esper can cast its spells. Unequip it and the spells go too. Nothing is learned.
-                ; Many Espers also change their holder’s stats while equipped. There are no stat bonuses at level up.
+                ; In OT6, whoever equips an Esper can cast its spells and summon it. Unequip it and both go. Spells are never learned.
+                ; A won battle gives Magic Points to the Esper each member has equipped. At 10, 30, 75, 200 and 500 points, it ranks up.
+                ; Each rank gives that character a bonus: a stat or an ability. It is kept for good, whatever Esper is equipped later.
+                ; The victory screen shows the points and any new rank. Under Skills, an Esper’s page shows its ranks and what each one gives.
         return
 _cc36b5:
         dlg $0275

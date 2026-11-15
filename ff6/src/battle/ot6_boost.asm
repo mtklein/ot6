@@ -1467,6 +1467,13 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
 ;     cell (_c18491: row * 2 + column) + $83.  A cell empty for this rider
 ;     (DefaultMagitekAttackTbl's $ff) cannot be confirmed, so its answer
 ;     does not matter.
+;   * the Lore list ($1b): Ot6SpellNoBoost on the lore under the cursor
+;     (Condemned, Roulette, Big Guard, L.5 Doom, L.3 Muddle, Reflect???,
+;     ForceField, Dischord, Sour Mouth, Pep Up, Rippler: no power, or Pep
+;     Up's fraction), the row the confirm queues (UpdateMenuState_1b's
+;     _c183f7: scroll + cursor row, one column, four bytes a row from the
+;     caster's list at $216a = the list's own $208e + $dc, the esper's row
+;     and the 54 spells' before it; the row's byte is the lore's id $8b-$a2).
 ; Filch and Bestow buy shields and pips since #469, so the thief list
 ; refuses nothing.  Everywhere else (the command window, before the action is
 ; picked) R stands.
@@ -1489,6 +1496,8 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         beq     @item
         cmp     #$2a
         beq     @magitek
+        cmp     #$1b
+        beq     @lore
         cmp     #$30
         jne     @buys
         lda     $6168
@@ -1520,6 +1529,21 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         clc
         adc     #$83            ; the beam's attack id (CmdAttackOffsetTbl)
         jsl     Ot6SpellNoBoost
+        bcs     @none
+        bra     @buys
+@lore:  lda     $891f,x         ; scroll
+        clc
+        adc     $8927,x         ; + cursor row: the lore row (one column)
+        longa
+        and     #$00ff
+        asl
+        asl                     ; four bytes a row
+        clc
+        adc     $302c,y         ; the caster's list
+        tax
+        shorta0
+        lda     a:$00dc,x       ; the lore's id (the esper's row and 54
+        jsl     Ot6SpellNoBoost ;   spells' rows come first: $dc bytes)
         bcs     @none
         bra     @buys
 @item:  lda     $8947,x         ; scroll

@@ -545,24 +545,21 @@ her Overcast sets; with the line's own ranks it won all four.
 
 The page under Skills > Espers shows the selected character's rank, Magic
 Points and next cost on the title row, and the five rungs as short labels,
-white once reached and grey until then. What it does not do yet, the
-remaining part of step 6:
+white once reached and grey until then. Since v0.45 the cursor walks the
+rung column too (`GenjuDetailCursorProp` {2, 7}: right from the spells, rows
+1-5), and the help window at the top shows what the highlighted rung does,
+one line from `Ot6RungDescStr` (`tools/esper_ladder.py`'s DESC: one
+description per label, every label one effect, so Shoat's signature is
+labelled "Safety Bit", not Alexandr's "No Death"). Under a rung the
+character has not reached whose effect bytes its other reached rungs already
+cover, on any stone and this one's earlier rungs included, a second line
+says "Already held from another rank" (`Ot6RungDescText`). Gear does not
+count, and neither does an HP or MP boost a larger one makes moot (the
+bits differ; the largest applies): the line is a bit-for-bit cover over the
+ladder alone. The Narshe school's magicite ghost teaches the ladder
+([narshe-school.md](narshe-school.md), $0274). What is left of step 6:
 
-- **Say what a rung does.** The labels name a relic ("Gold Hairpin") or an
-  immunity ("No Sleep"); the five new signatures (Conductor, Facet,
-  Rebirth, No Stop/Slow, Full Revive) and Sraphim's "Heal +25%" need a
-  sentence. Proposed: a cursor on the rung
-  rows (today the cursor walks only the spell rows, `GenjuDetailCursorProp`
-  {1, 7}) and the help line at the top of the screen showing the rung's
-  description, from a 130-entry text table beside `Ot6RungLabelTbl`.
-- **Mark "have".** An effect the character already holds (from gear or
-  another stone's rung) is marked so a player tours toward new ones, as the
-  table's notes say. The fold already computes it (`Ot6EsperFold`'s bits
-  for that character minus this rung's).
 - **The status page's list of kept bonuses** (optional, as the doc says).
-- **Teaching.** One Narshe school line in plain words: "A stone teaches its
-  wearer bonuses that stay. Every battle won pays Magic Points to the stone
-  each member wears; see Skills > Espers." (step 7).
 - **A wearing policy for the harness** (step 8): today the route equips
   stones for their spells only, so the ladder grows wherever the route's
   wearers happen to fight.

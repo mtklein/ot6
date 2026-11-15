@@ -436,6 +436,10 @@ TEST_ENV = {
     # snapshots; no write
     "battle_boostkeep": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # R refused on a Lore that moves no number (Ot6RowNoBoost's Lore arm):
+    # STRAGO taught one quiet lore before the walk (declared)
+    "battle_lorerefuse":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     # #469: reach, Debilitator's steps and the last refusals, from one
     # battle's snapshots outside Kohlingen; no write
     "battle_boostreach": "OT6_TIMEOUT=3600 "
@@ -891,11 +895,15 @@ check("spell_grants",
 # are docs/design/esper-rework.md's table, parsed from the doc (relic effects
 # by the ItemProp bytes of the relic each cell names); the selftest's mutants
 # move one rung's bit, stat and label in the ROM and two cells in the doc.
+# The esper page's help lines (DESC) are checked too: a description for every
+# label, one line within the help window's width (FontWidth), one effect a
+# label; the mutants move a rung's line in the ROM and drop or widen one.
 check("esper_ladder",
       "python3 tools/esper_ladder.py --selftest"
       " && python3 tools/esper_ladder.py",
       ["tools/esper_ladder.py", "docs/design/esper-rework.md", "ff6/src/menu/item_prop_en.dat",
-       "ff6/src/text/item_name_en.json", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
+       "ff6/src/text/item_name_en.json", "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg",
+       copy_if_changed_from("build/ot6.sfc")])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.
