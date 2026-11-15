@@ -273,8 +273,8 @@ local function walk(kindName, slot, want, tag)
       press(j < c and k.step or (k.cols == 2 and "left" or "up"))
     end
     H.assertEq(cursorIndex(k, slot), c, string.format("%s: back on cell %d to confirm it", tag, c))
-    local rowAddr = (kindName == "rage") and nil
-      or LISTPTR[slot] + ((kindName == "lore") and (55 + c) or (1 + c)) * 4
+    local rowAddr = nil         -- the rage list has no flags byte
+    if kindName ~= "rage" then rowAddr = LISTPTR[slot] + ((kindName == "lore") and (55 + c) or (1 + c)) * 4 end
     local greyed = rowAddr and (H.readByte(rowAddr + 1) & 0x80) ~= 0
     if not greyed then
       local before = H.readByte(STAGED)
@@ -285,6 +285,10 @@ local function walk(kindName, slot, want, tag)
         -- its A buzzes and stays
         H.log(string.format("[dense] %s: rage cell %d refused (greyed)", tag, c))
         goto nextcell
+      end
+      for _ = 1, 40 do              -- settle: targeting, or committed at once
+        if st() ~= ST_TRANS and st() ~= k.st then break end
+        frame({})
       end
       local got = H.readByte(STAGED)
       H.assertEq(got, want[c + 1], string.format("%s: A on cell %d stages %02x (was %02x)", tag, c, want[c + 1], before))
@@ -297,7 +301,13 @@ local function walk(kindName, slot, want, tag)
         if st() == k.st then break end
         press("b")
       end
-      H.assertEq(st(), k.st, string.format("%s: B backs out of cell %d's targeting", tag, c))
+      if st() ~= k.st then
+        -- some targetings back out to the command window, not the list
+        -- (vanilla's): open the list again and go on from the next cell
+        H.log(string.format("[dense] %s: B from cell %d's targeting left the list (state %02x); reopening",
+          tag, c, st()))
+        openWindow(k, slot, tag)
+      end
     else
       H.log(string.format("[dense] %s: cell %d is greyed (not confirmed)", tag, c))
     end

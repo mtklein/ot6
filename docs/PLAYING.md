@@ -363,6 +363,10 @@ equipped, the wearer can cast its spells and summon it once a battle. Take
 it off and both go. Nobody learns the spells. An Esper no longer raises or
 lowers stats while worn.
 
+The Magic list, in battle and under Skills, shows only the spells the
+character can cast now, packed from the top in the spell order chosen in
+Config; an Esper's spells sit in their usual places among the wearer's own.
+
 ### Magic Points and ranks
 
 - A won battle that pays Magic Points gives them to each living party member,
