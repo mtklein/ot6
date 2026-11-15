@@ -2323,17 +2323,40 @@ def _fill_lines(want, have, env):
                          f"declare OT6_POWERON_FILL={have}")
     if want == "zero":
         return []      # the reference tree: fenced like a fill, filled by nothing
-    m = re.fullmatch(r"(?:(ones|alt)|rand:(\d{1,9}))(?:@([a-z,]+))?", want)
-    regions = (m.group(3) or "wram,sram").split(",") if m else []
-    if not m or not regions or not set(regions) <= set(FILL_REGIONS):
+    m = re.fullmatch(r"(?:(ones|alt)|rand:(\d{1,9}))(?:@([a-z0-9,:~+-]+))?", want, re.I)
+    sel = {}
+    for tok in ((m.group(3) or "wram,sram").split(",") if m else []):
+        r = re.fullmatch(r"([a-z]+)(?:([:~])((?:[0-9A-F]+(?:-[0-9A-F]+)?\+?)+))?", tok, re.I)
+        if not r or r.group(1) not in FILL_REGIONS:
+            sel = None
+            break
+        if r.group(2):
+            spans = []
+            for part in filter(None, r.group(3).split("+")):
+                lo, _, hi = part.partition("-")
+                spans.append((int(lo, 16), int(hi or lo, 16)))
+            sel[r.group(1)] = (r.group(2) == "~", spans, r.group(3))
+        else:
+            sel[r.group(1)] = True
+    if not m or not sel:
         raise ValueError(f"OT6_POWERON_FILL={want!r}: expected ones, alt, "
                          f"rand:<seed> or zero, optionally @ a comma list of "
-                         f"{','.join(FILL_REGIONS)} (default wram,sram)")
+                         f"{','.join(FILL_REGIONS)} (default wram,sram), each "
+                         f"optionally :<lo-hi+...> (only those offsets, hex) "
+                         f"or ~<lo-hi+...> (all but them)")
     mode, seed = (m.group(1), 0) if m.group(1) else ("rand", int(m.group(2)))
     if env.get("OT6_SRAM_CHECKPOINT"):
-        regions = [r for r in regions if r != "sram"]
-    return [f'OT6_FILL_MODE = "{mode}"\n', f"OT6_FILL_SEED = {seed}\n",
-            "OT6_FILL_REGIONS = {%s}\n" % ", ".join(f"{r} = true" for r in regions),
+        sel.pop("sram", None)
+
+    def lua(v):
+        if v is True:
+            return "true"
+        exc, spans, text = v
+        return ("{except = %s, text = \"%s\", ranges = {%s}}"
+                % ("true" if exc else "false", text,
+                   ", ".join("{0x%X, 0x%X}" % ab for ab in spans)))
+    return [f'OT6_FILL_MODE = "{mode.lower()}"\n', f"OT6_FILL_SEED = {seed}\n",
+            "OT6_FILL_REGIONS = {%s}\n" % ", ".join(f"{k} = {lua(v)}" for k, v in sel.items()),
             FILL_LUA.read_text()]
 
 

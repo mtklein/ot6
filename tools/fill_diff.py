@@ -51,11 +51,13 @@ BLOCK = (0x1600, 0x2000)
 # --------------------------------------------------------------- fill pattern
 def parse_mode(text):
     """build/FILL_TREE's mode -> (kind, seed, regions)."""
-    m = re.fullmatch(r"(?:(ones|alt)|rand:(\d{1,9}))(?:@([a-z,]+))?", text.strip())
+    m = re.fullmatch(r"(?:(ones|alt)|rand:(\d{1,9}))(?:@([a-z0-9,:~+-]+))?", text.strip(), re.I)
     if not m:
         return None
-    kind, seed = (m.group(1), 0) if m.group(1) else ("rand", int(m.group(2)))
-    return kind, seed, set((m.group(3) or "wram,sram").split(","))
+    kind, seed = (m.group(1).lower(), 0) if m.group(1) else ("rand", int(m.group(2)))
+    # a region's :<ranges> or ~<ranges> (a lab bisection) still fills with the
+    # same pattern: a byte that holds it is fill-shaped either way
+    return kind, seed, {re.split(r"[:~]", t)[0] for t in (m.group(3) or "wram,sram").split(",")}
 
 
 def fill_value(kind, seed, region, off):
@@ -321,6 +323,8 @@ def selftest():
     check("parse_mode reads regions", parse_mode("rand:7@wram,spc") == ("rand", 7, {"wram", "spc"}))
     check("parse_mode defaults to wram,sram", parse_mode("ones")[2] == {"wram", "sram"})
     check("parse_mode refuses junk", parse_mode("twos") is None)
+    check("parse_mode reads a bisection's regions",
+          parse_mode("ones@wram:1D54+1FD3-1FF2,sram")[2] == {"wram", "sram"})
 
     # the doc: never-written rows, read from the real table
     rows = layout_rows(LAYOUT.read_text())

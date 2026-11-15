@@ -10,7 +10,10 @@
 --   OT6_FILL_MODE   "ones" | "alt" | "rand"
 --   OT6_FILL_SEED   integer (rand only; 0 otherwise)
 --   OT6_FILL_REGIONS the RAMs to fill, a set of wram, sram, vram, oam,
---                   cgram, spc (default wram and sram).  sram is dropped
+--                   cgram, spc (default wram and sram); a region may
+--                   instead map to {ranges = {{lo, hi}...}, except = bool,
+--                   text = ...} to fill only those offsets, or all but them
+--                   (a lab bisection).  sram is dropped
 --                   when a battery was handed to the run
 --                   (OT6_SRAM_CHECKPOINT): Mesen loaded it over SRAM, and its
 --                   never-written ranges already carry the fill of the run
@@ -63,13 +66,26 @@ do
   local done = {}
   for _, r in ipairs(regions) do
     local id, name, memtype, size = r[1], r[2], r[3], r[4]
-    if OT6_FILL_REGIONS[name] then
+    local sel = OT6_FILL_REGIONS[name]
+    if sel == true then
       if mode == "ones" then
         for off = 0, size - 1 do emu.write(off, 0xFF, memtype) end
       else
         for off = 0, size - 1 do emu.write(off, value(id, off), memtype) end
       end
       done[#done + 1] = name
+    elseif sel then
+      -- a lab bisection: only these ranges ({lo, hi} pairs), or all but them
+      local function inside(off)
+        for _, r in ipairs(sel.ranges) do
+          if off >= r[1] and off <= r[2] then return true end
+        end
+        return false
+      end
+      for off = 0, size - 1 do
+        if inside(off) ~= sel.except then emu.write(off, value(id, off), memtype) end
+      end
+      done[#done + 1] = name .. (sel.except and "~" or ":") .. sel.text
     end
   end
   local reset = emu.read(0xFFFC, mt.snesMemory) | (emu.read(0xFFFD, mt.snesMemory) << 8)
