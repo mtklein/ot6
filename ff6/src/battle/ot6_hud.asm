@@ -3552,8 +3552,9 @@ Ot6ShieldTbl:
                                 ;   a beast's hide (the tiger's keys).
                                 ;   pierce|bludg let party 1's swords
                                 ;   slide off: the v0.45 lab's descent
-                                ;   broke it alive in 8 of 72 fights,
-                                ;   the floor's 3 slash 24.  fire vanilla
+                                ;   broke it alive in 2 of 18 distinct
+                                ;   fights, the floor's 3 slash and
+                                ;   this row 6.  fire vanilla
         ; -- the banquet's sparring troopers (battle 30): terra and
         ; locke's blades --
         .word   $00c2

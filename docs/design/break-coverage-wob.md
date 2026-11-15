@@ -237,7 +237,7 @@ it heals it.
 
 ## The event fights (v0.45, sections 13-18)
 
-Authored 2026-11-14. The v0.45 design audit
+Authored 2026-11-14 (wt/v045-rows). The v0.45 design audit
 (`build/attempts/wt/design-audit/shield_coverage.txt`) listed 25 species in
 formations with no authored row. Fourteen are in formations the game deals:
 event battles a script calls, and one pool the route has not claimed. The
@@ -308,12 +308,16 @@ the v0.45 lab, party 1's descent fought Fidor's formation three times
 | `$01C` Fidor | the troopers' war hound | 13 | 355 | fire | — | 3 · slash | **2** · slash\|pierce |
 
 Lesson: every raider takes the troopers' keys, so each squad's hands carry
-over from one wave to the next. Fidor's first draft was pierce|bludg, so
-that the swords would slide off it. On that ROM, party 1's descent met
-Fidor three times in each of the lab's 24 draws and broke it with HP left
-in 8 of the 72 fights. On main's floor row (3 · slash) it broke it in 24
-(`narshe-after-pb.txt`, `narshe-base.txt`). The swords are most of party
-1's blows, so the row gives them back.
+over from one wave to the next. The lab ran `gen_narshe_battle` unchanged
+at seed shifts 0-23 from the graph's `reunion_ready`. Every arm passed all 24
+runs, which were 6 distinct plays, each with three Fidor fights. Fidor's
+first draft was pierce|bludg, so that the swords would slide off it. On that
+ROM the descent broke Fidor with HP left in 2 of the 18 distinct fights,
+against 6 on main's floor row (3 · slash). The swords are most of party 1's
+blows. With the troopers' keys the descent breaks it in 6 of 18 again, and
+its fights are shorter: 1900 frames on average, against 2077 on main and
+2292 on the draft (`narshe-base.txt`, `narshe-after-pb.txt`,
+`narshe-after-sp.txt`, `summary.txt`).
 
 ## 16. The banquet's sparring troopers (battle 30)
 
@@ -393,3 +397,18 @@ every row missing) and on one mutant ROM with a mutation per suite
 before this landing lists an unauthored species after. The landing's own
 replay claims world group 15 (`gate/audit.final.txt`), which added the
 Joker (section 9) and the ChickenLip (the side-zones branch's row).
+
+v0.45 (sections 13-18), `build/attempts/wt/v045-rows/` (px13). The graph's
+line was replayed on the branch's ROM from power-on to `reunion_ready`, with
+`wob_train_specter` beside it. The raft fights of `gen_scenario` and
+`gen_rapids` played the new rows, and every leg passed. The three play suites
+pass from those captures (`v045-rows-labs.tgz`, `suites/`), and each fails on
+main's ROM at its gauge check (`v045-base-labs.tgz`, `neg_*`: "got 3 ($3),
+want 2 ($2)" for the raft, "got 2 ($2), want 1 ($1)" for Siegfried).
+`battle_breakwob_events` fails on main's ROM with 132 mismatches
+(`suite_events_on_main_rom.log`). It also fails on a mutant that gives Fidor
+slash|pierce|bludg (`suite_events_mutant_fidor_slash.txt`); that mutant was
+made while Fidor's row was pierce|bludg. The `gen_moogle` sweep (shifts
+0-23, from `moogle_entry`; TERRA's flashback soldiers now draw no gauge) won
+the Marshal with the first squad in every distinct play: 6 of 6 on the
+branch, 7 of 7 on main (`moogle-after.txt`, `moogle-base.txt`).
