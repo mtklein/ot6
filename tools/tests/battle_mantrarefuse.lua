@@ -18,8 +18,9 @@
 -- nothing), the point raised on Pummel is dropped rather than charged (the bank keeps it), and the MP charged is
 -- the row's flat price.
 --
--- Red on the mutant ROM with Mantra's line taken out of Ot6SpellNoNumber (R raised the boost on Mantra and the
--- turn charged the point and the escalated MP): build/attempts/wt/v045-land/mantra/.
+-- Red on the mutant ROM with Mantra's line taken out of Ot6SpellNoNumber, the rules before this change (R raised
+-- the boost on Mantra; the heal reached the effect doubled, 30, and left as SABIN's HP, 1315, so the point bought
+-- nothing; the turn charged 40 MP, 2.5x): build/attempts/wt/v045-land/mantra/.
 -- No write: the Continue's SABIN knows Mantra (L23; asserted).
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -189,7 +190,8 @@ H.run({ maxFrames = 60000 }, {
     }, "R on Mantra and Pummel, then Mantra")
   end)(),
   H.waitUntil(function() return #heals > 0 and heals[#heals].leave ~= nil end, 3000, "Mantra's effect ran", 5),
-  H.waitFrames(240),
+  H.waitUntil(function() return pend(sabinS) == 0 end, 1800, "the point pending on Mantra settled (dropped or charged)", 5),
+  H.waitFrames(60),
   H.call(function()
     H.screenshot("mantrarefuse_after")
     local h = heals[1]
@@ -204,7 +206,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(r[PUMMEL], 1, "R on Pummel, which moves a number, raises the boost to 1")
     H.assertEq(r.pend, 1, "Mantra was confirmed with the point raised on Pummel pending")
     H.assertEq(r.mp0 - mp1, base, "the turn charged Mantra's flat price, not 2.5x for the point (Ot6BlitzPrice)")
-    H.assertEq(bank2 >= r.bank1, true, "the point pending on Mantra was dropped, not charged (Ot6ActionEnd's Blitz arm)")
+    H.assertEq(bank2, r.bank1, "the point pending on Mantra was dropped, not charged (Ot6ActionEnd's Blitz arm)")
     H.log("[mantrarefuse] PASS: R refused on Mantra, taken on Pummel; a pending point on Mantra kept and its price flat")
   end),
 })
