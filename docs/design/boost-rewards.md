@@ -136,6 +136,7 @@ guidelines, a bug.
 | Master's Mark | the divine (Locke) |
 | SwdTech | the tech (the cursor row is the boost); Cleave at 3 (Cyan) |
 | Blitz | the multiplier; Bum Rush at 3 (Sabin) |
+| Blitz: Mantra, whose special effect writes the heal (SABIN's HP over the bodies) after the multiplier (`Ot6SpellNoNumber` reads its +9, $15; until v0.45 a boost on it cost the points and 2.5x the MP per point and healed what an unboosted one heals) | refused (R on the Blitz list's row, `Ot6RowNoBoost`; a boost raised on the command window before it was picked is dropped at the turn's end; its price is flat, `Ot6BlitzPrice`; battle_mantrarefuse) |
 | Tools with a number: AutoCrossbow, Bio Blaster, Flash, Drill, Chain Saw | the multiplier; Overclock at 3 (Edgar) |
 | Tools without one: NoiseBlaster | refused (#469) |
 | Air Anchor (power 128, pierce) | the multiplier |

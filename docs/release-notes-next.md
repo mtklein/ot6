@@ -17,7 +17,10 @@ Condemned as well as instant death. On Strago's Lore list, the R Button no
 longer adds Boost Points to a Lore that a boost can't improve, such as
 Condemned, Roulette or Big Guard. That now includes Revenge, Blow Fish, Pearl
 Wind, Step Mine and Exploder: their damage or healing never grew with a boost,
-so boosting them spent the points for nothing.
+so boosting them spent the points for nothing. The same goes for Sabin's
+Mantra on the Blitz list: its healing is Sabin's HP shared among the party
+whatever the boost, so the R Button no longer boosts it, a boost raised before
+picking it is kept rather than spent, and it costs the same MP at any boost.
 
 When Gau and Gogo both use Rage in the same battle, each now keeps the odds
 his own Boost Points bought. Before, whoever started raging last set the odds
