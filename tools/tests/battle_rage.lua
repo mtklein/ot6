@@ -536,7 +536,7 @@ add({
     H.assertEq(#mine >= 2 and #theirs >= 1, true, string.format(
       "shared: both ragers rolled after both starts (GAU %d, second %d)", #mine, #theirs))
     H.assertEq(#theirs >= 2, true, "shared: the second rager rolled at least twice")
-    H.assertEq(tierOf(actor), 3, "shared: GAU's stored tier is still 3 after the second rager's unboosted start")
+    H.assertEq(tierOf(actor), 3, "shared: GAU's stored tier is still 3 after the second rager's start at 1")
     H.assertEq(tierOf(second), SECOND_TIER, "shared: the second rager's stored tier is its own")
     for _, e in ipairs(mine) do
       H.assertEq(e.coin, 1, "shared: every possessed turn of GAU's is the special -- his 3 points still buy it")
