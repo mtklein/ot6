@@ -204,6 +204,10 @@ release is published:
 - The annotated tag `vX.Y`, main, the release branch and the tag pushed;
   `gh release create` with both assets and the notes; `gh release view`
   shows both (Obtainium installs the APK from there).
+- The instruction booklet was rebuilt on the release commit (`python3
+  tools/manual/build.py --version X.Y --booklet`, docs/manual/ committed) and
+  `ot6-vX.Y-manual.pdf` is attached to the GitHub release with the zip and
+  the APK (docs/TOOLING.md, "The instruction booklet").
 - The release's saves joined the golden set (`tools/golden_saves.py add vX.Y
   <zip> <keys>`, docs/TOOLING.md), so every later release is tested against
   them: save compatibility is the v1 family's contract (owner, 2026-11-15;
