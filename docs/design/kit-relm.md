@@ -1,5 +1,17 @@
 # Relm: the painter as the party's supporter (#538)
 
+> **Owner's ruling (2026-11-15): overshoot.** "let's overshoot and make
+> players say 'relm is so busted' than undershoot." Where this document
+> picked the cautious option, build the strong one: **Tint** lets Relm pick
+> the colour and the ally's weapon attacks truly carry that element (its
+> weakness damage and its shield chip both), not only a chip on a revealed
+> weakness; **Masterpiece** keeps its full peak (a gift can complete a
+> divine; three in a round is the intended big moment); and when tuning
+> costs, durations and levels, err generous. The abuse limits stay (one
+> lengthening a break, no Gesture off a Gestured turn): they stop loops,
+> not power. Sections below that say otherwise are superseded by this note
+> until the build rewrites them.
+
 Status: **designed, not built** (2026-11-15). The owner's direction: "As an
 artist, she should have abilities that buff the team, like a bard or
 synergist." The brainstorm in #538 was approved in full; this document turns
