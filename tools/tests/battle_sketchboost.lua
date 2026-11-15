@@ -141,8 +141,9 @@ local function runTry(t)
       H.call(function()
         Tm.observe()
         -- the battle can end before RELM's Sketch runs (the others' Defend turns and the monsters' own
-        -- actions, queued in the window's snapshot, can finish the last body): that window gave no try
-        if t.endF == nil and t.void == nil then
+        -- actions, queued in the window's snapshot, can finish the last body): that window gave no try.
+        -- A Sketch that ran (t.drawn set) and itself killed the last body is a try, not a void.
+        if t.endF == nil and t.void == nil and t.drawn == nil then
           local standing = false
           for m = 0, 5 do if live(m) then standing = true end end
           if not H.battleLoadStarted() or not standing then
@@ -187,9 +188,9 @@ local function runTry(t)
       armed = nil
       H.setPad({})
       if t.void then
-        H.log(string.format("[sketch] try %d (%s): the battle ended at f%d before RELM's Sketch ran (sent %s): "
+        H.log(string.format("[sketch] try %d (%s): the battle ended at f%d before RELM's Sketch ran (sent %s, drawn %s): "
           .. "no try; the next window counts instead", t.n, t.window and ("window " .. t.window) or ("delay " ..
-          t.delay), t.void, tostring(t.sent)))
+          t.delay), t.void, tostring(t.sent), t.drawn and string.format("$%02X", t.drawn) or "nil"))
         return
       end
       H.log(string.format("[sketch] try %d (%s%s): pending at the confirm %s; drew %s%s; bank %s -> %s", t.n,
