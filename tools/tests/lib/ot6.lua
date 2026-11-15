@@ -21943,13 +21943,23 @@ end
 -- already flushed before the request (`map=0 n=1 xy=0:0` at f21) stays in
 -- the log: only the load's frames are fixed, and the `map=1 ... xy=0:28`
 -- lines of the audit were not reproduced.
+-- The map id the trace keys on ($1F64) is the game's only once the game has
+-- written it: a map load, a Continue's copy of the slot, or a state load.
+-- Before that the trace records nothing, so a boot's read of the power-on
+-- RAM (`[tiles] map=0` on a zeroed console, `map=511` on an all-ones one)
+-- is no longer logged as a map stood on.
+M.traceMapSet = false
+emu.addMemoryCallback(function() M.traceMapSet = true end, emu.callbackType.write,
+  0x1F64, 0x1F65, emu.cpuType.snes, emu.memType.snesWorkRam)
 function M.traceOnLoad(first)
+  M.traceMapSet = true
   if M.TRACE_HOLD == false then return end
   if first then traceSet, traceCount, traceMap = {}, 0, nil else traceFlush() end
   M.traceHoldUntil = M.frame + 3
 end
 
 local function traceTick()
+  if not M.traceMapSet then return end
   -- the world map keeps its party tile in $e0/$e2, not the field object (#288)
   local world = M.worldMode ~= nil and M.worldMode()
   if world then

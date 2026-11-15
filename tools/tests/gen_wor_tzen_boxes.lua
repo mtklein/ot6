@@ -336,7 +336,7 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     guard()
     houseIn = timer0()
-    for _, o in pairs(BOXES) do H.assertEq(H.chestOpen(o.bit), false, o.what .. " is shut (bit " .. o.bit .. ")") end
+    for _, o in ipairs({ BOXES.low, BOXES.high }) do H.assertEq(H.chestOpen(o.bit), false, o.what .. " is shut (bit " .. o.bit .. ")") end
     say("house", "in the house")
   end),
 
@@ -379,7 +379,7 @@ H.run({ maxFrames = 200000 }, {
     say("tzen", "SABIN joined")
     H.assertEq(sw(0x028A), 1, "Sabin joined ($028A, :90262)")
     H.assertEq(inParty(SABIN) and inParty(CELES), true, "SABIN and CELES in the party")
-    for _, o in pairs(BOXES) do
+    for _, o in ipairs({ BOXES.low, BOXES.high }) do  -- a fixed order: pairs() over string keys follows Lua's per-run hash seed
       H.assertEq(H.chestOpen(o.bit), true, string.format("%s (bit %d) opened and won (audit_chests reads it)",
         o.what, o.bit))
     end
