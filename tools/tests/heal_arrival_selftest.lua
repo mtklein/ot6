@@ -16,7 +16,10 @@
 --      v0.30), a cure the queued hit beats is not cast on an ally, and the
 --      spend rule no longer counts a self-heal that lands too late as saving;
 --   5. M.loveGuard / Driver:coverPlan: a Fight on a body under Love Token is
---      re-aimed at a body without it, else cast, else stands.
+--      re-aimed at a body without it, else cast, else stands;
+--   6. M.roundWorst / the worst lift: a member inside her round takes the
+--      heal that clears it at its worst (the Veldt's White Dragon, v0.45);
+--      M.WORST_LIFT_OFF is the driver before it.
 -- M.HEAL_ARRIVAL_OFF and COVER_OFF are the driver before #459 and #466; the
 -- old-driver arms below run with them.  Mutants: build/attempts/wt/
 -- v036-driver/mut/ (mkmut.py there builds each from lib/ot6.lua).
@@ -280,11 +283,13 @@ local function selfLate()
   return D:makePlanRules(0)
 end
 do
-  H.HEAL_ARRIVAL_OFF = true
+  -- (the driver before #459 is also the driver before the worst lift: with
+  -- it, the X-Potion that clears both gauges' worst goes before the Cure)
+  H.HEAL_ARRIVAL_OFF, H.WORST_LIFT_OFF = true, true
   local p = selfLate()
   check(said("no spend (care): cure $2D saves") ~= nil, "the old rules: the Cure saves, no spend")
   check(p.kind == "heal", "and she casts it")
-  H.HEAL_ARRIVAL_OFF = false
+  H.HEAL_ARRIVAL_OFF, H.WORST_LIFT_OFF = false, false
   p = selfLate()
   check(said("cure $2D +377 = 459, it lands after") ~= nil, "the late Cure is listed as refused for the spend")
   check(said("item $EA +961 = 1043, it lands after") ~= nil, "and so is the late X-Potion")
@@ -395,6 +400,72 @@ do
   check(p ~= nil and p.kind == "magic", "makePlan runs the cover: a cast, got " .. tostring(p and p.kind))
 end
 
+-- 6. The worst lift (M.roundWorst, M.itemChoice's worstCost) --------------
+-- The Veldt's White Dragon at v0.45 (px13 ~/work/v045-qual/build/states/
+-- wor_veldt.log, key be54-g01E1): its turn is up to three Pearls (AI script
+-- _36).  RELM at 1426/3758 deciding, the dragon's gauge full, its worst
+-- 1176 and typical 289 (four turns); the round "2 enemy action(s) inside
+-- 191 ticks: s0 2x (1176 worst + 1x289 typical)", 1465.  She drank the
+-- Potion (1676) and the next turn's two Pearls took 1245 and the 431 left.
+do
+  check(H.roundWorst({ window = 191, enemies = { { slot = 0, eta = 0, period = 182, worst = 1176, typical = 289 } } })
+    == 2352, "the dragon's round at its worst: two Pearls at 1176")
+  check(H.roundWorst({ window = 100, enemies = { { slot = 0, eta = 0, period = 182, worst = 1176 } } }) == 1176,
+    "one action inside the window: its worst once")
+  check(H.roundWorst({ window = 191, enemies = { { slot = 0, eta = 0, period = 182 } }, fallback = 500 }) == 1000,
+    "nothing measured: the battle's worst, per action")
+  local items = { { id = POTION, restore = 250, gil = 300 }, { id = XPOTION, restore = 3327, gil = 41338, unsold = true } }
+  local it, why = H.itemChoice({ hp = 1426, maxhp = 3758, roundCost = 1465, worstCost = 2352, allies = 3, items = items })
+  check(it.id == XPOTION and why:find("clears the round at its worst (1426 + 2332 > 2352)", 1, true),
+    "inside the round: the X-Potion that clears it at its worst, got " .. tostring(it.id) .. " " .. tostring(why))
+  it = H.itemChoice({ hp = 1426, maxhp = 3758, roundCost = 1465, allies = 3, items = items })
+  check(it.id == POTION, "no worst price given: the cheapest lift, as before")
+  it = H.itemChoice({ hp = 1600, maxhp = 3758, roundCost = 1465, worstCost = 2352, allies = 3, items = items })
+  check(it == nil, "outside the round the worst lift does not fire (and the X-Potion is kept)")
+  it = H.itemChoice({ hp = 1426, maxhp = 2000, roundCost = 1465, worstCost = 2352, allies = 3, items = items })
+  check(it.id == POTION, "nothing in hand clears a worst above max HP: the cheapest lift")
+  H.WORST_LIFT_OFF = true
+  it = H.itemChoice({ hp = 1426, maxhp = 3758, roundCost = 1465, worstCost = 2352, allies = 3, items = items })
+  check(it.id == POTION, "WORST_LIFT_OFF: the Potion, as at v0.45")
+  H.WORST_LIFT_OFF = false
+end
+local function veldt(o)
+  reset()
+  member(0, 3719, 3719, 188, { eta = 140 })
+  member(1, 3595, 3595, 188, { eta = 90 })
+  member(2, o.hp, 3758, 191, { cmds = o.cmds or { 0x00, 0x01, 0xFF, 0xFF }, mp = 667 })
+  member(3, 1697, 1697, 600, { eta = 500 })
+  monster(0, 7432, 0, 182)
+  bag({ [0] = { POTION, 98 }, [2] = { XPOTION, 9 } })
+  local D = driver()
+  D.hitLedger[0] = { max = 1176, maxOn = { [2] = 1176 }, actN = 4, actSum = 1156 }
+  D.itemRestore[POTION], D.itemRestore[XPOTION] = 250, 3327
+  D.castRestore[CURE] = 816
+  if o.owed then D.topUpOwed[2] = 5300 end
+  return D:makePlanRules(2)
+end
+do
+  local p = veldt({ hp = 1426 })
+  check(said("2 enemy action(s) inside 191 ticks: s0 2x (1176 worst + 1x289 typical)") ~= nil,
+    "the v0.45 round, priced the same")
+  check(p.kind == "item" and p.item == XPOTION and p.target == 2,
+    "RELM drinks the X-Potion that clears the round at its worst, got " .. tostring(p.kind) .. " " .. tostring(p.item))
+  H.WORST_LIFT_OFF = true
+  p = veldt({ hp = 1426 })
+  check(p.kind == "item" and p.item == POTION, "WORST_LIFT_OFF: the Potion, as at v0.45, got " .. tostring(p.item))
+  H.WORST_LIFT_OFF = false
+  -- the raise's top-up: raised to 469, her own Cure (816) the old rules'
+  -- top-up ("the raise's top-up (#168)" though 469 + 816 is under the round)
+  p = veldt({ hp = 469, owed = true, cmds = { 0x00, 0x02, 0x01, 0xFF } })
+  check(p.kind == "item" and p.item == XPOTION, "the owed top-up: the X-Potion, got " .. tostring(p.kind))
+  check(said("no cure on entity 2 (469/3758): $2D restores 816, and the round at its worst takes") ~= nil,
+    "the passed-over Cure is said")
+  H.WORST_LIFT_OFF = true
+  p = veldt({ hp = 469, owed = true, cmds = { 0x00, 0x02, 0x01, 0xFF } })
+  check(p.kind == "heal" and p.spell == CURE, "WORST_LIFT_OFF: the 816 Cure, as at v0.45, got " .. tostring(p.kind))
+  H.WORST_LIFT_OFF = false
+end
+
 print(string.format("heal_arrival_selftest: PASS -- %d checks: the arrival's arithmetic on Tzen, the White "
   .. "Dragon and Wrexsoul, the in-time lift, the arrival's estimate, the X-Potion that gives way to the Cure, "
-  .. "the queued hit that cancels a cure, the spend past a late self-heal, Love Token's guard and the Fight it turns", n))
+  .. "the queued hit that cancels a cure, the spend past a late self-heal, Love Token's guard and the Fight it turns, the worst lift on the Veldt's dragon", n))
