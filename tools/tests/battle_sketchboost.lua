@@ -134,12 +134,23 @@ local function runTry(t)
       H.checkReq(req, "snapshot load")
       H.rearmInputInjection()
       mf, tapNo = 0, -1
-      t.sent, t.endF, t.drawn, t.after = false, nil, nil, false
+      t.sent, t.endF, t.drawn, t.after, t.void = false, nil, nil, false, nil
       armed = t
     end),
-    H.driveUntil(function() return t.endF ~= nil and H.frame >= t.endF + 120 end, 14000, {
+    H.driveUntil(function() return (t.endF ~= nil and H.frame >= t.endF + 120) or t.void ~= nil end, 14000, {
       H.call(function()
         Tm.observe()
+        -- the battle can end before RELM's Sketch runs (the others' Defend turns and the monsters' own
+        -- actions, queued in the window's snapshot, can finish the last body): that window gave no try
+        if t.endF == nil and t.void == nil then
+          local standing = false
+          for m = 0, 5 do if live(m) then standing = true end end
+          if not H.battleLoadStarted() or not standing then
+            t.void = H.frame
+            H.setPad({})
+            return
+          end
+        end
         if t.endF and not t.after and H.frame >= t.endF + 6 then
           t.after, t.bankEnd = true, bank(relmS)
         end
@@ -175,6 +186,12 @@ local function runTry(t)
     H.call(function()
       armed = nil
       H.setPad({})
+      if t.void then
+        H.log(string.format("[sketch] try %d (%s): the battle ended at f%d before RELM's Sketch ran (sent %s): "
+          .. "no try; the next window counts instead", t.n, t.window and ("window " .. t.window) or ("delay " ..
+          t.delay), t.void, tostring(t.sent)))
+        return
+      end
       H.log(string.format("[sketch] try %d (%s%s): pending at the confirm %s; drew %s%s; bank %s -> %s", t.n,
         t.window and ("window " .. t.window .. ", m" .. tostring(t.tgt)) or ("delay " .. t.delay), t.inject and string.format(", $%02X injected", t.inject) or "", tostring(t.pendAtConfirm), t.drawn and string.format("$%02X", t.drawn) or "nothing (missed)",
         t.drawn and (noNumber(t.drawn) and " (buys nothing)" or (t.drawn == SCAN and " (Scan: breadth)"
@@ -427,7 +444,12 @@ for k = 1, WMAX do
     for _, st in ipairs(windowSnap(t)) do body[#body + 1] = st end
   end
   for _, st in ipairs(runTry(t)) do body[#body + 1] = st end
-  steps[#steps + 1] = H.cond(function() return k <= nWin end, body, { H.call(function() t.skipped = true end) })
+  -- as many windows as give nWin tries; a window whose battle ended before the Sketch ran gives none
+  steps[#steps + 1] = H.cond(function()
+    local counted = 0
+    for i = 1, k - 1 do if not tries[i].skipped and not tries[i].void then counted = counted + 1 end end
+    return counted < nWin
+  end, body, { H.call(function() t.skipped = true end) })
 end
 -- the injected tries reload S: its target again
 steps[#steps + 1] = H.call(function() tgtMon = tries[1].tgt end)
@@ -450,7 +472,7 @@ steps[#steps + 1] = H.call(function()
   end
   local injected = 0
   for _, t in ipairs(tries) do
-    if t.skipped then goto continue end
+    if t.skipped or t.void then goto continue end
     H.assertEq(t.pendAtConfirm, 1, "try " .. t.n .. ": the Sketch was confirmed at 1 BP")
     if t.inject then
       injected = injected + 1
@@ -471,9 +493,17 @@ steps[#steps + 1] = H.call(function()
     end
     ::continue::
   end
-  local nat = 0
-  for i = 1, nWin do if tries[i].drawn and noNumber(tries[i].drawn) then nat = nat + 1 end end
-  check(nat >= 1, string.format("%d of %d natural tries drew an attack with no number", nat, nWin))
+  local nat, counted = 0, 0
+  for i = 1, WMAX do
+    local t = tries[i]
+    if not t.skipped and not t.void then
+      counted = counted + 1
+      if t.drawn and noNumber(t.drawn) then nat = nat + 1 end
+    end
+  end
+  check(counted == nWin, string.format("RELM took the %d natural tries the odds ask for within %d windows (%d)",
+    nWin, WMAX, counted))
+  check(nat >= 1, string.format("%d of %d natural tries drew an attack with no number", nat, counted))
   for _, id in ipairs(INJECT) do
     check(landed[id] == true, string.format("an injected $%02X landed within %d tries", id, INJECT_TRIES))
   end
