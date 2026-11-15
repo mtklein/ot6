@@ -206,10 +206,59 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         inx
         cpx     #OT6_SAVETAIL_LEN
         bcc     @tail
+        ; vanilla's own never-written save-block bytes (the power-on fill,
+        ; tools/uninit_waivers.txt): every range below is read before New
+        ; Game or its opening event writes it, or carried into every save
+        ; unwritten, and zero is the value vanilla assumes (a console that
+        ; powers on blank).  Ot6NewGameZero lists them.
+        phy
+        ldy     #$0000
+@rng:   tyx
+        lda     f:Ot6NewGameZero+2,x    ; length (bytes, < 256)
+        beq     @rdone
+        pha
+        longa
+        lda     f:Ot6NewGameZero,x      ; start, WRAM bank $7e
+        tax
+        shorta
+        pla
+@byte:  pha
+        lda     #$00
+        sta     f:$7e0000,x
+        pla
+        inx
+        dec     a
+        bne     @byte
+        iny
+        iny
+        iny
+        bra     @rng
+@rdone: ply
         plx
         plp
         rts
 .endproc
+
+; (start, length) per range, a length of 0 ends the list
+Ot6NewGameZero:
+        .word   $1e70
+        .byte   16      ; unused tail after the treasure bits ($1e40-$1e6f)
+        .word   $1f60
+        .byte   4       ; world position and airship position: an event sets
+                        ;   each before the world map reads it
+        .word   $1f6e
+        .byte   2       ; the random-battle counter (field/battle.asm adds
+                        ;   each step; vanilla clears it only after a battle)
+        .word   $1fa8
+        .byte   24      ; unused by any code
+        .word   $1fc2
+        .byte   16      ; event variables 0-7 (EventCmd_e8-eb; add_var 0 runs
+                        ;   on what is there)
+        .word   $1fd3
+        .byte   32      ; the 16 objects' saved positions (PushPartyMap,
+                        ;   read back at field init, obj.asm:3437)
+        .word   $0000
+        .byte   0
 
 ; [ sign the save block, and keep the reserve zero ] (#389)
 ;

@@ -50,6 +50,9 @@
         sta     f:$7e0000+OT6_MIMICCOPY ; nor a Mimic copy mark
         sta     f:$7e0000+OT6_SPELLNONE ; nor a no-reward spell turn's mark
         sta     f:$7e0000+OT6_BLUESEEN  ; nor a Berserk Strago saw last battle
+        sta     f:$7e0000+OT6_PASSRETARGET ; nor an added-pass mark: read on a
+                                ;   retarget before the first action's clear
+                                ;   (InitGfxScript), so unwritten after power-on
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
@@ -104,6 +107,12 @@
                                         ;   vanilla's $57d5 name scratch,
                                         ;   harmless at init (vanilla always
                                         ;   writes it before reading)
+        ldx     #$0000          ; $ed6d-$ed8e past the shadow: the wallet's
+@clr3:  sta     f:$7e0000+OT6_WALLETSIG,x ; SIG/SIGP, NUMCTR, BRKLIVE, the six
+        inx                             ; BRKTICK/BRKPAL slots (and cells
+        inx                             ; zeroed above), read before written
+        cpx     #$0022                  ; after power-on (uninit_waivers.txt)
+        bcc     @clr3
         plx                             ; (OT6_ATKCLASS and OT6_FONTDIRTY sit
                                         ;   in the shadow strip: the @clr
                                         ;   loop covered them)

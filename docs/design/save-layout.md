@@ -203,7 +203,7 @@ None is moved or re-encoded.
 | `$1860-$1862` | Gil | Read by Setzer's coin attacks |
 | `$1EDE-$1EDF` | Characters available | Vanilla's random Shadow departure is gone (v0.16): the bit is no longer cleared after battle |
 | `$1E80-$1F5F` | Event switches | Read by OT6 code (`$00BF` Terra's return, `$0068` the tube room, `$00CA`, `$02E3` Shadow's initialization); OT6 sets no new switches; its three added save points ride vanilla's standing `$0632` |
-| `$1F6E` | Random battle counter | `Ot6DangerStep` scales the step and adds it there |
+| `$1F6E` | Random battle counter | `Ot6DangerStep` scales the step and adds it there; zeroed at New Game (`Ot6NewGameClear`) |
 | `$1616-$1619` | Battle commands | Gau's join gives FIGHT, RAGE, MAGIC, ITEM (v0.8; vanilla RAGE, LEAP, MAGIC, ITEM). Set when he joins, so a save where he joined earlier keeps the old list |
 
 ## Who writes what, and when
@@ -215,7 +215,16 @@ None is moved or re-encoded.
   menu ends at once in a New Game, with no slot list shown.
 - **New Game.** `Ot6CodexNewGame` zeroes and signs the New-Game codex page
   `$2C00`, `Ot6EsperNewGame` clears and signs the live esper page `$3C00`,
-  and `Ot6NewGameClear` zeroes WRAM `$1E1D-$1E3F` and `$1FF7-$1FFD`.
+  and `Ot6NewGameClear` zeroes WRAM `$1E1D-$1E3F` and `$1FF7-$1FFD`, and
+  vanilla's own bytes that New Game leaves unwritten (`Ot6NewGameZero`;
+  the power-on fill found each read unwritten or carried into every save):
+  `$1E70-$1E7F` (unused, after the treasure bits), `$1F60-$1F63` (world
+  and airship positions, which an event sets before use), `$1F6E-$1F6F`
+  (the random-battle counter), `$1FA8-$1FBF` (unused), `$1FC2-$1FD1`
+  (event variables 0-7) and `$1FD3-$1FF2` (the objects' saved positions).
+  Each is zeroed at New Game; zero is the value vanilla assumes, and no
+  field's meaning changes. A save from an older release keeps what it
+  holds there.
   Nothing in the battery's slots is written. (Measured on an all-ones power-on
   fill: `GameLoadMenu`, `CheckSRAM`, `ClearSRAM` and `Ot6CodexNewGame` each
   ran once, battery `$1E00` read 0 and both pages were signed afterwards,
