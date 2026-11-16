@@ -17566,8 +17566,20 @@ function M.setzerBattle(plan, opts)
       end
       local L, dir = M.battleLayout(), nil
       if mons ~= 0 or chars == 0 then
-        A.cross = (A.cross or 0) + 1
-        dir = L.toChars[1 + (A.cross - 1) % #L.toChars]
+        if A.presses < 6 or #L.toChars < 2 then
+          A.cross = (A.cross or 0) + 1
+          dir = L.toChars[1 + (A.cross - 1) % #L.toChars]
+        else
+          -- six alternating presses have not crossed: on a two-way layout
+          -- the alternation can shuttle between two monsters forever (v0.46's
+          -- battle_passside, group $00F8 at beCC: mons 01 <-> 04 for 24
+          -- presses).  Hold one direction while it moves the cursor and turn
+          -- only where it stops (replay2/passside_dbg.log)
+          A.hold = A.hold or 1
+          if A.holdFrom == node then A.hold = A.hold % #L.toChars + 1 end
+          A.holdFrom = node
+          dir = L.toChars[A.hold]
+        end
       else
         local cur = 0
         for e = 0, 3 do if chars & (1 << e) ~= 0 then cur = e; break end end
