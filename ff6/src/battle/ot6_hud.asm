@@ -1289,24 +1289,10 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 .proc Ot6PipStage
         .a8
         .i16
-        phx                     ; preserved from the top: the window-open
-        phy                     ;   arm below uses x
-        lda     $7bca           ; a window open: its character is active,
-        beq     :+              ;   so its earned point is shown from now on
-        lda     $62ca
-        and     #$03
-        asl
-        longa
-        and     #$0006
-        tax
-        shorta0
-        lda     f:Ot6CharBitTbl,x
-        asl
-        asl
-        asl
-        asl
-        trb     OT6_BPMARK
-:       lda     OT6_PIPLIVE
+        phx                     ; preserved from the top
+        phy
+        jsr     Ot6BpWindowSeen ; a window open: its earned point shows
+        lda     OT6_PIPLIVE
         beq     @out            ; the party window not drawn yet this battle
         ldx     #$0000          ; menu row * 2
 @row:   longa
@@ -1362,10 +1348,49 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; [ one character's boost cell ]  a = character slot (0-3) -> a = the
 ; cell's tile, b = its attribute ($21), carry set when it is the arrows.
 ; a8/i16, any db (long reads only).  preserves x/y.
+; [ a window open: its character is active, so its earned point shows ]
+;
+; Clears the open window's character's high nibble of OT6_BPMARK (its regen
+; point not yet shown).  Called by Ot6PipFace, so the menu engine's own
+; staging of a row at the window's open (Ot6PipGlyph_ext, through the text
+; engine) reads the same face as Ot6PipStage: before, the text engine could
+; stage the row in the frame the window opened, before Ot6PipStage's clear,
+; and its copy of the party window then overwrote the flush's cell for six
+; frames (battle_bpdisplay at be80 on v0.46's replay: "f4078 row 0 (slot 0):
+; shows p0, the rule says p1", build/attempts/wt/v046-land/replay1/bpdbg.log).
+; a8/i16, any db (long reads only).  preserves x/y; clobbers a (b = 0).
+.proc Ot6BpWindowSeen
+        .a8
+        .i16
+        lda     f:$7e7bca
+        beq     @out
+        phx
+        lda     f:$7e62ca
+        and     #$03
+        asl
+        longa
+        and     #$0006
+        tax
+        shorta0
+        lda     f:Ot6CharBitTbl,x
+        asl
+        asl
+        asl
+        asl
+        eor     #$ff
+        and     f:$7e0000+OT6_BPMARK
+        sta     f:$7e0000+OT6_BPMARK
+        plx
+@out:   rts
+.endproc
+
 .proc Ot6PipFace
         .a8
         .i16
         phx
+        pha
+        jsr     Ot6BpWindowSeen
+        pla
         and     #$03
         asl
         longa
