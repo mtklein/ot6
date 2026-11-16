@@ -402,7 +402,7 @@ Ranks 1, 2 and 4 are stat points. Ranks 3 and 5 are effects.
 
 | Esper | Spells while worn | Rank 1 (10) | Rank 2 (30) | Rank 3 (75) | Rank 4 (200) | Rank 5 (500) |
 |---|---|---|---|---|---|---|
-| Ramuh | Bolt, Rasp | Raises Stamina by 1 | Raises Mag.Pwr by 1 | Protects against Dark | Raises Stamina by 2 | Bolt spells break 1 more shield |
+| Ramuh | Bolt, Rasp | Raises Stamina by 1 | Raises Mag.Pwr by 1 | Protects against Dark | Raises Stamina by 2 | Bolt cuts 2 shields on weak foes |
 | Ifrit | Fire, Drain | Raises Vigor by 1 | Raises Stamina by 1 | Raises max HP by 1/8 | Raises Vigor by 2 | Raises Fight damage by 1/4 |
 | Shiva | Ice, Osmose, Shell | Raises Mag.Pwr by 1 | Raises Speed by 1 | Protects against Seizure | Raises Mag.Pwr by 2 | Halves the MP spells cost |
 | Siren | Mute, Sleep, Bserk | Raises Speed by 1 | Raises Mag.Pwr by 1 | Protects against Sleep | Raises Speed by 2 | Blocks Berserk and Muddle |
@@ -412,7 +412,7 @@ Ranks 1, 2 and 4 are stat points. Ranks 3 and 5 are effects.
 | Bismark | Haste, Slow | Raises Vigor by 1 | Raises Stamina by 1 | Casts Safe when HP is low | Raises Vigor by 2 | Raises max HP by 1/4 |
 | Stray | Muddle, Imp | Raises Mag.Pwr by 1 | Raises Speed by 1 | Protects against Imp | Raises Mag.Pwr by 2 | Raises the success rate of Steal |
 | Palidor | Float, Slow | Raises Speed by 1 | Raises Vigor by 1 | Walks faster outside battle | Raises Speed by 2 | Float in every battle |
-| Tritoch | Ice, Bolt, Poison | Raises Mag.Pwr by 1 | Raises Speed by 1 | Raises Speed by 1 | Raises Mag.Pwr by 2 | Blocks Dark and Petrify; max MP +1/2 |
+| Tritoch | Ice, Bolt, Poison | Raises Mag.Pwr by 1 | Raises Speed by 1 | Raises Speed by 1 | Raises Mag.Pwr by 2 | No Dark or Petrify; max MP +1/2 |
 | Odin / Raiden | Meteor, Bserk (Raiden also Quick) | Raises Vigor by 1 | Raises Speed by 1 | Fight always hits | Raises Vigor by 2 | Haste in every battle |
 | Bahamut | Flare, W Wind | Raises Mag.Pwr by 1 | Raises Vigor by 1 | Raises max HP by 1/4 | Raises Mag.Pwr by 2 | Fight and magic damage +1/4 |
 | Alexandr | Dispel, Safe, Shell | Raises Stamina by 1 | Raises Vigor by 1 | Protects against instant death | Raises Stamina by 2 | Safe in every battle |
