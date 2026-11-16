@@ -176,7 +176,7 @@ are in MP. Every character's first skill is theirs from the day they join.
 - **Economizer.** Won at the Colosseum with the Gem Box. Every spell its
   wearer casts costs 1 MP at any boost.
 
-### Locke, Thief (dagger)
+### Locke, Treasure Hunter (dagger)
 
 | Skill | MP | Effect | Learned |
 |---|---|---|---|
@@ -195,7 +195,9 @@ likelier. Three points always succeed and take the rare item if there is one,
 the common item if not. A boost never makes up an item the enemy lacks.
 Only the first shield Filch takes becomes a point for Locke. His skills are
 in the list behind Steal, the ones he has learned packed from the top in this
-table's order, down the left column and then the right.
+table's order, down the left column and then the right. In the field menu,
+Skills > Treasure Hunter shows all eight in the same order, with the ones
+still to learn marked locked.
 
 ### Edgar, Machinist (spear)
 

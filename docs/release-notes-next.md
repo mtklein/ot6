@@ -24,6 +24,9 @@ every other ally a free point. She has Portrait and Tint when she joins and
 learns the rest by level and story; a boost on most rows reaches one more
 ally or enemy per point. Gogo with Sketch opens her list too.
 
+Locke's page in the field menu's Skills list is now Treasure Hunter, as he
+insists, where it used to say Thief.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

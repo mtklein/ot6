@@ -1,7 +1,7 @@
 -- @manual
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- readme_shots_skills.lua -- Continue the wor-locke-v1 battery, open the
--- field menu -> Skills -> LOCKE -> Thief, and screenshot the page (README
+-- field menu -> Skills -> LOCKE -> Treasure Hunter, and screenshot the page (README
 -- skills bullet).  Not a test.  By hand:
 --   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-locke-v1 \
 --     tools/tests/run.sh tools/tests/readme_shots_skills.lua <log>
