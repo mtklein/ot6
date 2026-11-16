@@ -96,7 +96,8 @@ H.run({ maxFrames = 900000 }, {
       local s = gogoSlot()
       if cur and s ~= nil and (emu.getState()["cpu.x"] & 0xFF) == s * 2 then
         cur.copies[#cur.copies + 1] = { cmd = H.readByte(0x3F20), atk = H.readByte(0x3F21),
-          mp = H.readWord(0x3C08 + s * 2), pend = H.readByte(0x3E9D + s * 2), plans = #H.mimics }
+          mp = H.readWord(0x3C08 + s * 2), pend = H.readByte(0x3E9D + s * 2), plans = #H.mimics,
+          gift = (H.readByte(0xEF0E) >> s) & 1 }   -- Relm's gift (OT6_GIFT, #538): a point on top
       end
     end, emu.callbackType.exec, H.sym("mimicreplace"), H.sym("mimicreplace"))
     -- each copy's end: Ot6ActionEnd for the same seat
@@ -151,7 +152,12 @@ H.run({ maxFrames = 900000 }, {
         p and p.cmd or 0xFF, c.cmd))
       H.assertEq(c.mpEnd, c.mp, string.format("2. copy %d is free (GOGO's MP at its end)", i))
       if p then
-        H.assertEq(c.pend, math.min(p.boost, p.bp, 3), string.format("3. copy %d's pending pips are its plan's", i))
+        -- a gift Relm's Portrait or Masterpiece left him (#538) is pending
+        -- on top of the plan's pips (kit-relm.md: "a Gogo's copy reads his
+        -- own pending boost, gift included"); the replay's draw had him
+        -- gifted: copy 3, pending 2 for a 1-BP plan
+        H.assertEq(c.pend, math.min(math.min(p.boost, p.bp, 3) + (c.gift or 0), 3), string.format(
+          "3. copy %d's pending pips are its plan's, plus a gift he holds (%d)", i, c.gift or 0))
       end
       if c.pend > 0 then boosted = boosted + 1 end
     end
