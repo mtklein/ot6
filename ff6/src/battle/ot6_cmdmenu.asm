@@ -411,6 +411,8 @@
         beq     @thief
         cmp     #$04
         beq     @setzer
+        cmp     #$05
+        bcs     @paint          ; Relm's list and its colours (#538)
         cmp     #$00
         beq     @tools
         pla                     ; blitz
@@ -426,6 +428,8 @@
         jml     Ot6CostFor      ; the tech's own row price, unescalated
 @thief: pla                     ; flat but for Trickshot, the one row whose
         jml     Ot6ThiefRowCost ;   boost multiplies (Ot6ThiefCharge's rule)
+@paint: pla                     ; the reach rows per body at the pending
+        jml     Ot6PaintRowCost ;   boost, the rest flat (Ot6PaintCharge's rule)
 @empty: lda     #$00            ; an empty cell draws two blanks and stays white
         rtl
 .endproc
@@ -574,6 +578,8 @@
         .i16
         pha                     ; [S+1] park the MP grey
         lda     $6168
+        cmp     #$05
+        beq     @paint          ; Relm's list: the divine and Gesture's loop
         cmp     #$04
         beq     @setzer         ; Setzer's table: the purse and the divine
         cmp     #$03
@@ -590,7 +596,7 @@
         and     #$00ff
         tax
         shorta0
-        lda     OT6_BP_CLASS,x         ; current bp
+        jsl     Ot6BankGift     ; current bp, and a Portrait gift (#538)
         pha                     ; [S+1] park bp ($01,s)
         tya                     ; A = drawn-row*6
         ldx     #$0000          ; row i accumulator
@@ -648,6 +654,8 @@
 @setzer:
         pla                     ; the MP grey
         jml     Ot6SetzerRowGrey
+@paint: pla                     ; the MP grey
+        jml     Ot6PaintRowGrey
 ; Master's Mark: fewer than three points pending, the divine's one gate
 ; (kits.md "Divines"); a boost pressed or taken back with the window up
 ; re-stages the row, so the grey follows R and L, as Jackpot's does
@@ -849,7 +857,7 @@
         tax
         shorta0
         ; --- refuse a row the caster cannot pay the BP for ---
-        lda     OT6_BP_CLASS,x             ; current bp
+        jsl     Ot6BankGift                ; current bp, and a gift (#538)
         cmp     $01,s               ; bp vs r; C set iff bp >= r (affordable)
         bcs     @ok
         pla                         ; drop r

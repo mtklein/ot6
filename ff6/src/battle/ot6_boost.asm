@@ -68,6 +68,29 @@
         sta     f:$7e0000+OT6_PIPROWW+5
         sta     f:$7e0000+OT6_PIPROWW+6
         sta     f:$7e0000+OT6_PIPROWW+7
+        sta     f:$7e0000+OT6_GIFT      ; nor Relm's paint (#538): a gift,
+        sta     f:$7e0000+OT6_VARNISH   ;   a coat, a granted turn's mark,
+        sta     f:$7e0000+OT6_VARNISHING ;  a Still Life or Underpainting
+        sta     f:$7e0000+OT6_GESTURED  ;   mark, or a Tint's turns and
+        sta     f:$7e0000+OT6_STILLMARK ;   colour (8-bit stores, one a byte)
+        sta     f:$7e0000+OT6_STILLHELD
+        sta     f:$7e0000+OT6_UNDERPAINT
+        sta     f:$7e0000+OT6_TINT+0
+        sta     f:$7e0000+OT6_TINT+1
+        sta     f:$7e0000+OT6_TINT+2
+        sta     f:$7e0000+OT6_TINT+3
+        sta     f:$7e0000+OT6_TINT+4
+        sta     f:$7e0000+OT6_TINT+5
+        sta     f:$7e0000+OT6_TINT+6
+        sta     f:$7e0000+OT6_TINT+7
+        sta     f:$7e0000+OT6_TINTELEM+0
+        sta     f:$7e0000+OT6_TINTELEM+1
+        sta     f:$7e0000+OT6_TINTELEM+2
+        sta     f:$7e0000+OT6_TINTELEM+3
+        sta     f:$7e0000+OT6_TINTELEM+4
+        sta     f:$7e0000+OT6_TINTELEM+5
+        sta     f:$7e0000+OT6_TINTELEM+6
+        sta     f:$7e0000+OT6_TINTELEM+7
         sta     f:$7e0000+OT6_HOLD      ; nor a held gauge (#539)
         sta     f:$7e0000+OT6_EVHEAD    ;   or its events
         sta     f:$7e0000+OT6_EVTAIL
@@ -330,6 +353,7 @@
 @spend: lda     OT6_BOOST_REVEALED,x         ; pending boost spent this action?
         beq     @gain
         sta     OT6_SCR_BIT     ; consume it: bp -= pending
+        jsr     Ot6GiftSpend    ; #538: less the point a Portrait gift pays
         lda     OT6_BP_CLASS,x
         sec
         sbc     OT6_SCR_BIT
@@ -374,7 +398,8 @@
         ; frame already consumed the pending value.  It fires when the action
         ; issued no numeral at all, or a $ffff "hide numerals" one, the same
         ; hole Ot6RevealCommit is called at the top of this proc to plug.
-done:   jsr     Ot6PipPending
+done:   jsr     Ot6PaintActionEnd ; #538: the painter's marks the action ends
+        jsr     Ot6PipPending
         plp
         rtl
 .endproc
@@ -872,6 +897,7 @@ out:    rts
         lda     $3018,x
         ora     f:$7e0000+OT6_UNCTL
         sta     f:$7e0000+OT6_UNCTL
+        jsl     Ot6UnctlGift    ; #538: a Portrait gift waits for the player
 out:    longa
         pla
         plp
@@ -1645,9 +1671,12 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         cmp     #$30
         jne     @buys
         lda     $6168
+        cmp     #$05
+        beq     :+              ; Relm's list: Portrait refuses (#538)
         cmp     #$02
-        jcs     @buys           ; bushido, thief, Setzer: not a tool or a blitz
-        lda     $895f,x         ; scroll
+        jcs     @buys           ; bushido, thief, Setzer, the colours: not a
+                                ;   tool or a blitz
+:       lda     $895f,x         ; scroll
         clc
         adc     $8967,x         ; + row
         asl
@@ -1663,6 +1692,13 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         pla
         shorta0
         lda     $6168
+        cmp     #$05
+        bne     :+
+        lda     $4005,x         ; the painter's row
+        jsl     Ot6PaintNoBoost
+        jcs     @none
+        brl     @buys
+:       cmp     #$00
         bne     @blitz
         lda     $4005,x         ; the row's tool (item id)
         jsl     Ot6ToolNoBoost
@@ -2785,6 +2821,8 @@ OT6_LIFE3_ID = $35
         beq     @rage           ; rage: the same shape as dance
         cmp     #$0f
         beq     @slot           ; slot: Setzer's table, flat
+        cmp     #$0d
+        beq     @paint          ; sketch: Relm's list (#538)
         ; no cmd-$11 arm: Leap is free.  It is never rendered on any
         ; surface, and it shares the Fight row on the Veldt (Ot6VeldtRow,
         ; battle_main.asm), where the free floor has to survive it.  Falling
@@ -2902,6 +2940,14 @@ OT6_LIFE3_ID = $35
         bcs     :+                      ;   nothing (pla keeps the carry)
         lda     #$00
 :       plp
+        rtl
+@paint: ; Relm's list (ot6_paint.asm): the row the list queued is in $3a7b,
+        ; free under command $0d as under Steal; Sketch's row and an unlisted
+        ; Sketch's $ff are free, as Sketch always was
+        pla
+        lda     $3a7b
+        jsl     Ot6PaintCharge
+        plp
         rtl
 @swdtech:
         ; SwdTech's boost was already spent, on the tech: Ot6BushidoTier left

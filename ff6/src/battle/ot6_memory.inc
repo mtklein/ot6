@@ -673,4 +673,32 @@ OT6_PIPRR            := $eefd   ; the row the flush rewrites next
 .assert OT6_PIPRR = OT6_PIPLIVE + 1, error, "the flush's row turn must follow the live flag"
 .assert OT6_PIPRR <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; Relm's kit (#538, ot6_paint.asm; docs/design/kit-relm.md).  All battle
+; state, cleared by InitBP; the three monster masks also per slot by
+; Ot6SeedShields (a Cmd_20 reload never carries a mark onto a new body).
+; OT6_TINT: a Tint's turns left, per character (stride 2, by entity offset),
+; counted down by Ot6ActionEnd; OT6_TINTELEM: its colour (element bits).
+; OT6_GIFT: the characters holding Portrait's gift (----4321, $3018's
+; shape).  OT6_VARNISH: the characters holding a coat; OT6_VARNISHING: the
+; ones the action now resolving spent its coat on (its later hits miss
+; too), cleared at every action's end.  OT6_GESTURED: the characters whose
+; turn a Gesture gave (that turn cannot Gesture), cleared at its end.
+; OT6_STILLMARK: the monsters Still Life waits on (slot s = bit s);
+; OT6_STILLHELD: the ones whose break it is holding now; OT6_UNDERPAINT:
+; the ones Underpainting waits on.
+OT6_TINT             := $eefe   ; 8 bytes
+OT6_TINTELEM         := $ef06   ; 8 bytes
+OT6_GIFT             := $ef0e
+OT6_VARNISH          := $ef0f
+OT6_VARNISHING       := $ef10
+OT6_GESTURED         := $ef11
+OT6_STILLMARK        := $ef12
+OT6_STILLHELD        := $ef13
+OT6_UNDERPAINT       := $ef14
+.assert OT6_TINT = OT6_PIPRR + 1, error, "the painter's state must follow the flush's row turn"
+.assert OT6_TINTELEM = OT6_TINT + 8, error, "the Tint colours must follow the Tint turns"
+.assert OT6_GIFT = OT6_TINTELEM + 8, error, "the gift mask must follow the Tint colours"
+.assert OT6_UNDERPAINT = OT6_GIFT + 6, error, "the painter's masks are six bytes"
+.assert OT6_UNDERPAINT <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 .endif

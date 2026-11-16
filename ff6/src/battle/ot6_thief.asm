@@ -354,8 +354,10 @@ Ot6ThiefBanner:
         sta     $8967,y
         lda     $6168
         cmp     #$03
-        bne     :+
-        jsl     Ot6ThiefClamp
+        beq     :+
+        cmp     #$05            ; Relm's list packs its rows too (#538)
+        bne     :++
+:       jsl     Ot6ThiefClamp
 :       lda     $37             ; a as the store left it
         rtl
 .endproc
@@ -1021,6 +1023,8 @@ OT6_THIEF_NAMELEN = 10
         lda     $6168
         cmp     #$02
         beq     @bushido
+        cmp     #$05
+        bcs     @paint          ; Relm's list and its colours (#538)
         cmp     #$03
         bne     @no
         lda     $01,s
@@ -1078,6 +1082,15 @@ OT6_THIEF_NAMELEN = 10
         plp
         clc
         rtl
+@paint: pla
+        jsl     Ot6PaintListName
+        bcc     :+
+        plp
+        sec
+        rtl
+:       plp
+        clc
+        rtl
 .endproc
 
 ; DrawListLetter's EN body.  in: B:A = attribute:tile, Y = buffer offset.
@@ -1108,7 +1121,12 @@ OT6_THIEF_NAMELEN = 10
         .i16
         ldy     #$0002
         lda     ($76),y         ; the row id
-        sec
+        cmp     #OT6_PAINT_SKETCH
+        bcc     :+
+        jsl     Ot6PaintBannerName      ; Relm's rows (#538)
+        plp
+        rtl
+:       sec
         sbc     #OT6_THIEF_MUG
         ldy     #$0000
         cmp     #OT6_THIEF_MARK - OT6_THIEF_MUG + 1

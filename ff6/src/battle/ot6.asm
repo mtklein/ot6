@@ -120,3 +120,7 @@
 
 ; dense ability lists (#541), appended for the same reason.
         .include "ot6_dense.asm"
+
+; Relm's kit, the painter's list behind Sketch (#538), appended for the same
+; reason.
+        .include "ot6_paint.asm"

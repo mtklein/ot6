@@ -338,17 +338,27 @@
         plx                     ; the shadow line base
         cmp     #100
         bne     @gauge
-        lda     #OT6_BROKEN_ATTR ; broken: the slot's cell in the lead cell,
-        xba                     ;   palette 7; cell 0 stays empty.  whole-
-        longa                   ;   word store: the nmi flush can fire
-        sta     OT6_HUDLEAD,y   ;   between two byte stores
+        xba                     ; broken: the slot's cell in the lead cell,
+        pha                     ;   palette 7 (green while Still Life holds
+        jsr     Ot6StillBrokenAttr ; it or waits, #538); cell 0 stays empty.
+        xba                     ;   whole-word store: the nmi flush can fire
+        pla                     ;   between two byte stores
+        longa
+        sta     OT6_HUDLEAD,y
         shorta0
         bra     @slots
-@gauge: lda     #OT6_GAUGE_ATTR ; whole-word stores, as above
-        xba
+@gauge: xba                     ; whole-word stores, as above
+        pha                     ; [1,s] the slot's cell
+        jsr     Ot6UnderAttr    ; the count's attribute: green while
+        xba                     ;   Underpainting waits (#538)
+        pla
         longa                   ; a = attr << 8 | the slot's cell
         sta     f:$7e0000+OT6_SHADOW+4,x        ; cell 0: the count tile
-        lda     #(OT6_GAUGE_ATTR << 8) | OT6_EMBLEM
+        shorta0
+        jsr     Ot6StillAttr    ; the emblem's: green while Still Life waits
+        xba
+        lda     #OT6_EMBLEM
+        longa
         sta     OT6_HUDLEAD,y   ; the lead cell: the emblem
         shorta0
         ; weakness slots into cells 1-4: elements first (vanilla's own
@@ -1118,9 +1128,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         inc     a
         cmp     #$04            ; spend at most 3
         bcs     @deny
-        cmp     OT6_BP_CLASS,y         ; and never more than current bp
-        beq     @store
-        bcs     @deny
+        jsr     Ot6BoostRoom    ; and never past the bank, plus a Portrait
+        bcc     @deny           ;   gift held (#538)
 @store: sta     OT6_BOOST_REVEALED,y
         inc     $6281           ; ching (spc $2c): boost committed
         bra     @refold
@@ -1159,6 +1168,22 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         jsl     Ot6RecheckMagic
 @show:  rts                     ; display is Ot6PipStage's job
 @off:   rts
+.endproc
+
+; [ is there room for this pending boost? ]  in: A = the pending wanted, y =
+; the character.  out: carry set = it is at most the bank plus the gift
+; (Ot6BankGift).  a8/i16.  preserves A, X and Y.
+.proc Ot6BoostRoom
+        .a8
+        .i16
+        pha
+        phx
+        tyx
+        jsl     Ot6BankGift
+        plx
+        cmp     $01,s           ; room - wanted: carry set iff room >= wanted
+        pla
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -1425,9 +1450,10 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         lda     f:$7e0000+OT6_BPMARK
         and     $02,s
         beq     :+              ; not begun: no spend to show
-        lda     $01,s
+        jsr     Ot6PaidPending  ; the points it pays: a gift's is not
+        eor     #$ff            ;   a pip (#538)
         sec
-        sbc     f:$7e0000+OT6_BOOST_REVEALED,x
+        adc     $01,s           ; the count less the paid points
         sta     $01,s
 :       lda     $02,s
         asl

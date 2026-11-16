@@ -18265,14 +18265,18 @@ function M.kitBattle(plan, opts)
       pulse("b")
     elseif (st == 0x30 or st == 0x2D) and p.row ~= nil then
       -- the Tools shell, or the Throw list in the same shell (#383: SHADOW's
-      -- throwing kit; wItemList $4005, three-byte rows, $FF ends the list)
+      -- throwing kit; wItemList $4005, three-byte rows, $FF ends the list).
+      -- p.row2: a second list the first row's A opens in the same window
+      -- (RELM's Tint, #538: the colours, w7e6168 = 6), whose row is p.row2
+      local rowId = p.row
+      if p.row2 ~= nil and M.readByte(0x6168) == 6 then rowId = p.row2 end
       local want
       for i = 0, (st == 0x2D and 63 or 7) do
         local rid = M.readByte(0x4005 + i * 3)
         if rid == 0xFF and st == 0x2D then break end
-        if want == nil and rid == p.row then want = i end
+        if want == nil and rid == rowId then want = i end
       end
-      if want == nil then M.assertEq(false, true, string.format("the list holds row $%02X", p.row)) end
+      if want == nil then M.assertEq(false, true, string.format("the list holds row $%02X", rowId)) end
       if st == 0x2D then
         -- the Throw list is one column: its scroll plus its row (battle_procboost's steer)
         local cur = M.readByte(0x8953 + a) + M.readByte(0x895B + a)
@@ -18311,6 +18315,27 @@ function M.kitBattle(plan, opts)
       if p.self then
         if cool == 0 then done(p, a) end
         pulse("a")
+        return
+      end
+      if p.allySeat ~= nil then
+        -- a named member (#538: RELM's ally rows): walk the party side's
+        -- cursor to seat p.allySeat, then confirm
+        local chars, mons = M.readByte(0x7B7D), M.readByte(0x7B7E)
+        if mons == 0 and chars == (1 << p.allySeat) then
+          if cool == 0 then done(p, a) end
+          pulse("a")
+          return
+        end
+        if cool == 0 then
+          p.allyPresses = (p.allyPresses or 0) + 1
+          M.assertEq(p.allyPresses <= 16, true, string.format("the target select reaches seat %d", p.allySeat))
+        end
+        if mons ~= 0 or chars == 0 then
+          local L = M.battleLayout()
+          pulse(L.toChars[1 + ((p.allyPresses or 1) - 1) % #L.toChars])
+        else
+          pulse("down")
+        end
         return
       end
       if p.ally then

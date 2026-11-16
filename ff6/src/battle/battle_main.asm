@@ -3354,7 +3354,10 @@ CmdNoEffect:
 Cmd_0d:
 @151f:  tyx
         jsr     _c2298a
-        lda     #$ff
+        jsl     Ot6PaintExec ; ot6 #538: Sketch is the first row of Relm's
+        bcc     :+           ;   list; carry set = another row, run in bank
+        jmp     ExecAttack   ;   F0 (the banner and the animation follow)
+:       lda     #$ff
         sta     $b7
         lda     #$aa        ; special effect $55 (sketch)
         sta     $11a9
@@ -6057,7 +6060,8 @@ CheckHit:
 @22e5:  plp
         sec
         php
-@22e8:  plp
+@22e8:  jsl     Ot6VarnishGate  ; ot6 #538: a varnished ally turns the
+        plp                     ;   next enemy hit (the stacked P's carry)
         plx
         pla
         rts

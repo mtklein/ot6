@@ -33,6 +33,12 @@ CODE_EXT_INC = 1
 .global Ot6ThiefBannerName       ;   attack name type 3: a thief row's banner
 .global Ot6ThiefPageRow          ;   the field Thief page's rows: id, name, gate
 .global Ot6ThiefName             ;   the later thief rows' 10-letter list names
+.global Ot6PaintListOpen         ; #538 relm's kit: sketch -> tools-shell list
+.global Ot6PaintExec             ;   Cmd_0d's execute-side dispatch (the rows)
+.global Ot6KitConfirm            ;   the tools-shell confirm in modes 4-6
+.global Ot6VarnishGate           ;   CheckHit's exit: a coat turns a hit
+.global Ot6PaintPageRow          ;   the field page's rows
+.global Ot6PaintName             ;   the list's 10-letter names
 .global Ot6SetzerListOpen        ; setzer's kit: slot -> tools-shell table
 .global Ot6SetzerConfirm         ;   the Slot row chains to the reels
 .global Ot6SetzerExec            ;   Cmd_0f's dispatch (coin toss/hired help/jackpot)
