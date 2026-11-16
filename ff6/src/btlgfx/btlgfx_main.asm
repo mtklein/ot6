@@ -18282,6 +18282,13 @@ _c1_slot_open:
         jmp     OpenToolsWindow
 @reels: jmp     OpenSlotWindow
 
+; ot6 (relm's kit, #538): Sketch is the first row of the painter's list, the
+; twin of the thief submenu.  OpenCmdMenuTbl[$0d] hits this stub; bank $f0
+; fills wItemList with the rows Relm has learned and raises mode w7e6168=5.
+_c1_paint_open:
+        jsl     Ot6PaintListOpen
+        jmp     OpenToolsWindow
+
 ; ------------------------------------------------------------------------------
 
 ; [ init target cursor select ]
@@ -19082,7 +19089,9 @@ OpenCmdMenuTbl:
         .addr   _c1776b
         .addr   _c17795
         .addr   OpenLoreWindow
-        .addr   _c17795
+        .addr   _c1_paint_open          ; ot6: $0d sketch -- was _c17795;
+                                        ;   now Relm's list, whose first row
+                                        ;   IS Sketch (#538)
         .addr   _c17795
         .addr   _c1_slot_open           ; ot6: $0f slot -- was OpenSlotWindow;
                                         ;   now Setzer's table, whose first row
@@ -20792,9 +20801,9 @@ UpdateMenuState_30:
                                 ;   No new commit code: the whole point of
                                 ;   putting the ladder behind Steal is that this
                                 ;   path already carries a per-row id.
-        cmp     #$04            ; ot6: setzer's table? a kit row takes the
-        bne     @notsetzer      ;   thief arm (target select, the row id as
-        jsl     Ot6SetzerConfirm ;  the queued attack byte under command $0f);
+        cmp     #$04            ; ot6: setzer's table or relm's lists? a kit
+        bcc     @notsetzer      ;   row takes the thief arm (target select,
+        jsl     Ot6KitConfirm   ;   the row id as the queued attack byte);
         bcs     :+              ;   the Slot row (carry clear) is chained on
         rts                     ;   to the reels in bank F0
 @notsetzer:
