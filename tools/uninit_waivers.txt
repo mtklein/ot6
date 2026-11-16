@@ -1,16 +1,40 @@
-# Uninitialised reads proven benign, for the power-on fill
+# Uninitialised reads, understood, for the power-on fill
 # (OT6_POWERON_FILL, lib/poweron_fill.lua) and the read-before-write
 # instrument (OT6_RBW, tools/rbw_report.py).  docs/TOOLING.md "Uninitialised
 # memory".
 #
 #   fill <region> <lo>[-<hi>] <reason>
 #       the fill leaves these offsets zero, so a read already understood
-#       does not move the play and hide what comes after it.  Each one names
-#       the instruction, what the value changes, and the evidence.
-#   read <file>:<line> <ram> <reason>
-#       tools/rbw_report.py counts this instruction's reads of unwritten
-#       bytes without listing them.
+#       does not move the play and hide what comes after it.
+#   unread <region> <lo>[-<hi>] <reason>
+#       rbw_report.py counts any instruction's reads of these offsets
+#       without listing them (the fill still fills them).
+#   read <file>:<line> <region> <reason>
+#       rbw_report.py counts this instruction's reads without listing them.
 #
-# A waiver is a finding, not a fix: each says why it is harmless, or why it
-# is left for the ROM's owner (the proposed fix is in the reason).
+# Two sections.  TO FIX: reads that move the play, or OT6 reads that should
+# be cleared at their init; each names the fix, and goes when the ROM fixes
+# it.  NO PLAY EFFECT: reads shown not to move the play (the evidence is
+# each line's; the blanket evidence is the power-on-leg wave, which fills
+# everything not waived as `fill` and plays the same), kept so the
+# detector lists only what is new.
 
+# ---------------------------------------------------------------- TO FIX
+# (none: v0.46 zeroes every read this section listed -- Ot6NewGameClear and
+# Ot6PowerOnClear, InitBP, InitBattleGfx, InitWaterGfx; #543 removed
+# OT6_GREYLIVE)
+
+# ----------------------------------------------------------- NO PLAY EFFECT
+unread wram 1A6D the active party number, read by the field's object init at boot (field/obj.asm:3184-3932) before a New Game or a Continue sets it; vanilla. Same play filled alone (build/attempts/wt/v046-fills/regions/gen_whelk_poweron_ones_wram_1A6D.log, airship/b3/1A6D.log).
+unread wram 1D54 the controller configuration, read by InitCtrl at boot (menu/ctrl.asm:28) before a New Game or a Continue sets it (bit 6 picks a custom button map from $1D50-$1D53); vanilla. Same play filled alone (regions/gen_whelk_poweron_ones_wram_1D54.log, airship/b3/1D54.log).
+read src/menu/save.asm:591 wram PushSRAM copies $1600-$1FFF to $7EAC8D as the load menu opens, whatever it holds; a copy, which the load overwrites; vanilla.
+unread wram 7BF7-7E6B event, HDMA and reset buffers read at boot before their first fill (field/event.asm:3895, hdma.asm:348, reset.asm:778); vanilla. Same play filled alone (regions/gen_whelk_poweron_ones_wram_7B00-7FFF.log).
+unread wram 8049-9848 field object and menu buffers read before their first write (menu_common.asm:2620, field/map.asm, obj.asm, window.asm); vanilla. Same play with $8000-$B85F filled (fire/b2/8000-B85F+B862-BFFF.log) and $8000-$B7FF in 2 KiB parts (airship/b2/).
+unread wram E9C4-E9CF the battle's mode-7 matrix shadow, copied to the PPU each battle NMI (btlgfx_main.asm:1694-1716) before anything writes it; display only, vanilla. Same play filled alone (kolts/b3/E9C4-E9CF.log).
+unread wram EBFB-EC01 battle-graphics bytes read at the first battle (btlgfx_main.asm:338, :33785-:33853); vanilla. Same play filled alone (kolts/b3/EBFB+EBFF.log).
+unread wram EDFB-EE16 an HDMA table: read in 4-byte groups on the frames a map loads, charged to whatever instruction is running (the reads land inside sound_main.asm's wait loop at :566), so it is a DMA, not code; display registers only. Same play in every power-on leg of the wave.
+unread wram EE2C the high byte of Ot6BlueLearn's 16-bit read of OT6_BLUESEEN (ot6_blue.asm:121), masked off by `and #$00ff`; OT6_BLUESEEN itself is cleared at battle start (ot6_boost.asm:52).
+unread sram 1FF1 the battery's random seed, which the load menu adds to before ClearSRAM or a load sets it (menu_common.asm:226); "any value is valid" (save-layout.md).
+unread sram 1FF8-1FFF the validity words, read to decide whether the battery is valid (menu_sram.asm:10-16); by design.
+unread sram 2000-2001 the slot-1 codex page's magic, read to tell O7 from O8 before signing (ot6_codex.asm:65); by design (save-layout.md: unsigned reads as absent).
+unread sram 3C00-3C01 the live esper page's magic, read before it is signed (ot6_esper.asm:465); by design.

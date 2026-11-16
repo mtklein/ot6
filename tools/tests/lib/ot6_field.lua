@@ -8112,9 +8112,13 @@ function M.careStockPotions(level, opts)
   local reserve = math.min(M.POTION_BAND_CAP, math.ceil((level + ahead) * 1.5))
   local gap = math.max(0, 99 * 50 - 50 * (opts.tonics or M.invCountOf(0xE8)))
   local want = reserve + math.ceil(gap / 250) + (opts.spend or 0)
+  -- not logged at frame 0: a generator's file scope can price its list
+  -- before the game has loaded a party, from RAM nothing wrote yet
   if want > 99 then
-    M.log(string.format("careStockPotions: L%d+%d wants %d Potions (reserve %d + field care %d + spend %d); "
-      .. "the stack holds 99", level, ahead, want, reserve, math.ceil(gap / 250), opts.spend or 0))
+    if M.frame > 0 then
+      M.log(string.format("careStockPotions: L%d+%d wants %d Potions (reserve %d + field care %d + spend %d); "
+        .. "the stack holds 99", level, ahead, want, reserve, math.ceil(gap / 250), opts.spend or 0))
+    end
     want = 99
   end
   return want
@@ -10725,8 +10729,13 @@ do
           M.charMaxHp(c))
       end
       local mp, x, y = M.partyWhere(p)
+      -- on the world map the field objects are not the party's: until a
+      -- field map has loaded since power-on they hold whatever the field's
+      -- init made of RAM it never wrote ($1FD3, field/obj.asm:3437)
+      local where = (M.worldMode() and "the world map")
+        or (mp and string.format("map %d (%d,%d)", mp, x, y)) or "(not shown)"
       t[#t + 1] = string.format("party %d%s at %s: %s", p, p == M.activeParty() and " (walking)" or "",
-        mp and string.format("map %d (%d,%d)", mp, x, y) or "(not shown)", table.concat(m, ", "))
+        where, table.concat(m, ", "))
     end
     return table.concat(t, "; ")
   end

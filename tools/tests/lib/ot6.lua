@@ -511,6 +511,8 @@ function M.requestLoadState(blob)
   if RUN ~= nil then RUN.goUnhandled = nil end
   -- the battle-end reading the lib holds is the old timeline's (#491)
   if M.traceOnLoad then M.traceOnLoad(M.loadedFrame == nil) end
+  M.battleHpSet = true               -- the loaded machine's battle RAM is its own
+  M.battleCueSet.present, M.battleCueSet.lit = true, true
   M.loadedFrame = M.frame
   if M.forgetBattleEnd then M.forgetBattleEnd() end
   M.mpSpent = {}                     -- (the Economizer's proxy: this timeline's casts, #524)
@@ -759,7 +761,17 @@ end
 -- (Tolerating any odd seat beside a live one read field garbage, species
 -- $5554, as a battle: qual3, six suites.)
 M.blsSeen = nil              -- the last frame this read a battle (a field: the chunk is at its local cap)
+-- The HP table is a battle's only once the game has written it since power-on
+-- (a battle, or the field's $FFFF fill) or a state load brought a machine
+-- that had: after a Continue and before the first battle it holds the
+-- power-on RAM, which a random fill can make read as a live party
+-- (`waitUntil 'battle 70 active' satisfied after 0 frames`, OT6_POWERON_FILL
+-- =rand:1).  On a zeroed console that RAM reads as no battle anyway.
+M.battleHpSet = false
+emu.addMemoryCallback(function() M.battleHpSet = true end, emu.callbackType.write,
+  M.BATTLE_HP, M.BATTLE_HP + 7, emu.cpuType.snes, emu.memType.snesWorkRam)
 function M.battleLoadStarted()
+  if not M.battleHpSet then return false end
   local anyLive, odd = false, false
   for i = 0, 3 do
     local hp = M.readWord(M.BATTLE_HP + i * 2)
@@ -815,8 +827,20 @@ end
 -- True while a battle is fully up and rendering.  A crashed battle load
 -- leaves the screen dark and fails this check.  emu.getState() is not
 -- used here: polling it is correlated with emulator crashes.
+-- The other two cues hold the power-on RAM, too, until the first battle
+-- writes them: a battle load starts (the HP table) a few frames before the
+-- monsters' present bits and the screen's brightness are set, and a random
+-- fill read as both (`battle 70 active` after 0 frames, the formation still
+-- $FFFF; build/attempts/wt/v046-fills-2/ifrit/).  So each counts once the
+-- game has written it since power-on, or a state load brought it.
+M.battleCueSet = { present = false, lit = false }
+emu.addMemoryCallback(function() M.battleCueSet.present = true end, emu.callbackType.write,
+  M.MONSTER_PRESENT, M.MONSTER_PRESENT, emu.cpuType.snes, emu.memType.snesWorkRam)
+emu.addMemoryCallback(function() M.battleCueSet.lit = true end, emu.callbackType.write,
+  0xE9F9, 0xE9F9, emu.cpuType.snes, emu.memType.snesWorkRam)
 function M.battleActive()
-  return M.battleLoadStarted() and M.monstersPresent() > 0 and M.battleScreenLit()
+  return M.battleLoadStarted() and M.battleCueSet.present and M.battleCueSet.lit
+    and M.monstersPresent() > 0 and M.battleScreenLit()
 end
 
 -- --------------------------------------------- absorbed-weapon guard --
@@ -21978,13 +22002,23 @@ end
 -- already flushed before the request (`map=0 n=1 xy=0:0` at f21) stays in
 -- the log: only the load's frames are fixed, and the `map=1 ... xy=0:28`
 -- lines of the audit were not reproduced.
+-- The map id the trace keys on ($1F64) is the game's only once the game has
+-- written it: a map load, a Continue's copy of the slot, or a state load.
+-- Before that the trace records nothing, so a boot's read of the power-on
+-- RAM (`[tiles] map=0` on a zeroed console, `map=511` on an all-ones one)
+-- is no longer logged as a map stood on.
+M.traceMapSet = false
+emu.addMemoryCallback(function() M.traceMapSet = true end, emu.callbackType.write,
+  0x1F64, 0x1F65, emu.cpuType.snes, emu.memType.snesWorkRam)
 function M.traceOnLoad(first)
+  M.traceMapSet = true
   if M.TRACE_HOLD == false then return end
   if first then traceSet, traceCount, traceMap = {}, 0, nil else traceFlush() end
   M.traceHoldUntil = M.frame + 3
 end
 
 local function traceTick()
+  if not M.traceMapSet then return end
   -- the world map keeps its party tile in $e0/$e2, not the field object (#288)
   local world = M.worldMode ~= nil and M.worldMode()
   if world then
