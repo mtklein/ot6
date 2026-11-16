@@ -134,7 +134,8 @@ reachable on a body that takes both Slow and Stop (§5).
 
 From the ROM (`slowstop_immune.txt`: MonsterProp +22, "blocked status 3",
 read by `LoadRageProp` at `battle_main.asm:7881`; `FixImmuneStatus` blocks
-Slow with Haste, `battle_main.asm:6583-6592`), of 384 records:
+Slow with Haste, `battle_main.asm:6583-6592`), of 384 records, tallied in
+`slowstop_tally.txt`:
 
 ```
   69 slow=IMMUNE stop=IMMUNE
