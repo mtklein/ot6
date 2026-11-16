@@ -69,6 +69,17 @@ emu.addMemoryCallback(function()
   H.log(string.format("[pin] f%d %s by %s (entity %d) at monster %d ($%03X): status3 $%02X broken %d allowed $%02X",
     ev.f, kind, H.SPLIT_NAMES[ev.who] or "?", x, y, ev.species, ev.pre, ev.broken, ev.allowed))
 end, emu.callbackType.exec, PIN, PIN)
+-- the rule: what a throw should leave, from the state Ot6Pin found
+local function expect(ev)
+  if ev.pre & STOP ~= 0 then return "pinned already", ev.pre & (SLOW | STOP) end
+  if ev.pre & SLOW == 0 then
+    return "hobble", (ev.allowed & SLOW ~= 0) and SLOW or 0
+  end
+  if ev.broken ~= 0 then return "broken, hobbled already", SLOW end
+  if ev.allowed & STOP == 0 then return "stop-immune, hobbled already", SLOW end
+  return "pin", STOP
+end
+
 emu.addMemoryCallback(function()
   if not watching then return end
   for _, ev in ipairs(events) do
@@ -77,6 +88,15 @@ emu.addMemoryCallback(function()
       ev.dead = (H.readByte(0x3EE4 + ev.y) & 0xC2) ~= 0
       H.log(string.format("[pin] f%d -> monster %d status3 $%02X after the %s of f%d%s", H.frame, ev.y, ev.post,
         ev.kind, ev.f, ev.dead and " (dead)" or ""))
+      -- judged here as well as at the end, so a broken rule fails at the throw that shows it (an error in a
+      -- callback fails the run at the next frame) rather than after a battle it may not survive
+      if ev.kind == "throw" and not ev.dead then
+        local why, want = expect(ev)
+        if ev.post & (SLOW | STOP) ~= want then
+          error(string.format("the throw of f%d at monster %d: %s, so status3 & $14 should be $%02X; it is $%02X",
+            ev.f, ev.y, why, want, ev.post & (SLOW | STOP)))
+        end
+      end
     end
   end
 end, emu.callbackType.exec, FLUSH, FLUSH)
@@ -90,6 +110,11 @@ emu.addMemoryCallback(function(addr, v)
   if pc >= STOPT and pc < STOPT + 0x20 then
     stops[#stops + 1] = { f = H.frame, e = e, v = v }
     H.log(string.format("[stop] f%d monster %d's Stop lands: %d ticks", H.frame, e, v))
+    local last
+    for _, ev in ipairs(events) do if ev.y == e then last = ev end end
+    if last ~= nil and last.kind == "throw" and v ~= 8 then
+      error(string.format("the pin of f%d on monster %d counts %d ticks, not OT6_PIN_TICKS = 8", last.f, e, v))
+    end
   end
 end, emu.callbackType.write, 0x7E3AF1, 0x7E3B04)
 emu.addMemoryCallback(function()
@@ -211,17 +236,6 @@ emu.addEventCallback(function()
     shots.gogo = true; H.screenshot("shadowpin_gogo")
   end
 end, emu.eventType.endFrame)
-
--- the rule: what a throw should leave, from the state Ot6Pin found
-local function expect(ev)
-  if ev.pre & STOP ~= 0 then return "pinned already", ev.pre & (SLOW | STOP) end
-  if ev.pre & SLOW == 0 then
-    return "hobble", (ev.allowed & SLOW ~= 0) and SLOW or 0
-  end
-  if ev.broken ~= 0 then return "broken, hobbled already", SLOW end
-  if ev.allowed & STOP == 0 then return "stop-immune, hobbled already", SLOW end
-  return "pin", STOP
-end
 
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0

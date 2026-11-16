@@ -596,3 +596,25 @@ measurements, `suites/` for the suites and their mutants).
   throwables on the route (section 6, "Supply") is not built: it moves the
   line's shop stops and saves and is left for its own change.
 
+**The suites** (by play, on the v0.46 line's captures; `suites/`):
+
+- `battle_shadowpin` (Continues `wor-kt-factory-v1`; Inferno's battle,
+  party 3): SHADOW's Slow and SABIN's Break (magicite moved in the Skills
+  menu) make Striker Broken and hobbled, and a throw leaves it hobbled; a
+  throw hobbles Rough and GOGO's Mimic of it pins it (8 ticks); a Slow spell
+  and one throw pin; CYAN's Stop counts 18; two throws at Inferno hobble him
+  and leave him hobbled. Every throw is judged by the rule from the state
+  Ot6Pin found; each mark appears two frames after its numeral's event and
+  about 170 after the status was computed, and each knife goes within six
+  frames of its Stop ending. Red on seven mutants (`mut.py`): `rule_off`,
+  `pin_never`, `pin_keeps_slow`, `pin_ticks`, `broken_pins`, `mark_live`,
+  `mark_none`.
+- `battle_shadowpin_immune` (`train_b68_entry`; battle 68): two throws at the
+  Ghost Train, which blocks both, leave it with neither and no mark. Red on
+  `immune_off` (its MonsterProp +22 cleared).
+- `battle_shadowkit` gains the trap: every body the Fire Skean lands on is
+  hobbled by the rule, and no ally is hobbled or pinned by the smoke or the
+  exit. Red on `ally_hobbled` (Ot6Pin's target test gone).
+- `shadowpin_policy_selftest`: `M.shadowPolicy`, twelve checks, each red on
+  its own mutant.
+

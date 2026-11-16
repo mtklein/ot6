@@ -16132,7 +16132,7 @@ end
 -- What it throws: the cheapest throwable in the bag by its price (ItemProp, M.itemPrice; the battle bag's Throw
 -- flag $20, as MakeThrowList reads it), never a skean or a trick ($AB-$AF), from above the bag's reserve.  No
 -- throwable, no line: the Fight.  Random battles keep today's Fight and skean lines, so the legs' frame cost
--- stays put.  Opt-out: opts.shadowpin = false, or the lab lever M.SHADOWPIN_OFF.  Each line logs what it read.
+-- stays put.  Opt-out: opts.shadowpin = false, or the lab lever M.SHADOWPIN_OFF (or a prelude's global SHADOWPIN_OFF).  Each line logs what it read.
 M.shadowLines = {}       -- every trap line this run, oldest first
 -- The policy itself, a pure function of a snapshot (shadowpin_policy_selftest holds it to the rules above):
 --   s.event   the battle is an event battle; s.row SHADOW's Throw row is there
@@ -16167,7 +16167,7 @@ function M.shadowPolicy(s)
   return { kind = kind, slot = aim.slot, why = aim.why, item = item, price = price }
 end
 function Driver:shadowLine(actor, boost)
-  if self.opts.shadowpin == false or M.SHADOWPIN_OFF then return nil end
+  if self.opts.shadowpin == false or M.SHADOWPIN_OFF or rawget(_G, "SHADOWPIN_OFF") then return nil end
   local row = cmdRow(actor, BATTLE.CMD_THROW)
   local s = { event = M.readByte(0x57BD) == 0, row = row ~= nil, mons = {}, bag = {} }
   if not s.event or not s.row then return nil end              -- a random battle: the Fight and skean lines
