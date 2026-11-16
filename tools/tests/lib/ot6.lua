@@ -18965,7 +18965,8 @@ end
 -- bodies it hit; a body whose row holds the pass's class (classOf(row), the
 -- class the ROM should have used) and stands shielded and unbroken loses a
 -- shield, Broken when the last goes; the hit is halved while its shields
--- hold, doubled once Broken, capped at 9,999 and at its HP.  Returns the
+-- hold (the breaking one too, #542), doubled on a body Broken before it,
+-- capped at 9,999 and at its HP.  Returns the
 -- replayed bodies { [slot] = { hp, sh, brk, cls } }, the passes { { cost,
 -- hits = { {slot, class, want, d, chip} } } }, and every class the ROM used
 -- that classOf did not name (a list of strings, empty when they agree).
@@ -19010,9 +19011,12 @@ function M.setzerReplay(r, classOf)
           h.want, t.cls)
       end
       h.chip = h.want ~= 0 and (t.cls & h.want) ~= 0 and t.sh > 0 and not t.brk
+      -- #542: the hit is judged on the body before it (OT6_HITBRK), so the
+      -- toss that takes the last shield is halved, not doubled
+      local shielded, broken = not t.brk and t.sh > 0, t.brk
       if h.chip then t.sh = t.sh - 1; if t.sh == 0 then t.brk = true end end
       local d = (2 * p.cost) // n
-      if not t.brk and t.sh > 0 then d = (d * 8) >> 4 elseif t.brk and d < 32768 then d = d * 2 end
+      if shielded then d = (d * 8) >> 4 elseif broken and d < 32768 then d = d * 2 end
       d = math.min(d, 9999, t.hp)
       t.hp = t.hp - d
       h.d = d
