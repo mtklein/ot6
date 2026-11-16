@@ -639,6 +639,10 @@ TEST_ENV = {
     # and RunicBlade sending a Wizard's spell back on the Narshe cliffs
     "battle_breakfour": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/esper-mtn-save-v1",
+    # #540: the boost cells beside the names, sampled every frame across one
+    # random battle beside Esper Mountain's save point; no write
+    "battle_bpdisplay": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
     "battle_runicmonster": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-narshe-cliffs-v1",
     # #427: one Morph a battle, four battles at least (11-16k frames on the

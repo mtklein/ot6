@@ -40,9 +40,14 @@ Under each enemy is one line:
 While an enemy has shields it takes half damage. Each hit that matches a
 weakness removes one shield. A hit that matches both an element and a weapon
 type removes two, and an attack that strikes several times removes a shield
-per hit. At zero the enemy breaks: its shield icon shows broken and its
-sprite turns grey, it cannot act for a while, and it takes double damage.
-When it recovers, its shields come back.
+per hit. At zero the enemy breaks: its shield icon shows broken, it cannot
+act for a while, and hits on it do double damage. The hit that breaks it is
+still a hit on a shielded enemy and does half; in an attack that strikes
+several times, the strikes after the break do double. When it recovers, its
+shields come back.
+
+The shield count, the break's flash and sound, and a newly found weakness
+change as the hit that caused them lands, one strike at a time.
 
 A weakness you find is remembered for every enemy of that kind, in later
 battles and in your save. Scan reveals all of a kind's weaknesses at once.
@@ -83,6 +88,9 @@ Locke's Filch, Sabin's Bum Rush and Cyan's Cleave on a boss.
 - While choosing a command, the R Button adds a point (up to 3, and no more
   than you hold). The L Button takes one back. Arrows and a glow show how
   many are pending, and the dots after each name show the bank.
+- The arrows stay after the command is chosen, until the action starts; then
+  the dots show the bank without the points it is spending. The point gained
+  after an action shows when that character's next turn comes.
 - The points are spent when the action happens.
 - A Mimic copies the action but pays nothing, and the boost buys what it
   buys on the copied action.
