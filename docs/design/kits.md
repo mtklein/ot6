@@ -1151,6 +1151,16 @@ weapon in the bag, as in vanilla.
 Interceptor is his passive (vanilla's: a physical attack on him is blocked
 and countered half the time).
 
+**The trap: throws that hobble and pin (#546).**  Designed, not built:
+[kit-shadow-pin.md](kit-shadow-pin.md).  Octopath's Leghold Trap, as FF6's
+Slow and Stop, keyed on Throw itself so it works in the World of Balance
+with whatever is in the bag: a throw hobbles (Slows) a free enemy and pins
+(Stops, for eight ticks, about two of its turns) one already Slowed; the pin
+uses up the hobble; a Broken enemy is never pinned; vanilla's immunities
+stand; a mark before the shield gauge shows the hobble and the pin.  The
+boost keeps buying the multiplier.  Until it is built, the table above and
+the paragraphs below describe the game as it is.
+
 **The skeans pierce (#383).**  A Fire Skean, Water Edge or Bolt Edge
 resolves as its spell (`$51`-`$53`: `ThrowToolsOffsetTbl` maps the items
 `$AB`-`$AD` there), and `Ot6SkillClassTbl` gives those spells the pierce
