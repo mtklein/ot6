@@ -30,8 +30,10 @@
 --      and Still Life's 16, OT6_BROKEN_TICKS), and the second mark waits
 --      for the next break;
 --   8. Tint on RELM herself: once her casting action has ended she holds
---      all four turns (OT6_TINT_TURNS), as an ally would (#538 review: the
---      casting action's own end counted one down);
+--      all four turns (OT6_TINT_TURNS), as an ally would (the #538 review
+--      read the casting action's end as counting one down; measured, it
+--      does not, and a ROM that started hers one higher held 5:
+--      build/attempts/wt/v047-noretarget/suites/b5/battle_relmwor.log);
 --   9. Varnish on TERRA by a RELM who cannot pay: her MP is written one
 --      under the price as her action begins (a declared write: the drop an
 --      enemy's Rasp or Osmose makes between her confirm and her turn), and

@@ -303,8 +303,8 @@ Every ability is feasible. None needs new art, a new status or save data.
 - **The counter.** `OT6_TINT`, 8 bytes (4 characters, stride 2), turns left,
   and `OT6_TINTELEM` its colour.  `Ot6ActionEnd` decrements it for the
   actor. A fallen ally takes no turns, so the paint waits on them. Relm's
-  own Tint starts one turn higher, since the casting action's end counts
-  one down, so she swings with it as many turns as an ally does.
+  own Tint holds all four turns once her casting action has ended (the
+  cast does not count one down; measured, `battle_relmwor` stage 8).
 - **Display.** A banner at the cast ("Tint") and the shield count dropping
   on each keyed hit. There is no free status icon in FF6's battle HUD, and
   recolouring the swing's weapon sprite would mean a palette swap per swing;
