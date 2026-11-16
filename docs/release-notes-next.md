@@ -57,7 +57,10 @@ order, with spells lent by an Esper or a shield in their usual places among
 them. Strago's Lore list in battle shows his lores one under another. The
 Magic, Lore and Rage lists no longer scroll past their last entry, and the
 cursor no longer stops on an empty space. A muddled character can now pick a
-spell lent by an Esper, as well as the ones they know.
+spell lent by an Esper, as well as the ones they know. Mog's Dance list and the
+list behind Locke's Steal are packed the same way in battle: the dances Mog
+knows and the skills Locke has learned sit together from the top, with no gap
+for one still to come, and the cursor stays on them.
 
 ## Saves
 
