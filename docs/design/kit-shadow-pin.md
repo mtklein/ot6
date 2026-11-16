@@ -1,6 +1,7 @@
 # Shadow: throws that hobble and pin (#546)
 
-Status: **designed, not built** (2026-11-16). The owner's direction:
+Status: **built** for v0.48 (2026-11-16, `wt/v048-shadow`; section 9 has what the build measured and
+where it differs from this design). Designed 2026-11-16. The owner's direction:
 "let's reimagine leghold trap into slow/stop style effects on abilities of
 shadow." Octopath's Hunter has Leghold Trap, which pushes an enemy's turn
 back. FF6 shows no turn order, so the trap becomes FF6's own Slow and Stop.
@@ -8,8 +9,10 @@ The picture is Vamp in MGS2, who throws a knife into your shadow and pins you
 to the ground: **Shadow pins your shadow.**
 
 The rule is keyed on the Throw command, not on any item, so it works in the
-World of Balance with whatever is in the bag. His stars and skeans only
-arrive in the World of Ruin (kits.md "Shadow"), and his early kit is thin.
+World of Balance with whatever is in the bag. (This read once that his stars
+and skeans arrive only in the World of Ruin; the shop data says otherwise:
+Kohlingen, Jidoor, Albrook and the Phantom Train's ghost merchant sell them
+in the World of Balance, kits.md "Shadow".)
 The owner's ruling for Relm, "overshoot rather than undershoot", applies
 here too; vanilla's Slow and Stop immunities stand, so most bosses keep
 their protection.
@@ -536,3 +539,60 @@ be a change to every Slow in the game.
 dagger just before its shield, and a pinned one a knife standing in its
 shadow; the mark shows any Slow or Stop, whoever cast it. I recommend this
 pair: the dagger is the font's own and the knife is one new tile.
+
+## 9. As built (v0.48, `wt/v048-shadow`)
+
+Evidence is in `build/attempts/wt/v048-shadow/` (`step0/` for the
+measurements, `suites/` for the suites and their mutants).
+
+**Step 0, measured.**
+
+- *A turn already queued.* Yes, it survives a pin. In Inferno's battle a pin
+  landed on Striker while its command list held a turn (`[stop] f19233
+  monster 10 stop counter := 8 (status3 $04) list head $7F`); ExecAction then
+  ran its AI script while it was Stopped (`[ai] f19423 monster 10 runs its AI
+  script, status3 $10 stopped true`), vanilla held the chosen action (the
+  `$3aa0` bit 4/6 test at ExecAction's `@016d`), and it acted on the same
+  list entry once the pin had worn off (`[act] f20880 monster 10 ExecAction:
+  status3 $00 list head $7F` / `[exec] f20880 monster 10 executes command
+  $00`). So `Ot6BrokenTurn` consumes a Stopped monster's queued turn as it
+  consumes a Broken one's; with the arm the same draw shows no turn for
+  Striker after the pin (`step0/pinturn_arm.log` against
+  `pinturn_noarm2.log`, the `no_stop_arm` mutant ROM). The arm is for
+  monsters only: a Stopped character's queued command is left to vanilla.
+  It covers every Stop on a monster, Fenrir's and the Stop spell's included.
+- *The tick.* A pin's 8 ticks ran 1192 and 1131 frames on a body at normal
+  speed (`[tick] f4244 ... 8 -> 7` to `[tick] f5249 ... 1 -> 0`, the Stop
+  landing at f4057), about 144-149 frames a tick against DESIGN.md's 134.9.
+- *The flush.* The mark cell costs one more word a line. With all six lines
+  forced to move at once and every slot showing the knife (a declared
+  measurement write in the lab, at the flush's entry), the longest flush ran
+  13 scanlines and the latest ended on scanline 253; in play the latest end
+  was 253 too (`step0/flushbudget.log`: `[budget] synthetic (six lines
+  moving, six knives): 240 nmis, latest entry scanline 246, latest rtl
+  scanline 253, longest flush 13 scanlines`). The one-shot writes stay gated
+  per line by `@late`, so it fits; the fallback cell was not needed.
+- *Story counters.* `step0/story_vs_pin.txt` crosses
+  `story-while-broken/enum_blocks.txt` with the immunity tally. Among bodies
+  that take both statuses, the counter-script story blocks Shadow can meet
+  are M-TekArmor's (a battle-switch-gated magic-hit event) and none on
+  Rough and Striker, whose story blocks are on their turn scripts (they bring
+  each other back on a timer): a pin delays those as a break does.
+
+**Where the build differs from sections 4-6.**
+
+- The mark cell is written only while it holds a mark; a free slot writes
+  nothing there (so a neighbour's line that reaches the cell keeps it), and a
+  mark that ends is blanked once, gated like a line move
+  (`OT6_MARKSHOWN`). A line anchored in column 0 or 1 has no mark cell.
+- `Ot6Pin` holds any monster whose Slow, Stop or Haste an action changes, not
+  only a throw's target, so a Slow spell's dagger shows at its script's end.
+  A status timer running out (command `$29`, `_c25b06`) holds nothing, so the
+  knife goes the moment the Stop does.
+- The knife is font cell `$74`, between the pip cells, uploaded with the
+  other fixed glyphs (slice B grows by one tile).
+- The driver line reads the battle as section 6 says, in event battles only,
+  and throws the cheapest throwable the bag already holds. Buying
+  throwables on the route (section 6, "Supply") is not built: it moves the
+  line's shop stops and saves and is left for its own change.
+

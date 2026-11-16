@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_shadowpin.lua -- Shadow's throws hobble and pin (#546, docs/design/kit-shadow-pin.md), by play.
 --
 --   OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1 tools/tests/run.sh tools/tests/battle_shadowpin.lua
@@ -11,17 +12,16 @@
 -- status is computed, and clears when the status ends.
 --
 -- Continues wor-kt-factory-v1 (party 3: CYAN, SHADOW, SABIN, GOGO on the factory's save point beside Inferno),
--- puts a magicite that teaches Slow on SHADOW and one that teaches Stop on CYAN through the Skills menu
--- (both have Magic; GOGO's commands hold none), cares, and walks onto Inferno's trigger (event battle 114: Inferno, which takes Slow and not
+-- puts magicite that teaches Slow on SHADOW, Stop on CYAN and Break on SABIN through the Skills menu (all
+-- three have Magic; GOGO's commands hold none), cares, and walks onto Inferno's trigger (event battle 114: Inferno, which takes Slow and not
 -- Stop, and his arms Rough and Striker, which take both; any random battle on the way is played by the
 -- tactical driver).  In Inferno's battle the plan, through the real menu (H.kitBattle; the others Defend):
---   1. SHADOW throws at Striker: hobbled.          2. GOGO Mimics it: Striker pinned (Shadow hobbles, Gogo pins).
---   3.-5. SHADOW throws at Striker whenever it is not Stopped: his knives chip its pierce key, and the throw that
---       finds it Broken and hobbled leaves it hobbled, never pinned.
---   6. SHADOW throws at Rough: hobbled.            7. SHADOW throws at Rough: pinned, 8 ticks, the hobble used up.
---   8. SHADOW casts Slow on a free arm.            9. SHADOW throws at it: pinned by one throw.
---   10. CYAN casts Stop on an arm: 18 ticks, vanilla's.
---   11. 12. SHADOW throws at Inferno twice: hobbled, then still hobbled (Stop-immune), never Stopped.
+--   1. SHADOW casts Slow on Striker.   2. SABIN's Break (two points: three shields, no damage) breaks it.
+--   3. SHADOW throws at the Broken, Slowed Striker: it stays hobbled, never pinned.
+--   4. SHADOW throws at Rough: hobbled.            5. GOGO Mimics it: Rough pinned (Shadow hobbles, Gogo pins).
+--   6. SHADOW casts Slow on a free arm.            7. SHADOW throws at it: pinned by one throw.
+--   8. CYAN casts Stop on an arm: 18 ticks, vanilla's.
+--   9. 10. SHADOW throws at Inferno twice: hobbled, then still hobbled (Stop-immune), never Stopped.
 -- Every throw is judged by the rule from the target's state as Ot6Pin found it (stopped, slowed, broken, what
 -- it may take) against its status 3 at the script's end, so a draw that breaks an arm is judged as the rule
 -- says (a Broken arm is hobbled, never pinned).  The marks are read from VRAM (the cell two before each line's
@@ -147,9 +147,10 @@ end
 
 -- Striker standing, and not Stopped; and whether a throw has found a Broken, hobbled body yet
 local function strikerUp() return armState(STRIKER) end
-local function strikerFree()
+local function strikerBroken()
   local s, st = armState(STRIKER)
-  return s ~= nil and st & STOP == 0 and (events[#events] == nil or events[#events].post ~= nil)
+  return s ~= nil and st & STOP == 0 and st & SLOW ~= 0 and H.readByte(0x3E88 + 8 + 2 * s) > 2
+    and (events[#events] == nil or events[#events].post ~= nil)
 end
 local function brokenCaseSeen()
   for _, ev in ipairs(events) do
@@ -160,34 +161,42 @@ local function brokenCaseSeen()
 end
 
 local KNIFE_ITEM = 0x01           -- Mithril Knife: the bag holds a stack of them
+local SPELL_BREAK = 0x0C
+-- a hold that gives up after 2400 frames (about two of SHADOW's turns twice over): a gate the rule should open
+-- (an arm hobbled, a body free) that never opens plays the entry anyway, so a broken rule fails on the
+-- judgement below rather than stalling the battle into a wipe
+local function patient(fn)
+  local t0
+  return function()
+    if fn() then return true end
+    t0 = t0 or H.frame
+    return H.frame - t0 > 2400
+  end
+end
 local plan = {
-  -- 1. SHADOW hobbles Striker; 2. GOGO's Mimic of that throw pins it.  GOGO holds his window until the hobble
-  -- has landed and is the action Mimic would copy (SaveForMimic's command, $3F20, a Throw)
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[STRIKER] end },
-  { who = GOGO, cmd = 0x12, boost = 0, self = true, hold = true, when = function()
+  -- 1. SHADOW casts Slow on Striker; 2. SABIN's Break, boosted two points, takes its three shields (OT6's
+  -- Break: no damage, no status); 3. SHADOW throws at the Broken, Slowed Striker: it stays hobbled, never pinned
+  -- (one knife: a Broken body takes double, and the arms die to a few)
+  { who = SHADOW, cmd = 0x02, spell = SPELL_SLOW, boost = 0, slotFn = strikerUp },
+  { who = SABIN, cmd = 0x02, spell = SPELL_BREAK, boost = 2, slotFn = strikerUp, hold = true,
+    when = patient(function() local _, st = armState(STRIKER); return st ~= nil and st & SLOW ~= 0 end) },
+  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, hold = true, slotFn = strikerUp,
+    when = patient(strikerBroken) },
+  -- 4. SHADOW hobbles Rough; 6. GOGO's Mimic of that throw pins it.  GOGO holds his window until the hobble has
+  -- landed and is the action Mimic would copy (SaveForMimic's command, $3F20, a Throw)
+  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[ROUGH] end },
+  { who = GOGO, cmd = 0x12, boost = 0, self = true, hold = true, when = patient(function()
       local e = events[#events]
       return e ~= nil and e.kind == "throw" and e.who == SHADOW and e.post ~= nil and e.pre & SLOW == 0
         and e.post & SLOW ~= 0 and H.readByte(0x3F20) == 0x08
-    end },
-  -- 3.-5. Striker is keyed to pierce (three shields, slash and pierce, Ot6ShieldTbl), so every Mithril Knife
-  -- chips it: once its pin has ended SHADOW throws at it whenever it is not Stopped, until one throw has found
-  -- it Broken and hobbled (that one must leave it hobbled, never pinned); the rest are skipped
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, hold = true, slotFn = strikerUp, when = strikerFree,
-    skip = brokenCaseSeen },
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, hold = true, slotFn = strikerUp, when = strikerFree,
-    skip = brokenCaseSeen },
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, hold = true, slotFn = strikerUp, when = strikerFree,
-    skip = brokenCaseSeen },
-  -- 6. 7. SHADOW hobbles Rough, then pins it
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[ROUGH] end },
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[ROUGH] end },
-  -- 8. SHADOW casts Slow on a free arm; 9. one throw pins it
+    end) },
+  -- 6. SHADOW casts Slow on a free arm; 7. one throw pins it
   { who = SHADOW, cmd = 0x02, spell = SPELL_SLOW, boost = 0, hold = true, slotFn = freeArm,
-    when = function() return freeArm() ~= nil end },
+    when = patient(function() return freeArm() ~= nil end) },
   { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = slowedArm },
-  -- 10. CYAN casts Stop on an arm: vanilla's 18 ticks
+  -- 8. CYAN casts Stop on an arm: vanilla's 18 ticks
   { who = CYAN, cmd = 0x02, spell = SPELL_STOP, boost = 0, slotFn = unstoppedArm },
-  -- 11. 12. SHADOW throws at Inferno twice: hobbled, then still hobbled (Stop-immune)
+  -- 9. 10. SHADOW throws at Inferno twice: hobbled, then still hobbled (Stop-immune)
   { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[INFERNO] end },
   { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[INFERNO] end },
 }
@@ -242,11 +251,13 @@ H.run({ maxFrames = 1200000 }, {
       if shots.stopEsper == nil and teaches(e, SPELL_STOP) and usable(e) and e ~= shots.slowEsper then
         shots.stopEsper = e
       end
+      if shots.breakEsper == nil and teaches(e, 0x0C) and usable(e) and e ~= shots.slowEsper
+         and e ~= shots.stopEsper then shots.breakEsper = e end
     end
     H.log(string.format("[shadowpin] magicite for Slow %s, for Stop %s", tostring(shots.slowEsper),
       tostring(shots.stopEsper)))
-    H.assertEq(shots.slowEsper ~= nil and shots.stopEsper ~= nil, true,
-      "the party owns a magicite teaching Slow and one teaching Stop that party 3 may wear")
+    H.assertEq(shots.slowEsper ~= nil and shots.stopEsper ~= nil and shots.breakEsper ~= nil, true,
+      "the party owns magicite teaching Slow, Stop and Break that party 3 may wear")
     H.assertEq(H.invCountOf(KNIFE_ITEM) >= 7, true, "the bag holds seven Mithril Knives to throw")
   end),
   H.lazy(function()
@@ -257,7 +268,12 @@ H.run({ maxFrames = 1200000 }, {
     return H.equipEsper(function() return (H.readByte(0x1850 + CYAN) >> 3) & 3 end, shots.stopEsper,
       { tag = "the Stop magicite -> CYAN" })
   end),
+  H.lazy(function()
+    return H.equipEsper(function() return (H.readByte(0x1850 + SABIN) >> 3) & 3 end, shots.breakEsper,
+      { tag = "the Break magicite -> SABIN" })
+  end),
   H.call(function()
+    H.assertEq(H.knowsSpell(SABIN, 0x0C), true, "SABIN can cast Break")
     H.assertEq(H.knowsSpell(SHADOW, SPELL_SLOW), true, "SHADOW can cast Slow (the magicite he now wears)")
     H.assertEq(H.knowsSpell(CYAN, SPELL_STOP), true, "CYAN can cast Stop")
   end),
@@ -283,31 +299,27 @@ H.run({ maxFrames = 1200000 }, {
       "Inferno and both arms are on the field")
     watching = true
   end),
-  -- no care window from SHADOW's hobble on Striker (entry 1) until GOGO's Mimic has thrown: a Potion queued
+  -- no care window from SHADOW's hobble on Rough (entry 4) until GOGO's Mimic has thrown: a Potion queued
   -- between them would be the action Mimic copies
-  H.kitBattle(plan, { maxFrames = 200000, untilPlanDone = true,
+  -- the step ends once the plan is spent and its last throw, the second at Inferno, has landed; until then
+  -- the others (and SHADOW, once his entries are played) Defend, so the battle runs on
+  H.kitBattle(plan, { maxFrames = 200000, untilPlanDone = true, idle = "defend",
+    planDone = function()
+      local inferno = 0
+      for _, ev in ipairs(events) do
+        if ev.post == nil then return false end
+        if ev.kind == "throw" and ev.species == INFERNO then inferno = inferno + 1 end
+      end
+      return inferno >= 2
+    end,
     care = function()
-      if shots.gogoThrew then return true end
-      for _, r in ipairs(H.vars.kit or {}) do if r.entry >= 1 then return false end end
+      if shots.gogoThrew or (shots.careT0 and H.frame - shots.careT0 > 2400) then return true end
+      shots.careT0 = shots.careT0 or ((function()
+        for _, r in ipairs(H.vars.kit or {}) do if r.entry >= 4 then return H.frame end end
+      end)())
+      for _, r in ipairs(H.vars.kit or {}) do if r.entry >= 4 then return false end end
       return true
     end }),
-  -- let the last throw's script end and every pin wear off
-  H.driveUntil(function()
-    local throws = 0
-    for _, ev in ipairs(events) do
-      if ev.post == nil then return false end
-      if ev.kind == "throw" then throws = throws + 1 end
-    end
-    local inferno = 0
-    for _, ev in ipairs(events) do if ev.kind == "throw" and ev.species == INFERNO then inferno = inferno + 1 end end
-    if inferno < 2 then return false end          -- the plan's last throw, the second at Inferno, has landed
-    for _, sp in ipairs({ ROUGH, STRIKER }) do
-      local s, st = armState(sp)
-      if s and st & STOP ~= 0 then return false end
-    end
-    return true
-  end, 6000, { { tick = function() H.setPad({}); return "frame" end, reset = function() end } },
-    "the last script ends and the pins wear off"),
   H.call(function()
     watching = false
     -- every throw, by the rule
@@ -345,16 +357,16 @@ H.run({ maxFrames = 1200000 }, {
         end
       end
     end
-    H.assertEq((seen.hobble or 0) >= 2, true, "1. a first throw hobbles (two or more seen)")
-    H.assertEq((seen.pin or 0) >= 2, true, "7. a throw at a hobbled arm pins it, the hobble used up (two or more)")
-    H.assertEq(seen.gogo ~= nil, true, "2. SHADOW's throw hobbles, GOGO's Mimic of it pins")
-    H.assertEq(seen.spellpin ~= nil, true, "9. a Slow spell, then one throw, pins")
-    H.assertEq(seen.vanillaStop, true, "10. a Stop spell keeps vanilla's 18 ticks")
-    H.assertEq(seen.infernoHobble ~= nil, true, "11. a throw hobbles Inferno")
+    H.assertEq((seen.hobble or 0) >= 2, true, "4. 9. a first throw hobbles (two or more seen)")
+    H.assertEq((seen.pin or 0) >= 2, true, "5. 7. a throw at a hobbled arm pins it, the hobble used up (two or more)")
+    H.assertEq(seen.gogo ~= nil, true, "5. SHADOW's throw hobbles, GOGO's Mimic of it pins")
+    H.assertEq(seen.spellpin ~= nil, true, "7. a Slow spell, then one throw, pins")
+    H.assertEq(seen.vanillaStop, true, "8. a Stop spell keeps vanilla's 18 ticks")
+    H.assertEq(seen.infernoHobble ~= nil, true, "9. a throw hobbles Inferno")
     H.assertEq(seen.immune ~= nil and seen.immune.species == INFERNO, true,
-      "12. the throw at the hobbled, Stop-immune Inferno leaves him hobbled, not pinned")
+      "10. the throw at the hobbled, Stop-immune Inferno leaves him hobbled, not pinned")
     H.assertEq((seen["broken, hobbled already"] or 0) >= 1, true,
-      "3.-5. a throw at a Broken, hobbled arm leaves it hobbled, never pinned")
+      "3. a throw at a Broken, hobbled arm leaves it hobbled, never pinned")
     H.log(string.format("[shadowpin] throws judged: hobble %d, pin %d, broken %d, pinned already %d, immune %d",
       seen.hobble or 0, seen.pin or 0, seen["broken, hobbled already"] or 0, seen["pinned already"] or 0,
       seen["stop-immune, hobbled already"] or 0))
@@ -391,7 +403,8 @@ H.run({ maxFrames = 1200000 }, {
           local tShow
           for _, v in ipairs(fr.vram) do if v.f >= t.f and v.m == 0 and tShow == nil then tShow = v.f end end
           H.log(string.format("[mark] slot %d's Stop ended at f%d; the knife went at f%s", l, t.f, tostring(tShow)))
-          H.assertEq(tShow ~= nil and tShow <= t.f + 3, true,
+          -- (within 6 frames: the line builder runs on the battle loop's WaitFrame, the flush on the nmi after)
+          H.assertEq(tShow ~= nil and tShow <= t.f + 6, true,
             string.format("slot %d: the knife clears when the Stop ends", l))
           cleared = cleared + 1
         end
