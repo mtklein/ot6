@@ -642,7 +642,9 @@ do
     { aoe = true, byTarget = { [1] = { hit = 0 }, [2] = { hit = 1, chips = 1 } } })
   local r = H.raceSim(st, H.raceAttack(line, 0))
   check(r.leftNow == 200, "area effects use each body's hit chance and shields")
-  line = H.raceLine({ kind = "fight", boostLeft = 0, hits = 1, aim = 2 }, 50,
+  -- 100: the breaking hit lands shielded (#542), so it takes the body's
+  -- whole 100 only at full price (50 broke it at x4 before v0.46)
+  line = H.raceLine({ kind = "fight", boostLeft = 0, hits = 1, aim = 2 }, 100,
     { byTarget = { [1] = { hit = 0 }, [2] = { hit = 1, chips = 1 } } })
   r = H.raceSim(st, H.raceAttack(line, 0))
   check(r.leftNow == 200, "score the frozen target rather than the lowest HP/default target")
@@ -733,13 +735,52 @@ do
     "horizon does not credit a command that has not resolved")
 end
 
--- 42. The final shield-breaking hit receives the break it causes.
+-- 42. #542: the hit that removes the final shield is a shielded hit (the
+-- ROM judges a hit on the body before it, OT6_HITBRK); only the swings
+-- after it get the broken multiplier.  (Until v0.46 the breaking hit was
+-- doubled itself, and this case asserted 300.)
 do
   local st={actor=1, samples=0, contCare=false, horizon=1,
     party={member(1000,1000,0,{period=1000})},
     enemies={{hp=500,sh=1,eta=100,period=1000,act={dmg={0}}}}}
   local r=H.raceSim(st,{kind="attack",line={per=50,hits=1,chips=1},boost=0})
-  check(r.leftNow==300,"the last shield chips before this hit's damage is priced")
+  check(r.leftNow==450,"the breaking hit is priced as a hit on a shielded body (#542)")
+  r=H.raceSim(st,{kind="attack",line={per=50,hits=2,chips=1},boost=0})
+  check(r.leftNow==250,"the swing after the breaking hit lands on a broken body: 50 + 200")
+  st.enemies[1].sh=2
+  r=H.raceSim(st,{kind="attack",line={per=50,hits=3,chips=3},boost=0})
+  check(r.leftNow==200,"two shields: two shielded swings break it, the third is broken (500-50-50-200)")
+end
+
+-- 42b. #542 in the damage watch: the drop of the hit that turned the gauge
+-- over is normalized shielded, the drops after it broken; a gauge turned
+-- over by no hit (OT6's Break) or by another actor leaves nothing pending.
+-- The mutant (M.BREAKHIT_OLD, the rule before #542) reads the breaking
+-- hit's drop as broken.
+do
+  local function run(old)
+    H.BREAKHIT_OLD = old
+    local t, out, k = { brk = {}, pend = {} }, {}, 0
+    local function f(who, brk, dropped) k = k + 1; out[k] = H.brokenForDrop(t, 2, who, brk, dropped) end
+    f(1, false, true)    -- swing 1: shielded
+    f(1, true, false)    -- swing 2's calc empties the last shield
+    f(1, true, true)     -- swing 2's HP falls: the breaking hit
+    f(1, true, true)     -- swing 3: broken
+    f(nil, false, false) -- recovered
+    f(nil, true, false)  -- a Break spell's take, no hit, no actor
+    f(3, true, true)     -- the next action's hit: broken
+    f(nil, false, false)
+    f(0, true, false)    -- entity 0 breaks it ...
+    f(2, true, true)     -- ... and entity 2's hit lands first: broken
+    H.BREAKHIT_OLD = nil
+    return table.concat({ tostring(out[1]), tostring(out[3]), tostring(out[4]), tostring(out[7]),
+      tostring(out[10]) }, " ")
+  end
+  local got = run(nil)
+  check(got == "false false true true true",
+    "the breaking hit's drop is shielded, the next is broken, a hitless or another's break pends nothing: " .. got)
+  check(run(true) == "false true true true true",
+    "MUTANT the pre-#542 rule reads the breaking hit's drop broken")
 end
 
 -- 43. An unknown continuation cannot obtain an instantaneous saving Cure.
@@ -798,8 +839,8 @@ do
   c.line.hit=0.5
   local miss=H.raceSim(st,c,function() return 0.9 end)
   local land=H.raceSim(st,c,function() return 0.1 end)
-  check(miss.leftNow==1000 and land.leftNow==300,
-    "a sampled hit chips before damage; a sampled miss does neither")
+  check(miss.leftNow==1000 and land.leftNow==450,
+    "a sampled hit chips and lands shielded (#542); a sampled miss does neither")
 end
 
 -- 46. Guesses are explicit bounded estimates; paired scenarios must not
@@ -921,7 +962,7 @@ do
   check(not H.raceSim(st,a).standNow,"final shield chip suppresses living attack retaliation")
   a.line.chips=0
   check(H.raceSim(st,a).standNow,"unbroken living last-stand retaliation still fires")
-  st.enemies[1].stand={n=1,deathOnly=true};a.line.chips=1;a.line.per=300
+  st.enemies[1].stand={n=1,deathOnly=true};a.line.chips=1;a.line.per=1000 -- lethal though shielded (#542)
   check(H.raceSim(st,a).standNow,"broken death counter remains admitted after lethal hit")
 end
 

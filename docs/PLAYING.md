@@ -12,8 +12,8 @@ rest. The same material, with pictures and tips for each area, is in the
 ## What is different at a glance
 
 - Enemies have shields and hidden weaknesses. Hitting a weakness removes a
-  shield. At zero shields an enemy is broken: it loses its turns and takes
-  double damage.
+  shield. At zero shields an enemy is broken: it loses its turns, and the
+  hits after the one that broke it do double damage.
 - Each character has Boost Points. Pressing the R Button while choosing a
   command spends points to make an action stronger, surer, wider or longer.
 - Every character has one job and a kit of up to eight skills. Most skills
@@ -40,7 +40,7 @@ Under each enemy is one line:
 While an enemy has shields it takes half damage. Each hit that matches a
 weakness removes one shield. A hit that matches both an element and a weapon
 type removes two, and an attack that strikes several times removes a shield
-per hit. At zero the enemy breaks: its shield icon shows broken, it cannot
+per hit. At zero the enemy breaks: its shield icon is drawn cracked, it cannot
 act for a while, and hits on it do double damage. The hit that breaks it is
 still a hit on a shielded enemy and does half; in an attack that strikes
 several times, the strikes after the break do double. When it recovers, its

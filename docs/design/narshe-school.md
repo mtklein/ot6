@@ -64,9 +64,9 @@ the Empire's plates), which players could not follow.
 | Key mechanic (WoB) | Advisor | Room |
 |---|---|---|
 | Orientation; level-ups restore HP/MP; half as many random battles, double Exp./GP | $0257 greeter | outside the door, and the hall |
-| Shields, half damage while shielded, breaking (can't act, ×2 damage), recovery | $0267 | middle (106) |
+| Shields, half damage while shielded, breaking (can't act, ×2 damage on the hits after the breaking one), recovery | $0267 | middle (106) |
 | Weaknesses: '?' cells, elements and weapon types, the Magic list's element icons and the weapon icons, the codex | $0264 | middle (106) |
-| Boost Points: 1 at the start, +1 a turn, cap 5; R adds (up to 3), L takes back; no point on a boosted turn | $026D | left (105) |
+| Boost Points: 1 at the start, +1 a turn (shown at the next turn), cap 5; R adds (up to 3; arrows until the action starts), L takes back; no point on a boosted turn | $026D | left (105) |
 | What a boost buys: Fight's extra hits (free; twice as many with two weapons); ×2/×4/×8 damage on other skills, Dance included; MP ×2.5 a point, capped at 99 and never below the unboosted price; a status spell's reach, one more target a point at its MP again | $0270 | left (105) |
 | Stronger spells: Fire → Fire 2 → Fire 3 and the other families, at the cast spell's MP; the Magic list previews | $026E | left (105) |
 | Skills that changed: MP on Blitz/Tools/SwdTech/Steal/Dance/Rage; SwdTech rows; Steal/Slot/Rage odds (Steal and Rage certain at 3); Shadow's break kill | $0276 | left (105), far corner |
@@ -117,7 +117,7 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> A hit on a weakness removes a shield. At zero it breaks: until it recovers, it can't act and takes double damage.
+> Each hit on a weakness removes one shield. At zero it breaks: it can't act for a while, and the hits after that do double damage.
 >
 > *(next box)*
 >
@@ -145,11 +145,11 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Each character starts a battle with 1, and gains 1 after each of their turns, up to 5.
+> Each character starts a battle with 1, and gains 1 after each of their turns, up to 5. It shows when their next turn comes.
 >
 > *(next box)*
 >
-> While choosing a command, press the R Button to add a point: up to 3, if you have them. Arrows show how many.
+> While choosing a command, press the R Button to add a point: up to 3, if you have them. Arrows show how many until the action starts.
 >
 > *(next box)*
 >
@@ -242,15 +242,22 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 Every claim was checked against the code (2026-09-28):
 
 - Shields and breaking: the shield cell under each monster draws the
-  count (any count 1-99: one numeral in the grey shield up to 9, two
-  numerals on a dark shield from 10; #292) and a grey shield with an X
-  while broken (`ot6_hud.asm`, the BG3 cells under each sprite). Every
+  count beside a white shield emblem (any count 1-99: the battle font's
+  numeral up to 9, two small numerals from 10; #292, #397) and a cracked shield (grey
+  body, red rim, its right half dropped a row: `gen_shield_glyphs.py`'s
+  tile 100) while broken (`ot6_hud.asm`, the BG3 cells under each sprite;
+  the monster itself keeps its colours, #543). Every
   damaging hit on a shielded, unbroken monster is ×0.5, on or off
   weakness (`Ot6ShieldedDmg`, `Ot6ShieldedMulW = $0008`); a hit on a
   weakness chips 1 (`Ot6Chip`, `Ot6ClassChip`; a hit matching both an
   element and a class chips 2); at 0 the broken timer (`OT6_BREAK_TICKS`
   = $10, about 36 s of battle time) stops new actions (`Ot6Gate`) and
-  doubles damage (`Ot6BrokenDmg`); recovery refills the shields.
+  doubles damage (`Ot6BrokenDmg`) on every hit after the breaking one:
+  the hit that empties the last shield is judged shielded (`OT6_HITBRK`,
+  #542); recovery refills the shields.
+- Boost Points (#540): the point a character earns after an action is
+  shown when that character's next turn comes, and the points put on a
+  command show as arrows until the action starts.
 - Weaknesses: '?' until chipped, then the element or class icon; the
   reveal is written to the save's codex at once and pre-revealed in later
   battles (`ot6_codex.asm`, `ot6_break.asm`). Magic-list element icons:

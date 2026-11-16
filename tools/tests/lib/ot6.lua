@@ -1904,6 +1904,29 @@ end
 function M.raceDamageBase(drop, shieldMax, broken)
   return drop / (broken and 4 or shieldMax == 0 and 2 or 1)
 end
+-- Whether a monster HP drop the damage watch sees landed on a Broken body
+-- (#542).  The gauge reads Broken from the damage calc of the hit that
+-- empties the last shield, frames before that hit's HP falls, but that hit
+-- is judged on the body before it (OT6_HITBRK): a shielded hit.  So the
+-- first drop by the action that turned the gauge over is the breaking
+-- hit's (false), and only drops after it are broken ones.  A gauge turned
+-- over by something that is no hit (OT6's Break, Filch) or by another
+-- actor leaves no pending hit for the next drop.  t = { brk = {}, pend = {} }
+-- per battle; s the slot; who the acting entity (nil: none); brkNow its
+-- gauge this frame; dropped whether its HP fell this frame.  Returns nil
+-- when nothing dropped.  M.BREAKHIT_OLD = true is the rule before #542 (a
+-- dropped hit is broken whenever the gauge reads so).
+function M.brokenForDrop(t, s, who, brkNow, dropped)
+  if not brkNow then t.pend[s] = nil
+  elseif not t.brk[s] then t.pend[s] = who or false end
+  t.brk[s] = brkNow
+  if not dropped then return nil end
+  if M.BREAKHIT_OLD then return brkNow end
+  local pend = t.pend[s]
+  t.pend[s] = nil
+  if pend ~= nil and pend ~= false and pend == who then return false end
+  return brkNow
+end
 
 -- one line's hits on enemy e (mutated), times the line's hit chance
 -- one line on one body; returns the hits left when the body fell first
@@ -1936,14 +1959,16 @@ local function strike(e, line, hit, draw, t)
     -- damage under the same hit probability (zero never breaks a shield).
     local landed = hit
     if draw and hit > 0 and hit < 1 then landed = draw() < hit and 1 or 0 end
-    -- Ot6HitJoin chips first: the hit removing the final shield receives
-    -- the broken-body damage multiplier itself, not only its next swing.
+    -- #542: a hit is judged on the body as it was before the hit landed
+    -- (Ot6HitJoin's OT6_HITBRK), so the hit removing the final shield is
+    -- still a shielded hit; only the swings after it get the broken x2
+    -- (4 here: per is the shielded-body hit, which is half vanilla's).
+    local mult = (e.sh or 0) > 0 and 1
+      or ((e.shMax == nil or e.breakUntil) and 4 or 2)
     if (e.sh or 0) > 0 and i <= chips then
       e.sh = math.max(0, e.sh - landed)
       if e.sh == 0 and e.shMax ~= nil then e.breakUntil = t + e.breakDuration end
     end
-    local mult = (e.sh or 0) > 0 and 1
-      or ((e.shMax == nil or e.breakUntil) and 4 or 2)
     e.hp = e.hp - per * mult * landed
   end
   if e.hp < 0 then e.hp = 0 end
@@ -17162,6 +17187,7 @@ function Driver:idle()
   self.healWatch, self.healSaid, self.finisherSaid, self.inertSaid = nil, nil, nil, {}
   self.priceSaid = {}
   self.dmgWatch, self.dmgSeen, self.monHpLast = {}, {}, {}
+  self.brkDrop = { brk = {}, pend = {} }
   self.slotWatch = nil
   self.dmgHit, self.hitLedger, self.partyHpLast = {}, {}, {}
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
@@ -20204,9 +20230,12 @@ function Driver:watchDamage()
   if who == nil and execDone[#execDone] ~= nil then
     who = execDone[#execDone].actor
   end
+  self.brkDrop = self.brkDrop or { brk = {}, pend = {} }
   for s = 0, 5 do
     local hp = M.readWord(BATTLE.MON_HP + s * 2)
     local last = self.monHpLast[s]
+    local brkHit = M.brokenForDrop(self.brkDrop, s, who, M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0,
+      who ~= nil and last ~= nil and hp < last)
     local sw = self.slotWatch
     if sw and who == sw.actor and last ~= nil and hp < last then
       sw.seen = sw.seen + (last - hp)
@@ -20217,14 +20246,14 @@ function Driver:watchDamage()
       if w then
         local drop = last - hp
         w.seen = w.seen + drop
-        -- normalized per hit by the state of THIS slot's gauge as
-        -- the hit landed: a volley that breaks mid-way lands its
-        -- rest broken (x4 shielded), and the per-hit figure (#165)
-        -- must not average the two
-        w.norm = w.norm
-          + ((M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0) and (drop // 4) or drop)
+        -- normalized per hit by the state of THIS slot's gauge before
+        -- the hit landed: a volley that breaks mid-way lands its rest
+        -- broken (x4 shielded), the breaking hit itself shielded (#542,
+        -- M.brokenForDrop), and the per-hit figure (#165) must not
+        -- average the two
+        w.norm = w.norm + (brkHit and (drop // 4) or drop)
         w.raceNorm = (w.raceNorm or 0) + M.raceDamageBase(drop,
-          M.readByte(BATTLE.SH_MAX + s * 2), M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0)
+          M.readByte(BATTLE.SH_MAX + s * 2), brkHit)
         w.n = w.n + 1
       end
     end
