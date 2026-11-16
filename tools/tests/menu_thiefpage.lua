@@ -1,7 +1,8 @@
 -- @suite savestate=celes_freed
 -- menu_thiefpage.lua -- the field Skills->Thief page.
 --
--- The skills list has an 8th row, Thief, gated like every other row by the
+-- The skills list has an 8th row, Treasure Hunter (the page's internal name
+-- stays "thief"), gated like every other row by the
 -- character's own battle commands, and A on it opens a field info page in
 -- the Blitz page's shape: one column, name + MP price per row, B backs out,
 -- A is a no-op.  Eight rows, the battle list's order read a column at a
@@ -38,6 +39,33 @@ local ST_MAIN, ST_CHAR, ST_SKILLS, ST_THIEF = 0x05, 0x06, 0x0a, 0x30
 local SKILLS_ROW_THIEF = 7              -- Espers Magic SwdTech Blitz Lore Rage Dance THIEF
 
 local function st() return H.readByte(ZMENUSTATE) end
+
+-- ---- the name on the list and on the page's title box (VRAM, what shows) ----
+-- Locke's row is "Treasure Hunter", the word he insists on in the story, on
+-- the Skills list (BG3 screen A, row 19 from column 2) and in the page's
+-- title box (BG3 screen B, row 5 from column 15).  Both boxes are widened for
+-- it: the list window to 15 tiles (its top-right corner at BG2A {17,7}) and
+-- the page draws a 15-tile title box over the shared 7-tile one (corners at
+-- BG2B {14,4} and {30,4}), which the B exit puts back.
+-- VRAM word addresses: BG2 screen A $1000, B $1400; BG3 A $4000, B $4400.
+local VR = emu.memType.snesVideoRam
+local function vcell(base, x, y) return emu.readWord((base + y * 32 + x) * 2, VR) end
+local BG2A_V, BG2B_V, BG3A_V, BG3B_V = 0x1000, 0x1400, 0x4000, 0x4400
+local TITLE = "Treasure Hunter"
+local function enc(ch)                  -- menu text codec, letters and space
+  local b = ch:byte()
+  if ch == " " then return 0xff end
+  if b >= 65 and b <= 90 then return 0x80 + b - 65 end
+  return 0x9a + b - 97
+end
+local function assertVText(base, x0, y, text, what)
+  for i = 1, #text do
+    H.assertEq(vcell(base, x0 + i - 1, y) & 0xff, enc(text:sub(i, i)),
+      string.format("%s: '%s' letter %d ('%s') at {%d,%d}", what, text, i,
+        text:sub(i, i), x0 + i - 1, y))
+  end
+end
+local box0 = {}                          -- BG2B rows 4-6 before the page opens
 
 -- BG1 screen A tilemap shadow (wBG1Tiles::ScreenA = $7e3849, menu_ram.inc):
 -- 2 bytes per cell (char, color), 64 bytes per row; cell(x,y) = char byte.
@@ -255,6 +283,15 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     H.assertEq(H.readByte(THIEF_ROW_COLOR), 0x20,
       "Thief row white for LOCKE -- his own record carries Steal")
+    assertVText(BG3A_V, 2, 19, TITLE, "Skills list row 8")
+    H.assertEq(vcell(BG2A_V, 17, 7), vcell(BG2A_V, 9, 1),
+      "the list window is 15 tiles wide: its top-right corner at BG2A {17,7} "
+      .. "is the Espers/Magic window's corner tile ({9,1})")
+    for y = 4, 6 do
+      for x = 0, 31 do box0[#box0 + 1] = vcell(BG2B_V, x, y) end
+    end
+    H.screenshot("thiefpage_list")
+    H.log("LIST OK: Locke's row reads '" .. TITLE .. "' inside a 15-tile list window")
   end),
 
   H.driveUntil(function()
@@ -270,6 +307,13 @@ H.run({ maxFrames = 30000 }, {
     for i = 0, ROWS - 1 do assertThiefRow(i) end
     assertGeometry("thief page")
     for n = 0, ROWS - 1 do assertCursorGutter(n, "thief page") end
+    assertVText(BG3B_V, 15, 5, TITLE, "page title box")
+    H.assertEq(vcell(BG2B_V, 14, 4), vcell(BG2B_V, 1, 1),
+      "the page's title box opens at BG2B {14,4}: the description window's "
+      .. "top-left corner tile ({1,1})")
+    H.assertEq(vcell(BG2B_V, 30, 4), vcell(BG2B_V, 30, 1),
+      "the page's title box closes at BG2B {30,4}: the top-right corner tile")
+    H.log("TITLE OK: the page's title box reads '" .. TITLE .. "' (BG2B {14,4}-{30,6})")
     H.assertEq(H.readByte(0x9ec9), 0xff,
       "description buffer holds the blank marker -- the thief rows have no "
       .. "desc asset and must not show another page's text")
@@ -299,6 +343,27 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(H.readByte(THIEF_ROW_COLOR), 0x20,
       "back on the list, the Thief row is still LOCKE-white -- the list "
       .. "redraw (_c34d27/ReloadSkillsMenu) recomputed the colors")
+    local i = 0
+    for y = 4, 6 do
+      for x = 0, 31 do
+        i = i + 1
+        H.assertEq(vcell(BG2B_V, x, y), box0[i], string.format(
+          "B put the shared 7-tile title box back: BG2B {%d,%d} as before the "
+          .. "page opened (every other page titles at column 23 inside it)", x, y))
+      end
+    end
+    for x = 15, 29 do
+      local t = vcell(BG3B_V, x, 5) & 0xff
+      H.assertEq(t >= 0x80 and t <= 0xb3, false, string.format(
+        "B cleared the long title: BG3B {%d,5} holds no letter (the next "
+        .. "page writes only its own short title at column 23)", x))
+    end
+    for _, cyc in ipairs({ 0, 1, 2 }) do
+      H.assertEq(vcell(0x0000, NAME_COL + cyc, thiefRow(0)) & 0xff, 0, string.format(
+        "the page's rows left BG1 screen A in VRAM ({%d,%d}): the list "
+        .. "must not show them through", NAME_COL + cyc, thiefRow(0)))
+    end
+    H.log("EXIT OK: the shared title box, an empty title row and a clean BG1 behind the list")
   end),
 
   H.driveUntil(function()
