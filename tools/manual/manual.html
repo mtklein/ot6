@@ -257,7 +257,7 @@
     <div class="sub">For players who know Final Fantasy III</div>
     <ul>
       <li><b>Shields and weaknesses.</b> Enemies have shields and hidden weaknesses. Hitting a weakness removes a
-        shield. At zero shields an enemy is broken: it loses its turns and takes double damage.</li>
+        shield. At zero shields an enemy is broken: it loses its turns, and the hits after the one that broke it do double damage.</li>
       <li><b>Boost Points.</b> Each character has Boost Points. Pressing the R Button while choosing a command spends
         points to make an action stronger, surer, wider or longer.</li>
       <li><b>One job, one kit.</b> Every character has one job and a kit of up to eight skills. Most skills cost MP,
@@ -294,7 +294,8 @@
       <li><b>A weakness not yet found.</b> A grey question mark. Hit it with the right thing and it turns into an
         icon, for every monster of that kind, for good.</li>
       <li><b>The bank.</b> The dots after a name are the Boost Points that character holds, up to five.</li>
-      <li><b>A boost on the way.</b> Arrows after the name show the points put on the command being chosen.</li>
+      <li><b>A boost on the way.</b> Arrows after the name show the points put on a command, until its action
+        starts.</li>
       <li><b>The glow.</b> A character with a boost pending lights up, so you can see who is about to spend.</li>
     </ol>
     <p class="small"><i>The next pages explain each of these. If a monster ever has no line at all, it simply has
@@ -352,9 +353,9 @@
     damage.</p>
     <h2>Break!</h2>
     <figure class="fig-right"><img class="shot" src="img/break.png" alt="">
-      <figcaption>Broken: the Whelk's head turns grey and a beam lands for 764.</figcaption></figure>
-    <p>When the last shield falls, the enemy breaks. Its shield icon shows broken and its sprite turns grey. It
-    cannot act for a while, and it takes double damage.</p>
+      <figcaption>Broken: the Whelk's head shows the broken shield, and a beam on it does double.</figcaption></figure>
+    <p>When the last shield falls, the enemy breaks. Its shield icon is drawn cracked. It cannot act for a while, and
+    hits on it do double damage. The hit that breaks it still does half, so the payoff comes on the next hit.</p>
     <p>When it recovers, its shields come back. So plan the break: strip the shields, then hit hard while it is
     down.</p>
     <div class="clear"></div>
@@ -374,13 +375,14 @@
     <h2>Earning</h2>
     <ul>
       <li>Every character starts a battle with 1 Boost Point (BP).</li>
-      <li>A character gains 1 BP after each action, up to 5. An action that was boosted earns none.</li>
+      <li>A character gains 1 BP after each action, up to 5. An action that was boosted earns none. The new point
+        shows when that character's next turn comes.</li>
     </ul>
     <h2>Spending</h2>
     <ul>
       <li>The R Button puts up to 3 points on the command you are choosing, and the L Button takes one back
         (page {{page:p-controls-battle}}).</li>
-      <li>The points are spent when the action happens.</li>
+      <li>The points are spent when the action happens. Until it starts, the arrows stay after the name.</li>
       <li>A Mimic copies the action but pays nothing, and the boost buys what it buys on the copied action.</li>
     </ul>
     <div class="clear"></div>
@@ -574,7 +576,7 @@
     <div class="char">
       <div class="charhead"><img class="portrait" src="img/portrait_locke.png" alt=""><span class="name">Locke</span><span class="job">Thief</span><span class="arms">dagger</span></div>
       <figure class="fig-right"><img class="shot" src="img/locke.png" alt="">
-        <figcaption>Locke's kit lives behind Steal. Locked rows open as the story goes on.</figcaption></figure>
+        <figcaption>Locke's kit lives behind Steal. Rows open as the story goes on; battle lists only those.</figcaption></figure>
       <p>Steal by boost: with 0 points it is the Steal you know. One point makes the steal likelier and the rare item
       likelier. Two points make both a lot likelier. Three points always succeed and take the rare item if there is
       one, the common item if not. A boost never makes up an item the enemy lacks.</p>
@@ -800,7 +802,7 @@
     <div class="char">
       <div class="charhead"><img class="portrait" src="img/portrait_mog.png" alt=""><span class="name">Mog</span><span class="job">Dancer</span><span class="arms">spear</span></div>
       <figure class="fig-right" style="width:1.6in"><img class="shot" src="img/mog.png" alt="">
-        <figcaption>Mog&rsquo;s Dance list, each Dance at 8 MP unboosted.</figcaption></figure>
+        <figcaption>Mog&rsquo;s Dance list: the Dances he knows, from the top, each at 8 MP unboosted.</figcaption></figure>
       <p class="small">Mog learns his eight Dances by fighting on each dance's terrain. Dances cost 8 MP, 20 with 1
       point, 50 with 2 and 99 with 3, and a boost multiplies every step. Off its own terrain a Dance may stumble: it
       fails half the time. 1 point cuts that to one in four, 2 points to one in 16, and 3 points to never. A stumble

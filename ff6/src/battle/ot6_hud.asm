@@ -161,13 +161,30 @@
         .a8
         lda     #$01
         sta     f:$7e0000+OT6_SCRIPTBUSY
+        lda     #$00            ; BtlGfx_04 zeroes the multi-target numeral
+        sta     f:$7e0000+OT6_MULCTR    ;   counter as it starts (#539)
         rtl
 .endproc
 
+; the script is over: whatever its hits did is shown now (#539's flush).
+; a8 from C1; pins its own widths and db, restores them.
 .proc Ot6ScriptEnd_ext
         .a8
         lda     #$00
         sta     f:$7e0000+OT6_SCRIPTBUSY
+        php
+        phb
+        sep     #$20
+        rep     #$10
+        .a8
+        .i16
+        lda     #$7e
+        pha
+        plb
+        jsr     Ot6ShowFlush
+        jsr     Ot6PipPending   ; and a deferred point shows (#540)
+        plb
+        plp
         rtl
 .endproc
 
@@ -220,9 +237,6 @@
         lda     OT6_BRKLIVE     ; db=$7e is pinned at the top of this proc
         beq     :+
         jsr     Ot6BreakFlash
-:       lda     OT6_GREYLIVE    ; broken monsters in grey (#397): the same
-        beq     :+              ;   inline gate, after the flash, so a
-        jsr     Ot6GreyPaint    ;   flash's hand-back lands first
 :
         plb
         ply
@@ -283,22 +297,21 @@
         sta     f:$7e0000+OT6_SHADOW+12,x
         sta     OT6_HUDLEAD,y   ; the lead cell too (db = $7e here)
         shorta0
-        ; dead monsters: cells stay blank, line stays live (erases old art)
-        lda     $3eec,y
-        bit     #$c2
-        jne     @done
         ; the shield gauge (#397): the lead cell and cell 0.  shielded: the
         ; emblem (fixed cell $71) in the lead cell and the slot's count tile
         ; in cell 0, both in text palette 0, plain white.
         ; broken: the broken shield (the slot's tile 100) in the lead cell,
         ; palette 7, and cell 0 empty.  shieldless: both empty.
-        lda     $3e90,y
-        beq     @count
-        lda     #$01
-        sta     OT6_GREYLIVE    ; a broken monster: wake the grey painter
+        ; dead monsters: cells stay blank, line stays live (erases old art).
+        ; all of it as of the last hit shown (#539, Ot6ShownGauge)
+        jsr     Ot6ShownGauge
+        bit     #$40
+        jne     @done           ; dead or petrified
+        cmp     #$00
+        bpl     @count
         lda     #100            ; the broken shield's tile
         bra     @tile
-@count: lda     $3e40,y
+@count: and     #$3f
         jeq     @slots          ; shieldless
         cmp     #100            ; the count tiles run 1..99
         bcc     @tile
@@ -508,296 +521,6 @@
 ; bit s.
 Ot6ShownBitTbl:
         .byte   $01,$02,$04,$08,$10,$20
-
-; ------------------------------------------------------------------------------
-
-; [ broken monsters in grey (#397) ]
-
-; A broken monster's sprite is moved onto a grey copy of its own palette for
-; as long as it stays broken, so the state reads at a glance.
-;
-; Where the grey copy lives.  Monsters draw from obj palettes 0-2, one per
-; distinct monster palette in the formation (LoadMonsterPal: w7e8123 lists
-; the loaded palettes, $ffff past the last, and w7e80db bits 1-3 point each
-; slot at its palette); palette 3 is the engine's flash/death scratch and
-; 4-7 are the characters'.  A formation with fewer than three monster
-; palettes leaves the rest unused, and those are the spares this proc
-; writes: one lone boss or a pack of one species leaves two, two species
-; leave one, three leave none.  With no spare free the monster keeps its
-; colours (the HUD's broken shield still says it).  Two broken monsters of
-; one palette share one grey copy.  The PPU update DMAs all eight sprite
-; palettes from WRAM every frame (btlgfx_main.asm:1512-1518), so the copy
-; and the w7e80db repoint are WRAM writes, as with the break flash.
-;
-; Who owns the sprite.  The proc acts only on frames no battle script runs
-; (OT6_SCRIPTBUSY), only on a slot whose palette bits are 0-2 (3 is the
-; flash or an animation; the +5 shift of AnimCmd_80_35 moves them to 5-7),
-; and never while that slot's break flash is pending or live: the flash hands
-; the sprite back to its own palette and the grey follows the flash.  A
-; script that saved and restored w7e80db across the break (PushMonsterPalID/
-; PopMonsterPalID, or ExecAnimScript's save into w7e616e) or a palette
-; reload hands back a stale value; the next quiet frame corrects it either
-; way.  A monster's own palette is read
-; the way LoadMonsterPal assigns it (Ot6OwnPal), so a monster that recovers
-; goes back to it whatever happened while it was grey.
-;
-; Display only: it writes the sprite's palette bits and an unused palette.
-; a8/i16, db = $7e (Ot6BgHud_ext's context).  clobbers x/y; exits with the
-; whole of a clear, as the battle code it returns to expects.
-.proc Ot6GreyPaint
-        .a8
-        .i16
-        lda     a:OT6_SCRIPTBUSY
-        beq     :+
-        rts                     ; a script owns the sprites: keep the flag
-:       longa
-        ldx     #$0000
-@k:     lda     $8123,x         ; w7e8123: the formation's loaded palettes
-        cmp     #$ffff
-        beq     @kd
-        inx
-        inx
-        cpx     #$0006
-        bcc     @k
-@kd:    txa                     ; 2 * (palettes loaded, up to 3) = the
-        shorta                  ;   sprite bits of the first spare palette
-        pha                     ; $01,s: the first spare's bits (6 = none)
-        stz     OT6_GREYLIVE    ; recomputed below
-        ldy     #$0000
-@slot:  tyx
-        jsr     Ot6GreyHeld     ; a = the slot's palette bits
-        bcc     @next           ; no monster, or a dead one: death owns it
-        lda     OT6_BRKTICK,y
-        bne     @wait           ; a break flash is pending or live
-        lda     $80db,y
-        and     #$0e
-        cmp     #$06
-        bcs     @next           ; palette 3+: not ours to move
-        cmp     $01,s
-        bcs     @spare          ; already on a spare: the grey copy
-        lda     $3e90,y         ; on its own palette.  broken?
-        beq     @next
-        lda     $3aa8,y
-        lsr
-        bcc     @wait           ; broken but off the field (the whelk's
-                                ;   head in its shell): grey it when it is
-        jsr     Ot6GreyStart
-@wait:  lda     #$01
-        sta     OT6_GREYLIVE
-        bra     @next
-@spare: lda     $3e90,y
-        bne     @wait           ; broken and grey: keep watching
-        tyx                     ; recovered: back to its own palette
-        jsr     Ot6OwnPal
-        sta     OT6_SCR_BIT
-        lda     $80db,y
-        and     #$f1
-        ora     OT6_SCR_BIT
-        sta     $80db,y
-@next:  iny
-        iny
-        cpy     #$000c
-        bcc     @slot
-        pla
-        shorta0                 ; leave b = 0: Ot6GreyHeld's 16-bit reads
-        rts                     ;   leave $ff there, and the battle code
-.endproc                        ;   WaitFrame returns to does a 16-bit tax
-                                ;   on a with b assumed clear (the probe
-                                ;   that found it: C1/44D9 dispatching on
-                                ;   $ff04, build/attempts/wt/polish-shield-
-                                ;   hud/probes/tr5.txt)
-
-; [ move one broken monster onto a grey copy of its palette ]
-
-; y = its slot offset, $03,s = the first spare's bits (Ot6GreyPaint's
-; frame).  A spare another monster of the same palette already stands on is
-; shared; else the first spare no monster stands on gets a grey copy of its
-; palette.  None: the monster keeps its colours.
-; a8/i16, db = $7e.  preserves y; clobbers a/x and the OT6_SCR scratch.
-.proc Ot6GreyStart
-        .a8
-        .i16
-        tyx
-        jsr     Ot6OwnPal
-        sta     OT6_SCR_BIT     ; the palette to grey
-        ldx     #$0000
-@z:     jsr     Ot6GreyHeld     ; a = monster x's palette bits, or c=0
-        bcc     @zn
-        cmp     $03,s
-        bcc     @zn             ; on its own palette
-        sta     OT6_SCR_IDX
-        jsr     Ot6OwnPal
-        cmp     OT6_SCR_BIT
-        bne     @zn
-        lda     OT6_SCR_IDX
-        bra     @point          ; a grey copy of this palette: share it
-@zn:    inx
-        inx
-        cpx     #$000c
-        bcc     @z
-        lda     $03,s           ; first candidate spare
-@s:     cmp     #$06
-        bcs     @none
-        sta     OT6_SCR_IDX
-        ldx     #$0000
-@u:     jsr     Ot6GreyHeld
-        bcc     @un
-        cmp     OT6_SCR_IDX
-        beq     @taken
-@un:    inx
-        inx
-        cpx     #$000c
-        bcc     @u
-        jsr     Ot6GreyBuild    ; free: build the copy there
-        lda     OT6_SCR_IDX
-@point: sta     OT6_SCR_IDX
-        lda     $80db,y
-        and     #$f1
-        ora     OT6_SCR_IDX
-        sta     $80db,y
-@none:  rts
-@taken: lda     OT6_SCR_IDX
-        inc     a
-        inc     a
-        bra     @s
-.endproc
-
-; x = slot offset -> carry set and a = its sprite palette bits if the slot
-; holds a monster (w7e8117 names its palette) that is not dead, else carry
-; clear.  A retracted or not-yet-entered monster still holds its palette;
-; an empty slot does not, though LoadMonsterPal points it at the first
-; unloaded palette.  a8/i16, db = $7e.
-.proc Ot6GreyHeld
-        .a8
-        .i16
-        longa
-        lda     $8117,x
-        cmp     #$ffff
-        shorta
-        beq     @no
-        lda     $3eec,x
-        bit     #$c2
-        bne     @no
-        lda     $80db,x
-        and     #$0e
-        sec
-        rts
-@no:    clc
-        rts
-.endproc
-
-; x = slot offset -> a = the sprite palette bits LoadMonsterPal gives the
-; slot: twice the index of its palette (w7e8117) in the loaded list
-; (w7e8123), 0 when it is not among the first three.  a8/i16, db = $7e.
-; preserves x/y.
-.proc Ot6OwnPal
-        .a8
-        .i16
-        phy
-        longa
-        lda     $8117,x
-        ldy     #$0000
-@f:     cmp     $8123,y
-        beq     @got
-        iny
-        iny
-        cpy     #$0006
-        bcc     @f
-        ldy     #$0000
-@got:   tya
-        shorta
-        ply
-        rts
-.endproc
-
-; [ write a grey copy of one monster palette into another ]
-
-; OT6_SCR_BIT = the source's sprite bits, OT6_SCR_IDX = the destination's
-; (palette p's bits are 2p, and its 16 colours sit at w7e7e00::_8 + 32p,
-; $7e7f00 + 16 * bits).  Each colour becomes its luma, (2r + 5g + b) / 8,
-; on all three channels.  a8/i16, db = $7e.  preserves y.
-.proc Ot6GreyBuild
-        .a8
-        .i16
-        phy
-        longa
-        lda     OT6_SCR_BIT
-        and     #$00ff
-        asl
-        asl
-        asl
-        asl
-        tax
-        lda     OT6_SCR_IDX
-        and     #$00ff
-        asl
-        asl
-        asl
-        asl
-        tay
-        clc
-        adc     #$0020
-        pha                     ; the destination's end (no scratch byte:
-                                ;   WaitFrame's callers hold their own)
-@c:     lda     $7f00,x         ; bgr555
-        pha                     ; $03,s after the next push: the colour
-        and     #$001f
-        asl
-        pha                     ; $01,s: 2r
-        lda     $03,s
-        xba
-        lsr
-        lsr
-        and     #$001f          ; b
-        clc
-        adc     $01,s
-        sta     $01,s           ; 2r + b
-        lda     $03,s
-        lsr
-        lsr
-        lsr
-        lsr
-        lsr
-        and     #$001f          ; g
-        sta     $03,s
-        asl
-        asl
-        clc
-        adc     $03,s           ; 5g
-        clc
-        adc     $01,s
-        lsr
-        lsr
-        lsr                     ; luma 0..31
-        sta     $01,s
-        asl
-        asl
-        asl
-        asl
-        asl
-        ora     $01,s
-        asl
-        asl
-        asl
-        asl
-        asl
-        ora     $01,s
-        sta     $7f00,y
-        pla
-        pla
-        inx
-        inx
-        iny
-        iny
-        tya
-        cmp     $01,s
-        bne     @c
-        pla
-        shorta0
-        ply
-        rts
-.endproc
-
 
 ; ------------------------------------------------------------------------------
 
@@ -1236,51 +959,50 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         lda     f:$7e0000+OT6_WALLETCELLS+8
         sta     hVMDATAL
 @pipline:
-        ; live pip pseudo-line: one cell in the party-window menu map. the
-        ; map is the menu engine's own, and this code paints one cell in it.
-        ; Ot6PipStage points it at the active character while a menu is
-        ; open, and at the character who just spent BP for a few frames
-        ; after (OT6_PIPTAIL), so the drop lands on the charge frame.
-        ; the party window is double-buffered: each name row is staged at
-        ; map row 1+2r and at 9+2r (+$100 words) and the scroll picks a band,
-        ; so both are painted: writing only the low band would leave boost
-        ; feedback invisible whenever the high band is up.
-        longa
-        lda     f:$7e0000+OT6_PIPPREV
-        beq     @cur
-        cmp     f:$7e0000+OT6_PIPCUR
-        beq     @cur
+        ; the boost cells (#540): one name row's pip cell a frame, in the
+        ; party-window menu map: the lowest row Ot6PipStage marked dirty,
+        ; else the next in turn, so a cell changes on the frame after its
+        ; face does and a write the ppu dropped is made again within four
+        ; frames (the old live cell's steady rewrite, which needed no
+        ; lateness gate either).  the party window is double-buffered: each
+        ; name row is staged at map row 1+2r and at 9+2r (+$100 words) and
+        ; the scroll picks a band, so both are painted.  a row with no
+        ; character (word 0) is left alone.
         shorta0
-        jsr     @late
-        bcs     @pdone
+        lda     f:$7e0000+OT6_PIPLIVE
+        beq     @pdone          ; the party window not drawn yet this battle
+        ldx     #$0000
+        lda     f:$7e0000+OT6_PIPDIRTY
+        beq     @prr
+@pbit:  lsr
+        bcs     @prow
+        inx
+        bra     @pbit
+@prr:   lda     f:$7e0000+OT6_PIPRR
+        inc     a
+        and     #$03
+        sta     f:$7e0000+OT6_PIPRR
+        tax
+@prow:  lda     f:Ot6HitBitTbl,x        ; the row's bit
+        eor     #$ff
+        and     f:$7e0000+OT6_PIPDIRTY
+        sta     f:$7e0000+OT6_PIPDIRTY
         longa
-        lda     f:$7e0000+OT6_PIPPREV            ; reload (gate ate a)
-        sta     hVMADDL                  ; moved/closed: blank the old cell
-        lda     #$21ff          ; $21ff is correct here, on purpose: the pip
-                                ;   lives in the party-window menu map, whose
-                                ;   hdma $2105 sections ($8973/$8977) no anim
-                                ;   ever flips to 16x16.  the field-map blank
-                                ;   above had to become $01ee (the entrance-
-                                ;   flash fix), but $01ee is the field map's
-                                ;   fill, not this map's
+        txa
+        asl
+        tax                     ; the row's word index
+        lda     f:$7e0000+OT6_PIPROWW,x
+        beq     @pdone          ; no character on this row
+        lda     f:Ot6PipRowAddr,x
+        sta     f:$7e0000+OT6_PIPPREV   ; the cell painted last (H.livePipCell
+        sta     hVMADDL                 ;   reads it, the old live cell's word)
+        lda     f:$7e0000+OT6_PIPROWW,x
         sta     hVMDATAL
-        lda     f:$7e0000+OT6_PIPPREV
+        lda     f:Ot6PipRowAddr,x
         clc
-        adc     #$0100                   ; ...and its band twin
+        adc     #$0100          ; ...and its band twin
         sta     hVMADDL
-        lda     #$21ff
-        sta     hVMDATAL
-@cur:   lda     f:$7e0000+OT6_PIPCUR
-        sta     f:$7e0000+OT6_PIPPREV
-        beq     @pdone
-        sta     hVMADDL
-        lda     f:$7e0000+OT6_PIPCELL
-        sta     hVMDATAL
-        lda     f:$7e0000+OT6_PIPCUR
-        clc
-        adc     #$0100
-        sta     hVMADDL
-        lda     f:$7e0000+OT6_PIPCELL
+        lda     f:$7e0000+OT6_PIPROWW,x
         sta     hVMDATAL
 @pdone: shorta0
 @out:   plb
@@ -1533,127 +1255,231 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         sta     f:$7e0000+OT6_PIPTAIL   ;   painting, Ot6ActionEnd's own value
         lda     #$00
         sta     f:$7e0000+OT6_PIPPEND   ; consumed (stz has no long mode)
-@none:  rts
+@none:  lda     #$00                    ; and a runic absorb's point shows
+        sta     f:$7e0000+OT6_BPDEFER   ;   on the same numeral (#540)
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------
 
-; [ stage the live pip cell: the drop lands on the charge frame ]
+; [ the boost display: every name row's pip cell, as the rule has it (#540) ]
 ;
-; One cell (the flush paints it into both window bands), pointed at:
-;   - the active character while a battle menu is open, giving compose-time
-;     feedback, an arrow cluster while a boost is pending and uncommitted;
-;   - the character who just spent bp for OT6_PIPTAIL frames after their
-;     action resolved (Ot6ActionEnd arms both), so the drop is visible even
-;     though no menu is open at resolution.
-; The glyph is the full bank rather than bank-minus-pending: a committed spend
-; keeps showing its pips until Ot6ActionEnd's charge writes bp, which is what
-; makes the visible drop and the mechanical event the same frame.
+; Each party-window name row has one cell for its character's Boost Points:
+; an arrow cluster for a pending boost, else the pips of the bank.  The rule
+; (owner, #540): pending points stay visible as arrows until the action that
+; spends them begins, and the point a turn earns at its end is not shown
+; until that character is active again.  Display only: the bank
+; (OT6_BP_CLASS) and the pending boost (OT6_BOOST_REVEALED) move when the
+; rules say, and every rule reads them; Ot6PipFace derives the cell:
+;   - pending and the action not begun (OT6_BPMARK's low nibble): the arrows;
+;   - else the pips of the bank, less the pending once the action has begun
+;     (the spend is charged at its end, Ot6ActionEnd), less the regen point
+;     not yet shown (OT6_BPMARK's high nibble: set by Ot6ActionEnd's gain,
+;     cleared when the character's window opens or its next turn begins), less
+;     a cover or absorb point whose blow has not landed yet (OT6_PIPPEND,
+;     OT6_BPDEFER: cleared on the damage numeral or the script's end).
+; This proc stages all four rows every main-loop frame into OT6_PIPROWW and
+; marks a row dirty when its word changes; the nmi flush writes the dirty
+; rows into both bands of the party window.  The menu engine's own staging
+; of a row (Ot6PipGlyph_ext, at every window open) reads the same face and
+; marks the row dirty, so the two never disagree for longer than a frame.
+; The active character's arrows pulse while its action is still being
+; composed (Ot6CommittedSlot clear), as before.
 ; a8/i16, db=$7e (Ot6BgHud_ext's context).  clobbers a; preserves x/y.
 .proc Ot6PipStage
         .a8
         .i16
-        ; the charge window takes priority.  While OT6_PIPTAIL runs, the cell
-        ; follows the character who just spent BP even if a menu is open for
-        ; someone else: one cell can only show one row.  The other rows are
-        ; re-staged at the next window open (Ot6PipGlyph_ext), and the tail
-        ; is ~half a second, so a boost being composed elsewhere gets its
-        ; arrow back immediately after.
-        lda     f:$7e0000+OT6_PIPTAIL
-        beq     @nottail
-        dec     a
-        sta     f:$7e0000+OT6_PIPTAIL
-        lda     f:$7e0000+OT6_PIPSLOT    ; the character who just charged
-        bra     @have
-@nottail:
-        lda     $7bca           ; battle menu open?
-        bne     @menu
-        jmp     @off            ; nothing to show
-@menu:  lda     $62ca
-        and     #$03
-@have:  and     #$03
-        sta     OT6_SCR_BIT     ; the slot whose cell we paint
-        phx
+        phx                     ; preserved from the top
         phy
-        ldx     #$0000
-@row:   cmp     $64d6,x         ; find the menu row showing this slot
-        beq     @found
-        inx
-        cpx     #$0004
-        bcc     @row
-        ply
-        plx
-        jmp     @off            ; not on screen: disable the pseudo-line
-@found: ; map word = $7800 + (1 + row*2)*32 + 20
-        longa
+        jsr     Ot6BpWindowSeen ; a window open: its earned point shows
+        lda     OT6_PIPLIVE
+        beq     @out            ; the party window not drawn yet this battle
+        ldx     #$0000          ; menu row * 2
+@row:   longa
         txa
-        asl                     ; row*2
-        inc     a               ; +1
-        asl
-        asl
-        asl
-        asl
-        asl                     ; *32
-        clc
-        adc     #$7814          ; $7800 + 20
-        sta     f:$7e0000+OT6_PIPCUR
-        shorta0
-        lda     OT6_SCR_BIT
-        asl                     ; slot -> entity offset
-        longa
-        and     #$00ff
+        lsr
         tay
-        shorta0                 ; y = entity offset
-        ; arrow iff a menu is open, this row is the ACTIVE character, a boost
-        ; is pending, and the action is not committed yet
-        lda     $7bca
-        beq     @jpips
+        shorta0
+        lda     $64d6,y         ; menu row -> character slot
+        cmp     #$ff
+        bne     :+
+        longa                   ; no character on this row: the flush
+        stz     OT6_PIPROWW,x   ;   leaves its cell alone
+        shorta0
+        bra     @next
+:       pha                     ; [$02,s] the slot
+        jsr     Ot6PipFace      ; a = tile, b = attribute; carry = arrows
+        pha                     ; [$01,s] the tile
+        bcc     @calm
+        lda     $7bca           ; arrows: pulse while the active character
+        beq     @calm           ;   is still composing its action
         lda     $62ca
         and     #$03
-        cmp     OT6_SCR_BIT
-        bne     @jpips
-        lda     OT6_BOOST_REVEALED,y
-        beq     @jpips
-        lda     OT6_SCR_BIT
+        cmp     $02,s
+        bne     @calm
+        lda     $02,s
         jsr     Ot6CommittedSlot
-        bcc     @arrow
-@jpips: jmp     @pips
-@arrow:
-        lda     OT6_BOOST_REVEALED,y     ; pending 1-3 -> arrow cell
+        bcs     @calm
+        lda     $0e             ; frame counter: pulse every 8 frames,
+        and     #$08            ;   palette 2 (yellow) <-> 0 (white)
+        ora     #$21
+        bra     @attr
+@calm:  lda     #$21
+@attr:  xba
+        pla                     ; a = the tile, b = the attribute
         longa
+        cmp     OT6_PIPROWW,x
+        beq     @same
+        sta     OT6_PIPROWW,x
+        shorta0
+        lda     f:Ot6CharBitTbl,x
+        tsb     OT6_PIPDIRTY
+@same:  shorta0
+        pla
+@next:  inx
+        inx
+        cpx     #$0008
+        bcc     @row
+@out:   ply
+        plx
+        rts
+.endproc
+
+; [ one character's boost cell ]  a = character slot (0-3) -> a = the
+; cell's tile, b = its attribute ($21), carry set when it is the arrows.
+; a8/i16, any db (long reads only).  preserves x/y.
+; [ a window open: its character is active, so its earned point shows ]
+;
+; Clears the open window's character's high nibble of OT6_BPMARK (its regen
+; point not yet shown).  Called by Ot6PipFace, so the menu engine's own
+; staging of a row at the window's open (Ot6PipGlyph_ext, through the text
+; engine) reads the same face as Ot6PipStage: before, the text engine could
+; stage the row in the frame the window opened, before Ot6PipStage's clear,
+; and its copy of the party window then overwrote the flush's cell for six
+; frames (battle_bpdisplay at be80 on v0.46's replay: "f4078 row 0 (slot 0):
+; shows p0, the rule says p1", build/attempts/wt/v046-land/replay1/bpdbg.log).
+; a8/i16, any db (long reads only).  preserves x/y; clobbers a (b = 0).
+.proc Ot6BpWindowSeen
+        .a8
+        .i16
+        lda     f:$7e7bca
+        beq     @out
+        phx
+        lda     f:$7e62ca
+        and     #$03
+        asl
+        longa
+        and     #$0006
+        tax
+        shorta0
+        lda     f:Ot6CharBitTbl,x
+        asl
+        asl
+        asl
+        asl
+        eor     #$ff
+        and     f:$7e0000+OT6_BPMARK
+        sta     f:$7e0000+OT6_BPMARK
+        plx
+@out:   rts
+.endproc
+
+.proc Ot6PipFace
+        .a8
+        .i16
+        phx
+        pha
+        jsr     Ot6BpWindowSeen
+        pla
+        and     #$03
+        asl
+        longa
+        and     #$0006
+        tax                     ; x = entity offset
+        shorta0
+        lda     f:Ot6CharBitTbl,x
+        pha                     ; [$01,s] the slot's begun bit
+        lda     f:$7e0000+OT6_BOOST_REVEALED,x
+        beq     @pips           ; nothing pending
+        lda     f:$7e0000+OT6_BPMARK
+        and     $01,s
+        bne     @pips           ; the action has begun: the spend shows
+        lda     f:$7e0000+OT6_BOOST_REVEALED,x
+        cmp     #$04
+        bcc     :+
+        lda     #$03
+:       longa
         and     #$00ff
         tax
         shorta0
+        pla                     ; drop the bit
         lda     f:Ot6ArrowCellTbl-1,x
-        sta     f:$7e0000+OT6_PIPCELL
-        lda     $0e             ; frame counter: pulse every 8 frames
-        and     #$08            ; palette 2 (yellow) <-> 0 (white)
-        ora     #$21
-        sta     f:$7e0000+OT6_PIPCELL+1
-        ply
+        xba
+        lda     #$21
+        xba
         plx
+        sec
         rts
-@pips:  lda     OT6_BP_CLASS,y  ; the full bank (see the block comment)
-        cmp     #$06
+@pips:  lda     f:$7e0000+OT6_BP_CLASS,x
+        pha                     ; [$01,s] the count, [$02,s] the bit
+        lda     f:$7e0000+OT6_BPMARK
+        and     $02,s
+        beq     :+              ; not begun: no spend to show
+        lda     $01,s
+        sec
+        sbc     f:$7e0000+OT6_BOOST_REVEALED,x
+        sta     $01,s
+:       lda     $02,s
+        asl
+        asl
+        asl
+        asl                     ; its owed bit
+        and     f:$7e0000+OT6_BPMARK
+        beq     :+
+        lda     $01,s           ; the regen point, not shown yet
+        dec     a
+        sta     $01,s
+:       lda     $02,s
+        and     f:$7e0000+OT6_BPDEFER
+        beq     :+
+        lda     $01,s           ; an absorb's point, its spell not landed
+        dec     a
+        sta     $01,s
+:       txa
+        lsr
+        inc     a
+        cmp     f:$7e0000+OT6_PIPPEND
+        bne     :+
+        lda     $01,s           ; a cover's point, its blow not landed
+        dec     a
+        sta     $01,s
+:       pla
+        bpl     :+
+        lda     #$00            ; (never below empty)
+:       cmp     #$06
         bcc     :+
         lda     #$05
 :       longa
         and     #$00ff
         tax
         shorta0
-        lda     f:Ot6PipCellTbl,x
-        sta     f:$7e0000+OT6_PIPCELL
+        pla                     ; drop the bit
         lda     #$21
-        sta     f:$7e0000+OT6_PIPCELL+1
-        ply
+        xba
+        lda     f:Ot6PipCellTbl,x
         plx
-        rts
-@off:   longa
-        lda     #$0000
-        sta     f:$7e0000+OT6_PIPCUR
-        shorta0
+        clc
         rts
 .endproc
+
+; character bits by entity offset (stride 2), and the pip rows' bits by
+; row word index: one table for both
+Ot6CharBitTbl:
+        .byte   $01,$00,$02,$00,$04,$00,$08,$00
+
+; a name row's pip cell in the party-window map: $7800 + (1 + row*2)*32 + 20
+Ot6PipRowAddr:
+        .word   $7834,$7874,$78b4,$78f4
 
 ; ------------------------------------------------------------------------------
 
@@ -1926,6 +1752,10 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; menu text command $13, reached from template $01 (character names) only.
 ; +$4a = staging pointer w7e5b95 + row*28, so the menu row is recoverable
 ; without trusting any earlier command's state. empty rows draw blank.
+; The cell is Ot6PipFace's (#540), the one the live stage draws; the row's
+; word is refreshed and marked dirty, so the flush lays the same word (its
+; pulse included) over whatever the engine stages, and the live stage starts
+; once a row has been drawn this battle (OT6_PIPLIVE).
 
 .proc Ot6PipGlyph_ext
         .a8
@@ -1945,24 +1775,26 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 :       lda     f:$7e64d6,x     ; menu row -> character slot
         cmp     #$ff
         beq     @blank
-        asl                     ; slot -> entity offset
+        pha                     ; [$01,s] the slot
         longa
-        and     #$0006
-        tax
+        txa
+        asl
+        tax                     ; the row's word index
         shorta0
-        lda     f:$7e3e9c,x     ; bp: the full bank. the staged cell
-                                ;   agrees with the live painter, which shows
-                                ;   a committed spend at full strength until
-                                ;   Ot6ActionEnd's charge lands
-        cmp     #$06
-        bcc     :+
-        lda     #$05
-:       longa
-        and     #$00ff
-        tax
-        shorta0
-        lda     f:Ot6PipCellTbl,x
-        plx
+        pla
+        jsr     Ot6PipFace      ; a = tile, b = attribute
+        pha
+        longa
+        sta     f:$7e0000+OT6_PIPROWW,x
+        shorta
+        lda     f:Ot6CharBitTbl,x
+        ora     f:$7e0000+OT6_PIPDIRTY
+        sta     f:$7e0000+OT6_PIPDIRTY
+        lda     #$01
+        sta     f:$7e0000+OT6_PIPLIVE
+        tdc                     ; b = 0, as the text engine's 16-bit reads of
+        pla                     ;   a expect (the old body left it so); a =
+        plx                     ;   the tile
         rtl
 @blank: lda     #$ff
         plx

@@ -99,7 +99,9 @@ OT6_MARK_BOOST      = 3         ; the divine's one gate: a full boost
 ; In page order, which is the window read a column at a time: Steal, Filch,
 ; Bestow, Mug down the left, Trickshot, Dismantle, Appraise and Master's Mark
 ; down the right.  The cell is the wItemList offset (row*6, +3 for the right
-; column).  Steal, Filch and Bestow come at join (kits.md: the grant-at-join
+; column) each row has once all eight are learned; the battle list packs the
+; rows learned so far in this order (Ot6ThiefListOpen), so before that a row
+; can sit higher than its cell here.  Steal, Filch and Bestow come at join (kits.md: the grant-at-join
 ; ruling); the other five come by story, each an event switch its beat sets
 ; once and nothing clears (event_main.asm):
 ;   Trickshot   $001A  the Lete River ride is run (:39327)
@@ -206,8 +208,9 @@ Ot6ThiefBanner:
 ; ------------------------------------------------------------------------------
 
 ; [ open Steal as a submenu, the twin of Ot6BlitzListOpen ]
-; Every learned row of the table goes in its own cell, the rest stay $ff
-; (blank and unselectable), so the window is two columns of up to four.  Per
+; The learned rows of the table go into the cells in the table's order, down
+; the left column and then the right, and the rest stay $ff (blank and
+; unselectable), so the window is two columns of up to four.  Per
 ; row: Index = the id, Qty = the MP cost as of this open, Flags = the row's
 ; own targeting byte, which the Tools confirm copies into w7e7a84 in place
 ; of the command's.  That is why Bestow can point at the party while the
@@ -235,15 +238,36 @@ Ot6ThiefBanner:
         inx
         cpx     #$0018          ; 8 cells * 3 bytes
         bcc     @pad
-        ; --- every learned row into its cell ---
+        ; --- every learned row, packed: the k-th goes down the left column,
+        ; then down the right (cell (k & 3) * 2 + k / 4), so a row the story
+        ; has not taught leaves no hole (#541's sequel) ---
         ldx     #$0000
+        lda     #0
+        pha                     ; 1,s k, the rows placed
 @row:   jsl     Ot6ThiefRowKnown
         bcc     @next
-        lda     f:Ot6ThiefRowTbl+1,x
+        lda     1,s
+        lsr
+        lsr
+        pha                     ; 1,s its column, 2,s k
+        lda     2,s
+        and     #$03
+        asl
+        clc
+        adc     1,s             ; its cell
+        sta     1,s
+        asl
+        clc
+        adc     1,s             ; * 3, the wItemList offset
+        sta     1,s
+        pla
         longa
         and     #$00ff
         tay                     ; Y = the cell
         shorta0
+        lda     1,s
+        inc
+        sta     1,s
         lda     f:Ot6ThiefRowTbl,x
         sta     $4005,y
         jsl     Ot6ThiefCost    ; flat here; Ot6KitRowCost redraws the live
@@ -258,13 +282,81 @@ Ot6ThiefBanner:
         inx
         cpx     #OT6_THIEF_REC*OT6_THIEF_ROWS
         bcc     @row
-        ; --- honor Config>Cursor the same way Blitz/Bushido/Tools do: leave the
-        ; shared cursor triple alone, and force a fresh window re-init. ---
+        pla                     ; drop k
+        ; --- honor Config>Cursor the same way Blitz/Bushido/Tools do: keep
+        ; the shared cursor triple, only moved onto a listed row when it
+        ; points past the last one (#541's sequel: the tools shell's cursor
+        ; may come from another kit's longer list), and force a fresh window
+        ; re-init. ---
+        ldy     $62ca
+        jsl     Ot6ThiefClamp
         stz     $7ba5           ; force MakeToolsList_04 to re-init the window
         lda     #$04
         sta     $7b9e           ; jump the tools state machine to its draw phase
         lda     #$03
         sta     $6168           ; w7e6168 = 3 : thief mode (1 blitz, 2 bushido)
+        rtl
+.endproc
+
+; [ the thief list's cursor kept on a listed row ]
+; n = the listed cells (Ot6ThiefListOpen packs them, so any $ff is past the
+; last), read down the columns as the list is.  in: a8/i16, db = $7e, y =
+; the slot.  Preserves a, x, y and P.
+.proc Ot6ThiefClamp
+        .a8
+        .i16
+        php
+        rep     #$30
+        .a16
+        pha
+        phx
+        tya
+        and     #$0003
+        clc
+        adc     #$8963          ; this slot's column cell (row cell $8967)
+        pha
+        sep     #$20
+        .a8
+        ldx     #$0000
+        lda     #0
+@n:     pha
+        lda     a:$4005,x       ; wItemList::Index
+        cmp     #$ff
+        pla
+        bcs     :+              ; (carry from the compare: $ff only)
+        inc
+:       inx
+        inx
+        inx
+        cpx     #$0018          ; 8 cells * 3 bytes
+        bcc     @n
+        plx                     ; (a 16-bit pull: x = the column cell)
+        sec                     ; down the columns
+        jsl     Ot6GridClamp
+        rep     #$30
+        .a16
+        plx
+        pla
+        plp
+        rtl
+.endproc
+
+; [ the tools shell's cursor store (UpdateMenuState_30 @87eb) ]
+; `lda $36 / sta w7e8963,y / lda $37 / sta w7e8967,y`, then, in the thief
+; list (w7e6168 = 3), the clamp: the shell's other kits keep vanilla's
+; cursor.  y = the slot.  a8/i16, db = $7e.
+.proc Ot6ToolsCursorStore
+        .a8
+        .i16
+        lda     $36
+        sta     $8963,y
+        lda     $37
+        sta     $8967,y
+        lda     $6168
+        cmp     #$03
+        bne     :+
+        jsl     Ot6ThiefClamp
+:       lda     $37             ; a as the store left it
         rtl
 .endproc
 
@@ -495,6 +587,7 @@ Ot6ThiefBanner:
         and     #$03            ; the points (Ot6Boost caps the spend at 3)
         inc     a               ; one shield, and one more a point
         jsr     Ot6TakeShields  ; the last one taken breaks the body
+        jsr     Ot6HitUnbroke   ; #542: a Filch is no hit, so no damage to judge
 @bank:  ; --- the chip landed: Locke keeps the first as a boost point ---
         lda     OT6_BP_CLASS,x
         cmp     #$05

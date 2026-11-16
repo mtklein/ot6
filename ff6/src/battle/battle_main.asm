@@ -3142,7 +3142,8 @@ deal_sub:
 
 ExecCmd:
 _dispatcher:
-@13d3:  phx
+@13d3:  jsl     Ot6BpBegin      ; ot6 #540: a character's action begins
+        phx
         php
         jsr     InitGfxScript
         lda     #$10
@@ -13468,17 +13469,13 @@ GetMPCost:
         lda     $3a7b       ; branch if attacker is a monster
         cpx     #$0008
         bcs     @4f47
-        phx
-        tax
-        lda     $3084,x     ; pointer to master spell list
-        plx
-        cmp     #$ff
-        beq     @4f53       ; return if spell is not in list
-        longa
-        asl2
-        adc     $302c,x     ; calculate pointer to character spell list (at $208e)
-        tax
-        shorta
+        ; ot6 #541: the caster's own row, not the union's: his list is
+        ; packed (ot6_dense.asm), so the master pointer $3084 no longer names
+        ; his row.  Same 20 bytes as vanilla's lookup.
+        jsl     Ot6SpellRowPtr  ; x = the row; carry set = not in his list
+        bcs     @4f53       ; return if spell is not in list
+        nop7
+        nop7
         lda     a:$0003,x     ; modified mp cost (byte 3)
         bra     @4f54
 @4f47:  xba
@@ -14806,8 +14803,10 @@ _56f6:  dey4
         bne     _56e9
         plp
         plx
-        lda     $f6
-        sta     $3cf8,x     ; number of available spells
+        jsl     Ot6PackSpellList  ; ot6 #541: pack this caster's spell and lore
+        nop                     ;   rows (ot6_dense.asm) and store his spell
+                                ;   count, vanilla's `lda $f6 / sta $3cf8,x`
+                                ;   (5 bytes) re-counted from the rows
         rts
 
 ; ------------------------------------------------------------------------------
@@ -15090,6 +15089,12 @@ InitSkills:
         lda     $1d28       ; known blitzes
         jsr     CountBits
         stx     $3a80       ; set number of known blitzes
+.if LANG_EN
+        jsl     Ot6DanceList    ; ot6: the known dances packed from the top
+        bra     :+              ;   (ot6_dense.asm), was a cell per dance id;
+        .res    14, $ea         ;   vanilla's 20 bytes kept
+:
+.else
         lda     $1d4c       ; known dances
         sta     $ee
         ldx     #$07
@@ -15100,6 +15105,7 @@ InitSkills:
 @582f:  sta     $267e,x     ; set known dances
         dex
         bpl     @5828
+.endif
         ; ot6: the one choke point for Gau's 8-slot rage
         ; loadout.  Ot6RageList writes at most eight ids to $257e and the count
         ; to $3a9a, and everything downstream narrows itself: the
@@ -16781,6 +16787,7 @@ ShowDmgNumerals:
         beq     @63ae       ; branch if target didn't take damage
         dec
         sta     $3a2a
+        jsl     Ot6NumQueued            ; ot6 #539: what this numeral shows
         txa
         lsr
         xba
@@ -16798,6 +16805,7 @@ ShowDmgNumeralsMulti:
 @63b4:  bcc     @63da
         php
         shorta
+        jsl     Ot6NumQueuedMulti       ; ot6 #539: what these numerals show
         lda     #$03        ; battle script command $03 (multiple damage numerals)
         jsr     _c2629b       ; add battle script command to queue
         lda     $3a34       ; number of targets

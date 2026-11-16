@@ -27,9 +27,9 @@ local GIRL = 0x15E
 local function tierSpecies()
   local bm = H.sym("BattleMonsters") & 0x3FFFFF
   local out = {}
-  for f in pairs(TIERS) do
+  for _, f in ipairs(H.sortedKeys(TIERS)) do   -- a fixed order for the log
     local rec = H.formationRecord(function(i) return H.readRomByte(bm + f * 15 + i) end)
-    for _, sp in pairs(rec.species) do out[#out + 1] = sp end
+    for _, k in ipairs(H.sortedKeys(rec.species)) do out[#out + 1] = rec.species[k] end
   end
   return out
 end

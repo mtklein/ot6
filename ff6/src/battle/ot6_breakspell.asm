@@ -103,6 +103,7 @@ OT6_BREAK_SPELL = $0c
         bcc     @out            ; a character: no shields
         jsr     Ot6BreakChips   ; A = shields this cast takes
         jsr     Ot6TakeShields
+        jsr     Ot6HitUnbroke   ; #542: no damage rides the cast
 @out:   pla
         plp
         rtl
@@ -123,14 +124,16 @@ OT6_BREAK_SPELL = $0c
         bne     @out            ; Broken: nothing more to take
         lda     OT6_SHIELD_CUR,y
         beq     @out            ; shieldless
+        jsr     Ot6Hold         ; #539: the gauge shows the take with its hit
+        lda     OT6_SHIELD_CUR,y
         dec     a
         sta     OT6_SHIELD_CUR,y
         bne     @more
         lda     #OT6_BREAK_TICKS
         sta     OT6_BROKEN_TICKS,y      ; shields down: Break
-        lda     #$ff
-        sta     OT6_BRKTICK-8,y         ; the flash, pending (Ot6BreakArm)
-        bra     @out
+        jsr     Ot6HitBroke             ; #542: a hit it rides is judged shielded
+        bra     @out                    ; (the flash: the script's numeral or
+                                        ;   its end, #539's Ot6ShowFlush)
 @more:  lda     $01,s
         dec     a
         sta     $01,s

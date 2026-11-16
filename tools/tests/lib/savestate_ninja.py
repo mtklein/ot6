@@ -80,6 +80,7 @@ root: run ninja from the root.
 """
 
 import argparse
+import os
 import re
 import runpy
 import sys
@@ -89,6 +90,12 @@ HERE = Path(__file__).resolve().parent          # tools/tests/lib
 ROOT = HERE.parent.parent.parent                # lib -> tests -> tools -> root
 
 SELF = "tools/tests/lib/savestate_ninja.py"
+# The lab levers and measuring policies compose.py honours (OT6_LEVERS,
+# lib/ot6.lua M.lever; OT6_POLICY/OT6_POLICY_FORMS, #422) are an A/B arm's,
+# never the line's or a suite's: every graph rule that runs an emulator runs
+# it with them unset, so a lab's exported variable cannot leak into
+# qualification.  The VAR=value splices before it still pass through.
+LAB_UNSET = "env -u OT6_LEVERS -u OT6_POLICY -u OT6_POLICY_FORMS"
 GRAPH = "tools/tests/savestate_graph.py"
 OUT = "build/build.ninja"
 ROM = "build/ot6.sfc"
@@ -434,6 +441,7 @@ def emit_state_rules(w):
     # queue, party-cure firings) read per-segment logs, and one overwritten
     # file keeps only the last edge of a wave.
     w("  command = OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$expect' $env "
+      f"{LAB_UNSET} "
       "tools/tests/run.sh tools/tests/$gen.lua build/states/$state.log "
       "&& $stamps")
     w("  description = generate $state <- $gen")
@@ -444,6 +452,7 @@ def emit_state_rules(w):
     w("# next leg Continues.")
     w("rule generate_capture")
     w("  command = OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$expect' $env "
+      f"{LAB_UNSET} "
       "tools/tests/run.sh tools/tests/$gen.lua build/states/$state.log "
       "&& $stamps && $seal")
     w("  description = generate $state <- $gen (captures $key)")
@@ -454,7 +463,7 @@ def emit_state_rules(w):
     w("# booted), which checkpoint_drift.py reads where a producer's stamp")
     w("# would be.")
     w("rule capture")
-    w("  command = OT6_WORKER=$worker $env tools/tests/run.sh "
+    w(f"  command = OT6_WORKER=$worker $env {LAB_UNSET} tools/tests/run.sh "
       "tools/tests/$gen.lua $log && $seal && "
       "{ echo \"rom $$(sh tools/tests/lib/savestate_stamp.sh romsig)\" && "
       "echo \"generator $$(sh tools/tests/lib/savestate_stamp.sh gensig $gen)\" && "
@@ -1029,6 +1038,24 @@ def selftest():
         check("copy_if_changed rule is restat",
               text.split("rule copy_if_changed")[1].split("rule ")[0].count(
                   "restat = 1") == 1)
+        # a lab's lever or policy never reaches a graph run (OT6_LEVERS,
+        # OT6_POLICY): every rule that starts run.sh unsets them first
+        runs = [l for l in lines if l.startswith("  command =")
+                and "tools/tests/run.sh" in l]
+        check("every run.sh rule unsets the lab levers and policies",
+              len(runs) >= 3 and all(LAB_UNSET in l for l in runs))
+        import subprocess
+        probe = 'echo "${OT6_LEVERS-}|${OT6_POLICY-}|${OT6_POLICY_FORMS-}|$X"'
+        leak = dict(os.environ, OT6_LEVERS="WORST_LIFT_OFF",
+                    OT6_POLICY="naive", OT6_POLICY_FORMS="1A")
+        got = subprocess.run(f"X=kept {LAB_UNSET} sh -c '{probe}'", shell=True,
+                             env=leak, capture_output=True, text=True).stdout
+        check("the unset hides an exported lever and policy, keeps a splice",
+              got.strip() == "|||kept")
+        got = subprocess.run(f"X=kept sh -c '{probe}'", shell=True,
+                             env=leak, capture_output=True, text=True).stdout
+        check("NEGATIVE without the unset the lever reaches the run",
+              got.strip() == "WORST_LIFT_OFF|naive|1A|kept")
         gen_lines = [l for l in lines if ": generate" in l]
         cap_lines = [l for l in lines if ": capture" in l]
         check("one generate edge per graph entry, no copies",

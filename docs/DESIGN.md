@@ -95,21 +95,33 @@ solo boss. Breadth and rate are separate levers and are priced separately;
 for the length of a private timer at `$3e88,y`; no ATB cell is written.
 While the timer runs `Ot6Gate` refuses to queue its turns (vanilla Stop is
 not used) and `Ot6BrokenTurn` empties a turn it had already queued, so its
-gauge refills and waits; all damage it takes is ×2. A break reveals no
+gauge refills and waits; every hit that lands on it while Broken is ×2. A
+break reveals no
 weaknesses. On recovery (`Ot6Tick`), shields reset to `shield_max`. `OT6_BREAK_TICKS` is
 `$10` (`ot6_break.asm:1`), which measures **2159 frames** — about 36 s of
 battle time — for an on-stage monster (`probe_ifritbreak.lua`, deleted).
 
-**Shielded resistance.** While an enemy still has shields and is not broken it
-takes reduced damage (×0.5), so the swing from shielded to broken is ×4, and
-×4 on-weakness too rather than ×2: vanilla's weakness ×2 (`asl $f0` in
-`CalcTargetDmg`) lands before `Ot6HitJoin` applies the
-shielded/broken factor, so the two stack. The full range against an
-unbroken-unweak baseline is 8 (broken+weak) : 4 (broken) : 2 (shielded+weak)
-: 1. The published 4:2:1 damage-per-BP measurement samples the
-broken-and-unweak case, so it never measures the strongest state. Either way
-the conclusion holds: boosting into an unbroken, non-weak target is the worst
-return on BP, which is intended.
+**Shielded resistance.** Every hit is judged on the enemy's state before it
+lands. While an enemy still has shields it takes reduced damage (×0.5), and
+the hit that takes its last shield is one of those hits: it lands on a
+shielded enemy, so it is halved and not doubled. Only a hit on an enemy that
+is already Broken takes ×2; in a multi-hit action, the hits after the one
+that breaks (owner, 2026-11-15, #542: "the hit that breaks should not
+benefit from dropped shields", which gives each monster about one more
+shield's worth of hits; through v0.45 the breaking hit skipped the ×0.5 and
+took the ×2, measured at 784 against the 190 of the chips before it on the
+Whelk's head, `battle_break`). `Ot6HitBroke` marks the slot whose last
+shield a take removes (`OT6_HITBRK`), `Ot6ShieldedDmg` halves a marked hit
+and `Ot6BrokenDmg` withholds its ×2 and clears the mark. Shadow's
+Assassinate still kills on the breaking hit: its gate reads the break, not
+the damage. The swing from shielded to broken is ×4, and ×4 on-weakness too
+rather than ×2: vanilla's weakness ×2 (`asl $f0` in `CalcTargetDmg`) lands
+before `Ot6HitJoin` applies the shielded/broken factor, so the two stack.
+The full range against an unbroken-unweak baseline is 8 (broken+weak) : 4
+(broken) : 2 (shielded+weak) : 1. The published 4:2:1 damage-per-BP
+measurement samples the broken-and-unweak case, so it never measures the
+strongest state. Either way the conclusion holds: boosting into an
+unbroken, non-weak target is the worst return on BP, which is intended.
 
 **Reveal.** Weaknesses start hidden. Chipping one reveals that entry
 (`Ot6RevealCommit`, for every monster of the species) and it stays revealed,
@@ -130,9 +142,16 @@ drew it gold on navy, the lightning and holy icons' yellow, and a revealed
 bolt beside the count read as a smear of it (owner, 2026-11-14). White is
 also the wind and weapon-class icons' colour, and the '?' grey earth's: the
 battle text palettes hold no other white or mid grey. A broken monster shows a broken
-shield where the gauge was, and its sprite turns grey until it recovers: a
-grey copy of its palette in a monster palette the formation left unused, so
-a formation with three monster palettes keeps its colours.
+shield where the gauge was; its sprite keeps its colours (#543 removed
+v0.45's grey sprite, which a formation with three monster palettes could not
+show). The gauge, a revealed weakness, the break's white flash and its
+cleave change when the hit that caused them visibly lands, one hit at a time
+(#539): an action's hits are all computed before its battle script plays
+them, so the HUD draws a held copy of each monster's gauge (`OT6_HOLD`,
+`OT6_SHOWN`) that each damage numeral advances to the state its hit left
+(`Ot6NumQueued` notes it as the numeral is queued, `Ot6RevealPoll` shows it
+when the script reaches that numeral), and the script's end shows the rest.
+Display only: every rule reads the live state.
 
 **Sources of chip by character.** This is what makes party composition a
 puzzle: weapon attacks chip by weapon class; spells chip by element; each
@@ -147,6 +166,18 @@ Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
 - Spend up to 3 BP when confirming an action. Attack: +1 hit per BP. Skills:
   potency tier per BP. Single-target statuses and cures: one more body per BP.
   Def., Row, Leap and Possess take no boost.
+- The cell beside each name shows the bank as the player has seen it
+  happen (owner, #540: "visible until the ability that uses them begins,
+  and should not visibly regenerate until that player becomes active").
+  A pending boost shows as arrows from the press until its action begins,
+  confirmed and queued included; from then the pips show the bank less the
+  pending points, which `Ot6ActionEnd` charges when the action ends. The
+  regen point shows when its character is next active (its window opens or
+  its next action begins), a cover's or an absorb's point when the blow or
+  spell lands. Display only (`Ot6PipFace`, `OT6_BPMARK`): every rule reads
+  the bank and the pending byte, which move when they always did; the
+  owner's wording is about what is visible, and moving the bank would move
+  every BP decision in the game.
 - Enemies don't have BP, same asymmetry as Octopath: bosses get shields and
   telegraphs, players get the economy.
 - Boosting also costs MP, when the boost is buying damage. A boosted

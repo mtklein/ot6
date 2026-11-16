@@ -1,7 +1,9 @@
 # Water Rondo: the World of Balance detour (#428)
 
-MOG learns Water Rondo from a battle on the `UNDERWATER` background, and
-the only such battles are the Serpent Trench's. The detour that reaches
+MOG learns Water Rondo from a battle on the `RIVER`, `WATERFALL` or
+`UNDERWATER` background (the dance table in battle_main.asm, beside
+`DANCE::WATER_RONDO`), not only in the Serpent Trench; this route brings
+him to the trench's underwater battles. The detour that reaches
 them is played the first time the airship belongs to the party, between
 the Narshe mission meeting and the Imperial Base (`gen_water_rondo`,
 between `narshe-mission-v1` and the new cut `water-rondo-v1`). The owner

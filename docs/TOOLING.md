@@ -573,8 +573,21 @@ or all but some (`ones@wram~1F6E`) to bisect a divergence.
 **Waivers.** `tools/uninit_waivers.txt`: a `fill` line names offsets a
 whole-RAM fill leaves zero, a read already understood (each with its
 instruction, its effect, the proposed fix and the evidence), so the
-comparison can go on past it; a `read` line is an instruction
-`rbw_report.py` counts but does not list.
+comparison can go on past it; a `read` line is an instruction, and an
+`unread` line a range of offsets, whose reads `rbw_report.py` counts but
+does not list. The file has two sections: TO FIX (reads that move the
+play, and OT6 reads that belong cleared at their init; each goes when the
+ROM fixes it) and NO PLAY EFFECT (reads shown not to move the play), so the
+detector lists only what is new.
+
+The harness itself must not read the game's state before the game has set
+it: on a zeroed console such a read looks like "nothing there", under a
+fill it looks like a map, a party or a battle. The tile trace waits for the
+game to write the map id, `battleLoadStarted`/`battleActive` for the game to
+write the battle's HP table, monster bits and brightness (a state load
+counts as written), `partiesLine` names the world map rather than stale
+field objects, and nothing is logged from a generator's file scope at frame
+0.
 
 **Commands.**
 
@@ -620,6 +633,18 @@ finds something, since only it shows what a fill leaves in the saves. A
 divergence the wave finds is bisected with lab-tree runs of that one leg
 (`ones@wram:<half>`), confirmed with `OT6_RBW=1`, and then fixed in the ROM
 or waived with its evidence.
+
+`ones` alone misses a read whose effect is a comparison of two unwritten
+words: all ones makes them equal, as zero does. OT6_WALLETSIG/SIGP was that
+(the ones wave played the same; under `rand:1@wram,sram,vram,oam,cgram`
+seven legs parted, each by a tick in its first battle;
+`build/attempts/wt/v046-fills-3/`), so the release wave is
+`rand:<seed>@wram,sram,vram,oam,cgram`, and a new seed now and then; the
+`ones` line stays the milestone run. The rand wave on px13 (2026-11-15,
+12 at a time): 90 legs in 26 minutes, 13,702 emulator-seconds. A WRAM
+halving of one leg (eight ranges at a time, then eight inside the guilty
+eighth, then the waived offsets one by one) took three rounds, each one leg's time on
+eight emulators (gen_narshe_mission: 224 s in the wave).
 
 ## Mesen facts the harness depends on
 

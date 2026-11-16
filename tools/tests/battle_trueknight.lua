@@ -553,8 +553,14 @@ H.run({ maxFrames = 60000 }, {
     local at = arms[#arms]
     local viaNumeral = false
     for _, n in ipairs(numerals) do if n == at then viaNumeral = true end end
-    H.assertEq(H.readByte(PIPSLOT), knight,
-      "and the live cell points at the blocker")
+    -- the arm itself pointed at the blocker (armsFor filters by the slot the
+    -- arming write found).  Since #540 the battle script's end delivers the
+    -- pending point (Ot6ScriptEnd_ext) before Ot6ActionEnd's own charge arm,
+    -- which then points the cell at the actor; and Ot6PipStage draws every
+    -- row from the rule, so OT6_PIPSLOT has no reader left to show either
+    -- (battle_bpdisplay asserts what the cells show).
+    -- (the arm on the blocker is the assert above: armsFor(knight) counts
+    -- only arms whose write found the blocker's slot)
     H.assertEq(H.readByte(PIPPEND), 0, "with nothing left pending")
     H.log(string.format("6a: delivered at f%d (staged f%d, +%d) via %s",
       at, H.vars.stagedF, at - H.vars.stagedF,
@@ -611,7 +617,8 @@ H.run({ maxFrames = 60000 }, {
     end
     H.log(string.format("6b: %d numeral(s) happened in the window and none "
       .. "of them could reach the poll", inWindow))
-    H.assertEq(H.readByte(PIPSLOT), knight, "6b: pointing at the blocker")
+    -- (pointing at the blocker: armsFor(knight) counts only arms on his slot;
+    -- OT6_PIPSLOT itself has no reader since #540, see 6a)
     H.log(string.format("6b: backstop delivered at f%d (staged f%d, +%d) -- a "
       .. "pending paint never outlives the action that banked it",
       arms[#arms], H.vars.stagedF2, arms[#arms] - H.vars.stagedF2))

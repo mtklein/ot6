@@ -29,8 +29,8 @@
 --      esper page now carries the live page, signed; the saved block is
 --      the block the save was handed (read at CopyGameDataToSRAM's entry)
 --      but for play time, timers and checksum, and, when that block was
---      unsigned (a save from before v0.45), the signature, the zeroed
---      reserve and tail and the impossible loadout values reset to AUTO;
+--      unsigned (a save from before v0.45), the signature and the zeroed
+--      reserve and tail; the loadouts, junk ones included, are untouched;
 --   5. the console's Reset, the title, Continue again: the reload is the
 --      saved block, and the live esper page is what was saved;
 --   6. saved again: a signed block, so only play time, timers and checksum
@@ -205,49 +205,12 @@ local function signedBlock(get)
   return (get(SIG) | (get(SIG + 1) << 8)) == SIGWORD and get(SIG + 2) >= 1 and get(SIG + 2) <= VER
 end
 
--- What the first signing does to the three loadouts (Ot6RepairLoadouts):
--- a value no save can hold goes back to AUTO; {addr = expected byte}.
-local function repaired(pre)
-  local e = {}
-  local w = pre[0x1E1D] | (pre[0x1E1E] << 8)
-  local bad = false
-  if w ~= 0 then
-    if (w & 0xF000) ~= 0 then bad = true end
-    for k = 0, 2 do
-      local t = (w >> (3 + 3 * k)) & 7
-      if ((pre[0x1CF7] >> t) & 1) == 0 then bad = true end
-    end
-  end
-  e[0x1E1D], e[0x1E1E] = bad and 0 or pre[0x1E1D], bad and 0 or pre[0x1E1E]
-  for i = 0, 7 do
-    local v = pre[0x1E1F + i]
-    if v ~= 0 then
-      local id = v - 1
-      if ((pre[0x1D2C + (id >> 3)] >> (id & 7)) & 1) == 0 then v = 0 end
-    end
-    e[0x1E1F + i] = v
-  end
-  for i = 0, 4 do
-    local v = pre[0x1E27 + i]
-    if v ~= 0 then
-      if v > 0x18 then
-        v = 0
-      else
-        local id = v - 1
-        if ((pre[0x1D29 + (id >> 3)] >> (id & 7)) & 1) == 0 then v = 0 end
-      end
-    end
-    e[0x1E27 + i] = v
-  end
-  return e
-end
-
 -- The block a save wrote, against the block it was handed (read at
 -- CopyGameDataToSRAM's entry): byte for byte what Ot6SaveSign makes of it,
 -- but for what the save itself writes (play time, timers, checksum).  A
--- first signing sets the signature and version, zeroes the reserve and the
--- tail, and resets impossible loadout values; a signed block keeps all of
--- them.
+-- first signing sets the signature and version and zeroes the reserve and
+-- the tail; a signed block keeps all of them.  The loadouts are never edited
+-- (owner, 2026-11-15: no repair by inference), junk ones included.
 local function assertSaved(tag, B, firstSign, s)
   s = s or slot
   local function sb(a) return B[SLOT_PTR[s] + (a - 0x1600)] end
@@ -256,12 +219,7 @@ local function assertSaved(tag, B, firstSign, s)
   H.assertEq(sb(SIG + 2), VER, tag .. ": ... with layout version 1")
   local want = {}
   for a = 0x1600, 0x1FFF do want[a] = presave[a] end
-  local fixed = 0
   if firstSign then
-    for a, v in pairs(repaired(presave)) do
-      if v ~= want[a] then fixed = fixed + 1 end
-      want[a] = v
-    end
     want[SIG], want[SIG + 1], want[SIG + 2] = SIGWORD & 0xFF, SIGWORD >> 8, VER
     for a = 0x1E2F, 0x1E3F do want[a] = 0 end
     for a = 0x1FF7, 0x1FFD do want[a] = 0 end
@@ -279,13 +237,12 @@ local function assertSaved(tag, B, firstSign, s)
       end
     end
   end
-  H.log(string.format("[golden] %s: %s; %d impossible loadout byte(s) reset; %d byte(s) off", tag,
-    firstSign and "the save signed an unsigned block" or "the block was signed already", fixed, bad))
+  H.log(string.format("[golden] %s: %s; %d byte(s) changed beyond the save's own and the documented zeroing", tag,
+    firstSign and "the save signed an unsigned block" or "the block was signed already", bad))
   H.assertEq(junk, 0, tag .. ": the reserve $1E2F-$1E3F and the tail $1FF7-$1FFD are zero")
-  H.assertEq(loadout, 0, tag .. (firstSign and ": impossible loadout values are reset to AUTO, the rest kept"
-    or ": the loadouts are as they were"))
+  H.assertEq(loadout, 0, tag .. ": the loadouts are as they were")
   H.assertEq(bad, 0, tag .. ": the save changed nothing in the block but play time, timers, checksum"
-    .. (firstSign and ", the signature, the reserve and impossible loadout values" or ""))
+    .. (firstSign and ", the signature, the reserve and the tail" or ""))
   presave = nil
 end
 

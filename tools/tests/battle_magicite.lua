@@ -41,6 +41,7 @@ local SUMMONED = 0x3f2e
 local TONIC, POTION = 0xE8, 0xE9
 
 local BOSS = 0                            -- Number 024's monster slot
+local DIVINE_WINDOW = 90                  -- frames after the boss's action a divine may confirm
 local function bossHp() return H.readWord(0x3BFC + BOSS*2) end
 local function bossMp() return H.readWord(0x3C08 + 8 + BOSS*2) end
 local function bossAllow34() return H.readWord(0x3330 + 8 + BOSS*2) end
@@ -425,6 +426,7 @@ local observerOn = false
 -- window in which a summon confirmed now can be hijacked before it
 -- executes.  summonSafe below refuses to confirm in it.
 local monInFlight = 0
+local monDoneAt = nil   -- the frame the last monster action returned
 -- What the engine actually dispatched for each once-per-battle divine:
 -- the caster's status-2 byte and the target word at ExecCmd.  Kept so the
 -- phase can ASSERT the precondition was reached instead of inferring it
@@ -467,6 +469,7 @@ local function installObserver()
     local x = emu.getState()["cpu.x"] & 0xffff
     if x % 2 ~= 0 or x >= 20 then return end
     if x >= 8 and monInFlight > 0 then monInFlight = monInFlight - 1 end
+    if x >= 8 then monDoneAt = H.frame end
     -- a divine's own return: its whole effect is in by now
     for _, atk in ipairs({ DDUST, INFERNO }) do
       local d = divineDispatch[atk]
@@ -558,6 +561,17 @@ local function summonUnsafe(s)
   if (a & ST1_IMP) ~= 0 then return "an Imp" end
   if (a & ST1_PETRIFY) ~= 0 then return "petrified" end
   if monInFlight > 0 then return "an enemy action is in flight" end
+  -- a divine confirmed late in the boss's gauge is overtaken by its next
+  -- action: on v0.46's replay (the fights run longer under #542) Number
+  -- 024's Special Muddled LOCKE (exec f3067) between his confirm and his
+  -- summon's turn, and Inferno went out at no target (f3265, target word
+  -- 0000).  So a divine is confirmed in the window the boss's own action
+  -- just opened (its gauge refilling from empty), or on a Broken boss,
+  -- which takes no turns.
+  if H.readByte(0x3E90 + BOSS * 2) == 0
+     and (monDoneAt == nil or H.frame - monDoneAt > DIVINE_WINDOW) then
+    return "the boss's next action could come first (wait for it to act)"
+  end
   return nil
 end
 local holdWhy = {}

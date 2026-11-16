@@ -124,7 +124,26 @@ H.run({ maxFrames = 400000 }, {
   -- Against the box, no Steal: LOCKE's treasure-hunt line spends turns that take 0 off a 6000-HP, 5-shield body,
   -- and every action draws its counter (key be90 was lost that way, gigantos/s0 attempt 1).  The blades lead.
   -- Set here, not in FIGHT's table, so the walk to the box plays as before (FIGHT is read live).
-  H.call(function() FIGHT.locke = false end),
+  -- And no blow under three points (#527): Gigantos (AI _174) answers every action that hits it with Battle, Battle
+  -- and Throat Jab, so the 0-BP openers (SHADOW's 152, TERRA's 245, EDGAR's 288 AutoCrossbow: build/attempts/wt/
+  -- v046-polish/giga-lab/giga-base, seed08) each drew three hits for a twentieth of its HP, and the box cost 13 deaths over 12 keys.  A
+  -- member Defends (half the physical hit, a point banked) while its bank is under 3 and every standing member is
+  -- above half its HP and none is down; at 3 it swings, and LOCKE's one 3-BP Fight broke the body and took its last 5315.  Below half
+  -- HP the driver's care runs as before.  OT6_LEVERS=GIGA_HOLD_OFF is the leg before it.
+  H.call(function()
+    FIGHT.locke = false
+    if H.lever("GIGA_HOLD_OFF") then return end
+    local function hold(_, actor)
+      if H.readByte(0x3E9C + actor * 2) >= 3 then return false end
+      for e = 0, 3 do
+        local hp, mx = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+        if mx > 0 and mx ~= 0xFFFF and hp * 2 <= mx then return false end   -- hurt, or down
+      end
+      return true
+    end
+    -- (a function in FIGHT is a live option, H.fightDriverFor: it returns the option's value)
+    FIGHT.holdFor = function() return hold end
+  end),
   K.monsterBox({ x = 48, y = 15, bit = 95, form = 170, species = 0x0AE, what = "the Gigantos box (394 (48,15))",
     avoid = AVOID, done = function(line) won = line end }),
   H.call(function()

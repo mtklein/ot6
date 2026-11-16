@@ -160,11 +160,12 @@ local function touchDragon(o, maxFrames, what)
         if p and (best == nil or #p < #best) then best = p end
       end
       if best == nil then
-        local reach, bt, bd = H.bfsReach(nil, nil, nil, {}), nil, 1e9
+        local reach, bt, bd, bk = H.bfsReach(nil, nil, nil, {}), nil, 1e9, nil
         for k in pairs(reach) do
           local x, y = k & 0xFF, k >> 8
           local d = math.abs(x - ox) + math.abs(y - oy)
-          if d < bd then bt, bd = { x, y }, d end
+          -- a tie goes to the smaller y, then x (k = y << 8 | x), not to pairs()'s order
+          if d < bd or (d == bd and k < bk) then bt, bd, bk = { x, y }, d, k end
         end
         if bt and not (bt[1] == px and bt[2] == py) then best = H.bfsPath(bt[1], bt[2]) end
       end

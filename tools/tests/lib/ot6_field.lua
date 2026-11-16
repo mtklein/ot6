@@ -930,8 +930,11 @@ function M.fightDriverFor(tag, base, fight)
   if live then
     local memo = {}
     local frame, idle = F.frame, F.idle
+    -- in a fixed order: the callbacks share memo, so one may see what an
+    -- earlier one stored this frame
+    local liveKeys = M.sortedKeys(live)
     F.frame = function(...)
-      for k, fn in pairs(live) do o[k] = fn(tag, memo) end
+      for _, k in ipairs(liveKeys) do o[k] = live[k](tag, memo) end
       return frame(...)
     end
     F.idle = function(...)
@@ -8112,9 +8115,13 @@ function M.careStockPotions(level, opts)
   local reserve = math.min(M.POTION_BAND_CAP, math.ceil((level + ahead) * 1.5))
   local gap = math.max(0, 99 * 50 - 50 * (opts.tonics or M.invCountOf(0xE8)))
   local want = reserve + math.ceil(gap / 250) + (opts.spend or 0)
+  -- not logged at frame 0: a generator's file scope can price its list
+  -- before the game has loaded a party, from RAM nothing wrote yet
   if want > 99 then
-    M.log(string.format("careStockPotions: L%d+%d wants %d Potions (reserve %d + field care %d + spend %d); "
-      .. "the stack holds 99", level, ahead, want, reserve, math.ceil(gap / 250), opts.spend or 0))
+    if M.frame > 0 then
+      M.log(string.format("careStockPotions: L%d+%d wants %d Potions (reserve %d + field care %d + spend %d); "
+        .. "the stack holds 99", level, ahead, want, reserve, math.ceil(gap / 250), opts.spend or 0))
+    end
     want = 99
   end
   return want
@@ -10404,7 +10411,7 @@ function M.gearBaselineViolations(opts)
   local out = {}
   local function bad(fmt, ...) out[#out + 1] = string.format(fmt, ...) end
   local ms = M.gearBaselineMembers(true)
-  for name in pairs(M.gearOverlaysOpen) do bad("the overlay %s is still on", name) end
+  for _, name in ipairs(M.sortedKeys(M.gearOverlaysOpen)) do bad("the overlay %s is still on", name) end
   for _, m in ipairs(ms) do
     for s = 4, 5 do
       local cur = charByte(m.ch, 0x1F + s)
@@ -10617,7 +10624,7 @@ function M.gearBaseline(opts)
     M.call(function()
       -- an overlay closes only once it is off: its relics on no party's member, and an overlay of the weapon and
       -- armor slots by the gear rule's passes above (whose check is the assert's)
-      for name in pairs(M.gearOverlaysOpen) do
+      for _, name in ipairs(M.sortedKeys(M.gearOverlaysOpen)) do   -- (sorted: the lines below are logged)
         if M.GEAR_OVERLAYS[name].gear or not M.gearOverlayWorn(name) then
           M.log(string.format("[baseline] %s: the overlay %s comes off at the save", tag, name))
           M.gearOverlaysOpen[name] = nil
@@ -10725,8 +10732,13 @@ do
           M.charMaxHp(c))
       end
       local mp, x, y = M.partyWhere(p)
+      -- on the world map the field objects are not the party's: until a
+      -- field map has loaded since power-on they hold whatever the field's
+      -- init made of RAM it never wrote ($1FD3, field/obj.asm:3437)
+      local where = (M.worldMode() and "the world map")
+        or (mp and string.format("map %d (%d,%d)", mp, x, y)) or "(not shown)"
       t[#t + 1] = string.format("party %d%s at %s: %s", p, p == M.activeParty() and " (walking)" or "",
-        mp and string.format("map %d (%d,%d)", mp, x, y) or "(not shown)", table.concat(m, ", "))
+        where, table.concat(m, ", "))
     end
     return table.concat(t, "; ")
   end

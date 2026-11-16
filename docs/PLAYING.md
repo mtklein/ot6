@@ -12,8 +12,8 @@ rest. The same material, with pictures and tips for each area, is in the
 ## What is different at a glance
 
 - Enemies have shields and hidden weaknesses. Hitting a weakness removes a
-  shield. At zero shields an enemy is broken: it loses its turns and takes
-  double damage.
+  shield. At zero shields an enemy is broken: it loses its turns, and the
+  hits after the one that broke it do double damage.
 - Each character has Boost Points. Pressing the R Button while choosing a
   command spends points to make an action stronger, surer, wider or longer.
 - Every character has one job and a kit of up to eight skills. Most skills
@@ -40,9 +40,14 @@ Under each enemy is one line:
 While an enemy has shields it takes half damage. Each hit that matches a
 weakness removes one shield. A hit that matches both an element and a weapon
 type removes two, and an attack that strikes several times removes a shield
-per hit. At zero the enemy breaks: its shield icon shows broken and its
-sprite turns grey, it cannot act for a while, and it takes double damage.
-When it recovers, its shields come back.
+per hit. At zero the enemy breaks: its shield icon is drawn cracked, it cannot
+act for a while, and hits on it do double damage. The hit that breaks it is
+still a hit on a shielded enemy and does half; in an attack that strikes
+several times, the strikes after the break do double. When it recovers, its
+shields come back.
+
+The shield count, the break's flash and sound, and a newly found weakness
+change as the hit that caused them lands, one strike at a time.
 
 A weakness you find is remembered for every enemy of that kind, in later
 battles and in your save. Scan reveals all of a kind's weaknesses at once.
@@ -83,6 +88,9 @@ Locke's Filch, Sabin's Bum Rush and Cyan's Cleave on a boss.
 - While choosing a command, the R Button adds a point (up to 3, and no more
   than you hold). The L Button takes one back. Arrows and a glow show how
   many are pending, and the dots after each name show the bank.
+- The arrows stay after the command is chosen, until the action starts; then
+  the dots show the bank without the points it is spending. The point gained
+  after an action shows when that character's next turn comes.
 - The points are spent when the action happens.
 - A Mimic copies the action but pays nothing, and the boost buys what it
   buys on the copied action.
@@ -181,7 +189,8 @@ the steal likelier and the rare item likelier. Two points make both a lot
 likelier. Three points always succeed and take the rare item if there is one,
 the common item if not. A boost never makes up an item the enemy lacks.
 Only the first shield Filch takes becomes a point for Locke. His skills are
-in the list behind Steal.
+in the list behind Steal, the ones he has learned packed from the top in this
+table's order, down the left column and then the right.
 
 ### Edgar, Machinist (spear)
 
@@ -323,6 +332,8 @@ in FF6.
 ### Mog, Dancer (spear)
 
 Mog learns his eight Dances by fighting on each dance's terrain, as in FF6.
+His Dance list in battle shows the ones he knows, packed from the top in this
+table's order.
 
 | Dance | Terrain |
 |---|---|
@@ -362,6 +373,10 @@ Equip an Esper under Skills > Espers, as in FF6. While it is
 equipped, the wearer can cast its spells and summon it once a battle. Take
 it off and both go. Nobody learns the spells. An Esper no longer raises or
 lowers stats while worn.
+
+The Magic list, in battle and under Skills, shows only the spells the
+character can cast now, packed from the top in the spell order chosen in
+Config; an Esper's spells sit in their usual places among the wearer's own.
 
 ### Magic Points and ranks
 

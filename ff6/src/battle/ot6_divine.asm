@@ -165,8 +165,9 @@ done:   plp
 ; shields, Break's 3-BP ceiling (Ot6BreakChips), whatever its keys, the
 ; way Shadow's Assassinate makes a full boost pay against what it cannot
 ; kill.  Killable bodies are unchanged: Death (Ot6CleaveMark).  The take comes
-; before the hit rolls, so a body it breaks takes the cut Broken
-; (Ot6BrokenDmg), and the cut chips nothing more off it.
+; before the hit rolls, and the cut is the hit that breaks: since #542 it
+; lands as a hit on a shielded body (Ot6TakeShields marks OT6_HITBRK), halved
+; and not doubled, and it chips nothing more off it.
 ; a8/i8 (Ot6Oblivion's shortai), db=$7e.  Preserves x and y; clobbers A.
 .proc Ot6CleaveStrip
         .a8
@@ -415,7 +416,7 @@ done:   ply
 ; blow (Doom) the keyed 3-BP Fight out-earned it.  Now each landed blow takes
 ; one shield, keyless like OT6's Break: one Bum Rush strips four, so it breaks
 ; a body at four or fewer shields, and the blows after the break land Broken
-; (Ot6BrokenDmg doubles them, the breaking blow included).  A body that keys
+; (Ot6BrokenDmg doubles them; the breaking blow lands shielded, #542).  A body that keys
 ; bludgeon loses its shield to the class chip instead (Ot6ClassChip, which
 ; also reveals the key), so a blow never takes two.  The gates are the class
 ; chip's: a monster target, not Broken (Ot6TakeShields), not wounded or

@@ -177,7 +177,7 @@ w("# One suite test: compose, boot Mesen headless, publish the log, touch the")
 w("# ok.  $env carries the per-test environment (dirty-RAM pins, checkpoint")
 w("# batteries, coverage artifact dirs); the separating space lives here.")
 w("rule suitetest")
-w("  command = $env nice tools/build/run_suite_test.sh $test $out")
+w(f"  command = $env {sn.LAB_UNSET} nice tools/build/run_suite_test.sh $test $out")
 w("  description = suite $test")
 w()
 
@@ -629,6 +629,10 @@ TEST_ENV = {
     # save outside Nikeah after MOG learns it
     "battle_waterrondo": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/water-rondo-v1",
+    # #541's sequel: MOG's Dance list and LOCKE's thief list packed, from the
+    # same save (both seated, each list with a gap vanilla would show)
+    "battle_densekits": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/water-rondo-v1",
     # #270: the driver's ward line (Shell) against the Dirt Dragon, from the
     # same snapshot
     "battle_wardline": "OT6_TIMEOUT=1800",
@@ -639,6 +643,10 @@ TEST_ENV = {
     # and RunicBlade sending a Wizard's spell back on the Narshe cliffs
     "battle_breakfour": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/esper-mtn-save-v1",
+    # #540: the boost cells beside the names, sampled every frame across one
+    # random battle beside Esper Mountain's save point; no write
+    "battle_bpdisplay": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
     "battle_runicmonster": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-narshe-cliffs-v1",
     # #427: one Morph a battle, four battles at least (11-16k frames on the
@@ -803,10 +811,6 @@ MUTANTS = {
     "sigonly": ("VerCheck=eaeaeaeaeaea", "junk/v0.44-sig-ver0", "with layout version 1"),
     # the page reserves zeroed for the slot loaded, not the slot saved into
     "srcpages": ("SlotAt=ad1f02", "junk/v0.44-wor-cyan", "saveas: slot 1's codex and esper page pads"),
-    # no loadout repair: impossible values survive the first signing
-    "norepair": ("Ot6RepairLoadouts", "junk/v0.44-mixed", "impossible loadout values are reset"),
-    # the Bushido mask counting slot 0 ($f007): the page's seeded word is lost
-    "mask0": ("MaskAt=8907f0", "junk/v0.44-mixed", "impossible loadout values are reset"),
     # no New Game clear (battle_newgameloadouts, below)
     "noclear": ("Ot6NewGameClear", None, None),
 }

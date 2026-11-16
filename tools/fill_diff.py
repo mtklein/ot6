@@ -225,6 +225,10 @@ def ot6_lines(path):
     return out
 
 
+def same_line(x, y):
+    return x == y
+
+
 def first_log_diff(ref_log, fil_log):
     """(line number, ref, fill, observations differing) of the first [ot6]
     line that differs outside the harness's observations; False when none
@@ -236,7 +240,7 @@ def first_log_diff(ref_log, fil_log):
     pa = [(i, x) for i, x in enumerate(a) if not x.startswith(OBSERVATIONS)]
     pb = [(i, x) for i, x in enumerate(b) if not x.startswith(OBSERVATIONS)]
     for (i, x), (_, y) in zip(pa, pb):
-        if x != y:
+        if not same_line(x, y):
             return i + 1, x, y, obs
     if len(pa) != len(pb):
         k = min(len(pa), len(pb))

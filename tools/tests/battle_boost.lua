@@ -201,6 +201,7 @@ H.run({ maxFrames = 30000 }, {
     for w, n in pairs(cellSeen) do
       parts[#parts + 1] = string.format("%04x x%d", w, n)
     end
+    table.sort(parts)
     H.log("boost cell words seen: " .. table.concat(parts, ", "))
     H.assertEq(cellSeen[0x216d] ~= nil, true, "arrow-3 in white seen")
     H.assertEq(cellSeen[0x296d] ~= nil, true, "arrow-3 in yellow seen (pulse alive)")
@@ -215,6 +216,7 @@ H.run({ maxFrames = 30000 }, {
       -- is on screen matters, and it never may be
       if k:sub(-3) == "yon" then other = other + n end
     end
+    table.sort(mparts)
     H.log("sprite mark states seen: " .. table.concat(mparts, ", "))
     H.assertEq(other, 0,
       "the retired boost-mark oam entry stays parked and unused")

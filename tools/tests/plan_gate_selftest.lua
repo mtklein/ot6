@@ -299,10 +299,13 @@ end
 local function drive(L, stepObj, frames, onFrame)
   local pressed, realSet = {}, L.setPad
   L.setPad = function(b)
+    local names = {}
     for k2, v in pairs(b or {}) do
       local nm = type(k2) == "number" and v or (v and k2)
-      if nm then pressed[#pressed + 1] = nm end
+      if nm then names[#names + 1] = nm end
     end
+    table.sort(names)                  -- (string keys: pairs() order is per run)
+    for _, nm in ipairs(names) do pressed[#pressed + 1] = nm end
     return realSet(b)
   end
   local ok, err = pcall(function()

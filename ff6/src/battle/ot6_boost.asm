@@ -50,8 +50,27 @@
         sta     f:$7e0000+OT6_MIMICCOPY ; nor a Mimic copy mark
         sta     f:$7e0000+OT6_SPELLNONE ; nor a no-reward spell turn's mark
         sta     f:$7e0000+OT6_BLUESEEN  ; nor a Berserk Strago saw last battle
+        sta     f:$7e0000+OT6_PASSRETARGET ; nor an added-pass mark: read on a
+                                ;   retarget before the first action's clear
+                                ;   (InitGfxScript), so unwritten after power-on
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
+        sta     f:$7e0000+OT6_BPMARK    ; nor a boost display's marks (#540)
+        sta     f:$7e0000+OT6_BPDEFER
+        sta     f:$7e0000+OT6_PIPDIRTY
+        sta     f:$7e0000+OT6_PIPLIVE
+        sta     f:$7e0000+OT6_PIPRR     ; nor the flush's row turn, nor the
+        sta     f:$7e0000+OT6_PIPROWW+0 ;   staged row words: read before
+        sta     f:$7e0000+OT6_PIPROWW+1 ;   written after power-on (the
+        sta     f:$7e0000+OT6_PIPROWW+2 ;   v0.46 review); 8-bit stores,
+        sta     f:$7e0000+OT6_PIPROWW+3 ;   so one per byte
+        sta     f:$7e0000+OT6_PIPROWW+4
+        sta     f:$7e0000+OT6_PIPROWW+5
+        sta     f:$7e0000+OT6_PIPROWW+6
+        sta     f:$7e0000+OT6_PIPROWW+7
+        sta     f:$7e0000+OT6_HOLD      ; nor a held gauge (#539)
+        sta     f:$7e0000+OT6_EVHEAD    ;   or its events
+        sta     f:$7e0000+OT6_EVTAIL
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
                                 ;   this one" flag (#236): it would hand the
                                 ;   first uncontrolled swing of this battle a
@@ -100,10 +119,20 @@
                                         ;   not left to the shadow loop above,
                                         ;   which stops at $ed61
         sta     f:$7e0000+OT6_LASTLR
+        sta     f:$7e0000+OT6_PIPCUR    ; #544: the retired live cell's words
+        sta     f:$7e0000+OT6_PIPPREV   ;   held the field's junk into the
+        sta     f:$7e0000+OT6_PIPCELL   ;   battle, and v0.45's painter blanked
+                                        ;   VRAM wherever it pointed
         sta     f:$7e0000+OT6_RESTAGE   ; word store: the high byte lands on
                                         ;   vanilla's $57d5 name scratch,
                                         ;   harmless at init (vanilla always
                                         ;   writes it before reading)
+        ldx     #$0000          ; $ed6d-$ed8e past the shadow: the wallet's
+@clr3:  sta     f:$7e0000+OT6_WALLETSIG,x ; SIG/SIGP, NUMCTR, BRKLIVE, the six
+        inx                             ; BRKTICK/BRKPAL slots (and cells
+        inx                             ; zeroed above), read before written
+        cpx     #$0022                  ; after power-on (uninit_waivers.txt)
+        bcc     @clr3
         plx                             ; (OT6_ATKCLASS and OT6_FONTDIRTY sit
                                         ;   in the shadow strip: the @clr
                                         ;   loop covered them)
@@ -170,13 +199,20 @@
         shorta0
         .a8
         .i16
-        jsr     Ot6RevealCommit ; any reveal this action banked and no
-                                ;   numeral displayed (a 0-damage or
-                                ;   numeral-less script) commits no later
-                                ;   than the action's own end
+        jsr     Ot6ShowFlush    ; any reveal or gauge this action banked
+                                ;   and no numeral displayed (a 0-damage or
+                                ;   numeral-less script) shows no later
+                                ;   than the action's own end (#539)
+        lda     #$00            ; #542: a breaking take whose hit never
+        sta     OT6_HITBRK      ;   landed (a missed Cleave cut) is not
+                                ;   carried into the next action
         txa                     ; width-neutral character test
         cmp     #$08
         jcs     done            ; monsters have no bp
+        lda     f:Ot6CharBitTbl,x       ; #540: the action is over, so a
+        eor     #$ff                    ;   pending boost raised from here on
+        and     f:$7e0000+OT6_BPMARK    ;   is for the next one
+        sta     f:$7e0000+OT6_BPMARK
         longa                   ; #236: where this actor stands as its OWN
         lda     $3bf4,x         ;   turn ends is the line a later hit is
         sta     f:$7e0000+OT6_HPMARK,x  ;   measured against.  Drawn on both
@@ -318,6 +354,13 @@
         bcs     done            ; capped at 5
         inc
         sta     OT6_BP_CLASS,x
+        lda     f:Ot6CharBitTbl,x       ; #540: shown when this character is
+        asl                             ;   active again (its window, or its
+        asl                             ;   next turn's head)
+        asl
+        asl
+        ora     f:$7e0000+OT6_BPMARK
+        sta     f:$7e0000+OT6_BPMARK
         jsr     Ot6BankMoved    ; same on the regen arm.  the two arms are
                                 ;   marked separately, and not at `done`,
                                 ;   because `done` is also where a monster and
@@ -332,6 +375,69 @@
         ; issued no numeral at all, or a $ffff "hide numerals" one, the same
         ; hole Ot6RevealCommit is called at the top of this proc to plug.
 done:   jsr     Ot6PipPending
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #540: the turn's action begins ]
+
+; jsl from ExecCmd's head (battle_main.asm), every path into it: the turn
+; loop, an immediate action and a character's counter list; x = the actor's
+; entity offset.  A counterattack ($b1 bit 0, the flag _c22163 sets) is no
+; action of the character's, and a boost raised in its open window is not
+; for it (Ot6AssassinateGate's reading), so it changes nothing here.
+; Otherwise, for a character, its turn has come, so the point its last turn
+; earned shows now (OT6_BPMARK's owed bit).  With an action to run ($b5 is
+; not $12, the CmdNoEffect an emptied command list runs as, Ot6NoActionMark's
+; case) its pending points show as spent from here
+; (OT6_BPMARK's begun bit), unless the action will buy nothing with them: an
+; Item whose use the boost never moves (Ot6ItemNoBoost) or a spell turn
+; Ot6QueueFold found no reward in (OT6_SPELLNONE), whose points
+; Ot6ActionEnd keeps, so their arrows stay up until then.  The display
+; only: the bank and the pending boost are Ot6ActionEnd's to charge.
+; a8, either index width, db=$7e.  preserves a/x/y/p.  rtl.
+.proc Ot6BpBegin
+        .a8
+        php
+        rep     #$10
+        .i16
+        phx
+        pha
+        txa
+        cmp     #$08
+        bcs     @out            ; a monster: no boost
+        lda     $b1
+        lsr
+        bcs     @out            ; a counterattack: not its own action
+        lda     f:Ot6CharBitTbl,x
+        asl
+        asl
+        asl
+        asl
+        eor     #$ff
+        and     f:$7e0000+OT6_BPMARK
+        sta     f:$7e0000+OT6_BPMARK    ; its earned point shows
+        lda     $b5
+        cmp     #$12
+        beq     @out            ; no action to run this turn (CmdNoEffect)
+        lda     OT6_BOOST_REVEALED,x
+        beq     @begin
+        lda     $3a7c           ; the queued command
+        cmp     #$01            ; Item
+        bne     @spell
+        lda     $3a7d           ; the item
+        jsl     Ot6ItemNoBoost
+        bcs     @out            ; kept at its end: the arrows stay
+@spell: lda     $3018,x
+        and     f:$7e0000+OT6_SPELLNONE
+        bne     @out            ; kept at its end: the arrows stay
+@begin: lda     f:Ot6CharBitTbl,x
+        ora     f:$7e0000+OT6_BPMARK
+        sta     f:$7e0000+OT6_BPMARK
+@out:   pla
+        plx
         plp
         rtl
 .endproc
@@ -461,6 +567,9 @@ done:   jsr     Ot6PipPending
         bcs     done            ; the bank cap holds; an absorb never wraps
         inc
         sta     OT6_BP_CLASS,y
+        lda     $3018,y             ; #540: the point shows when the spell
+        ora     f:$7e0000+OT6_BPDEFER   ;   it ate visibly lands (the numeral,
+        sta     f:$7e0000+OT6_BPDEFER   ;   or the script's end)
         lda     $3018,y         ; flag: paid this round.  set only when a pip
         ora     f:$7e0000+OT6_RUNICPAID  ;   was really banked, so a capped-away
         sta     f:$7e0000+OT6_RUNICPAID  ;   earn at 5 bp costs nothing:
@@ -2445,12 +2554,13 @@ OT6_LIFE3_ID = $35
 ; the walk below covers the caster's whole list rather than the eight family
 ; heads, and Ot6MagicPrice decides per row which of the two rules applies.
 ;
-; The walk is driven off the master spell list $3034 (position -> real id)
-; rather than off the rows themselves, because a lore's row byte is its id
-; minus $8b (battle_main.asm:14648) and would be indistinguishable from a
-; magic id.  Position p is row p+1; row 0 is the equipped esper, whose row
-; byte is an esper index and whose MagicProp record is that index + $36.
-;
+; The walk reads each row's own id (#541: every caster's list is packed,
+; ot6_dense.asm, so a row is his, not a master-list position).  Rows 1..54
+; hold spell ids; rows 55..78 hold a lore's number, its id minus $8b
+; (battle_main.asm:14648), so the row's segment says which.  Row 0 is the
+; equipped esper, whose row byte is an esper index and whose MagicProp record
+; is that index + $36.
+
 ; Cost: 78 rows instead of 8 families, but an unlearned row leaves after two
 ; loads, and this is a burst on a recheck request (an L/R edge, or the end of
 ; an action), never per-frame work -- the same budget note Ot6Boost's call
@@ -2505,7 +2615,7 @@ OT6_LIFE3_ID = $35
         bcs     @out            ; monsters have no boost and no spell list
         ; x is the only register the 65816 can index a long address with
         ; (`lda f:tbl,y` has no encoding), and this walk needs it three
-        ; different ways per row (master-list cursor, caster, list row), so
+        ; different ways per row (row cursor, caster, list row), so
         ; the two invariants live in scratch and x is working state.
         stx     OT6_SCR_SLOT2   ; the caster's entity offset
         jsl     Ot6FoldSteps    ; -> OT6_SCR_BIT (0 restores the base prices)
@@ -2535,21 +2645,32 @@ OT6_LIFE3_ID = $35
         jsl     Ot6MagicPrice
         plx                     ; the row back
         sta     a:$0003,x
-        ; --- rows 1..78: every spell and lore anybody in the party knows ---
-@rows:  ldx     #$0000
-        stx     OT6_SCR_IDX     ; p, the master-list position (word store: the
-                                ;   high byte must stay 0 for the bumps below)
-@row:   ldx     OT6_SCR_IDX
-        lda     $3034,x         ; the master spell list: position -> the REAL
-                                ;   id ($00-$35 magic, $8b-$a2 lore, $ff =
-                                ;   nobody knows it).  The caster's own row
-                                ;   byte cannot stand in for this: a lore is
-                                ;   stored there as id - $8b
-                                ;   (battle_main.asm:14648), which collides
-                                ;   with the magic ids
+        ; --- rows 1..78: the caster's packed spells, then his lores ---
+        ; Each row names its own id (#541: the lists are packed per caster,
+        ; ot6_dense.asm, so a row is no longer a master-list position):
+        ; rows 1..54 hold the spell id itself, rows 55..78 a lore's number,
+        ; id - $8b (battle_main.asm:14648), so the segment says which.
+@rows:  ldx     #$0001
+        stx     OT6_SCR_IDX     ; r, the row (word store: the high byte must
+                                ;   stay 0 for the bumps below)
+@row:   ldx     OT6_SCR_SLOT2   ; the caster
+        longa
+        lda     OT6_SCR_IDX
+        asl2
+        clc
+        adc     $302c,x
+        tax                     ; -> this caster's row r
+        shorta0
+        lda     a:$0000,x       ; the row's id byte
         cmp     #$ff
-        beq     @next           ; nobody knows it: dead in every list
-        cmp     #$99
+        beq     @next           ; an empty row: nothing to price
+        pha
+        lda     OT6_SCR_IDX
+        cmp     #55             ; carry: a lore row
+        pla
+        bcc     @real
+        adc     #$8b - 1        ; carry set: + $8b, the lore's attack id
+@real:  cmp     #$99
         beq     @next           ; Step Mine: its price is the play clock's,
                                 ;   not MagicProp's (battle_main.asm:14670),
                                 ;   so recomputing the row would overwrite the
@@ -2557,19 +2678,6 @@ OT6_LIFE3_ID = $35
                                 ;   reproduce.  Ot6QueueFold skips it too, so
                                 ;   both surfaces stay vanilla together
         pha                     ; [$01,s] the real id
-        ldx     OT6_SCR_SLOT2   ; the caster
-        longa
-        lda     OT6_SCR_IDX
-        inc                     ; row = position + 1 (row 0 is the esper), the
-        asl2                    ;   same arithmetic battle init used to fill
-        clc                     ;   the lists (:14644) and GetMPCost uses to
-        adc     $302c,x         ;   read one back (:13268)
-        tax                     ; -> this caster's row for this spell
-        shorta0
-        lda     a:$0000,x       ; the row's id byte
-        bmi     @drop           ; $ff: not learned.  leave the row alone; it
-                                ;   is already disabled, and a price on a row
-                                ;   the caster cannot pick means nothing
         phx                     ; the row
         lda     $03,s           ; the real id (parked under the row pointer)
         ldx     OT6_SCR_SLOT2   ; the caster
@@ -2577,14 +2685,14 @@ OT6_LIFE3_ID = $35
                                 ;   one, by Ot6InFoldTbl's single answer
         plx                     ; the row back
         sta     a:$0003,x       ; the byte: grey, number, confirm and charge
-@drop:  pla                     ; drop the parked id
+        pla                     ; drop the parked id
 @next:  longa
         lda     OT6_SCR_IDX
         inc
         sta     OT6_SCR_IDX
-        cmp     #$004e          ; 78 rows: 54 spells + 24 lores, the same count
-        shorta0                 ;   UpdateEnabledMagic's own loop walks four
-        bcc     @row            ;   instructions later (:14797)
+        cmp     #$004f          ; rows 1..78: 54 spells + 24 lores, the same
+        shorta0                 ;   count UpdateEnabledMagic's own loop walks
+        bcc     @row            ;   (:14797)
 @out:   ply
         plx
         pla
@@ -3242,15 +3350,16 @@ Ot6AbilityCostTbl:
         ;    window renders from.  This column stays monotonic with the tech
         ;    index: the boost window offers techs weakest->strongest and the
         ;    row is the boost level, so a dearer 2x row than 3x row would
-        ;    read as a bug.
+        ;    read as a bug.  BP below is kits.md's column; the window itself
+        ;    is the three best techs known at 1, 2 and 3 BP (Ot6BushidoPick).
         .byte   $55,  4         ; Dispatch     BP1
         .byte   $56, 10         ; Retort       BP1
-        .byte   $57, 13         ; Slash        BP2
+        .byte   $57, 13         ; Slash        BP1
         .byte   $58, 16         ; Quadra Slam  BP2
-        .byte   $59, 18         ; Empowerer    BP3
+        .byte   $59, 18         ; Empowerer    BP2
         .byte   $5a, 28         ; Stunner      BP3
         .byte   $5b, 50         ; Quadra Slice BP3
-        .byte   $5c, 99         ; Cleave       BP3+Broken, the 99 anchor
+        .byte   $5c, 99         ; Cleave       BP3 (the 3-BP row only, from the Phantom Train farewell), the 99 anchor
         ; -- Tools (Edgar), cmd $09, tool ITEM ids $a3-$aa.  names are
         ;    item_name_en.json's, i.e. what the Tools window prints.
         .byte   $aa,  4         ; AutoCrossbow

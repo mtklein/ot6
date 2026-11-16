@@ -298,8 +298,20 @@ local function pinAll() pinGau(); pinGuards() end
 -- keep running. It never presses into the rage window itself.
 local function tick()
   pinAll()
-  if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) ~= ST_RAGE then
-    H.setPad({ "a" })
+  if H.readByte(MENU) ~= 0 then
+    local who = H.readByte(ACTOR)
+    local other = actor ~= nil and who ~= actor and who ~= second
+    if H.readByte(MSTATE) ~= ST_RAGE then
+      if not other then H.setPad({ "a" }) end
+    elseif other then
+      -- another member's window that opened behind the arm's rage and went
+      -- on into the rage list: back it out to its command list and leave it
+      -- there (no A for it), where the battle keeps running.  Which slot's window opens first is the
+      -- battle's draw; at be80 (v0.46) slot 0's did, slot 1's opened behind
+      -- it and sat in the rage list, and the arm's rage never ran
+      -- (build/attempts/wt/v046-land/replay1/rage_dbg.log).
+      H.setPad({ "b" })
+    end
   end
 end
 local function ride(n)
@@ -698,7 +710,7 @@ coinSummary = function()
     drawn[e.draws] = (drawn[e.draws] or 0) + 1
   end
   local d = {}
-  for k, v in pairs(drawn) do d[#d + 1] = string.format("%d draw(s) x%d", k, v) end
+  for _, k in ipairs(H.sortedKeys(drawn)) do d[#d + 1] = string.format("%d draw(s) x%d", k, drawn[k]) end
   return c0, c1, table.concat(d, ", ")
 end
 

@@ -491,6 +491,16 @@ H.run({ maxFrames = 200000 }, {
 
   -- ------------------------------------- 3. positive: the absorb pays both --
   baseline(2),
+  -- the cell as the absorb finds it: since #540 the point her own Runic turn
+  -- earned is not shown until she is active again, so the cell can sit one
+  -- below the bank; the absorb's point is the one that must show
+  H.waitFrames(8),
+  H.call(function()
+    local row = rowOf(celes)
+    H.vars.cellBefore = row and pipWordRow(row) or nil
+    H.log(string.format("celes pip cell before the absorb: %s (bank %d)",
+      H.vars.cellBefore and string.format("$%04x", H.vars.cellBefore) or "off", bp(celes)))
+  end),
   castPhase(true, "positive", 24000),
   H.call(function()
     H.log("positive phase ids: " .. idList(mark)
@@ -525,8 +535,11 @@ H.run({ maxFrames = 200000 }, {
     H.log(string.format("celes menu row %d: pip word $%04x (bank %d wants $%02x)",
       row, w, bp(celes), PIP[bp(celes)]))
     H.assertEq(w >> 8, 0x21, "the pip cell carries the pip palette")
-    H.assertEq(w & 0xff, PIP[bp(celes)],
-      "the party window shows the post-absorb bank, so the +1 is visible")
+    local shown = nil
+    for n, g in pairs(PIP) do if g == (H.vars.cellBefore or 0) & 0xff then shown = n end end
+    H.assertEq(shown ~= nil, true, "the cell showed pips before the absorb")
+    H.assertEq(w & 0xff, PIP[shown + 1],
+      "the party window shows the absorb's point: one pip more than before it, so the +1 is visible")
     H.screenshot("runic_pips")
   end),
 

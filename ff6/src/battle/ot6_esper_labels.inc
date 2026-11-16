@@ -35,7 +35,7 @@ Ot6RungLabelTbl:
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Maduin 2: Stamina +1
         .byte   $81,$9a,$ab,$9d,$c3,$ac,$ff,$87,$9a,$ad,$ff,$ff   ; Maduin 3: Bard's Hat
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b6,$ff,$ff   ; Maduin 4: Mag.Pwr +2
-        .byte   $84,$9a,$ab,$ab,$a2,$a7,$a0,$ff,$ff,$ff,$ff,$ff   ; Maduin 5: Earring
+        .byte   $84,$9a,$ab,$ab,$a2,$a7,$a0,$ac,$ff,$ff,$ff,$ff   ; Maduin 5: Earrings
         .byte   $95,$a2,$a0,$a8,$ab,$ff,$ff,$ff,$ca,$b5,$ff,$ff   ; Bismark 1: Vigor   +1
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Bismark 2: Stamina +1
         .byte   $8c,$a2,$ad,$a1,$ab,$a2,$a5,$86,$a5,$a8,$af,$9e   ; Bismark 3: MithrilGlove

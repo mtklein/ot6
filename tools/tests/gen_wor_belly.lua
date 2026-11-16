@@ -292,7 +292,7 @@ local function simRisk(spans, tEnd, conds)
     if hit then hits = hits + 1 end
   end
   local wk, wn = nil, 0
-  for k, n in pairs(worst) do if n > wn then wk, wn = k, n end end
+  for k, n in pairs(worst) do if n > wn or (n == wn and wk ~= nil and k < wk) then wk, wn = k, n end end  -- a tie keeps the smaller k
   return hits / CAREFUL_TRIALS, wk
 end
 -- wait for control, fighting a battle that opens meanwhile (one the last step's arrival left loading)

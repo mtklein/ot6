@@ -194,21 +194,32 @@ local costs = {}                        -- cost-queue stores while cmd $13 queue
 local buzzes, confirms = 0, 0
 local refused = nil
 
+-- the cell a dance sits in.  The Dance list is packed (#541's sequel): the
+-- dances MOG knows close up from the top in id order, so a dance's cell is
+-- its place in the list ($267E), read live, not its id
+local function danceCell(id)
+  for i = 0, 7 do if H.readByte(0x267E + i) == id then return i end end
+  return nil
+end
+
 local function danceCursorToKnown(what)
   -- danceId is discovered at runtime, so the target row/col are computed
   -- inside the callbacks, not at step-construction time.
   return H.driveUntil(function()
     local a = H.readByte(ACTOR)
     return H.readByte(MSTATE) == ST_DANCE
-       and H.readByte(0x8937 + a) == danceId % 2
-       and H.readByte(0x893B + a) == danceId // 2
+       and danceCell(danceId) ~= nil
+       and H.readByte(0x8937 + a) == danceCell(danceId) % 2
+       and H.readByte(0x893B + a) == danceCell(danceId) // 2
   end, 900, {
     H.call(function()
       ph = ph + 1
       local edge = ph % 10 < 5
       local a = H.readByte(ACTOR)
       if H.readByte(MSTATE) ~= ST_DANCE then H.setPad({}) return end
-      local row, col = danceId // 2, danceId % 2
+      local cell = danceCell(danceId)
+      assert(cell, string.format("the Dance list holds dance %d", danceId))
+      local row, col = cell // 2, cell % 2
       local cr, cc = H.readByte(0x893B + a), H.readByte(0x8937 + a)
       if cr ~= row then H.setPad(edge and { [(cr < row) and "down" or "up"] = true } or {})
       elseif cc ~= col then H.setPad(edge and { [(cc < col) and "right" or "left"] = true } or {})
@@ -441,7 +452,7 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- ---- 2. charge at dance start ----------------------------------------
-  -- walk onto the known dance's positional cell (see danceCursorToKnown)
+  -- walk onto the known dance's cell in the packed list (see danceCell)
   -- and confirm; the dance self-targets, so one confirm queues it.
   danceCursorToKnown("cursor onto the learned dance's cell"),
   H.driveUntil(function()

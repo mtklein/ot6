@@ -129,8 +129,18 @@ OT6_SCRAP_LEN        = $23          ; the whole scrap New Game clears, from OT6_
 
 ; Battle-only scratch. InitBattle clears through $3ed3.  The walkers use the
 ; interleaved even words.  ($3ecb held the once-a-battle divine flag until
-; the owner's 2026-10-11 rule made a full 3-BP boost a divine's only gate;
-; it is free again.)
+; the owner's 2026-10-11 rule made a full 3-BP boost a divine's only gate.)
+;
+; OT6_HITBRK (#542): one bit per monster slot (slot s = bit s, the $201e
+; mask's order), set when a take empties that monster's last shield and
+; cleared when the hit that took it has had its damage judged
+; (Ot6BrokenDmg).  A hit is judged on the state before it lands, so the
+; hit that breaks is still a hit on a shielded body: Ot6ShieldedDmg
+; attenuates it and Ot6BrokenDmg does not double it.  The takes that are not
+; hits (OT6's Break, Filch) clear their bit at once; Cleave's strip leaves it
+; for the cut that follows; Ot6ActionEnd clears the byte, so a bit whose hit
+; never landed (a missed cut) cannot outlive its action.
+OT6_HITBRK           := $3ecb
 OT6_SCR_SLOT2        := $3ecc
 OT6_SCR_BIT          := $3ece
 OT6_SCR_IDX          := $3ed0
@@ -138,6 +148,7 @@ OT6_SCR_COLS         := $3ed2
 
 .assert OT6_SCR_SLOT2 >= $3ecb, error, "OT6 battle scratch precedes owned range"
 .assert OT6_SCR_COLS + 1 <= $3ed3, error, "OT6 battle scratch exceeds owned range"
+.assert OT6_HITBRK + 1 = OT6_SCR_SLOT2, error, "the breaking-hit mask must sit in the cleared byte below the battle scratch"
 
 ; Battle/HUD global scratch.
 OT6_MAPBASE          := $57b6
@@ -161,9 +172,9 @@ OT6_RANDBTL          := $57bd
 OT6_HUDVEIL          := $57be
 OT6_SCRIPTBUSY       := $57bf
 OT6_SPECIES          := $57c0
-OT6_PIPCUR           := $57cc   ; live pip cell (0 = off); keeps the
-OT6_PIPPREV          := $57ce   ;   one-cell footprint and moves only which
-OT6_PIPCELL          := $57d0   ;   cell it is (see Ot6PipStage)
+OT6_PIPCUR           := $57cc   ; unused since #540 (the one live pip cell
+OT6_PIPPREV          := $57ce   ;   gave way to every row's, OT6_PIPROWW); PREV
+OT6_PIPCELL          := $57d0   ;   holds the cell the flush painted last
 OT6_LASTLR           := $57d2
 OT6_RESTAGE          := $57d4
 
@@ -218,17 +229,17 @@ OT6_NUMCTR           := $ed71   ; last-seen damage-numeral thread counter
                                 ;   ($632e).  a change means GfxCmd_0b has
                                 ;   allocated a numeral (the damage frame)
                                 ;   and Ot6RevealPoll commits pending reveals.
-                                ;   past InitBP's clear on purpose: a stale
-                                ;   value costs one no-op commit (see the proc)
+                                ;   past InitBP's shadow clear; InitBP zeroes
+                                ;   it with $ed6d-$ed8e (power-on junk was read
+                                ;   unwritten, tools/uninit_waivers.txt)
 OT6_COVERPAID        := $ed72   ; per-character bitmask (----1234, the
                                 ;   $3f2f shape).  bit set =
                                 ;   that character's True Knight cover has
                                 ;   already banked its BP this round.  set by
                                 ;   Ot6CoverBP, cleared per character by
                                 ;   Ot6ActionEnd (the round boundary) and
-                                ;   wholesale by InitBP.  unlike NUMCTR a stale
-                                ;   value here would suppress a real earn, so
-                                ;   it is init-cleared explicitly.
+                                ;   wholesale by InitBP (a stale value here
+                                ;   would suppress a real earn).
 OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
                                 ;   + 1 (0 = nothing pending).  Ot6CoverBP
                                 ;   banks the blocker here at the cover commit
@@ -254,10 +265,10 @@ OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
 ;   1..$18     a live flash, counting down one per main-loop frame
 ; OT6_BRKPAL banks the monster's own sprite-palette bits (w7e80db & $0e) for
 ; the frame the flash hands the sprite back.
-; Both live past InitBP's shadow clear, so power-on junk is possible; every
-; reader is gated on the monster being present ($3aa8) and Ot6SeedShields
-; zeroes both per slot at every seed (fresh battle and Cmd_20 reload), which
-; is the same clearing contract OT6_RVPEND_* already runs on.
+; Both live past InitBP's shadow clear; InitBP zeroes them with the rest of
+; $ed6d-$ed8e, and Ot6SeedShields zeroes both per slot at every seed (fresh
+; battle and Cmd_20 reload), the clearing contract OT6_RVPEND_* runs on.
+; Every reader is also gated on the monster being present ($3aa8).
 ;
 ; The per-battle-frame path (WaitFrame, after WaitVblank returns,
 ; btlgfx_main.asm:432-445) has essentially no cycle slack: the battle loop's
@@ -266,8 +277,8 @@ OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
 ; OT6_BRKLIVE gates the per-frame break-flash painter inline at its call site
 ; (ot6_hud.asm) rather than through a proc call, since even a `jsr` into a
 ; proc that early-outs is over budget.  Nonzero = at least one slot has a
-; live countdown; the painter recomputes it as it walks, so a stale value
-; costs exactly one walk and the byte needs no init clear.
+; live countdown; the painter recomputes it as it walks, and InitBP zeroes
+; it at every battle's start (it was read unwritten after power-on).
 ;
 ; MEASURED SINCE (#236): "essentially no cycle slack" is too strong.  A delay
 ; loop of known length on that very path, watched through WaitVblank's own
@@ -586,13 +597,8 @@ OT6_BLUESEEN         := $ee2b
 ; anchor commits, so it needs no init.
 OT6_HUDLEAD          := $ee2c   ; 12 bytes
 .assert OT6_HUDLEAD = OT6_BLUESEEN + 1, error, "the hud lead cells must follow the blue-magic mark"
-; Broken monsters drawn in grey (#397, Ot6GreyPaint in ot6_hud.asm).
-; OT6_GREYLIVE wakes the painter: the HUD builder sets it on any frame it
-; draws a broken monster, and the painter recomputes it as it walks, so a
-; stale value costs one walk and needs no init (the OT6_BRKLIVE contract).
-OT6_GREYLIVE         := $ee38
-.assert OT6_GREYLIVE = OT6_HUDLEAD + 12, error, "the grey painter's flag must follow the hud lead cells"
-.assert OT6_GREYLIVE <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+; $ee38 held OT6_GREYLIVE, the grey painter's wake flag, until #543 took the
+; grey look for broken monsters away (v0.46); it is free.
 ; The boost tier a Rage was started at, per character (4 characters, stride
 ; 2, indexed by the rager's entity offset): Ot6RageTierStore writes it at the
 ; start turn (Cmd_10 and FixPlayerAttack's cmd-$10 arm), Ot6RageCoin reads it
@@ -605,8 +611,66 @@ OT6_GREYLIVE         := $ee38
 ; writer of that status (Cmd_10's start) always records first, so a stale
 ; byte is never read (the OT6_DANCETIER contract).
 OT6_RAGETIER         := $ee39   ; 8 bytes (4 characters, stride 2)
-.assert OT6_RAGETIER = OT6_GREYLIVE + 1, error, "the rage tier must follow the grey painter's flag"
+.assert OT6_RAGETIER = OT6_HUDLEAD + 13, error, "the rage tier must sit one free byte past the hud lead cells"
 .assert OT6_RAGETIER >= OT6_SHADOW + $70, error, "OT6 rage tier must sit PAST InitBP's shadow clear (it is stored per trance, not per battle)"
 .assert OT6_RAGETIER + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
+; The break, as the player sees it, lands with the hit (#539).  An action's
+; hits are all computed before its battle script plays them, so a chip
+; changes OT6_SHIELD_CUR and OT6_BROKEN_TICKS frames before the hit that made
+; it is drawn.  While a monster's gauge is HELD (its slot's bit in OT6_HOLD,
+; slot s = bit s), the HUD draws OT6_SHOWN instead of the live state: the
+; gauge as of the last hit shown, $80 for broken, else the count (0 =
+; shieldless), and $40 for a monster the hits shown have killed.  The first
+; take of an action holds the slot at the state it found (Ot6Hold), and so
+; does the first numeral an action queues for a monster it took nothing
+; from, so its line does not vanish before the blow that kills it shows.
+; Each damage numeral the action queues for a held monster pushes an event
+; onto the OT6_EVQ ring: the battle-script queue
+; offset of that numeral command, the slot offset, the gauge after that
+; pass, and the weaknesses pending then.  Ot6RevealPoll pops each event as
+; the script reaches its numeral, so the count, the reveal, the break flash
+; and its sound land with that hit; the script's end (Ot6ShowFlush) pops
+; the rest and releases every hold.  Display only: every rule reads the
+; live state.  EVHEAD == EVTAIL is empty; a full ring drops the event, and
+; the flush still shows the state.  OT6_MULCTR is the last-seen multi-target
+; numeral counter w7e7b3d (BtlGfx_04 zeroes it, and so does
+; Ot6ScriptBegin_ext).  InitBP clears the hold, the ring and the BP marks.
+OT6_EVLEN            = 5        ; tag, slot offset, gauge, elements, classes
+OT6_EVN              = 32
+OT6_SHOWN            := $ee41   ; 12 bytes, stride 2 by slot offset
+OT6_HOLD             := $ee4d
+OT6_EVHEAD           := $ee4e
+OT6_EVTAIL           := $ee4f
+OT6_MULCTR           := $ee50
+OT6_EVQ              := $ee51   ; OT6_EVN * OT6_EVLEN bytes
+.assert OT6_SHOWN = OT6_RAGETIER + 8, error, "the held gauges must follow the rage tier"
+.assert OT6_HOLD = OT6_SHOWN + 12, error, "the hold mask must follow the held gauges"
+.assert OT6_EVQ = OT6_MULCTR + 1, error, "the event ring must follow its counters"
+.assert OT6_EVQ + OT6_EVN * OT6_EVLEN - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
+; The boost display (#540, Ot6PipStage in ot6_hud.asm).  OT6_BPMARK: bits
+; 0-3, the character in that slot has begun the action its pending boost is
+; for (set at its turn's head, Ot6BpBegin; cleared by Ot6ActionEnd); bits
+; 4-7, the point its last turn earned is not shown yet (set by Ot6ActionEnd's
+; regen, cleared when its window opens or its next turn begins).
+; OT6_BPDEFER: bits 0-3, a runic absorb's point whose spell has not landed
+; (cleared on the damage numeral with the cover's OT6_PIPPEND).  OT6_PIPROWW:
+; each name row's staged cell word; OT6_PIPDIRTY: the rows the nmi flush
+; must write first; OT6_PIPLIVE: the party window has drawn its rows this
+; battle; OT6_PIPRR: the row the flush rewrites next when none is dirty.
+; InitBP clears all of them, the four row words and PIPRR included (each was
+; read before written after power-on until the v0.46 review).
+OT6_BPMARK           := $eef1
+OT6_BPDEFER          := $eef2
+OT6_PIPROWW          := $eef3   ; 4 words, by menu row
+OT6_PIPDIRTY         := $eefb
+OT6_PIPLIVE          := $eefc
+OT6_PIPRR            := $eefd   ; the row the flush rewrites next
+.assert OT6_BPMARK = OT6_EVQ + OT6_EVN * OT6_EVLEN, error, "the boost marks must follow the event ring"
+.assert OT6_PIPROWW = OT6_BPDEFER + 1, error, "the pip rows must follow the absorb marks"
+.assert OT6_PIPDIRTY = OT6_PIPROWW + 8, error, "the dirty mask must follow the pip rows"
+.assert OT6_PIPRR = OT6_PIPLIVE + 1, error, "the flush's row turn must follow the live flag"
+.assert OT6_PIPRR <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif

@@ -152,10 +152,13 @@ end
 local function drive(L, stepObj, frames, onFrame)
   local pressed, realSet = {}, L.setPad
   L.setPad = function(b)
+    local names = {}
     for k2, v in pairs(b or {}) do
       local nm = type(k2) == "number" and v or (v and k2)
-      if nm then pressed[#pressed + 1] = nm end
+      if nm then names[#names + 1] = nm end
     end
+    table.sort(names)                  -- (string keys: pairs() order is per run)
+    for _, nm in ipairs(names) do pressed[#pressed + 1] = nm end
     return realSet(b)
   end
   local ok, err = pcall(function()
@@ -295,7 +298,10 @@ local function careCase(L)
       local nm = type(k2) == "number" and v or (v and k2)
       if nm then now[nm] = true end
     end
-    for nm in pairs(now) do
+    local order = {}
+    for nm in pairs(now) do order[#order + 1] = nm end
+    table.sort(order)
+    for _, nm in ipairs(order) do
       if not held[nm] then                 -- a press (the menu acts on the edge)
         local st, cur = mem[0x26], mem[0x4B]
         if st == 0x05 then

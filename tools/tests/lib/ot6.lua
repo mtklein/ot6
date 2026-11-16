@@ -43,6 +43,12 @@
 --    live; input is pushed from an inputPolled callback (see below).
 
 local M = {}
+-- A lab lever (lib/compose.py's OT6_LEVERS, a comma list of names): true
+-- when this run was composed with `name` on, for an A/B arm of a rule
+-- switch; nothing in the graph sets it.
+function M.lever(name)
+  return type(OT6_LEVERS) == "string" and ("," .. OT6_LEVERS .. ","):find("," .. name .. ",", 1, true) ~= nil
+end
 
 local seqStep -- forward declaration (defined in the step-runner section)
 
@@ -185,6 +191,16 @@ local LIVE_IVL = 128
 -- this is seconds apart; measured in docs/TOOLING.md.
 M.HB_IVL = 1024
 
+-- A table's keys in sorted order, for a loop whose order can reach a verdict,
+-- a log line or a choice: Mesen's Lua seeds string hashing per run, so
+-- pairs() over string keys walks them in a different order each run.
+function M.sortedKeys(t)
+  local keys = {}
+  for k in pairs(t) do keys[#keys + 1] = k end
+  table.sort(keys)
+  return keys
+end
+
 -- ----------------------------------------------------------- progress --
 -- Script-level forward progress, the only thing run.sh's stall watch
 -- counts (owner, 2026-10-19: frames advancing is not progress; a game
@@ -237,7 +253,8 @@ function M.progressSample()
   local sw = 0
   for i = 0, 223 do sw = (sw * 31 + rb(0x1E80 + i)) % 4294967291 end
   f.bag, f.roster, f.hp, f.sw = bag, roster, hp, sw
-  for k, v in pairs(f) do
+  for _, k in ipairs(M.sortedKeys(f)) do     -- (sorted: the key named is the heartbeat's reason)
+    local v = f[k]
     if M.progLast[k] ~= nil and M.progLast[k] ~= v then
       M.progLast[k] = v
       M.progress(k)
@@ -505,6 +522,8 @@ function M.requestLoadState(blob)
   if RUN ~= nil then RUN.goUnhandled = nil end
   -- the battle-end reading the lib holds is the old timeline's (#491)
   if M.traceOnLoad then M.traceOnLoad(M.loadedFrame == nil) end
+  M.battleHpSet = true               -- the loaded machine's battle RAM is its own
+  M.battleCueSet.present, M.battleCueSet.lit = true, true
   M.loadedFrame = M.frame
   if M.forgetBattleEnd then M.forgetBattleEnd() end
   M.mpSpent = {}                     -- (the Economizer's proxy: this timeline's casts, #524)
@@ -753,7 +772,24 @@ end
 -- (Tolerating any odd seat beside a live one read field garbage, species
 -- $5554, as a battle: qual3, six suites.)
 M.blsSeen = nil              -- the last frame this read a battle (a field: the chunk is at its local cap)
+-- The HP table is a battle's only once the game has written it since power-on
+-- (a battle, or the field's $FFFF fill) or a state load brought a machine
+-- that had: after a Continue and before the first battle it holds the
+-- power-on RAM, which a random fill can make read as a live party
+-- (`waitUntil 'battle 70 active' satisfied after 0 frames`, OT6_POWERON_FILL
+-- =rand:1).  On a zeroed console that RAM reads as no battle anyway.
+-- A file-scope WRAM write watch.  A standalone selftest's stub emu has no
+-- memory callbacks and no power-on RAM: there the watch is skipped and fn
+-- runs at once, as if the game had written the cells (its stubbed reads are
+-- what the selftest means the game to hold).
+function M.onWrite(fn, lo, hi)
+  if not (emu.addMemoryCallback and emu.callbackType and emu.cpuType and emu.memType) then fn(); return end
+  emu.addMemoryCallback(fn, emu.callbackType.write, lo, hi, emu.cpuType.snes, emu.memType.snesWorkRam)
+end
+M.battleHpSet = false
+M.onWrite(function() M.battleHpSet = true end, M.BATTLE_HP, M.BATTLE_HP + 7)
 function M.battleLoadStarted()
+  if not M.battleHpSet then return false end
   local anyLive, odd = false, false
   for i = 0, 3 do
     local hp = M.readWord(M.BATTLE_HP + i * 2)
@@ -809,8 +845,18 @@ end
 -- True while a battle is fully up and rendering.  A crashed battle load
 -- leaves the screen dark and fails this check.  emu.getState() is not
 -- used here: polling it is correlated with emulator crashes.
+-- The other two cues hold the power-on RAM, too, until the first battle
+-- writes them: a battle load starts (the HP table) a few frames before the
+-- monsters' present bits and the screen's brightness are set, and a random
+-- fill read as both (`battle 70 active` after 0 frames, the formation still
+-- $FFFF; build/attempts/wt/v046-fills-2/ifrit/).  So each counts once the
+-- game has written it since power-on, or a state load brought it.
+M.battleCueSet = { present = false, lit = false }
+M.onWrite(function() M.battleCueSet.present = true end, M.MONSTER_PRESENT, M.MONSTER_PRESENT)
+M.onWrite(function() M.battleCueSet.lit = true end, 0xE9F9, 0xE9F9)
 function M.battleActive()
-  return M.battleLoadStarted() and M.monstersPresent() > 0 and M.battleScreenLit()
+  return M.battleLoadStarted() and M.battleCueSet.present and M.battleCueSet.lit
+    and M.monstersPresent() > 0 and M.battleScreenLit()
 end
 
 -- --------------------------------------------- absorbed-weapon guard --
@@ -1898,6 +1944,29 @@ end
 function M.raceDamageBase(drop, shieldMax, broken)
   return drop / (broken and 4 or shieldMax == 0 and 2 or 1)
 end
+-- Whether a monster HP drop the damage watch sees landed on a Broken body
+-- (#542).  The gauge reads Broken from the damage calc of the hit that
+-- empties the last shield, frames before that hit's HP falls, but that hit
+-- is judged on the body before it (OT6_HITBRK): a shielded hit.  So the
+-- first drop by the action that turned the gauge over is the breaking
+-- hit's (false), and only drops after it are broken ones.  A gauge turned
+-- over by something that is no hit (OT6's Break, Filch) or by another
+-- actor leaves no pending hit for the next drop.  t = { brk = {}, pend = {} }
+-- per battle; s the slot; who the acting entity (nil: none); brkNow its
+-- gauge this frame; dropped whether its HP fell this frame.  Returns nil
+-- when nothing dropped.  M.BREAKHIT_OLD = true is the rule before #542 (a
+-- dropped hit is broken whenever the gauge reads so).
+function M.brokenForDrop(t, s, who, brkNow, dropped)
+  if not brkNow then t.pend[s] = nil
+  elseif not t.brk[s] then t.pend[s] = who or false end
+  t.brk[s] = brkNow
+  if not dropped then return nil end
+  if M.BREAKHIT_OLD then return brkNow end
+  local pend = t.pend[s]
+  t.pend[s] = nil
+  if pend ~= nil and pend ~= false and pend == who then return false end
+  return brkNow
+end
 
 -- one line's hits on enemy e (mutated), times the line's hit chance
 -- one line on one body; returns the hits left when the body fell first
@@ -1930,14 +1999,16 @@ local function strike(e, line, hit, draw, t)
     -- damage under the same hit probability (zero never breaks a shield).
     local landed = hit
     if draw and hit > 0 and hit < 1 then landed = draw() < hit and 1 or 0 end
-    -- Ot6HitJoin chips first: the hit removing the final shield receives
-    -- the broken-body damage multiplier itself, not only its next swing.
+    -- #542: a hit is judged on the body as it was before the hit landed
+    -- (Ot6HitJoin's OT6_HITBRK), so the hit removing the final shield is
+    -- still a shielded hit; only the swings after it get the broken x2
+    -- (4 here: per is the shielded-body hit, which is half vanilla's).
+    local mult = (e.sh or 0) > 0 and 1
+      or ((e.shMax == nil or e.breakUntil) and 4 or 2)
     if (e.sh or 0) > 0 and i <= chips then
       e.sh = math.max(0, e.sh - landed)
       if e.sh == 0 and e.shMax ~= nil then e.breakUntil = t + e.breakDuration end
     end
-    local mult = (e.sh or 0) > 0 and 1
-      or ((e.shMax == nil or e.breakUntil) and 4 or 2)
     e.hp = e.hp - per * mult * landed
   end
   if e.hp < 0 then e.hp = 0 end
@@ -2795,7 +2866,10 @@ function M.wipeRisk(members)
   for k = 1, n do
     if won then break end
     local a, nxt, nn = order[k], {}, 0
-    for _, st in pairs(states) do
+    -- in key order: the first state to finish is `won`, and its counts go
+    -- into the reason, so pairs()'s order would pick among equal ones
+    for _, sk in ipairs(M.sortedKeys(states)) do
+      local st = states[sk]
       for q = 1, nm do
         local pr = prices[q][a]
         if pr > 0 and st.d[q] < hp[q] then
@@ -15660,7 +15734,8 @@ function Driver:makePlanRules(actor)
   -- (route-wor-side-trips.md section 3).  Off by default.
   if self.opts.tactical and self.opts.throw ~= false and id == 3
      and cmdRow(actor, BATTLE.CMD_THROW) then
-    for item, elem in pairs(BATTLE.SKEAN_ELEM) do
+    for _, item in ipairs({ 0xAB, 0xAC, 0xAD }) do   -- SKEAN_ELEM's keys, in a fixed order
+      local elem = BATTLE.SKEAN_ELEM[item]
       if self:battInvIdx(item) then
         for s = 0, 5 do
           local known = M.readByte(0x3E91 + s * 2)
@@ -17156,6 +17231,7 @@ function Driver:idle()
   self.healWatch, self.healSaid, self.finisherSaid, self.inertSaid = nil, nil, nil, {}
   self.priceSaid = {}
   self.dmgWatch, self.dmgSeen, self.monHpLast = {}, {}, {}
+  self.brkDrop = { brk = {}, pend = {} }
   self.slotWatch = nil
   self.dmgHit, self.hitLedger, self.partyHpLast = {}, {}, {}
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
@@ -17490,8 +17566,20 @@ function M.setzerBattle(plan, opts)
       end
       local L, dir = M.battleLayout(), nil
       if mons ~= 0 or chars == 0 then
-        A.cross = (A.cross or 0) + 1
-        dir = L.toChars[1 + (A.cross - 1) % #L.toChars]
+        if A.presses < 6 or #L.toChars < 2 then
+          A.cross = (A.cross or 0) + 1
+          dir = L.toChars[1 + (A.cross - 1) % #L.toChars]
+        else
+          -- six alternating presses have not crossed: on a two-way layout
+          -- the alternation can shuttle between two monsters forever (v0.46's
+          -- battle_passside, group $00F8 at beCC: mons 01 <-> 04 for 24
+          -- presses).  Hold one direction while it moves the cursor and turn
+          -- only where it stops (replay2/passside_dbg.log)
+          A.hold = A.hold or 1
+          if A.holdFrom == node then A.hold = A.hold % #L.toChars + 1 end
+          A.holdFrom = node
+          dir = L.toChars[A.hold]
+        end
       else
         local cur = 0
         for e = 0, 3 do if chars & (1 << e) ~= 0 then cur = e; break end end
@@ -18889,7 +18977,8 @@ end
 -- bodies it hit; a body whose row holds the pass's class (classOf(row), the
 -- class the ROM should have used) and stands shielded and unbroken loses a
 -- shield, Broken when the last goes; the hit is halved while its shields
--- hold, doubled once Broken, capped at 9,999 and at its HP.  Returns the
+-- hold (the breaking one too, #542), doubled on a body Broken before it,
+-- capped at 9,999 and at its HP.  Returns the
 -- replayed bodies { [slot] = { hp, sh, brk, cls } }, the passes { { cost,
 -- hits = { {slot, class, want, d, chip} } } }, and every class the ROM used
 -- that classOf did not name (a list of strings, empty when they agree).
@@ -18934,9 +19023,12 @@ function M.setzerReplay(r, classOf)
           h.want, t.cls)
       end
       h.chip = h.want ~= 0 and (t.cls & h.want) ~= 0 and t.sh > 0 and not t.brk
+      -- #542: the hit is judged on the body before it (OT6_HITBRK), so the
+      -- toss that takes the last shield is halved, not doubled
+      local shielded, broken = not t.brk and t.sh > 0, t.brk
       if h.chip then t.sh = t.sh - 1; if t.sh == 0 then t.brk = true end end
       local d = (2 * p.cost) // n
-      if not t.brk and t.sh > 0 then d = (d * 8) >> 4 elseif t.brk and d < 32768 then d = d * 2 end
+      if shielded then d = (d * 8) >> 4 elseif broken and d < 32768 then d = d * 2 end
       d = math.min(d, 9999, t.hp)
       t.hp = t.hp - d
       h.d = d
@@ -20198,9 +20290,12 @@ function Driver:watchDamage()
   if who == nil and execDone[#execDone] ~= nil then
     who = execDone[#execDone].actor
   end
+  self.brkDrop = self.brkDrop or { brk = {}, pend = {} }
   for s = 0, 5 do
     local hp = M.readWord(BATTLE.MON_HP + s * 2)
     local last = self.monHpLast[s]
+    local brkHit = M.brokenForDrop(self.brkDrop, s, who, M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0,
+      who ~= nil and last ~= nil and hp < last)
     local sw = self.slotWatch
     if sw and who == sw.actor and last ~= nil and hp < last then
       sw.seen = sw.seen + (last - hp)
@@ -20211,14 +20306,14 @@ function Driver:watchDamage()
       if w then
         local drop = last - hp
         w.seen = w.seen + drop
-        -- normalized per hit by the state of THIS slot's gauge as
-        -- the hit landed: a volley that breaks mid-way lands its
-        -- rest broken (x4 shielded), and the per-hit figure (#165)
-        -- must not average the two
-        w.norm = w.norm
-          + ((M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0) and (drop // 4) or drop)
+        -- normalized per hit by the state of THIS slot's gauge before
+        -- the hit landed: a volley that breaks mid-way lands its rest
+        -- broken (x4 shielded), the breaking hit itself shielded (#542,
+        -- M.brokenForDrop), and the per-hit figure (#165) must not
+        -- average the two
+        w.norm = w.norm + (brkHit and (drop // 4) or drop)
         w.raceNorm = (w.raceNorm or 0) + M.raceDamageBase(drop,
-          M.readByte(BATTLE.SH_MAX + s * 2), M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0)
+          M.readByte(BATTLE.SH_MAX + s * 2), brkHit)
         w.n = w.n + 1
       end
     end
@@ -21943,13 +22038,22 @@ end
 -- already flushed before the request (`map=0 n=1 xy=0:0` at f21) stays in
 -- the log: only the load's frames are fixed, and the `map=1 ... xy=0:28`
 -- lines of the audit were not reproduced.
+-- The map id the trace keys on ($1F64) is the game's only once the game has
+-- written it: a map load, a Continue's copy of the slot, or a state load.
+-- Before that the trace records nothing, so a boot's read of the power-on
+-- RAM (`[tiles] map=0` on a zeroed console, `map=511` on an all-ones one)
+-- is no longer logged as a map stood on.
+M.traceMapSet = false
+M.onWrite(function() M.traceMapSet = true end, 0x1F64, 0x1F65)
 function M.traceOnLoad(first)
+  M.traceMapSet = true
   if M.TRACE_HOLD == false then return end
   if first then traceSet, traceCount, traceMap = {}, 0, nil else traceFlush() end
   M.traceHoldUntil = M.frame + 3
 end
 
 local function traceTick()
+  if not M.traceMapSet then return end
   -- the world map keeps its party tile in $e0/$e2, not the field object (#288)
   local world = M.worldMode ~= nil and M.worldMode()
   if world then

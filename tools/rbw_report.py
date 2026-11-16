@@ -14,7 +14,9 @@ debug file names the source line.
 
 tools/uninit_waivers.txt lists the reads proven benign, one per line:
 
-    read <file>:<line> <ram> <reason>
+    read <file>:<line> <ram> <reason>     one instruction
+    unread <ram> <lo>[-<hi>] <reason>      any instruction's read of these offsets
+    fill <ram> <lo>[-<hi>] <reason>        (the fill's own waivers count too)
 
 A waived line's reads are counted and not listed (--all lists them too).
 Exit status 1 when an unwaived read remains.
@@ -95,6 +97,12 @@ def load_waivers(path):
         f = raw.split(None, 3)
         if len(f) == 4 and f[0] == "read":
             out[(f[1], f[2])] = f[3]
+        elif len(f) == 4 and f[0] in ("fill", "unread"):
+            # an address waiver: any instruction's read of these offsets
+            # (`fill` lines too: what the fill leaves zero is understood)
+            lo, _, hi = f[2].partition("-")
+            reason = f[3].split(None, 1)
+            out.setdefault(("*", f[1]), []).append((int(lo, 16), int(hi or lo, 16), f[3]))
     return out
 
 
@@ -125,6 +133,12 @@ def report(log_lines, dbg, waivers, show_all=False, out=print):
     open_, waived = [], []
     for (where, ram), g in sorted(groups.items(), key=lambda kv: kv[1]["first"]):
         reason = waivers.get((where, ram))
+        if not reason:
+            spans = waivers.get(("*", ram), [])
+            # every offset under some waiver (overlapping waivers count once)
+            hit = [next((r for lo, hi, r in spans if lo <= a <= hi), None) for a in sorted(g["addrs"])]
+            if all(hit):
+                reason = hit[0]
         (waived if reason else open_).append((where, ram, g, reason))
     for where, ram, g, reason in open_ + (waived if show_all else []):
         rs = ranges(g["addrs"])
@@ -166,12 +180,21 @@ def selftest():
                "[rbw] f30 sram $04000 pc $C00015 v=$FF",
                "[ot6] unrelated"]
         w = Path(t, "w.txt")
-        w.write_text("# comment\nfill wram 1F6E a fill line\nread src/a.asm:8 sram the magic check reads before it signs\n")
+        w.write_text("# comment\nfill wram 1F6E a fill line\nread src/a.asm:8 sram the magic check reads before it signs\n"
+                     "unread wram 1FD3 an address waiver covering half the group\n")
         lines = []
         o, wv = report(log, d, load_waivers(w), out=lines.append)
         check("reads group by source line", len(o) == 1 and o[0][0] == "src/a.asm:7")
         check("consecutive addresses print as a range", "$01FD3-$01FD4" in lines[0])
-        check("a waived line is counted, not listed", len(wv) == 1 and len(lines) == 2)
+        check("a waived line is counted, not listed; a half-covered group stays listed", len(wv) == 1 and len(lines) == 2)
+        w.write_text("unread wram 1FD0-1FDF every read of these\n")
+        o, wv = report(log, d, load_waivers(w), out=[].append)
+        check("an address waiver covering a group's every address waives it",
+              [x[0] for x in o] == ["src/a.asm:8"] and len(wv) == 1)
+        w.write_text("unread wram 1FD0-1FDF every read of these\nunread wram 1FD3 one of them again\n")
+        o, wv = report(log, d, load_waivers(w), out=[].append)
+        check("overlapping address waivers still waive the group",
+              [x[0] for x in o] == ["src/a.asm:8"] and len(wv) == 1)
     print("rbw_report selftest: " + ("OK" if not fails else f"{len(fails)} FAILURE(S)"))
     return 1 if fails else 0
 

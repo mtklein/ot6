@@ -1,6 +1,9 @@
 -- @suite
 -- battle_clockwork.lua -- the HUD's boost pips and weakness reveals land
--- on the mechanical frame, not near it.
+-- on the mechanical frame, not near it.  Since #540 the pips' frame is the
+-- boosted action's start (its ExecCmd): the spent points leave the cell as
+-- the action begins, not at Ot6ActionEnd's charge after its animation, and
+-- not a frame before it begins.
 
 -- Staged with battle_mpcost.lua's drive: all-Bushido CYAN,
 -- boost banked by the swdtech submenu row, guards stopped with HP and
@@ -88,6 +91,7 @@ end
 -- per-frame observations across the in-flight window
 local watch = false
 local chargeF, spentGlyphBeforeCharge, spentGlyphAfterF = nil, nil, nil
+local beginF, spentF = nil, nil      -- the boosted action's ExecCmd; the spent glyph's first frame
 local hpFrames, rclsF = {}, { [2] = nil, [3] = nil }
 local numeralF, lastCtr = {}, nil
 local function sample()
@@ -98,6 +102,7 @@ local function sample()
   if lo then
     local spent = PIP[2]        -- bp 5 - pend 3 = 2 -> the charged glyph
     if (lo & 0xFF) == spent or (hi & 0xFF) == spent then
+      spentF = spentF or H.frame
       if not chargeF then
         spentGlyphBeforeCharge = spentGlyphBeforeCharge or H.frame
       elseif not spentGlyphAfterF then
@@ -155,6 +160,9 @@ H.run({ maxFrames = 40000 }, {
     H.log("actor slot " .. actor .. " (CYAN, pending 3 -> Slash, single target)")
     pinField()
     emu.addEventCallback(function() sample() end, emu.eventType.startFrame)
+    emu.addMemoryCallback(function()
+      if watch and not beginF and (emu.getState()["cpu.x"] & 0xFF) == actor * 2 then beginF = H.frame end
+    end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"))
   end),
 
   H.driveUntil(inWindow, 1500, {
@@ -198,14 +206,20 @@ H.run({ maxFrames = 40000 }, {
       msPresent[2], tostring(rclsF[msPresent[2]]),
       table.concat((function() local t = {} for _, f in ipairs(numeralF) do
         t[#t + 1] = tostring(f) end return t end)(), ",")))
-    -- 1. pips: the bank displays the full value until the charge...
-    H.assertEq(spentGlyphBeforeCharge, nil,
-      "the charged pip value never shows before Ot6ActionEnd's charge "
-      .. "(pre-change: the menu restage painted it hundreds of frames early)")
-    -- ...and the drop lands within a handful of frames of the bp write.
-    H.assertEq(spentGlyphAfterF ~= nil and spentGlyphAfterF - chargeF <= 8, true,
-      string.format("the pip drop lands on the charge frame (charge %s, drop %s)",
-        tostring(chargeF), tostring(spentGlyphAfterF)))
+    H.log(string.format("the boosted tech began f%s; the spent glyph first showed f%s",
+      tostring(beginF), tostring(spentF)))
+    -- 1. pips: the bank displays the full value until the action begins
+    -- (#540; before it, until Ot6ActionEnd's charge)...
+    H.assertEq(beginF ~= nil, true, "the boosted tech's ExecCmd was seen")
+    H.assertEq(spentF ~= nil and spentF >= beginF, true,
+      string.format("the charged pip value never shows before the action begins "
+        .. "(pre-#397: the menu restage painted it hundreds of frames early; begin %s, shown %s)",
+        tostring(beginF), tostring(spentF)))
+    -- ...and the drop lands within a handful of frames of the begin, well
+    -- before the charge at the action's end
+    H.assertEq(spentF - beginF <= 8 and spentF < chargeF, true,
+      string.format("the pip drop lands as the action begins, before the charge (begin %s, drop %s, charge %s)",
+        tostring(beginF), tostring(spentF), tostring(chargeF)))
     -- 2. reveals: committed after damage calc, on a numeral frame...
     local ra, rb = rclsF[msPresent[1]], rclsF[msPresent[2]]
     H.assertEq(ra ~= nil and rb ~= nil, true, "both same-species guards revealed")

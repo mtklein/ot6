@@ -23,16 +23,18 @@
 --   2. a fire hit chips the head's shield and reveals the fire weakness
 --      (mask $01 in the head's $3E91 slot)
 --   3. shields reach 0 -> broken timer nonzero
---   3b. the broken x2 for a flags3-$20 attack: Fire Beam carries flags3
---      $20 (can't dodge), and the old whole-byte $f2 gate denied it the
---      broken double.  The breaking hit lands with the timer already
---      set, so its recorded drop must be ~4x the first (unbroken) chip's
---      drop on the same body: the first chip is elemental-weak x2 then
---      shielded-resistance x0.5 (Ot6ShieldedDmg attenuates while shields
---      hold), giving ~1x base, while the breaking hit's chip empties the
---      shields before the damage tail runs, so it collects weak x2 and
---      broken x2 unattenuated, giving ~4x base.  Bounded 3x-6x (vanilla's
---      224..255/256 damage spread keeps the true ratio inside [3.51, 4.55]).
+--   3b. every hit is judged on the head's state before it lands (#542).
+--      Each hit's damage is read as it enters OT6's factor (Ot6HitJoin)
+--      and as it leaves (CalcMaxDmg, next), with the head's shields and
+--      timer as CalcTargetDmg began: a hit on a shielded head is halved,
+--      the hit that takes the last shield included, and a hit on a head
+--      already Broken is doubled.  So the breaking beam's recorded HP drop
+--      is about the first chip's (both elemental-weak x2 then shielded
+--      x0.5; vanilla's 224..255/256 spread bounds the ratio to [0.87,
+--      1.14]), where v0.45's breaking hit skipped the halving and took the
+--      double, about 4x (build/attempts/wt/v046-break-feel/).  Then, from a
+--      snapshot taken at the break, Terra beams the Broken head once more:
+--      that hit is doubled.  The run goes back to the snapshot for 4.
 --   4. the broken timer expires -> shields restore to max, and the revealed
 --      mask survives recovery
 --
@@ -45,11 +47,10 @@
 --      '?' a mid grey, neither one any weakness icon's colour but for the
 --      icons colourCheck names;
 --   3h. broken, the lead cell holds the head's broken-shield tile (tile 100)
---      under $3D (text palette 7) and the count cell is empty; and the head's sprite is moved
---      onto a spare monster palette (one the formation left unloaded) that
---      holds the grey of its own palette, colour for colour, while the shell
---      stays on its own;
---   4h. recovered, the head is back on its own palette.
+--      under $3D (text palette 7) and the count cell is empty; the head's
+--      sprite stays on its own palette (#543 took the grey away: the broken
+--      shield is the whole broken look), though the formation leaves a
+--      spare palette the old grey would have used.
 --
 -- Addresses, all +slot*2 off the monster slot the head lands in (found by
 -- species scan, never hardcoded): shields $3E40, broken timer $3E90,
@@ -72,7 +73,7 @@ local MFLAGS, MGAUGE = 0x3AA8, 0x3221 -- monster $3AA0/$3219 rows, +slot*2
 local hs, terra                       -- head monster slot, Terra's char slot
 local shell                           -- the shell's monster slot
 
--- the shield gauge and the grey (#397)
+-- the shield gauge (#397)
 local HUDSHADOW = 0xECF1              -- OT6_SHADOW: 6 lines x 14, +0 anchor
 local SPRDATA = 0x80DB                -- w7e80db: bits 1-3 the obj palette
 local LOADED = 0x8123                 -- w7e8123: the formation's palettes
@@ -85,11 +86,6 @@ local function palsLoaded()
   local k = 0
   while k < 3 and H.readWord(LOADED + k * 2) ~= 0xFFFF do k = k + 1 end
   return k
-end
-local function color(bits, i) return H.readWord(0x7F00 + bits * 16 + i * 2) end
-local function luma(c)
-  local l = (2 * (c & 31) + 5 * ((c >> 5) & 31) + ((c >> 10) & 31)) >> 3
-  return l | (l << 5) | (l << 10)
 end
 local function slotCell(s)
   return H.readRomByte((H.sym("Ot6ShieldSlotCellTbl") & 0x3FFFFF) + s)
@@ -174,27 +170,6 @@ local function ownBits(s)
   end
   return 0
 end
--- s stands on a spare palette holding the grey of its own palette
-local function grey(s)
-  local bits, k = palBits(s), palsLoaded()
-  if bits >= 6 or bits // 2 < k then return false end
-  local own = ownBits(s)
-  for i = 0, 15 do
-    if color(bits, i) ~= luma(color(own, i)) then return false end
-  end
-  return true
-end
-local function greyReport(tag)
-  local t = {}
-  for s = 0, 5 do
-    t[#t + 1] = string.format("s%d=%02X/%02X", s, palBits(s), ownBits(s))
-  end
-  local a, lead, count = headLine()
-  H.log(string.format("[grey] %s: palettes loaded %d; bits/own %s; head line @%s lead %04X count %04X",
-    tag, palsLoaded(), table.concat(t, " "), a and string.format("%04X", a) or "off",
-    lead or 0, count or 0))
-end
-
 local function shields()  return H.readByte(SHLD + hs * 2) end
 local function maxShield() return H.readByte(SHLD + hs * 2 + 1) end
 local function timer()    return H.readByte(TIMER + hs * 2) end
@@ -205,6 +180,48 @@ local function headHp()   return H.readWord(MHP + hs * 2) end
 local function headAlive()
   return (H.readByte(ALIVE + hs * 2) & 1) == 1
      and (H.readByte(MSTAT + hs * 2) & 0xC2) == 0
+end
+
+-- #542: every hit on the head, judged.  CalcTargetDmg's entry is the head's
+-- state before the hit (no chip of this hit has run: Ot6Chip sits in its
+-- weak branch, the rest in Ot6HitJoin); $f0 at Ot6HitJoin's entry is the
+-- damage OT6's factor receives (vanilla's elemental x2 included), and $f0 at
+-- CalcMaxDmg, the next call after the join, is what it leaves.  Read only.
+local hits, cur = {}, nil
+local function armHitWatch()
+  emu.addMemoryCallback(function()
+    local y = emu.getState()["cpu.y"] & 0xFF
+    if hs == nil or y ~= 8 + hs * 2 then cur = nil; return end
+    cur = { sh = H.readByte(SHLD + hs * 2), brk = H.readByte(TIMER + hs * 2) ~= 0, f = H.frame }
+  end, emu.callbackType.exec, H.sym("CalcTargetDmg"))
+  emu.addMemoryCallback(function()
+    if cur then cur.din = H.readWord(0xF0) end
+  end, emu.callbackType.exec, H.sym("Ot6HitJoin"))
+  emu.addMemoryCallback(function()
+    if cur and cur.din then
+      cur.dout, cur.heal = H.readWord(0xF0), (H.readByte(0xF2) & 1) == 1
+      cur.broke = not cur.brk and H.readByte(TIMER + hs * 2) ~= 0
+      hits[#hits + 1] = cur
+      H.log(string.format("[hit] f%d head before: shields %d broken %s; damage %d -> %d%s",
+        cur.f, cur.sh, tostring(cur.brk), cur.din, cur.dout, cur.broke and " (this hit broke it)" or ""))
+    end
+    cur = nil
+  end, emu.callbackType.exec, H.sym("CalcMaxDmg"))
+end
+-- what OT6's factor owes a hit, from the state before it: shielded x0.5
+-- (Ot6ShieldedMulW's 8/16, floored), Broken x2 (under vanilla's sign guard)
+local function owed(h)
+  if h.heal then return h.din end
+  if h.brk then return h.din < 0x8000 and h.din * 2 or h.din end
+  if h.sh > 0 then return h.din // 2 end
+  return h.din
+end
+local function checkHits(what)
+  for _, h in ipairs(hits) do
+    H.assertEq(h.dout, owed(h), string.format(
+      "%s: the hit at f%d (shields %d, broken %s before it%s) is judged on the state before it lands",
+      what, h.f, h.sh, tostring(h.brk), h.broke and ", and it broke the head" or ""))
+  end
 end
 
 local function report(tag)
@@ -302,8 +319,12 @@ local function terraSafe()
   return terraHp() * 2 > H.readWord(PMAXHP + terra * 2)
 end
 
--- the sequence for this window's owner, or nil to hold the menu open
+-- the sequence for this window's owner, or nil to hold the menu open.
+-- In the branch after the break (3b) everyone beams while the head shows,
+-- so a hit reaches it inside its Broken window.
+local beamAll = false
 local function seqFor(actor)
+  if beamAll then return headAlive() and BEAM or HEAL end
   if actor ~= terra then return HEAL end
   local why = (not terraSafe() and "heal") or (beamWindow() and "beam")
     or "hold"
@@ -434,6 +455,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(terra ~= nil, true, "TERRA has a party slot (the only beamer)")
     H.log(string.format("head slot %d, shell slot %d, terra slot %d",
       hs, shell, terra))
+    armHitWatch()
 
     -- Ot6ShieldTbl authors $0134 as 4 shields / OT6_PIERCE (ot6_hud.asm:1730)
     H.assertEq(shields(), 4, "head seeded at its authored 4 shields")
@@ -452,7 +474,6 @@ H.run({ maxFrames = 60000 }, {
   H.waitUntil(function() return gaugeShown() end, 600,
     "the head's shield gauge drawn: emblem, then its count tile, palette 0", 1),
   H.call(function()
-    greyReport("seeded")
     colourCheck()
     local _, lead, count = headLine()
     H.assertEq(lead >> 8, GAUGE, "the shield emblem draws under the gauge attribute (palette 0)")
@@ -460,7 +481,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(qmarksShown(), true,
       "the head's two unrevealed weaknesses drawn as '?' in the '?' attribute")
     H.assertEq(palsLoaded() < 3, true,
-      "precondition: the formation left a monster palette unloaded (a spare for the grey)")
+      "precondition: the formation left a monster palette unloaded (the spare v0.45's grey took)")
     H.assertEq(palBits(hs), ownBits(hs), "the head starts on its own palette")
     H.screenshot("break_gauge")
   end),
@@ -519,31 +540,100 @@ H.run({ maxFrames = 60000 }, {
     local first, last = drops[1], drops[#drops]
     H.assertEq(first.broken, false, "first chip landed unbroken")
     H.assertEq(last.broken, true, "breaking hit landed with the timer up")
-    -- shielded resistance sets these bounds: the unbroken chip is weak x2 *
-    -- shielded x0.5 = ~1x base; the breaking hit is weak x2 * broken x2,
-    -- unattenuated because its chip zeroed the shields before the damage
-    -- tail, giving ~4x base.  True range [3.51, 4.55] under vanilla's
-    -- 224..255/256 spread.
-    H.assertEq(last.d > first.d * 3, true,
-      "broken beam hit > 3x the shielded chip (0.5x lifted, x2 collected)")
-    H.assertEq(last.d < first.d * 6, true,
-      "and < 6x (weak x2 * broken x2, not something wilder)")
+    -- #542: the breaking beam landed on a shielded head, so its drop is
+    -- the chip's (weak x2 * shielded x0.5 both), inside vanilla's spread
+    -- [224/255, 255/224]; v0.45's was ~4x (190 190 193 784B)
+    H.assertEq(last.d * 100 >= first.d * 85 and last.d * 100 <= first.d * 118, true,
+      string.format("the breaking beam's drop (%d) is the shielded chip's (%d), not the Broken double",
+        last.d, first.d))
+    checkHits("to the break")
+    local brk = 0
+    for _, h in ipairs(hits) do
+      if h.broke then
+        brk = brk + 1
+        H.assertEq(h.sh, 1, "the breaking hit found one shield left")
+        H.assertEq(h.dout, h.din // 2, "the breaking hit is halved as a shielded hit (#542)")
+      end
+    end
+    H.assertEq(brk, 1, "exactly one hit broke the head, and the watcher saw it")
     H.screenshot("break_broken")
   end),
-  -- 3h. broken: the broken shield in the gauge, the head in grey, the shell
-  -- in colour.  The head may be retracted into its shell for a while.
-  H.waitUntil(function() return grey(hs) and brokenShown() end, 3000,
-    "the broken head drawn in grey under the broken shield", 1),
+  -- 3b, the branch: from a snapshot at the break, everyone beams while the
+  -- head shows until a hit lands on it Broken, which is doubled; then the
+  -- run goes back to the snapshot, so 3h and 4 see the head as the break
+  -- left it.
   H.call(function()
-    greyReport("broken")
-    H.assertEq(timer() > 0, true, "the head is still broken")
-    H.assertEq(grey(hs), true, "the broken head's sprite is on a grey copy of its own palette")
-    H.assertEq(palBits(shell), ownBits(shell), "the shell, not broken, keeps its own palette")
-    H.assertEq(brokenShown(), true, "the gauge shows the broken shield and no count")
+    H.setPad({})
+    H.vars.brkSnap = H.requestSaveState()
   end),
-  -- the palette reaches CGRAM at the next vblank's DMA: photograph after it
-  H.waitFrames(4),
-  H.call(function() H.screenshot("break_grey") end),
+  H.waitFrames(2),
+  H.call(function()
+    H.checkReq(H.vars.brkSnap, "snapshot at the break")
+    H.vars.hitsAtBreak = #hits
+    beamAll = true
+    mStreak, mSeq, mIdx, mStall, holding = 0, nil, 1, 0, false
+  end),
+  H.driveUntil(function()
+    for i = H.vars.hitsAtBreak + 1, #hits do
+      if hits[i].brk then return true end
+    end
+    if timer() == 0 then
+      error(string.format("the head recovered (timer 0, shields %d) before a hit landed on it Broken",
+        shields()), 0)
+    end
+    return false
+  end, 6000, { H.call(pulseTick) }, "a hit on the Broken head"),
+  H.call(function()
+    H.setPad({})
+    checkHits("after the break")
+    local h
+    for i = H.vars.hitsAtBreak + 1, #hits do
+      if hits[i].brk then h = hits[i]; break end
+    end
+    H.assertEq(h.dout, h.din * 2, "a hit on the head already Broken is doubled")
+    H.vars.numAt = H.readByte(0x632E)
+  end),
+  -- the doubled beam's numeral on the head (the manual's picture of a
+  -- break, tools/manual/shots.py "break"): the numeral counter moves, on a
+  -- thread aimed at the head (target 4 + its slot)
+  H.waitUntil(function()
+    local c = H.readByte(0x632E)
+    return c ~= H.vars.numAt and c ~= 0 and H.readByte(0x631E + ((c - 1) & 3)) == 4 + hs
+  end, 900, "the doubled beam's numeral on the head", 1),
+  H.waitFrames(12),
+  H.call(function()
+    H.screenshot("break_double")
+    beamAll = false
+    mStreak, mSeq, mIdx, mStall, holding = 0, nil, 1, 0, false
+    H.vars.backReq = H.requestLoadState(H.vars.brkSnap.blob)
+  end),
+  H.waitFrames(2),
+  H.call(function()
+    H.checkReq(H.vars.backReq, "back to the snapshot at the break")
+    H.rearmInputInjection()
+  end),
+  -- 3h. broken: the broken shield in the gauge, and the head on its own
+  -- palette (#543).  The head may be retracted into its shell for a while.
+  H.waitUntil(function() return brokenShown() end, 3000,
+    "the broken head's gauge shows the broken shield", 1),
+  -- the grey stood the head on a spare palette (one the formation left
+  -- unloaded, bits 2*palsLoaded()..4) for as long as it was broken; now it
+  -- never does.  Palette 3 (bits 6) is the engine's own flash and retract
+  -- animations' and is not the grey's.
+  H.call(function() H.vars.onSpare, H.vars.spareSeen = 0, 0 end),
+  H.repeatN(180, { H.call(function()
+    local b = palBits(hs)
+    if b < 6 and b // 2 >= palsLoaded() then H.vars.onSpare = H.vars.onSpare + 1 end
+    if timer() > 0 then H.vars.spareSeen = H.vars.spareSeen + 1 end
+  end), H.waitFrames(1) }),
+  H.call(function()
+    H.assertEq(H.vars.spareSeen, 180, "the head stayed broken through the look")
+    H.assertEq(brokenShown(), true, "the gauge shows the broken shield and no count")
+    H.assertEq(H.vars.onSpare, 0,
+      "the broken head's sprite never stands on a spare palette: no grey (#543)")
+    H.assertEq(palBits(shell), ownBits(shell), "the shell keeps its own palette")
+    H.screenshot("break_broken_look")
+  end),
 
   -- 4. recovery: timer expires, shields restore, reveal persists.  Nothing
   -- is pressed from here on, so the head takes no further damage; the shell
@@ -580,13 +670,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(shields(), 4, "shields restored to max")
     H.assertEq(revealed() & 0x01, 0x01, "revealed weakness survives recovery")
   end),
-  -- 4h. back in colour, at the recovery: the head recovers inside its shell
-  -- as often as not (the report above reads alive=false), and its sprite
-  -- palette goes back on the first quiet frame all the same
-  H.waitUntil(function() return palBits(hs) == ownBits(hs) end, 600,
-    "the recovered head back on its own palette", 1),
   H.call(function()
-    greyReport("recovered")
     H.assertEq(palBits(hs), ownBits(hs), "the recovered head draws from its own palette")
     H.screenshot("break_recovered")
   end),

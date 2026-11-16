@@ -42,7 +42,7 @@ WORK = ROOT / "build" / "manual" / "shots"
 SUITES = {
     "shields": ("battle_class", "class_hud_pierce"),
     "shields_whelk": ("battle_break", "break_gauge"),
-    "break": ("battle_break", "break_grey"),
+    "break": ("battle_break", "break_double"),
     "boost": ("battle_boost", "boost_selected"),
     "aura": ("battle_auraband", "auraband_all_four"),
     "esper_rank": ("menu_esperdetail", "esperdetail_staged_rank4_rung5"),
@@ -59,7 +59,7 @@ SUITES = {
     "mastersmark": ("battle_mastersmark", "mastersmark_banner_1"),
     "cover": ("@boss_shots", "boss_rev2_late"),
     "celes": ("@battle_shots", "celes_runic_6"),
-    "mog": ("@battle_shots", "mog_dance_1"),
+    "mog": ("battle_densekits", "battle_densekits_dance"),
     "strago": ("battle_lorerefuse", "lorerefuse_after"),
     "portrait_umaro": ("@portrait_shots", "menu_tritoch", (12, 15, 63, 62)),
     "portrait_mog": ("@portrait_shots", "menu_tritoch", (12, 63, 63, 110)),

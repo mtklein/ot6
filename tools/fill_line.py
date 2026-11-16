@@ -161,6 +161,10 @@ def legs(args):
         state, gen, key = leg
         env = dict(os.environ, OT6_POWERON_FILL=mode, OT6_NO_PUBLISH="1",
                    OT6_WORKER=f"fill-{state}")
+        if args.machines:
+            # publish into the wave's own directory, to compare the machines
+            env.pop("OT6_NO_PUBLISH")
+            env["OT6_ARTIFACT_DIR"] = str(out / state)
         env.pop("OT6_SRAM_CHECKPOINT", None)
         if key:
             env["OT6_SRAM_CHECKPOINT"] = str(ref / "build/checkpoints" / key)
@@ -176,6 +180,16 @@ def legs(args):
             what = f"PLAY PARTS at line {dl[0]}\n      ref  {dl[1][:200]}\n      fill {dl[2][:200]}"
         else:
             what = "same play" + (f" ({dl[3]} observation(s) differ)" if dl else "")
+        if args.machines:
+            same, moved = [], []
+            for m in sorted((out / state).glob("*.mss")):
+                r = ref / "build/states" / m.name
+                if r.exists():
+                    eq = (fill_diff.machine_stream(m.read_bytes())
+                          == fill_diff.machine_stream(r.read_bytes()))
+                    (same if eq else moved).append(m.stem)
+            what += (f"; machines identical: {','.join(same) or '-'}"
+                     + (f"; MACHINES DIFFER: {','.join(moved)}" if moved else ""))
         return f"{state} ({gen}{', ' + key if key else ''}) rc={rc} {time.time() - t0:.0f}s: {what}"
 
     with cf.ThreadPoolExecutor(args.jobs) as ex, open(out / "summary.txt", "a") as f:
@@ -224,6 +238,12 @@ def selftest(_args=None):
         check("a fill tree's own mode fills, the fill code first after its globals",
               isinstance(got, list) and got[0] == 'OT6_FILL_MODE = "rand"\n'
               and "OT6_FILL_SEED = 9\n" in got and "emu.write" in got[-1])
+        # (a waiver of its own: the tree's file may hold none)
+        real = compose.WAIVERS_UNINIT
+        compose.WAIVERS_UNINIT = Path(t, "waivers.txt")
+        compose.WAIVERS_UNINIT.write_text("fill wram 1F6E-1F6F a test waiver\n")
+        got = prologue(fill, {"OT6_POWERON_FILL": "rand:9"})
+        compose.WAIVERS_UNINIT = real
         check("the waivers' offsets are left zero in a whole-region fill",
               isinstance(got, list) and "except = true" in got[2] and "0x1F6E" in got[2])
         got = prologue(fill, {"OT6_POWERON_FILL": "rand:9",
@@ -264,6 +284,10 @@ def main():
     g.add_argument("--ref", required=True, help="tree whose build/checkpoints and build/states logs are the line's")
     g.add_argument("--jobs", type=int, default=4)
     g.add_argument("--only", help="comma list of states")
+    g.add_argument("--machines", action="store_true",
+                   help="publish each leg's states into build/legs/<state>/ and compare "
+                        "their emulated machines with the reference's (a zero tree's proof "
+                        "that a harness change moved no play)")
     r = sub.add_parser("run")
     r.add_argument("dir")
     r.add_argument("--until")
