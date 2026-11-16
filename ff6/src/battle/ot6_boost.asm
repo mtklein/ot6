@@ -107,6 +107,10 @@
                                         ;   not left to the shadow loop above,
                                         ;   which stops at $ed61
         sta     f:$7e0000+OT6_LASTLR
+        sta     f:$7e0000+OT6_PIPCUR    ; #544: the retired live cell's words
+        sta     f:$7e0000+OT6_PIPPREV   ;   held the field's junk into the
+        sta     f:$7e0000+OT6_PIPCELL   ;   battle, and v0.45's painter blanked
+                                        ;   VRAM wherever it pointed
         sta     f:$7e0000+OT6_RESTAGE   ; word store: the high byte lands on
                                         ;   vanilla's $57d5 name scratch,
                                         ;   harmless at init (vanilla always

@@ -24,6 +24,10 @@ comes.
 Broken enemies no longer turn grey. The cracked shield under an enemy shows
 that it is broken.
 
+Stray black squares no longer appear in battle. A battle could start with
+one punched in the scenery, often at the top right, and another in the
+menus, most often on the Veldt.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44
