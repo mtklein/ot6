@@ -767,9 +767,16 @@ M.blsSeen = nil              -- the last frame this read a battle (a field: the 
 -- power-on RAM, which a random fill can make read as a live party
 -- (`waitUntil 'battle 70 active' satisfied after 0 frames`, OT6_POWERON_FILL
 -- =rand:1).  On a zeroed console that RAM reads as no battle anyway.
+-- A file-scope WRAM write watch.  A standalone selftest's stub emu has no
+-- memory callbacks and no power-on RAM: there the watch is skipped and fn
+-- runs at once, as if the game had written the cells (its stubbed reads are
+-- what the selftest means the game to hold).
+function M.onWrite(fn, lo, hi)
+  if not (emu.addMemoryCallback and emu.callbackType and emu.cpuType and emu.memType) then fn(); return end
+  emu.addMemoryCallback(fn, emu.callbackType.write, lo, hi, emu.cpuType.snes, emu.memType.snesWorkRam)
+end
 M.battleHpSet = false
-emu.addMemoryCallback(function() M.battleHpSet = true end, emu.callbackType.write,
-  M.BATTLE_HP, M.BATTLE_HP + 7, emu.cpuType.snes, emu.memType.snesWorkRam)
+M.onWrite(function() M.battleHpSet = true end, M.BATTLE_HP, M.BATTLE_HP + 7)
 function M.battleLoadStarted()
   if not M.battleHpSet then return false end
   local anyLive, odd = false, false
@@ -834,10 +841,8 @@ end
 -- $FFFF; build/attempts/wt/v046-fills-2/ifrit/).  So each counts once the
 -- game has written it since power-on, or a state load brought it.
 M.battleCueSet = { present = false, lit = false }
-emu.addMemoryCallback(function() M.battleCueSet.present = true end, emu.callbackType.write,
-  M.MONSTER_PRESENT, M.MONSTER_PRESENT, emu.cpuType.snes, emu.memType.snesWorkRam)
-emu.addMemoryCallback(function() M.battleCueSet.lit = true end, emu.callbackType.write,
-  0xE9F9, 0xE9F9, emu.cpuType.snes, emu.memType.snesWorkRam)
+M.onWrite(function() M.battleCueSet.present = true end, M.MONSTER_PRESENT, M.MONSTER_PRESENT)
+M.onWrite(function() M.battleCueSet.lit = true end, 0xE9F9, 0xE9F9)
 function M.battleActive()
   return M.battleLoadStarted() and M.battleCueSet.present and M.battleCueSet.lit
     and M.monstersPresent() > 0 and M.battleScreenLit()
@@ -22008,8 +22013,7 @@ end
 -- RAM (`[tiles] map=0` on a zeroed console, `map=511` on an all-ones one)
 -- is no longer logged as a map stood on.
 M.traceMapSet = false
-emu.addMemoryCallback(function() M.traceMapSet = true end, emu.callbackType.write,
-  0x1F64, 0x1F65, emu.cpuType.snes, emu.memType.snesWorkRam)
+M.onWrite(function() M.traceMapSet = true end, 0x1F64, 0x1F65)
 function M.traceOnLoad(first)
   M.traceMapSet = true
   if M.TRACE_HOLD == false then return end
