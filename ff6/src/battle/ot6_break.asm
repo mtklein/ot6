@@ -1158,7 +1158,9 @@ done:   rts
 ; x = the event's byte offset.  The slot's held gauge takes the event's; a
 ; gauge that turns broken here banks the break flash and its cleave
 ; (OT6_BRKTICK = $ff, which the caller's Ot6BreakArm fires); its pending
-; weaknesses are revealed on every monster of the species.
+; weaknesses are revealed on every monster of the species.  An event whose
+; slot is no longer held (a scene change mid-action: Ot6SeedShields released
+; it) is skipped: the gauge it would set is not this slot's any more.
 ; a8/i16, db=$7e.  preserves x/y; clobbers a.
 .proc Ot6EvApply
         .a8
@@ -1169,6 +1171,14 @@ done:   rts
         and     #$00ff
         tay                     ; slot offset
         shorta0
+        phx
+        tya
+        lsr                     ; monster slot 0-5 (b = 0: shorta0)
+        tax
+        lda     f:Ot6HitBitTbl,x
+        plx
+        and     OT6_HOLD
+        beq     @skip           ; released: a leftover event
         lda     OT6_SHOWN,y
         pha                     ; the gauge shown before this hit
         lda     OT6_EVQ+2,x
@@ -1184,7 +1194,7 @@ done:   rts
         xba
         lda     OT6_EVQ+4,x
         jsr     Ot6RevealSibs
-        ply
+@skip:  ply
         rts
 .endproc
 

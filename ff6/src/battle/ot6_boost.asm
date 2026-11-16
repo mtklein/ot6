@@ -59,6 +59,15 @@
         sta     f:$7e0000+OT6_BPDEFER
         sta     f:$7e0000+OT6_PIPDIRTY
         sta     f:$7e0000+OT6_PIPLIVE
+        sta     f:$7e0000+OT6_PIPRR     ; nor the flush's row turn, nor the
+        sta     f:$7e0000+OT6_PIPROWW+0 ;   staged row words: read before
+        sta     f:$7e0000+OT6_PIPROWW+1 ;   written after power-on (the
+        sta     f:$7e0000+OT6_PIPROWW+2 ;   v0.46 review); 8-bit stores,
+        sta     f:$7e0000+OT6_PIPROWW+3 ;   so one per byte
+        sta     f:$7e0000+OT6_PIPROWW+4
+        sta     f:$7e0000+OT6_PIPROWW+5
+        sta     f:$7e0000+OT6_PIPROWW+6
+        sta     f:$7e0000+OT6_PIPROWW+7
         sta     f:$7e0000+OT6_HOLD      ; nor a held gauge (#539)
         sta     f:$7e0000+OT6_EVHEAD    ;   or its events
         sta     f:$7e0000+OT6_EVTAIL

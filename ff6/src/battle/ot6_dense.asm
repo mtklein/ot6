@@ -246,8 +246,8 @@ PackRows:
 ; entries in c columns, four rows on screen:
 ;
 ;   Magic  $8913  c = 2  n = $3cf8 + slot*2 (Ot6PackSpellList's count)
-;   Lore   $891f  c = 1  n = $3a87 (the lores offered, the same five or six
-;                        for every caster, InitSpellList's count)
+;   Lore   $891f  c = 1  n = the caster's packed lore rows (rows 55..78 up
+;                        to the first empty one; Ot6PackSpellList)
 ;   Rage   $892b  c = 2  n = $3a9a (Ot6RageList's count)
 ;
 ; The scroll's top is max(0, ceil(n/c) - 4), where vanilla used a constant
@@ -282,8 +282,26 @@ OT6_LIST_RAGE  = 4
         lda     $3cf8,x
         plx
         bra     @n
-@lore:  sep     #$20
-        lda     $3a87
+@lore:  asl                     ; lore: the caster's own packed lore rows
+        phx                     ;   (55..78 of his list, Ot6PackSpellList),
+        tax                     ;   counted to the first empty one, not
+        lda     $302c,x         ;   $3a87's count for every caster (the
+        clc                     ;   v0.46 review)
+        adc     #55 * 4
+        tax
+        sep     #$20
+        .a8
+        lda     #0
+@lcnt:  pha
+        lda     a:$0000,x
+        cmp     #$ff
+        pla
+        bcs     @lend           ; an empty row (id $ff): the end
+        inc
+        inx4
+        cmp     #24
+        bcc     @lcnt
+@lend:  plx
         bra     @n
 @rage:  sep     #$20
         lda     $3a9a
@@ -430,6 +448,24 @@ ScrollTbl:
 ot6_dense_list "Magic", OT6_LIST_MAGIC, $8913
 ot6_dense_list "Lore",  OT6_LIST_LORE,  $891f
 ot6_dense_list "Rage",  OT6_LIST_RAGE,  $892b
+
+; OpenMagicWindow's head (`lda #$0d / sta w7e7bc2`), then the Magic clamp for
+; the active slot, so a remembered cursor past the packed list's end is moved
+; onto it before _c18414 reads its row's MP (the v0.46 review: the row read
+; for one frame was an empty one).  a8/i16, db = $7e.  Clobbers a and x;
+; preserves y.
+.proc Ot6DenseMagicPre
+        .a8
+        .i16
+        lda     #$0d
+        sta     $7bc2
+        phy
+        ldy     $62ca
+        ldx     #OT6_LIST_MAGIC
+        jsr     Ot6ListClamp
+        ply
+        rtl
+.endproc
 
 ; in: a = the top.  out as the Bar entries above.  Preserves x and y.
 .proc Ot6ListBar

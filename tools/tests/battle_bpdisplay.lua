@@ -45,7 +45,10 @@ local vram = emu.memType.snesVideoRam
 local function bank(c) return H.readByte(0x3E9C + c * 2) end
 local function pend(c) return H.readByte(0x3E9D + c * 2) end
 
-local W = { viol = {}, queuedArrows = 0, withheld = 0, begins = 0, spent = 0, kept = 0, frames = 0 }
+local W = { viol = {}, queuedArrows = 0, withheld = 0, begins = 0, spent = 0, kept = 0, frames = 0, mismRow = {} }
+-- frames a row may disagree with the rule past the grace across the whole
+-- battle, every run counted (a run of six is a violation by itself)
+local MISM_TOTAL = 24
 local st = {}
 for c = 0, 3 do st[c] = { begun = false, owed = false, mism = 0, seen = false } end
 
@@ -203,6 +206,9 @@ local function sample()
           if s.owed and not s.begun and got == want and b > 0 then W.withheld = W.withheld + 1 end
         else
           s.mism = s.mism + 1
+          -- every mismatched frame past the grace, run or no run: a cell that
+          -- alternates right and wrong never makes a run of six (review)
+          W.mismRow[r] = (W.mismRow[r] or 0) + 1
           if s.mism == 6 then
             W.viol[#W.viol + 1] = string.format("f%d row %d (slot %d): shows %s, the rule says %s "
               .. "(bank %d, pending %d, begun %s, regen not yet shown %s; OT6_BPMARK $%02X)", H.frame, r, c,
@@ -235,7 +241,15 @@ H.run({ maxFrames = 200000 }, {
       .. "frames a queued boost's arrows showed with its window shut %d; frames a regen point was "
       .. "withheld %d; violations %d", W.frames, W.begins, W.spent, W.kept, W.queuedArrows, W.withheld, #W.viol))
     for i = 1, math.min(#W.viol, 20) do H.log("[bpdisplay] violation: " .. W.viol[i]) end
+    local worst, rows = 0, {}
+    for r = 0, 3 do
+      rows[#rows + 1] = string.format("row %d %d", r, W.mismRow[r] or 0)
+      worst = math.max(worst, W.mismRow[r] or 0)
+    end
+    H.log("[bpdisplay] frames a cell disagreed with the rule past the grace, all told: " .. table.concat(rows, ", "))
     H.assertEq(#W.viol, 0, "every pip cell followed the rule on every frame (#540)")
+    H.assertEq(worst <= MISM_TOTAL, true, string.format(
+      "no row disagreed with the rule on more than %d frames past the grace in all (worst %d)", MISM_TOTAL, worst))
     H.assertEq(W.begins >= 2 and W.spent >= 2, true,
       "coverage: at least two boosted actions began and spent their points")
     H.assertEq(W.queuedArrows > 0, true,

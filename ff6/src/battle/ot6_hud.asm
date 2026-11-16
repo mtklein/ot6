@@ -1289,6 +1289,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 .proc Ot6PipStage
         .a8
         .i16
+        phx                     ; preserved from the top: the window-open
+        phy                     ;   arm below uses x
         lda     $7bca           ; a window open: its character is active,
         beq     :+              ;   so its earned point is shown from now on
         lda     $62ca
@@ -1306,8 +1308,6 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         trb     OT6_BPMARK
 :       lda     OT6_PIPLIVE
         beq     @out            ; the party window not drawn yet this battle
-        phx
-        phy
         ldx     #$0000          ; menu row * 2
 @row:   longa
         txa
@@ -1354,9 +1354,9 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         inx
         cpx     #$0008
         bcc     @row
-        ply
+@out:   ply
         plx
-@out:   rts
+        rts
 .endproc
 
 ; [ one character's boost cell ]  a = character slot (0-3) -> a = the

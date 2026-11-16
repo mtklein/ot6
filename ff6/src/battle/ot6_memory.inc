@@ -659,13 +659,14 @@ OT6_EVQ              := $ee51   ; OT6_EVN * OT6_EVLEN bytes
 ; each name row's staged cell word; OT6_PIPDIRTY: the rows the nmi flush
 ; must write first; OT6_PIPLIVE: the party window has drawn its rows this
 ; battle; OT6_PIPRR: the row the flush rewrites next when none is dirty.
-; InitBP clears all of them.
+; InitBP clears all of them, the four row words and PIPRR included (each was
+; read before written after power-on until the v0.46 review).
 OT6_BPMARK           := $eef1
 OT6_BPDEFER          := $eef2
 OT6_PIPROWW          := $eef3   ; 4 words, by menu row
 OT6_PIPDIRTY         := $eefb
 OT6_PIPLIVE          := $eefc
-OT6_PIPRR            := $eefd   ; the row the flush rewrites next (no init: masked)
+OT6_PIPRR            := $eefd   ; the row the flush rewrites next
 .assert OT6_BPMARK = OT6_EVQ + OT6_EVN * OT6_EVLEN, error, "the boost marks must follow the event ring"
 .assert OT6_PIPROWW = OT6_BPDEFER + 1, error, "the pip rows must follow the absorb marks"
 .assert OT6_PIPDIRTY = OT6_PIPROWW + 8, error, "the dirty mask must follow the pip rows"

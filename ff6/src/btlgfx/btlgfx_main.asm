@@ -13034,8 +13034,13 @@ OpenItemWindow:
 
 UpdateMenuState_0d:
 OpenMagicWindow:
+.if LANG_EN
+@57a0:  jsl     Ot6DenseMagicPre    ; ot6 #541: menu state $0d, and the cursor
+        nop                     ;   clamped before _c18414 reads its row
+.else
 @57a0:  lda     #$0d
         sta     w7e7bc2
+.endif
         lda     w7e7ba5
         bmi     @57c4
         jsr     _c18414

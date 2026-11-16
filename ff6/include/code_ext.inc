@@ -161,6 +161,7 @@ CODE_EXT_INC = 1
 ; #541: dense ability lists (battle/ot6_dense.asm)
 .global Ot6PackSpellList, Ot6SpellRowPtr
 .global Ot6DenseMagicAtTop, Ot6DenseMagicStore, Ot6DenseMagicOpen, Ot6DenseMagicBar
+.global Ot6DenseMagicPre
 .global Ot6DenseLoreAtTop, Ot6DenseLoreStore, Ot6DenseLoreOpen, Ot6DenseLoreBar
 .global Ot6DenseRageAtTop, Ot6DenseRageStore, Ot6DenseRageOpen, Ot6DenseRageBar
 
