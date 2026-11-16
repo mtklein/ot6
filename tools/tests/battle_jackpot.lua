@@ -207,7 +207,12 @@ local function checkJackpot(r, i)
       H.assertEq(r.mon1[b].sh, r.mon0[b].sh, string.format("Jackpot %d: slot %d's shields do not move", i, b))
     end
   end
-  return { empty = empty, redraws = redraws }
+  -- #545: the rolls a throw never threw once its body fell count as the
+  -- search's "empty" draw (before, such a roll ran as a pass that found no
+  -- body; now the throw ends there)
+  local cut = H.JACKPOT_ROLLS - #r.passes
+  if cut > 0 then H.log(string.format("[jackpot]   %d roll(s) not thrown: the body fell (#545)", cut)) end
+  return { empty = empty + cut, redraws = redraws }
 end
 
 -- A fixed pass (1-3) from the grave at the first battle key whose fight the
@@ -611,7 +616,7 @@ local search = H.seqStep({
         (S.foundAll or {}).redraw or 0, ENTRY))
       return
     end
-    H.assertEq(S.found.empty ~= nil, true, string.format("the search met a pass that finds no body within its %d "
+    H.assertEq(S.found.empty ~= nil, true, string.format("the search met a throw whose body fell before its last roll within its %d "
       .. "candidates (%d distinct)", #CAND, S.distinct))
     H.log(string.format("[jackpot] search: an empty pass at %s; a redraw in play %s; %d candidate(s), %d "
       .. "distinct, %d lost to a wipe before the first throw (entry shift %d)", S.found.empty,

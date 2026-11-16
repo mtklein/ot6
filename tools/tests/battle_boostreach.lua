@@ -110,8 +110,12 @@ local quiet
 local actS
 local tgtMon, allyS
 local function chars()
-  return string.format("MP E%d C%d bank E%d C%d pend E%d C%d", mp(edgarS), mp(celesS), bank(edgarS),
-    bank(celesS), pend(edgarS), pend(celesS))
+  local t = {}
+  for e = 0, 6, 2 do
+    t[#t + 1] = string.format("e%d %dhp s%02X", e, H.readWord(0x3BF4 + e), H.readByte(0x3EE4 + e))
+  end
+  return string.format("MP E%d C%d bank E%d C%d pend E%d C%d [%s]", mp(edgarS), mp(celesS), bank(edgarS),
+    bank(celesS), pend(edgarS), pend(celesS), table.concat(t, " "))
 end
 local function mons()
   local t = {}
