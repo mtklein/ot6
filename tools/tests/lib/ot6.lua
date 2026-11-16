@@ -18679,7 +18679,7 @@ function M.passWatch()
     local a = W.open[x]
     if not a then return end
     a.spent = { pre = M.readWord(0x3A30), stand = M.passStanding(), pstand = M.passPartyStanding(),
-      a70 = M.readByte(0x3A70), foes = M.readByte(0x3A40) }
+      a70 = M.readByte(0x3A70), foes = M.readByte(0x3A40), at = #a.passes }
   end, emu.callbackType.exec, sp, sp)
   local fin = M.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
@@ -18762,9 +18762,17 @@ function M.passCheck(a, check, note, tag)
     local foes = sp.foes or 0
     local onMon, onPty = sp.pre >> 8, sp.pre & 0xFF & ~foes
     local what = string.format("%s by e%d at %d BP, after pass %d (key %s; aimed at $%04X, standing $%02X, party "
-      .. "standing $%X, %d pass(es) left)", a.kind, a.e, a.boost, #a.passes, a.key or "?", sp.pre, sp.stand,
+      .. "standing $%X, %d pass(es) left)", a.kind, a.e, a.boost, sp.at, a.key or "?", sp.pre, sp.stand,
       sp.pstand, sp.a70 + 1)
-    M.log(string.format("[%s]   spent: %s", tag, what))
+    if onMon == 0 then M.log(string.format("[%s]   spent: %s", tag, what)) end
+    -- a Hired Help's spent pass runs as its last, so Setzer walks home
+    -- (Ot6PassSpentHire): it lands on no one; any other action ends there
+    local walk = #a.passes - sp.at
+    check(walk, a.kind == "hire" and 1 or 0, string.format("P: a spent %s runs %s -- %s", a.kind,
+      a.kind == "hire" and "one more pass, its walk home" or "no more passes", what), a.kind, a.key)
+    for p = sp.at + 1, #a.passes do
+      check(a.passes[p].post or 0, 0, "P: the spent hire's walk home lands on no one -- " .. what, a.kind, a.key)
+    end
     check(a.ext, true, "P: only an action OT6 added passes to is cut short -- " .. what, a.kind, a.key)
     check((onMon & sp.stand) == 0 and (onPty & sp.pstand) == 0 and ((sp.pre & 0xFF & foes) & sp.pstand) == 0, true,
       "P: an action's passes are spent only once every body it was aimed at has fallen -- " .. what, a.kind, a.key)
@@ -18778,7 +18786,7 @@ function M.passCheck(a, check, note, tag)
     -- coin rows buy one pass a point; fewer only when the aim fell (#545)
     local want = a.row == 0x5B and M.JACKPOT_ROLLS or 1 + a.boost
     if a.spent then
-      check(#a.passes < want, true, string.format("E: %s at %d BP, its aim fallen, runs fewer than %s passes", a.kind,
+      check(a.spent.at < want, true, string.format("E: %s at %d BP, its aim fallen, lands fewer than %s passes", a.kind,
         a.boost, a.row == 0x5B and "Jackpot's fixed" or "1 + boost"), a.kind, a.key)
     else
       check(#a.passes, want, string.format("E: %s at %d BP runs %s passes", a.kind, a.boost,
@@ -18789,6 +18797,7 @@ function M.passCheck(a, check, note, tag)
   for _, q in ipairs(a.passes) do if q.b5 ~= 0x02 then famN = famN + 1 end end
   for p, q in ipairs(a.passes) do
     local k0 = a.kind == "capture" and "fight" or a.kind
+    if a.spent and p > a.spent.at then break end   -- the spent hire's walk home, held above
     if q.b5 ~= 0x02 and q.post ~= nil and a.ext and (q.pre & 0xFF & ~(q.foes or 0)) == 0
         and ((q.pre >> 8) & q.stand) == 0 and q.stand ~= 0 and p == 1 then
       local what = string.format("%s by e%d at %d BP, its first targeting pass (key %s; queued on $%04X, standing "

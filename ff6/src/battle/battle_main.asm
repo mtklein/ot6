@@ -8436,7 +8436,9 @@ ExecAttack:
 @31e9:  jsr     Ot6PassSpent    ; ot6 #545: a later pass OT6 added whose
         bcc     @ot6aimed       ;   aimed body has fallen ends the action
         stz     $3a70           ;   here: no swing, no move to another
-        jmp     @3275           ;   enemy (ot6_passes.asm, Ot6PassStays)
+        jsl     Ot6PassSpentHire ;  enemy (ot6_passes.asm, Ot6PassStays);
+        bcs     @ot6aimed       ;   a hire's runs as its last, landing
+        jmp     @3275           ;   nowhere, so Setzer walks home
 @ot6aimed:
         jsr     ShowAttackName
         lda     $3417
