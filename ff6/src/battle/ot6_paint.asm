@@ -693,10 +693,11 @@ Ot6PaintBanner:
 
 ; [ the bodies a row touches: its target, then one more a point ]
 ;
-; From the target the menu chose (the lowest bit of $b8, else of $b9), in
-; battle order and wrapping within its side, each body the row fits
-; (Ot6PaintFits) takes the row (Ot6PaintApply) until A bodies have, or every
-; seat of the side has been asked.  A point beyond the bodies left finds
+; The target the menu chose (the lowest bit of $b8, else of $b9) takes the
+; row if it fits (Ot6PaintFits), else nobody does; from it, in battle order
+; and wrapping within its side, each body the row fits takes the row
+; (Ot6PaintApply) until A bodies have, or every seat of the side has been
+; asked.  A point beyond the bodies left finds
 ; nobody and is spent, as a reach spell's is (#469).  $b8/$b9 become the
 ; bodies touched.  in: A = the bodies (1-4), OT6_SCR_IDX = the id,
 ; OT6_SCR_SLOT2 = the caster.  a8/i16, db=$7e, x = the caster.  clobbers a
@@ -719,6 +720,9 @@ Ot6PaintBanner:
         iny
         bra     @find
 @first: phy                     ; [1,s] the first body
+        jsr     Ot6PaintFits    ; the body named must take it, or nobody
+        bcc     @done           ;   does (a point reaches from it, never
+                                ;   past it to another)
 @body:  jsr     Ot6PaintFits
         bcc     @skip
         jsr     Ot6PaintApply

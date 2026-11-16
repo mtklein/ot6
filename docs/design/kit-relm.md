@@ -10,13 +10,14 @@
 > costs, durations and levels, err generous. The abuse limits stay (one
 > lengthening a break, no Gesture off a Gestured turn): they stop loops,
 > not power. Sections below that say otherwise are superseded by this note
-> until the build rewrites them.
+> until the build rewrites them.  (Built in v0.47: the sections below are
+> rewritten to the build; `kits.md` "Relm" is the summary.)
 >
 > **Gogo (owner, 2026-11-15):** a Gogo with Sketch opens Relm's whole list,
 > not plain Sketch: each command he picks gives its owner's full kit, as far
 > as is reasonable (#547).
 
-Status: **designed, not built** (2026-11-15). The owner's direction: "As an
+Status: **built** (v0.47, `ot6_paint.asm`; designed 2026-11-15). The owner's direction: "As an
 artist, she should have abilities that buff the team, like a bard or
 synergist." The brainstorm in #538 was approved in full; this document turns
 it into a kit that can be built, and says where the approved ideas had to
@@ -41,7 +42,7 @@ The owner also finds the World of Balance too easy on boosted attacks alone.
 Nothing below adds damage to a plain boosted Fight. Tint gives a key to a
 hit that had none and adds no damage; Portrait and Masterpiece save a boost
 point but cost Relm's turn and MP; Gesture gives turns, which do help a
-boosted Fighter, so it comes late (L48) and needs timing to pay.
+boosted Fighter, so it comes late (L42) and needs timing to pay.
 
 Evidence for the numbers below is in
 `build/attempts/wt/v047-relm-design/` (`sources.txt`: the source lines cited;
@@ -57,23 +58,31 @@ the Sketch row, with Sketch as the first row.
 | # | Row (list / banner) | What it does | Target | MP | A boost point buys | Lasts | Ends | Stacking | Learned |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | **Sketch** ✦ | vanilla Sketch, bug and all (vanilla-destructive-bugs.md) | an enemy | 0 | what the sketched attack's boost buys (boost-rewards.md, unchanged) | the action | -- | -- | join |
-| 2 | **Portrait** | the ally's next boosted action counts as boosted one point higher than they paid for: one free point (the gift) | one ally, not Relm | 18 | refuses the boost (its party-wide form is Masterpiece, below) | until that ally's next action that takes a boost | that action, or the battle's end | one gift a body; a second Portrait on a gifted ally is refused at the cursor | her recruitment, Esper Mountain (switch `$02E8`) |
-| 3 | **Tint** | for three of the ally's turns, each Fight, Mug/Capture or Jump hit that keys nothing else takes one shield from a body whose element weakness is already revealed; damage is unchanged | an ally (Relm included) | 16 a body | one more ally, in battle order | 3 of that ally's turns | the third turn's end, or the battle's end | a second Tint resets the count to 3; never two shields from one Tint hit | level 18 (she joins at 22, so she has it on joining) |
-| 4 | **Varnish** | the next enemy action that would land on the ally misses | an ally (Relm included) | 20 a body | one more ally, in battle order | until used | an enemy hit lands on it, or the battle ends | one coat a body; a varnished ally is passed over | level 25 |
-| 5 | **Still Life** (list: StillLife) | the body's break, the current one or its next, lasts half as long again (+8 break ticks) | an enemy | 36 a body | one more enemy, in battle order | one break | that break's end | once a break: a mark laid during a lengthened break waits for the next | Owzer's mansion, after Chadarnook (switch `$0240`) |
-| 6 | **Underpainting** (list: Underpnt.) | the next weakness hit on the body takes two shields instead of one | an enemy | 40 a body | one more enemy, in battle order | until a weakness hit lands | that hit, or the battle's end | one mark a body; adds to Ramuh's Conductor | level 42 |
-| 7 | **Gesture** | fills the ally's turn gauge: their turn comes up now | an ally, not Relm | 48 a body | one more ally, in battle order | instant | -- | a body whose gauge is already full or whose action is queued is passed over | level 48 |
+| 2 | **Portrait** | the ally's next boosted action is charged one point less: one free point (the gift), raised as a pending point at once | one ally, not Relm | 12 | refuses the boost (its party-wide form is Masterpiece, below) | until that ally's next boosted action | that action, or the battle's end | one gift a body; a Portrait on a gifted ally does nothing and costs nothing | her recruitment, Esper Mountain (switch `$02E8`) |
+| 3 | **Tint** | a second list of the eight elements; for four of the ally's turns their weapon attacks carry the one picked, OR'd onto the weapon's own: its weakness damage, its chip, and vanilla's absorb and null | an ally (Relm included) | 10 a body | one more ally, in battle order | 4 of that ally's turns | the fourth turn's end, or the battle's end | a second Tint repaints and resets the count to 4 | level 18 (she joins at 22, so she has it on joining) |
+| 4 | **Varnish** | the next enemy action that would land on the ally misses (all its hits on her) | an ally (Relm included) | 14 a body | one more ally, in battle order | until used | an enemy hit lands on it, or the battle ends | one coat a body | level 24 |
+| 5 | **Still Life** (list: StillLife) | the body's break, the current one or its next, lasts twice as long (+16 break ticks) | an enemy | 24 a body | one more enemy, in battle order | one break | that break's end | once a break: a mark laid during a held break waits for the next | Owzer's mansion, after Chadarnook (switch `$0240`) |
+| 6 | **Underpainting** (list: Underpnt.) | the next weakness hit on the body takes two shields instead of one | an enemy | 28 a body | one more enemy, in battle order | until a weakness hit lands | that hit, or the battle's end | one mark a body; adds to Ramuh's Conductor | level 36 (her World of Ruin return) |
+| 7 | **Gesture** | fills the ally's turn gauge: their turn comes up now | an ally, not Relm | 30 a body | one more ally, in battle order | instant | -- | a body whose gauge is already full or whose action is queued cannot take it | level 42 |
 | 8 | **Masterpiece** (list: Mstrpiece; divine) | every other ally receives Portrait's gift | the party | 99 | the divine itself: greyed and refused under three points | as Portrait | as Portrait | gives nothing to an ally already holding a gift | Strago's return, the Fanatics' Tower (switch `$00BA`) |
 
 The per-body prices follow the reach rule boost-rewards.md built: each point
 is its own use, `base × (1 + boost)`, capped at 99 (`Ot6PerPointPrice`). So
-Gesture is 48 / 96 / 99 / 99 and Still Life 36 / 72 / 99 / 99. Portrait is
+Gesture is 30 / 60 / 90 / 99 and Still Life 24 / 48 / 72 / 96. Portrait is
 flat (it refuses the boost) and Masterpiece is 99, the divine ceiling.
 
 **The eight slots are full.** Sketch plus the seven approved ideas fill the
 eight rows the cast pillar allows, so no row was cut and no alternative was
-needed. Two of the approved ideas had to bend: Portrait's boost (below) and
-Tint's colour (below).
+needed. Portrait's boost had to bend (below).  The prices, durations and
+levels are the overshoot the owner ruled: each row costs about two thirds of
+the first design's, Tint lasts four turns, Still Life doubles a break, and
+Underpainting and Gesture come six levels sooner.
+
+**The named body must take the row, or nobody does.**  A row aimed at a
+body it cannot land on (a Gesture at an ally whose turn is full or queued,
+a Portrait on a gifted ally, a second coat or mark) does nothing and costs
+nothing: no MP, the boost kept.  A boost's further bodies walk on from the
+named one, passing over those that cannot take it.
 
 ### Rulings, one per question the brief raised
 
@@ -94,19 +103,19 @@ divine would be bought below its gate. The standing rule settles it: an
 action whose boost would buy nothing new refuses it. Masterpiece is
 Portrait's party-wide form, as Haste2 is Haste's.
 
-**Tint matches each foe's known weakness rather than a chosen colour.** An
-element picker would need a second list under the first (the tools shell
-has one level). Instead the paint takes, against each body it strikes,
-whatever element that body's HUD already shows as a weakness. The player
-still has to reveal the weakness first (a chip, Analyze, Appraise), so the
-key puzzle stands; Tint shares a key the party knows with a fighter whose
-weapon lacks it. It adds a key, never damage: the hit deals what it would
-have dealt, and it chips only when nothing else about the hit did, so a
-fighter who already keys the body gains nothing. That keeps it from being
-a plain boosted-Fight buff (the owner's concern above). And because it
-only ever adds a weakness, it cannot heal a body that absorbs the element.
-This is a reading of the approved text; §7 asks the owner whether it feels
-right.
+**Tint: Relm picks the colour** (owner, 2026-11-15).  Confirming the Tint
+row turns the same window into a second list of the eight elements (Fire,
+Ice, Bolt, Poison down the left, Wind, Pearl, Earth, Water down the right;
+mode 6, ids `$f0`-`$f7`), redrawn in place by the restage gate the R
+price uses, so the window never closes; B leaves it as any list.  A list
+row per element was the alternative, but the eight rows are full, and the
+Tools shell holds eight cells; a second list costs one confirm arm and one
+mode.  The colour is OR'd onto the weapon's element in `$11a1`
+(`Ot6TintSwing`, from `Ot6WeaponClass`), so the hit truly carries it:
+vanilla's weakness ×2 and its absorb and null apply, and a weakness chips
+through `Ot6Chip`.  The player chose it, so it can land on a body that
+drinks it.  OR'd rather than replacing, the paint never takes away the key
+a weapon already holds.
 
 **Portrait's gift is a point, never a pip.** It raises what an action's
 boost buys; it is not banked and cannot be handed on. So:
@@ -288,9 +297,9 @@ Every ability is feasible. None needs new art, a new status or save data.
   the fighter could not key, and the swings deal what they would have.
 - **Absorbers.** It adds only weaknesses the body has, so it never touches
   absorb, null or resist.
-- **The counter.** `OT6_TINT`, 8 bytes (4 characters, stride 2), turns left.
-  `Ot6ActionEnd` decrements it for the actor. A fallen ally takes no turns,
-  so the paint waits on them.
+- **The counter.** `OT6_TINT`, 8 bytes (4 characters, stride 2), turns left,
+  and `OT6_TINTELEM` its colour.  `Ot6ActionEnd` decrements it for the
+  actor. A fallen ally takes no turns, so the paint waits on them.
 - **Display.** A banner at the cast ("Tint") and the shield count dropping
   on each keyed hit. There is no free status icon in FF6's battle HUD, and
   recolouring the swing's weapon sprite would mean a palette swap per swing;
@@ -391,18 +400,20 @@ range's bound (`<= $ef1f`, the asserts beside it):
 
 | Name | Address | Size | Shape | Cleared by |
 |---|---|---|---|---|
-| `OT6_TINT` | `$ee41` | 8 | turns left, 4 characters, stride 2 | `Ot6InitBP` |
-| `OT6_GIFT` | `$ee49` | 1 | character mask | `Ot6InitBP` |
-| `OT6_VARNISH` | `$ee4a` | 1 | character mask | `Ot6InitBP` |
-| `OT6_GESTURED` | `$ee4b` | 1 | character mask | `Ot6InitBP`, and per actor at `Ot6ActionEnd` |
-| `OT6_STILLMARK` | `$ee4c` | 1 | monster mask | `Ot6InitBP`, per slot in `Ot6SeedShields` |
-| `OT6_STILLHELD` | `$ee4d` | 1 | monster mask | as above, and on recovery |
-| `OT6_UNDERPAINT` | `$ee4e` | 1 | monster mask | `Ot6InitBP`, per slot in `Ot6SeedShields` |
+| `OT6_TINT` | `$eefe` | 8 | turns left, 4 characters, stride 2 | `Ot6InitBP` |
+| `OT6_TINTELEM` | `$ef06` | 8 | the colour, 4 characters, stride 2 | `Ot6InitBP` |
+| `OT6_GIFT` | `$ef0e` | 1 | character mask | `Ot6InitBP` |
+| `OT6_VARNISH` | `$ef0f` | 1 | character mask | `Ot6InitBP` |
+| `OT6_VARNISHING` | `$ef10` | 1 | the coats the resolving enemy action spent | `Ot6InitBP`, every action's end |
+| `OT6_GESTURED` | `$ef11` | 1 | character mask | `Ot6InitBP`, and per actor at `Ot6ActionEnd` |
+| `OT6_STILLMARK` | `$ef12` | 1 | monster mask | `Ot6InitBP`, per slot in `Ot6SeedShields` |
+| `OT6_STILLHELD` | `$ef13` | 1 | monster mask | as above, and on recovery |
+| `OT6_UNDERPAINT` | `$ef14` | 1 | monster mask | `Ot6InitBP`, per slot in `Ot6SeedShields` |
 
-Fourteen bytes, `$ee41`-`$ee4e`. They lie past `Ot6InitBP`'s shadow clear
-(`cpx #$0070`, `ot6_boost.asm:75`), so `Ot6InitBP` zeroes them with
-explicit stores, as it does `OT6_RUNICTURNS`, and each gets an assert in
-`ot6_memory.inc`.
+Twenty-three bytes, `$eefe`-`$ef14`, after `OT6_PIPRR` (the first plan's
+`$ee41` went to #539's held gauges), under the range's bound `$ef1f`, each
+with its assert in `ot6_memory.inc`, and zeroed by explicit stores in
+`Ot6InitBP` (past its shadow clear).
 
 ## 3. Acquisition
 
@@ -422,10 +433,10 @@ L46 after the Fanatics' Tower plain (level-curve.md:561).
 | Sketch ✦ | at join | -- | her signature |
 | Portrait | story, WoB | her recruitment (`$02E8`, Esper Mountain) | her threat to anyone who crosses her is a portrait ("I'm gonna draw your portrait!", `event_main.asm:5068`); it is what she does |
 | Tint | level 18 | on joining (she joins at 22) | the plain first lesson: colour a fighter's weapon to key a known weakness |
-| Varnish | level 25 | the World of Balance's end if she is seated through the Floating Continent, else on rejoining | a second, simple buff before the break tools |
+| Varnish | level 24 | the World of Balance's end if she is seated through the Floating Continent, else on rejoining | a second, simple buff before the break tools |
 | Still Life | story, WoR | Owzer's mansion, after Chadarnook (`$0240`, `event_main.asm:48874`, set where Starlet is given) | a painting that holds a demon fast; the painter's beat |
-| Underpainting | level 42 | the World of Ruin, on the Fanatics' Tower plain | the break tools arrive together in her World of Ruin arc |
-| Gesture | level 48 | the World of Ruin, about the Zone Eater (level-curve.md:562: the belly at 48-50) | the strongest tempo tool comes late, where the World of Balance's ease is not at stake |
+| Underpainting | level 36 | on rejoining in the World of Ruin (she is seated at 36) | the break tools arrive together in her World of Ruin arc |
+| Gesture | level 42 | the World of Ruin, after the Fanatics' Tower plain | the strongest tempo tool comes late, where the World of Balance's ease is not at stake |
 | Masterpiece | story, WoR | Strago's return at the tower's foot (`$00BA`, `event_main.asm:89459`) | the grandfather she paints for comes back (her line at the end: "And I have a brave Grandpa who'll stand by me through it all", `event_main.asm:9703`); divines come by story |
 
 Three story beats and four levels. The Thamasa fire and the Floating
@@ -437,11 +448,11 @@ so a beat there could be missed by a player who benched her. A switch would
 still teach it, but it would arrive without being seen.
 
 **On joining in the World of Balance** she has Sketch, Portrait and Tint,
-and Varnish at L25: a kit that makes the party's known weaknesses and its
+and Varnish at L24: a kit that makes the party's known weaknesses and its
 boosts go further, ready for the Floating Continent. **In the World of
-Ruin** she rejoins with Varnish and gains Still Life at once, Masterpiece a
-few minutes later at the tower's foot, Underpainting on the plain and
-Gesture around the Zone Eater.
+Ruin** she rejoins with Varnish and Underpainting and gains Still Life at
+once, Masterpiece a few minutes later at the tower's foot, and Gesture after
+the tower's plain.
 
 **The save.** Nothing new. A row's known-test reads either a vanilla event
 switch (`$1E80 + n/8`, bit `n & 7`, as `Ot6ThiefRowKnown` does,
@@ -451,7 +462,7 @@ policy allows "change what the game does with a field, as long as every
 value an older save can hold there still reads sensibly": a save past a
 beat or a level has the row, whatever version wrote it. When built,
 save-layout.md's event-switch row (`$1E80-$1F5F`, "Read by OT6 code")
-adds `$02E8`, `$0240` and `$00BA` to the switches OT6 reads. OT6 sets no
+lists `$02E8`, `$0240` and `$00BA` with the switches OT6 reads. OT6 sets no
 new switch.
 
 ## 4. Balance
@@ -462,18 +473,18 @@ unbroken, unweak baseline runs 8 (broken and weak) : 4 (broken) : 2
 breaking hit takes the shielded rate, so the hits that land inside the
 window are the whole ×4. Relm's MP pool, from the ROM's tables before esper
 ranks (`relm_mp.txt`): 194 at L22, 230 at L25, 419 at L39, 464 at L42, 561
-at L48. Each price sits at 8-9% of the pool on arrival (Tint 16/194 = 8.2%,
-Portrait 18/194 = 9.3%, Varnish 20/230 = 8.7%, Still Life 36/419 = 8.6%,
-Underpainting 40/464 = 8.6%, Gesture 48/561 = 8.6%), at the bottom of
-mp-economy.md's 8-20% band because each is a support turn that buys no
-damage of its own.
+at L48. The first design put each price at 8-9% of the pool on arrival;
+the build overshoots (owner, 2026-11-15) to 5-7%: Tint 10/194 = 5.2%,
+Portrait 12/194 = 6.2%, Varnish 14 at L24, Still Life 24 and Underpainting
+28 at L36 (about 6%), Gesture 30 at L42 (6.5%), below mp-economy.md's 8-20%
+band because each is a support turn that buys no damage of its own.
 
 | Row | Where it shines | Why it is not essential | Limit against trivialising |
 |---|---|---|---|
-| Tint | a body whose revealed weakness is an element only a caster holds: the Chadarnook demon (weak fire, holy; slash and pierce, six shields, route-wor-thamasa.md:219) when the fire is Terra's Fire and the blades are busy | every key it shares is a key the party already has in a spell | no damage, no second chip, revealed weaknesses only, three turns |
+| Tint | a body weak to an element only a caster holds: the Chadarnook demon (weak fire, holy; slash and pierce, six shields, route-wor-thamasa.md:219) with the blades painted fire | a caster's spell keys the same body | the colour is the player's, so a wrong one backfires (absorb, null); four turns |
 | Portrait | the turn before a divine or a fold: a two-banked ally reaches three | the ally can bank the point themselves a turn later | single target, refuses a boost, one gift a body, a point never a pip |
 | Varnish | a boss's telegraphed big hit, on the healer or the member it would kill | Safe, Shell, Image, Runic, healing and levels answer the same hits | one action a coat, one coat a body |
-| Still Life | long bosses after #542: half as many hits again land in the window | breaks happen and pay without it | once a break; at most 1.5× a break (3239 frames) |
+| Still Life | long bosses after #542: the window, and every hit in it, doubles | breaks happen and pay without it | once a break; at most twice a break (4318 frames) |
 | Underpainting | bosses with many shields: it gives back the one shield #542 adds | keys and boosts break bodies without it | one mark a body, one extra shield, weakness hits only |
 | Gesture | a Broken boss: the heavy hitters who just acted get another turn inside the window | turns come on their own; it only moves them | not on herself; a body already full or queued is passed over; a granted turn cannot Gesture; 48 a body, 99 at two or three points |
 | Masterpiece | the burst: three allies boosted at once, into a window | Portrait and the allies' own banks do the same over more turns | full bank, 99 MP, no stacking |
@@ -552,18 +563,16 @@ after #542 avoids cutting the same saves twice.
 
 ## 7. Questions for the owner
 
-**Does Tint feel right as a key that matches each foe, rather than a colour
-you pick?** As designed, the paint takes on whatever element each struck
-monster is already known to fear, so a fighter whose weapon has no key can
-use the party's. The other reading, Relm choosing fire or ice when she
-paints, needs a second menu under her list and lets the paint land on a body
-that drinks it. I recommend the matching version: it reads as a synergist
-sharing what the party has learned, and it never backfires.
+Answered 2026-11-15: Tint is a colour she picks, and Masterpiece keeps its
+full peak (the note at the top).  Open after the build:
 
-**Is a round where three allies throw their divines the peak you want for
-her?** Masterpiece on allies who hold two points each lets them all reach a
-divine at once. It costs her whole bank and a lot of MP, and it comes after
-Strago's return in the World of Ruin. I recommend keeping it as her
-showpiece; if it feels like too much, the gentler version is that a gift
-raises an action to two points at most, so Masterpiece speeds divines up
-but never completes one.
+- **Do the overshoot prices feel busted enough, or too much?**  Each row
+  costs about two thirds of the first design's, Tint lasts four turns and
+  Still Life doubles a break.  The generous option was built.
+- **The Fake Mustache.**  Built as vanilla: a Relm wearing it gets Control
+  and no list, as a gloved Locke gets Capture.  A list behind Control would
+  need the Control state's own menu path; say if she should keep her kit
+  with it.
+- **The field Skills page** for her list (Locke has one) is not built: the
+  Skills menu's eighth row is Locke's, and a ninth needs the window
+  regrown.  The battle list and PLAYING.md carry the rows meanwhile.

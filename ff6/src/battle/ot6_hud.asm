@@ -338,28 +338,50 @@
         plx                     ; the shadow line base
         cmp     #100
         bne     @gauge
-        xba                     ; broken: the slot's cell in the lead cell,
-        pha                     ;   palette 7 (green while Still Life holds
-        jsr     Ot6StillBrokenAttr ; it or waits, #538); cell 0 stays empty.
-        xba                     ;   whole-word store: the nmi flush can fire
-        pla                     ;   between two byte stores
+        lda     OT6_STILLMARK   ; #538: anything Still Life marks or holds?
+        ora     OT6_STILLHELD   ;   (one test a line while nothing is)
+        bne     @pbroke
+        lda     #OT6_BROKEN_ATTR ; broken: the slot's cell in the lead cell,
+        xba                     ;   palette 7; cell 0 stays empty.  whole-
+        longa                   ;   word store: the nmi flush can fire
+        sta     OT6_HUDLEAD,y   ;   between two byte stores
+        shorta0
+        bra     @slots
+@pbroke:
+        xba                     ; a = the slot's cell
+        pha
+        jsr     Ot6StillBrokenAttr ; palette 7, or green while Still Life
+        xba                     ;   holds the break or waits on the next
+        pla
         longa
         sta     OT6_HUDLEAD,y
         shorta0
         bra     @slots
-@gauge: xba                     ; whole-word stores, as above
-        pha                     ; [1,s] the slot's cell
-        jsr     Ot6UnderAttr    ; the count's attribute: green while
-        xba                     ;   Underpainting waits (#538)
-        pla
+@gauge: lda     OT6_UNDERPAINT  ; #538: anything painted on a shield line?
+        ora     OT6_STILLMARK
+        bne     @pgauge
+        lda     #OT6_GAUGE_ATTR ; whole-word stores, as above
+        xba
         longa                   ; a = attr << 8 | the slot's cell
         sta     f:$7e0000+OT6_SHADOW+4,x        ; cell 0: the count tile
+        lda     #(OT6_GAUGE_ATTR << 8) | OT6_EMBLEM
+        sta     OT6_HUDLEAD,y   ; the lead cell: the emblem
         shorta0
-        jsr     Ot6StillAttr    ; the emblem's: green while Still Life waits
+        bra     @slots
+@pgauge:
+        xba                     ; a = the slot's cell
+        pha
+        jsr     Ot6UnderAttr    ; the count: green while Underpainting waits
+        xba
+        pla
+        longa                   ; a = attr << 8 | the slot's cell
+        sta     f:$7e0000+OT6_SHADOW+4,x
+        shorta0
+        jsr     Ot6StillAttr    ; the emblem: green while Still Life waits
         xba
         lda     #OT6_EMBLEM
         longa
-        sta     OT6_HUDLEAD,y   ; the lead cell: the emblem
+        sta     OT6_HUDLEAD,y
         shorta0
         ; weakness slots into cells 1-4: elements first (vanilla's own
         ; data), then the class weaknesses, sharing the same four cells.

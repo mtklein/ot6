@@ -202,7 +202,7 @@ None is moved or re-encoded.
 | `$1D28`, `$1D29-$1D2B`, `$1D2C-$1D4B` | Blitzes, lores, rages learned | Read by the command menu, the divines and the loadouts |
 | `$1860-$1862` | Gil | Read by Setzer's coin attacks |
 | `$1EDE-$1EDF` | Characters available | Vanilla's random Shadow departure is gone (v0.16): the bit is no longer cleared after battle |
-| `$1E80-$1F5F` | Event switches | Read by OT6 code (`$00BF` Terra's return, `$0068` the tube room, `$00CA`, `$02E3` Shadow's initialization); OT6 sets no new switches; its three added save points ride vanilla's standing `$0632` |
+| `$1E80-$1F5F` | Event switches | Read by OT6 code (`$00BF` Terra's return, `$0068` the tube room, `$00CA`, `$02E3` Shadow's initialization, and Relm's list: `$02E8` her recruitment, `$0240` Owzer's mansion after Chadarnook, `$00BA` Strago's return); OT6 sets no new switches; its three added save points ride vanilla's standing `$0632` |
 | `$1F6E` | Random battle counter | `Ot6DangerStep` scales the step and adds it there; zeroed at New Game (`Ot6NewGameClear`) |
 | `$1616-$1619` | Battle commands | Gau's join gives FIGHT, RAGE, MAGIC, ITEM (v0.8; vanilla RAGE, LEAP, MAGIC, ITEM). Set when he joins, so a save where he joined earlier keeps the old list |
 

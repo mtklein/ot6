@@ -9888,6 +9888,226 @@ function Driver:lockeMug(actor, plan)
            reason = "mug", finish = plan.reason == "finish" or nil }
 end
 
+-- RELM's list behind Sketch (#538; docs/design/kit-relm.md section 5).  The
+-- rows' ids, the switches and levels that teach them (Ot6PaintRowTbl), and
+-- their base MP (Ot6PaintCostTbl).
+BATTLE.RELM = { CMD = 0x0D, SKETCH = 0xE8, PORTRAIT = 0xE9, TINT = 0xEA, VARNISH = 0xEB, STILL = 0xEC, UNDER = 0xED,
+  GESTURE = 0xEE, MASTER = 0xEF, COLOUR = 0xF0,
+  SW = { [0xE9] = 0x02E8, [0xEC] = 0x0240, [0xEF] = 0x00BA },
+  LV = { [0xEA] = 18, [0xEB] = 24, [0xED] = 36, [0xEE] = 42 },
+  PRICE = { [0xE9] = 12, [0xEA] = 10, [0xEB] = 14, [0xEC] = 24, [0xED] = 28, [0xEE] = 30, [0xEF] = 99 },
+  NAME = { [0xE9] = "Portrait", [0xEA] = "Tint", [0xEB] = "Varnish", [0xEC] = "Still Life", [0xED] = "Underpainting",
+    [0xEE] = "Gesture", [0xEF] = "Masterpiece" },
+  GIFT = 0xEF0E, VARNISH_MASK = 0xEF0F, GESTURED = 0xEF11, STILLMARK = 0xEF12, STILLHELD = 0xEF13,
+  UNDERPAINT = 0xEF14, TINT_TURNS = 0xEEFE }
+M.BATTLE_RELM = BATTLE.RELM
+function M.relmKnows(id)
+  local R = BATTLE.RELM
+  if R.SW[id] then return (M.readByte(0x1E80 + (R.SW[id] >> 3)) >> (R.SW[id] & 7)) & 1 == 1 end
+  if R.LV[id] then return M.readByte(0x1600 + 37 * 8 + 8) >= R.LV[id] end
+  return true
+end
+
+-- The policy, as a pure function of a snapshot (M.relmSnapshot reads one
+-- from the battle; relm_policy_selftest builds them by hand).  In priority
+-- order, in event battles only (random battles keep her Fight: the Locke
+-- and Setzer precedent, the legs' frame cost):
+--   1. Masterpiece at three banked when a body is Broken or two allies hold
+--      two or more, and two allies or more can take the gift;
+--   2. Still Life on a Broken body with more than half its break left, not
+--      marked or held already;
+--   3. Underpainting on a body at four shields or more whose weakness the
+--      party has revealed (it can key it), not marked already;
+--   4. Gesture while a body is Broken, on the strongest ally (weapon power)
+--      whose gauge is under half full and who has nothing queued;
+--   5. Portrait while a body is Broken, on the ally with the most banked
+--      that holds no gift;
+--   6. Tint on the strongest ally holding no Tint whose weapon lacks every
+--      colour the press target is weak to (and does not absorb or null),
+--      in the lowest such colour;
+--   7. Varnish when no ally holds a coat, on the standing member with the
+--      lowest max HP;
+--   8. otherwise nil: her Fight.
+-- Each row needs its MP and leaves o.mpFloor (20) behind, but Masterpiece,
+-- whose 99 is the divine's own.  s = { event, relm (seat), mp, bank,
+-- knows[id], press (slot or nil), party[seat] = { up, gift, coat, tint,
+-- gauge, queued, maxhp, atk, wpn, bank }, mons[slot] = { up, ticks, sh, weak,
+-- absorb, null, rev, weakC, revC, still, under } }.  Out: { id, seat, slot,
+-- colour, boost, why } or nil.
+function M.relmPolicy(s, o)
+  o = o or {}
+  local R = M.BATTLE_RELM
+  if not s.event then return nil end
+  local floor = o.mpFloor or 20
+  local function pays(id) return s.knows[id] and s.mp - R.PRICE[id] >= floor end
+  local brokenAny = false
+  for _, m in pairs(s.mons) do if m.up and m.ticks > 0 then brokenAny = true end end
+  local function allies(f)
+    local best, bestK
+    for seat = 0, 3 do
+      local p = s.party[seat]
+      if p ~= nil and p.up and seat ~= s.relm and f(p) then
+        local k = p.atk or 0
+        if bestK == nil or k > bestK then best, bestK = seat, k end
+      end
+    end
+    return best
+  end
+  -- 1. Masterpiece
+  if s.knows[R.MASTER] and s.bank >= 3 and s.mp >= R.PRICE[R.MASTER] then
+    local takers, two = 0, 0
+    for seat = 0, 3 do
+      local p = s.party[seat]
+      if p ~= nil and p.up and seat ~= s.relm and not p.gift and not p.umaro then
+        takers = takers + 1
+        if (p.bank or 0) >= 2 then two = two + 1 end
+      end
+    end
+    if takers >= 2 and (brokenAny or two >= 2) then
+      return { id = R.MASTER, boost = 3, why = string.format("%d allies take the gift; %s", takers,
+        brokenAny and "a body is Broken" or "two allies hold two or more") }
+    end
+  end
+  -- 2. Still Life
+  if pays(R.STILL) then
+    for slot = 0, 5 do
+      local m = s.mons[slot]
+      if m ~= nil and m.up and m.ticks > 8 and not m.still then
+        return { id = R.STILL, slot = slot, boost = 0, why = string.format("Broken, %d of 16 ticks left", m.ticks) }
+      end
+    end
+  end
+  -- 3. Underpainting
+  if pays(R.UNDER) then
+    for slot = 0, 5 do
+      local m = s.mons[slot]
+      if m ~= nil and m.up and m.ticks == 0 and m.sh >= 4 and not m.under
+         and ((m.weak & m.rev) ~= 0 or (m.weakC & m.revC) ~= 0) then
+        return { id = R.UNDER, slot = slot, boost = 0, why = string.format("%d shields, a key revealed", m.sh) }
+      end
+    end
+  end
+  -- 4. Gesture
+  if brokenAny and pays(R.GESTURE) and not s.gestured then
+    local seat = allies(function(p) return p.gauge ~= nil and p.gauge > 0 and p.gauge < 0x80 and not p.queued end)
+    if seat ~= nil then
+      return { id = R.GESTURE, seat = seat, boost = 0, why = "a body is Broken; the strongest ally's gauge is under "
+        .. "half" }
+    end
+  end
+  -- 5. Portrait
+  if brokenAny and pays(R.PORTRAIT) then
+    local best, bestB
+    for seat = 0, 3 do
+      local p = s.party[seat]
+      if p ~= nil and p.up and seat ~= s.relm and not p.gift and not p.umaro
+         and (bestB == nil or (p.bank or 0) > bestB) then best, bestB = seat, p.bank or 0 end
+    end
+    if best ~= nil then
+      return { id = R.PORTRAIT, seat = best, boost = 0, why = string.format("a body is Broken; seat %d holds %d",
+        best, bestB) }
+    end
+  end
+  -- 6. Tint
+  local t = s.press ~= nil and s.mons[s.press] or nil
+  if t ~= nil and t.up and pays(R.TINT) then
+    local w = t.weak & ~t.absorb & ~t.null & 0xFF
+    if w ~= 0 then
+      local seat = allies(function(p) return (p.tint or 0) == 0 and ((p.wpn or 0) & w) == 0 end)
+      if seat ~= nil then
+        local c = 0
+        while (w >> c) & 1 == 0 do c = c + 1 end
+        return { id = R.TINT, seat = seat, colour = c, boost = 0, why = string.format("slot %d is weak to colour %d "
+          .. "and seat %d's weapon lacks it", s.press, c, seat) }
+      end
+    end
+  end
+  -- 7. Varnish
+  if pays(R.VARNISH) then
+    local any = false
+    for seat = 0, 3 do if s.party[seat] ~= nil and s.party[seat].coat then any = true end end
+    if not any then
+      local best, bestH
+      for seat = 0, 3 do
+        local p = s.party[seat]
+        if p ~= nil and p.up and (bestH == nil or p.maxhp < bestH) then best, bestH = seat, p.maxhp end
+      end
+      if best ~= nil then
+        return { id = R.VARNISH, seat = best, boost = 0, why = string.format("no coat stands; seat %d has the "
+          .. "lowest max HP (%d)", best, bestH) }
+      end
+    end
+  end
+  return nil
+end
+
+-- the snapshot M.relmPolicy reads, from the battle
+function M.relmSnapshot(actor, press)
+  local R = BATTLE.RELM
+  local s = { event = M.readByte(M.RANDBTL) == 0, relm = actor, mp = M.readWord(BATTLE.CURMP + actor * 2),
+    bank = M.readByte(BATTLE.BP + actor * 2), knows = {}, party = {}, mons = {}, press = press,
+    gestured = (M.readByte(R.GESTURED) >> actor) & 1 == 1 }
+  for _, id in ipairs({ R.PORTRAIT, R.TINT, R.VARNISH, R.STILL, R.UNDER, R.GESTURE, R.MASTER }) do
+    s.knows[id] = M.relmKnows(id)
+  end
+  for seat = 0, 3 do
+    local e = seat * 2
+    local ch = M.readByte(0x3ED8 + e)
+    if ch ~= 0xFF then
+      s.party[seat] = { up = (M.readByte(0x3AA0 + e) & 1) == 1 and M.readWord(0x3BF4 + e) > 0
+          and (M.readByte(0x3EE4 + e) & 0xC2) == 0, umaro = ch == 0x0D,
+        gift = (M.readByte(R.GIFT) >> seat) & 1 == 1, coat = (M.readByte(R.VARNISH_MASK) >> seat) & 1 == 1,
+        tint = M.readByte(R.TINT_TURNS + e), gauge = M.readByte(0x3219 + e), queued = M.readByte(0x32CC + e) ~= 0xFF,
+        maxhp = M.readWord(0x3C1C + e), atk = M.readByte(0x3B68 + e) + M.readByte(0x3B69 + e),
+        wpn = M.readByte(0x3B90 + e) | M.readByte(0x3B91 + e), bank = M.readByte(BATTLE.BP + e) }
+    end
+  end
+  for slot = 0, 5 do
+    local e = 8 + slot * 2
+    local bit = 1 << slot
+    s.mons[slot] = { up = monAlive(slot), ticks = M.readByte(0x3E88 + e), sh = M.readByte(0x3E38 + e),
+      weak = M.readByte(0x3BE0 + e), absorb = M.readByte(0x3BCC + e), null = M.readByte(0x3BCD + e),
+      rev = M.readByte(0x3E89 + e), weakC = M.readByte(0x3E9C + e), revC = M.readByte(0x3E9D + e),
+      still = (M.readByte(R.STILLMARK) | M.readByte(R.STILLHELD)) & bit ~= 0,
+      under = M.readByte(R.UNDERPAINT) & bit ~= 0 }
+  end
+  return s
+end
+
+-- RELM's rows as a plan (o = opts.relm; false, or the RELM_POLICY_OFF
+-- global, turns them all off: the control arm), else nil and her Fight.
+-- Each decision is logged with what it read: "[fight] actor=3 RELM Still
+-- Life at 0 BP on slot 2: Broken, 11 of 16 ticks left (24 MP of 482)".
+function Driver:relmLine(actor, have)
+  local o = self.opts.relm
+  if o == false or RELM_POLICY_OFF or M.readByte(BATTLE.BCHID + actor * 2) ~= 8 then return nil end
+  o = type(o) == "table" and o or {}
+  local R = BATTLE.RELM
+  local row = cmdRow(actor, R.CMD)
+  if row == nil or self.skillDead[R.CMD] then return nil end
+  local press = self:pressTarget()
+  if press == nil then for s = 0, 5 do if monAlive(s) then press = s; break end end end
+  local s = M.relmSnapshot(actor, press)
+  if o.inRandoms then s.event = true end   -- (a lab's lever: random battles too)
+  local d = M.relmPolicy(s, o)
+  if d == nil then return nil end
+  M.log(string.format("[%s] actor=%d RELM %s at %d BP%s: %s (%d MP of %d)", self.tag or "fight", actor,
+    R.NAME[d.id], d.boost, d.slot and (" on slot " .. d.slot) or (d.seat and (" on seat " .. d.seat) or ""), d.why,
+    R.PRICE[d.id], s.mp))
+  M.relmLog = M.relmLog or {}
+  M.relmLog[#M.relmLog + 1] = { id = d.id, frame = M.frame }
+  local plan = { kind = "skill", cmd = R.CMD, skill = d.id, row = row, boostLeft = d.boost, reason = "relm" }
+  if d.colour ~= nil then plan.skill2 = R.COLOUR + d.colour end
+  if d.slot ~= nil then
+    plan.aim, plan.aimHard = d.slot, d.slot
+  elseif d.id == R.MASTER then
+    plan.ally, plan.all, plan.auto, plan.buff = true, true, true, true
+  else
+    plan.ally, plan.target, plan.buff = true, d.seat, true
+  end
+  return plan
+end
+
 -- The MagiTek attack this actor's list offers that does the most to the
 -- target (#373), as a plan, or nil.  Entries 0-2 are the beams (fire, ice,
 -- lightning: MagicProp's own element bytes), 3 Bio Blast, 4 Heal Force (a
@@ -15575,6 +15795,11 @@ function Driver:makePlanRules(actor)
     local line = self:lockeLine(actor, have)
     if line then return line end
   end
+  -- RELM's list, when a row of it pays (#538; Driver:relmLine)
+  if id == 8 then
+    local line = self:relmLine(actor, have)
+    if line then return line end
+  end
   -- GAU's Rage, at his first window of a battle (#269; Driver:rageLine)
   if id == 0x0B then
     local line = self:rageLine(actor, have)
@@ -16711,9 +16936,13 @@ function Driver:button(actor)
         return { "b" }
       end
     end
+    -- plan.skill2: the row of a second list the first row's A opens in the
+    -- same window (RELM's Tint: the colours, w7e6168 = 6, #538)
+    local wantId = self.plan.skill
+    if self.plan.skill2 ~= nil and M.readByte(0x6168) == 6 then wantId = self.plan.skill2 end
     local want
     for i = 0, 7 do
-      if M.readByte(BATTLE.ITEMLIST + i * 3) == self.plan.skill then want = i; break end
+      if M.readByte(BATTLE.ITEMLIST + i * 3) == wantId then want = i; break end
     end
     if want == nil then self:dropPlan("skill_row_missing"); return { "b" } end
     local wc, wr = want % 2, want // 2
@@ -17297,7 +17526,7 @@ end
 -- hand since, and battle_jackpot its own).  A caller reads these after the
 -- battle; nothing it asked for (who, cmd, boost, row, slot...) is touched.
 M.KIT_ENTRY_STATE = { "opened", "seat", "presses", "lPresses", "tookBack", "allyPresses", "greyed",
-  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt" }
+  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1" }
 function M.freshKitEntries(plan)
   for _, q in ipairs(plan) do
     for _, f in ipairs(M.KIT_ENTRY_STATE) do q[f] = nil end
@@ -18107,6 +18336,12 @@ function M.kitBattle(plan, opts)
     aim = nil
   end
   local function tick()
+    -- p.skip: an entry whose moment has passed (#538: a Gesture that found
+    -- no turn to give) is dropped, unplayed, when skip() says so
+    if plan[k] ~= nil and plan[k].skip ~= nil and not plan[k].opened and plan[k].skip() then
+      M.log(string.format("[kit] f%d entry %d skipped (its moment passed)", M.frame, k))
+      k = k + 1
+    end
     local p0 = plan[k]
     if p0 ~= nil and p0.self and p0.opened and p0.seat ~= nil
         and (M.readByte(MENU) == 0 or (M.readByte(ACTOR) & 3) ~= p0.seat) then
@@ -18160,7 +18395,16 @@ function M.kitBattle(plan, opts)
       if opts.idle == "defend" then defend(st) else fight(a, st, true) end
       return
     end
-    if M.readByte(0x3ED8 + a * 2) ~= p.who then
+    -- p.when: the entry waits until when() says so (#538: a window it is
+    -- meant for, RELM's Gesture on a Gestured turn); its character is one
+    -- of the others until then, or (p.hold) keeps its command window open,
+    -- touching nothing, while battle time runs
+    if p.hold and p.when ~= nil and not p.opened and M.readByte(0x3ED8 + a * 2) == p.who and st == 0x05
+       and not p.when() then
+      M.setPad({})
+      return
+    end
+    if M.readByte(0x3ED8 + a * 2) ~= p.who or (p.when ~= nil and not p.opened and not p.when()) then
       -- the others' care while the plan plays (#470, M.newSpinnerCare, the
       -- care setzerBattle gives SETZER's party): a fallen member raised, a
       -- member under half HP given a Potion (a Tonic without), the plan's
@@ -18256,7 +18500,7 @@ function M.kitBattle(plan, opts)
       end
       if opts.onList and cool == 0 then opts.onList(p, a) end
       pulse("a")
-    elseif (st == 0x30 or st == 0x0E) and p.peek then
+    elseif (st == 0x30 or st == 0x0E) and p.peek and p.row == nil then
       -- open the window, let the caller read it, back out
       if cool == 0 then
         if opts.onList then opts.onList(p, a) end
@@ -18290,7 +18534,25 @@ function M.kitBattle(plan, opts)
         p.presses = (p.presses or 0) + (cool == 0 and 1 or 0)
         if p.presses > 3 then done(p, a, true); pulse("b"); return end
       end
+      -- p.listR = n: R pressed n times with the cursor on the row (#538: a
+      -- row whose boost buys nothing refuses it); the pending boost before
+      -- and after is kept on the entry (p.listR0, p.listR1)
+      if p.listR ~= nil and (p.listRn or 0) < p.listR then
+        if cool == 0 then
+          if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
+          p.listRn = (p.listRn or 0) + 1
+        end
+        pulse("r")
+        return
+      end
+      if p.listR ~= nil and p.listR1 == nil and cool == 0 then p.listR1 = M.readByte(0x3E9D + a * 2) end
       if opts.onList and cool == 0 then opts.onList(p, a) end
+      -- p.peek with a row: the list read on that row, then backed out of
+      if p.peek then
+        if cool == 0 then done(p, a, true) end
+        pulse("b")
+        return
+      end
       if p.direct and cool == 0 then done(p, a) end
       pulse("a")
     elseif st == 0x38 then
