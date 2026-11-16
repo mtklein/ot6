@@ -497,3 +497,182 @@ ot6_dense_list "Rage",  OT6_LIST_RAGE,  $892b
         clc
         rtl
 .endproc
+
+; ------------------------------------------------------------------------------
+; Mog's Dance list and Locke's thief list, packed the same way (#541's sequel)
+;
+; Neither window scrolls: both show their eight cells, two columns of four.
+; Vanilla gave each dance its own cell (cell i = dance i, $ff where he has
+; not learned it), and the thief list put each of Locke's eight rows in its
+; own cell, blank until the story teaches it, so a list with a dance or a row
+; missing from its middle showed the hole.  Here the entries he has close up
+; from the top in the list's own reading order (the dances in dance-id order
+; across the rows, as vanilla's cells read; the thief rows down the left
+; column, then down the right, as that list reads), and the cursor never
+; rests on a cell past the last entry: after a move, and on the window's
+; open (a remembered cursor can point past a shorter list, from another
+; battle or, for the tools shell's cursor, another kit's list).  Every reader
+; that goes from cell to entry (the draw, the price and grey, the confirm)
+; reads the entry's own id out of the cell, so none of them changes.
+; ------------------------------------------------------------------------------
+
+; [ the known dances, packed (InitSkills) ]
+;
+; Replaces InitSkills's loop over $1d4c: the dances known go to $267e[0..]
+; in id order and the rest of the eight cells are $ff.  Entered a8/i8 with
+; db = $7e; leaves x = $ff as the loop did.  Preserves y and P.
+.proc Ot6DanceList
+        php
+        sep     #$30
+        .a8
+        .i8
+        phy
+        lda     $1d4c           ; the dances known, bit n = dance n
+        sta     $ee
+        ldx     #0              ; the next cell
+        ldy     #0              ; the dance
+@id:    lsr     $ee
+        bcc     @next
+        tya
+        sta     $267e,x
+        inx
+@next:  iny
+        cpy     #8
+        bne     @id
+        lda     #$ff
+@fill:  cpx     #8
+        beq     @done
+        sta     $267e,x
+        inx
+        bra     @fill
+@done:  ldx     #$ff
+        ply
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ keep a two-column, four-row cursor on its list's entries ]
+;
+; in: a8/i16, db = $7e.  a = n, the entries listed (packed from the first
+; cell); x = the slot's column cell (its row cell is 4 bytes on, both lists'
+; shape); carry clear = the cells read across the rows (cell = row*2 + col),
+; set = down the columns (cell = col*4 + row).  A cursor on cell n or later
+; moves to cell n-1; with n = 0 it stays (nothing to land on; the confirm's
+; buzz answers A).  Preserves a, x, y and P.
+.proc Ot6GridClamp
+        .a8
+        .i16
+        php                     ; P: the carry is the order
+        pha
+        cmp     #0
+        beq     @done           ; nothing listed
+        pha                     ; 1,s n, 2,s a, 3,s P
+        lda     3,s
+        lsr                     ; carry = the order
+        bcs     @cols
+        lda     a:$0004,x       ; across the rows: row * 2 + column
+        asl
+        clc
+        adc     a:$0000,x
+        bra     @have
+@cols:  lda     a:$0000,x       ; down the columns: column * 4 + row
+        asl
+        asl
+        clc
+        adc     a:$0004,x
+@have:  cmp     1,s
+        bcc     @fine           ; on an entry
+        lda     1,s
+        dec                     ; the last entry
+        pha                     ; 1,s cell, 2,s n, 3,s a, 4,s P
+        lda     4,s
+        lsr
+        bcs     @col2
+        lda     1,s
+        and     #$01
+        sta     a:$0000,x       ; its column
+        lda     1,s
+        lsr
+        sta     a:$0004,x       ; its row
+        bra     @set
+@col2:  lda     1,s
+        and     #$03
+        sta     a:$0004,x       ; its row
+        lda     1,s
+        lsr
+        lsr
+        sta     a:$0000,x       ; its column
+@set:   pla
+@fine:  pla                     ; n
+@done:  pla
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the Dance window's cursor kept on a listed dance ]
+;
+; in: a8/i16, db = $7e, y = the slot.  Preserves a, x, y and P.
+.proc Ot6DanceClamp
+        .a8
+        .i16
+        php
+        rep     #$30
+        .a16
+        pha
+        phx
+        tya
+        and     #$0003
+        clc
+        adc     #$8937          ; this slot's column cell (row cell $893b)
+        pha
+        sep     #$20
+        .a8
+        ldx     #$0000
+@n:     lda     a:$267e,x       ; n: the cells up to the first empty one
+        cmp     #$ff
+        beq     @have
+        inx
+        cpx     #8
+        bcc     @n
+@have:  txa
+        plx                     ; (a 16-bit pull: x = the column cell)
+        clc                     ; across the rows, vanilla's cell order
+        jsl     Ot6GridClamp
+        rep     #$30
+        .a16
+        plx
+        pla
+        plp
+        rts
+.endproc
+
+; OpenDanceWindow's head (`lda #$1f / sta w7e7bc2`), then the clamp for the
+; active slot, before the window's first cursor frame.  a8/i16, db = $7e.
+.proc Ot6DenseDanceOpen
+        .a8
+        .i16
+        lda     #$1f
+        sta     $7bc2
+        phy
+        ldy     $62ca
+        jsr     Ot6DanceClamp
+        ply
+        rtl
+.endproc
+
+; UpdateMenuState_21's store (`lda $36 / sta w7e8937,y / lda $37 / sta
+; w7e893b,y`), then the clamp.  y = the slot.  a8/i16, db = $7e.
+.proc Ot6DenseDanceStore
+        .a8
+        .i16
+        lda     $36
+        sta     $8937,y
+        lda     $37
+        sta     $893b,y
+        jsr     Ot6DanceClamp
+        rtl
+.endproc

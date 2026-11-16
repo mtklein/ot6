@@ -629,6 +629,10 @@ TEST_ENV = {
     # save outside Nikeah after MOG learns it
     "battle_waterrondo": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/water-rondo-v1",
+    # #541's sequel: MOG's Dance list and LOCKE's thief list packed, from the
+    # same save (both seated, each list with a gap vanilla would show)
+    "battle_densekits": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/water-rondo-v1",
     # #270: the driver's ward line (Shell) against the Dirt Dragon, from the
     # same snapshot
     "battle_wardline": "OT6_TIMEOUT=1800",

@@ -189,7 +189,8 @@ the steal likelier and the rare item likelier. Two points make both a lot
 likelier. Three points always succeed and take the rare item if there is one,
 the common item if not. A boost never makes up an item the enemy lacks.
 Only the first shield Filch takes becomes a point for Locke. His skills are
-in the list behind Steal.
+in the list behind Steal, the ones he has learned packed from the top in this
+table's order, down the left column and then the right.
 
 ### Edgar, Machinist (spear)
 
@@ -331,6 +332,8 @@ in FF6.
 ### Mog, Dancer (spear)
 
 Mog learns his eight Dances by fighting on each dance's terrain, as in FF6.
+His Dance list in battle shows the ones he knows, packed from the top in this
+table's order.
 
 | Dance | Terrain |
 |---|---|

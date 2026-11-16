@@ -265,8 +265,18 @@ local function toPend(s, p)
   if pend(s) > p then return "l" end
   return nil
 end
+-- the cell a dance sits in.  The Dance list is packed (#541's sequel): the
+-- dances MOG knows close up from the top in id order, so a dance's cell is
+-- its place in the list ($267E), read live, not its id
+local function danceCell(id)
+  for i = 0, 7 do if H.readByte(0x267E + i) == id then return i end end
+  return nil
+end
+
 local function toDance(s, id)
-  local row, col = id // 2, id % 2
+  local cell = danceCell(id)
+  assert(cell, string.format("the Dance list holds dance %d", id))
+  local row, col = cell // 2, cell % 2
   local cr, cc = H.readByte(0x893B + s), H.readByte(0x8937 + s)
   if cr ~= row then return cr < row and "down" or "up" end
   if cc ~= col then return cc < col and "right" or "left" end

@@ -177,14 +177,23 @@ local function openDance(what)
     }, what)
 end
 
+-- the cell a dance sits in.  The Dance list is packed (#541's sequel): the
+-- dances MOG knows close up from the top in id order, so a dance's cell is
+-- its place in the list ($267E), read live, not its id
+local function danceCell(id)
+  for i = 0, 7 do if H.readByte(0x267E + i) == id then return i end end
+  return nil
+end
+
 local function danceCursorTo(what)   -- onto offId, read when it runs
   return H.driveUntil(function()
     if rec.lost or lostNow() then return true end
     local id = offId
     local a = H.readByte(ACTOR)
     return H.readByte(MSTATE) == ST_DANCE
-       and H.readByte(0x8937 + a) == id % 2
-       and H.readByte(0x893B + a) == id // 2
+       and danceCell(id) ~= nil
+       and H.readByte(0x8937 + a) == danceCell(id) % 2
+       and H.readByte(0x893B + a) == danceCell(id) // 2
   end, 900, {
     H.call(function()
       ph = ph + 1
@@ -192,7 +201,9 @@ local function danceCursorTo(what)   -- onto offId, read when it runs
       local a = H.readByte(ACTOR)
       if H.readByte(MSTATE) ~= ST_DANCE then H.setPad({}) return end
       local id = offId
-      local row, col = id // 2, id % 2
+      local cell = danceCell(id)
+      assert(cell, string.format("the Dance list holds dance %d", id))
+      local row, col = cell // 2, cell % 2
       local cr, cc = H.readByte(0x893B + a), H.readByte(0x8937 + a)
       if cr ~= row then H.setPad(edge and { [(cr < row) and "down" or "up"] = true } or {})
       elseif cc ~= col then H.setPad(edge and { [(cc < col) and "right" or "left"] = true } or {})

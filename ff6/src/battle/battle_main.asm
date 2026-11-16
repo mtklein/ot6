@@ -15089,6 +15089,12 @@ InitSkills:
         lda     $1d28       ; known blitzes
         jsr     CountBits
         stx     $3a80       ; set number of known blitzes
+.if LANG_EN
+        jsl     Ot6DanceList    ; ot6: the known dances packed from the top
+        bra     :+              ;   (ot6_dense.asm), was a cell per dance id;
+        .res    14, $ea         ;   vanilla's 20 bytes kept
+:
+.else
         lda     $1d4c       ; known dances
         sta     $ee
         ldx     #$07
@@ -15099,6 +15105,7 @@ InitSkills:
 @582f:  sta     $267e,x     ; set known dances
         dex
         bpl     @5828
+.endif
         ; ot6: the one choke point for Gau's 8-slot rage
         ; loadout.  Ot6RageList writes at most eight ids to $257e and the count
         ; to $3a9a, and everything downstream narrows itself: the
