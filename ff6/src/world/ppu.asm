@@ -390,6 +390,8 @@ InitWaterGfx:
         sta     $7eb85c
         lda     #$e090
         sta     $7eb85e
+        lda     #$0000          ; ot6: the 16-frame phase (UpdateWaterAnim) starts
+        sta     $7eb860         ;   at 0, not at power-on's RAM
         shorta
         rts
 

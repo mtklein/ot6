@@ -50,6 +50,9 @@
         sta     f:$7e0000+OT6_MIMICCOPY ; nor a Mimic copy mark
         sta     f:$7e0000+OT6_SPELLNONE ; nor a no-reward spell turn's mark
         sta     f:$7e0000+OT6_BLUESEEN  ; nor a Berserk Strago saw last battle
+        sta     f:$7e0000+OT6_PASSRETARGET ; nor an added-pass mark: read on a
+                                ;   retarget before the first action's clear
+                                ;   (InitGfxScript), so unwritten after power-on
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
@@ -104,6 +107,12 @@
                                         ;   vanilla's $57d5 name scratch,
                                         ;   harmless at init (vanilla always
                                         ;   writes it before reading)
+        ldx     #$0000          ; $ed6d-$ed8e past the shadow: the wallet's
+@clr3:  sta     f:$7e0000+OT6_WALLETSIG,x ; SIG/SIGP, NUMCTR, BRKLIVE, the six
+        inx                             ; BRKTICK/BRKPAL slots (and cells
+        inx                             ; zeroed above), read before written
+        cpx     #$0022                  ; after power-on (uninit_waivers.txt)
+        bcc     @clr3
         plx                             ; (OT6_ATKCLASS and OT6_FONTDIRTY sit
                                         ;   in the shadow strip: the @clr
                                         ;   loop covered them)
@@ -3242,15 +3251,16 @@ Ot6AbilityCostTbl:
         ;    window renders from.  This column stays monotonic with the tech
         ;    index: the boost window offers techs weakest->strongest and the
         ;    row is the boost level, so a dearer 2x row than 3x row would
-        ;    read as a bug.
+        ;    read as a bug.  BP below is kits.md's column; the window itself
+        ;    is the three best techs known at 1, 2 and 3 BP (Ot6BushidoPick).
         .byte   $55,  4         ; Dispatch     BP1
         .byte   $56, 10         ; Retort       BP1
-        .byte   $57, 13         ; Slash        BP2
+        .byte   $57, 13         ; Slash        BP1
         .byte   $58, 16         ; Quadra Slam  BP2
-        .byte   $59, 18         ; Empowerer    BP3
+        .byte   $59, 18         ; Empowerer    BP2
         .byte   $5a, 28         ; Stunner      BP3
         .byte   $5b, 50         ; Quadra Slice BP3
-        .byte   $5c, 99         ; Cleave       BP3+Broken, the 99 anchor
+        .byte   $5c, 99         ; Cleave       BP3 (the 3-BP row only, from the Phantom Train farewell), the 99 anchor
         ; -- Tools (Edgar), cmd $09, tool ITEM ids $a3-$aa.  names are
         ;    item_name_en.json's, i.e. what the Tools window prints.
         .byte   $aa,  4         ; AutoCrossbow

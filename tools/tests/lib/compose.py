@@ -2507,6 +2507,14 @@ def main() -> int:
             return 1
     if os.environ.get("OT6_COVERAGE"):
         preamble.append("OT6_COVERAGE = true  -- lib/ot6.lua coverageFlush (#130)\n")
+    # Lab levers (lib/ot6.lua M.lever): OT6_LEVERS a comma list of rule
+    # switches for an A/B arm (WORST_LIFT_OFF ...); never set by the graph.
+    raw = os.environ.get("OT6_LEVERS")
+    if raw:
+        if not re.fullmatch(r"[A-Z0-9_]+(,[A-Z0-9_]+)*", raw):
+            print(f"error: OT6_LEVERS={raw!r} is not a comma list of NAMES")
+            return 1
+        preamble.append('OT6_LEVERS = "%s"  -- lab levers\n' % raw)
     # The measuring policies (#422, lib/ot6.lua Driver:policyPlan;
     # tools/fight_report.py): OT6_POLICY a comma list of naive, nocare,
     # noboost, noskill; OT6_POLICY_FORMS the formations it applies to.

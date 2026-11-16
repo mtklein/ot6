@@ -43,6 +43,12 @@
 --    live; input is pushed from an inputPolled callback (see below).
 
 local M = {}
+-- A lab lever (lib/compose.py's OT6_LEVERS, a comma list of names): true
+-- when this run was composed with `name` on, for an A/B arm of a rule
+-- switch; nothing in the graph sets it.
+function M.lever(name)
+  return type(OT6_LEVERS) == "string" and ("," .. OT6_LEVERS .. ","):find("," .. name .. ",", 1, true) ~= nil
+end
 
 local seqStep -- forward declaration (defined in the step-runner section)
 

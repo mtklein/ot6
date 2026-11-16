@@ -67,7 +67,7 @@ the Empire's plates), which players could not follow.
 | Shields, half damage while shielded, breaking (can't act, ×2 damage), recovery | $0267 | middle (106) |
 | Weaknesses: '?' cells, elements and weapon types, the Magic list's element icons and the weapon icons, the codex | $0264 | middle (106) |
 | Boost Points: 1 at the start, +1 a turn, cap 5; R adds (up to 3), L takes back; no point on a boosted turn | $026D | left (105) |
-| What a boost buys: Fight's extra hits (free); ×2/×4/×8 damage on other skills, Dance included; MP ×2.5 a point, capped at 99 and never below the unboosted price | $0270 | left (105) |
+| What a boost buys: Fight's extra hits (free; twice as many with two weapons); ×2/×4/×8 damage on other skills, Dance included; MP ×2.5 a point, capped at 99 and never below the unboosted price; a status spell's reach, one more target a point at its MP again | $0270 | left (105) |
 | Stronger spells: Fire → Fire 2 → Fire 3 and the other families, at the cast spell's MP; the Magic list previews | $026E | left (105) |
 | Skills that changed: MP on Blitz/Tools/SwdTech/Steal/Dance/Rage; SwdTech rows; Steal/Slot/Rage odds (Steal and Rage certain at 3); Shadow's break kill | $0276 | left (105), far corner |
 | Runic earns a Boost Point | $026F page 1 | left (105) |
@@ -117,11 +117,11 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Each hit on a weakness removes one shield. At zero it breaks: it can't act for a while and takes double damage.
+> A hit on a weakness removes a shield. At zero it breaks: until it recovers, it can't act and takes double damage.
 >
 > *(next box)*
 >
-> A broken monster's shield icon shows an X. When it recovers, its shields come back.
+> A broken monster's shield icon is drawn cracked. When it recovers, its shields come back.
 
 **$0264 — weaknesses: the ? marks, elements and weapon types, the codex (middle room):**
 
@@ -155,17 +155,21 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > Press the L Button to take one back. Boosting uses up those points, and you gain no new point that turn.
 
-**$0270 — what a boost buys: Fight, damage skills, the MP price (left room):**
+**$0270 — what a boost buys: Fight, damage skills, the MP price, status spells' reach (left room):**
 
-> A boosted Fight hits once more for each point, and costs no MP.
+> A boosted Fight hits once more for each point, twice more with two weapons, and costs no MP.
 >
 > *(next box)*
 >
-> Boosting a Blitz, Tool, Dance, Lore, Esper or most spells does 2x damage for 1 point, 4x for 2, and 8x for 3.
+> Boosting a Blitz, Tool, Dance, Lore, Esper or damage spell does 2x damage for 1 point, 4x for 2, and 8x for 3.
 >
 > *(next box)*
 >
 > Those cost more MP when boosted: 2.5x per point, never over 99, and never less than unboosted.
+>
+> *(next box)*
+>
+> Boosting a status spell such as Sleep, Mute or Safe casts it on one more target per point, for its MP again each time.
 
 **$026E — stronger spells from a boost (left room):**
 
@@ -262,7 +266,10 @@ Every claim was checked against the code (2026-09-28):
   those (`Ot6BoostPriceFor`, [mp-economy.md](mp-economy.md)): capped at
   99, and a spell already dearer than 99 (Phoenix, 110) keeps its price.
   Dance is in $0270's list because a boosted Dance multiplies every step
-  of that dance (#294, `Ot6DanceStartGate`).
+  of that dance (#294, `Ot6DanceStartGate`).  Fight's swings: two a point,
+  alternating hands, so one weapon lands one more hit and a Genji Glove
+  pair two.  A single-target status spell's boost buys reach, each point
+  at the spell's MP again (#469, [boost-rewards.md](boost-rewards.md)).
 - Stronger spells: `Ot6FoldTbl` (Fire, Ice, Bolt, Poison, Cure, Life,
   Slow, Haste), `Ot6FoldSteps` clamps a boost of 3 to two tiers, the
   cast tier's own MP (`Ot6QueueFold` → `Ot6SpellMP`), and the Magic

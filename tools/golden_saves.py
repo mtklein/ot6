@@ -438,99 +438,6 @@ def firstsave_problems(b, rows):
     return p
 
 
-# ------------------------------------------------- the loadout repair model --
-# Ot6RepairLoadouts (ot6_codex.asm) as Python, and the field pages' writers
-# (ot6_loadout.asm Ot6LoadoutSeedWord / Ot6LoadoutCycleCore and
-# ot6_bushido.asm Ot6BushidoPick; ot6_rage.asm and ot6_lore.asm's seed and
-# cycle), so the selftest can enumerate every value a page can write and
-# hold the repair to keeping each one.
-def _bit(L, t):
-    return (L >> t) & 1
-
-
-def repair_bushido(w, L):
-    """The word Ot6RepairLoadouts leaves, given $1CF7 = L."""
-    if w == 0:
-        return 0
-    if w & 0xF000:
-        return 0
-    for k in range(3):                      # slots 1-3, bits 3-11
-        if not _bit(L, (w >> (3 + 3 * k)) & 7):
-            return 0
-    return w
-
-
-def repair_byte(b, learned, limit):
-    """A Rage (limit None) or Lore (limit $18) byte after the repair."""
-    if b == 0:
-        return 0
-    if limit is not None and b > limit:
-        return 0
-    return b if (b - 1) in learned else 0
-
-
-def bushido_pick(slot, L):
-    """Ot6BushidoPick for the field (Ot6LoadoutAutoTech)."""
-    b = max(1, slot)
-    ceil = max(0, bin(L & 0x7F).count("1") - 1)
-    if L & 0x80:
-        if b >= 3:
-            return 7
-        base = max(0, ceil - 1)
-    else:
-        base = max(0, ceil - 2)
-    return min(base + b - 1, ceil)
-
-
-def _assign(w, slot, t):
-    return (w & ~(7 << (3 * slot)) & 0xFFFF) | ((t & 7) << (3 * slot))
-
-
-def bushido_seed(L):
-    w = 0
-    for slot in range(4):                   # slot 0 mirrors slot 1 (the clamp)
-        w = _assign(w, slot, bushido_pick(slot, L))
-    return w
-
-
-def bushido_cycle(w, row, delta, L):
-    if w == 0:
-        w = bushido_seed(L)
-    slot = row + 1
-    t = (w >> (3 * slot)) & 7
-    for _ in range(8):
-        t = (t + delta) & 7
-        if _bit(L, t) and (t != 7 or slot >= 3):
-            break
-    return _assign(w, slot, t)
-
-
-def bushido_reachable(L):
-    """Every word the Bushido page can leave, from AUTO, at $1CF7 = L."""
-    seen, todo = {0}, [0]
-    while todo:
-        w = todo.pop()
-        for nxt in [0] + [bushido_cycle(w, r, d, L) for r in range(3) for d in (1, 7)]:
-            if nxt not in seen:
-                seen.add(nxt)
-                todo.append(nxt)
-    return seen
-
-
-def plausible_swdtech_sets():
-    """$1CF7 as play leaves it: the level table teaches techs 0..6 in order
-    (Dispatch at level 1), and the Phantom Train farewell teaches Cleave
-    (bit 7) to a CYAN who already knows Dispatch.  ($80 alone, Cleave with no
-    Dispatch, is no state play reaches; there the seeded word names the
-    unlearned Dispatch in slots 1-2 and the repair would reset it to AUTO,
-    which is harmless.)"""
-    for k in range(8):
-        prefix = (1 << k) - 1
-        yield prefix
-        if k >= 1:
-            yield prefix | 0x80
-
-
 def oldest_golden():
     return load_manifest()["sets"][0]["version"]
 
@@ -643,31 +550,6 @@ def selftest():
         raise AssertionError("gap accepted")
     except GoldenError:
         pass
-    # every value the field pages can write survives the repair
-    words = 0
-    for L in plausible_swdtech_sets():
-        for w in bushido_reachable(L):
-            assert repair_bushido(w, L) == w, ("the repair resets a page-made Bushido word", hex(w), hex(L))
-            words += 1
-    assert bushido_seed(0xBF) == 0x0F64 and bushido_seed(0x3F) == 0x0B1B, \
-        (hex(bushido_seed(0xBF)), hex(bushido_seed(0x3F)))
-    assert repair_bushido(0x0F64, 0xBF) == 0x0F64 and repair_bushido(0x0B1B, 0x3F) == 0x0B1B
-    assert repair_bushido(0xFFFF, 0xBF) == 0                 # all-ones junk
-    assert repair_bushido(0x0F64 | 0x1000, 0xBF) == 0       # a bit past the slots
-    assert repair_bushido(0x0E00 | (5 << 6) | (4 << 3), 0x3F) == 0   # Cleave unlearned
-    import random
-    rng = random.Random(389)
-    for _ in range(200):
-        rl = {i for i in range(255) if rng.random() < rng.random()}
-        ll = {i for i in range(24) if rng.random() < 0.5}
-        for i in rl:                         # Ot6RageSeed / Ot6RageCycleCore store id + 1 of a learned rage
-            assert repair_byte(i + 1, rl, None) == i + 1
-        for i in ll:                         # Ot6LoreSeed / Ot6LoreCycleCore: a learned lore (id + 1)
-            assert repair_byte(i + 1, ll, 0x18) == i + 1
-        assert repair_byte(0, rl, None) == 0 and repair_byte(0, ll, 0x18) == 0   # Y: AUTO
-        if 254 not in rl:
-            assert repair_byte(0xFF, rl, None) == 0
-        assert repair_byte(0x19, ll, 0x18) == 0 and repair_byte(0xFF, ll, 0x18) == 0
     # a New Game's first save
     fsb = bytearray(after)
     assert firstsave_problems(bytes(fsb), rows) == [], firstsave_problems(bytes(fsb), rows)
@@ -691,8 +573,7 @@ def selftest():
     assert any("save layout" in x for x in notes_problems(good + "This release uses the v0.29 save layout.\n", "v0.28"))
     assert any("no line" in x for x in notes_problems("## Saves\n\nOlder saves load.\n", "v0.28"))
     assert any("oldest golden" in x for x in notes_problems(good.replace("v0.28", "v0.40"), "v0.28"))
-    print(f"golden_saves selftest OK ({words} page-made Bushido words over 15 SwdTech sets, "
-          f"and every page-made Rage and Lore byte over 200 learned sets, survive the repair)")
+    print("golden_saves selftest OK")
     return 0
 
 

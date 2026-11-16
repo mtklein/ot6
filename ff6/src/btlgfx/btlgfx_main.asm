@@ -2269,6 +2269,7 @@ user_init:
         lda     #$ff        ; disable nmi
         sta     $46
         stz     w7ee9ef       ; start battle time
+        stz     w7ee9db       ; ot6: the condemned-numeral counter starts at 0 (read unwritten after power-on)
         jsr     _c10fe0
         lda     $2f44       ; invisible monsters
         not_a

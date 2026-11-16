@@ -30,6 +30,7 @@
         sta     hINIDISP
         stz     hNMITIMEN               ; disable nmi and irq
         jsr     ClearRAM
+        jsl     Ot6PowerOnClear         ; ot6: and the save block's never-written bytes
         ldx     #0                      ; set $00 and $02
         stx     $00
         ldx     #$ffff

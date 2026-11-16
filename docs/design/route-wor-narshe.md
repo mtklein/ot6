@@ -81,8 +81,9 @@ marked.
    has to be seated before the cliffs.
 7. **Water Rondo is not known here.** `wor-cyan-v1` knows one dance:
    `$1D4C = $40`, Dusk Requiem (bit 6; Water Rondo is bit 5;
-   `wor-cyan-v1_roster.txt`). Water Rondo is WoB-missable, learned only in
-   the Serpent Trench, and this route's MOG never learned it. See section
+   `wor-cyan-v1_roster.txt`). Water Rondo is learned from a battle on the
+   river, waterfall or underwater background (battle_main.asm's dance
+   table), and this route's MOG never fought on one. See section
    10. (It was Mog's divine then; since #478 it is an ordinary dance and
    Mog has no divine.)
 8. **Narshe's arc is ice.** Every boss absorbs ice and is weak to fire

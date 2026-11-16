@@ -206,10 +206,73 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         inx
         cpx     #OT6_SAVETAIL_LEN
         bcc     @tail
+        ; vanilla's own never-written save-block bytes (the power-on fill,
+        ; tools/uninit_waivers.txt): every range below is read before New
+        ; Game or its opening event writes it, or carried into every save
+        ; unwritten, and zero is the value vanilla assumes (a console that
+        ; powers on blank).  Ot6NewGameZero lists them.
+        phy
+        ldy     #$0000
+@rng:   tyx
+        lda     f:Ot6NewGameZero+2,x    ; length (bytes, < 256)
+        beq     @rdone
+        pha
+        longa
+        lda     f:Ot6NewGameZero,x      ; start, WRAM bank $7e
+        tax
+        shorta
+        pla
+@byte:  pha
+        lda     #$00
+        sta     f:$7e0000,x
+        pla
+        inx
+        dec     a
+        bne     @byte
+        iny
+        iny
+        iny
+        bra     @rng
+@rdone: ply
         plx
         plp
         rts
 .endproc
+
+; At power-on, before the field's first init: the reset path runs InitNewGame
+; and loads the starting map, which reads the objects' saved positions
+; ($1fd3-$1ff2, obj.asm:3437) before a New Game or a Continue writes them,
+; and a Continue does not reload the objects from the block, so the junk
+; stayed on the off-screen characters (gen_wob_airship_hunt under the
+; all-ones fill: "party 1 ... at map 3 (255,255)").  The same zeroing as a
+; New Game's; a Continue then loads the slot over all of it.
+.proc Ot6PowerOnClear
+        php
+        jsr     Ot6NewGameClear
+        plp
+        rtl
+.endproc
+
+; (start, length) per range, a length of 0 ends the list
+Ot6NewGameZero:
+        .word   $1e70
+        .byte   16      ; unused tail after the treasure bits ($1e40-$1e6f)
+        .word   $1f60
+        .byte   4       ; world position and airship position: an event sets
+                        ;   each before the world map reads it
+        .word   $1f6e
+        .byte   2       ; the random-battle counter (field/battle.asm adds
+                        ;   each step; vanilla clears it only after a battle)
+        .word   $1fa8
+        .byte   24      ; unused by any code
+        .word   $1fc2
+        .byte   16      ; event variables 0-7 (EventCmd_e8-eb; add_var 0 runs
+                        ;   on what is there)
+        .word   $1fd3
+        .byte   32      ; the 16 objects' saved positions (PushPartyMap,
+                        ;   read back at field init, obj.asm:3437)
+        .word   $0000
+        .byte   0
 
 ; [ sign the save block, and keep the reserve zero ] (#389)
 ;
@@ -246,8 +309,7 @@ VerCheck:                       ; (mutant_rom.py's seam for the version test)
         cmp     #OT6_SAVEVER_CUR+1
         bcs     Sign
         bra     Pages
-Sign:  jsr     Ot6RepairLoadouts
-        shorta
+Sign:   shorta
         lda     #$00
         ldx     #$0000
 @rsv:   sta     f:OT6_SAVERSV,x
@@ -316,146 +378,6 @@ SlotAt: lda     5,s             ; the destination slot (under the phx/phy)
         plp
         rts
 .endproc
-
-; [ first signing: loadout values no save can hold go back to AUTO ] (#389)
-;
-; An unsigned block may carry a New Game's power-on junk in the three
-; loadouts (all-$FF under an all-ones fill, which read as manual loadouts
-; whose every slot names nothing).  The field pages store only learned
-; entries, and learning is never undone, so these values cannot be
-; legitimate and are reset:
-;   * the Bushido word, to $0000 (AUTO), when a bit past its slots is set
-;     (bits 12-15) or one of the three slots the battle reads (slots 1-3,
-;     bits 3-11) names a SwdTech not learned ($1cf7).  Slot 0 (bits 0-2)
-;     is left alone: the page's first edit seeds it on purpose, a mirror of
-;     slot 1 (Ot6LoadoutSeedWord) that nothing reads;
-;   * a Rage byte, to $00 (unset), when it names a rage not learned ($1d2c);
-;   * a Lore byte, to $00, when it is past $18 (lore ids are 0..23) or
-;     names a lore not learned ($1d29).
-; An all-unset Rage or Lore loadout is AUTO.  Every other value is left as
-; it is.  The one junk value this cannot tell from a real one is a Rage
-; byte $FF when Gau has learned rage 254.
-; Called from Ot6SaveSign's signing path only.  a/x/y widths saved.
-.proc Ot6RepairLoadouts
-        php
-        longai
-        phx
-        phy
-        ; --- Bushido
-        lda     f:OT6_LOADOUT
-        beq     RRage           ; AUTO
-MaskAt: bit     #$f000          ; (mutant_rom.py's seam for this mask)
-        bne     RBzero          ; a bit past the three slots read (12-15)
-        lsr
-        lsr
-        lsr                     ; slot 1 in bits 0-2
-        ldy     #$0003
-RBslot: pha
-        and     #$0007
-        tax
-        shorta
-        lda     f:Ot6RepairBit,x
-        and     f:$7e1cf7       ; that SwdTech learned?
-        longa
-        beq     RBpull          ; no: the word cannot be real
-        pla
-        lsr
-        lsr
-        lsr
-        dey
-        bne     RBslot
-        bra     RRage
-RBpull: pla
-RBzero: lda     #$0000
-        sta     f:OT6_LOADOUT
-        ; --- Rage: eight bytes, id + 1
-RRage:  shorta
-        ldx     #$0000
-RRslot: lda     f:OT6_RAGELOAD,x
-        beq     RRnext
-        dec     a               ; the rage id, 0..254
-        jsr     RageLearned
-        bcs     RRnext
-        lda     #$00
-        sta     f:OT6_RAGELOAD,x
-RRnext: inx
-        cpx     #OT6_RAGESLOTS
-        bcc     RRslot
-        ; --- Lore: five bytes, id + 1, ids 0..23
-        ldx     #$0000
-RLslot: lda     f:OT6_LORELOAD,x
-        beq     RLnext
-        cmp     #$19
-        bcs     RLzero          ; past lore 23
-        dec     a
-        jsr     LoreLearned
-        bcs     RLnext
-RLzero: lda     #$00
-        sta     f:OT6_LORELOAD,x
-RLnext: inx
-        cpx     #OT6_LORESLOTS
-        bcc     RLslot
-        ply
-        plx
-        plp
-        rts
-
-; a8/i16.  A = id.  out: carry = learned.  X preserved.
-RageLearned:
-        phx
-        pha                     ; [2,s] the id
-        and     #$07
-        longa
-        and     #$00ff
-        tax
-        shorta
-        lda     f:Ot6RepairBit,x
-        pha                     ; [1,s] its bit, [2,s] the id
-        lda     2,s
-        lsr
-        lsr
-        lsr
-        longa
-        and     #$001f
-        tax
-        shorta
-        lda     f:$7e1d2c,x
-        and     1,s
-        cmp     #$01            ; carry = the bit is set
-        pla
-        pla
-        plx
-        rts
-
-LoreLearned:
-        phx
-        pha
-        and     #$07
-        longa
-        and     #$00ff
-        tax
-        shorta
-        lda     f:Ot6RepairBit,x
-        pha
-        lda     2,s
-        lsr
-        lsr
-        lsr
-        longa
-        and     #$0003
-        tax
-        shorta
-        lda     f:$7e1d29,x
-        and     1,s
-        cmp     #$01
-        pla
-        pla
-        plx
-        rts
-.endproc
-
-Ot6RepairBit:
-        .byte   $01, $02, $04, $08, $10, $20, $40, $80
 
 ; Initialize/migrate the selected persistent page while the load menu owns the
 ; machine, before gameplay can enter a battle through a caller with narrower
