@@ -1767,8 +1767,9 @@ Ot6PipRowAddr:
         sta     f:$7e0000+OT6_PIPDIRTY
         lda     #$01
         sta     f:$7e0000+OT6_PIPLIVE
-        pla                     ; the tile
-        plx
+        tdc                     ; b = 0, as the text engine's 16-bit reads of
+        pla                     ;   a expect (the old body left it so); a =
+        plx                     ;   the tile
         rtl
 @blank: lda     #$ff
         plx

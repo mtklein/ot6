@@ -10,8 +10,9 @@
 --   1. a pending boost shows as its arrows from the press until the action
 --      it is for begins (its ExecCmd), not only while its menu is open: a
 --      confirmed, queued action keeps its arrows;
---   2. from the moment that action begins (a few frames' grace: the battle
---      computes the action before it draws again), the cell shows the bank less the
+--   2. from the moment that action begins (judged once its battle script
+--      is drawing: the battle computes the action before it draws again),
+--      the cell shows the bank less the
 --      pending points (the spend), until the action ends and the bank is
 --      charged; a boost the action ends up not spending (kept) may hold its
 --      arrows instead, and one it spends may not;
@@ -72,7 +73,7 @@ local function arm()
     if not s.begun then
       -- (a pending boost an action raises for itself, Bestow's point or
       -- Umaro's dump, is spent by an action already begun)
-      s.begun, s.beginF, s.arrowsIn, s.pipsIn = true, H.frame, 0, 0
+      s.begun, s.beginF, s.arrowsIn, s.pipsIn, s.drawn = true, H.frame, 0, 0, nil
       if pend(x >> 1) > 0 then
         H.log(string.format("[bpdisplay] f%d slot %d begins: command %02X, queued %04X, pending %d, bank %d",
           H.frame, x >> 1, H.readByte(0xB5), H.readWord(0x3A7C), pend(x >> 1), bank(x >> 1)))
@@ -122,16 +123,17 @@ local function sample()
       if s.endPend > 0 then
         if b + s.endPend == s.endBank then
           W.spent = W.spent + 1
-          if s.begun and s.arrowsIn > 8 then
+          if s.begun and s.arrowsIn > 2 then
             W.viol[#W.viol + 1] = string.format("f%d slot %d: arrows held %d frames after a spent boost began",
               H.frame, c, s.arrowsIn)
           end
         else
           W.kept = W.kept + 1
-          if s.begun and s.pipsIn > 8 then
+          if s.begun and s.pipsIn > 2 then
             W.viol[#W.viol + 1] = string.format("f%d slot %d: a kept boost showed as spent for %d frames",
               H.frame, c, s.pipsIn)
           end
+          if b == s.endBank + 1 then s.owed = true end   -- kept, then its regen (3)
         end
       elseif b == s.endBank + 1 then
         s.owed = true                      -- a regen point (3)
@@ -141,11 +143,30 @@ local function sample()
       s.begun, s.endAt = false, nil
     end
   end
+  local busy = H.readByte(0x57BF) ~= 0       -- OT6_SCRIPTBUSY: a battle script runs
+  for c = 0, 3 do
+    local s = st[c]
+    if s.begun and s.drawn == nil and busy then s.drawn = H.frame end
+  end
   for r = 0, 3 do
     local c = H.readByte(0x64D6 + r)
     if c ~= 0xFF and c < 4 then
       local s = st[c]
       local got = face(emu.readWord(ROWADDR[r] * 2, vram))
+      -- the name beside the cell is drawn too: Ot6PipGlyph_ext once left
+      -- the text engine a nonzero b and every name in the window went blank
+      local lit = 0
+      for k = 1, 8 do
+        if (emu.readWord((ROWADDR[r] - k) * 2, vram) & 0xFF) ~= 0xFF then lit = lit + 1 end
+      end
+      if s.seen and lit == 0 then
+        s.blank = (s.blank or 0) + 1
+        if s.blank == 30 then
+          W.viol[#W.viol + 1] = string.format("f%d row %d (slot %d): no name drawn beside the cell", H.frame, r, c)
+        end
+      else
+        s.blank = 0
+      end
       local p, b = pend(c), bank(c)
       local want, alt
       if p > 0 and not s.begun then
@@ -156,8 +177,17 @@ local function sample()
       else
         want = "p" .. math.max(0, b - (s.owed and 1 or 0))
       end
+      -- a cover's point (OT6_PIPPEND = slot + 1) or a runic absorb's
+      -- (OT6_BPDEFER) shows when its blow or spell lands: one fewer until then
+      if not s.begun and p == 0 and (H.readByte(0xED74) == c + 1
+          or (H.readByte(0xEEF2) & (1 << c)) ~= 0) then
+        alt = "p" .. math.max(0, b - (s.owed and 1 or 0) - 1)
+      end
       if got:sub(1, 1) ~= "?" then s.seen = true end
-      if s.seen and s.sync ~= false then
+      -- the battle computes an action before it draws again: a begun action
+      -- is judged from four frames after its script starts drawing
+      local settling = s.begun and (s.drawn == nil or H.frame < s.drawn + 4)
+      if s.seen and s.sync ~= false and not settling then
         if got == want or got == alt then
           s.mism = 0
           if s.begun and p > 0 then
