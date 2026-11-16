@@ -634,6 +634,18 @@ divergence the wave finds is bisected with lab-tree runs of that one leg
 (`ones@wram:<half>`), confirmed with `OT6_RBW=1`, and then fixed in the ROM
 or waived with its evidence.
 
+`ones` alone misses a read whose effect is a comparison of two unwritten
+words: all ones makes them equal, as zero does. OT6_WALLETSIG/SIGP was that
+(the ones wave played the same; under `rand:1@wram,sram,vram,oam,cgram`
+seven legs parted, each by a tick in its first battle;
+`build/attempts/wt/v046-fills-3/`), so the release wave is
+`rand:<seed>@wram,sram,vram,oam,cgram`, and a new seed now and then; the
+`ones` line stays the milestone run. The rand wave on px13 (2026-11-15,
+12 at a time): 90 legs in 26 minutes, 13,702 emulator-seconds. A WRAM
+halving of one leg (eight ranges at a time, then eight inside the guilty
+eighth, then the waived offsets one by one) took three rounds, each one leg's time on
+eight emulators (gen_narshe_mission: 224 s in the wave).
+
 ## Mesen facts the harness depends on
 
 - With no config file, Mesen ignores `--testrunner` and launches the GUI
