@@ -17747,12 +17747,16 @@ function M.setzerBattle(plan, opts)
         Z.rec.seq[#Z.rec.seq + 1] = { t = "hit", y = ev.y, class = ev.class }
       end
     end, emu.callbackType.exec, c, c)
-    -- a body's break running out (Ot6Tick's recovery arm, `lda OT6_SHIELD_MAX,x`
-    -- 10 bytes in: its shields go back to their max), in the same sequence as
-    -- the passes, so the replay restores them where the engine did
-    local tk = M.sym("Ot6Tick") + 10
-    M.assertEq(M.readRomByte(tk & 0x3FFFFF) == 0xBD and M.readRomWord((tk & 0x3FFFFF) + 1) == 0x3E39, true,
-      "Ot6Tick's recovery arm is `lda $3e39,x` 10 bytes in")
+    -- a body's break running out (Ot6Tick's recovery arm, `lda OT6_SHIELD_MAX,x`:
+    -- its shields go back to their max), in the same sequence as the passes,
+    -- so the replay restores them where the engine did.  Found by its bytes in
+    -- the proc's first 32 (10 bytes in until Still Life's hold went before it)
+    local tk = nil
+    for k = 0, 31 do
+      local a = (M.sym("Ot6Tick") + k) & 0x3FFFFF
+      if tk == nil and M.readRomByte(a) == 0xBD and M.readRomWord(a + 1) == 0x3E39 then tk = M.sym("Ot6Tick") + k end
+    end
+    M.assertEq(tk ~= nil, true, "Ot6Tick's recovery arm (`lda $3e39,x`) is in its first 32 bytes")
     emu.addMemoryCallback(function()
       if live() and Z.rec then
         Z.rec.seq[#Z.rec.seq + 1] = { t = "recover", y = emu.getState()["cpu.x"] & 0xff }

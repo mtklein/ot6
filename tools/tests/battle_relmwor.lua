@@ -105,6 +105,10 @@ local function arm()
       rec.starved = { f = H.frame, mp = PRICE[VARNISH] - 1, cost = H.readWord(0x3A4C), coat0 = H.readByte(VARN) }
       H.writeWord(0x3C08 + x, PRICE[VARNISH] - 1)
     end
+    -- RELM's Gesture is executing: the $FF its apply writes to the ally's
+    -- gauge byte is told from the engine's own (the turn's reset as an
+    -- action starts) by this, up to her action's end
+    if relm ~= nil and x == relm * 2 and H.readByte(0xB6) == GESTURE then rec.gestLive = H.frame end
     rec.execs = rec.execs or {}
     rec.execs[#rec.execs + 1] = { x = x, id = H.readByte(0xB6), b8 = H.readByte(0xB8), b9 = H.readByte(0xB9),
       mp0 = H.readWord(0x3C08 + x), bank0 = H.readByte(0x3E9C + x), pend0 = H.readByte(0x3E9D + x), f = H.frame }
@@ -129,6 +133,7 @@ local function arm()
     local x = emu.getState()["cpu.x"] & 0xFF
     rec.ends = rec.ends or {}
     rec.ends[#rec.ends + 1] = { x = x, f = H.frame, gest = H.readByte(GEST) }
+    if relm ~= nil and x == relm * 2 then rec.gestLive = nil end
     if stage == 5 and gogo ~= nil and relm ~= nil and x == relm * 2 and rec.giveUp == nil then
       local ex = rec.execs and rec.execs[#rec.execs]
       if ex ~= nil and ex.x == x and ex.id == GESTURE and not ex.ended then
@@ -160,7 +165,11 @@ local function arm()
   end, emu.callbackType.write, 0x7E0000 + VARN, 0x7E0000 + VARN)
   emu.addMemoryCallback(function(addr, v)
     if stage ~= 4 or terra == nil or addr ~= 0x7E3219 + terra * 2 then return end
-    if v == 0xFF and rec.gestured == nil then
+    -- only while RELM's Gesture runs: TERRA's own turn also writes $FF here
+    -- (the gauge reset as her action starts), which on the v0.47 replay's
+    -- draw came first and was read as the Gesture (build/attempts/
+    -- wt/v047-noretarget/suites/b4: "mark $00 then ... mark $00 at its end")
+    if v == 0xFF and rec.gestured == nil and rec.gestLive ~= nil then
       rec.gestured = { f = H.frame, gest = H.readByte(GEST), was = rec.gauge }
     elseif v == 0 and rec.gestured ~= nil and rec.full == nil then
       rec.full = H.frame      -- actioncounter's carry: the gauge is full
