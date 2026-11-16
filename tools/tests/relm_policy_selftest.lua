@@ -54,7 +54,7 @@ local function snap(f)
   for _, id in ipairs({ 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF }) do s.knows[id] = true end
   for seat = 0, 3 do
     s.party[seat] = { up = true, gift = false, coat = seat == 0, tint = 0, gauge = 0x40, queued = false,
-      maxhp = 4000 + seat * 100, atk = 100 + seat * 10, wpn = 0, bank = 1 }
+      maxhp = 4000 + seat * 100, atk = 100 + seat * 10, wpn = 0, bank = 1, fights = true }
   end
   for slot = 0, 1 do
     s.mons[slot] = { up = true, ticks = 0, sh = 3, weak = 0, absorb = 0, null = 0, rev = 0, weakC = 0, revC = 0,
@@ -94,6 +94,10 @@ check("Tint on the strongest ally whose weapon lacks the press target's weakness
     s.party[3].wpn = 0x04                              -- the strongest holds bolt already
   end))
   return id == 0xEA and d.seat == 2 and d.colour == 2
+end)
+check("Tint passes over an ally with no Fight row", "p.fights and ", "", function()
+  local id, d = pick(snap(function(s) s.mons[0].weak = 0x01; s.party[3].fights = false end))
+  return id == 0xEA and d.seat == 2
 end)
 check("Tint passes over an ally already tinted", "(p.tint or 0) == 0", "true", function()
   local id, d = pick(snap(function(s) s.mons[0].weak = 0x01; s.party[3].tint = 2 end))

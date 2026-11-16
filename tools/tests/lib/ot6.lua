@@ -9922,16 +9922,16 @@ end
 --      whose gauge is under half full and who has nothing queued;
 --   5. Portrait while a body is Broken, on the ally with the most banked
 --      that holds no gift;
---   6. Tint on the strongest ally holding no Tint whose weapon lacks every
---      colour the press target is weak to (and does not absorb or null),
---      in the lowest such colour;
+--   6. Tint on the strongest ally with a Fight row, holding no Tint, whose
+--      weapon lacks every colour the press target is weak to (and does not
+--      absorb or null), in the lowest such colour;
 --   7. Varnish when no ally holds a coat, on the standing member with the
 --      lowest max HP;
 --   8. otherwise nil: her Fight.
 -- Each row needs its MP and leaves o.mpFloor (20) behind, but Masterpiece,
 -- whose 99 is the divine's own.  s = { event, relm (seat), mp, bank,
 -- knows[id], press (slot or nil), party[seat] = { up, gift, coat, tint,
--- gauge, queued, maxhp, atk, wpn, bank }, mons[slot] = { up, ticks, sh, weak,
+-- gauge, queued, maxhp, atk, wpn, bank, fights }, mons[slot] = { up, ticks, sh, weak,
 -- absorb, null, rev, weakC, revC, still, under } }.  Out: { id, seat, slot,
 -- colour, boost, why } or nil.
 function M.relmPolicy(s, o)
@@ -10013,7 +10013,7 @@ function M.relmPolicy(s, o)
   if t ~= nil and t.up and pays(R.TINT) then
     local w = t.weak & ~t.absorb & ~t.null & 0xFF
     if w ~= 0 then
-      local seat = allies(function(p) return (p.tint or 0) == 0 and ((p.wpn or 0) & w) == 0 end)
+      local seat = allies(function(p) return p.fights and (p.tint or 0) == 0 and ((p.wpn or 0) & w) == 0 end)
       if seat ~= nil then
         local c = 0
         while (w >> c) & 1 == 0 do c = c + 1 end
@@ -10059,7 +10059,8 @@ function M.relmSnapshot(actor, press)
         gift = (M.readByte(R.GIFT) >> seat) & 1 == 1, coat = (M.readByte(R.VARNISH_MASK) >> seat) & 1 == 1,
         tint = M.readByte(R.TINT_TURNS + e), gauge = M.readByte(0x3219 + e), queued = M.readByte(0x32CC + e) ~= 0xFF,
         maxhp = M.readWord(0x3C1C + e), atk = M.readByte(0x3B68 + e) + M.readByte(0x3B69 + e),
-        wpn = M.readByte(0x3B90 + e) | M.readByte(0x3B91 + e), bank = M.readByte(BATTLE.BP + e) }
+        wpn = M.readByte(0x3B90 + e) | M.readByte(0x3B91 + e), bank = M.readByte(BATTLE.BP + e),
+        fights = cmdRow(seat, 0x00) ~= nil }
     end
   end
   for slot = 0, 5 do
@@ -10101,7 +10102,9 @@ function Driver:relmLine(actor, have)
   if d.slot ~= nil then
     plan.aim, plan.aimHard = d.slot, d.slot
   elseif d.id == R.MASTER then
-    plan.ally, plan.all, plan.auto, plan.buff = true, true, true, true
+    -- the party side, whole (targeting $0a): the engine's aim is confirmed
+    -- as it stands (plan.auto); target names her seat for the steer's mask
+    plan.ally, plan.all, plan.auto, plan.buff, plan.target = true, true, true, true, actor
   else
     plan.ally, plan.target, plan.buff = true, d.seat, true
   end

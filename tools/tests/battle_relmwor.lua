@@ -63,9 +63,28 @@ local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __
 local rec, seen = {}, nil
 local relm, terra, gogo, ally, target, colour = nil, nil, nil, nil, nil, nil
 
+-- the screenshots of each effect's mark, one each: name -> the frame to take it
+local shotAt, shotDone = {}, {}
+local function shoot(name, delay) if not shotDone[name] then shotAt[name] = H.frame + delay end end
 local function arm()
+  emu.addEventCallback(function()
+    for name, f in pairs(shotAt) do
+      if H.frame >= f then shotAt[name], shotDone[name] = nil, true; H.screenshot(name) end
+    end
+  end, emu.eventType.endFrame)
+  emu.addMemoryCallback(function(_, v)
+    if v & 0xFF ~= 0 and stage == 6 then shoot("relmwor_underpaint", 20) end
+  end, emu.callbackType.write, 0x7E0000 + UPAINT, 0x7E0000 + UPAINT)
+  emu.addMemoryCallback(function(_, v)
+    if v ~= 0 and stage == 7 then shoot("relmwor_stilllife_mark", 20) end
+  end, emu.callbackType.write, 0x7E0000 + SMARK, 0x7E0000 + SMARK)
+  emu.addMemoryCallback(function(_, v)
+    if v ~= 0 and stage == 7 then shoot("relmwor_stilllife_held", 20) end
+  end, emu.callbackType.write, 0x7E0000 + SHELD, 0x7E0000 + SHELD)
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xFF
+    if stage == 2 and H.readByte(0xB6) == MASTER then shoot("relmwor_masterpiece", 90) end
+    if stage == 4 and H.readByte(0xB6) == GESTURE then shoot("relmwor_gesture", 30) end
     rec.execs = rec.execs or {}
     rec.execs[#rec.execs + 1] = { x = x, id = H.readByte(0xB6), b8 = H.readByte(0xB8), b9 = H.readByte(0xB9),
       mp0 = H.readWord(0x3C08 + x), bank0 = H.readByte(0x3E9C + x), pend0 = H.readByte(0x3E9D + x), f = H.frame }
@@ -99,6 +118,7 @@ local function arm()
       st["cpu.y"] & 0xFF
     if y ~= ally * 2 or att < 8 or (p & 1) == 1 or rec.turned ~= nil then return end
     rec.turned = { f = H.frame, att = att, coat = H.readByte(VARN) & (1 << ally), hp0 = H.readWord(0x3BF4 + y) }
+    shoot("relmwor_varnish_miss", 25)
   end, emu.callbackType.exec, vg, vg)
   emu.addMemoryCallback(function(_, v)
     if stage == 3 and ally ~= nil and (v >> ally) & 1 == 1 and rec.varnishedAt == nil then rec.varnishedAt = H.frame end

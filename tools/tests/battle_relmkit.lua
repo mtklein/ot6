@@ -62,9 +62,18 @@ local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __
 local rec, seen = {}, nil
 local relm, ally, target, colour = nil, nil, nil, nil
 
+local shotAt, shotDone = {}, {}
 local function arm()
+  emu.addEventCallback(function()
+    for name, f in pairs(shotAt) do
+      if H.frame >= f then shotAt[name], shotDone[name] = nil, true; H.screenshot(name) end
+    end
+  end, emu.eventType.endFrame)
   emu.addMemoryCallback(function()
     if relm == nil or (emu.getState()["cpu.x"] & 0xFF) ~= relm * 2 then return end
+    local id = H.readByte(0xB6)
+    if id == PORTRAIT and not shotDone.relmkit_portrait then shotAt.relmkit_portrait = H.frame + 90 end
+    if id >= COLOUR and not shotDone.relmkit_tint then shotAt.relmkit_tint = H.frame + 20 end
     local e = relm * 2
     rec.exec = { id = H.readByte(0xB6), b8 = H.readByte(0xB8), mp0 = H.readWord(0x3C08 + e),
       bank0 = H.readByte(0x3E9C + e), pend0 = H.readByte(0x3E9D + e), f = H.frame }
