@@ -116,6 +116,10 @@ check("not from the reserve", "and it.spare and", "and", function()
   local d = pick(snap(function(s) s.bag[2].spare = false end))
   return d.item == 0x00
 end)
+check("never a weapon no shop sells (price 2)", "it.price > 2 and ", "", function()
+  local d = pick(snap(function(s) s.bag[#s.bag + 1] = { id = 0x24, price = 2, throw = true, spare = true } end))
+  return d.item == 0x41
+end)
 check("nothing to throw: the Fight", "if item == nil then return { kind = \"none\"",
   "if false then return { kind = \"none\"", function()
   local d = pick(snap(function(s) s.bag = { { id = 0xAB, price = 10, throw = true, spare = true } } end))

@@ -16130,7 +16130,9 @@ end
 --   3. a Broken monster that is hobbled already is left to the Fight (the x2 is the Fight's), and nothing else
 --      is thrown at.
 -- What it throws: the cheapest throwable in the bag by its price (ItemProp, M.itemPrice; the battle bag's Throw
--- flag $20, as MakeThrowList reads it), never a skean or a trick ($AB-$AF), from above the bag's reserve.  No
+-- flag $20, as MakeThrowList reads it), never a skean or a trick ($AB-$AF), from above the bag's reserve, and
+-- never a weapon no shop sells (ItemProp's price 2: the Imp Halberd, Excalibur, the Atma Weapon and their kind,
+-- which "cheapest" would otherwise pick first; measured, the Inferno lab threw an Imp Halberd).  No
 -- throwable, no line: the Fight.  Random battles keep today's Fight and skean lines, so the legs' frame cost
 -- stays put.  Opt-out: opts.shadowpin = false, or the lab lever M.SHADOWPIN_OFF (or a prelude's global SHADOWPIN_OFF).  Each line logs what it read.
 M.shadowLines = {}       -- every trap line this run, oldest first
@@ -16159,7 +16161,7 @@ function M.shadowPolicy(s)
   if aim == nil then return nil end
   local item, price
   for _, it in ipairs(s.bag) do
-    if it.throw and it.spare and (it.id < 0xAB or it.id > 0xAF) and (price == nil or it.price < price) then
+    if it.throw and it.spare and it.price > 2 and (it.id < 0xAB or it.id > 0xAF) and (price == nil or it.price < price) then
       item, price = it.id, it.price
     end
   end
