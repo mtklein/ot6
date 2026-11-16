@@ -600,7 +600,7 @@ H.run({ maxFrames = 60000 }, {
     local c = H.readByte(0x632E)
     return c ~= H.vars.numAt and c ~= 0 and H.readByte(0x631E + ((c - 1) & 3)) == 4 + hs
   end, 900, "the doubled beam's numeral on the head", 1),
-  H.waitFrames(8),
+  H.waitFrames(12),
   H.call(function()
     H.screenshot("break_double")
     beamAll = false

@@ -124,8 +124,8 @@ local function sample()
         if b + s.endPend == s.endBank then
           W.spent = W.spent + 1
           if s.begun and s.arrowsIn > 2 then
-            W.viol[#W.viol + 1] = string.format("f%d slot %d: arrows held %d frames after a spent boost began",
-              H.frame, c, s.arrowsIn)
+            W.viol[#W.viol + 1] = string.format("f%d slot %d: arrows held %d frames after a spent boost "
+              .. "began (f%d, its script drawing from f%s)", H.frame, c, s.arrowsIn, s.beginF, tostring(s.drawn))
           end
         else
           W.kept = W.kept + 1
@@ -179,14 +179,17 @@ local function sample()
       end
       -- a cover's point (OT6_PIPPEND = slot + 1) or a runic absorb's
       -- (OT6_BPDEFER) shows when its blow or spell lands: one fewer until then
-      if not s.begun and p == 0 and (H.readByte(0xED74) == c + 1
+      if (not s.begun or p == 0) and (H.readByte(0xED74) == c + 1
           or (H.readByte(0xEEF2) & (1 << c)) ~= 0) then
-        alt = "p" .. math.max(0, b - (s.owed and 1 or 0) - 1)
+        alt = "p" .. math.max(0, b - p - (s.owed and 1 or 0) - 1)
       end
       if got:sub(1, 1) ~= "?" then s.seen = true end
-      -- the battle computes an action before it draws again: a begun action
-      -- is judged from four frames after its script starts drawing
-      local settling = s.begun and (s.drawn == nil or H.frame < s.drawn + 4)
+      -- the battle computes an action before it draws again, and the command
+      -- window's close redraws the party window from the menu's own staging
+      -- for a few frames more (measured: up to 15, battle_runic spliced,
+      -- build/attempts/wt/v046-break-feel/bpw): a begun action is judged
+      -- from 16 frames after its script starts drawing
+      local settling = s.begun and (s.drawn == nil or H.frame < s.drawn + 16)
       if s.seen and s.sync ~= false and not settling then
         if got == want or got == alt then
           s.mism = 0
@@ -202,8 +205,8 @@ local function sample()
           s.mism = s.mism + 1
           if s.mism == 6 then
             W.viol[#W.viol + 1] = string.format("f%d row %d (slot %d): shows %s, the rule says %s "
-              .. "(bank %d, pending %d, begun %s, regen not yet shown %s)", H.frame, r, c, got, want,
-              b, p, tostring(s.begun), tostring(s.owed))
+              .. "(bank %d, pending %d, begun %s, regen not yet shown %s; OT6_BPMARK $%02X)", H.frame, r, c,
+              got, want, b, p, tostring(s.begun), tostring(s.owed), H.readByte(0xEEF1))
           end
         end
       end
