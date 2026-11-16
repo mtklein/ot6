@@ -357,6 +357,18 @@ local function runCase(c)
       c.sent, c.after, c.endF, c.mask = false, false, nil, nil
       c.triedR, c.pendAfterR = false, nil
       c.allyT = allyS
+      if c.name == "impl-b1" and (H.readByte(0x3EE4 + allyS * 2) & 0x20) == 0 then
+        -- the lift is aimed at an imped ally: impa-b1's Imp can miss its own
+        -- target and land on the next (v0.47's replay: aimed at e2, only e4
+        -- imped), so the aim goes to an ally snapshot I holds imped
+        for e = 0, 6, 2 do
+          if c.allyT == allyS and (H.readByte(0x3EE4 + e) & 0x20) ~= 0 and H.readWord(0x3BF4 + e) > 0 then
+            c.allyT = e // 2
+          end
+        end
+        H.log(string.format("[boostreach] impl-b1: seat %d is not imped at snapshot I; aimed at seat %d", allyS,
+          c.allyT))
+      end
       if c.aimFree then
         -- a seat without Safe whose walk (battle order after it, wrapping)
         -- meets a body under Safe before one it can reach: from S (Safe on
