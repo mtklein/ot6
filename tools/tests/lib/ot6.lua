@@ -2142,7 +2142,7 @@ function M.raceSim(st, first, draw)
     else
       local k = target(false, fixed)
       local left = k and strike(E[k], line, p.hit, draw, t_now) or 0
-      while left > 0 and st.retarget == true do
+      while left > 0 and (st.retarget == true or (st.retarget == nil and M.v046Rule())) do
         k = target(false, nil)
         if k == nil then break end
         local hp0 = E[k].hp
@@ -13521,8 +13521,14 @@ end
 -- multi-part kill order is in force.  A body no boost in the bank finishes keeps the full boost.  A plan pressed
 -- to an exact count (exactBoost, boostWant: the care race's) is left alone.  M.AIM_TRIM = false is the driver
 -- before #545 (the full bank on every boosted Fight, the swings past a death carried to the next body).
+-- M.v046Rule(): the driver as it played v0.46's rule (a single-target
+-- action's passes carried to the next body): M.AIM_TRIM = false, or a
+-- prelude's OT6_V046_RULE = true, for an A/B against a ROM built with
+-- OT6_PASSES_STAY = 0.  Off, the trim, the race's spent swings and the
+-- one-body-a-turn estimate are #545's.
+function M.v046Rule() return M.AIM_TRIM == false or rawget(_G, "OT6_V046_RULE") == true end
 function Driver:aimedBoostPlan(actor, plan)
-  if M.AIM_TRIM == false or plan == nil or plan.kind ~= "fight" or plan.ally or plan.target ~= nil then return plan end
+  if M.v046Rule() or plan == nil or plan.kind ~= "fight" or plan.ally or plan.target ~= nil then return plan end
   if plan.exactBoost or plan.boostWant ~= nil then return plan end
   local boost = plan.boostLeft or 0
   if boost < 1 or (M.readByte(0x3C58 + actor * 2) & 1) == 1 then return plan end
@@ -14864,7 +14870,7 @@ function Driver:makePlanRules(actor)
           local perTurn = dh.per * (best.hits or 1)
           -- one body a turn at most for a single-target line: the hits
           -- past a death are spent (#545), not carried to the next body
-          local bodies = (best.bodies or 1) > 1 and 1 or livingMonsters()
+          local bodies = ((best.bodies or 1) > 1 or M.v046Rule()) and 1 or livingMonsters()
           local chipRounds = math.max(math.ceil(left / perTurn), bodies)
           if rounds == nil or chipRounds < rounds then
             rounds = chipRounds
