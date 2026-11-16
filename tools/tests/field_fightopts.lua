@@ -85,7 +85,8 @@ H.run({ maxFrames = 600, watchdog = false }, {
       H.assertEq(o.tools, false, c[1] .. ": fight.tools reached the driver")
       H.assertEq(o.traceTgt, true, c[1] .. ": fight.traceTgt reached the driver")
       H.assertEq(o.focus, FOCUS, c[1] .. ": fight.focus reached the driver")
-      for k, v in pairs(c[3]) do
+      for _, k in ipairs(H.sortedKeys(c[3])) do   -- (sorted: the first failure named is the same every run)
+        local v = c[3][k]
         H.assertEq(o[k], v, string.format("%s: %s", c[1], k))
       end
       H.log(string.format("field_fightopts: %s merged fight options", c[1]))

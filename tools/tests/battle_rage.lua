@@ -698,7 +698,7 @@ coinSummary = function()
     drawn[e.draws] = (drawn[e.draws] or 0) + 1
   end
   local d = {}
-  for k, v in pairs(drawn) do d[#d + 1] = string.format("%d draw(s) x%d", k, v) end
+  for _, k in ipairs(H.sortedKeys(drawn)) do d[#d + 1] = string.format("%d draw(s) x%d", k, drawn[k]) end
   return c0, c1, table.concat(d, ", ")
 end
 

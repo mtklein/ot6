@@ -173,7 +173,8 @@ local function observe()
     if cur then
       -- a status that ended with the battle closes its window here, at
       -- this battle's last line, not at the end of the run
-      for e, o in pairs(cur.open) do
+      for _, e in ipairs(H.sortedKeys(cur.open)) do
+        local o = cur.open[e]
         o.to = #lines
         cur.landed[#cur.landed + 1] = o
         H.log(string.format("[test] battle %d: %s on entity %d ended with the battle (line %d)",
@@ -427,7 +428,7 @@ H.run({ maxFrames = 200000 }, {
     if cur then cur.to = #lines; battles[#battles + 1] = cur; cur = nil end
     for _, b in ipairs(battles) do
       b.to = b.to or #lines
-      for _, o in pairs(b.open) do o.to = b.to; b.landed[#b.landed + 1] = o end
+      for _, e in ipairs(H.sortedKeys(b.open)) do local o = b.open[e]; o.to = b.to; b.landed[#b.landed + 1] = o end
     end
     local seen = 0
     for _, b in ipairs(battles) do
