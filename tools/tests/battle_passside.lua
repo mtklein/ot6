@@ -1,12 +1,14 @@
 -- @suite slow
 -- battle_passside.lua -- the mechanism twin of battle_passretarget for the
--- cases play does not deal on cue (ot6_passes.asm): a pass OT6 added
--- retargets only on the monster side.  When the body it fell from was a
--- party member it spreads to no other one; once the monster side has
--- emptied it lands nowhere, never on the party, even for an attacker whose
--- vanilla Retarget would pick its own party; and an action whose queued
--- target fell before it began still gets vanilla's first-pass retarget on
--- its first pass that targets, even when an empty hand's pass came first.
+-- cases play does not deal on cue (ot6_passes.asm, #545): a pass OT6 added
+-- stays on what its action was aimed at.  When that was a party member who
+-- fell, the action's passes are spent and spread to no other ally; a
+-- single-target action whose monster fell is spent while other monsters
+-- stand, even for an attacker whose vanilla Retarget would pick its own
+-- party; a group action re-splits over its group's survivors and is spent
+-- once the group has fallen; and an action whose queued target fell before
+-- it began still gets vanilla's first-pass retarget on its first pass that
+-- targets, even when an empty hand's pass came first.
 --
 -- A mechanism test, not play: it stages its draws with declared writes
 -- (tools/state_write_waivers.txt) from a battle reached by play.  Continue
@@ -21,21 +23,20 @@
 --               first swing fells the ally, and the second stays on that
 --               ally (the Fight's backup target) or lands nowhere (check H).
 --               Each ally in turn until one falls to the first swing.
---   emptied:    every monster's HP is set to 1 as the selected Fight begins,
+--   spent:      every monster's HP is set to 1 as the selected Fight begins,
 --               and SETZER's bank to 3 before the menu; he
---               Fights his default target at 3 BP (then 2 BP): each swing
---               fells a monster and the next goes to another (F, A, B, C),
---               and the swings after the last land on no party member (G).
---   emptystart: every monster's HP is set to 1 as Coin Toss begins,
+--               Fights his default target at 3 BP (then 2 BP): the first
+--               swing fells it and the action's other swings are spent
+--               while the other monsters stand (P), never moved to them.
+--               (Under v0.46's rule each swing went on to another body.)
+--   allfallen:  every monster's HP is set to 1 as Coin Toss begins,
 --               and SETZER's bank to 3 before the menu; he
---               throws Coin Toss at 3 BP over the group, and the tosses
---               fell the crowd with tosses to spare: the toss after the last
---               body falls starts on the fallen and lands nowhere (G), and
---               the one after that starts empty and lands nowhere too (G) --
---               the branch where vanilla, seeing an empty start, would
---               Retarget.  (Measured: toss 1 felled two of three, toss 2
---               the third, toss 3 started on the fallen, and toss 4 was the
---               one empty start -- round3/side/r5_passside.log.)
+--               throws Coin Toss at 3 BP over the group: a toss that fells
+--               part of the group re-splits over the survivors (D), and once
+--               the whole group has fallen the tosses left are spent (P),
+--               none landing on the party.  (v0.46's rule: toss 1 felled two
+--               of three, toss 2 the third, toss 3 started on the fallen and
+--               toss 4 started empty -- round3/side/r5_passside.log.)
 --   offhand:    SETZER's weapon moves to his off hand (the per-hand battle
 --               bytes swapped: power $3B68, element $3B90, props $3BA4, hit
 --               rate $3B7C, spellcast $3D34, special $3CBC, item $3CA8), and
@@ -45,7 +46,7 @@
 --               it must still get vanilla's first-pass retarget, onto the
 --               side vanilla's Retarget picks for SETZER's state -- the
 --               monsters (I).  Then 2 BP.
--- In emptied and emptystart SETZER is also Muddled as his action starts
+-- In spent and allfallen SETZER is also Muddled as his action starts
 -- ($3EE5 bit 5 written at ExecCmd): the bit vanilla's Retarget reads to
 -- turn an attacker on its own party, so a pass that fell through to it
 -- would land there.  That write is mechanism staging: the engine's
@@ -86,13 +87,12 @@
 -- If a command spent its pips, real Defends rebuild the requested bank.
 -- Every pass of every action is held to M.passCheck, whose checks name
 -- what they assert.
--- Negative controls (build/attempts/wt/pass-retarget/round3/mutants/): a
--- ROM whose pass spreads to the party side fails H; one that sends the
--- pass to the party once no monster stands fails G (emptied); one whose
--- empty-start pass falls through to vanilla's Retarget fails G
--- (emptystart); one whose "first pass" is the pass count, as 71224074's
--- was, fails I (offhand); one that sends a normal actor's first pass to
--- the party side fails I (round4/mutants/).
+-- Negative controls (build/attempts/wt/pass-retarget/round3/mutants/,
+-- before #545): a ROM whose pass spreads to the party side fails H; one
+-- whose "first pass" is the pass count, as 71224074's was, fails I
+-- (offhand); one that sends a normal actor's first pass to the party side
+-- fails I (round4/mutants/).  #545 (build/attempts/wt/v047-noretarget/
+-- mutants/): v0.46's rule (OT6_PASSES_STAY = 0) fails N and S (spent).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -101,7 +101,7 @@ local SETZER = 9
 local COIN = 0x59
 
 local function want(got, exp, what) return H.assertEq(got, exp, what) end
-local seen = { party = {}, emptied = {}, emptystart = {}, first = {} }
+local seen = { party = {}, spent = {}, allfallen = {}, first = {} }
 local function note(event, kind, key0, what)
   if seen[event] then seen[event][#seen[event] + 1] = what end
   H.log(string.format("[%s]   %s: %s", TAG, event, what))
@@ -225,7 +225,7 @@ end
 
 local W, since, wp, done = nil, 0, 1, false
 local WPS = { { 124, 26 }, { 120, 11 } }
-local KINDS = { "party", "emptied", "emptystart", "first" }
+local KINDS = { "party", "spent", "allfallen", "first" }
 -- the kinds whose draw is met so far, and the crowds the cases have used.
 -- MAX_CROWDS is a chosen margin, not a measured need: over K 0-9 no run
 -- used more than 2 crowds (passside/batch2/).  Three ways a crowd leaves a
@@ -258,8 +258,8 @@ local function play()
       S.cases = {}
       local function add(c) if not metAll[c.kind] then S.cases[#S.cases + 1] = c end end
       for _, e in ipairs(S.allies) do add({ kind = "party", e = e }) end
-      for _, b in ipairs({ 3, 2 }) do add({ kind = "emptied", e = sz, boost = b }) end
-      for _, b in ipairs({ 3, 2 }) do add({ kind = "emptystart", e = sz, boost = b }) end
+      for _, b in ipairs({ 3, 2 }) do add({ kind = "spent", e = sz, boost = b }) end
+      for _, b in ipairs({ 3, 2 }) do add({ kind = "allfallen", e = sz, boost = b }) end
       for _, b in ipairs({ 1, 2 }) do add({ kind = "first", e = sz, boost = b }) end
       S.ci, S.phase, S.met = 1, "write", {}
     end
@@ -282,17 +282,17 @@ local function play()
           prepare = function() H.writeWord(0x3BF4 + x, 1) end }
         S.step = battleFor({ { row = "fight", cmd = 0x00, boost = 1, ally = c.e }, { row = "defend" },
           { row = "defend" } }, { untilPlanDone = true, fullBoost = true }, c.lead)
-      elseif c.kind == "emptied" then
+      elseif c.kind == "spent" then
         H.writeByte(0x3E9C + x, 3)
         atExec = { e = x, cmd = 0x00, muddle = true, kind = c.kind, boost = c.boost, prepare = crowdTo1 }
-        H.log(string.format("[%s] emptied: monster HP armed for 1 at controlled execution, SETZER's bank 3; he Fights at %d BP", TAG, c.boost))
+        H.log(string.format("[%s] spent: monster HP armed for 1 at controlled execution, SETZER's bank 3; he Fights at %d BP", TAG, c.boost))
         S.actor, S.want = x, "fight"
         S.step = battleFor({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
           { row = "defend" } }, { untilPlanDone = true, fullBoost = true }, c.lead)
-      elseif c.kind == "emptystart" then
+      elseif c.kind == "allfallen" then
         H.writeByte(0x3E9C + x, 3)
         atExec = { e = x, cmd = 0x0F, muddle = true, kind = c.kind, boost = c.boost, prepare = crowdTo1 }
-        H.log(string.format("[%s] emptystart: monster HP armed for 1 at controlled execution, SETZER's bank 3; Coin Toss at %d BP", TAG,
+        H.log(string.format("[%s] allfallen: monster HP armed for 1 at controlled execution, SETZER's bank 3; Coin Toss at %d BP", TAG,
           c.boost))
         S.actor, S.want = x, "coin"
         S.step = battleFor({ { row = COIN, boost = c.boost }, { row = "defend" } }, { untilPlanDone = true, fullBoost = true }, c.lead)

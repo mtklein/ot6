@@ -8433,7 +8433,12 @@ ExecAttack:
         tsb     $ba
         stz     $b8
         stz     $b9
-@31e9:  jsr     ShowAttackName
+@31e9:  jsr     Ot6PassSpent    ; ot6 #545: a later pass OT6 added whose
+        bcc     @ot6aimed       ;   aimed body has fallen ends the action
+        stz     $3a70           ;   here: no swing, no move to another
+        jmp     @3275           ;   enemy (ot6_passes.asm, Ot6PassStays)
+@ot6aimed:
+        jsr     ShowAttackName
         lda     $3417
         bmi     @31f2
         tax
@@ -8511,6 +8516,43 @@ ExecAttack:
         jsl     Ot6PassesDone   ; ot6: the last pass is done, and the passes
                                 ;   OT6 added with it (ot6_passes.asm)
 @3291:  rts
+
+; ------------------------------------------------------------------------------
+
+; [ ot6 #545: has this pass's aimed body fallen? ]
+
+; called at a pass's start, before its name and animation.  Ot6PassStays
+; (ot6_passes.asm, the switch) says whether this pass must find its aim
+; still standing: a pass after the first of an action OT6 added passes to,
+; aimed rather than random.  If so, the pass's starting targets ($b8, the
+; previous pass's $3a30) are masked as ChooseTarget masks them
+; (_c25917 and CheckTargetsPresent: dead, gone, hidden or out of combat).
+; carry set: none stands, the action's passes are spent.  $b8 is kept.
+; a8, i8, db=$7e.
+Ot6PassSpent:
+        .a8
+        jsl     Ot6PassStays
+        bcc     @keep
+        longa
+        lda     $b8
+        pha
+        shorta
+        jsr     _c25917
+        jsr     CheckTargetsPresent
+        longa
+        lda     $b8
+        beq     Ot6PassSpentNone
+        pla
+        sta     $b8
+        shorta
+        clc
+@keep:  rts
+Ot6PassSpentNone:               ; (a label of its own: the test library's
+        pla                     ;   pass watch hooks it)
+        sta     $b8
+        shorta
+        sec
+        rts
 
 ; ------------------------------------------------------------------------------
 

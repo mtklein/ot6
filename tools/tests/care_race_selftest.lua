@@ -309,10 +309,19 @@ do
     party = { member(900, 1043, 0, { lines = L, bp = 1, period = 202 }) },
     enemies = { { hp = 582, sh = 2, eta = 42, period = 303, act = { dmg = { 98 } } },
                 { hp = 850, sh = 2, eta = 62, period = 303, act = { dmg = { 91 } } } } }
+  st.retarget = true
   local r1 = H.raceEval(st, { kind = "attack", line = L[1], boost = 1 })
-  check(r1.leftNow < 850 * 3, "the 1-BP Fight's last two swings land on the second monster")
+  check(r1.leftNow < 850 * 3, "v0.46's rule: the 1-BP Fight's last two swings land on the second monster")
   check(choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[1], boost = 1 } }).boost == 1,
-    "the boost now, not the bank")
+    "v0.46's rule: the boost now, not the bank")
+  -- 18b. #545: the swings past the first body's death are spent, and the
+  -- second body keeps its HP
+  st.retarget = nil
+  r1 = H.raceEval(st, { kind = "attack", line = L[1], boost = 1 })
+  check(r1.leftNow >= 850 * 3, "#545: the 1-BP Fight's last two swings take nothing off the second monster, got "
+    .. r1.leftNow)
+  check(choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[1], boost = 1 } }).boost == 0,
+    "#545: the bank, not a boost whose swings past the kill are spent")
 end
 
 -- 19. An enemy Runic takes a cure too, unless it cannot act (review of
@@ -336,6 +345,7 @@ do
     enemies = { { hp = 500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } },
                 { hp = 900, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } }, stand = { n = 1 } },
                 { hp = 1500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } } } }
+  st.retarget = true   -- v0.46's rule: the carry this case is about
   local r2 = H.raceEval(st, { kind = "attack", line = L[2], boost = 2 })
   check(r2.wipe, "the 2-BP Fight can leave the Sneezer alone: the worst case reads CELES gone")
   check(choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[2], boost = 2 } }).boost == 0,
@@ -357,6 +367,7 @@ do
   -- 2-BP Fight: 6 swings of 100 on the Sneezer (300 HP behind a shield):
   -- three kill it, three carry to slot 1 (500 HP): 300 off, two standing;
   -- at 150 a swing two kill it and four take slot 1's 500: one standing
+  st.retarget = true   -- v0.46's rule: the carry this case is about
   local r = H.raceEval(st, { kind = "attack", line = L[2], boost = 2 })
   check(r.worstWipe and r.wipe, "at 1.5x the carried swings would leave one standing: the guard reads the party gone")
 end
@@ -386,6 +397,7 @@ do
     party = { member(500, 1043, 0, { lines = L, bp = 1, period = 202, heals = {} }) },
     enemies = { { hp = 200, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } },
                 { hp = 300, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } }, stand = { n = 1 } } } }
+  st.retarget = true   -- v0.46's rule: the carry that set every attack off
   local c = choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[1], boost = 1 },
     { kind = "heal", target = 1, restore = 300, cost = 5 } })
   check(c.kind == "attack", "with every attack setting it off, the race attacks, got " .. c.kind)
@@ -465,6 +477,7 @@ do
     enemies = { { hp = 850, sh = 2, eta = 20, period = 303, act = { dmg = { 133 } } },
                 { hp = 922, sh = 2, eta = 240, period = 303, act = { dmg = { 71 } }, stand = { n = 1 } },
                 { hp = 458, sh = 2, eta = 222, period = 272, act = { dmg = { 61 } } } } }
+  st.retarget = true   -- v0.46's rule: the carry this case is about
   local c = choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[1], boost = 1 } })
   check(c.boost == 0, "the 1-BP Fight whose last swing carries is held back, got " .. c.boost)
 end
@@ -529,6 +542,66 @@ do
   st.careCasts = true
   check(#D:raceCandidates(0, st) == 5, "the actor's open cure line offers a cast")
   H.readByte, H.leftMask, H.itemPower, H.itemPrice = readByte, leftMask, itemPower, itemPrice
+end
+
+-- 31. #545: a boosted Fight buys only what its aimed body needs
+-- (Driver:aimedBoostPlan).  Synthetic reads only: one weapon (one landed
+-- hit a point plus one), 100 a hit, shields no hit of it chips.
+do
+  local D = H.newFightDriver("aimed boost unit").driver
+  local readByte, readWord, isWeapon, wClass, wElem = H.readByte, H.readWord, H.isWeapon, H.weaponClass, H.weaponElement
+  local mem = {}
+  H.readByte = function(a) return (mem[a] or 0) & 0xFF end
+  H.readWord = function(a) return (mem[a] or 0) | ((mem[a + 1] or 0) << 8) end
+  H.isWeapon = function(i) return i ~= nil and i < 0xFF end
+  H.weaponClass, H.weaponElement = function() return 0 end, function() return 0 end
+  local function body(s, hp, sh, broken)
+    mem[0x3BFC + s * 2], mem[0x3BFD + s * 2] = hp & 0xFF, hp >> 8
+    mem[0x3AA8 + s * 2] = hp > 0 and 1 or 0
+    mem[0x3E40 + s * 2] = sh
+    mem[0x3E90 + s * 2] = broken and 1 or 0
+  end
+  local function reset()
+    mem = { [0x3ED8] = 0, [0x1600 + 0x1F] = 0x01, [0x1600 + 0x20] = 0xFF }
+    D.dmgHit = { [0] = { kind = "fight", per = 100, n = 2 } }
+    D.opts.aim, D.opts.focus, D.parts = nil, nil, nil
+  end
+  local function fight(boost, aim) return { kind = "fight", row = 0, boostLeft = boost, aim = aim } end
+  reset(); body(0, 250, 2)
+  -- 2 BP: 3 hits, 300, 262 at the lowest roll; 1 BP: 200
+  check(D:aimedBoostPlan(0, fight(3)).boostLeft == 2, "the only monster at 250 HP: 2 BP of 3, one kept")
+  H.AIM_TRIM = false
+  check(D:aimedBoostPlan(0, fight(3)).boostLeft == 3, "M.AIM_TRIM = false: the full bank, as before #545")
+  H.AIM_TRIM = nil
+  body(0, 263, 2)
+  check(D:aimedBoostPlan(0, fight(3)).boostLeft == 3, "263 HP: 2 BP's 300 is 262 at the lowest roll, so all 3")
+  body(0, 250, 2, true)
+  check(D:aimedBoostPlan(0, fight(2)).boostLeft == 0, "Broken at 250 HP: one hit at 400 (x4) finishes it, 0 BP")
+  reset(); body(0, 250, 2); body(1, 5000, 2)
+  check(D:aimedBoostPlan(0, fight(3, 1)).boostLeft == 3, "aimed at a body no boost finishes: the full boost")
+  local p = D:aimedBoostPlan(0, fight(3, 0))
+  check(p.boostLeft == 2 and p.aim == 0, "aimed at the 250-HP body: 2 BP")
+  p = D:aimedBoostPlan(0, fight(3))
+  check(p.boostLeft == 2 and p.aim == 0, "no aim, two bodies: aimed at the one the fewest pips finish, 2 BP")
+  D.opts.focus = { 1 }
+  p = D:aimedBoostPlan(0, fight(3))
+  check(p.boostLeft == 3 and p.aim == nil, "an authored kill order and no aim: left alone")
+  D.opts.focus = nil
+  mem[0x3EE4 + 8] = 0x10
+  p = D:aimedBoostPlan(0, fight(3))
+  check(p.boostLeft == 3 and p.aim == nil, "the 250-HP body Vanished: no aim chosen there")
+  mem[0x3EE4 + 8] = 0
+  mem[0x3C58] = 1
+  check(D:aimedBoostPlan(0, fight(3, 0)).boostLeft == 3, "Offering (random every pass): left alone")
+  mem[0x3C58] = 0
+  D.dmgHit = {}
+  check(D:aimedBoostPlan(0, fight(3, 0)).boostLeft == 3, "nothing measured yet: the full boost")
+  reset(); body(0, 250, 2)
+  local q = fight(3); q.exactBoost = true
+  check(D:aimedBoostPlan(0, q).boostLeft == 3, "a boost pressed to an exact count (the care race's): left alone")
+  q = { kind = "fight", row = 0, boostLeft = 1, target = 2, ally = true }
+  check(D:aimedBoostPlan(0, q).boostLeft == 1, "a Fight on an ally: left alone")
+  H.readByte, H.readWord, H.isWeapon, H.weaponClass, H.weaponElement = readByte, readWord, isWeapon, wClass, wElem
 end
 
 -- 30. The Gate regression's party-status class: simulated continuation
@@ -1133,4 +1206,4 @@ end
 
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes, the aimed boost (#545)", n))

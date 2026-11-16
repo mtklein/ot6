@@ -2128,9 +2128,9 @@ function M.raceSim(st, first, draw)
     for k, e in pairs(E) do if e.hp > 0 and (best == nil or e.hp < E[best].hp) then best = k end end
     return best
   end
-  -- a single-target line's swings past its body's death go on to the next
-  -- standing one (the engine retargets a dead target's remaining strikes),
-  -- chipping nothing there: the chips were counted against the first body
+  -- a single-target line's swings past its body's death are spent (#545:
+  -- the engine ends the action there); st.retarget = true is v0.46's rule,
+  -- where they went on to the next standing body, chipping nothing there
   local death, t_now, wouldStand, first_act
   -- whether the last attack's carried swings took half or more of a body
   -- they did not kill (the last-stand read counts that body as fallen)
@@ -2142,7 +2142,7 @@ function M.raceSim(st, first, draw)
     else
       local k = target(false, fixed)
       local left = k and strike(E[k], line, p.hit, draw, t_now) or 0
-      while left > 0 and st.retarget ~= false do
+      while left > 0 and st.retarget == true do
         k = target(false, nil)
         if k == nil then break end
         local hp0 = E[k].hp
@@ -12675,6 +12675,7 @@ function Driver:makePlan(actor)
   plan = self:lifeRaisePlan(actor, plan)
   plan = self:boostCurePlan(actor, plan)
   plan = self:reserveBankPlan(actor, plan)
+  plan = self:aimedBoostPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
   plan = self:studyHoldPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
@@ -13278,6 +13279,77 @@ function Driver:reserveBankPlan(actor, plan)
   M.log(string.format("[%s] actor=%d keeps %d BP for care: its %s at %d BP, not %d", self.tag or "fight", actor,
     bank - keep, plan.kind, keep, plan.boostLeft))
   plan.boostLeft = keep
+  return plan
+end
+
+-- A boosted Fight buys only what its aimed body needs (#545, the owner's trial: a single-target action stays on
+-- the body it was aimed at, and the swings past that body's death are spent, not carried to another).  For a plain
+-- boosted Fight on a monster (no Offering: its eight passes pick at random), the smallest boost whose expected
+-- damage on the aimed slot, at the engine's lowest damage roll (224/256), takes its HP: the per-hit figure its last
+-- Fight landed (dmgHit), else the smallest any member's Fight has landed, the hits up to the last chip shielded and
+-- the rest broken (M.killEstimate), x4 on a body already Broken -- the arithmetic Driver:finishAim prices.  The
+-- pips above it stay in the bank for the next turn.  The aim is the plan's (chipAim, a kill order, a re-aim), or
+-- the only monster; with two or more and no aim (the cursor's default), the slot the fewest pips finish (tie: the
+-- fewest HP) becomes the aim, among the bodies a swing can touch (no Vanish or Image), when no authored or
+-- multi-part kill order is in force.  A body no boost in the bank finishes keeps the full boost.  A plan pressed
+-- to an exact count (exactBoost, boostWant: the care race's) is left alone.  M.AIM_TRIM = false is the driver
+-- before #545 (the full bank on every boosted Fight, the swings past a death carried to the next body).
+function Driver:aimedBoostPlan(actor, plan)
+  if M.AIM_TRIM == false or plan == nil or plan.kind ~= "fight" or plan.ally or plan.target ~= nil then return plan end
+  if plan.exactBoost or plan.boostWant ~= nil then return plan end
+  local boost = plan.boostLeft or 0
+  if boost < 1 or (M.readByte(0x3C58 + actor * 2) & 1) == 1 then return plan end
+  local per = nil
+  local dh = self.dmgHit[actor]
+  if dh ~= nil and dh.kind == "fight" and dh.per > 0 then per = dh.per end
+  if per == nil then
+    for e = 0, 3 do
+      local d = self.dmgHit[e]
+      if d ~= nil and d.kind == "fight" and d.per > 0 and (per == nil or d.per < per) then per = d.per end
+    end
+  end
+  if per == nil then return plan end
+  local _, l = handsOf(actor)
+  -- the fewest pips that finish slot s, or nil
+  local function need(s)
+    local hp = M.readWord(BATTLE.MON_HP + s * 2)
+    local sh = M.readByte(BATTLE.SH_CUR + s * 2)
+    local broken = M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0
+    for b = 0, boost do
+      local mh, oh = M.fightHits(l ~= nil and 2 or 1, b)
+      local hits = mh + oh
+      local est = broken and per * 4 * hits
+        or M.killEstimate({ per = per, hits = hits, chips = fightChips(actor, s, b), need = sh })
+        or per * hits
+      if est * 224 // 256 >= hp then return b, est, hp, sh, broken end
+    end
+    return nil
+  end
+  local slot, chose = plan.aim, false
+  if slot == nil then slot = soleTarget() end
+  if slot == nil then
+    if self.opts.aim == false or self.opts.focus or self.parts then return plan end
+    local bestB, bestHp
+    for s = 0, 5 do
+      if monAlive(s) and (M.readByte(0x3EE4 + 8 + s * 2) & 0x14) == 0 then
+        local b, _, hp = need(s)
+        if b ~= nil and (bestB == nil or b < bestB or (b == bestB and hp < bestHp)) then
+          slot, bestB, bestHp = s, b, hp
+        end
+      end
+    end
+    if slot == nil then return plan end
+    chose = true
+  end
+  if not monAlive(slot) then return plan end
+  local b, est, hp, sh, broken = need(slot)
+  if b == nil or b >= boost then return plan end
+  M.log(string.format("[%s] actor=%d [aim] slot %d at %d HP (%d shield(s)%s) dies to a Fight at %d BP (%d at %d a "
+    .. "hit, %d at the lowest roll)%s; the swings past its death are spent (#545) -- Fight at %d BP, not %d, %d BP "
+    .. "kept", self.tag or "fight", actor, slot, hp, sh, broken and ", BROKEN" or "", b, est, per, est * 224 // 256,
+    chose and ", aimed there" or "", b, boost, boost - b))
+  plan.boostLeft = b
+  if chose then plan.aim = slot end
   return plan
 end
 
@@ -18592,6 +18664,17 @@ function M.passWatch()
     local q = a and a.passes[#a.passes]
     if q and q.post == nil then q.post = M.readByte(0xB8) | (M.readByte(0xB9) << 8) end
   end, emu.callbackType.exec, post, post)
+  -- #545: a later pass whose aimed bodies have all fallen ends the action
+  -- before its name and animation (battle_main's Ot6PassSpent); the pass it
+  -- would have been starts on $3A30, the last pass's targets
+  local sp = M.sym("Ot6PassSpentNone")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    local a = W.open[x]
+    if not a then return end
+    a.spent = { pre = M.readWord(0x3A30), stand = M.passStanding(), pstand = M.passPartyStanding(),
+      a70 = M.readByte(0x3A70), foes = M.readByte(0x3A40) }
+  end, emu.callbackType.exec, sp, sp)
   local fin = M.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xff
@@ -18668,12 +18751,33 @@ function M.passCheck(a, check, note, tag)
   M.log(string.format("[%s] %s by e%d at %d BP%s%s, %d pass(es), key %s: %s", tag, a.kind, a.e, a.boost,
     a.ab and string.format(" (id $%02X)", a.ab) or "", a.offering and " (Offering)" or "", #a.passes, a.key or "?",
     table.concat(lines, "; ")))
+  if a.spent then
+    local sp = a.spent
+    local foes = sp.foes or 0
+    local onMon, onPty = sp.pre >> 8, sp.pre & 0xFF & ~foes
+    local what = string.format("%s by e%d at %d BP, after pass %d (key %s; aimed at $%04X, standing $%02X, party "
+      .. "standing $%X, %d pass(es) left)", a.kind, a.e, a.boost, #a.passes, a.key or "?", sp.pre, sp.stand,
+      sp.pstand, sp.a70 + 1)
+    M.log(string.format("[%s]   spent: %s", tag, what))
+    check(a.ext, true, "P: only an action OT6 added passes to is cut short -- " .. what, a.kind, a.key)
+    check((onMon & sp.stand) == 0 and (onPty & sp.pstand) == 0 and ((sp.pre & 0xFF & foes) & sp.pstand) == 0, true,
+      "P: an action's passes are spent only once every body it was aimed at has fallen -- " .. what, a.kind, a.key)
+    if onMon ~= 0 then
+      note(sp.stand ~= 0 and "spent" or "allfallen", a.kind == "capture" and "fight" or a.kind, a.key, what)
+    end
+    if onPty ~= 0 then note("party", a.kind, a.key, what) end
+  end
   if a.cmd == 0x0F and a.row and PASS_ROW[a.row] and a.boost >= 1 then
     -- Jackpot's full boost buys a fixed throw of M.JACKPOT_ROLLS rolls; the
-    -- coin rows buy one pass a point
+    -- coin rows buy one pass a point; fewer only when the aim fell (#545)
     local want = a.row == 0x5B and M.JACKPOT_ROLLS or 1 + a.boost
-    check(#a.passes, want, string.format("E: %s at %d BP runs %s passes", a.kind, a.boost,
-      a.row == 0x5B and "Jackpot's fixed" or "1 + boost"), a.kind, a.key)
+    if a.spent then
+      check(#a.passes < want, true, string.format("E: %s at %d BP, its aim fallen, runs fewer than %s passes", a.kind,
+        a.boost, a.row == 0x5B and "Jackpot's fixed" or "1 + boost"), a.kind, a.key)
+    else
+      check(#a.passes, want, string.format("E: %s at %d BP runs %s passes", a.kind, a.boost,
+        a.row == 0x5B and "Jackpot's fixed" or "1 + boost"), a.kind, a.key)
+    end
   end
   local famN = 0
   for _, q in ipairs(a.passes) do if q.b5 ~= 0x02 then famN = famN + 1 end end
@@ -18714,26 +18818,34 @@ function M.passCheck(a, check, note, tag)
         if (prePty & ~(q.pstand or 0xF)) ~= 0 then note("party", k, a.key, what) end
         check(q.post & ~q.pre, 0, "H: a pass OT6 added that starts on a party member spreads to no other one -- "
           .. what, a.kind, a.key)
-      elseif a.ext and preSide and stand == 0 then
-        note("emptied", k, a.key, what)
-        check(postPty, 0, "G: once the monster side has emptied, a pass OT6 added lands on no party member -- "
-          .. what, a.kind, a.key)
-      elseif preSide and prePty == 0 and stand ~= 0 then
+      elseif a.ext and preSide and (q.ba & 0x40) == 0 then
+        -- #545: a later pass stays on what the action was aimed at; once
+        -- all of that has fallen the action is spent, so no pass starts
+        -- on fallen bodies alone (the old rule moved it to another body)
         local fell = preMon & ~stand & 0x3F
-        if a.ext then
-          check(postPty, 0, "F: a pass OT6 added stays on the monster side -- " .. what, a.kind, a.key)
-          check(post ~= 0, true, "A: it lands on a body while one stands -- " .. what, a.kind, a.key)
+        local aimStands = (preMon & stand) ~= 0 or (q.pre & 0xFF & foes) ~= 0
+        if stand == 0 then note("emptied", k, a.key, what) end
+        check(aimStands, true, "N: a pass OT6 added starts only while a body it was aimed at stands -- " .. what,
+          a.kind, a.key)
+        check(postPty, 0, "F: a pass OT6 added stays on the monster side -- " .. what, a.kind, a.key)
+        check(q.post & ~q.pre, 0, "S: it never moves to a body it was not aimed at -- " .. what, a.kind, a.key)
+        if aimStands then
+          check(post ~= 0, true, "A: it lands on its aim while that stands -- " .. what, a.kind, a.key)
           if passBits(preMon) >= 2 and (preMon & stand) ~= 0 then
             check(post, preMon & stand, "D: a group pass lands on the group's survivors -- " .. what, a.kind, a.key)
           end
-          check(post & ~stand & 0x3F, 0, "B: it lands on standing bodies only -- " .. what, a.kind, a.key)
-          if M.PASS_ONE[a.kind] then
-            check(passBits(post), 1, "C: a one-body action's pass lands on one body -- " .. what, a.kind, a.key)
-          end
-          if (preMon & stand) == 0 then note("retarget", k, a.key, what) end
-          if a.kind == "coin" and passBits(preMon) >= 2 and fell ~= 0 and (preMon & stand) ~= 0 then
-            note("resplit", k, a.key, what)
-          end
+        end
+        check(post & ~stand & 0x3F, 0, "B: it lands on standing bodies only -- " .. what, a.kind, a.key)
+        if M.PASS_ONE[a.kind] and post ~= 0 then
+          check(passBits(post), 1, "C: a one-body action's pass lands on one body -- " .. what, a.kind, a.key)
+        end
+        if (preMon & stand) == 0 then note("retarget", k, a.key, what) end
+        if a.kind == "coin" and passBits(preMon) >= 2 and fell ~= 0 and (preMon & stand) ~= 0 then
+          note("resplit", k, a.key, what)
+        end
+      elseif preSide and prePty == 0 and stand ~= 0 then
+        if a.ext then
+          -- random every pass ($ba bit 6: Offering): its own rule
         elseif a.kind == "fight" and famN == 2 and (q.ba & 0x40) == 0 and (preMon & stand) == 0 then
           check(q.post, q.pre, "vanilla: an unboosted two-hand Fight's second hand swings at the body the first "
             .. "hand felled -- " .. what, a.kind, a.key)

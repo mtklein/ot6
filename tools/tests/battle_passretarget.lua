@@ -1,8 +1,9 @@
 -- @suite slow
--- battle_passretarget.lua -- a pass OT6 added to an action goes to another
--- monster when the one it was on has fallen, and never to the party
--- (guidelines.md "Boost pays once"; kits.md "a hire that outlives its
--- target goes to another body"; ot6_passes.asm).
+-- battle_passretarget.lua -- a pass OT6 added to an action stays on the
+-- body the action was aimed at; once that body has fallen the action's
+-- remaining passes are spent, moving to no other monster and never to the
+-- party (#545, the owner's trial; guidelines.md "Boost pays once";
+-- kits.md; ot6_passes.asm's switch, OT6_PASSES_STAY).
 --
 -- OT6 buys extra passes of an action through the engine's multi-hit counter
 -- $3a70: a boosted Fight or Capture (two swings a point), Setzer's Coin Toss,
@@ -12,7 +13,11 @@
 -- landed nowhere and the one after retargeted (wt/hire-sprite: a 3 BP Hired
 -- Help on three bodies landed passes 1 and 3), and a Fight's later swings
 -- went to the corpse (Fight's targeting puts an emptied mask back on the
--- backup targets, $3a4e) or nowhere, while a body still stood.
+-- backup targets, $3a4e) or nowhere, while a body still stood.  v0.24 to
+-- v0.46 sent such a pass to another standing monster; since #545 the
+-- action ends at the pass that would start on the fallen, before its name
+-- or animation (no swing at the corpse).  A Coin Toss over the group keeps
+-- tossing at the group's survivors.
 --
 -- Played, no writes: Continue the wor-tomb-v1 battery, walk Darill's Tomb's
 -- east room into random battles (field group 151: a Mad Oscar; a Mad Oscar
@@ -25,10 +30,10 @@
 -- opening snapshot (TESTING.md: branch one legitimately reached state):
 --   hire:    Hired Help at 1 BP on the weakest body: a hire lands 1,550 on
 --            a shielded body at L31 (kits.md) and an Exoray has 1,200 HP, so
---            the first hire kills it and the second must find another body;
+--            the first hire kills it and the second is spent;
 --   jackpot: Jackpot (a divine: 3 BP, its two rolls) on the default target
 --            (a face of 3 or more, 2,511 shielded at L31, kills any body of
---            the crowd at full HP, so the second roll must find another);
+--            the crowd at full HP, so the second roll is spent);
 --   resplit: Hired Help unboosted on the strongest body (2,058 -> 458 on a
 --            PowerDemon), then Coin Toss at 2 BP over the group, so a toss
 --            fells one body and the next splits over the rest; or Coin Toss
@@ -42,15 +47,18 @@
 --
 -- The instrument and its checks are the library's (M.passWatch,
 -- M.passCheck): every pass of every character's action, and for an action
--- OT6 extended F (stays on the monster side), A (lands on a body while one
--- stands), D (a group's survivors: the coins re-split), B (standing bodies
--- only), C (one body for a one-body action), G (once the monster side has
--- emptied, no party member), H (a pass that starts on a party member
--- spreads to no other one) and E (a Setzer row runs 1 + boost passes), and
--- vanilla's own two-hand Fight rule.  G and H are met here only when the
--- draw deals them; battle_passside makes them on purpose.
--- The draws the property needs, each kind or the suite fails naming it: a
--- pass whose starting body has fallen while another stands, for Hired
+-- OT6 extended N (a later pass starts only while a body it was aimed at
+-- stands), S (it never moves to a body it was not aimed at), P (the action
+-- is spent only once all of its aim has fallen), F (stays on the monster
+-- side), A (lands on its aim while that stands), D (a group's survivors:
+-- the coins re-split), B (standing bodies only), C (one body for a one-body
+-- action), G (once the monster side has emptied, no party member), H (a
+-- pass that starts on a party member spreads to no other one) and E (a
+-- Setzer row runs 1 + boost passes, fewer only when spent), and vanilla's
+-- own two-hand Fight rule.  G and H are met here only when the draw deals
+-- them; battle_passside makes them on purpose.
+-- The draws the property needs, each kind or the suite fails naming it: an
+-- action spent because its body fell while another stands, for Hired
 -- Help, Jackpot and a boosted Fight, and a Coin Toss pass whose group lost
 -- a body and kept another.  The budget: a crowd within
 -- M.setzerCrowdBudget's decoded worst case of the last, and per kind (the
@@ -59,7 +67,8 @@
 -- battle's key ($be at the open and the formation) is logged, and the
 -- draws are counted by distinct key.
 -- Negative controls: the ROM before the fix (PASS_TALLY) and the mutant
--- ROMs in build/attempts/wt/pass-retarget/.
+-- ROMs in build/attempts/wt/pass-retarget/; for #545, v0.46's rule
+-- (OT6_PASSES_STAY = 0) in build/attempts/wt/v047-noretarget/mutants/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -89,7 +98,9 @@ local EVENTS = { "hire", "jackpot", "coin", "fight", "blitz", "tool", "gprain" }
 local seen = { resplit = {}, vanilla = {}, emptied = {}, party = {} }
 for _, k in ipairs(EVENTS) do seen[k] = {} end
 local function note(event, kind, key0, what)
-  local k = event == "retarget" and kind or event
+  -- #545: the draw is a pass spent because its aim fell while another
+  -- monster stands; "allfallen" is spent with the monster side emptied
+  local k = event == "spent" and kind or event == "allfallen" and "emptied" or event
   if seen[k] then seen[k][key0 or "?"] = (seen[k][key0 or "?"] or 0) + 1 end
   H.log(string.format("[%s]   %s: %s", TAG, event, what))
 end
@@ -178,8 +189,8 @@ local function allSeen()
   if #pending() > 0 then return false end
   setzerDoneAt = setzerDoneAt or battles
   if count(seen.fight) > 0 then return true end
-  H.assertEq(battles - setzerDoneAt < FIGHTAFTER, true, string.format("fight: the draw this needs (a boosted swing "
-    .. "whose body fell while another stands) within %d battles after SETZER's (none in %d battles)", FIGHTAFTER,
+  H.assertEq(battles - setzerDoneAt < FIGHTAFTER, true, string.format("fight: the draw this needs (a boosted Fight "
+    .. "spent because its body fell while another stands) within %d battles after SETZER's (none in %d battles)", FIGHTAFTER,
     battles))
   return false
 end
@@ -329,8 +340,8 @@ local function play()
         S.try = S.try + 1
       else
         crowdsFor[p.kind] = (crowdsFor[p.kind] or 0) + 1
-        H.assertEq(crowdsFor[p.kind] < p.crowds, true, string.format("%s: the draw this needs (a pass whose body "
-          .. "fell while another stands) within %d crowds, %d candidates each (%d distinct throws)", p.kind,
+        H.assertEq(crowdsFor[p.kind] < p.crowds, true, string.format("%s: the draw this needs (an action spent "
+          .. "because its body fell while another stands) within %d crowds, %d candidates each (%d distinct throws)", p.kind,
           p.crowds, #p.cands, count(throws[p.kind])))
         S.ki, S.try = S.ki + 1, 1
       end
@@ -384,7 +395,7 @@ H.run({ maxFrames = 2400000 }, {
     W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG)
   end),
   H.driveUntil(function() return allSeen() end, 2200000, steps,
-    "every kind meets a pass whose body fell while another stands"),
+    "every kind meets an action spent because its body fell while another stands"),
   H.call(function()
     judgeNew()
     local t = {}
