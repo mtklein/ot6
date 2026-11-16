@@ -436,7 +436,8 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     local want = { [0x05] = 0x11, [0x01] = 0x00, [0x04] = 0x03 }
     local names = { [0x05] = "SABIN/KIRIN", [0x01] = "LOCKE/RAMUH",
                     [0x04] = "EDGAR/SIREN" }
-    for c, esper in pairs(want) do
+    for _, c in ipairs(H.sortedKeys(want)) do   -- a fixed log order
+      local esper = want[c]
       local worn = H.readByte(0x1600 + 37 * c + 0x1E)
       H.log(string.format("[prep] char %d wears esper %02X", c, worn))
       H.assertEq(worn, esper, names[c] .. " is worn")

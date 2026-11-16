@@ -2866,7 +2866,10 @@ function M.wipeRisk(members)
   for k = 1, n do
     if won then break end
     local a, nxt, nn = order[k], {}, 0
-    for _, st in pairs(states) do
+    -- in key order: the first state to finish is `won`, and its counts go
+    -- into the reason, so pairs()'s order would pick among equal ones
+    for _, sk in ipairs(M.sortedKeys(states)) do
+      local st = states[sk]
       for q = 1, nm do
         local pr = prices[q][a]
         if pr > 0 and st.d[q] < hp[q] then
@@ -15731,7 +15734,8 @@ function Driver:makePlanRules(actor)
   -- (route-wor-side-trips.md section 3).  Off by default.
   if self.opts.tactical and self.opts.throw ~= false and id == 3
      and cmdRow(actor, BATTLE.CMD_THROW) then
-    for item, elem in pairs(BATTLE.SKEAN_ELEM) do
+    for _, item in ipairs({ 0xAB, 0xAC, 0xAD }) do   -- SKEAN_ELEM's keys, in a fixed order
+      local elem = BATTLE.SKEAN_ELEM[item]
       if self:battInvIdx(item) then
         for s = 0, 5 do
           local known = M.readByte(0x3E91 + s * 2)

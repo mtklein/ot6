@@ -930,8 +930,11 @@ function M.fightDriverFor(tag, base, fight)
   if live then
     local memo = {}
     local frame, idle = F.frame, F.idle
+    -- in a fixed order: the callbacks share memo, so one may see what an
+    -- earlier one stored this frame
+    local liveKeys = M.sortedKeys(live)
     F.frame = function(...)
-      for k, fn in pairs(live) do o[k] = fn(tag, memo) end
+      for _, k in ipairs(liveKeys) do o[k] = live[k](tag, memo) end
       return frame(...)
     end
     F.idle = function(...)
