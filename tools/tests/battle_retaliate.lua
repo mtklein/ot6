@@ -338,10 +338,12 @@ H.run({ maxFrames = 150000 }, {
       if W.open and W.swings > 0 then W.closed = true end
     end, emu.callbackType.exec, sSF, sSF)
     -- #545: the volley ends when its body falls; the passes it had left
-    -- ($3a70 + 1 at Ot6PassSpentNone) are counted here
+    -- ($3a70 at Ot6PassSpentNone: the pass that found its body fallen was
+    -- entered, and counted at Ot6WeaponClass, ExecAttack's head; the ones
+    -- after it never are) are counted here
     local sSP = H.sym("Ot6PassSpentNone")
     emu.addMemoryCallback(function()
-      if W.open and not W.closed then W.spent = H.readByte(0x3A70) + 1 end
+      if W.open and not W.closed then W.spent = H.readByte(0x3A70) end
     end, emu.callbackType.exec, sSP, sSP)
 
     emu.addEventCallback(function()
@@ -501,8 +503,8 @@ H.run({ maxFrames = 150000 }, {
       wantPasses))
     if cut then
       -- the volley that killed: the armed hand's passes run so far land
-      H.assertEq(W.hits == 0 or W.hits == W.hand[0] or W.hits == W.hand[1], true, string.format(
-        "a cut volley lands its armed hand's passes or none (landed %d; passes %d / %d)", W.hits, W.hand[0],
+      H.assertEq(W.hits == 0 or W.hits == W.hand[0] or W.hits == W.hand[1] or W.hits == W.hand[0] - 1 or W.hits == W.hand[1] - 1, true, string.format(
+        "a cut volley lands its armed hand's passes (less the spent one, which lands nothing) or none (landed %d; passes %d / %d)", W.hits, W.hand[0],
         W.hand[1]))
       main, off = W.hits, 0
     end

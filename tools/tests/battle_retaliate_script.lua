@@ -232,6 +232,14 @@ local function installObservers()
   emu.addMemoryCallback(function()
     if W.open and not W.closed then W.closed = true end
   end, emu.callbackType.exec, sSF, sSF)
+  -- #545: the volley ends when its body falls; the passes it had left
+  -- ($3a70 at Ot6PassSpentNone: the pass that found its body fallen was
+  -- entered, and counted at Ot6WeaponClass, ExecAttack's head; the ones
+  -- after it never are) are counted here
+  local sSP = H.sym("Ot6PassSpentNone")
+  emu.addMemoryCallback(function()
+    if W.open and not W.closed then W.spent = H.readByte(0x3A70) end
+  end, emu.callbackType.exec, sSP, sSP)
 
   -- his hurt line, from its writes; and hp drops, flag, and the line as
   -- it stood at the start of the frame
@@ -550,10 +558,12 @@ H.run({ maxFrames = 3000 + 2 * MAX_BRANCHES * (2 * BRANCH_IDLE * MAX_BRANCHES
       .. "%d an unboosted Fight queues", wantA70, D.base, D.perBp, want,
       D.base))
     local wantPasses = H.fightPasses(want)
-    H.assertEq(W.swings, wantPasses, string.format(
+    local spent = W.spent or 0
+    H.assertEq(W.swings + spent, wantPasses, string.format(
       "the multi-attack loop ran %d passes for the %d-pip dump, and NOT the "
-      .. "%d an unboosted Fight runs", wantPasses, want, H.fightPasses(0)))
-    H.assertEq(W.hand[0] == W.hand[1], true, string.format(
+      .. "%d an unboosted Fight runs (%d run, %d spent once its body fell, #545)", wantPasses, want,
+      H.fightPasses(0), W.swings, spent))
+    H.assertEq(spent > 0 and math.abs(W.hand[0] - W.hand[1]) <= 1 or W.hand[0] == W.hand[1], true, string.format(
       "the passes alternate hands: %d main, %d off", W.hand[0], W.hand[1]))
     local c = H.readByte(0x3ED8 + SUBJ * 2)
     local rh = H.readByte(0x1600 + 37 * c + 0x1F)
@@ -561,6 +571,13 @@ H.run({ maxFrames = 3000 + 2 * MAX_BRANCHES * (2 * BRANCH_IDLE * MAX_BRANCHES
     D.hands = (H.isWeapon(rh) and 1 or 0) + (H.isWeapon(lh) and 1 or 0)
     if D.hands == 0 then D.hands = 1 end
     local main, off = H.fightHits(D.hands, want)
+    if spent > 0 then
+      -- the volley that killed: the armed hand's passes run so far land
+      H.assertEq(W.hits == 0 or W.hits == W.hand[0] or W.hits == W.hand[1] or W.hits == W.hand[0] - 1 or W.hits == W.hand[1] - 1, true, string.format(
+        "a cut volley lands its armed hand's passes (less the spent one, which lands nothing) or none (landed %d; passes %d / %d)", W.hits, W.hand[0],
+        W.hand[1]))
+      main, off = W.hits, 0
+    end
     H.assertEq(W.hits == 0 or W.hits == main + off, true, string.format(
       "the volley landed 0 or %d hits and nothing between (measured %d)",
       main + off, W.hits))
