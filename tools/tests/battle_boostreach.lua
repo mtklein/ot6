@@ -732,7 +732,13 @@ steps[#steps + 1] = H.call(function()
               .. "imped %s before, %s after", c.name, e, tostring(c.imp0[e]), tostring(c.impAfter[e])))
           end
         end
-        check(n == 2, string.format("%s: the point reached a second ally (%d in the mask)", c.name, n))
+        -- the point's walk from an imped target lifts only another imped
+        -- ally (it takes the bodies the cast changes the same way): with
+        -- one imped at snapshot I it finds none and is spent (measured on
+        -- the v0.47 replay: aimed at the one imped ally, mask $0004, "the
+        -- others it can land on:" none)
+        check(n == math.min(2, imped), string.format("%s: the point reached %d imped all(ies) beside the target (%d "
+          .. "in the mask, %d imped at snapshot I)", c.name, math.min(2, imped) - 1, n, imped))
       end
       if c.spell == SAFE then
         for e = 0, 6, 2 do
