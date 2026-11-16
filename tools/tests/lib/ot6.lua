@@ -13522,11 +13522,11 @@ end
 -- to an exact count (exactBoost, boostWant: the care race's) is left alone.  M.AIM_TRIM = false is the driver
 -- before #545 (the full bank on every boosted Fight, the swings past a death carried to the next body).
 -- M.v046Rule(): the driver as it played v0.46's rule (a single-target
--- action's passes carried to the next body): M.AIM_TRIM = false, or a
--- prelude's OT6_V046_RULE = true, for an A/B against a ROM built with
+-- action's passes carried to the next body): M.AIM_TRIM = false, or the
+-- lab lever OT6_LEVERS=V046_RULE, for an A/B against a ROM built with
 -- OT6_PASSES_STAY = 0.  Off, the trim, the race's spent swings and the
 -- one-body-a-turn estimate are #545's.
-function M.v046Rule() return M.AIM_TRIM == false or rawget(_G, "OT6_V046_RULE") == true end
+function M.v046Rule() return M.AIM_TRIM == false or M.lever("V046_RULE") end
 function Driver:aimedBoostPlan(actor, plan)
   if M.v046Rule() or plan == nil or plan.kind ~= "fight" or plan.ally or plan.target ~= nil then return plan end
   if plan.exactBoost or plan.boostWant ~= nil then return plan end
