@@ -34,9 +34,11 @@ lightning. Tritoch's top rank says it raises maximum MP, and Maduin's top rank
 is named Earrings, after the item.
 
 The Narshe Beginner's House is up to date. It now says a broken enemy's shield
-is drawn cracked, that a boosted Fight with two weapons lands two
-more hits per point, and that boosting a status spell such as Sleep or Mute
-spreads it to one more target per point.
+is drawn cracked, that only the hits after the one that breaks it do double
+damage, that a new Boost Point shows at the character's next turn and the
+arrows stay until the action starts, that a boosted Fight with two weapons
+lands two more hits per point, and that boosting a status spell such as Sleep
+or Mute spreads it to one more target per point, for its MP again per point.
 
 Saving no longer changes Gau's, Strago's or Cyan's loadouts. If a game was
 started before v0.45 on an emulator or console whose memory did not start out
