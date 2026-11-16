@@ -145,6 +145,34 @@
           "sha256": "b5c9fb34c965649622231119e521445c990db05a39950501b69a7246a9082b41"
         }
       ]
+    },
+    {
+      "version": "v0.46",
+      "zip": "ot6-v0.46.zip",
+      "zip_sha256": "43a9e8c050e228888a36152979df03dcd72395e0c02e82e7d6c580cf8865669f",
+      "esper": "signed",
+      "fixtures": [
+        {
+          "key": "kolts-summit-v1",
+          "file": "03 - Mt. Kolts, summit save point.srm",
+          "sha256": "4dfa9b4a1b8e0c390674a6be7c2bc8f61eefd1962bebfdc72f7e2c6fb507c5e9"
+        },
+        {
+          "key": "esper-mtn-save-v1",
+          "file": "24 - Esper Mountain, save point.srm",
+          "sha256": "c859b46b77652f9ece5e586900360c8665dfb7fb862e687680fb4e882fce5afb"
+        },
+        {
+          "key": "wor-cyan-v1",
+          "file": "42 - The Falcon, after the Storm Dragon.srm",
+          "sha256": "93ec98077a8bb280aa3e6f1b64b18441c3364fb1d0b2388723e7334d397f0a55"
+        },
+        {
+          "key": "wor-kt-plates-v1",
+          "file": "70 - Kefka's Tower, two parties on the plates (before Kefka).srm",
+          "sha256": "d234e913e8a12088e1d199d8dea1f947f90542767a9dba947ea017eeb063d360"
+        }
+      ]
     }
   ]
 }
