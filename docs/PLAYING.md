@@ -114,6 +114,11 @@ Reach spells also cover as many bodies as there are points, skipping anyone
 the spell would not change. Each point costs the spell's MP again, even if
 nobody is left for it.
 
+Extra hits stay on the enemy you picked. A boosted Fight, Pummel or Hired
+Help on one enemy stops when that enemy falls, and the hits left over are
+lost, so boost only as far as that enemy needs. An action that hits every
+enemy, like Coin Toss, keeps going until they are all down.
+
 Some characters have an ultimate, offered only at 3 BP. It can be used again
 whenever the bank holds three.
 

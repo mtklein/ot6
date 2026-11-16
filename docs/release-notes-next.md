@@ -5,6 +5,13 @@ and its effect. Cite evidence in the commit message.
 
 ## What's changed
 
+A boosted attack on one enemy now stays on that enemy. Once it falls, the
+rest of the action's hits are lost instead of moving on to the next enemy,
+so a boosted Fight, Pummel, Hired Help or Jackpot clears one enemy a turn.
+Boost only as far as the enemy you picked needs and keep the other points
+for later. Attacks that hit every enemy, like Coin Toss, keep going until
+they are all down, and ones that pick at random, like Offering, still do.
+
 Relm now supports the party. Her Sketch command opens a list, with Sketch
 as its first row. Portrait gives an ally a free boost point for their next
 boosted action, so two banked points and a Portrait make a divine. Tint lets
