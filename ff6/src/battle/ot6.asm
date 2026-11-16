@@ -62,7 +62,7 @@
 ; appended for the same reason: nothing already in bank $f0 moves.
         .include "ot6_setzer.asm"
 
-; a pass OT6 added retargets when its body has fallen, appended for the same
+; a pass OT6 added stays on its aim (#545; it retargeted before), appended for the same
 ; reason.
         .include "ot6_passes.asm"
 

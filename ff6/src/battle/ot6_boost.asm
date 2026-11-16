@@ -746,7 +746,7 @@ spend:  asl                     ; two swings per bp
         clc
         adc     $3a70
         sta     $3a70
-        jsl     Ot6PassesAdded  ; a pass whose body fell retargets
+        jsl     Ot6PassesAdded  ; #545: passes stay on the aim (ot6_passes.asm)
 done:   rtl
 .endproc
 
@@ -1038,7 +1038,7 @@ done:   plx
         clc
         adc     $3a70
         sta     $3a70
-        jsl     Ot6PassesAdded  ; a throw whose body fell retargets
+        jsl     Ot6PassesAdded  ; #545: throws stay on the aim (ot6_passes.asm)
 done:   pla
         rtl
 .endproc

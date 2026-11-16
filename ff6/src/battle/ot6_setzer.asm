@@ -507,7 +507,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         clc                             ;   its own toss or hire, so no point is
         adc     $3a70                   ;   lost to the 9,999 cap on one hit
         sta     $3a70
-        jsl     Ot6PassesAdded          ; a pass whose body fell retargets
+        jsl     Ot6PassesAdded          ; #545: passes stay on the aim (ot6_passes.asm)
         lda     f:$7e0000+OT6_SETZERROW
         cmp     #OT6_SETZER_JACKPOT
         beq     @dice
@@ -613,7 +613,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         clc
         adc     $3a70
         sta     $3a70
-        jsl     Ot6PassesAdded  ; a toss whose bodies fell retargets
+        jsl     Ot6PassesAdded  ; #545: tosses stay on the group
 @done:  rtl
 .endproc
 

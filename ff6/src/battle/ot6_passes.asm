@@ -1,5 +1,6 @@
 ; ------------------------------------------------------------------------------
-; OT6: a pass OT6 added goes to another body when its target has fallen
+; OT6: a pass OT6 added stays on its aim (#545; v0.24-v0.46: it went to
+; another body when its target had fallen)
 ;
 ; OT6 buys extra passes of an action through $3a70, the engine's one
 ; multi-hit counter (ot6_hitcount.asm's header): a boosted Fight or Capture
@@ -31,6 +32,15 @@
 ; weapon's follow-up spell: $ba bit 3) never reach this branch with a
 ; choice to make.  Only an action OT6 added passes to retargets, and only
 ; after its first pass.
+;
+; That was v0.46's rule.  Since #545 (OT6_PASSES_STAY below) a later pass
+; never moves: at each pass's start, before its name or animation,
+; battle_main's Ot6PassSpent masks the pass's starting targets (the previous
+; pass's) as ChooseTarget would, and with none standing ends the action
+; there (Ot6PassStays says which passes it asks: a later pass of a marked
+; action, not random every pass, not one that may hit the fallen).  A group
+; pass still re-splits over its survivors.  Ot6PassRetarget's monster-side
+; arm is then never taken; it stays for the switch's other setting.
 ; ------------------------------------------------------------------------------
 
 .segment "ot6_code"
