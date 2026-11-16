@@ -1035,6 +1035,9 @@ done:   rts
         txa
         cmp     #$08
         bcc     @out            ; a character's numeral
+        lda     $3a7c
+        cmp     #$29            ; a status timer running out (_c25b06): no
+        beq     @out            ;   hit to wait for; its change shows live (#546)
         longa
         txa
         and     #$00ff

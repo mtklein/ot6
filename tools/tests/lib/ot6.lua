@@ -16071,6 +16071,11 @@ function Driver:makePlanRules(actor)
       end
     end
   end
+  -- SHADOW's trap (#546, kit-shadow-pin.md section 6): Driver:shadowLine
+  if id == 3 then
+    local line = self:shadowLine(actor, boost)
+    if line then return line end
+  end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   -- MagiTek (#373): the Narshe riders' command table is MagiTek, -, -,
   -- Item, with no Fight row, and every attack turn here was a "switch" --
@@ -16113,6 +16118,84 @@ function Driver:makePlanRules(actor)
   local fb = boost
   if standBoost ~= nil then fb = standBoost; M.log(standSay) end   -- the last-stand trim (#454, #462)
   return { kind = "fight", row = fight, boostLeft = fb, aim = self:chipAim(actor, fb) }
+end
+
+-- SHADOW's trap (#546; docs/design/kit-shadow-pin.md section 6).  Every Throw of his hobbles (Slows) a free
+-- monster and pins (Stops, 8 ticks) a Slowed one, using up the hobble; a Broken one is never pinned.  In event
+-- battles (OT6_RANDBTL, $57BD, clear), after the skean line, in priority order:
+--   1. pin: a standing, unbroken, Slowed monster that may be Stopped ($3330, the allowed statuses vanilla
+--      builds from MonsterProp +22) and is not Stopped, the one with the most HP left;
+--   2. hobble: a standing monster that takes Slow and is neither Slowed nor Stopped, the most HP left, at the
+--      open and again after each pin ends (one that blocks Stop is hobbled once and stays so);
+--   3. a Broken monster that is hobbled already is left to the Fight (the x2 is the Fight's), and nothing else
+--      is thrown at.
+-- What it throws: the cheapest throwable in the bag by its price (ItemProp, M.itemPrice; the battle bag's Throw
+-- flag $20, as MakeThrowList reads it), never a skean or a trick ($AB-$AF), from above the bag's reserve.  No
+-- throwable, no line: the Fight.  Random battles keep today's Fight and skean lines, so the legs' frame cost
+-- stays put.  Opt-out: opts.shadowpin = false, or the lab lever M.SHADOWPIN_OFF.  Each line logs what it read.
+M.shadowLines = {}       -- every trap line this run, oldest first
+-- The policy itself, a pure function of a snapshot (shadowpin_policy_selftest holds it to the rules above):
+--   s.event   the battle is an event battle; s.row SHADOW's Throw row is there
+--   s.mons[slot] = { up, st3 (status 3), broken (break ticks), allowed ($3330's status-3 byte), hp }
+--   s.bag     { { id, price, throw (the bag's Throw flag), spare (count above the reserve) }, ... }
+-- -> nil, or { kind = "pin" | "hobble", slot, why, item, price }, or { kind = "none" } with nothing to throw
+function M.shadowPolicy(s)
+  if not s.event or not s.row then return nil end
+  local pin, hobble
+  for slot = 0, 5 do
+    local m = s.mons[slot]
+    if m and m.up and m.st3 & 0x10 == 0 then
+      if m.st3 & 0x04 ~= 0 and m.broken == 0 and m.allowed & 0x10 ~= 0 then
+        if pin == nil or m.hp > pin.hp then pin = { slot = slot, hp = m.hp, why = "Slowed, stop ok" } end
+      elseif m.st3 & 0x04 == 0 and m.allowed & 0x04 ~= 0 then
+        if hobble == nil or m.hp > hobble.hp then
+          hobble = { slot = slot, hp = m.hp, why = (m.allowed & 0x10 ~= 0) and "free" or "stop-immune" }
+        end
+      end
+    end
+  end
+  local aim, kind = pin, "pin"
+  if aim == nil then aim, kind = hobble, "hobble" end
+  if aim == nil then return nil end
+  local item, price
+  for _, it in ipairs(s.bag) do
+    if it.throw and it.spare and (it.id < 0xAB or it.id > 0xAF) and (price == nil or it.price < price) then
+      item, price = it.id, it.price
+    end
+  end
+  if item == nil then return { kind = "none", why = "no throwable in the bag" } end
+  return { kind = kind, slot = aim.slot, why = aim.why, item = item, price = price }
+end
+function Driver:shadowLine(actor, boost)
+  if self.opts.shadowpin == false or M.SHADOWPIN_OFF then return nil end
+  local row = cmdRow(actor, BATTLE.CMD_THROW)
+  local s = { event = M.readByte(0x57BD) == 0, row = row ~= nil, mons = {}, bag = {} }
+  if not s.event or not s.row then return nil end              -- a random battle: the Fight and skean lines
+  for slot = 0, 5 do
+    local e = 8 + 2 * slot
+    s.mons[slot] = { up = monAlive(slot), st3 = M.readByte(0x3EF8 + e), broken = M.readByte(0x3E88 + e),
+      allowed = M.readByte(0x3330 + e), hp = M.readWord(0x3BF4 + e) }
+  end
+  for i = 0, 251 do
+    local id = M.readByte(BATTLE.BATTINV + i * 5)
+    if id ~= 0xFF and M.readByte(BATTLE.BATTINV + i * 5 + 3) > 0 then
+      s.bag[#s.bag + 1] = { id = id, price = M.itemPrice(id),
+        throw = (M.readByte(BATTLE.BATTINV + i * 5 + 1) & 0x20) ~= 0, spare = self:battInvIdx(id) ~= nil }
+    end
+  end
+  local d = M.shadowPolicy(s)
+  if d == nil then return nil end
+  if d.kind == "none" then
+    if not self.shadowNone then
+      self.shadowNone = true
+      M.log(string.format("[shadow] actor=%d no throwable in the bag: the Fight", actor))
+    end
+    return nil
+  end
+  local sp = M.monsterIds()[d.slot + 1] or 0
+  M.log(string.format("[shadow] %s slot %d $%03X: %s, $%02X (%d gil)", d.kind, d.slot, sp, d.why, d.item, d.price))
+  M.shadowLines[#M.shadowLines + 1] = { kind = d.kind, slot = d.slot, species = sp, item = d.item, frame = M.frame }
+  return { kind = "throw", item = d.item, row = row, boostLeft = boost, aim = d.slot, aimHard = d.slot, trap = d.kind }
 end
 
 function Driver:layoutOf()
@@ -17620,7 +17703,7 @@ end
 -- hand since, and battle_jackpot its own).  A caller reads these after the
 -- battle; nothing it asked for (who, cmd, boost, row, slot...) is touched.
 M.KIT_ENTRY_STATE = { "opened", "seat", "presses", "lPresses", "tookBack", "allyPresses", "greyed",
-  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1" }
+  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen" }
 function M.freshKitEntries(plan)
   for _, q in ipairs(plan) do
     for _, f in ipairs(M.KIT_ENTRY_STATE) do q[f] = nil end
@@ -18712,6 +18795,12 @@ function M.kitBattle(plan, opts)
         local L = M.battleLayout()
         pulse(L.toChars[1 + ((p.allyPresses or 1) - 1) % #L.toChars])
         return
+      end
+      -- p.slotFn: the slot is chosen as the target select opens, from the battle as it then stands (#546's
+      -- suite: "the arm that is free now"); nil keeps p.slot
+      if p.slotFn ~= nil and p.slotChosen == nil then
+        p.slotChosen = true
+        p.slot = p.slotFn() or p.slot
       end
       local want = p.slot ~= nil and (1 << p.slot) or nil
       if want and (M.readByte(0x3A75) & want) == 0 then

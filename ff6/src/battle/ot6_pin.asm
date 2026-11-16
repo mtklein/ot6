@@ -93,7 +93,13 @@ OT6_MARK_STATUS = STATUS3::SLOW | STATUS3::STOP | STATUS3::HASTE
         sta     $3de8,y
 @hold:  ; any attack that changes a monster's Slow, Stop or Haste holds its
         ; line, so the mark changes with the hit (or the script's end), not
-        ; when the status is computed
+        ; when the status is computed.  Not a timer's: a Stop wearing off is
+        ; command $29 (_c25b06's CreateImmediateAction; Cmd_29 resolves it
+        ; as $b5 = $12, so the action's own command $3a7c is read), and the
+        ; knife goes the moment the status does, as the design has it
+        lda     $3a7c
+        cmp     #$29
+        beq     @out
         lda     $3de8,y
         ora     $3e10,y
         and     $3330,y

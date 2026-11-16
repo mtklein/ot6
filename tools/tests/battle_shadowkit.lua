@@ -24,6 +24,8 @@
 --   3. SHADOW throws an Inviz Edge at 1 BP: the mask is SHADOW and the next standing ally after him; each
 --      masked member holds Vanish after it.
 --   4. SHADOW throws a Shadow Edge at 2 BP: SHADOW and the next two standing allies; each holds Image.
+--   5. (#546) every body the Fire Skean lands on is hobbled by the trap's rule, and no party member is hobbled or
+--      pinned by the smoke or the exit (Ot6Pin's target test: the trap is for monsters).
 -- Each trick's mask is read at the proc's own exit (Ot6TrickReachOut) against the boost pending at its
 -- entry and the standing mask ($3A74); a member outside a trick's mask gains nothing from it.  Nothing is
 -- written.
@@ -87,6 +89,39 @@ emu.addMemoryCallback(function(addr, v)
     H.log(string.format("[status] f%d entity %d gains %s", H.frame, e, byte == 0 and "Vanish" or "Image"))
   end
 end, emu.callbackType.write, 0x7E3EE4, 0x7E3EEB)
+
+-- #546: the trap.  Every body a thrown Fire Skean lands on is hobbled (Slow), or pinned if it was Slowed; no
+-- party member gains Slow or Stop from the smoke or the exit (they land on allies, and the trap is for
+-- monsters).  Ot6Pin's entry gives the state each throw found; the script's end (Ot6ShowFlush) what it left.
+local PIN, FLUSH = H.sym("Ot6Pin"), H.sym("Ot6ShowFlush")
+local skeanHits, allySlowed = {}, {}
+emu.addMemoryCallback(function()
+  if not watching then return end
+  local st = emu.getState()
+  local x, y = st["cpu.x"] & 0xFF, st["cpu.y"] & 0xFF
+  if H.readByte(0xB5) ~= 0x08 or x >= 8 then return end
+  if y >= 8 and H.readByte(0x3A7D) == FIRE_SKEAN then
+    skeanHits[#skeanHits + 1] = { f = H.frame, y = y, pre = H.readByte(0x3EF8 + y), allowed = H.readByte(0x3330 + y),
+      broken = H.readByte(0x3E88 + y) }
+  end
+end, emu.callbackType.exec, PIN, PIN)
+emu.addMemoryCallback(function()
+  if not watching then return end
+  for _, h in ipairs(skeanHits) do
+    if h.post == nil and h.f < H.frame then
+      h.post, h.dead = H.readByte(0x3EF8 + h.y), (H.readByte(0x3EE4 + h.y) & 0xC2) ~= 0
+      H.log(string.format("[trap] f%d the Fire Skean of f%d left monster %d: status3 $%02X -> $%02X%s", H.frame, h.f,
+        h.y, h.pre, h.post, h.dead and " (dead)" or ""))
+    end
+  end
+  for e = 0, 6, 2 do
+    local st3 = H.readByte(0x3EF8 + e)
+    if st3 & 0x14 ~= 0 and not allySlowed[e] then
+      allySlowed[e] = st3
+      H.log(string.format("[trap] f%d party entity %d holds Slow or Stop: status3 $%02X", H.frame, e, st3))
+    end
+  end
+end, emu.callbackType.exec, FLUSH, FLUSH)
 
 -- the seats a trick at this boost should cover: the thrower, then the next standing seats after him that it
 -- can land on (not under Vanish, which a thrown item misses; for the smoke, not already doubled), read at the
@@ -194,6 +229,24 @@ H.run({ maxFrames = 600000 }, {
             .. "%d-BP throw", i + 1, e, p[3], p[2]))
         end
       end
+    end
+    -- #546: the skean hobbles (or pins) every body it lands on; the smoke and exit slow nobody
+    local judged = 0
+    for _, h in ipairs(skeanHits) do
+      if h.post ~= nil and not h.dead then
+        local want
+        if h.pre & 0x10 ~= 0 then want = h.pre & 0x14
+        elseif h.pre & 0x04 == 0 then want = (h.allowed & 0x04 ~= 0) and 0x04 or 0
+        elseif h.broken ~= 0 or h.allowed & 0x10 == 0 then want = 0x04
+        else want = 0x10 end
+        H.assertEq(h.post & 0x14, want, string.format("the Fire Skean on monster %d: the trap's rule", h.y))
+        judged = judged + 1
+      end
+    end
+    H.assertEq(judged >= 1, true, string.format("the Fire Skean hobbled the bodies it landed on (%d judged)", judged))
+    for e = 0, 6, 2 do
+      H.assertEq(allySlowed[e] == nil, true, string.format("party entity %d was not hobbled or pinned by the smoke "
+        .. "or the exit", e))
     end
     H.log("[kit] PASS: the skean pierces; the smoke and exit reach one more ally per point")
   end),
