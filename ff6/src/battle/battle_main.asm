@@ -8795,6 +8795,7 @@ CalcAttackEffect:
         jsl     Ot6BreakSpell   ; ot6: Break takes shields, not a petrify (#398)
         jsl     Ot6Analyze      ; ot6: a character's Scan reads every weakness (#381)
         jsr     MagicStatusEffect
+        jsl     Ot6Pin          ; ot6: a throw hobbles or pins (#546)
         jsr     DoTargetEffect
         lda     $3a48
         bne     @346c
@@ -12087,8 +12088,8 @@ RemoveStatus_1b:
 SetStatus_14:
 @467d:  php
         shorta
-        lda     #$12
-        sta     $3af1,y
+        jsl     Ot6StopTicks    ; ot6: was `lda #$12 / sta $3af1,y`; a pin
+        nop                     ;   counts OT6_PIN_TICKS (#546)
         plp
         rts
 

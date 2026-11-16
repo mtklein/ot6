@@ -58,7 +58,7 @@
 .proc Ot6LoadBgGlyphsB
         .a8
         .i16
-        ot6_glyph_slice $0002, $000a
+        ot6_glyph_slice $0002, $000b
 .endproc
 
 ; [ upload one monster slot's shield-count tile (#292) ]
@@ -305,6 +305,7 @@
         ; dead monsters: cells stay blank, line stays live (erases old art).
         ; all of it as of the last hit shown (#539, Ot6ShownGauge)
         jsr     Ot6ShownGauge
+        jsr     Ot6MarkStage    ; the trap's mark before the emblem (#546)
         bit     #$40
         jne     @done           ; dead or petrified
         cmp     #$00
@@ -813,7 +814,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
                                 ;   check grew the body past bcs reach)
         longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; reload prev (gate ate a)
-        dec     a               ; from the lead cell
+        dec     a               ; from the mark cell (#546), two before
+        dec     a               ;   the anchor
         sta     hVMADDL                          ; blank the old cells
         ; the blank word is vanilla's $01ee junk fill rather than $21ff.
         ; cells a line abandons (a move or a disable) are rewritten once,
@@ -839,11 +841,12 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         sta     hVMDATAL
         sta     hVMDATAL
         sta     hVMDATAL
+        sta     hVMDATAL
 @write: lda     f:$7e0000+OT6_SHADOW,x
         sta     f:$7e0000+OT6_SHADOW+2,x         ; prev = cur
         beq     @skip           ; (n/z from the lda)
-        dec     a               ; from the lead cell
-        sta     hVMADDL
+        jsr     @mark           ; the mark cell, if any (#546), and the
+                                ;   address of the lead cell
         lda     f:$7e0000+OT6_HUDVEIL-1          ; veil rides the high byte
         and     #$ff00                           ;   (low byte = randbtl)
         bne     @veil
@@ -1042,12 +1045,82 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         plx
         plp
         rtl
+; local: the trap's mark cell (#546), two before the anchor.  a16 in, a =
+; the line's anchor (cur), x = the shadow line base, y = the slot offset.
+; A slot whose OT6_MARKCELL holds a mark has the mark's word written at
+; anchor - 2 (vanilla's fill under a veil) every nmi, like the line's other
+; cells, and its OT6_MARKSHOWN bit set.  A free slot writes nothing there,
+; so a neighbour's line that reaches the cell keeps it, except once after a
+; mark ends: that blank is a one-shot, gated like the line moves and retried
+; when late.  A line anchored in column 0 or 1 has no mark cell (it would
+; wrap into the row above).  Out: the vram address is the lead cell's
+; (anchor - 1), a16.  Preserves x/y; clobbers a.
+@mark:  .a16
+        .i16
+        pha                     ; [$01,s] cur
+        and     #$001f
+        cmp     #$0002
+        bcc     @mnone          ; column 0 or 1
+        shorta0
+        phx                     ; [$01,s] the shadow base, [$03,s] cur
+        tya
+        lsr                     ; the slot (b = 0)
+        tax
+        lda     f:$7e0000+OT6_MARKCELL,x
+        bne     @mhas
+        lda     f:Ot6HitBitTbl,x
+        and     f:$7e0000+OT6_MARKSHOWN
+        beq     @mnone8         ; free, and nothing shown: nothing to write
+        jsr     @late           ; a mark that ended: blank its cell once
+        bcs     @mnone8         ; late: the bit stays, next nmi
+        lda     f:Ot6HitBitTbl,x
+        eor     #$ff
+        and     f:$7e0000+OT6_MARKSHOWN
+        sta     f:$7e0000+OT6_MARKSHOWN
+        bra     @mfill
+@mhas:  pha                     ; the mark
+        lda     f:Ot6HitBitTbl,x
+        ora     f:$7e0000+OT6_MARKSHOWN
+        sta     f:$7e0000+OT6_MARKSHOWN
+        pla
+        asl                     ; word index (b = 0)
+        tax
+        lda     f:$7e0000+OT6_HUDVEIL   ; the veils the line below takes:
+        ora     f:$7e0000+$64d5         ;   an entry/exit, a dialog window,
+        ora     f:$7e0000+OT6_FONTDIRTY ;   a font re-lay
+        bne     @mfill
+        lda     f:$7e0000+$896f
+        and     #$40            ;   or bg3 in 16x16 tile mode
+        bne     @mfill
+        longa
+        lda     f:Ot6MarkWordTbl,x
+        bra     @mput
+@mfill: longa
+        lda     #$01ee          ; vanilla's fill
+@mput:  plx                     ; the shadow base
+        pha                     ; [$01,s] the word, [$03,s] cur
+        lda     $03,s
+        dec     a
+        dec     a
+        sta     hVMADDL
+        pla
+        sta     hVMDATAL        ; the address steps on to the lead cell
+        pla                     ; (cur)
+        rts
+@mnone8:
+        plx
+        longa
+@mnone: pla                     ; cur
+        dec     a               ; the lead cell
+        sta     hVMADDL
+        rts
 ; local: enough vblank left for a one-shot transition write? (a8, db=0;
 ; clobbers a; carry set = too late, defer.) constants mirror the font
 ; slice gate above: v must be in [225,248]; past 248 the worst-case
 ; transition burst (~9 scanlines at the measured PIO rate, see the
 ; @nofont comment) could run into active display, where the PPU drops
 ; VRAM writes and a one-shot has no next-frame rewrite to heal it.
+        .a8                     ; (@mark above leaves the assembler a16)
 @late:  lda     hSLHV           ; software-latch the h/v counters
         lda     hSTAT78         ; reset the opvct read flip-flop
         lda     hOPVCT          ; v low byte
@@ -3529,6 +3602,8 @@ Ot6ShieldSlotCellTbl:
 ; the mid grey vanilla draws unusable list entries in), apart from the
 ; gauge's white.  The weakness icons are in Ot6ElemPalTbl (ot6_icons.asm).
 OT6_EMBLEM      = $71
+OT6_KNIFE       = $74           ; the pin's knife cell (#546): blank in the
+                                ;   font, between the pip cells
 OT6_GAUGE_ATTR  = $21 | (0 << 2)
 OT6_BROKEN_ATTR = $21 | (7 << 2)
 OT6_QMARK_ATTR  = $21 | (1 << 2)
@@ -3562,6 +3637,7 @@ Ot6BgGlyphCellTbl:
         .byte   $68
         .byte   $6c
         .byte   $6d
+        .byte   OT6_KNIFE       ; the pin's knife (#546)
 
 Ot6BgGlyphData:
 ; the shield gauge's emblem (#397), in text palette 0: a plain white shield
@@ -3596,3 +3672,15 @@ Ot6BgGlyphData:
 ; boost-3: three narrow arrows
         .byte   $00,$00,$00,$00,$92,$92,$db,$db
         .byte   $db,$db,$92,$92,$00,$00,$00,$00
+; the pin (#546): a knife standing point-down in its shadow, text palette 0
+; (gen_shield_glyphs.py draws it, beside the emblem)
+        .byte   OT6_KNIFE_TILE
+
+; the trap's mark before the shield emblem (#546), by OT6_MARKCELL: free
+; (never drawn: Ot6BgHudFlush_ext writes nothing for it), hobbled (the
+; battle font's own dagger, $d8, the item icon beside the class icons
+; Ot6ClassGlyphTbl uses), pinned (the knife).  Text palette 0, the gauge's.
+Ot6MarkWordTbl:
+        .word   $01ee
+        .word   (OT6_GAUGE_ATTR << 8) | $d8
+        .word   (OT6_GAUGE_ATTR << 8) | OT6_KNIFE
