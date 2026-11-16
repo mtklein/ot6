@@ -2223,7 +2223,10 @@ Ot6ThiefTitleBoxDMA:
 ; clears nothing, so the wide box and columns 15-22 of the title must not
 ; outlast this page.  The windows the wide box overlapped are redrawn in
 ; _c34c80's order, and both screens go up in one vblank before the list
-; returns (the Blitz page's B exit waits the same way).
+; returns (the Blitz page's B exit waits the same way).  DMA 1 is then aimed
+; back at BG1 screen A, where the page's frames left it: the list screen
+; repeats whatever DMA 1 last held, and ReloadSkillsMenu's cleared BG1 must
+; reach VRAM or the page's rows show through the list.
 Ot6ThiefTitleBoxOff:
         ldy     #near SkillsCharWindow2
         jsr     DrawWindow
@@ -2235,7 +2238,8 @@ Ot6ThiefTitleBoxOff:
         ldy     #near SkillsThiefTitleBlankText
         jsr     DrawPosKana
         jsr     InitDMA1BG3ScreenB
-        jmp     WaitVblank
+        jsr     WaitVblank
+        jmp     InitDMA1BG1ScreenA
 
 ; ---- draw the eight rows ----
 ; In the battle window's order read a column at a time (Ot6ThiefRowTbl, bank
