@@ -225,23 +225,8 @@ def ot6_lines(path):
     return out
 
 
-# partiesLine names the world map since a433c08e; before it, a party on the
-# world map was listed at its stale field object's map, or not shown.  A
-# reference line played under the older library and a fill line that says
-# "the world map" where the reference said one of those are the same play
-# (the zero wave, build/attempts/wt/v046-fills-3/zero-wave/).  Remove once
-# the line has been replayed under a433c08e's library.
-PARTY_AT = re.compile(r"(\bparty \d+(?: \(walking\))?) at (\(not shown\)|map \d+ \(\d+,\d+\)|the world map):")
-
-
 def same_line(x, y):
-    if x == y:
-        return True
-    if "at the world map:" not in y:
-        return False
-    return PARTY_AT.sub(r"\1 at LOC:", x) == PARTY_AT.sub(r"\1 at LOC:", y) and \
-        all(m.group(2) != "the world map" or n.group(2) == "the world map"
-            for m, n in zip(PARTY_AT.finditer(x), PARTY_AT.finditer(y)))
+    return x == y
 
 
 def first_log_diff(ref_log, fil_log):
@@ -413,13 +398,6 @@ def selftest():
     check("parse_mode reads regions", parse_mode("rand:7@wram,spc") == ("rand", 7, {"wram", "spc"}))
     check("parse_mode defaults to wram,sram", parse_mode("ones")[2] == {"wram", "sram"})
     check("parse_mode refuses junk", parse_mode("twos") is None)
-    w = "[ot6] [wob] f1035 boot world (1,2); party 1 (walking) at %s: SABIN L14"
-    check("the world map's new party text matches the old",
-          same_line(w % "(not shown)", w % "the world map")
-          and same_line(w % "map 3 (0,0)", w % "the world map"))
-    check("a party moved off the world map still differs",
-          not same_line(w % "the world map", w % "map 3 (0,0)")
-          and not same_line(w % "map 3 (0,0)", w % "map 4 (0,0)"))
     check("parse_mode reads a bisection's regions",
           parse_mode("ones@wram:1D54+1FD3-1FF2,sram")[2] == {"wram", "sram"})
 
