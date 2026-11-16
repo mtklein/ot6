@@ -160,5 +160,61 @@ check("each row leaves the MP floor", "s.mp - R.PRICE[id] >= floor", "s.mp >= R.
   local id = pick(snap(function(s) s.mp = 25; s.party[0].coat = false end))
   return id == nil
 end)
+-- M.relmSnapshot's `up` (#538 review): an ally asleep, stopped or frozen
+-- cannot take a turn, so no row counts on one (a Gesture there is refused
+-- every turn).  Synthetic reads; the mutant edits M.relmSnapshot's source.
+local function snapMutant(from, to)
+  local a = lib:find("\nfunction M%.relmSnapshot%(")
+  assert(a, "M.relmSnapshot in the lib")
+  local b = lib:find("\nend\n", a, true)
+  local src = lib:sub(a + 1, b + 4)
+  local _, count = src:gsub(plain(from), "")
+  assert(count == 1, string.format("mutant: '%s' occurs %d times", from, count))
+  src = src:gsub(plain(from), (to:gsub("%%", "%%%%")))
+  -- the function's upvalues (BATTLE, cmdRow, monAlive) are the lib's locals:
+  -- the mutant reaches them through the real function's upvalues
+  local real = H.relmSnapshot
+  local env = setmetatable({}, { __index = _G })
+  local i = 1
+  while true do
+    local name, v = debug.getupvalue(real, i)
+    if name == nil then break end
+    env[name] = v
+    i = i + 1
+  end
+  env.M = H
+  local chunk = assert(load("local M = M\n" .. src .. "\nreturn M.relmSnapshot", "snapmutant", "t", env))
+  local saved = H.relmSnapshot
+  local f = chunk()
+  H.relmSnapshot = saved
+  return f
+end
+local function checkSnap(what, from, to, f)
+  n = n + 1
+  local ok, r = pcall(f, H.relmSnapshot)
+  assert(ok and r == true, "FAIL " .. what .. ": " .. tostring(r))
+  local mok, mr = pcall(f, snapMutant(from, to))
+  assert(not mok or mr ~= true, string.format("FAIL %s: the mutant ('%s' -> '%s') passed it too", what, from, to))
+end
+local function upWith(addr, val)
+  return function(snapFn)
+    local mem = {}
+    for seat = 0, 3 do
+      local e = seat * 2
+      mem[0x3ED8 + e] = seat; mem[0x3AA0 + e] = 1; mem[0x3BF4 + e] = 1000
+    end
+    mem[addr] = val
+    local rb, rw = H.readByte, H.readWord
+    H.readByte = function(a) return (mem[a] or 0) & 0xFF end
+    H.readWord = function(a) return mem[a] or 0 end
+    local ok, s = pcall(snapFn, 1, 0)
+    H.readByte, H.readWord = rb, rw
+    assert(ok, s)
+    return s.party[0].up == false and s.party[2].up == true
+  end
+end
+checkSnap("an ally asleep is not up", "and (M.readByte(0x3EE5 + e) & 0x80) == 0", "", upWith(0x3EE5, 0x80))
+checkSnap("an ally stopped is not up", "and (M.readByte(0x3EF8 + e) & 0x10) == 0", "", upWith(0x3EF8, 0x10))
+checkSnap("an ally frozen is not up", "and (M.readByte(0x3EF9 + e) & 0x02) == 0", "", upWith(0x3EF9, 0x02))
 print = rawPrint
 print(string.format("relm_policy_selftest: %d checks, each with its mutant red", n))

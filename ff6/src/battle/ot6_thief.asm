@@ -463,6 +463,15 @@ Ot6ThiefBanner:
         lda     $b6
         jsl     Ot6ThiefIsNew           ; carry set = one of the kit's rows
         bcc     @plain
+        pha                             ; a thief who cannot pay the row's MP
+        rep     #$20                    ;   ($3c08 below $3a4c, the cost
+        .a16                            ;   staged at action load) does
+        lda     $3c08,x                 ;   nothing: CalcAttackEffect's check
+        cmp     $3a4c                   ;   refuses the cast after this, so
+        sep     #$20                    ;   the row must not land first
+        .a8                             ;   (#538 review, Relm's list's hole)
+        pla
+        bcc     @short
         cmp     #OT6_THIEF_BESTOW
         beq     @bestow
         cmp     #OT6_THIEF_FILCH
@@ -497,6 +506,9 @@ Ot6ThiefBanner:
         plp
         sec                             ; handled: no steal special effect
         rtl
+@short: plp
+        sec                             ; handled: nothing done, the fizzle
+        rtl                             ;   follows
 @plain: plp
         clc
         rtl
@@ -671,13 +683,28 @@ done:   plp
 @have:  lda     OT6_BP_CLASS,y
         cmp     #$05
         bcs     @keep           ; the ally is capped: the point would be lost
-        lda     OT6_BOOST_REVEALED,x    ; the pips pending: 0 hands one
+        lda     #$00            ; [$02,s] Relm's gift held, 0 or 1 (#538):
+        pha                     ;   a point, never a pip, so it is not
+        lda     f:Ot6CharBitTbl,x       ;   handed on: the pips pending
+        and     OT6_GIFT                ;   less the gift (the gift waits
+        beq     :+                      ;   under Muddle or Berserk, and its
+        lda     f:Ot6CharBitTbl,x       ;   raise is then not pending)
+        and     OT6_UNCTL
         bne     :+
         inc     a
+        sta     $01,s
+:       lda     OT6_BOOST_REVEALED,x    ; the pips pending
+        sec
+        sbc     $01,s           ; less the gift
+        bcs     :+
+        lda     #$00
+:       cmp     #$00
+        bne     :+
+        inc     a               ; none paid: an unboosted Bestow hands one
 :       cmp     OT6_BP_CLASS,x  ; never more than Locke holds (R keeps the
         bcc     :+              ;   pending under the bank; this is the
         lda     OT6_BP_CLASS,x  ;   belt)
-:       pha                     ; [$01,s] the pips to hand
+:       pha                     ; [$01,s] the pips to hand, [$02,s] the gift
         lda     #$05
         sec
         sbc     OT6_BP_CLASS,y  ; the room the ally has
@@ -685,10 +712,15 @@ done:   plp
         bcs     :+
         sta     $01,s           ; hand only what it can hold
 :       pla
-        sta     OT6_BOOST_REVEALED,x    ; Locke's half: Ot6ActionEnd charges
-        clc                             ;   exactly what was handed
-        adc     OT6_BP_CLASS,y
-        sta     OT6_BP_CLASS,y  ; the ally banks them
+        pha
+        clc
+        adc     $02,s           ; Locke's half: the handed pips, plus the
+        sta     OT6_BOOST_REVEALED,x    ;   gift's raise, which Ot6GiftSpend
+        pla                     ;   takes off the charge without spending
+        clc                     ;   the gift; so the charge is exactly what
+        adc     OT6_BP_CLASS,y  ;   was handed, and the pip display's
+        sta     OT6_BP_CLASS,y  ;   "pending less the gift" shows it too
+        pla                     ; (the gift)
         jsr     Ot6BankMoved    ; the ALLY's bank moved, and the ally
                                 ;   is the one who may have a kit window open,
                                 ;   since Locke is mid-action

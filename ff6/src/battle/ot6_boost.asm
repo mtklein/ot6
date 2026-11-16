@@ -422,6 +422,12 @@ done:   jsr     Ot6PaintActionEnd ; #538: the painter's marks the action ends
 ; Ot6QueueFold found no reward in (OT6_SPELLNONE), whose points
 ; Ot6ActionEnd keeps, so their arrows stay up until then.  The display
 ; only: the bank and the pending boost are Ot6ActionEnd's to charge.
+; Every actor, before the monster and counter exits: the coat a Varnish
+; spent stops that action's other hits only (OT6_VARNISHING, Ot6VarnishGate),
+; and a counterattack (ExecRetal) or a monster's turn of several command-list
+; entries reaches Ot6ActionEnd's clear once or never, so each action that
+; begins clears it (#538 review: a counter that spent a coat made the next
+; enemy action miss too).
 ; a8, either index width, db=$7e.  preserves a/x/y/p.  rtl.
 .proc Ot6BpBegin
         .a8
@@ -430,6 +436,8 @@ done:   jsr     Ot6PaintActionEnd ; #538: the painter's marks the action ends
         .i16
         phx
         pha
+        lda     #$00
+        sta     f:$7e0000+OT6_VARNISHING
         txa
         cmp     #$08
         bcs     @out            ; a monster: no boost
@@ -935,6 +943,16 @@ out:    longa
         eor     #$ff
         and     f:$7e0000+OT6_UNCTL
         sta     f:$7e0000+OT6_UNCTL
+        lda     f:Ot6CharBitTbl,x       ; #538: a gift Relm gave that waited
+        and     f:$7e0000+OT6_GIFT      ;   out the engine's turns (Muddle,
+        beq     out                     ;   Berserk, a dance, a rage) is
+        lda     f:$7e0000+OT6_BOOST_REVEALED,x ; pending again now that the
+        bne     out                     ;   player has the window, so its
+        inc     a                       ;   arrow shows (#538 review)
+        sta     f:$7e0000+OT6_BOOST_REVEALED,x
+        lda     f:$7e0000+$3204,x
+        ora     #$80                    ; the spell prices fold the raise
+        sta     f:$7e0000+$3204,x
 out:    longa
         pla
         plp

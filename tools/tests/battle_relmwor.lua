@@ -28,7 +28,20 @@
 --   7. Still Life on a body, TERRA's Break spell until it breaks, Still
 --      Life again once the break is held: the break lasted 32 ticks (its 16
 --      and Still Life's 16, OT6_BROKEN_TICKS), and the second mark waits
---      for the next break.
+--      for the next break;
+--   8. Tint on RELM herself: once her casting action has ended she holds
+--      all four turns (OT6_TINT_TURNS), as an ally would (#538 review: the
+--      casting action's own end counted one down);
+--   9. Varnish on TERRA by a RELM who cannot pay: her MP is written one
+--      under the price as her action begins (a declared write: the drop an
+--      enemy's Rasp or Osmose makes between her confirm and her turn), and
+--      the row lands nothing -- no coat -- and the MP check refuses it,
+--      charging nothing (#538 review: the row landed first, unpaid);
+--  10. a coat spent by a counter leaves its "this action spent the coat"
+--      mask (OT6_VARNISHING) standing, since a counter reaches no action
+--      end: staged as a declared write of that mask as a monster's action
+--      begins, which must clear it before the action runs (#538 review: the
+--      next enemy action missed too).
 -- The one write: GOGO's Lore command slot becomes Sketch in his record
 -- before the first battle (state_write_waivers.txt; the battle_mimic
 -- expedient: the line never gives him Sketch, and the field menu that would
@@ -46,6 +59,7 @@ local ORDER = { SKETCH, PORTRAIT, TINT, VARNISH, STILL, UNDER, GESTURE, MASTER }
 local PRICE = { [SKETCH] = 0, [PORTRAIT] = 12, [TINT] = 10, [VARNISH] = 14, [STILL] = 24, [UNDER] = 28,
   [GESTURE] = 30, [MASTER] = 99 }
 local GIFT, VARN, GEST, SMARK, SHELD, UPAINT = 0xEF0E, 0xEF0F, 0xEF11, 0xEF12, 0xEF13, 0xEF14
+local VARNING, TINTN, TINT_TURNS, LAST = 0xEF10, 0xEEFE, 4, 10
 local BUDGET = 40
 
 local function seatOf(ch) for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == ch then return s end end end
@@ -85,10 +99,31 @@ local function arm()
     local x = emu.getState()["cpu.x"] & 0xFF
     if stage == 2 and H.readByte(0xB6) == MASTER then shoot("relmwor_masterpiece", 90) end
     if stage == 4 and H.readByte(0xB6) == GESTURE then shoot("relmwor_gesture", 30) end
+    if stage == 9 and relm ~= nil and x == relm * 2 and H.readByte(0xB6) == VARNISH and rec.starved == nil then
+      -- the declared write (stage 9): her MP one under the row's price, the
+      -- cost already staged in $3A4C
+      rec.starved = { f = H.frame, mp = PRICE[VARNISH] - 1, cost = H.readWord(0x3A4C), coat0 = H.readByte(VARN) }
+      H.writeWord(0x3C08 + x, PRICE[VARNISH] - 1)
+    end
     rec.execs = rec.execs or {}
     rec.execs[#rec.execs + 1] = { x = x, id = H.readByte(0xB6), b8 = H.readByte(0xB8), b9 = H.readByte(0xB9),
       mp0 = H.readWord(0x3C08 + x), bank0 = H.readByte(0x3E9C + x), pend0 = H.readByte(0x3E9D + x), f = H.frame }
   end, emu.callbackType.exec, H.sym("Ot6PaintExec"), H.sym("Ot6PaintExec"))
+  -- stage 10: a monster's action begins with the leaked mask (the declared
+  -- write), and ExecCmd's next instruction after Ot6BpBegin reads it
+  local bb, after = H.sym("Ot6BpBegin"), H.sym("ExecCmd@battle_code") + 4
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xFF
+    if stage == 10 and x >= 8 and rec.leakArmed == nil and H.battleActive() then
+      rec.leakArmed = { f = H.frame, x = x }
+      H.writeByte(VARNING, 0x0F)
+    end
+  end, emu.callbackType.exec, bb, bb)
+  emu.addMemoryCallback(function()
+    if stage == 10 and rec.leakArmed ~= nil and rec.leak == nil then
+      rec.leak = { f = H.frame, v = H.readByte(VARNING) }
+    end
+  end, emu.callbackType.exec, after, after)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xFF
@@ -172,7 +207,7 @@ end
 
 local function decide()
   battles = battles + 1
-  H.assertEq(battles <= BUDGET, true, string.format("the seven stages within %d battles", BUDGET))
+  H.assertEq(battles <= BUDGET, true, string.format("the ten stages within %d battles", BUDGET))
   plan, mode, rec, seen, ally, target, colour = {}, "fightout", {}, nil, nil, nil, nil
   relm, terra, gogo = seatOf(RELM), seatOf(TERRA), seatOf(GOGO)
   if not up(relm) or H.readWord(0x3C08 + relm * 2) < 120 or not up(terra) then
@@ -219,6 +254,13 @@ local function decide()
     plan = { { who = RELM, cmd = CMD, row = UNDER, slot = target },
              { who = RELM, cmd = CMD, row = TINT, row2 = COLOUR + colour, allySeat = terra },
              { who = TERRA, cmd = FIGHT, boost = 0, slot = target } }
+  elseif stage == 8 then
+    plan = { { who = RELM, cmd = CMD, row = TINT, row2 = COLOUR, allySeat = relm } }
+  elseif stage == 9 then
+    if (H.readByte(VARN) >> terra) & 1 == 1 then H.log("[relmwor] TERRA holds a coat already: fought out"); return end
+    plan = { { who = RELM, cmd = CMD, row = VARNISH, allySeat = terra } }
+  elseif stage == 10 then
+    plan = {}
   else
     local best
     for s = 0, 5 do
@@ -268,6 +310,13 @@ local function closed()
     return rec.giveUp or k[3] ~= nil
   elseif stage == 6 then
     return rec.fight ~= nil and #endsOf(terra * 2, rec.fight.f) > 0
+  elseif stage == 8 then
+    local ex = lastExec(relm * 2, nil)
+    return ex ~= nil and #endsOf(relm * 2, ex.f) > 0
+  elseif stage == 9 then
+    return rec.starved ~= nil and #endsOf(relm * 2, rec.starved.f) > 0
+  elseif stage == 10 then
+    return rec.leak ~= nil
   end
   return rec.recovered ~= nil
 end
@@ -343,6 +392,28 @@ local function judge()
     H.assertEq(f.under & (1 << target) ~= 0, true, "the body was painted when TERRA swung")
     H.assertEq(first.v, f.sh - 2, "the first weakness chip took two shields")
     H.assertEq(H.readByte(UPAINT) & (1 << target), 0, "the mark is spent")
+    return true
+  end
+  if stage == 8 then
+    local ex = lastExec(relm * 2, nil)
+    local t = H.readByte(TINTN + relm * 2)
+    H.log(string.format("[relmwor] Tint on RELM herself ($%02X, f%d): %d turn(s) held once her action ended",
+      ex.id, ex.f, t))
+    H.assertEq(t, TINT_TURNS, "RELM's own Tint holds all its turns once her casting action has ended")
+    return true
+  elseif stage == 9 then
+    local r = rec.starved
+    local mp1 = H.readWord(0x3C08 + relm * 2)
+    H.log(string.format("[relmwor] Varnish by a RELM at %d MP for a %d-MP row (staged $3A4C %d): coat $%02X -> $%02X, "
+      .. "MP now %d", r.mp, PRICE[VARNISH], r.cost, r.coat0, H.readByte(VARN), mp1))
+    H.assertEq(r.cost, PRICE[VARNISH], "the row's price was staged before her turn")
+    H.assertEq(H.readByte(VARN) & (1 << terra), 0, "a row she cannot pay lands nothing: no coat")
+    H.assertEq(mp1, r.mp, "and charges nothing (the MP check refused it)")
+    return true
+  elseif stage == 10 then
+    H.log(string.format("[relmwor] a monster's action (x=$%02X, f%d) began with the leaked mask $0F: $%02X after "
+      .. "Ot6BpBegin", rec.leakArmed.x, rec.leakArmed.f, rec.leak.v))
+    H.assertEq(rec.leak.v, 0, "each action that begins clears the coat-spent mask")
     return true
   end
   -- stage 7: the body's break count, every write from the break on: 16 down
@@ -429,7 +500,7 @@ H.run({ maxFrames = 2500000 }, {
     H.assertEq(away ~= nil, true, "a walkable world tile beside the save")
     arm()
   end),
-  H.driveUntil(function() return stage > 7 end, 2400000, {
+  H.driveUntil(function() return stage > LAST end, 2400000, {
     H.cond(function() return not H.battleLoadStarted() end, { H.fieldCare({ tag = "relmwor" }), lap(), H.release() },
       {}),
     H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
@@ -452,6 +523,7 @@ H.run({ maxFrames = 2500000 }, {
     H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the world map",
       5),
-  }, "the seven stages"),
-  H.logStep("[relmwor] done: Masterpiece, Varnish, Gesture and its limit, GOGO's list, Underpainting, Still Life"),
+  }, "the ten stages"),
+  H.logStep("[relmwor] done: Masterpiece, Varnish, Gesture and its limit, GOGO's list, Underpainting, Still Life, "
+    .. "RELM's own Tint, the unpaid row, the leaked coat mask"),
 })

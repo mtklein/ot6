@@ -10,14 +10,14 @@
 > costs, durations and levels, err generous. The abuse limits stay (one
 > lengthening a break, no Gesture off a Gestured turn): they stop loops,
 > not power. Sections below that say otherwise are superseded by this note
-> until the build rewrites them.  (Built for v0.48: the sections below are
+> until the build rewrites them.  (Built in v0.47: the sections below are
 > rewritten to the build; `kits.md` "Relm" is the summary.)
 >
 > **Gogo (owner, 2026-11-15):** a Gogo with Sketch opens Relm's whole list,
 > not plain Sketch: each command he picks gives its owner's full kit, as far
 > as is reasonable (#547).
 
-Status: **built** (for v0.48, after #545; `ot6_paint.asm`; designed 2026-11-15). The owner's direction: "As an
+Status: **built** (v0.47, with #545; `ot6_paint.asm`; designed 2026-11-15). The owner's direction: "As an
 artist, she should have abilities that buff the team, like a bard or
 synergist." The brainstorm in #538 was approved in full; this document turns
 it into a kit that can be built, and says where the approved ideas had to
@@ -97,8 +97,10 @@ several hits. Varnish stops exactly one enemy action of any kind, physical,
 magic, a special or a can't-dodge hit, certainly. It is the one guard in
 the game against the single big hit a boss telegraphs, spell or not. It is
 judged after CheckHit's own verdict (§2), so a hit Image, Vanish or evasion
-already turned aside never uses it up, and Runic absorbs a spell before it
-reaches the hit test, so a standing Runic keeps the Varnish behind it.
+already turned aside never uses it up. A spell a Runic stance absorbs still
+reaches the hit test, as the MP it restores to the Runic ally, with the
+monster as its attacker; the gate lets a hit that restores through (the
+heal bit), so a standing Runic keeps the Varnish behind it.
 
 **Portrait refuses the boost.** The approved kit says both "boosting her
 abilities buys reach" and "Masterpiece: at 3 BP, every ally's next action
@@ -146,16 +148,17 @@ boost buys; it is not banked and cannot be handed on. So:
   does not lower a divine's 99 MP. §4 covers Masterpiece making three
   divines in one round.
 - **Uncontrolled turns.** The engine spends no boost on a turn it chooses
-  (Muddle, Charm, Berserk, the Colosseum, Umaro), so the gift waits. Umaro
+  (Muddle, Charm, Berserk, a dance's steps, a rage, the Colosseum, Umaro),
+  so the gift waits, and is pending again when the player next has the
+  window. Umaro
   never opens a window, so Portrait and Masterpiece pass over him.
 - **Mimic.** A Gogo's copy reads his own pending boost, gift included, as
   every Mimic does.
 
 **How the gift shows.** When a gifted ally's command window opens, their
-pending boost already reads one point, and their pip cell is drawn in a
-second battle text palette until the gift is used. R raises paid points on
-top, up to three in all and never past bank plus gift. L can lower the
-pending boost to zero to keep the gift for a later action.
+pending boost already reads one point, shown as the usual arrow. R raises
+paid points on top, up to three in all and never past bank plus gift. L can
+lower the pending boost to zero to keep the gift for a later action.
 
 **Gesture cannot loop.** Gesture gives a turn by spending one, so two
 characters Gesturing each other gain nothing; but with the reach a boost
@@ -183,11 +186,11 @@ take their extra shield, three in all; they come from different sources and
 each is paid for (a stone worn, a turn and MP spent).
 
 **The Fake Mustache.** The relic turns Sketch into Control
-(vanilla's RelicCmdTbl rewrite, which Locke's Thief Glove also uses). For
-Locke the gloved Capture has no submenu; Relm would lose her whole kit that
-way, so the list opens behind Control as well, with Control as its first
-row. Gogo, who can carry Sketch, gets plain Sketch with no list, as he gets
-plain Slot (Setzer's precedent).
+(vanilla's RelicCmdTbl rewrite, which Locke's Thief Glove also uses). A
+Relm wearing it keeps Control only, with no painter's list, as a gloved
+Locke gets Capture: the owner's call (2026-11-16), "more of a commitment
+to use". Gogo, who can carry Sketch, opens Relm's whole list from it
+(#547), with her learned rows.
 
 **The Fanatics' Tower** is magic-only: `InitCmdList` drops every row but
 Magic, Item and Mimic (kits.md, "The World of Ruin"), so Relm's kit is off
@@ -199,11 +202,10 @@ Every ability is feasible. None needs new art, a new status or save data.
 
 ### The list (menu surface)
 
-- **Open.** `OpenCmdMenuTbl[$0d]` (and `[$0e]` for Control) points at a C1
-  stub, `_c1_paint_open`, the twin of `_c1_thief_open` and `_c1_slot_open`
-  (`btlgfx_main.asm:18236-18256`): `jsl Ot6PaintListOpen`, then
-  `jmp OpenToolsWindow`, or straight to vanilla target select when the
-  caster is not Relm (carry clear, as `Ot6SetzerListOpen` does for Gogo).
+- **Open.** `OpenCmdMenuTbl[$0d]` points at a C1 stub, `_c1_paint_open`,
+  the twin of `_c1_thief_open` and `_c1_slot_open`: `jsl Ot6PaintListOpen`,
+  then `jmp OpenToolsWindow`, for whoever holds Sketch (no character test:
+  a Gogo with Sketch opens it too, #547). Control (`$0e`) is vanilla's.
   `Ot6PaintListOpen` copies `Ot6ThiefListOpen` (`ot6_thief.asm:225`): eight
   cells, two columns of four, each row's id, flat price and its own
   targeting byte, and mode `w7e6168 = 5`.
@@ -220,9 +222,11 @@ Every ability is feasible. None needs new art, a new status or save data.
   Gesture; a whole-party byte for Masterpiece, whose cursor opens on the
   party side and which gifts every ally whatever it names (Master's Mark's
   shape, `ot6_thief.asm:116-127`).
-- **Execute.** One hook at `Cmd_0d`'s head (and `Cmd_0e`'s), `jsl
-  Ot6PaintExec / bcs`, dispatches the rows, the shape of `Ot6ThiefExec`
-  (`ot6_thief.asm:364`). The Sketch row falls through to vanilla.
+- **Execute.** One hook at `Cmd_0d`'s head, `jsl Ot6PaintExec / bcs`,
+  dispatches the rows, the shape of `Ot6ThiefExec`. The Sketch row falls
+  through to vanilla. A caster who cannot pay the row's MP does nothing
+  there, so the universal MP check that follows refuses the cast with
+  nothing landed (`Ot6PaintRun`; Locke's rows the same, `Ot6ThiefExec`).
 - **Price.** `Ot6AbilityCost` gains a `$0d`/`$0e` arm keyed on `$3a7b`
   (`ot6_boost.asm:2665`, the `@steal` arm's shape); the reach rows price
   through `Ot6PerPointPrice`. `Ot6KitRowCost` (`ot6_cmdmenu.asm:401`) gains
@@ -258,9 +262,11 @@ Every ability is feasible. None needs new art, a new status or save data.
 - **The window.** On the frame a gifted ally's window opens, pending
   (`OT6_BOOST_REVEALED,x`, `$3e9d`) is raised from 0 to 1. `Ot6Boost`'s R
   cap, "never more than current bp" (`ot6_hud.asm:1399`), becomes bp plus
-  the gift. `Ot6BushidoRowGrey`'s SwdTech and Bestow arms read the same
-  sum. The pip cell (`Ot6PipGlyph_ext`, `ot6_hud.asm:1930`) ORs a palette
-  into its tile word while the gift stands.
+  the gift (`Ot6BankGift`). `Ot6BushidoRowGrey`'s SwdTech and Bestow arms
+  read the same sum. The raised pending point shows as the usual arrow; no
+  palette marks the gift (not built). A gift that waited out the engine's
+  turns (Muddle, Berserk, a dance, a rage) is raised again when the window
+  next opens (`Ot6UnctlClear`).
 - **The charge.** `Ot6ActionEnd`'s spend arm (`ot6_boost.asm:167`, the
   `@spend` label) subtracts pending less one when the gift bit is set and
   pending is at least one, then clears the bit. Every path that drops a
@@ -270,8 +276,10 @@ Every ability is feasible. None needs new art, a new status or save data.
 - **Price and divines.** Every price authority (`Ot6BoostPriceFor`,
   `ot6_boost.asm:1850`) and every divine gate reads pending, so the effective
   level is priced and gates the divine with no change to them.
-- **Bestow.** `Ot6Bestow` charges and hands only paid points: it reads
-  pending less the gift.
+- **Bestow.** `Ot6Bestow` hands only paid points: it reads pending less
+  the gift, and its pending holds those plus the gift's raise, which
+  `Ot6GiftSpend` takes off the charge without spending the gift; so the
+  charge, the hand-over and the pip display agree.
 - **Masterpiece.** Sets the gift bit on every other living ally who takes
   a window (not Umaro). Gated as Master's Mark is: greyed and refused under
   three pending, and a pick taken back to fewer does nothing and costs
@@ -280,31 +288,23 @@ Every ability is feasible. None needs new art, a new status or save data.
 ### Tint
 
 - **Where Fight's element is set.** `InitPlayerAttack`'s weapon arm loads
-  the swinging hand's element, `lda $3b90,x / sta $11a1`
-  (`battle_main.asm:7301`), beside `Ot6WeaponClass`. Tint does not touch
-  `$11a1`: rewriting the attack's element would also bring vanilla's
-  weakness ×2 (`asl $f0`, the `@0c0e` branch, `battle_main.asm:1912-1919`)
-  and its absorb test, and both are against the design.
-- **Where it chips.** A new leaf in `Ot6HitJoin` (`ot6_break.asm`, which
-  runs for every landed hit at `@0c1e`, `battle_main.asm:1920`), after
-  `Ot6ClassChip`: if the attacker is a character with Tint turns left, the
-  command is Fight, Capture or Jump (`$b5` `$00`/`$06`/`$16`; Mug runs as
-  Capture), the target is an unbroken monster, the hit took no chip of its
-  own, and `OT6_REVEALED_ELEM,y & $3be0,y` is nonzero, then take
-  one shield (`Ot6TakeShields`, `ot6_breakspell.asm:119`). "No chip of its
-  own" is read from the hit's own keys, the same tests the two chips make:
-  `$3be0,y & $11a1` (the element) and `OT6_ATKCLASS & OT6_BP_CLASS,y` (the
-  class) both zero.
+  the swinging hand's element into `$11a1` beside `Ot6WeaponClass`; Tint
+  ORs its colour in there (`Ot6TintSwing`, from `Ot6WeaponClass`), so the
+  hit truly carries both the weapon's element and the colour, and from
+  there vanilla's rules apply: the weakness doubles the hit and chips a
+  shield (`Ot6Chip`), and a body that absorbs or nulls the colour absorbs
+  or nulls the hit, as it would a spell of it.
 - **Which commands.** Only the weapon's own swings: Fight (and its boosted
-  swings, `Ot6FightBoost`), Mug and Capture, Jump. Not Throw (the thrown item
-  is not the painted weapon) and not skills, which carry their own element
-  and class. So every swing of a boosted Fight can key, but only on a body
-  the fighter could not key, and the swings deal what they would have.
-- **Absorbers.** It adds only weaknesses the body has, so it never touches
-  absorb, null or resist.
+  swings), Mug and Capture, Jump. Not Throw (the thrown item is not the
+  painted weapon) and not skills, which carry their own element and class.
+- **Absorbers.** The colour is a real element on the hit, so a body that
+  absorbs or nulls it does so: the policy picks a colour the press target
+  is weak to and does not absorb.
 - **The counter.** `OT6_TINT`, 8 bytes (4 characters, stride 2), turns left,
   and `OT6_TINTELEM` its colour.  `Ot6ActionEnd` decrements it for the
-  actor. A fallen ally takes no turns, so the paint waits on them.
+  actor. A fallen ally takes no turns, so the paint waits on them. Relm's
+  own Tint starts one turn higher, since the casting action's end counts
+  one down, so she swings with it as many turns as an ally does.
 - **Display.** A banner at the cast ("Tint") and the shield count dropping
   on each keyed hit. There is no free status icon in FF6's battle HUD, and
   recolouring the swing's weapon sprite would mean a palette swap per swing;
@@ -390,8 +390,15 @@ Every ability is feasible. None needs new art, a new status or save data.
   miss) and clear the bit. FF6 shows it as "Miss".
 - **Image and evasion** are judged inside `CheckHit` before its exit, so a
   hit they turned aside reaches the gate as a miss and the Varnish stays.
-- **Runic** absorbs in `RunicEffect` (`battle_main.asm:8463`), during
-  targeting, before `CheckHit` runs, so the spell never tests the Varnish.
+- **Runic** absorbs in `RunicEffect` and turns the spell into an MP
+  restore on the Runic ally, which still passes `CheckHit` with the monster
+  as attacker; the gate lets a hit with the heal bit (`$11a4` bit 0)
+  through, so the restore lands and the Varnish stays.
+- **One action.** `OT6_VARNISHING` (the coat this action spent: its other
+  hits on that body miss too) is cleared as each action begins
+  (`Ot6BpBegin`, ExecCmd's head), since a counter (`ExecRetal`) or a
+  monster's turn of several command-list entries reaches `Ot6ActionEnd`
+  once or never.
 - **What uses it up**: any enemy action that would land, damaging or not
   (a status, a Scan, a fraction). An ally's action never does, so a Cure on
   a varnished ally lands.
@@ -574,10 +581,9 @@ full peak (the note at the top).  Open after the build:
 - **Do the overshoot prices feel busted enough, or too much?**  Each row
   costs about two thirds of the first design's, Tint lasts four turns and
   Still Life doubles a break.  The generous option was built.
-- **The Fake Mustache.**  Built as vanilla: a Relm wearing it gets Control
-  and no list, as a gloved Locke gets Capture.  A list behind Control would
-  need the Control state's own menu path; say if she should keep her kit
-  with it.
+- **The Fake Mustache.**  Built as vanilla, and confirmed (owner,
+  2026-11-16, "more of a commitment to use"): a Relm wearing it gets Control
+  and no list, as a gloved Locke gets Capture.
 - **The field Skills page** for her list (Locke has one) is not built: the
   Skills menu's eighth row is Locke's, and a ninth needs the window
   regrown.  The battle list and PLAYING.md carry the rows meanwhile.

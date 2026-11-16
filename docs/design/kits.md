@@ -1307,7 +1307,8 @@ falling through to vanilla.
 - **GOGO** with Sketch opens her list with the rows Relm has learned, as
   his Steal opens Locke's (#547).  The Fake Mustache's Sketch → Control
   rewrite keeps vanilla Control and no list, as a gloved Locke's Capture
-  does.
+  does: confirmed as intended (owner, 2026-11-16: "more of a commitment to
+  use").
 
 Battle RAM (`ot6_memory.inc`, cleared by `Ot6InitBP`, the monster masks
 also per slot by `Ot6SeedShields`): `OT6_TINT`, `OT6_TINTELEM` (per

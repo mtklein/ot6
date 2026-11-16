@@ -615,10 +615,22 @@ Ot6PaintBanner:
         rtl
 .endproc
 
+; A caster who cannot pay the row's MP ($3c08 below $3a4c, the cost staged
+; at action load) does nothing here: CalcAttackEffect's universal check
+; refuses the cast after this and keeps the boost (Ot6FizzleDropBoost), so
+; the row must not have landed first (#538 review: the effect ran unpaid).
 ; a8/i16, db=$7e, x = the attacker, A = the id.  clobbers a and y.
 .proc Ot6PaintRun
         .a8
         .i16
+        pha
+        longa
+        lda     $3c08,x         ; the caster's MP ...
+        cmp     $3a4c           ; ... against the row's cost
+        sep     #$20
+        .a8
+        pla
+        bcc     @out            ; short: nothing done (the fizzle follows)
         sta     OT6_SCR_IDX     ; the id, for Ot6PaintFits/Apply
         stx     OT6_SCR_SLOT2   ; the caster (a word)
         cmp     #OT6_PAINT_MASTER
@@ -887,7 +899,14 @@ Ot6PaintBanner:
         plx
         sta     OT6_TINTELEM,y  ; the colour (a second Tint repaints it)
         lda     #OT6_TINT_TURNS
-        sta     OT6_TINT,y      ; and the turns start again
+        cpy     OT6_SCR_SLOT2
+        bne     :+
+        inc     a               ; the painter herself: the casting action's
+                                ;   own end counts one turn down
+                                ;   (Ot6PaintActionEnd), so hers start one
+                                ;   higher and she swings as many turns as
+                                ;   an ally (#538 review)
+:       sta     OT6_TINT,y      ; and the turns start again
         rts
 @varnish:
         lda     $3018,y
@@ -927,6 +946,12 @@ Ot6ElemBitTbl:
         tsb     OT6_GIFT
         and     OT6_UNCTL
         bne     @out
+        lda     $3ef8,y
+        lsr
+        bcs     @out            ; dancing: the engine takes her turns, and
+        lda     $3ef9,y         ;   raging his: the gift waits for a turn
+        lsr                     ;   the player controls, as under Muddle
+        bcs     @out            ;   (#538 review)
         tya
         lsr                     ; the character slot
         jsr     Ot6CommittedSlot
@@ -948,8 +973,10 @@ Ot6ElemBitTbl:
 ; [ the gift at the charge: one point of the action is free ]
 ; jsr from Ot6ActionEnd's spend arm, with the pending boost (1 or more) in
 ; OT6_SCR_BIT.  A gifted actor's charge is one point less and the gift is
-; spent, unless the engine drove the turn (OT6_UNCTL: the gift waits) or the
-; action was Bestow, which hands only paid pips (the gift is not a pip).
+; spent, unless the engine drove the turn (OT6_UNCTL, a dance or a rage: the
+; gift waits) or the action was Bestow, which hands only paid pips (the gift
+; is not a pip): its pending holds the pips handed plus the gift's raise,
+; and the raise is taken off the charge while the gift is kept.
 ; a8/i16, db=$7e, x = the actor.  preserves x and y; clobbers a.
 .proc Ot6GiftSpend
         .a8
@@ -960,15 +987,23 @@ Ot6ElemBitTbl:
         lda     f:Ot6CharBitTbl,x
         and     OT6_UNCTL
         bne     @out
+        lda     $3ef8,x
+        lsr
+        bcs     @out            ; a dance step or a raging turn: the gift
+        lda     $3ef9,x         ;   waits
+        lsr
+        bcs     @out
         lda     $3a7c
         cmp     #$05            ; Steal's command, Bestow's row?
         bne     @take
         lda     $3a7d
         cmp     #OT6_THIEF_BESTOW
-        beq     @out
+        beq     @raise          ; Bestow: the gift is kept, and its raise
+                                ;   (on top of the pips handed, Ot6Bestow)
+                                ;   is not charged
 @take:  lda     f:Ot6CharBitTbl,x
         trb     OT6_GIFT
-        dec     OT6_SCR_BIT     ; the point the gift pays
+@raise: dec     OT6_SCR_BIT     ; the point the gift pays
 @out:   rts
 .endproc
 
@@ -984,6 +1019,12 @@ Ot6ElemBitTbl:
         lda     f:Ot6CharBitTbl,x
         and     OT6_UNCTL
         bne     @out
+        lda     $3ef8,x
+        lsr
+        bcs     @out            ; dancing or raging: it waits
+        lda     $3ef9,x
+        lsr
+        bcs     @out
         lda     OT6_BOOST_REVEALED,x
         bne     @out
         inc     a
@@ -1022,6 +1063,12 @@ Ot6ElemBitTbl:
         lda     f:Ot6CharBitTbl,x
         and     f:$7e0000+OT6_UNCTL
         bne     @all
+        lda     f:$7e0000+$3ef8,x
+        lsr
+        bcs     @all            ; dancing or raging: the gift waits
+        lda     f:$7e0000+$3ef9,x
+        lsr
+        bcs     @all
         lda     f:$7e0000+OT6_BOOST_REVEALED,x
         beq     :+
         dec     a
@@ -1115,9 +1162,11 @@ Ot6ElemBitTbl:
 ; monster is the attacker and a varnished character the target, the coat is
 ; spent and the hit misses, through vanilla's own miss arm (@22d1's stores:
 ; the miss flag, the "Miss" target), and the rest of that action's hits on
-; that body miss too (OT6_VARNISHING, cleared at the action's end).  A hit
-; Image, evasion or Runic already turned aside never reaches here as a hit,
-; so it never spends the coat.  An ally's action never does.
+; that body miss too (OT6_VARNISHING, cleared as each action begins,
+; Ot6BpBegin).  A hit Image or evasion already turned aside never reaches
+; here as a hit, and one that restores (the heal bit: a Runic ally's MP
+; restore from the spell she absorbed) is let through, so neither spends
+; the coat.  An ally's action never does.
 ; a8 or a16, either index width (CheckHit's), db=$7e.  preserves a/x/y.
 .proc Ot6VarnishGate
         php                     ; [1,s] our P, [2..4,s] the return
@@ -1131,6 +1180,12 @@ Ot6ElemBitTbl:
         lda     $07,s
         cmp     #$08
         bcc     @out            ; a character's action
+        lda     $11a4
+        lsr
+        bcs     @out            ; a hit that restores (the heal bit, $11a4
+                                ;   bit 0): RunicEffect's MP restore on a
+                                ;   Runic ally, with the monster still the
+                                ;   attacker, is no attack to turn aside
         tya
         cmp     #$08
         bcs     @out            ; a monster's body

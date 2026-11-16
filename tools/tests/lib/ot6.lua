@@ -10054,8 +10054,12 @@ function M.relmSnapshot(actor, press)
     local e = seat * 2
     local ch = M.readByte(0x3ED8 + e)
     if ch ~= 0xFF then
+      -- up: in the fight and able to take a turn: not wounded, petrified or
+      -- a zombie, and not asleep, stopped or frozen (#538 review: a Gesture
+      -- on a sleeper is refused every turn, Ot6PaintFits)
       s.party[seat] = { up = (M.readByte(0x3AA0 + e) & 1) == 1 and M.readWord(0x3BF4 + e) > 0
-          and (M.readByte(0x3EE4 + e) & 0xC2) == 0, umaro = ch == 0x0D,
+          and (M.readByte(0x3EE4 + e) & 0xC2) == 0 and (M.readByte(0x3EE5 + e) & 0x80) == 0
+          and (M.readByte(0x3EF8 + e) & 0x10) == 0 and (M.readByte(0x3EF9 + e) & 0x02) == 0, umaro = ch == 0x0D,
         gift = (M.readByte(R.GIFT) >> seat) & 1 == 1, coat = (M.readByte(R.VARNISH_MASK) >> seat) & 1 == 1,
         tint = M.readByte(R.TINT_TURNS + e), gauge = M.readByte(0x3219 + e), queued = M.readByte(0x32CC + e) ~= 0xFF,
         maxhp = M.readWord(0x3C1C + e), atk = M.readByte(0x3B68 + e) + M.readByte(0x3B69 + e),
@@ -13566,6 +13570,9 @@ function Driver:aimedBoostPlan(actor, plan)
   end
   if not monAlive(slot) then return plan end
   local b, est, hp, sh, broken = need(slot)
+  -- a gift Relm's Portrait left (#538) is a point already pending and paid
+  -- for: never trimmed away
+  if b ~= nil and (M.readByte(BATTLE.RELM.GIFT) >> actor) & 1 == 1 then b = math.max(b, 1) end
   if b == nil or b >= boost then return plan end
   M.log(string.format("[%s] actor=%d [aim] slot %d at %d HP (%d shield(s)%s) dies to a Fight at %d BP (%d at %d a "
     .. "hit, %d at the lowest roll)%s; the swings past its death are spent (#545) -- Fight at %d BP, not %d, %d BP "

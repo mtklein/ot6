@@ -577,6 +577,9 @@ do
   check(D:aimedBoostPlan(0, fight(3)).boostLeft == 3, "263 HP: 2 BP's 300 is 262 at the lowest roll, so all 3")
   body(0, 250, 2, true)
   check(D:aimedBoostPlan(0, fight(2)).boostLeft == 0, "Broken at 250 HP: one hit at 400 (x4) finishes it, 0 BP")
+  mem[0xEF0E] = 1
+  check(D:aimedBoostPlan(0, fight(2)).boostLeft == 1, "the same, holding Relm's gift: the gifted point is kept")
+  mem[0xEF0E] = 0
   reset(); body(0, 250, 2); body(1, 5000, 2)
   check(D:aimedBoostPlan(0, fight(3, 1)).boostLeft == 3, "aimed at a body no boost finishes: the full boost")
   local p = D:aimedBoostPlan(0, fight(3, 0))
