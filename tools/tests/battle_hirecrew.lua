@@ -30,9 +30,10 @@
 -- one drawn strike with the figure's weapon for the class; and at SETZER's
 -- Ot6ActionEnd his sheet, screen position, offsets and pose ($61c0/$61c1)
 -- as at his Ot6SetzerExec.  The purse is not replayed here: a 2 or 3 BP
--- hire can outlive its target; a pass after a kill moves on to another
--- monster while one stands (pass-retarget, merged with v0.24), and a pass
--- with no body left still walks its figure in and out, and is checked so.  The ROM's identity is logged.
+-- hire can outlive its target; since #545 the hires stay on it, and the
+-- pass after the kill is the action's last: the next figure walks in, finds
+-- no one and walks out, and SETZER comes home (v0.24 to v0.46 sent it to
+-- another monster), checked as any pass with no body left.  The ROM's identity is logged.
 -- Negative controls (one byte-patched ROM a property, mutants2.py and its
 -- list beside each): build/attempts/wt/hire-sprite/round2/negative/,
 -- round3_main/negative/ (the same on the merged ROM) and round4/negative/

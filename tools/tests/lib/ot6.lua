@@ -19194,9 +19194,13 @@ function M.setzerCheckCoins(r, i, rate, classOf, tag)
   M.assertEq(#passes >= 1 and #passes <= 1 + r.boost, true, string.format("%s %d: 1 + boost passes at most", tag, i))
   if #passes < 1 + r.boost then
     -- fallen as the engine counts it: out of its alive mask ($3A75), which
-    -- a petrified body that keeps its HP is too
+    -- a petrified body that keeps its HP is too.  Since #545 the passes
+    -- stay on the action's aim (r.targets: the hire's one body, the toss's
+    -- group), so it is the aim that has fallen; with no aim at the start
+    -- (the engine aimed it), every body
+    local aim = r.targets ~= 0 and r.targets or 0x3F
     for b = 0, 5 do
-      if r.mon0[b].present then
+      if r.mon0[b].present and (aim >> b) & 1 == 1 then
         M.assertEq(r.mon1[b].alive, false, string.format("%s %d: %d of %d passes paid, so slot %d is out of the "
           .. "fight (HP %d, $3A75 bit clear)", tag, i, #passes, 1 + r.boost, b, r.mon1[b].hp))
       end
@@ -19534,7 +19538,14 @@ function M.hireCrewCheck(r, tag)
   for _, e in ipairs(HC.execs) do if e.f == r.f then ex = e end end
   for _, e in ipairs(HC.ends) do if e.f == r.ended then done = e end end
   M.assertEq(ex ~= nil, true, tag .. ": SETZER's slot read at Ot6SetzerExec")
-  M.assertEq(#passes, 1 + r.boost, tag .. ": one hire animation a pass")
+  -- one hire animation a pass; since #545 a hire whose body fell runs one
+  -- more pass, its walk home (it pays nothing and strikes nothing), and no
+  -- other, so fewer than 1 + boost passes run then
+  M.assertEq(#passes >= 1 and #passes <= 1 + r.boost, true, tag .. ": one hire animation a pass, 1 + boost at most")
+  if #passes < 1 + r.boost then
+    M.assertEq(#r.costs, #passes - 1, string.format("%s: %d of %d passes ran, the aim fell: every pass paid but the "
+      .. "last, its walk home", tag, #passes, 1 + r.boost))
+  end
   for k, p in ipairs(passes) do
     local fig = (p.mark >> 4) & 7
     local want = math.min(k - 1, 3)

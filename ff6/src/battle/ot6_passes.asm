@@ -233,18 +233,20 @@ no:
 
 ; [ #545: a spent Hired Help still walks Setzer home ]
 
-; jsl from ExecAttack once Ot6PassSpent has found the action spent and
-; zeroed $3a70.  A hire's animation steps Setzer out on the first pass and
-; brings him back on the last (Ot6HireMark's L, which reads $3a70 = 0); the
-; passes between leave his slot hidden off the edge.  Ending a hire before
+; jsl from ExecAttack once Ot6PassSpent has found the action spent.  A
+; hire's animation steps Setzer out on the first pass and brings him back
+; on the last (Ot6HireMark's L); the passes between leave his slot hidden
+; off the edge.  Ending a hire before
 ; its last pass left him there, hidden and not targetable (the passretarget
 ; draw on the first #545 ROM: a Revivify aimed at him never found him,
 ; build/attempts/wt/v047-noretarget/suites/b1/).  So a hire's spent pass
 ; runs as its last: ChooseTarget finds its body fallen and keeps the empty
 ; mask (Ot6PassRetarget), the pass pays nothing (Ot6CoinPrice), and the
-; figure walks in, finds no one and Setzer comes home.  Every other action
-; ends at once.  out: carry set = run the pass.  a8, any index width, db=$7e.
-; A clobbered.
+; figure walks in, finds no one and Setzer comes home.  The mark's bit 6
+; says so to Ot6HireMark, which takes the next figure from $3a70 as it
+; stands, then zeroes it and sets L, so this pass is the last.  Every other
+; action ends at once (its caller zeroes $3a70).  out: carry set = run the
+; pass.  a8, any index width, db=$7e.  A clobbered.
 .proc Ot6PassSpentHire
         .a8
         lda     $3a7c           ; the queued command: Setzer's row ...
@@ -253,6 +255,9 @@ no:
         lda     f:$7e0000+OT6_SETZERROW
         cmp     #OT6_SETZER_HIRE ; ... Hired Help
         bne     no
+        lda     f:$7e0000+OT6_PASSRETARGET
+        ora     #$40            ; spent: this pass is the last
+        sta     f:$7e0000+OT6_PASSRETARGET
         sec
         rtl
 no:     clc

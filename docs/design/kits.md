@@ -939,9 +939,10 @@ target): 1 + boost tosses, one pass of the action each (`Ot6SetzerEffect`
 adds the boost to the attack count), each at level × 30 gil, each its own
 hit on every body and its own ¤ chip on every ¤-weak one. Three points are
 four tosses and four chips a body. A toss after a body falls splits over
-the bodies left (`battle_passretarget`). A toss that finds no body standing (the
-tosses before it felled them all) pays nothing, and so does such a hire
-(`Ot6CoinPrice`, `battle_hirerefund`). The Coin Toss relic's GP Rain buys
+the bodies left (`battle_passretarget`). Once the tosses have felled them
+all, the tosses left are not thrown (#545, the owner's trial; see
+[multi-hit.md](multi-hit.md) §6). A toss or a hire that finds no body
+standing pays nothing (`Ot6CoinPrice`, `battle_hirerefund`). The Coin Toss relic's GP Rain buys
 tosses the same way (`Ot6RainPasses` in Cmd_18); before #319 its boost
 bought nothing (Ot6BoostDmg's multiplier runs before GP Rain's effect
 overwrites the damage). (Earlier the same day the boost doubled the coins,
@@ -963,10 +964,12 @@ Three points are four hires, four chips and 6,200 gil at L31; a hire
 lands 3,100 there (1,550 shielded, 6,200 on a Broken body), and its fee
 never passes 4,950 (L99), so the damage cannot wrap (the old one-hire x8
 fee wrapped from L82) and a hire that meets the cap on a Broken body still
-leaves every point its own hit. A hire that outlives its target goes to
-another monster, as every pass OT6 adds to an action does
-(`Ot6PassRetarget`; [multi-hit.md](multi-hit.md) §6), and one that finds
-none standing pays nothing.
+leaves every point its own hit. A hire stays on the body it was sent
+at: once that body falls the hires left are not paid or sent to another
+monster, as with every pass OT6 adds to a single-target action (#545, the
+owner's trial; `Ot6PassSpent`, [multi-hit.md](multi-hit.md) §6). The next
+figure walks in, finds no one and walks off, so Setzer comes home; it
+pays nothing.
 
 **Each hire is somebody new** (owner, 2026-10-02: a growing crew, not the
 same guy again). Setzer walks out of sight, and each hire walks in where
@@ -1030,8 +1033,8 @@ measurement below (one battle Rand, drawn again past 251, mod 6; the redraw
 takes the table's next byte, a fixed successor), each its own triple and
 its own hit.  Under three points the row greys and is refused; a throw
 whose boost was taken back after the pick rolls nothing and pays nothing.
-A roll whose target fell to the roll before goes to another monster; a pass
-that finds no body left is skipped: no triple, no dice, no draw. What one
+A roll whose target fell to the roll before is not rolled (#545): the
+throw ends there, with no triple, no dice and no draw. What one
 roll lands (the means at even odds; the 42-44 weights move them by under
 2%):
 
@@ -1086,7 +1089,8 @@ reads). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`,
 `battle_setzergrey` (the purse's grey and refusal), `battle_gprain` (the
 Coin Toss relic's GP Rain), `battle_hirerefund` (a hire past the last
 body pays nothing) and `battle_passretarget` (a hire, roll or swing whose
-body fell goes to another, and a toss re-splits over the survivors). The
+body fell ends its action and moves to no other body, and a toss re-splits
+over the survivors). The
 coin suites throw in the battles that deal a
 special-weak crowd (the engine's alive mask, so a petrified body is out)
 and assert that a toss split and chipped; the other battles are fought out

@@ -716,6 +716,10 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         bne     :+
         lda     #$01            ; F: the first pass
         tsb     $b7
+:       lda     f:$7e0000+OT6_PASSRETARGET
+        and     #$40            ; #545: the hire's aim fell, so this pass,
+        beq     :+              ;   which finds no one, is its last
+        stz     $3a70           ;   (Ot6PassSpentHire)
 :       lda     $3a70
         bne     :+
         lda     #$02            ; L: the last pass
