@@ -122,11 +122,12 @@ local function decide()
           fightHits = fightHits + 1
         end, emu.callbackType.exec, hj, hj)
         -- #545: the volley ends when its body falls; the passes it had left
-        -- ($3a70 + 1 at Ot6PassSpentNone, the pass that would have started
-        -- on the fallen body and those after it) are counted here
+        -- ($3a70 at Ot6PassSpentNone: the pass that found its body fallen
+        -- was entered, and counted by Ot6WeaponClass, ExecAttack's head, before
+        -- it ended the action; the ones after it never are) are counted here
         local sp = H.sym("Ot6PassSpentNone")
         emu.addMemoryCallback(function()
-          if counting and not closed then spentLeft = H.readByte(0x3A70) + 1 end
+          if counting and not closed then spentLeft = H.readByte(0x3A70) end
         end, emu.callbackType.exec, sp, sp)
         hitRefs.sf = emu.addMemoryCallback(function()
           if counting then closed = true end
@@ -288,8 +289,8 @@ H.run({ maxFrames = 45000 + MAX_BRANCHES * (MAX_BRANCHES * IDLE + 10000 + 200) }
             -- the empty hand's whiff; which parity is armed is the ROM's
             H.log(string.format("[branch] the volley's body fell after %d passes (%d left, spent): %d landed",
               fightSwings, spentLeft, fightHits))
-            H.assertEq(fightHits == 0 or fightHits == handPass[0] or fightHits == handPass[1], true, string.format(
-              "a cut volley lands its armed hand's passes or none (landed %d; passes %d / %d)", fightHits,
+            H.assertEq(fightHits == 0 or fightHits == handPass[0] or fightHits == handPass[1] or fightHits == handPass[0] - 1 or fightHits == handPass[1] - 1, true, string.format(
+              "a cut volley lands its armed hand's passes (less the spent one, which lands nothing) or none (landed %d; passes %d / %d)", fightHits,
               handPass[0], handPass[1]))
             main, off = fightHits, 0   -- the shape below holds it against what ran
           end
