@@ -42,7 +42,7 @@
 -- reach of a RELM checkpoint sketches one (MonsterSketch read off the ROM:
 -- the Lizard's Imp and Remedy, the Drop's Muddle, NeckHunter's Imp, live
 -- elsewhere), so two more tries are a DECLARED EXPEDIENT
--- (tools/state_write_waivers.txt): at Cmd_0d's `lda $3400` (Cmd_0d + 39, the
+-- (tools/state_write_waivers.txt): at Cmd_0d's `lda $3400` (found by its bytes, the
 -- brush's drawn attack, byte-identical on the old ROM) the drawn attack is
 -- replaced by Imp ($23), Slow ($19), Slow 2 ($28), Break ($0C) or Scan
 -- ($18): each payoff of the first four is Magic-gated (reach, the tier
@@ -388,10 +388,15 @@ local steps = {
     H.assertEntryContract("wor-locke-v1")
     MPB = H.sym("MagicProp") & 0x3FFFFF
     MSK = H.sym("MonsterSketch") & 0x3FFFFF
-    -- the declared injection (see the header): Cmd_0d + 39 is `lda $3400`
-    local ld = H.sym("Cmd_0d") + 39
-    H.assertEq(H.readRomByte(ld & 0x3FFFFF), 0xAD, "Cmd_0d + 39 is an lda abs")
-    H.assertEq(H.readRomWord((ld & 0x3FFFFF) + 1), 0x3400, "...of $3400, the brush's drawn attack")
+    -- the declared injection (see the header): Cmd_0d's `lda $3400`, found
+    -- by its bytes in the proc's first 64 (39 in until Relm's list put
+    -- Ot6PaintExec's jsl at its head, #538)
+    local ld = nil
+    for k = 0, 63 do
+      local a = (H.sym("Cmd_0d") + k) & 0x3FFFFF
+      if ld == nil and H.readRomByte(a) == 0xAD and H.readRomWord(a + 1) == 0x3400 then ld = H.sym("Cmd_0d") + k end
+    end
+    H.assertEq(ld ~= nil, true, "Cmd_0d holds `lda $3400`, the brush's drawn attack, in its first 64 bytes")
     emu.addMemoryCallback(function()
       local t = armed
       if t == nil or t.inject == nil or not t.sent or t.endF then return end

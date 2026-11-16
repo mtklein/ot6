@@ -623,8 +623,19 @@ local CASES = {
   { name = "safe-pass-b2", snap = "S", who = "C", cmd = CMD_MAGIC, spell = SAFE, boost = 2, ally = true,
     aimFree = true },
   -- the toggle: Imp on two allies, then Imp at the imped one lifts it from both
+  -- snapshot I needs what impl-b1 reads: two allies imped and standing at
+  -- the window it is taken in (the v0.47 replay's draw lost one between the
+  -- cast and CELES's next window, and impl-b1 read one: suite_battle_
+  -- boostreach.log, "impl-b1 ... mask $000A"); a window without it waits
+  -- for the next
   { name = "impa-b1",  snap = "C", who = "C", cmd = CMD_MAGIC, spell = IMP, boost = 1, ally = true, snapAfter = "I",
-    snapCond = function() return bank(celesS) >= 1 end },
+    snapCond = function()
+      local n = 0
+      for e = 0, 6, 2 do
+        if (H.readByte(0x3EE4 + e) & 0x20) ~= 0 and H.readWord(0x3BF4 + e) > 0 then n = n + 1 end
+      end
+      return bank(celesS) >= 1 and n >= 2
+    end },
   { name = "impl-b1",  snap = "I", who = "C", cmd = CMD_MAGIC, spell = IMP, boost = 1, ally = true },
   -- a spell the boost buys nothing on; Vanish at a monster
   { name = "quiet-b0", snap = "C", who = "C", cmd = CMD_MAGIC, spell = "quiet", boost = 0, here = true },

@@ -27,7 +27,8 @@
 -- What it holds, per Jackpot (at Ot6SetzerExec's entry and SETZER's
 -- Ot6ActionEnd; each pass at Ot6JackpotDice's entry and the dice effect's
 -- return; each roll as the effect sets the dice animation):
---   * two passes (the full boost's fixed throw, M.JACKPOT_ROLLS); a pass
+--   * two passes (the full boost's fixed throw, M.JACKPOT_ROLLS), fewer
+--     once the body it was aimed at has fallen (#545); a pass
 --     that finds a body rolls once, its face the first byte of the battle
 --     RNG table below 252 after $be, mod 6, and $be stops on that byte; a
 --     pass that finds none (the roll before felled the last body) rolls
@@ -106,7 +107,15 @@ local function checkJackpot(r, i)
   -- draw rule (the first byte of the battle RNG table below 252 after $be,
   -- mod 6; $be stops there), and one that finds none -- the rolls before it
   -- felled the last body -- rolls nothing and draws nothing
-  H.assertEq(#r.passes, H.JACKPOT_ROLLS, string.format("Jackpot %d: the throw's %d passes", i, H.JACKPOT_ROLLS))
+  -- #545: the rolls stay on the body aimed at (r.targets); once it has
+  -- fallen the rolls left are not thrown, so fewer passes run then
+  local aimDown = true
+  for b = 0, 5 do
+    if (r.targets >> b) & 1 == 1 and r.mon1[b].present and r.mon1[b].alive then aimDown = false end
+  end
+  H.assertEq(#r.passes == H.JACKPOT_ROLLS or (#r.passes >= 1 and #r.passes < H.JACKPOT_ROLLS and aimDown), true,
+    string.format("Jackpot %d: the throw's %d passes, fewer only once the body it was aimed at ($%02X) has fallen "
+      .. "(%d ran)", i, H.JACKPOT_ROLLS, r.targets, #r.passes))
   local rng = H.sym("RNGTbl") & 0x3FFFFF
   local aimed, empty, redraws = 0, 0, 0
   for k, q in ipairs(r.passes) do

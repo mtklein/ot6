@@ -30,10 +30,12 @@
 --      and Still Life's 16, OT6_BROKEN_TICKS), and the second mark waits
 --      for the next break;
 --   8. Tint on RELM herself: once her casting action has ended she holds
---      all four turns (OT6_TINT_TURNS), as an ally would (the #538 review
---      read the casting action's end as counting one down; measured, it
---      does not, and a ROM that started hers one higher held 5:
---      build/attempts/wt/v047-noretarget/suites/b5/battle_relmwor.log);
+--      all four turns (OT6_TINT_TURNS), as an ally would (#538 review: the
+--      casting action's own end counted one down; the replay read 3 on a
+--      ROM without the fix).  Read 60 frames after her action's end: an
+--      action's end can straddle a frame, and reads at its entry frame saw
+--      the count before the decrement (4 without the fix, 5 with it,
+--      build/attempts/wt/v047-noretarget/suites/b5, b6);
 --   9. Varnish on TERRA by a RELM who cannot pay: her MP is written one
 --      under the price as her action begins (a declared write: the drop an
 --      enemy's Rasp or Osmose makes between her confirm and her turn), and
@@ -323,7 +325,8 @@ local function closed()
     return rec.fight ~= nil and #endsOf(terra * 2, rec.fight.f) > 0
   elseif stage == 8 then
     local ex = lastExec(relm * 2, nil)
-    return ex ~= nil and #endsOf(relm * 2, ex.f) > 0
+    local e = ex and endsOf(relm * 2, ex.f)[1]
+    return e ~= nil and H.frame >= e.f + 60
   elseif stage == 9 then
     return rec.starved ~= nil and #endsOf(relm * 2, rec.starved.f) > 0
   elseif stage == 10 then

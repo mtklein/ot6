@@ -899,10 +899,15 @@ Ot6PaintBanner:
         plx
         sta     OT6_TINTELEM,y  ; the colour (a second Tint repaints it)
         lda     #OT6_TINT_TURNS
-        sta     OT6_TINT,y      ; and the turns start again (on Relm herself
-                                ;   too: her casting action's end does not
-                                ;   count one down -- measured, 4 turns held
-                                ;   once it ended, battle_relmwor stage 8)
+        cpy     OT6_SCR_SLOT2
+        bne     :+
+        inc     a               ; the painter herself: the casting action's
+                                ;   own end counts one turn down
+                                ;   (Ot6PaintActionEnd), so hers start one
+                                ;   higher and she swings as many turns as
+                                ;   an ally (#538 review; battle_relmwor
+                                ;   stage 8 read 3 without this)
+:       sta     OT6_TINT,y      ; and the turns start again
         rts
 @varnish:
         lda     $3018,y
