@@ -11,6 +11,10 @@
 > lengthening a break, no Gesture off a Gestured turn): they stop loops,
 > not power. Sections below that say otherwise are superseded by this note
 > until the build rewrites them.
+>
+> **Gogo (owner, 2026-11-15):** a Gogo with Sketch opens Relm's whole list,
+> not plain Sketch: each command he picks gives its owner's full kit, as far
+> as is reasonable (#547).
 
 Status: **designed, not built** (2026-11-15). The owner's direction: "As an
 artist, she should have abilities that buff the team, like a bard or
