@@ -14201,9 +14201,11 @@ function Driver:makePlanRules(actor)
   end
   -- The last-stand body inside a smaller Fight (#454): a removal counter
   -- (the Sneeze) that the focus takes first, already within reach of a
-  -- Fight at a lower boost, gets the smallest boost that kills it.  The
-  -- swings past its death carry onto the plain bodies, and a carry that
-  -- leaves N or fewer standing fires the counter on its killing blow:
+  -- Fight at a lower boost, gets the smallest boost that kills it.  Before
+  -- #545 the swings past its death carried onto the plain bodies, and a
+  -- carry that left N or fewer standing fired the counter on its killing
+  -- blow (since #545 they are spent, and Driver:aimedBoostPlan trims every
+  -- boosted Fight to its aimed body; this trim stays as the first word):
   -- measured on the WoR plains ($0CC), a 2-BP Fight on a Chitonid at
   -- 106 and 127 HP took 1414 and 1435 off the monsters, killed all three
   -- and CELES was sneezed out at 484 and 612 HP ("PARTY LEFT",
@@ -14232,7 +14234,7 @@ function Driver:makePlanRules(actor)
           or dh.per * hits
         if est >= hp then
           standSay = string.format("[%s] actor=%d [last stand] slot %d at %d HP (%d shield(s)%s) dies to a Fight at "
-            .. "%d BP (%d: %d hit(s) at %d); boosting to %d would carry swings onto the plain bodies -- "
+            .. "%d BP (%d: %d hit(s) at %d); boosting to %d would spend swings past its death -- "
             .. "Fight at %d BP, %d BP kept (#454)", self.tag or "fight", actor, slot, hp, sh,
             broken and ", BROKEN" or "", b, est, hits, dh.per, boost, b, have - b)
           standBoost = b
@@ -14630,11 +14632,15 @@ function Driver:makePlanRules(actor)
         if best ~= nil and dh ~= nil and dh.kind == best.kind
            and (best.kind ~= "skill" or dh.skill == best.skill) and dh.per > 0 then
           local perTurn = dh.per * (best.hits or 1)
-          local chipRounds = math.ceil(left / perTurn)
+          -- one body a turn at most for a single-target line: the hits
+          -- past a death are spent (#545), not carried to the next body
+          local bodies = (best.bodies or 1) > 1 and 1 or livingMonsters()
+          local chipRounds = math.max(math.ceil(left / perTurn), bodies)
           if rounds == nil or chipRounds < rounds then
             rounds = chipRounds
-            arith = string.format("%d chipping %d HP down at %d a turn (%s)",
-              chipRounds, left, perTurn, best.what)
+            arith = string.format("%d chipping %d HP down at %d a turn (%s%s)",
+              chipRounds, left, perTurn, best.what, bodies > 1 and string.format(", one of %d bodies a turn",
+              bodies) or "")
           end
         end
       end
