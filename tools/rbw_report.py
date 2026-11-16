@@ -135,8 +135,9 @@ def report(log_lines, dbg, waivers, show_all=False, out=print):
         reason = waivers.get((where, ram))
         if not reason:
             spans = waivers.get(("*", ram), [])
-            hit = [r for a in g["addrs"] for lo, hi, r in spans if lo <= a <= hi]
-            if len(hit) == len(g["addrs"]):
+            # every offset under some waiver (overlapping waivers count once)
+            hit = [next((r for lo, hi, r in spans if lo <= a <= hi), None) for a in sorted(g["addrs"])]
+            if all(hit):
                 reason = hit[0]
         (waived if reason else open_).append((where, ram, g, reason))
     for where, ram, g, reason in open_ + (waived if show_all else []):
@@ -189,6 +190,10 @@ def selftest():
         w.write_text("unread wram 1FD0-1FDF every read of these\n")
         o, wv = report(log, d, load_waivers(w), out=[].append)
         check("an address waiver covering a group's every address waives it",
+              [x[0] for x in o] == ["src/a.asm:8"] and len(wv) == 1)
+        w.write_text("unread wram 1FD0-1FDF every read of these\nunread wram 1FD3 one of them again\n")
+        o, wv = report(log, d, load_waivers(w), out=[].append)
+        check("overlapping address waivers still waive the group",
               [x[0] for x in o] == ["src/a.asm:8"] and len(wv) == 1)
     print("rbw_report selftest: " + ("OK" if not fails else f"{len(fails)} FAILURE(S)"))
     return 1 if fails else 0
