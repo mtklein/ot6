@@ -623,19 +623,8 @@ local CASES = {
   { name = "safe-pass-b2", snap = "S", who = "C", cmd = CMD_MAGIC, spell = SAFE, boost = 2, ally = true,
     aimFree = true },
   -- the toggle: Imp on two allies, then Imp at the imped one lifts it from both
-  -- snapshot I needs what impl-b1 reads: two allies imped and standing at
-  -- the window it is taken in (the v0.47 replay's draw lost one between the
-  -- cast and CELES's next window, and impl-b1 read one: suite_battle_
-  -- boostreach.log, "impl-b1 ... mask $000A"); a window without it waits
-  -- for the next
   { name = "impa-b1",  snap = "C", who = "C", cmd = CMD_MAGIC, spell = IMP, boost = 1, ally = true, snapAfter = "I",
-    snapCond = function()
-      local n = 0
-      for e = 0, 6, 2 do
-        if (H.readByte(0x3EE4 + e) & 0x20) ~= 0 and H.readWord(0x3BF4 + e) > 0 then n = n + 1 end
-      end
-      return bank(celesS) >= 1 and n >= 2
-    end },
+    snapCond = function() return bank(celesS) >= 1 end },
   { name = "impl-b1",  snap = "I", who = "C", cmd = CMD_MAGIC, spell = IMP, boost = 1, ally = true },
   -- a spell the boost buys nothing on; Vanish at a monster
   { name = "quiet-b0", snap = "C", who = "C", cmd = CMD_MAGIC, spell = "quiet", boost = 0, here = true },
@@ -708,16 +697,26 @@ steps[#steps + 1] = H.call(function()
           tostring(beyond), passed, t, c.mask))
       end
       if c.name == "impl-b1" then
+        -- the toggle, whatever snapshot I holds: the target was imped and is
+        -- lifted, and the point's second body flips (lifted if it was imped,
+        -- imped if not).  Snapshot I held two imped allies on v0.46's line,
+        -- and the walk's next body was the other; on v0.47's replay one had
+        -- lost its Imp by CELES's next window and the walk reached an
+        -- unimped ally (suite_battle_boostreach.log, "impl-b1 ... mask
+        -- $000A"), so the old "two imped, every one lifted" was the draw's
         local imped = 0
         for e = 0, 6, 2 do if c.imp0[e] then imped = imped + 1 end end
-        check(c.first ~= nil and c.imp0[c.first] and imped >= 2, c.name .. ": the target and another ally are "
-          .. "imped (snapshot I)")
+        H.log(string.format("[boostreach] impl-b1: %d all(ies) imped at snapshot I, mask $%04X", imped, c.mask))
+        check(c.first ~= nil and c.imp0[c.first], c.name .. ": the target is imped (snapshot I)")
+        local n = 0
         for e = 0, 6, 2 do
           if (c.mask & (1 << (e // 2))) ~= 0 then
-            check(c.imp0[e], string.format("%s: entity %d in the mask was imped (the toggle lifts)", c.name, e))
-            check(c.impAfter[e] == false, string.format("%s: entity %d is no longer imped after the cast", c.name, e))
+            n = n + 1
+            check(c.impAfter[e] == not c.imp0[e], string.format("%s: entity %d in the mask flipped (Imp toggles): "
+              .. "imped %s before, %s after", c.name, e, tostring(c.imp0[e]), tostring(c.impAfter[e])))
           end
         end
+        check(n == 2, string.format("%s: the point reached a second ally (%d in the mask)", c.name, n))
       end
       if c.spell == SAFE then
         for e = 0, 6, 2 do

@@ -57,6 +57,10 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL, CMDROW = 0x202E, 0x890F
 local ST_CMD, ST_DEF, ST_TGT = 0x05, 0x27, 0x38
+-- Relm's Sketch command opens her painter's list (#538): the Tools-shell
+-- list state, mode $6168 = 5, cells at $4005 + 3i (two columns), the
+-- cursor's column and row per actor at $8963/$8967; Sketch is row $E8
+local ST_LIST, ROW_SKETCH = 0x30, 0xE8
 local BANK, PEND = 0x3E9C, 0x3E9D
 local CMD_SKETCH = 0x0D
 local RELM = 8
@@ -170,7 +174,19 @@ local function runTry(t)
           if H.readByte(MENU) ~= 0 then
             local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
             if a == relmS and not t.sent then
-              if st == ST_CMD then
+              if st == ST_LIST and H.readByte(0x6168) == 5 then
+                -- the list: walk the cursor to the Sketch row and take it
+                local want
+                for i = 0, 7 do if H.readByte(0x4005 + i * 3) == ROW_SKETCH then want = i; break end end
+                assert(want ~= nil, "RELM's painter's list holds the Sketch row")
+                local wc, wr = want % 2, want // 2
+                local cc, cr = H.readByte(0x8963 + relmS), H.readByte(0x8967 + relmS)
+                if cc ~= wc then held = wc > cc and "right" or "left"
+                elseif cr ~= wr then held = wr > cr and "down" or "up"
+                else held = "a" end
+              elseif st == ST_LIST or st == 0x2E or st == 0x2F then
+                held = nil       -- the list opening or closing: wait
+              elseif st == ST_CMD then
                 if pend(relmS) < 1 then held = "r"
                 else
                   local want, cur = cmdRow(relmS, CMD_SKETCH), H.readByte(CMDROW + relmS) & 3
