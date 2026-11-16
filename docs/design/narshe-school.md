@@ -117,7 +117,7 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Each hit on a weakness removes one shield. At zero it breaks: it can't act for a while, and the hits after that do double damage.
+> A hit on a weakness removes a shield. At zero it breaks: it can't act for a while, and later hits do double damage.
 >
 > *(next box)*
 >
@@ -145,15 +145,15 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Each character starts a battle with 1, and gains 1 after each of their turns, up to 5. It shows when their next turn comes.
+> Each character starts a battle with 1, and gains 1 after each of their turns, up to 5, shown at their next turn.
 >
 > *(next box)*
 >
-> While choosing a command, press the R Button to add a point: up to 3, if you have them. Arrows show how many until the action starts.
+> While choosing a command, press the R Button to add a point: up to 3, if you have them. Arrows show how many.
 >
 > *(next box)*
 >
-> Press the L Button to take one back. Boosting uses up those points, and you gain no new point that turn.
+> Press the L Button to take one back. The arrows stay until the action starts, which uses up the points and earns none.
 
 **$0270 — what a boost buys: Fight, damage skills, the MP price, status spells' reach (left room):**
 

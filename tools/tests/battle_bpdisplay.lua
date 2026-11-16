@@ -48,7 +48,7 @@ local function pend(c) return H.readByte(0x3E9D + c * 2) end
 local W = { viol = {}, queuedArrows = 0, withheld = 0, begins = 0, spent = 0, kept = 0, frames = 0, mismRow = {} }
 -- frames a row may disagree with the rule past the grace across the whole
 -- battle, every run counted (a run of six is a violation by itself)
-local MISM_TOTAL = 24
+local MISM_TOTAL = 60
 local st = {}
 for c = 0, 3 do st[c] = { begun = false, owed = false, mism = 0, seen = false } end
 
