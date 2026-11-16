@@ -56,6 +56,18 @@ local function lanes()
     H.assertEq(plain(x, y) and B ~= nil, true, "two plain tiles that roll random battles")
   end)
 end
+-- a random battle fought out the way the line fights one: the driver's
+-- tactical kit and boost, items for care.  fightBattleByMenu's plain Fight
+-- lost a post-opera random battle under #542 (the breaking hit no longer
+-- doubled), and this run's precondition is a won battle, not a lost one:
+-- 'a counted game over the body never handled' on v0.46's replay, the party
+-- falling one by one to group $0094 by the opera house with 3 BP banked.
+local function fightOut()
+  local F = H.newFightDriver("esperreload", { tactical = true, boost = true, items = true })
+  return H.driveUntil(function() return not H.battleLoadStarted() end, 40000, {
+    H.call(function() F.frame() end),
+  }, "the battle fought out (the driver's kit, boosted)")
+end
 -- random battles, fought out, until the live page is ahead of slot 3's (at most eight)
 local function earn(tag)
   local n = 0
@@ -65,7 +77,7 @@ local function earn(tag)
     H.call(function() n = n + 1; H.assertEq(n <= 8, true, tag .. ": a battle that pays a stone-wearer within eight") end),
     pace(tag .. ": a random battle"),
     H.waitUntil(function() return H.battleActive() end, 1200, tag .. ": the battle is up", 2),
-    H.fightBattleByMenu(40000),
+    fightOut(),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the map", 2),
     H.fieldCare({ tag = "care between battles" }),
   }, tag)
