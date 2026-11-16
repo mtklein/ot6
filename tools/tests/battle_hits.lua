@@ -61,7 +61,7 @@ local armed = false
 -- The window is opened by the subject's first swing and closed by
 -- SaveForMimic, the frame the action resolves, so nothing that lands
 -- outside this one action can be counted into it.
-local fightSwings, fightHits = 0, 0
+local fightSwings, fightHits, spentLeft = 0, 0, 0
 local handPass = { [0] = 0, [1] = 0 }
 local counting, closed = false, false
 local hitRefs = {}
@@ -121,6 +121,13 @@ local function decide()
           if (emu.getState()["cpu.y"] & 0xFFFF) < 8 then return end
           fightHits = fightHits + 1
         end, emu.callbackType.exec, hj, hj)
+        -- #545: the volley ends when its body falls; the passes it had left
+        -- ($3a70 + 1 at Ot6PassSpentNone, the pass that would have started
+        -- on the fallen body and those after it) are counted here
+        local sp = H.sym("Ot6PassSpentNone")
+        emu.addMemoryCallback(function()
+          if counting and not closed then spentLeft = H.readByte(0x3A70) + 1 end
+        end, emu.callbackType.exec, sp, sp)
         hitRefs.sf = emu.addMemoryCallback(function()
           if counting then closed = true end
         end, emu.callbackType.exec, sf, sf)
@@ -225,7 +232,7 @@ H.run({ maxFrames = 45000 + MAX_BRANCHES * (MAX_BRANCHES * IDLE + 10000 + 200) }
         H.waitFrames(2),
         H.call(function()
           if k > 1 then H.checkReq(load, "snapshot restore"); H.rearmInputInjection() end
-          swings, fightSwings, fightHits = {}, 0, 0
+          swings, fightSwings, fightHits, spentLeft = {}, 0, 0, 0
           handPass = { [0] = 0, [1] = 0 }
           counting, closed = false, false
           B = { idle = (k - 1) * IDLE }
@@ -263,15 +270,29 @@ H.run({ maxFrames = 45000 + MAX_BRANCHES * (MAX_BRANCHES * IDLE + 10000 + 200) }
             fightSwings, handPass[0], handPass[1], fightHits))
           H.assertEq(hands, 1,
             "LOCKE carries ONE weapon here: this fixture is the one-weapon case")
-          H.assertEq(fightSwings, H.fightPasses(2), string.format(
-            "the loop ran %d passes for a 2-BP Fight ($3a70 = 5, +1)", fightSwings))
-          H.assertEq(handPass[0] == handPass[1], true, string.format(
-            "the passes alternate hands: %d main, %d off", handPass[0], handPass[1]))
+          H.assertEq(fightSwings + spentLeft, H.fightPasses(2), string.format(
+            "the loop ran %d passes for a 2-BP Fight ($3a70 = 5, +1), %d of them spent once its body fell (#545)",
+            fightSwings, spentLeft))
+          local cut = spentLeft > 0
+          H.assertEq(cut and math.abs(handPass[0] - handPass[1]) <= 1 or handPass[0] == handPass[1], true,
+            string.format("the passes alternate hands: %d main, %d off", handPass[0], handPass[1]))
           local main, off = H.fightHits(hands, 2)
-          H.assertEq(main + off, fightSwings // 2, string.format(
-            "H.fightHits(%d, 2) = %d, half the %d passes the loop just ran: the "
-            .. "other half are the EMPTY hand (#235)", hands, main + off, fightSwings))
+          if not cut then
+            H.assertEq(main + off, fightSwings // 2, string.format(
+              "H.fightHits(%d, 2) = %d, half the %d passes the loop just ran: the "
+              .. "other half are the EMPTY hand (#235)", hands, main + off, fightSwings))
+          end
           H.assertEq(off, 0, "and the model gives the empty hand none of them")
+          if cut then
+            -- the volley that killed: the armed hand's passes run so far land,
+            -- the empty hand's whiff; which parity is armed is the ROM's
+            H.log(string.format("[branch] the volley's body fell after %d passes (%d left, spent): %d landed",
+              fightSwings, spentLeft, fightHits))
+            H.assertEq(fightHits == 0 or fightHits == handPass[0] or fightHits == handPass[1], true, string.format(
+              "a cut volley lands its armed hand's passes or none (landed %d; passes %d / %d)", fightHits,
+              handPass[0], handPass[1]))
+            main, off = fightHits, 0   -- the shape below holds it against what ran
+          end
           -- What the volley actually landed.  A whole action can miss (the #219
           -- lab's histogram is 0 or N, never a value between: the whiffing half
           -- is the empty hand, not a die roll), so the measurement is asserted
