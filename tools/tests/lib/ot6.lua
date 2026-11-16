@@ -19853,6 +19853,8 @@ function M.hireCrewCheck(r, tag)
     M.assertEq(#r.costs, #passes - 1, string.format("%s: %d of %d passes ran, the aim fell: every pass paid but the "
       .. "last, its walk home", tag, #passes, 1 + r.boost))
   end
+  M.assertEq(#passes - #r.costs <= 1, true, string.format("%s: at most one pass found no one (the walk home once the "
+    .. "aim fell): %d passes, %d paid", tag, #passes, #r.costs))
   for k, p in ipairs(passes) do
     local fig = (p.mark >> 4) & 7
     local want = math.min(k - 1, 3)
