@@ -164,5 +164,7 @@ CODE_EXT_INC = 1
 .global Ot6DenseMagicPre
 .global Ot6DenseLoreAtTop, Ot6DenseLoreStore, Ot6DenseLoreOpen, Ot6DenseLoreBar
 .global Ot6DenseRageAtTop, Ot6DenseRageStore, Ot6DenseRageOpen, Ot6DenseRageBar
+; #541's sequel: Mog's Dance list and Locke's thief list packed
+.global Ot6DanceList, Ot6DenseDanceOpen, Ot6DenseDanceStore, Ot6ToolsCursorStore
 
 .endif

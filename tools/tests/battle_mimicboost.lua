@@ -94,8 +94,13 @@ local function quietSpell(s)
 end
 local TONIC, ANTIDOTE = 0xE8, 0xF2
 local TERRA, LOCKE, STRAGO = 0, 1, 7
--- the thief window's cells: { column, row } (Ot6ThiefRowTbl)
-local CELL = { steal = { 0, 0 }, filch = { 0, 1 }, bestow = { 0, 2 }, trick = { 1, 0 } }
+-- the thief window's cell holding row `id`: the list is packed (#541's
+-- sequel; the rows LOCKE has learned close up down the left column, then the
+-- right), so the cell is read from the window's own list ($4005), not fixed
+local function thiefCell(id)
+  for i = 0, 7 do if H.readByte(0x4005 + i * 3) == id then return i end end
+  return nil
+end
 local ROWID = { steal = 0x56, filch = 0x57, bestow = 0x58, trick = 0xE1 }
 local DRAWS = 12
 
@@ -222,7 +227,9 @@ local function sourcePress(c, st)
     return "a"
   end
   if c.cmd == CMD_STEAL and st == ST_LIST then
-    local col, row = CELL[c.row][1], CELL[c.row][2]
+    local cell = thiefCell(ROWID[c.row])
+    assert(cell, string.format("the thief list holds row $%02X", ROWID[c.row]))
+    local col, row = cell % 2, cell // 2
     local cc, cr = H.readByte(KCOL + s), H.readByte(KROW + s)
     if cc ~= col then return cc < col and "right" or "left" end
     if cr ~= row then return cr < row and "down" or "up" end

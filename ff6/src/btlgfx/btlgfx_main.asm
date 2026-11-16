@@ -13308,8 +13308,14 @@ OpenRageWindow:
 
 UpdateMenuState_1f:
 OpenDanceWindow:
+.if LANG_EN
+@5958:  jsl     Ot6DenseDanceOpen    ; ot6: menu state $1f, and a remembered
+        nop                     ;   cursor kept on the packed list
+                                ;   (ot6_dense.asm)
+.else
 @5958:  lda     #$1f
         sta     w7e7bc2
+.endif
         lda     w7e7ba5
         bmi     @596d
         jsr     _c15a17
@@ -20445,10 +20451,15 @@ UpdateMenuState_21:
         jsr     GetCursorInput
         lda     $3c
         bne     @85e6
+.if LANG_EN
+        jsl     Ot6DenseDanceStore   ; ot6: store the cursor, then keep it on
+        nop6                    ;   a listed dance (ot6_dense.asm)
+.else
         lda     $36
         sta     w7e8937,y
         lda     $37
         sta     w7e893b,y
+.endif
 @85e6:  lda     $09
         bpl     @85f0
         inc     $96
@@ -20736,10 +20747,15 @@ UpdateMenuState_30:
         jsr     ScrollToolsListUp
 
 ; no scroll
+.if LANG_EN
+@87eb:  jsl     Ot6ToolsCursorStore  ; ot6: store the cursor; in LOCKE's thief
+        nop6                    ;   list, kept on a listed row (ot6_thief.asm)
+.else
 @87eb:  lda     $36
         sta     w7e8963,y
         lda     $37
         sta     w7e8967,y
+.endif
 
 ; a button
 @87f5:  lda     $04

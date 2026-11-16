@@ -243,6 +243,14 @@ local function steerTo(a, cell)
 end
 
 local danceId = nil
+
+-- the cell a dance sits in.  The Dance list is packed (#541's sequel): the
+-- dances MOG knows close up from the top in id order, so a dance's cell is
+-- its place in the list ($267E), read live, not its id
+local function danceCell(id)
+  for i = 0, 7 do if H.readByte(0x267E + i) == id then return i end end
+  return nil
+end
 local function danceCost() return H.boostPrice(8, BOOST) end
 
 -- the hands of the caster for the live verb: R to the boost, open the list,
@@ -291,7 +299,9 @@ local function pulse()
       if btn == "a" then rec.pressed = rec.pi end
     end
   elseif st == ST_DANCE and V.cmd == CMD_DANCE then
-    local row, col = danceId // 2, danceId % 2
+    local cell = danceCell(danceId)
+    assert(cell, string.format("the Dance list holds dance %d", danceId))
+    local row, col = cell // 2, cell % 2
     local cr, cc = H.readByte(0x893B + a), H.readByte(0x8937 + a)
     if cr ~= row then btn = (cr < row) and "down" or "up"
     elseif cc ~= col then btn = (cc < col) and "right" or "left"

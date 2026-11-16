@@ -12,9 +12,10 @@
 -- Played: Continue fire-out-v1 (TERRA, LOCKE, STRAGO) and walk the plain east
 -- of Thamasa (battle_study's lap), one counted LOCKE action a battle through
 -- H.kitBattle; the others Fight.  Stages (one write, before stage 8):
---   1. the list (peek): Steal $56, Filch $57, Bestow $58 and Mug $E0 down the
---      left column, Trickshot $E1, Dismantle $E2 and Appraise $E3 down the
---      right, Master's Mark's cell empty; prices 4 / 4 / 8 / 3 MP;
+--   1. the list (peek): the learned rows packed in the table's order down the
+--      left column, then the right (here Steal $56, Filch $57, Bestow $58 and
+--      Mug $E0, then Trickshot $E1, Dismantle $E2 and Appraise $E3), the
+--      last cell empty; prices 4 / 4 / 8 / 3 MP;
 --   2. Mug at 1 BP on a body that carries loot: it runs as Capture --
 --      Ot6FightBoost buys its two extra swings (four passes of _magicpunch,
 --      a Fight's two, one a hand, and two for the point, or fewer only when
@@ -251,15 +252,25 @@ local function onList(p, a)
   for i = 0, 7 do t[#t + 1] = string.format("%d:$%02X/%d", i, cells[i].id, cells[i].qty) end
   H.log("[lockekit] the thief list: " .. table.concat(t, " "))
   H.assertEq(H.readByte(0x6168), 3, "the list is the thief list (w7e6168 = 3)")
-  local want = { [0] = STEAL, [2] = FILCH, [4] = BESTOW, [6] = MUG, [1] = TRICK, [3] = DIS, [5] = APP }
-  for i, id in pairs(want) do
-    H.assertEq(cells[i].id, id, string.format("cell %d holds row $%02X", i, id))
+  -- the list is packed (#541's sequel): the rows he has learned, in the
+  -- table's order, down the left column and then the right, the rest empty
+  local want, k = {}, 0
+  for _, id in ipairs({ STEAL, FILCH, BESTOW, MUG, TRICK, DIS, APP, MARK }) do
+    if H.lockeKnows(id) then want[(k % 4) * 2 + k // 4] = id; k = k + 1 end
   end
-  H.assertEq(cells[7].id, 0xFF, "Master's Mark's cell is empty: the Air Force ($00A0) is still ahead")
-  H.assertEq(cells[6].qty, 4, "Mug draws 4 MP")
-  H.assertEq(cells[1].qty, 4, "Trickshot draws 4 MP at 0 BP")
-  H.assertEq(cells[3].qty, 8, "Dismantle draws 8 MP")
-  H.assertEq(cells[5].qty, 3, "Appraise draws 3 MP")
+  for i = 0, 7 do
+    H.assertEq(cells[i].id, want[i] or 0xFF, string.format("cell %d holds %s", i,
+      want[i] and string.format("row $%02X", want[i]) or "nothing (past the learned rows)"))
+  end
+  H.assertEq(H.lockeKnows(MARK), false, "Master's Mark is not learned: the Air Force ($00A0) is still ahead")
+  local function qty(id)
+    for i = 0, 7 do if cells[i].id == id then return cells[i].qty end end
+    return nil
+  end
+  H.assertEq(qty(MUG), 4, "Mug draws 4 MP")
+  H.assertEq(qty(TRICK), 4, "Trickshot draws 4 MP at 0 BP")
+  H.assertEq(qty(DIS), 8, "Dismantle draws 8 MP")
+  H.assertEq(qty(APP), 3, "Appraise draws 3 MP")
   H.screenshot("lockekit_list")
 end
 

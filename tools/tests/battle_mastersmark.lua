@@ -16,7 +16,7 @@
 -- plays the list through H.kitBattle, everyone else Defends.  Nothing is
 -- written.  Stages, each in a battle where a standing body carries loot:
 --   1. (two or more bodies carrying loot) the row at 2 BP: drawn at 99 MP
---      in cell 7, refused at the list (it
+--      in its cell, refused at the list (it
 --      buzzes, the list stays up); then at 3 BP, confirmed: every body
 --      standing at the action lost its loot, the queue gained exactly the
 --      rare-else-common of each body that had any, in slot order;
@@ -181,8 +181,10 @@ end
 
 local function onList(p, a)
   if p.boost ~= 2 or p.refused ~= "list" then return end
-  H.assertEq(H.readByte(0x4005 + 7 * 3), MARK, "cell 7 holds Master's Mark ($E4): the Air Force is behind him")
-  H.assertEq(H.readByte(0x4006 + 7 * 3), MARK_MP, "it draws 99 MP")
+  local cell
+  for i = 0, 7 do if H.readByte(0x4005 + i * 3) == MARK then cell = i end end
+  H.assertEq(cell ~= nil, true, "the list holds Master's Mark ($E4): the Air Force is behind him")
+  H.assertEq(H.readByte(0x4006 + cell * 3), MARK_MP, "it draws 99 MP")
   H.screenshot("mastersmark_grey")
 end
 
