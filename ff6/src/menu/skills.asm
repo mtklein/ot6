@@ -498,12 +498,19 @@ DrawMagicMenu:
 .if LANG_EN
 
 SkillsOptionsWindow1:                   make_window BG2A, {1, 1}, {7, 4}
-SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {7, 12}
+SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {15, 12}
                                         ; 10 -> 12, one more text row (Thief
                                         ;   at BG3A row 19).  The window's 2
                                         ;   height units per text row: at 10
                                         ;   the frame closed under Dance and
                                         ;   the Thief row floated outside it.
+                                        ; 7 -> 15 wide for "Treasure Hunter"
+                                        ;   (columns 2-16): the frame's right
+                                        ;   edge is column 17, one short of
+                                        ;   the LV/HP/MP labels at column 18,
+                                        ;   and what it covers of the
+                                        ;   character window is the portrait's
+                                        ;   corner, empty on this screen
 SkillsCharWindow1:                      make_window BG2A, {1, 6}, {28, 5}
 SkillsMagicWindow1:                     make_window BG2A, {1, 13}, {28, 12}
 SkillsDescWindow1:                      make_window BG2A, {1, 1}, {28, 3}
@@ -511,6 +518,10 @@ SkillsCharWindow2:                      make_window BG2B, {1, 6}, {28, 5}
 SkillsMagicWindow2:                     make_window BG2B, {1, 13}, {28, 12}
 SkillsMPWindow:                         make_window BG2B, {22, 4}, {7, 1}
 SkillsDescWindow2:                      make_window BG2B, {1, 1}, {28, 3}
+; Locke's page title box, SkillsMPWindow stretched left to hold "Treasure
+; Hunter" (columns 15-29).  DrawThiefMenu draws it over the shared box and the
+; page's B exit puts the shared one back (Ot6ThiefTitleBoxOff).
+Ot6ThiefTitleWindow:                    make_window BG2B, {14, 4}, {15, 1}
 
 .else
 
@@ -2180,12 +2191,51 @@ OT6_THIEF_ATK0 = $56                    ; Steal; Filch $57, Bestow $58
 DrawThiefMenu:
         jsr     ClearBG1ScreenA
         jsr     Ot6ThiefPageDraw
+        ldy     #near Ot6ThiefTitleWindow
+        jsr     DrawWindow              ; the wide title box over the shared one
+        jsr     Ot6ThiefTitleBoxDMA
         lda     #$2c
         sta     zTextColor
         ldy     #near SkillsThiefTitleText
         jsr     DrawPosKana
         jsr     CreateSubPortraitTask
         jmp     InitDMA1BG3ScreenB
+
+; ---- the title box's BG2 rows to VRAM at the next vblank ----
+; BG2 screen B's rows 4-6, the rows the wide box and the shared one span
+; (screen B at VRAM $1400, 32 words a row).  DMA 2, because DMA 1 carries BG3
+; screen B the same frame; the page's own frames re-aim DMA 2 at the
+; description (LoadThiefDesc) only after this one has gone.
+OT6_THIEF_BOX_ROW = 4
+Ot6ThiefTitleBoxDMA:
+        ldy     #$1400 + OT6_THIEF_BOX_ROW * 32
+        sty     zDMA2Dest
+        ldy     #near wBG2Tiles::ScreenB + OT6_THIEF_BOX_ROW * 64
+        sty     zDMA2Src
+        lda     #^wBG2Tiles::ScreenB
+        sta     zDMA2Src+2
+        ldy     #3 * 64
+        sty     zDMA2Size
+        rts
+
+; ---- leaving the page: the shared title box back, the long title gone ----
+; Every other page draws its short title at column 23 into the shared box and
+; clears nothing, so the wide box and columns 15-22 of the title must not
+; outlast this page.  The windows the wide box overlapped are redrawn in
+; _c34c80's order, and both screens go up in one vblank before the list
+; returns (the Blitz page's B exit waits the same way).
+Ot6ThiefTitleBoxOff:
+        ldy     #near SkillsCharWindow2
+        jsr     DrawWindow
+        ldy     #near SkillsDescWindow2
+        jsr     DrawWindow
+        ldy     #near SkillsMPWindow
+        jsr     DrawWindow
+        jsr     Ot6ThiefTitleBoxDMA
+        ldy     #near SkillsThiefTitleBlankText
+        jsr     DrawPosKana
+        jsr     InitDMA1BG3ScreenB
+        jmp     WaitVblank
 
 ; ---- draw the eight rows ----
 ; In the battle window's order read a column at a time (Ot6ThiefRowTbl, bank
@@ -3587,6 +3637,7 @@ SkillsRageTitleText:            pos_text SKILLS_RAGE_TITLE
 SkillsDanceTitleText:           pos_text SKILLS_DANCE_TITLE
 .if LANG_EN
 SkillsThiefTitleText:           pos_text SKILLS_THIEF_TITLE
+SkillsThiefTitleBlankText:      pos_text SKILLS_THIEF_TITLE_BLANK
 .endif
 SkillsGenjuTitleText:           pos_text SKILLS_GENJU_TITLE
 SkillsBlitzTitleText:           pos_text SKILLS_BLITZ_TITLE

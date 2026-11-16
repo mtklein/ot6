@@ -2680,6 +2680,7 @@ MenuState_30_Thief:
         lda     z08+1
         bit     #>JOY_B
         beq     @done30
+        jsr     Ot6ThiefTitleBoxOff     ; the shared title box back (skills.asm)
         jsr     ReloadSkillsMenu
 @done30: rts
 .endif
