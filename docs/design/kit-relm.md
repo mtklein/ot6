@@ -10,14 +10,14 @@
 > costs, durations and levels, err generous. The abuse limits stay (one
 > lengthening a break, no Gesture off a Gestured turn): they stop loops,
 > not power. Sections below that say otherwise are superseded by this note
-> until the build rewrites them.  (Built in v0.47: the sections below are
+> until the build rewrites them.  (Built for v0.48: the sections below are
 > rewritten to the build; `kits.md` "Relm" is the summary.)
 >
 > **Gogo (owner, 2026-11-15):** a Gogo with Sketch opens Relm's whole list,
 > not plain Sketch: each command he picks gives its owner's full kit, as far
 > as is reasonable (#547).
 
-Status: **built** (v0.47, `ot6_paint.asm`; designed 2026-11-15). The owner's direction: "As an
+Status: **built** (for v0.48, after #545; `ot6_paint.asm`; designed 2026-11-15). The owner's direction: "As an
 artist, she should have abilities that buff the team, like a bard or
 synergist." The brainstorm in #538 was approved in full; this document turns
 it into a kit that can be built, and says where the approved ideas had to
@@ -77,6 +77,11 @@ needed. Portrait's boost had to bend (below).  The prices, durations and
 levels are the overshoot the owner ruled: each row costs about two thirds of
 the first design's, Tint lasts four turns, Still Life doubles a break, and
 Underpainting and Gesture come six levels sooner.
+
+**One body at a time (#545).**  A single-target action's later passes no
+longer move to another enemy after a kill, so the swings a Portrait's point
+buys and the hits a Tint colours land on the one body the fighter aimed at.
+Nothing in the kit counts on a pass carrying over.
 
 **The named body must take the row, or nobody does.**  A row aimed at a
 body it cannot land on (a Gesture at an ally whose turn is full or queued,
