@@ -169,7 +169,7 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Boosting a status spell such as Sleep, Mute or Safe casts it on one more target per point, for its MP again each time.
+> Boosting a status spell such as Sleep, Mute or Safe casts it on one more target per point, for its MP again per point.
 
 **$026E — stronger spells from a boost (left room):**
 

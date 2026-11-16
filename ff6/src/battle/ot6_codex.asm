@@ -182,13 +182,15 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         rtl
 .endproc
 
-; New Game: zero the save block's OT6 scrap ($1e1d-$1e3f: the three
-; loadouts, the signature and the reserve) and vanilla's unused tail
-; ($1ff7-$1ffd).  Vanilla clears WRAM only to $11ff (ClearRAM) and its New
-; Game names none of these bytes, so on a console or emulator whose RAM
-; powers on non-zero they held junk: all-$FF loadouts read as a manual Rage
-; and Lore loadout whose every slot names an unknown entry, and Gau and
-; Strago came up with empty lists.  Zero is AUTO and unsigned.
+; New Game, and power-on (Ot6PowerOnClear): zero the save block's OT6
+; scrap ($1e1d-$1e3f: the three loadouts, the signature and the reserve),
+; vanilla's unused tail ($1ff7-$1ffd), and the vanilla save-block ranges
+; that New Game leaves unwritten (Ot6NewGameZero).  Vanilla clears WRAM
+; only to $11ff (ClearRAM) and its New Game names none of these bytes, so
+; on a console or emulator whose RAM powers on non-zero they held junk:
+; all-$FF loadouts read as a manual Rage and Lore loadout whose every slot
+; names an unknown entry, and Gau and Strago came up with empty lists.
+; Zero is AUTO and unsigned, and the value vanilla assumes elsewhere.
 ; a/x widths saved.
 .proc Ot6NewGameClear
         php
@@ -264,13 +266,19 @@ Ot6NewGameZero:
         .byte   2       ; the random-battle counter (field/battle.asm adds
                         ;   each step; vanilla clears it only after a battle)
         .word   $1fa8
-        .byte   24      ; unused by any code
+        .byte   24      ; the timers' saved copy (PushTimers at a save,
+                        ;   PopTimers at a load and on leaving the field
+                        ;   menu, menu/save.asm): zero is no timer running
         .word   $1fc2
         .byte   16      ; event variables 0-7 (EventCmd_e8-eb; add_var 0 runs
                         ;   on what is there)
         .word   $1fd3
         .byte   32      ; the 16 objects' saved positions (PushPartyMap,
-                        ;   read back at field init, obj.asm:3437)
+                        ;   read back at field init, obj.asm:3437).  The
+                        ;   reader is the reset path's first field init,
+                        ;   which Ot6PowerOnClear covers; at New Game they
+                        ;   are already zero, so this entry is redundant
+                        ;   there and kept so both callers share one list
         .word   $0000
         .byte   0
 

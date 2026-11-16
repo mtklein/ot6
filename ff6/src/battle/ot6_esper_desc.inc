@@ -38,59 +38,59 @@ Ot6RungDescPtrs:
         .word   $0014   ; Raises Mag.Pwr by 1
         .word   $0028   ; Protects against Dark
         .word   $003e   ; Raises Stamina by 2
-        .word   $0052   ; Bolt spells cut 2 shields if weak
-        .word   $0074   ; Raises Vigor by 1
-        .word   $0086   ; Raises max HP by 1/8
-        .word   $009b   ; Raises Vigor by 2
-        .word   $00ad   ; Raises Fight damage by 1/4
-        .word   $00c8   ; Raises Speed by 1
-        .word   $00da   ; Protects against Seizure
-        .word   $00f3   ; Raises Mag.Pwr by 2
-        .word   $0107   ; Halves the MP spells cost
-        .word   $0121   ; Protects against Sleep
-        .word   $0138   ; Raises Speed by 2
-        .word   $014a   ; Blocks Berserk and Muddle
-        .word   $0164   ; Sometimes counters an attack
-        .word   $0181   ; Raises max HP by 1/2
-        .word   $0196   ; Protects against Petrify
-        .word   $01af   ; Blocks instant death, Condemned
-        .word   $01cf   ; Raises max MP by 1/8
-        .word   $01e4   ; Raises magic damage by 1/4
-        .word   $01ff   ; Casts Safe when HP is low
-        .word   $0219   ; Raises max HP by 1/4
-        .word   $022e   ; Protects against Imp
-        .word   $0243   ; Raises the success rate of Steal
-        .word   $0264   ; Walks faster outside battle
-        .word   $0280   ; Float in every battle
-        .word   $0296   ; No Dark or Petrify; max MP +1/2
-        .word   $02b6   ; Fight always hits
-        .word   $02c8   ; Haste in every battle
-        .word   $02de   ; Fight and magic damage +1/4
-        .word   $02fa   ; Protects against instant death
-        .word   $0319   ; Safe in every battle
-        .word   $032e   ; Raises all four stats by 1
-        .word   $0349   ; Gauntlet and Genji Glove effects
-        .word   $036a   ; Raises max MP by 1/4
-        .word   $037f   ; Raises Vigor by half
-        .word   $0394   ; Protects against Poison
-        .word   $03ac   ; Regen in every battle
-        .word   $03c2   ; Protects against Mute
-        .word   $03d8   ; Shell in every battle
-        .word   $03ee   ; Casts Shell when HP is low
-        .word   $0409   ; 2 Boost Points at battle start
-        .word   $0428   ; No back or pincer attacks
-        .word   $0442   ; Starts every battle with Image
-        .word   $0461   ; Healing done is 25% stronger
-        .word   $047e   ; Revives allies at full HP
-        .word   $0498   ; Protects against Muddle
-        .word   $04b0   ; Covers weak allies while healthy
-        .word   $04d1   ; Protects against Zombie
-        .word   $04e9   ; Blocks Dark, Zombie and Poison
-        .word   $0508   ; Raises preemptive attack rate
-        .word   $0526   ; Blocks Stop and Slow
-        .word   $053b   ; Protects against Berserk
-        .word   $0554   ; Blocks Condemned and Zombie
-        .word   $0570   ; Starts every battle with Life 3
+        .word   $0052   ; Bolt cuts 2 shields on weak foes
+        .word   $0073   ; Raises Vigor by 1
+        .word   $0085   ; Raises max HP by 1/8
+        .word   $009a   ; Raises Vigor by 2
+        .word   $00ac   ; Raises Fight damage by 1/4
+        .word   $00c7   ; Raises Speed by 1
+        .word   $00d9   ; Protects against Seizure
+        .word   $00f2   ; Raises Mag.Pwr by 2
+        .word   $0106   ; Halves the MP spells cost
+        .word   $0120   ; Protects against Sleep
+        .word   $0137   ; Raises Speed by 2
+        .word   $0149   ; Blocks Berserk and Muddle
+        .word   $0163   ; Sometimes counters an attack
+        .word   $0180   ; Raises max HP by 1/2
+        .word   $0195   ; Protects against Petrify
+        .word   $01ae   ; Blocks instant death, Condemned
+        .word   $01ce   ; Raises max MP by 1/8
+        .word   $01e3   ; Raises magic damage by 1/4
+        .word   $01fe   ; Casts Safe when HP is low
+        .word   $0218   ; Raises max HP by 1/4
+        .word   $022d   ; Protects against Imp
+        .word   $0242   ; Raises the success rate of Steal
+        .word   $0263   ; Walks faster outside battle
+        .word   $027f   ; Float in every battle
+        .word   $0295   ; No Dark or Petrify; max MP +1/2
+        .word   $02b5   ; Fight always hits
+        .word   $02c7   ; Haste in every battle
+        .word   $02dd   ; Fight and magic damage +1/4
+        .word   $02f9   ; Protects against instant death
+        .word   $0318   ; Safe in every battle
+        .word   $032d   ; Raises all four stats by 1
+        .word   $0348   ; Gauntlet and Genji Glove effects
+        .word   $0369   ; Raises max MP by 1/4
+        .word   $037e   ; Raises Vigor by half
+        .word   $0393   ; Protects against Poison
+        .word   $03ab   ; Regen in every battle
+        .word   $03c1   ; Protects against Mute
+        .word   $03d7   ; Shell in every battle
+        .word   $03ed   ; Casts Shell when HP is low
+        .word   $0408   ; 2 Boost Points at battle start
+        .word   $0427   ; No back or pincer attacks
+        .word   $0441   ; Starts every battle with Image
+        .word   $0460   ; Healing done is 25% stronger
+        .word   $047d   ; Revives allies at full HP
+        .word   $0497   ; Protects against Muddle
+        .word   $04af   ; Covers weak allies while healthy
+        .word   $04d0   ; Protects against Zombie
+        .word   $04e8   ; Blocks Dark, Zombie and Poison
+        .word   $0507   ; Raises preemptive attack rate
+        .word   $0525   ; Blocks Stop and Slow
+        .word   $053a   ; Protects against Berserk
+        .word   $0553   ; Blocks Condemned and Zombie
+        .word   $056f   ; Starts every battle with Life 3
 
 ; the descriptions, null-terminated, in the menu's description charset
 Ot6RungDescStr:
@@ -98,7 +98,7 @@ Ot6RungDescStr:
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$9b,$b2,$ff,$b5,$00   ; Raises Mag.Pwr by 1
         .byte   $8f,$ab,$a8,$ad,$9e,$9c,$ad,$ac,$ff,$9a,$a0,$9a,$a2,$a7,$ac,$ad,$ff,$83,$9a,$ab,$a4,$00   ; Protects against Dark
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$9b,$b2,$ff,$b6,$00   ; Raises Stamina by 2
-        .byte   $81,$a8,$a5,$ad,$ff,$ac,$a9,$9e,$a5,$a5,$ac,$ff,$9c,$ae,$ad,$ff,$b6,$ff,$ac,$a1,$a2,$9e,$a5,$9d,$ac,$ff,$a2,$9f,$ff,$b0,$9e,$9a,$a4,$00   ; Bolt spells cut 2 shields if weak
+        .byte   $81,$a8,$a5,$ad,$ff,$9c,$ae,$ad,$ac,$ff,$b6,$ff,$ac,$a1,$a2,$9e,$a5,$9d,$ac,$ff,$a8,$a7,$ff,$b0,$9e,$9a,$a4,$ff,$9f,$a8,$9e,$ac,$00   ; Bolt cuts 2 shields on weak foes
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$95,$a2,$a0,$a8,$ab,$ff,$9b,$b2,$ff,$b5,$00   ; Raises Vigor by 1
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$a6,$9a,$b1,$ff,$87,$8f,$ff,$9b,$b2,$ff,$b5,$c0,$bc,$00   ; Raises max HP by 1/8
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$95,$a2,$a0,$a8,$ab,$ff,$9b,$b2,$ff,$b6,$00   ; Raises Vigor by 2

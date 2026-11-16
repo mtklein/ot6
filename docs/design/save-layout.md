@@ -220,7 +220,8 @@ None is moved or re-encoded.
   the power-on fill found each read unwritten or carried into every save):
   `$1E70-$1E7F` (unused, after the treasure bits), `$1F60-$1F63` (world
   and airship positions, which an event sets before use), `$1F6E-$1F6F`
-  (the random-battle counter), `$1FA8-$1FBF` (unused), `$1FC2-$1FD1`
+  (the random-battle counter), `$1FA8-$1FBF` (the timers' saved copy, `PushTimers`/`PopTimers`; zero
+  means no timer), `$1FC2-$1FD1`
   (event variables 0-7) and `$1FD3-$1FF2` (the objects' saved positions).
   Each is zeroed at New Game, and at power-on before the field's first
   init (`Ot6PowerOnClear`); zero is the value vanilla assumes, and no

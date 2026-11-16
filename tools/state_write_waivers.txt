@@ -136,6 +136,7 @@ tools/tests/lib/ot6.lua	.writeWord(	1
 tools/tests/lib/ot6.lua	emu.loadSavestate	1
 tools/tests/lib/ot6.lua	emu.write	1
 tools/tests/lib/ot6.lua	emu.writeWord	1
+tools/tests/lib/poweron_fill.lua	emu.write	2	quarantine: the power-on fill instrument (OT6_POWERON_FILL, docs/TOOLING.md): it fills each RAM before the CPU's first instruction, standing in for what a console powers on holding; compose.py refuses it outside a fill tree, so no line state carries it
 tools/tests/menu_blitzpage.lua	.writeByte(	1
 # menu_lorepage.lua (#122): unit-style expedient, the menu_ragepage.lua
 # precedent.  Strago is unreachable by play until the v0.13 route lands (he

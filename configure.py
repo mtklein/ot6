@@ -177,7 +177,7 @@ w("# One suite test: compose, boot Mesen headless, publish the log, touch the")
 w("# ok.  $env carries the per-test environment (dirty-RAM pins, checkpoint")
 w("# batteries, coverage artifact dirs); the separating space lives here.")
 w("rule suitetest")
-w("  command = $env nice tools/build/run_suite_test.sh $test $out")
+w(f"  command = $env {sn.LAB_UNSET} nice tools/build/run_suite_test.sh $test $out")
 w("  description = suite $test")
 w()
 

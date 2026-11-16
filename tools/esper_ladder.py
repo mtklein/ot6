@@ -155,7 +155,7 @@ DESC = {
     "Mirage Vest": "Starts every battle with Image",
     "True Knight": "Covers weak allies while healthy",
     "Gaunt+Genji": "Gauntlet and Genji Glove effects",
-    "Conductor": "Bolt spells cut 2 shields if weak",
+    "Conductor": "Bolt cuts 2 shields on weak foes",
     "Facet": "2 Boost Points at battle start",
     "Heal +25%": "Healing done is 25% stronger",
     "Full Revive": "Revives allies at full HP",

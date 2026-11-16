@@ -218,17 +218,17 @@ OT6_NUMCTR           := $ed71   ; last-seen damage-numeral thread counter
                                 ;   ($632e).  a change means GfxCmd_0b has
                                 ;   allocated a numeral (the damage frame)
                                 ;   and Ot6RevealPoll commits pending reveals.
-                                ;   past InitBP's clear on purpose: a stale
-                                ;   value costs one no-op commit (see the proc)
+                                ;   past InitBP's shadow clear; InitBP zeroes
+                                ;   it with $ed6d-$ed8e (power-on junk was read
+                                ;   unwritten, tools/uninit_waivers.txt)
 OT6_COVERPAID        := $ed72   ; per-character bitmask (----1234, the
                                 ;   $3f2f shape).  bit set =
                                 ;   that character's True Knight cover has
                                 ;   already banked its BP this round.  set by
                                 ;   Ot6CoverBP, cleared per character by
                                 ;   Ot6ActionEnd (the round boundary) and
-                                ;   wholesale by InitBP.  unlike NUMCTR a stale
-                                ;   value here would suppress a real earn, so
-                                ;   it is init-cleared explicitly.
+                                ;   wholesale by InitBP (a stale value here
+                                ;   would suppress a real earn).
 OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
                                 ;   + 1 (0 = nothing pending).  Ot6CoverBP
                                 ;   banks the blocker here at the cover commit
@@ -254,10 +254,10 @@ OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
 ;   1..$18     a live flash, counting down one per main-loop frame
 ; OT6_BRKPAL banks the monster's own sprite-palette bits (w7e80db & $0e) for
 ; the frame the flash hands the sprite back.
-; Both live past InitBP's shadow clear, so power-on junk is possible; every
-; reader is gated on the monster being present ($3aa8) and Ot6SeedShields
-; zeroes both per slot at every seed (fresh battle and Cmd_20 reload), which
-; is the same clearing contract OT6_RVPEND_* already runs on.
+; Both live past InitBP's shadow clear; InitBP zeroes them with the rest of
+; $ed6d-$ed8e, and Ot6SeedShields zeroes both per slot at every seed (fresh
+; battle and Cmd_20 reload), the clearing contract OT6_RVPEND_* runs on.
+; Every reader is also gated on the monster being present ($3aa8).
 ;
 ; The per-battle-frame path (WaitFrame, after WaitVblank returns,
 ; btlgfx_main.asm:432-445) has essentially no cycle slack: the battle loop's
@@ -266,8 +266,8 @@ OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
 ; OT6_BRKLIVE gates the per-frame break-flash painter inline at its call site
 ; (ot6_hud.asm) rather than through a proc call, since even a `jsr` into a
 ; proc that early-outs is over budget.  Nonzero = at least one slot has a
-; live countdown; the painter recomputes it as it walks, so a stale value
-; costs exactly one walk and the byte needs no init clear.
+; live countdown; the painter recomputes it as it walks, and InitBP zeroes
+; it at every battle's start (it was read unwritten after power-on).
 ;
 ; MEASURED SINCE (#236): "essentially no cycle slack" is too strong.  A delay
 ; loop of known length on that very path, watched through WaitVblank's own
