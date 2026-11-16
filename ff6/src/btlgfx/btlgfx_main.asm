@@ -13042,8 +13042,13 @@ OpenMagicWindow:
         lda     $2095,x
         sta     w7e6178
         jsr     _c15a17
+.if LANG_EN
+        jsl     Ot6DenseMagicOpen    ; ot6 #541: a remembered cursor kept on the
+        nop2                    ;   packed list (ot6_dense.asm)
+.else
         ldx     w7e62ca
         lda     w7e8913,x
+.endif
         sta     w7e7ba6
         lda     #$80
         sta     w7e7ba5
@@ -13241,8 +13246,13 @@ OpenLoreWindow:
         lda     $216d,x
         sta     w7e6178
         jsr     _c15a17
+.if LANG_EN
+        jsl     Ot6DenseLoreOpen     ; ot6 #541 (ot6_dense.asm)
+        nop2
+.else
         ldx     w7e62ca
         lda     w7e891f,x
+.endif
         sta     w7e7ba6
         lda     #$80
         sta     w7e7ba5
@@ -13267,8 +13277,13 @@ OpenRageWindow:
         lda     w7e7ba5
         bmi     @5942
         jsr     _c15a17
+.if LANG_EN
+        jsl     Ot6DenseRageOpen     ; ot6 #541 (ot6_dense.asm)
+        nop2
+.else
         ldx     w7e62ca
         lda     w7e892b,x
+.endif
         sta     w7e7ba6
         lda     #$80
         sta     w7e7ba5
@@ -19651,10 +19666,12 @@ UpdateMenuState_0e:
         bmi     @8187
 
 ; scroll list down
-        lda     w7e8913,y
 .if LANG_EN
-        cmp     #$17
+        jsl     Ot6DenseMagicAtTop   ; ot6 #541: the packed list's own top
+        nop                     ;   (ot6_dense.asm), was `lda w7e8913,y /
+                                ;   cmp #$17`, 27 rows whatever it held
 .else
+        lda     w7e8913,y
         cmp     #$0e
 .endif
         beq     @81ae
@@ -19677,10 +19694,15 @@ UpdateMenuState_0e:
         sta     w7e8913,y
         inc     $94
         jsr     ScrollMagicListUp
+.if LANG_EN
+@81a4:  jsl     Ot6DenseMagicStore   ; ot6 #541: store the cursor, then keep it on
+        nop6                    ;   a listed spell (ot6_dense.asm)
+.else
 @81a4:  lda     $36
         sta     w7e8917,y
         lda     $37
         sta     w7e891b,y
+.endif
 
 ; A button
 @81ae:  lda     $04
@@ -19717,17 +19739,20 @@ UpdateMenuState_0e:
         lda     $2095,x
         sta     w7e6178
 .if LANG_EN
-        lda     #$17
-        sta     $36
-        ldx     #$0190
+        jsl     Ot6DenseMagicBar     ; ot6 #541: the scroll bar spans the packed
+        nop3                    ;   list (ot6_dense.asm), none when it does
+        bcs     :+              ;   not scroll; was `lda #$17 / sta $36 / ldx
+        lda     w7e8913,y       ;   #$0190 / stx $2e`
+        jsr     _c1898f
+:
 .else
         lda     #$0e
         sta     $36
         ldx     #$0292
-.endif
         stx     $2e
         lda     w7e8913,y
         jsr     _c1898f
+.endif
         lda     w7e8917,y
         tax
         lda     f:MagicCursorXPosTbl,x
@@ -19947,10 +19972,11 @@ UpdateMenuState_1b:
         lda     $3c
         beq     @8353
         bmi     @8345
-        lda     w7e891f,y
 .if LANG_EN
-        cmp     #$14
+        jsl     Ot6DenseLoreAtTop    ; ot6 #541: the packed lores' own top, was
+        nop                     ;   `lda w7e891f,y / cmp #$14` (24 rows)
 .else
+        lda     w7e891f,y
         cmp     #$08
 .endif
         beq     @835d
@@ -19965,10 +19991,15 @@ UpdateMenuState_1b:
         sta     w7e891f,y
         inc     $94
         jsr     ScrollLoreListUp
+.if LANG_EN
+@8353:  jsl     Ot6DenseLoreStore    ; ot6 #541 (ot6_dense.asm)
+        nop6
+.else
 @8353:  lda     $36
         sta     w7e8923,y
         lda     $37
         sta     w7e8927,y
+.endif
 @835d:  lda     $04
         bpl     @837c
         jsr     _c183f7
@@ -19989,16 +20020,21 @@ UpdateMenuState_1b:
 @8386:  jsr     _c183f7
         lda     $216d,x
         sta     w7e6178
+.if LANG_EN
+        jsl     Ot6DenseLoreBar      ; ot6 #541 (ot6_dense.asm), was `lda #$08 /
+        nop3                    ;   sta $36 / ldx #$01cd / stx $2e`
+        bcs     :+
+        lda     w7e891f,y
+        jsr     _c1898f
+:
+.else
         lda     #$08
         sta     $36
-.if LANG_EN
-        ldx     #$01cd
-.else
         ldx     #$0480
-.endif
         stx     $2e
         lda     w7e891f,y
         jsr     _c1898f
+.endif
 .if LANG_EN
         clr_ax
 .else
@@ -20264,8 +20300,13 @@ UpdateMenuState_1e:
         lda     $3c
         beq     @8516
         bmi     @8508
+.if LANG_EN
+        jsl     Ot6DenseRageAtTop    ; ot6 #541: the packed rages' own top, was
+        nop                     ;   `lda w7e892b,y / cmp #$7c` (128 rows)
+.else
         lda     w7e892b,y
         cmp     #$7c
+.endif
         beq     @8520
         inc
         sta     w7e892b,y
@@ -20278,10 +20319,15 @@ UpdateMenuState_1e:
         sta     w7e892b,y
         inc     $94
         jsr     ScrollRageListUp
+.if LANG_EN
+@8516:  jsl     Ot6DenseRageStore    ; ot6 #541 (ot6_dense.asm)
+        nop6
+.else
 @8516:  lda     $36
         sta     w7e892f,y
         lda     $37
         sta     w7e8933,y
+.endif
 @8520:  lda     $09
         bpl     @852a
         inc     $96
@@ -20307,12 +20353,21 @@ UpdateMenuState_1e:
         sta     w7e7a84
         jmp     _c17795
 @8548:  inc     $95
+.if LANG_EN
+@854a:  jsl     Ot6DenseRageBar      ; ot6 #541 (ot6_dense.asm), was `lda #$7c /
+        nop3                    ;   sta $36 / ldx #$004b / stx $2e`
+        bcs     :+
+        lda     w7e892b,y
+        jsr     _c1898f
+:
+.else
 @854a:  lda     #$7c
         sta     $36
         ldx     #$004b
         stx     $2e
         lda     w7e892b,y
         jsr     _c1898f
+.endif
         lda     w7e892f,y
         tax
         lda     f:RageCursorXPosTbl,x

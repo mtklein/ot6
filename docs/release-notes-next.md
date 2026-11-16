@@ -51,6 +51,14 @@ screen now start the same every time. A boosted Fight that switches to another
 enemy after its target falls also no longer behaves differently in the first
 battle after turning the console on.
 
+Spell lists are packed. The Magic list, in battle and under Skills, shows only
+the spells the character can cast now, from the top and in the usual spell
+order, with spells lent by an Esper or a shield in their usual places among
+them. Strago's Lore list in battle shows his lores one under another. The
+Magic, Lore and Rage lists no longer scroll past their last entry, and the
+cursor no longer stops on an empty space. A muddled character can now pick a
+spell lent by an Esper, as well as the ones they know.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

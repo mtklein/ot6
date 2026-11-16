@@ -13469,17 +13469,13 @@ GetMPCost:
         lda     $3a7b       ; branch if attacker is a monster
         cpx     #$0008
         bcs     @4f47
-        phx
-        tax
-        lda     $3084,x     ; pointer to master spell list
-        plx
-        cmp     #$ff
-        beq     @4f53       ; return if spell is not in list
-        longa
-        asl2
-        adc     $302c,x     ; calculate pointer to character spell list (at $208e)
-        tax
-        shorta
+        ; ot6 #541: the caster's own row, not the union's: his list is
+        ; packed (ot6_dense.asm), so the master pointer $3084 no longer names
+        ; his row.  Same 20 bytes as vanilla's lookup.
+        jsl     Ot6SpellRowPtr  ; x = the row; carry set = not in his list
+        bcs     @4f53       ; return if spell is not in list
+        nop7
+        nop7
         lda     a:$0003,x     ; modified mp cost (byte 3)
         bra     @4f54
 @4f47:  xba
@@ -14807,8 +14803,10 @@ _56f6:  dey4
         bne     _56e9
         plp
         plx
-        lda     $f6
-        sta     $3cf8,x     ; number of available spells
+        jsl     Ot6PackSpellList  ; ot6 #541: pack this caster's spell and lore
+        nop                     ;   rows (ot6_dense.asm) and store his spell
+                                ;   count, vanilla's `lda $f6 / sta $3cf8,x`
+                                ;   (5 bytes) re-counted from the rows
         rts
 
 ; ------------------------------------------------------------------------------

@@ -27,15 +27,17 @@ local function bp(slot) return H.readByte(0x3e9c + slot*2) end
 local function mp(slot) return H.readWord(0x3c08 + slot*2) end
 local function cmdptr(slot) return H.readByte(0x32cc + slot*2) end
 
--- One magic-list ROW, read exactly the way the ROM reaches it: the master
--- spell list ($3084, spell id -> entry index) into the caster's own list
--- ($302c,entity -> $208e/$21ca/$2306/$2442), stride 4.  GetMPCost walks this
--- (battle_main.asm:13201-13210) and so does CheckMagicEnabled (:14692).
+-- One magic-list ROW, read exactly the way the ROM reaches it: the caster's
+-- own list ($302c,entity -> $208e/$21ca/$2306/$2442), stride 4, rows 1..54
+-- the spells.  Each caster's list is packed (#541, ot6_dense.asm), so the
+-- row is found by its id among his rows, as GetMPCost's Ot6SpellRowPtr does.
 --   +0 id   +1 flags (bit 7 = disabled)   +2 targeting   +3 MP cost
 local function row(slot, spellId)
-  local idx = H.readByte(0x3084 + spellId)
-  if idx == 0xff then return nil end
-  return H.readWord(0x302c + slot * 2) + idx * 4
+  local base = H.readWord(0x302c + slot * 2)
+  for r = 1, 54 do
+    if H.readByte(base + r * 4) == spellId then return base + r * 4 end
+  end
+  return nil
 end
 local function rowCost(slot, spellId)
   local r = row(slot, spellId)

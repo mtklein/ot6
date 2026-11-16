@@ -2545,12 +2545,13 @@ OT6_LIFE3_ID = $35
 ; the walk below covers the caster's whole list rather than the eight family
 ; heads, and Ot6MagicPrice decides per row which of the two rules applies.
 ;
-; The walk is driven off the master spell list $3034 (position -> real id)
-; rather than off the rows themselves, because a lore's row byte is its id
-; minus $8b (battle_main.asm:14648) and would be indistinguishable from a
-; magic id.  Position p is row p+1; row 0 is the equipped esper, whose row
-; byte is an esper index and whose MagicProp record is that index + $36.
-;
+; The walk reads each row's own id (#541: every caster's list is packed,
+; ot6_dense.asm, so a row is his, not a master-list position).  Rows 1..54
+; hold spell ids; rows 55..78 hold a lore's number, its id minus $8b
+; (battle_main.asm:14648), so the row's segment says which.  Row 0 is the
+; equipped esper, whose row byte is an esper index and whose MagicProp record
+; is that index + $36.
+
 ; Cost: 78 rows instead of 8 families, but an unlearned row leaves after two
 ; loads, and this is a burst on a recheck request (an L/R edge, or the end of
 ; an action), never per-frame work -- the same budget note Ot6Boost's call
@@ -2605,7 +2606,7 @@ OT6_LIFE3_ID = $35
         bcs     @out            ; monsters have no boost and no spell list
         ; x is the only register the 65816 can index a long address with
         ; (`lda f:tbl,y` has no encoding), and this walk needs it three
-        ; different ways per row (master-list cursor, caster, list row), so
+        ; different ways per row (row cursor, caster, list row), so
         ; the two invariants live in scratch and x is working state.
         stx     OT6_SCR_SLOT2   ; the caster's entity offset
         jsl     Ot6FoldSteps    ; -> OT6_SCR_BIT (0 restores the base prices)
@@ -2635,21 +2636,32 @@ OT6_LIFE3_ID = $35
         jsl     Ot6MagicPrice
         plx                     ; the row back
         sta     a:$0003,x
-        ; --- rows 1..78: every spell and lore anybody in the party knows ---
-@rows:  ldx     #$0000
-        stx     OT6_SCR_IDX     ; p, the master-list position (word store: the
-                                ;   high byte must stay 0 for the bumps below)
-@row:   ldx     OT6_SCR_IDX
-        lda     $3034,x         ; the master spell list: position -> the REAL
-                                ;   id ($00-$35 magic, $8b-$a2 lore, $ff =
-                                ;   nobody knows it).  The caster's own row
-                                ;   byte cannot stand in for this: a lore is
-                                ;   stored there as id - $8b
-                                ;   (battle_main.asm:14648), which collides
-                                ;   with the magic ids
+        ; --- rows 1..78: the caster's packed spells, then his lores ---
+        ; Each row names its own id (#541: the lists are packed per caster,
+        ; ot6_dense.asm, so a row is no longer a master-list position):
+        ; rows 1..54 hold the spell id itself, rows 55..78 a lore's number,
+        ; id - $8b (battle_main.asm:14648), so the segment says which.
+@rows:  ldx     #$0001
+        stx     OT6_SCR_IDX     ; r, the row (word store: the high byte must
+                                ;   stay 0 for the bumps below)
+@row:   ldx     OT6_SCR_SLOT2   ; the caster
+        longa
+        lda     OT6_SCR_IDX
+        asl2
+        clc
+        adc     $302c,x
+        tax                     ; -> this caster's row r
+        shorta0
+        lda     a:$0000,x       ; the row's id byte
         cmp     #$ff
-        beq     @next           ; nobody knows it: dead in every list
-        cmp     #$99
+        beq     @next           ; an empty row: nothing to price
+        pha
+        lda     OT6_SCR_IDX
+        cmp     #55             ; carry: a lore row
+        pla
+        bcc     @real
+        adc     #$8b - 1        ; carry set: + $8b, the lore's attack id
+@real:  cmp     #$99
         beq     @next           ; Step Mine: its price is the play clock's,
                                 ;   not MagicProp's (battle_main.asm:14670),
                                 ;   so recomputing the row would overwrite the
@@ -2657,19 +2669,6 @@ OT6_LIFE3_ID = $35
                                 ;   reproduce.  Ot6QueueFold skips it too, so
                                 ;   both surfaces stay vanilla together
         pha                     ; [$01,s] the real id
-        ldx     OT6_SCR_SLOT2   ; the caster
-        longa
-        lda     OT6_SCR_IDX
-        inc                     ; row = position + 1 (row 0 is the esper), the
-        asl2                    ;   same arithmetic battle init used to fill
-        clc                     ;   the lists (:14644) and GetMPCost uses to
-        adc     $302c,x         ;   read one back (:13268)
-        tax                     ; -> this caster's row for this spell
-        shorta0
-        lda     a:$0000,x       ; the row's id byte
-        bmi     @drop           ; $ff: not learned.  leave the row alone; it
-                                ;   is already disabled, and a price on a row
-                                ;   the caster cannot pick means nothing
         phx                     ; the row
         lda     $03,s           ; the real id (parked under the row pointer)
         ldx     OT6_SCR_SLOT2   ; the caster
@@ -2677,14 +2676,14 @@ OT6_LIFE3_ID = $35
                                 ;   one, by Ot6InFoldTbl's single answer
         plx                     ; the row back
         sta     a:$0003,x       ; the byte: grey, number, confirm and charge
-@drop:  pla                     ; drop the parked id
+        pla                     ; drop the parked id
 @next:  longa
         lda     OT6_SCR_IDX
         inc
         sta     OT6_SCR_IDX
-        cmp     #$004e          ; 78 rows: 54 spells + 24 lores, the same count
-        shorta0                 ;   UpdateEnabledMagic's own loop walks four
-        bcc     @row            ;   instructions later (:14797)
+        cmp     #$004f          ; rows 1..78: 54 spells + 24 lores, the same
+        shorta0                 ;   count UpdateEnabledMagic's own loop walks
+        bcc     @row            ;   (:14797)
 @out:   ply
         plx
         pla
