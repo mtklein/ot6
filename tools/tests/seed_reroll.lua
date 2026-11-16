@@ -61,7 +61,7 @@ H.run({ maxFrames = 20000, retries = 3, seedGap = 1, watchdog = false }, {
     H.assertEq(H.rerollCount(), 1,
       "attempt 2 at shift 1 fought attempt 1's first battle and was re-rolled once")
     H.assertEq(run, 3, "the body ran three times: attempt 1, attempt 2 at shift "
-      .. "26 (re-rolled at its seed store), attempt 2 at the re-rolled shift")
+      .. "1 (re-rolled at its seed store), attempt 2 at the re-rolled shift")
     H.assertEq(fb.key ~= prev.key, true,
       "the re-rolled attempt fights a different first battle")
     H.log("[seed_reroll] a retry that repeated attempt 1's first battle was "
