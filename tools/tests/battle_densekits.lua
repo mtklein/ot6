@@ -227,13 +227,20 @@ local function closeWindow(k)
   end
 end
 
--- steer the cursor onto cell `want` (columns first, then rows)
+-- steer the cursor onto cell `want`, along the list's own order: the row
+-- first in a list read across the rows (the Dance list), the column first in
+-- one read down the columns (the thief list), so no step crosses an empty
+-- cell short of the target (a step onto one lands on the last entry)
 local function steerTo(k, slot, want, tag)
+  local rowsFirst = k == KIND.dance
   for _ = 1, 24 do
     local col, row = cursor(k, slot)
     if col == want % 2 and row == want // 2 then return end
-    if col ~= want % 2 then press(col < want % 2 and "right" or "left")
-    else press(row < want // 2 and "down" or "up") end
+    if (rowsFirst and row ~= want // 2) or (not rowsFirst and col == want % 2) then
+      press(row < want // 2 and "down" or "up")
+    else
+      press(col < want % 2 and "right" or "left")
+    end
   end
   local col, row = cursor(k, slot)
   H.assertEq(row * 2 + col, want, tag .. ": the cursor reaches cell " .. want)

@@ -59,7 +59,7 @@ SUITES = {
     "mastersmark": ("battle_mastersmark", "mastersmark_banner_1"),
     "cover": ("@boss_shots", "boss_rev2_late"),
     "celes": ("@battle_shots", "celes_runic_6"),
-    "mog": ("@battle_shots", "mog_dance_1"),
+    "mog": ("battle_densekits", "battle_densekits_dance"),
     "strago": ("battle_lorerefuse", "lorerefuse_after"),
     "portrait_umaro": ("@portrait_shots", "menu_tritoch", (12, 15, 63, 62)),
     "portrait_mog": ("@portrait_shots", "menu_tritoch", (12, 63, 63, 110)),
