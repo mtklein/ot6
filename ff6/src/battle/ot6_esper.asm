@@ -858,13 +858,17 @@ OT6_LIMIT = 42069
 ; so does the sum.
 ;
 ; jsl in place of `clc / adc $11b0` after `jsr LsrA`.  in: a16, A = the
-; quotient's low 16 bits, $ea = the bits past them (after LsrA's shifts),
-; $11b0 = power * 4.  out: A = the base, saturated; the caller stores it.
+; quotient's low 16 bits, $ea bits 0-2 = the bits past them, $11b0 = power *
+; 4.  out: A = the base, saturated; the caller stores it.  LsrA shifts $ea as
+; a word (a16), so $ea's upper five bits after its five shifts are $eb's,
+; which Mult24 never cleared: only bits 0-2, the product's bits 21-23, count.
+; (A first version tested all of $ea and saturated a Narshe Fire Beam to
+; 9999: battle_reveal, build/attempts/wt/v049-limitbreak/lab/reveal_dbg*.)
 .proc Ot6MagBase
         .a16
         pha
         lda     $ea
-        and     #$00ff
+        and     #$0007
         beq     :+
         pla                     ; the quotient is past 16 bits
         lda     #$ffff

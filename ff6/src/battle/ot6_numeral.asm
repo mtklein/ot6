@@ -42,10 +42,11 @@
 ; left-aligned in the slots and the half width ($6326) is four pixels a
 ; digit, as vanilla's: one to four digits draw exactly as before (A and B,
 ; same tiles' contents, same places).  The digits reach the tiles in
-; GfxCmd_0b's two transfers, as before: the first frame blanks the bottoms,
-; the second writes the tops (Ot6NumTfr, from the NMI's _c10640).  Slots 0-3
-; are vanilla's 128-byte buffer ($60b3, same layout); slot 4 is a glyph number
-; in the thread's $632a, which vanilla only ever cleared.
+; GfxCmd_0b's two transfers, a frame apart, as before; the digits are drawn
+; before the first (Ot6NumPrep), so the second, on the numeral's own frame,
+; is one transfer no larger than vanilla's (Ot6NumTfr).  Slots 0-3 are
+; vanilla's 128-byte buffer ($60b3, same layout); slot 4 is a glyph number in
+; the thread's $632a, which vanilla only ever cleared.
 ;
 ; Multi-target numerals (five or more targets, GfxCmd_03, ten numerals).
 ; Vanilla's ten four-tile slots fill the animation area's rows $60, $80, $a0
@@ -100,9 +101,9 @@ Ot6NumMultiDx:
 ; where each glyph goes in the $7f:e400 buffer ((tile - $60) * 32 + $e400)
 Ot6NumMultiAt:
         .word   $ed20, $ed40, $ed80, $eda0, $ede0
-; a blank tile for a slot with no digit
+; blank tiles: a slot with no digit, and the bottoms (up to five)
 Ot6NumBlank:
-        .res    32, $00
+        .res    160, $00
 
 ; ------------------------------------------------------------------------------
 
@@ -294,72 +295,82 @@ Ot6NumBlank:
 ;
 ; jsl from _c10640 (the battle NMI) in place of its one 128-byte transfer,
 ; once GfxCmd_0b has asked for one ($6316, cleared by the caller; $6317 the
-; VRAM address vanilla's tables give: $2c00/$2d00 + $40 * thread, top or
-; bottom).  The bottom request blanks the thread's bottoms in rows $d0
-; from the cleared buffer; the top request writes slots 0-1 to the A pair,
-; 2-3 to the B triple's first two and slot 4 (the glyph $632a names, or a
-; blank) to its third.  Each transfer is TfrVRAM's (DMA channel 7, length in
-; $36, as vanilla's).  a8 i16, db=$7e, dp=0.  Clobbers a/x/y.
+; VRAM address from its tables).  GfxCmd_0b asks twice, a frame apart: first
+; the bottoms ($2d00 + $40 * thread, vanilla's table), then the tops (its
+; second table, repointed to $2c00, $2c50, $2ca0, $2cd0).  Ot6NumPrep has
+; drawn the digits by the first, so the first frame carries everything but
+; four tiles: the thread's bottoms blanked, slot 4 (the glyph $632a names, or
+; a blank) and, for threads 2 and 3, the A pair (slots 0-1) in the status
+; block.  The second frame, the one the numeral appears on and the one
+; #539's reveal and its HUD redraw land on, carries one transfer no larger
+; than vanilla's: slots 0-3 (threads 0 and 1) or slots 2-3 (threads 2 and 3)
+; from the buffer.  (A first version moved all five slots on the second
+; frame, in two or three transfers: about three scanlines of the NMI where
+; vanilla's took one, on the frame #539's reveal redraws the HUD, whose flush
+; runs late in the same NMI: build/attempts/wt/v049-limitbreak/lab/
+; reveal_nmi2.log.)  Each
+; transfer is TfrVRAM's (DMA channel 7, VMAINC as the NMI left it).  a8 i16,
+; db=$7e, dp=0.  Clobbers a/x/y; a8, A = 0 out.
 .proc Ot6NumTfr_ext
         .a8
         .i16
-        phb
-        lda     #$00
-        pha
-        plb                     ; db=0 for the PPU and DMA registers
         rep     #$20
         .a16
-        lda     f:$7e6317
+        lda     $6317
+        bit     #$0100
+        bne     @bottom
+; the numeral's frame: one transfer, from $7e
+        sta     f:$002116
+        cmp     #$2ca0
+        bcs     :+
+        ldx     #$60b3          ; threads 0 and 1: slots 0-3
+        ldy     #$0080
+        bra     @top
+:       ldx     #$60b3 + $40    ; threads 2 and 3: slots 2-3
+        ldy     #$0040
+@top:   txa
+        sta     f:$004372
+        tya
+        sta     f:$004375
+        sep     #$20
+        .a8
+        lda     #$7e
+        sta     f:$004374
+        lda     #$01
+        sta     f:$004370
+        lda     #$18
+        sta     f:$004371
+        lda     #$80
+        sta     f:$00420b
+        tdc
+        rtl
+; the frame before: the bottoms, slot 4 and (threads 2, 3) the A pair
+        .a16
+@bottom:
+        phb
+        pea     $0000
+        plb
+        plb                     ; db=0 for the PPU and DMA registers
         lsr
         lsr
         lsr
         lsr
         lsr
         and     #$0006
-        pha                     ; [1,s] the thread * 2
-        lda     f:$7e6317
-        bit     #$0100
-        beq     @top
-; bottoms: zeros from the cleared buffer
-        lda     1,s
-        tax
+        tax                     ; the thread * 2
         lda     f:Ot6NumBot,x
         tay
         lda     f:Ot6NumBotLen,x
-        cmp     #$0081
-        bcc     @one
-        sbc     #$0080
-        pha                     ; the rest past 128 bytes
-        lda     #$0080
-        ldx     #$60b3
-        jsr     @dma7e
-        tya
-        clc
-        adc     #$0040
-        tay
-        pla
-@one:   ldx     #$60b3
-        jsr     @dma7e
-        bra     @done
-@top:   lda     1,s
-        tax
-        lda     f:Ot6NumTopA,x
-        tay
-        lda     #$0040
-        ldx     #$60b3
-        jsr     @dma7e          ; slots 0-1
+        phx
+        ldx     #.loword(Ot6NumBlank)
+        jsr     @dmaF0          ; the bottoms
         lda     1,s
         tax
         lda     f:Ot6NumTopB,x
-        tay
-        lda     #$0040
-        ldx     #$60b3 + $40
-        jsr     @dma7e          ; slots 2-3
-        tya
         clc
         adc     #$0020
         tay                     ; slot 4's tile
-        lda     1,s
+        txa
         lsr
         tax
         lda     f:$7e632a,x
@@ -380,29 +391,36 @@ Ot6NumBlank:
         .a8
         lda     #$7f
         jsr     @dma
-        bra     @done
+        rep     #$20
         .a16
+        bra     @pair
 @blank: ldx     #.loword(Ot6NumBlank)
         lda     #$0020
+        jsr     @dmaF0
+@pair:  plx
+        cpx     #$0004
+        bcc     @done           ; threads 0 and 1: slots 0-1 go with the tops
+        lda     f:Ot6NumTopA,x
+        tay
+        lda     #$0040
         sta     $36
+        ldx     #$60b3
         sep     #$20
         .a8
-        lda     #^Ot6NumBlank
+        lda     #$7e
         jsr     @dma
-@done:  rep     #$20
-        .a16
-        pla
-        sep     #$20
+@done:  sep     #$20
         .a8
         plb
         tdc
         rtl
         .a16
-; A (a16) = the length, X = the source in $7e, Y = the VRAM word address
-@dma7e: sta     $36
+; A (a16) = the length, X = the source in this bank (a blank), Y = the VRAM
+; word address
+@dmaF0: sta     $36
         sep     #$20
         .a8
-        lda     #$7e
+        lda     #^Ot6NumBlank
         jsr     @dma
         rep     #$20
         .a16
@@ -422,6 +440,42 @@ Ot6NumBlank:
         lda     #$80
         sta     $420b
         rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a single numeral's digits, drawn ahead ]
+;
+; jsl from GfxCmd_0b (btlgfx_main.asm @a4e2) in place of its buffer clear,
+; before it asks for the first transfer: the buffer cleared and, unless the
+; word is $ffff (no numeral), the digits drawn into it and slot 4 into the
+; thread's $632a (Ot6NumSingle's work, which @a510 repeats for its $14 and
+; $1e).  a8 i16, db=$7e.  a8, A = 0 out (the caller's next `tax` is i16).
+.proc Ot6NumPrep_ext
+        .a8
+        .i16
+        rep     #$20
+        .a16
+        ldx     #$007e
+:       stz     $60b3,x
+        dex
+        dex
+        bpl     :-
+        ldy     #$0002
+        lda     ($76),y
+        cmp     #$ffff
+        bne     :+
+        lda     $632e
+        and     #$0003
+        tax
+        sep     #$20
+        .a8
+        stz     $632a,x
+        tdc
+        rtl
+:       sep     #$20
+        .a8
+        jml     Ot6NumSingle_ext
 .endproc
 
 ; ------------------------------------------------------------------------------

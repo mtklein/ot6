@@ -16,7 +16,7 @@ CODE_EXT_INC = 1
 .global Ot6ToolListIcon_ext
 .global Ot6BgHud_ext, Ot6BgHudFlush_ext, Ot6PipGlyph_ext
 .global Ot6NumSingle_ext, Ot6NumTfr_ext, Ot6NumSprSingle_ext ; #550 five-digit numerals
-.global Ot6NumMulti_ext, Ot6NumSprMulti_ext
+.global Ot6NumMulti_ext, Ot6NumSprMulti_ext, Ot6NumPrep_ext
 .global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
 .global Ot6WeaponSpellQueued, Ot6WeaponSpellPass
 .global Ot6CodexSaveAs          ; copy slot-local weakness knowledge on Save As

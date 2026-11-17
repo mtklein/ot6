@@ -24855,11 +24855,11 @@ GfxCmd_0b:
 @a4dc:  inx
         cpx     #$0004
         bne     @a4c9
-@a4e2:  clr_ax
-@a4e4:  stz     w7e60b3,x     ; clear graphics buffer
-        inx
-        cpx     #$0080
-        bne     @a4e4
+@a4e2:  jsl     Ot6NumPrep_ext  ; ot6 #550: clear the buffer and draw the
+        bra     @a4e4           ;   digits into it now (ot6_numeral.asm), so
+        nop5                    ;   the first frame's transfer carries all
+@a4e4:                          ;   but four tiles (the same size as vanilla's
+                                ;   clear loop)
         lda     w7e632e       ; numeral counter
         asl
         tax
@@ -24965,7 +24965,9 @@ _c1a5cb:
 
 ; pointers to damage numeral graphics in vram (top of tiles, where the numbers are)
 _c1a5d3:
-@a5d3:  .word   $2c00,$2c40,$2c80,$2cc0
+@a5d3:  .word   $2c00,$2c50,$2ca0,$2cd0 ; ot6 #550: each thread's slot 2 for
+                                ;   threads 2 and 3, slot 0 for 0 and 1
+                                ;   (Ot6NumTfr, ot6_numeral.asm)
 
 ; ------------------------------------------------------------------------------
 
