@@ -482,8 +482,13 @@ H.run({ maxFrames = 60000 }, {
       "the head's two unrevealed weaknesses drawn as '?' in the '?' attribute")
     H.assertEq(palsLoaded() < 3, true,
       "precondition: the formation left a monster palette unloaded (the spare v0.45's grey took)")
-    H.assertEq(palBits(hs), ownBits(hs), "the head starts on its own palette")
     H.screenshot("break_gauge")
+  end),
+  -- palette 3 (bits 6) is the engine's own flash and retract animations' (3h below); a draw can open the
+  -- fight with the head in one of them, so the start's palette is read once that animation is over
+  H.waitUntil(function() return palBits(hs) ~= 6 end, 1200, "the head out of the engine's flash/retract palette", 1),
+  H.call(function()
+    H.assertEq(palBits(hs), ownBits(hs), "the head starts on its own palette")
   end),
 
   -- 2+3. Terra beams the head until it breaks (watcher rides the pred)
