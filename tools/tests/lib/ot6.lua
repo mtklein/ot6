@@ -18384,7 +18384,9 @@ end
 --     peek = true      open the command's window (Magic or a Tools-shell
 --                      list), hand it to opts.onList, and back out
 --     confirmWhen = fn at the monster target select, the cursor on the
---                      target, wait (no input) until fn() is true }
+--                      target, wait (no input) until fn() is true
+--     openWhen = fn    on the command window, the cursor on the command,
+--                      wait (no input) until fn() is true }
 -- The bank is filled to the entry's boost by real Defends first, then R
 -- raises and L lowers the pending boost to exactly it.  Everyone else
 -- Defends while the plan has entries (opts.others = "fight": Fights a live
@@ -18722,6 +18724,12 @@ function M.kitBattle(plan, opts)
           return
         end
       end
+      -- p.openWhen: the cursor rests on the command, touching nothing, until
+      -- openWhen() says so; the battle runs on meanwhile (a list would stop
+      -- the clock in Wait mode, and an auto-confirming target select cannot
+      -- be held: battle_limitbreak's Ultima waits here for the Reach Frogs'
+      -- Jump to land)
+      if p.openWhen ~= nil and not p.openWhen() then M.setPad({}); return end
       if cool == 0 then p.opened, p.seat = true, a end
       pulse("a")
     elseif (st == 0x0E or st == 0x30 or st == 0x2D) and not p.opened then

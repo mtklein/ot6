@@ -24,7 +24,7 @@
 --               fonts side by side
 --   right       count 500, and at H's pass's display the monsters' entries dropped and the first seated member's set
 --               to 12345 (synthetic): one five-digit single numeral on the party's side of the screen
---   broken      count 500; the first present monster is marked Broken (OT6_BROKEN_TICKS) and its amount set to
+--   broken      count 500; the first present monster is marked Broken (OT6_BROKEN_TICKS, as H's window opens) and its amount set to
 --               33,333 where Ot6BrokenDmg doubles it: 42,069 (x2 saturates and the cap takes it; vanilla's skip left
 --               33,333)
 --   weak        count 500; the first monster made weak to the pass's element and its amount set to 33,333 where
@@ -472,6 +472,8 @@ local function open(tag)
 end
 
 local results = {}
+local PROBES = 6                     -- encounters tried for the branches' battle (above)
+local BRANCH_TRIES = 4               -- tries per case (a frog in the air at the cast leaves a try unserved)
 local CASES = {
   { name = "holder", count = 500, shot = "limitbreak_frogs" },
   { name = "other", count = 499, shot = "limitbreak_frogs_9999" },
@@ -489,18 +491,21 @@ local CASES = {
   { name = "fight", count = 500, fight = true },
 }
 
-local function branch(cs, restore)
+local function branch(cs, restore, try)
   local r = { name = cs.name, count = cs.count, shot = cs.shot, multi = cs.multi, formula = cs.formula, bases = {},
     right = cs.right, fonts = cs.fonts, reflect = cs.reflect, fight = cs.fight, atma = cs.atma, monhit = cs.monhit,
     allcaps = {},
     caps = {}, nums = {}, mnums = {}, hp0 = {}, hp1 = {}, mons = {} }
   results[#results + 1] = r
+  r.try = try or 1
   local steps = {}
   if restore then
     local req
     steps[#steps + 1] = H.call(function() H.setPad({}); req = H.requestLoadState(snap.blob) end)
     steps[#steps + 1] = H.waitFrames(2)
     steps[#steps + 1] = H.call(function() H.checkReq(req, "the snapshot on the map"); H.rearmInputInjection() end)
+    -- a retried case idles on the map first, so the battle's clock (and the frogs' turns) fall otherwise
+    if r.try > 1 then steps[#steps + 1] = H.waitFrames((r.try - 1) * 13) end
   end
   local plan = {}
   local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
@@ -534,10 +539,7 @@ local function branch(cs, restore)
     end
     H.assertEq(#r.mons >= 1, true, cs.name .. ": a monster stands")
     inj = { heals = {} }
-    if cs.broken then
-      inj.broken = r.mons[1]
-      emu.write(0x7E0000 + H.sym("OT6_BROKEN_TICKS") + inj.broken, 8, emu.memType.snesMemory)
-    end
+    if cs.broken then inj.broken = r.mons[1] end
     if cs.weak then inj.weak = r.mons[1] end
     if cs.heal then inj.heal = r.mons[1] end
     if cs.multi then inj.multi = true; inj.vals = {} end
@@ -551,7 +553,33 @@ local function branch(cs, restore)
     elseif cs.fight then
       plan[1] = { who = FIGHTER, cmd = 0x00, boost = 1 }
     else
-      plan[1] = { who = who, cmd = CMD_MAGIC, spell = ULTIMA, boost = (cs.formula or cs.atma) and 0 or 2 }
+      plan[1] = { who = who, cmd = CMD_MAGIC, spell = ULTIMA, boost = (cs.formula or cs.atma) and 0 or 2,
+        -- Ultima is picked once every standing monster is one its target select can reach: the Reach Frogs Jump
+        -- (AIScript _59), and a frog in the air is out of btlgfx's shown mask ($61AB, so $0092); Ultima's target
+        -- select confirms itself on whoever is there.  On v0.49's merged line three frogs were up at H's window
+        -- and the cast hit the fourth alone (build/attempts/wt/v049-land/lab/limit_probe_diag.log.gz: "$0092 = $04,
+        -- standing $3A75 = $3C, 201E=3C 61AB=04", status 4 $20 on the three).  H's window waits for them to land.
+        openWhen = function()
+          for _, e in ipairs(r.mons) do
+            local s2 = (e - 8) // 2
+            if H.monStanding(s2) and ((H.readByte(0x0092) >> s2) & 1) == 0 then
+              if not r.heldSaid then
+                r.heldSaid = true
+                H.log(string.format("[limit] %s: f%d H's window waits: $0092 = $%02X, standing $3A75 = $%02X",
+                  cs.name, H.frame, H.readByte(0x0092), H.readByte(0x3A75)))
+              end
+              return false
+            end
+          end
+          -- the broken case's break is staged here, as H's window opens, so it stands at the cast: staged at the
+          -- open it ran out while H waited for the frogs (gate 1: "entity 12's damage total 33333 (amount 33333;
+          -- want 42069)", build/attempts/wt/v049-land/gate1/suite_battle_limitbreak.log)
+          if inj.broken and not inj.brokenStaged then
+            inj.brokenStaged = true
+            emu.write(0x7E0000 + H.sym("OT6_BROKEN_TICKS") + inj.broken, 8, emu.memType.snesMemory)
+          end
+          return true
+        end }
     end
     r.cmd = plan[1].cmd
     if cs.fonts then inj.fonts = true; inj.vals = {} end
@@ -593,6 +621,15 @@ local function watch()
     if H.readByte(0x3A7C) == CMD_MAGIC and H.readByte(0x3A7D) == ULTIMA then
       cur.live = true
       for _, e in ipairs(cur.mons) do cur.hp0[e] = H.readWord(0x3BF4 + e) end
+      -- a frog in the air (status 4 $20: its Jump) as Ultima goes off is out of its reach: the try is unserved
+      for _, e in ipairs(cur.mons) do
+        local s2 = (e - 8) // 2
+        if (H.readByte(0x3EF9 + e) & 0x20) ~= 0 or ((H.readByte(0x61AB) >> s2) & 1) == 0
+           or (H.readByte(0x3AA8 + s2 * 2) & 0x40) == 0 then
+          cur.unserved = (cur.unserved or "") .. string.format(" %d (status 4 $%02X, $61AB $%02X, $3AA8 $%02X)", e,
+            H.readByte(0x3EF9 + e), H.readByte(0x61AB), H.readByte(0x3AA8 + s2 * 2))
+        end
+      end
     end
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
   emu.addMemoryCallback(function()
@@ -651,9 +688,11 @@ local function claims()
       what, a and a.x or "-", b and b.x or "-"))
     claim(n.green == green, string.format("%s: %s is %s", r.name, what, n.green and "green" or "white"))
   end
-  local byName = {}
+  -- each case's last try is the one the claims read (an earlier try was unserved: a frog in the air)
+  local byName, finals = {}, {}
   for _, r in ipairs(results) do byName[r.name] = r end
-  for _, r in ipairs(results) do
+  for _, r in ipairs(results) do if byName[r.name] == r then finals[#finals + 1] = r end end
+  for _, r in ipairs(finals) do
     local holder = r.count >= 500
     local wantMask = holder and (1 << r.holderSeat) or 0
     claim(r.mask == wantMask, string.format("%s: OT6_LIMITBREAK %s at the open, exactly the holder's bit (want %s)",
@@ -874,13 +913,60 @@ H.run({ maxFrames = 900000 }, {
     arm()
     watch()
   end),
-  H.call(function() H.setPad({}); snap = H.requestSaveState() end),
-  H.waitFrames(2),
-  H.call(function() H.checkReq(snap, "the snapshot on the map") end),
+  -- the encounter every branch meets must be one the claims can be read on: at least four monsters standing, every
+  -- one a body the target cursor can reach when H's window comes (btlgfx's valid-monster mask $0092: present, shown,
+  -- targetable).  v0.49's merged line dealt a formation whose other three bodies stayed hidden: Ultima's target select
+  -- closed itself (UpdateMenuState_38: no monster valid) until one showed, and the cast hit that one alone
+  -- (build/attempts/wt/v049-land/lab/limitT_all.log.gz: $0092 = $00 with $3A75 = $3C, then $04).  A battle that
+  -- fails this is fought out by the menu and the next encounter taken, from a fresh snapshot on the map.
   H.lazy(function()
-    local steps = {}
-    for i, cs in ipairs(CASES) do
-      steps[#steps + 1] = branch(cs, i > 1)
+    local steps, found = {}, false
+    for k = 1, PROBES do
+      steps[#steps + 1] = H.cond(function() return not found end, {
+        H.call(function() H.setPad({}); snap = H.requestSaveState() end),
+        H.waitFrames(2),
+        H.call(function() H.checkReq(snap, "the snapshot on the map"); A, B = A0, B0 end),
+        open("probe " .. k),
+        H.waitUntil(function() return H.readByte(0x7BCA) ~= 0 end, 6000, "probe " .. k .. ": a command window", 2),
+        H.waitFrames(20),
+        H.call(function()
+          local standing, shown = 0, 0
+          for s2 = 0, 5 do
+            if H.monStanding(s2) then
+              standing = standing + 1
+              if ((H.readByte(0x0092) >> s2) & 1) == 1 then shown = shown + 1 end
+            end
+          end
+          found = standing >= 4 and shown == standing
+          H.log(string.format("[limit] probe %d: formation %s, %d monster(s) standing, %d of them targetable "
+            .. "($0092 = $%02X): %s", k, table.concat((function() local t = {} for _, w in ipairs(H.formationWords()) do
+              t[#t + 1] = string.format("%04X", w) end return t end)(), " "), standing, shown, H.readByte(0x0092),
+            found and "the branches' battle" or "fought out, the next encounter"))
+        end),
+        H.cond(function() return not found end, {
+          H.fightBattleByMenu(60000),
+          H.waitUntil(function() return H.worldHasControl() end, 3000, "probe " .. k .. ": back on the map", 5),
+        }, {}),
+      }, {})
+    end
+    steps[#steps + 1] = H.call(function()
+      H.assertEq(found, true, string.format("precondition: an encounter with four or more monsters, all targetable, "
+        .. "within %d", PROBES))
+    end)
+    for _, cs in ipairs(CASES) do
+      steps[#steps + 1] = branch(cs, true, 1)
+      -- a try whose Ultima went off with a frog in the air (cur.unserved, at the cast) reached fewer bodies than
+      -- the claims read: the case is played again from the snapshot, idling first (the broken case on v0.49's
+      -- merged line: entity 12 jumped between H's window and the cast; lab/limit_openwhen.log.gz)
+      for t = 2, BRANCH_TRIES do
+        steps[#steps + 1] = H.lazy(function()
+          local last = results[#results]
+          if last.name ~= cs.name or not last.unserved then return H.seqStep({}) end
+          H.log(string.format("[limit] %s try %d: a frog was in the air as Ultima went off (entity%s); again",
+            cs.name, last.try, last.unserved))
+          return branch(cs, true, t)
+        end)
+      end
     end
     return H.seqStep(steps)
   end),
