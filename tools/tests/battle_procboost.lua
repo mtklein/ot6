@@ -121,15 +121,6 @@ local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eigh
 -- played on try 1 (build/attempts/wt/v044-crusader/procboost/pb_fix3.log), so tries 2 and 3 are reserves
 -- for another's action landing first, each costing a window (ROUND_FRAMES, runBudget counts them).
 local RAGE_TRIES = 3
--- the magic, throw and rod cases' tries, for the same reason: on v0.49's
--- line (#555's list gate moved the draws) the magic and throw cases' only try
--- found the battle won by another member's queued action before the cast or
--- the throw ran, "magic try 1: the battle was won at f2800 before the action
--- ran (no attack observed): not measured" and the same for the throw at f6301
--- (build/attempts/wt/v048-spellboost/quick/suite_quick_battle_procboost.log);
--- tries 2 and 3 each spend one more of the actor's windows first, and a
--- preempted try is never counted as the case.
-local PREEMPT_TRIES = 3
 -- Veldt encounters taken for GAU's window (#411).  The Veldt deals by sector (GetVeldtBattle), not from a
 -- four-word pool, so the budget is measured, not read off odds: 80 encounters (the first 16 of the line, each at five
 -- seed shifts) gave GAU's window ready in 76 and not in 4
@@ -696,10 +687,10 @@ local function tryCase(c, n)
     H.driveUntil(function() return skip or phase == "sent" or c.preemptF ~= nil end, 6000 + (n - 1) * ROUND_FRAMES, {
       H.call(function()
         if phase == "reach" then
-          -- the bench's own turns won the battle while this actor's windows
-          -- were being spent (v0.49's line, gau_joined: rage entry 0's try 2
-          -- spent one of GAU's windows and the party felled the last monster
-          -- first, then waited 12,690 frames on the world map for a window;
+          -- the battle ended while this actor's windows were being spent
+          -- (v0.49's gate 1, gau_joined: rage entry 0's try 2 spent one of
+          -- GAU's windows, the battle ended, and the try waited 12,690 frames
+          -- on the world map for a window;
           -- build/attempts/wt/v049-land/gate1/suite_battle_procboost.log):
           -- the action never ran, so the try measured nothing and is not
           -- counted, as a battle won after the confirm is not
@@ -769,7 +760,17 @@ local function tryCase(c, n)
         -- lab: "timeout after 6000 frames driving toward rage entry 0
         -- resolves" over "Got Potion x1").  What the action did is recorded
         -- by then; the next try restores the snapshot.
-        if armed == c and c.endF == nil and H.readByte(0x3A75) == 0 then
+        -- ($3A77, the engine's count of enemies in the fight, stored once at
+        -- the end of the recount; $3A75, the mask, is zeroed and rebuilt bit
+        -- by bit there, and on v0.49's line a frame began inside that
+        -- rebuild: "$3A75 <- 00" at f11689 and its four bits back at f11690
+        -- with every monster standing, read as a won battle for rage
+        -- entries 0, 3 and 4 on all three tries;
+        -- build/attempts/wt/v049-land/lab/procboost_diag.log.gz.  The magic
+        -- and throw cases' "the battle was won ... before the action ran" on
+        -- #555's quick run, build/attempts/wt/v048-spellboost/quick/
+        -- suite_quick_battle_procboost.log, read the same mask)
+        if armed == c and c.endF == nil and H.readByte(0x3A77) == 0 then
           -- ...or the battle was won before the action ran at all: another
           -- member's queued action felled the last monster after the
           -- confirm (#534's replay, gau_joined: rage entry 0 over "Got Potion
@@ -961,7 +962,7 @@ end
 -- hands on #397's replay) procs whichever hand's swing rolled it
 local function isCast(c, k) return k.b5 == CMD_MAGIC and c.castSpells ~= nil and c.castSpells[k.b6] == true end
 local CASES = {
-  { name = "magic", char = TERRA, verb = "magic", spell = FIRE, tries = PREEMPT_TRIES },
+  { name = "magic", char = TERRA, verb = "magic", spell = FIRE, tries = 1 },
   { name = "fight", char = TERRA, verb = "fight", tries = FIGHT_TRIES,
     -- measured once a roll came up under $40 (the verdict holds every such
     -- roll to its cast) or a cast was seen; a try whose first swing felled
@@ -980,8 +981,8 @@ local CASES = {
       end
       return false
     end },
-  { name = "throw", char = SHADOW, verb = "throw", item = MITHRIL_KNIFE, tries = PREEMPT_TRIES },
-  { name = "rod", char = LOCKE, verb = "item", item = ICE_ROD, tries = PREEMPT_TRIES },
+  { name = "throw", char = SHADOW, verb = "throw", item = MITHRIL_KNIFE, tries = 1 },
+  { name = "rod", char = LOCKE, verb = "item", item = ICE_ROD, tries = 1 },
   { name = "magicite", char = LOCKE, verb = "item", item = MAGICITE, tries = MAGICITE_TRIES,
     -- measured, and some try so far drew again (the redraw arm ran)
     done = function(c)
