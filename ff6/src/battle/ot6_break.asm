@@ -214,6 +214,42 @@ done:   rtl
 
 ; ------------------------------------------------------------------------------
 
+; [ a monster Life or Reraise raises starts fresh too ]
+
+; the other way back from the dead: a wound cleared by status removal
+; (RemoveStatus_06/07, the Life family and ReraiseEffect's Life) reaches
+; _c2469c, vanilla's monster revive, which drops the body from $3a3a.  The
+; same renewal as Ot6Arrive, on the same test (still in $3a3a: counted dead),
+; and only when the wound is what this update clears ($f4 bit 7, the status
+; 1/2 clear mask; $3ee4 still holds it here, CalcStatus writes later), so a
+; zombie or a stone lifted from a monster that is not wounded keeps its
+; state.  characters never: y < $08 is a player character's revive, and
+; their break state does not exist.
+; called at _c2469c's head.  a16 (UpdateStatus' longa), either index width;
+; y = entity.  preserves x/y and the caller's flags; clobbers a (_c2469c
+; reloads it).
+.proc Ot6Revive
+        php
+        shorta
+        tya                     ; entity offset, width-neutral test
+        cmp     #$08
+        bcc     done            ; a character: vanilla's revive alone
+        lda     $3019,y
+        bit     $3a3a
+        beq     done            ; not counted dead: nothing to renew
+        lda     $f4
+        bpl     done            ; this update does not clear the wound
+        lda     $3ee4,y
+        bpl     done            ; nor was it wounded
+        lda     OT6_SHIELD_MAX,y
+        sta     OT6_SHIELD_CUR,y
+        jsr     Ot6FreshBreak
+done:   plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ element adds: widen a species' weak-element byte at monster seed time ]
 
 ; A runtime transform like Ot6HpScale, applied one hook later than the

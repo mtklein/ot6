@@ -5,7 +5,7 @@ and its effect. Cite evidence in the commit message.
 
 ## What's changed
 
-A monster that comes back into a fight after dying, like the Piranhas at Baren Falls, now returns with its full shields instead of still broken from the blow that killed it.
+A monster that comes back into a fight after dying, like the Piranhas at Baren Falls or one raised by Life, now returns with its full shields instead of still broken from the blow that killed it.
 
 ## Saves
 
