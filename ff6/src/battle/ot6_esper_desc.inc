@@ -65,32 +65,32 @@ Ot6RungDescPtrs:
         .word   $0295   ; No Dark or Petrify; max MP +1/2
         .word   $02b5   ; Fight always hits
         .word   $02c7   ; Haste in every battle
-        .word   $02dd   ; Fight and magic damage +1/4
-        .word   $02f9   ; Protects against instant death
-        .word   $0318   ; Safe in every battle
-        .word   $032d   ; Raises all four stats by 1
-        .word   $0348   ; Gauntlet and Genji Glove effects
-        .word   $0369   ; Raises max MP by 1/4
-        .word   $037e   ; Raises Vigor by half
-        .word   $0393   ; Protects against Poison
-        .word   $03ab   ; Regen in every battle
-        .word   $03c1   ; Protects against Mute
-        .word   $03d7   ; Shell in every battle
-        .word   $03ed   ; Casts Shell when HP is low
-        .word   $0408   ; 2 Boost Points at battle start
-        .word   $0427   ; No back or pincer attacks
-        .word   $0441   ; Starts every battle with Image
-        .word   $0460   ; Healing done is 25% stronger
-        .word   $047d   ; Revives allies at full HP
-        .word   $0497   ; Protects against Muddle
-        .word   $04af   ; Covers weak allies while healthy
-        .word   $04d0   ; Protects against Zombie
-        .word   $04e8   ; Blocks Dark, Zombie and Poison
-        .word   $0507   ; Raises preemptive attack rate
-        .word   $0525   ; Blocks Stop and Slow
-        .word   $053a   ; Protects against Berserk
-        .word   $0553   ; Blocks Condemned and Zombie
-        .word   $056f   ; Starts every battle with Life 3
+        .word   $02dd   ; Damage dealt can pass 9999
+        .word   $02f8   ; Protects against instant death
+        .word   $0317   ; Safe in every battle
+        .word   $032c   ; Raises all four stats by 1
+        .word   $0347   ; Gauntlet and Genji Glove effects
+        .word   $0368   ; Raises max MP by 1/4
+        .word   $037d   ; Fight and magic damage +1/4
+        .word   $0399   ; Protects against Poison
+        .word   $03b1   ; Regen in every battle
+        .word   $03c7   ; Protects against Mute
+        .word   $03dd   ; Shell in every battle
+        .word   $03f3   ; Casts Shell when HP is low
+        .word   $040e   ; 2 Boost Points at battle start
+        .word   $042d   ; No back or pincer attacks
+        .word   $0447   ; Starts every battle with Image
+        .word   $0466   ; Healing done is 25% stronger
+        .word   $0483   ; Revives allies at full HP
+        .word   $049d   ; Protects against Muddle
+        .word   $04b5   ; Covers weak allies while healthy
+        .word   $04d6   ; Protects against Zombie
+        .word   $04ee   ; Blocks Dark, Zombie and Poison
+        .word   $050d   ; Raises preemptive attack rate
+        .word   $052b   ; Blocks Stop and Slow
+        .word   $0540   ; Protects against Berserk
+        .word   $0559   ; Blocks Condemned and Zombie
+        .word   $0575   ; Starts every battle with Life 3
 
 ; the descriptions, null-terminated, in the menu's description charset
 Ot6RungDescStr:
@@ -125,13 +125,13 @@ Ot6RungDescStr:
         .byte   $8d,$a8,$ff,$83,$9a,$ab,$a4,$ff,$a8,$ab,$ff,$8f,$9e,$ad,$ab,$a2,$9f,$b2,$c8,$ff,$a6,$9a,$b1,$ff,$8c,$8f,$ff,$ca,$b5,$c0,$b6,$00   ; No Dark or Petrify; max MP +1/2
         .byte   $85,$a2,$a0,$a1,$ad,$ff,$9a,$a5,$b0,$9a,$b2,$ac,$ff,$a1,$a2,$ad,$ac,$00   ; Fight always hits
         .byte   $87,$9a,$ac,$ad,$9e,$ff,$a2,$a7,$ff,$9e,$af,$9e,$ab,$b2,$ff,$9b,$9a,$ad,$ad,$a5,$9e,$00   ; Haste in every battle
-        .byte   $85,$a2,$a0,$a1,$ad,$ff,$9a,$a7,$9d,$ff,$a6,$9a,$a0,$a2,$9c,$ff,$9d,$9a,$a6,$9a,$a0,$9e,$ff,$ca,$b5,$c0,$b8,$00   ; Fight and magic damage +1/4
+        .byte   $83,$9a,$a6,$9a,$a0,$9e,$ff,$9d,$9e,$9a,$a5,$ad,$ff,$9c,$9a,$a7,$ff,$a9,$9a,$ac,$ac,$ff,$bd,$bd,$bd,$bd,$00   ; Damage dealt can pass 9999
         .byte   $8f,$ab,$a8,$ad,$9e,$9c,$ad,$ac,$ff,$9a,$a0,$9a,$a2,$a7,$ac,$ad,$ff,$a2,$a7,$ac,$ad,$9a,$a7,$ad,$ff,$9d,$9e,$9a,$ad,$a1,$00   ; Protects against instant death
         .byte   $92,$9a,$9f,$9e,$ff,$a2,$a7,$ff,$9e,$af,$9e,$ab,$b2,$ff,$9b,$9a,$ad,$ad,$a5,$9e,$00   ; Safe in every battle
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$9a,$a5,$a5,$ff,$9f,$a8,$ae,$ab,$ff,$ac,$ad,$9a,$ad,$ac,$ff,$9b,$b2,$ff,$b5,$00   ; Raises all four stats by 1
         .byte   $86,$9a,$ae,$a7,$ad,$a5,$9e,$ad,$ff,$9a,$a7,$9d,$ff,$86,$9e,$a7,$a3,$a2,$ff,$86,$a5,$a8,$af,$9e,$ff,$9e,$9f,$9f,$9e,$9c,$ad,$ac,$00   ; Gauntlet and Genji Glove effects
         .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$a6,$9a,$b1,$ff,$8c,$8f,$ff,$9b,$b2,$ff,$b5,$c0,$b8,$00   ; Raises max MP by 1/4
-        .byte   $91,$9a,$a2,$ac,$9e,$ac,$ff,$95,$a2,$a0,$a8,$ab,$ff,$9b,$b2,$ff,$a1,$9a,$a5,$9f,$00   ; Raises Vigor by half
+        .byte   $85,$a2,$a0,$a1,$ad,$ff,$9a,$a7,$9d,$ff,$a6,$9a,$a0,$a2,$9c,$ff,$9d,$9a,$a6,$9a,$a0,$9e,$ff,$ca,$b5,$c0,$b8,$00   ; Fight and magic damage +1/4
         .byte   $8f,$ab,$a8,$ad,$9e,$9c,$ad,$ac,$ff,$9a,$a0,$9a,$a2,$a7,$ac,$ad,$ff,$8f,$a8,$a2,$ac,$a8,$a7,$00   ; Protects against Poison
         .byte   $91,$9e,$a0,$9e,$a7,$ff,$a2,$a7,$ff,$9e,$af,$9e,$ab,$b2,$ff,$9b,$9a,$ad,$ad,$a5,$9e,$00   ; Regen in every battle
         .byte   $8f,$ab,$a8,$ad,$9e,$9c,$ad,$ac,$ff,$9a,$a0,$9a,$a2,$a7,$ac,$ad,$ff,$8c,$ae,$ad,$9e,$00   ; Protects against Mute

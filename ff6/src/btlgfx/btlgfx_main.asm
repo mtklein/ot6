@@ -1028,8 +1028,10 @@ _c10640:
 @0640:  lda     w7e6316       ; return if damage numeral graphics update is disabled
         beq     @0658
         stz     w7e6316       ; disable damage numeral graphics update
-        ldx     #$0080
-        stx     $36         ; size = $0080 (4 8x8 tiles)
+        jsl     Ot6NumTfr_ext   ; ot6 #550: the thread's five slots (two or
+        rts                     ;   three transfers; ot6_numeral.asm).  What
+                                ;   follows is vanilla's, now unreached (same
+                                ;   size: the NMI's addresses stay put)
         ldx     #w7e60b3
         lda     #^w7e60b3_far
         ldy     w7e6317       ; source = $7e60b3 (graphics buffer)
@@ -6145,10 +6147,9 @@ DrawDmgNumSprites:
         sec
         sbc     $3c
         sta     $38
-        lda     $71         ; next available sprite
-        longa
-        asl2
-        tay
+        jsl     Ot6NumSprMulti_ext ; ot6 #550: two sprites, or three for five
+        jmp     @2bfa           ;   digits (ot6_numeral.asm); vanilla's write
+                                ;   below is unreached, kept for the size
         shorta0
         lda     $3a
         tax
@@ -6359,10 +6360,10 @@ _c12cc2:
         bra     @2d12
 @2d0e:  lda     #$ff
         sta     $3a         ; $3a = #$ff (character)
-@2d12:  lda     $71         ; next available sprite
-        longa
-        asl2
-        tay
+@2d12:  jsl     Ot6NumSprSingle_ext ; ot6 #550: two sprites, or three for five
+        pla                     ;   digits (ot6_numeral.asm); vanilla's write
+        rts                     ;   below is unreached, kept for the size
+        nop
         shorta0
         lda     w7e631a,x     ; branch if numeral is green
         and     #$80
@@ -24873,9 +24874,9 @@ GfxCmd_0b:
         cmp     #$ff
         bne     @a510
         rts
-@a510:  sta     $1e         ; $1e = hi byte of numeral value
-        and     #$40
-        beq     @a531       ; branch if not displaying "miss"
+@a510:  jsl     Ot6NumSingle_ext ; ot6 #550: Miss, a heal or up to five digits
+        bra     @a589           ;   (ot6_numeral.asm); vanilla's two branches
+                                ;   below are unreached, kept for the size
 
 ; miss
         longa
@@ -24937,7 +24938,8 @@ GfxCmd_0b:
         sta     w7e631e,x
         lda     $14
         sta     w7e6326,x     ; numeral graphics x offset (width / 2)
-        stz     w7e632a,x     ;
+        nop3                    ; ot6 #550: was stz w7e632a,x (vanilla's only
+                                ;   use); it holds the fifth slot's digit now
         stz     w7e6322,x     ;
         lda     $1e         ; green numeral flag
         and     #$80
@@ -25016,12 +25018,9 @@ damage_set:
         cmp     #$ff
         bne     @a627
         jmp     @a6eb
-@a627:  and     #$40
-        beq     @a655
-
-;
-        phb
-        lda     #$7f
+@a627:  jsl     Ot6NumMulti_ext ; ot6 #550: Miss, a heal or up to five digits
+        jmp     @a6bd           ;   (ot6_numeral.asm); vanilla's two branches
+                                ;   below are unreached, kept for the size
         pha
         plb
         phy

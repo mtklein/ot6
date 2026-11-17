@@ -127,3 +127,5 @@
 
 ; Shadow's hobble and pin (#546), appended for the same reason.
         .include "ot6_pin.asm"
+
+        .include "ot6_numeral.asm"      ; #550: five-digit damage numerals

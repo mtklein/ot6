@@ -1630,10 +1630,12 @@ done:   rts
         lda     $f2             ; heal bit only; the whole-byte gate let
         lsr                     ;   $20 can't-dodge block the double for
         bcs     done            ;   every beam and skill that carries it
-        lda     $f1
-        bmi     done            ; avoid 16-bit overflow (matches vanilla)
-        asl     $f0
-        rol     $f1
+        asl     $f0             ; x2, saturating at $ffff (#550: the skip
+        rol     $f1             ;   vanilla's weakness double used, which
+        bcc     done            ;   left 32,768 and up undoubled, made a
+        lda     #$ff            ;   harder hit on a broken body land for
+        sta     $f0             ;   less under Limit Break's cap)
+        sta     $f1
 done:   rtl
 broke:  trb     OT6_HITBRK      ; judged: the next hit lands on a broken body
         rtl

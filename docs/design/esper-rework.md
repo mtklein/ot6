@@ -380,9 +380,9 @@ bytes, `ItemProp+5` to `+13`).
 | Terrato | Quake, Quartr | Mag / Stm | counters physical attacks (Black Belt) | max HP +50% (Muscle Belt) |
 | Tritoch | Ice, Bolt, Poison | Mag / Spd | +1 speed | immune to Dark and Petrify (Jewel Ring), and max MP +50% (Crystal Orb) |
 | Odin / Raiden | Meteor, Bserk (Raiden: + Quick) | Vig / Spd | Fight never misses (Sniper Sight) | Haste in every battle (RunningShoes) |
-| Bahamut | Flare, W Wind | Mag / Vig | max HP +25% (Red Cap) | Fight and spells deal more damage (Hero Ring) |
+| Bahamut | Flare, W Wind | Mag / Vig | max HP +25% (Red Cap) | †*Limit Break*: the member's damage can pass 9999, up to 42,069 (healing stays at 9999) |
 | Phoenix | Life, Antdot | Stm / Spd | immune to Doom's countdown and Zombie | †*Rebirth*: enters every battle under Life 3 |
-| Ragnarok | Ultima, Warp | Vig / Mag | max MP +25% (Minerva) | vigor x1.5 (Hyper Wrist) |
+| Ragnarok | Ultima, Warp | Vig / Mag | max MP +25% (Minerva) | Fight and spells deal more damage (Hero Ring) |
 | Crusader | Merton, Meteor | all four +1 at rungs 1, 2 and 4 | max HP +25% (Red Cap) | Gauntlet (two-handed grip) and Genji Glove (two weapons) both allowed |
 
 Odin and Raiden share one counter: Raiden replaces Odin, and the progress
