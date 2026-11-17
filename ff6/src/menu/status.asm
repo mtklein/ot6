@@ -259,8 +259,12 @@ DrawStatusGogoWindow:
         tya
         clc
         adc     #$0080
-        tay
-        shorta
+        cmp     #BG_SCREEN::BG3C        ; ot6 #552: a 16th row (the revealed
+        bne     :+                      ;   Leo's Shock on a full roster) is
+        lda     #BG_SCREEN::BG3D        ;   tilemap row 32, which is screen D's
+:       tay                             ;   row 0 in the 64x64 BG3 map, not
+        shorta                          ;   screen C's (the HDMA shows it at
+                                        ;   line 196, the cursor's 16th row)
         plx
         inx
         cpx     $e5

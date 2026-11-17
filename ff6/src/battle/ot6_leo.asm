@@ -179,6 +179,8 @@ Cap:    cpx     #0
 
 .proc Ot6LeoActorMask
         php
+        asl     $3a21,x                 ; bit 15 out (vanilla's order: the
+                                        ;   shift's carry is dropped)
         asl
         asl
         asl                             ; carry: the Merit Award
@@ -196,8 +198,7 @@ Cap:    cpx     #0
         pha
 :       pla
         lsr                             ; carry: the bit
-        asl     $3a21,x
-        ror     $3a21,x
+        ror     $3a21,x                 ; bit 15 in
         plp
         rtl
 .endproc  ; Ot6LeoActorMask
