@@ -443,6 +443,18 @@ function M.sym(name)
     .. "(compose.py derives OT6_SYMS from ff6/rom/ff6-en.dbg; run via run.sh)", 2)
 end
 
+-- ------------------------------------------------------- numeral words --
+-- A damage numeral's word as _c262ef leaves it in $33D0/$33E4 (and the numeral commands carry it): OT6's coding
+-- since #550 (ot6_numeral.asm), the one place the harness decodes it.  $FFFF none; $F000 Miss; $C000 + v a heal of
+-- v; anything else damage of that amount (to $BFFF; the Limit Break cap is 42,069).  A word read before the display
+-- marks it (a raw amount) decodes as damage.  Returns { none, miss, heal, value }.
+function M.numeralWord(w)
+  if w == 0xFFFF then return { none = true, miss = false, heal = false, value = nil } end
+  if w == 0xF000 then return { none = false, miss = true, heal = false, value = nil } end
+  if w >= 0xC000 then return { none = false, miss = false, heal = true, value = w - 0xC000 } end
+  return { none = false, miss = false, heal = false, value = w }
+end
+
 -- ----------------------------------------------------------------- assert --
 function M.assertEq(got, want, what)
   if got ~= want then

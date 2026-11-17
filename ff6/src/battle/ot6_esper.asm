@@ -680,6 +680,7 @@ OT6_SLOT_CARBUNKL = 18
 OT6_SLOT_SRAPHIM  = 20
 OT6_SLOT_PHOENIX  = 25
 OT6_SLOT_FENRIR   = 23
+OT6_SLOT_BAHAMUT  = 12
 
 ; in: A (a16) = actor | counter slot << 8, i16.  out: A (a16) = that actor's
 ; Magic Points on that esper (0 for a guest, or with no progress page).  X
@@ -737,7 +738,9 @@ OT6_SLOT_FENRIR   = 23
 ; start.  x = the battle slot * 2 (either index width), db = $7e.  Facet:
 ; the boost bank opens at two points (Ot6InitBP opened it at one).  Rebirth:
 ; the character enters under Life 3 (status 4 bit $04, through the status-to-
-; set cell LoadCharProp fills, $3de9).  Preserves everything.
+; set cell LoadCharProp fills, $3de9).  Limit Break: the slot's bit in
+; OT6_LIMITBREAK says whether Ot6DmgCap lets its damage pass 9999.
+; Preserves everything.
 .proc Ot6EsperBattleInit
         php
         longi
@@ -757,11 +760,232 @@ OT6_SLOT_FENRIR   = 23
         lda     #OT6_SLOT_PHOENIX
         xba
         jsr     Ot6EsperSig
-        bcc     @out
+        bcc     @limit
         lda     $3de9,x         ; status 4 to set at the start
         ora     #$04            ; Life 3
         sta     $3de9,x
+@limit: lda     $3ed8,x
+        xba
+        lda     #OT6_SLOT_BAHAMUT
+        xba
+        jsr     Ot6EsperSig
+        lda     $3018,x         ; this slot's bit (the carry survives the lda)
+        bcc     @nolb
+        tsb     OT6_LIMITBREAK
+        bra     @out
+@nolb:  trb     OT6_LIMITBREAK
 @out:   pla
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ Bahamut's Limit Break: the damage cap ]
+;
+; The engine's one cap is CalcMaxDmg's (battle_main.asm @0c76), on the running
+; total a target takes or is healed by in one pass: 9999 for both.  A
+; character holding Bahamut's signature (OT6_LIMITBREAK, set at battle start
+; by Ot6EsperBattleInit) deals damage up to OT6_LIMIT instead; healing stays
+; at 9999 for everyone, and so does everyone else's damage.
+;
+; jsl in place of vanilla's `clc / adc $f0 / bcs / cmp #10000 / bcc / lda
+; #9999`.  in: a16, A = the target's total so far (0 for none), $f0 = this
+; hit's amount, x = the attacker, y = the target's cell: y < $14 the damage
+; side ($33d0,y), y >= $14 the heal side ($33d0+$14, i.e. $33e4); either index
+; width (the damage loop runs i8).  out: A = the capped total.  x/y kept.
+;
+; "The attacker" is CalcMaxDmg's x, the one the engine charges with the hit:
+; the actor for its own action, whatever command (Fight, Magic, a summon, a
+; throw, Jump's landing, a counter, Mimic's copy run as the mimic's own),
+; except a bounced spell's: CalcReflectDmg runs the bounce with x = the body
+; it bounced off, so there the caster is OT6_REFLCASTER's (Ot6ReflectBegin),
+; and a holder's spell bounced off anyone can pass 9999 while anyone else's
+; bounced off a holder cannot.  The drained side of a drain swapped round for
+; the attacker's heal is the heal side (9999).  Gogo and Umaro hold no espers (OT6_ESPER_CHARS),
+; so their copies of a holder's action cap at 9999.  docs/design/esper-rework.md
+; "Limit Break" has the list.
+OT6_LIMIT = 42069
+.assert OT6_LIMIT >= 10000, error, "the Limit Break cap must be above 9999"
+.proc Ot6DmgCap
+        .a16
+        clc
+        adc     $f0
+        bcc     :+
+        lda     #$ffff          ; past 16 bits: saturate, then cap
+:       cmp     #10000
+        bcc     @done
+        pha
+        tya
+        and     #$00ff
+        cmp     #$0014
+        bcs     @std            ; the heal side: 9999 for everyone
+        phx
+        lda     OT6_REFLCASTER  ; a bounce: the caster, not the reflector
+        and     #$00ff
+        bit     #$0080
+        beq     :+
+        and     #$007f
+        tax
+:       txa
+        and     #$00ff
+        cmp     #$0008
+        bcs     @mon            ; a monster's hit
+        sep     #$20
+        .a8
+        lda     $3018,x         ; the attacker's bit
+        and     OT6_LIMITBREAK
+        rep     #$20
+        .a16
+        plx                     ; (plx sets z: test the bit after it; b
+        and     #$00ff          ;   is 0, from the txa above)
+        beq     @std
+        pla
+        cmp     #OT6_LIMIT + 1
+        bcc     @done
+        lda     #OT6_LIMIT
+        rtl
+@mon:   plx
+@std:   pla
+        lda     #9999
+@done:  rtl
+.endproc
+
+; [ CalcReflectDmg's head ]
+;
+; jsl in place of its `jsr ClearGfxParams / stz $3a5a`: the same (the gfx
+; parameters $a0-$af cleared, $3a5a cleared as a word), and the caster (x,
+; the attacker ExecAttack runs) noted in OT6_REFLCASTER for Ot6DmgCap until
+; Ot6ReflectNowhere, after the bounce's target loop, clears it.  in: a16,
+; either index width, db=$7e, dp=0.  Preserves x/y; A clobbered (the caller
+; pushed it).
+.proc Ot6ReflectBegin
+        .a16
+        php
+        sep     #$20
+        .a8
+        txa
+        ora     #$80
+        sta     OT6_REFLCASTER
+        rep     #$20
+        .a16
+        stz     $a0
+        stz     $a2
+        stz     $a4
+        stz     $a6
+        stz     $a8
+        stz     $aa
+        stz     $ac
+        stz     $ae
+        stz     $3a5a
+        plp
+        rtl
+.endproc
+
+; [ the Atma Weapon's scale, saturated ]
+;
+; UltimaEffect scales the hit by (current HP + 1) * level / (max HP's high
+; byte + 1) / 256 over 64: Mult24 leaves the 24-bit product in $e8-$ea, and
+; vanilla took its low 16 bits after six shifts (LsrA with 5) and added one,
+; so a product past 2^22 wrapped and $ffff came back 0.  Under a 9999 cap the
+; wrap only lost damage past the cap now and then; with Limit Break and the
+; saturating doubles it could drop a holder's hit to a small number.  So the
+; quotient saturates at $ffff and so does the +1; where nothing overflows the
+; result is vanilla's to the bit.  LsrA shifts $ea as a word, so after its
+; six shifts only $ea's bits 0-1 (the product's 22-23) count, the rest being
+; $eb's (Ot6MagBase has the same reading for five shifts).
+;
+; jsl in place of `lda #5 / jsr LsrA / inc`.  in: a16, $e8-$ea the product.
+; out: A (a16) = the scaled damage; the caller stores it.  x/y kept.
+.proc Ot6AtmaScale
+        .a16
+        php
+        rep     #$30
+        .a16
+        .i16
+        phx
+        lda     $e8
+        ldx     #$0005
+:       lsr     $ea
+        ror
+        dex
+        bpl     :-
+        pha
+        lda     $ea
+        and     #$0003
+        beq     :+
+        pla
+        lda     #$ffff          ; the quotient is past 16 bits
+        bra     @out
+:       pla
+        inc     a
+        bne     @out
+        dec     a               ; $ffff + 1: stays $ffff
+@out:   plx
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the magic formula's base, saturated ]
+;
+; CalcMagicDmg's base is power * 4 + power * MagPwr * level / 32, the product
+; 24 bits wide (Mult24) and the quotient read as its low 16 (LsrA leaves the
+; bits past 16 in $ea), so in vanilla it wraps once power * MagPwr * level
+; reaches 2^21.  Monsters never get there (MagPwr x1.5 times level is at most
+; 3,285 in monster_prop.dat, which would need power 638), but a character
+; can: level 99 with MagPwr 112 and Crusader's Purifier (power 190), or 142
+; and Ultima (150); stats go to 255.  Under a 9999 cap the wrap only lost
+; damage above the cap now and then; with Limit Break it would drop a holder's
+; strongest spell to a small number.  So the quotient saturates at $ffff and
+; so does the sum.
+;
+; jsl in place of `clc / adc $11b0` after `jsr LsrA`.  in: a16, A = the
+; quotient's low 16 bits, $ea bits 0-2 = the bits past them, $11b0 = power *
+; 4.  out: A = the base, saturated; the caller stores it.  LsrA shifts $ea as
+; a word (a16), so $ea's upper five bits after its five shifts are $eb's,
+; which Mult24 never cleared: only bits 0-2, the product's bits 21-23, count.
+; (A first version tested all of $ea and saturated a Narshe Fire Beam to
+; 9999: battle_reveal, build/attempts/wt/v049-limitbreak/lab/reveal_dbg*.)
+.proc Ot6MagBase
+        .a16
+        pha
+        lda     $ea
+        and     #$0007
+        beq     :+
+        pla                     ; the quotient is past 16 bits
+        lda     #$ffff
+        rtl
+:       pla
+        clc
+        adc     $11b0
+        bcc     :+
+        lda     #$ffff
+:       rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ weakness x2, saturated ]
+;
+; CalcTargetDmg's elemental-weakness double (battle_main.asm @0c0e) skipped
+; the double when the amount's bit 15 was set, so 32,768 and up was not
+; doubled at all while 32,767 doubled to 65,534.  Under a 9999 cap that was
+; never seen; under Limit Break's it would make a stronger hit on a weak
+; body land for less.  The double now saturates at $ffff and the cap takes
+; it from there.  jsl after Ot6Chip in place of `lda $f1 / bmi / asl $f0 /
+; rol $f1`.  a8 in and out; $f0 = the amount.  x/y kept.
+.proc Ot6WeakDouble
+        .a8
+        php
+        rep     #$20
+        .a16
+        lda     $f0
+        asl
+        bcc     :+
+        lda     #$ffff
+:       sta     $f0
         plp
         rtl
 .endproc
@@ -1361,13 +1585,13 @@ Ot6LadderTbl:
         eff     0,0,0,0,0,0,$10,0,0,0
         stat    2,0,0,0
         eff     0,0,0,OT6_SIG_HASTE,0,0,0,0,0,0
-; 12 Bahamut: Mag / Vig; max HP +25% (Red Cap); Fight and spell damage up
-;    (Hero Ring)
+; 12 Bahamut: Mag / Vig; max HP +25% (Red Cap); Limit Break (new code: the
+;    member's damage caps at OT6_LIMIT, not 9999; Ot6DmgCap, #550)
         stat    0,0,0,1
         stat    1,0,0,0
         eff     0,0,0,0,$04,0,0,0,0,0
         stat    0,0,0,2
-        eff     0,0,0,0,$03,0,0,0,0,0
+        none
 ; 13 Alexandr: Stm / Vig; immune to Death; Safe (Guard Ring)
         stat    0,0,1,0
         stat    1,0,0,0
@@ -1381,14 +1605,16 @@ Ot6LadderTbl:
         eff     0,0,0,0,$04,0,0,0,0,0
         stat    1,1,1,1
         eff     0,0,0,0,0,0,0,$18,0,0
-; 15 Ragnarok: Vig / Mag; max MP +25% (Minerva); vigor x1.5 (Hyper Wrist;
-;    #534: Offering's four strikes halved every physical hit, forced random
-;    targets and dropped criticals and weapon procs, so it was no pure upgrade)
+; 15 Ragnarok: Vig / Mag; max MP +25% (Minerva); Fight and spell damage up
+;    (Hero Ring, Bahamut's until #550; its earring bit counts as a piece in
+;    Ot6EsperApply wherever it sits, #551.  The Offering's four strikes, the
+;    first signature here, halved every physical hit, #534; the Hyper Wrist's
+;    vigor x1.5 that followed gave way to the Hero Ring, #550)
         stat    1,0,0,0
         stat    0,0,0,1
         eff     0,0,0,0,$20,0,0,0,0,0
         stat    2,0,0,0
-        eff     0,0,0,0,0,0,$80,0,0,0
+        eff     0,0,0,0,$03,0,0,0,0,0
 ; 16 Kirin: Mag / Stm; immune to Poison; Regen (Cure Ring)
         stat    0,0,0,1
         stat    0,0,1,0

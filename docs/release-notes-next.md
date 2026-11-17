@@ -34,6 +34,14 @@ Both pages now explain each move. The window at the top of the screen
 says what the move under the cursor does, and for a move not learned yet,
 where or at what level it is learned.
 
+Bahamut's top Esper rank is now Limit Break: everything that character
+deals, from attacks and spells to throws, summons and counters, can do up to
+42,069 damage instead of stopping at 9999. Healing still stops at 9999, and
+everyone else's damage still stops at 9999. Damage numbers now show five
+digits when they need them. Bahamut's old top rank, the Hero Ring's boost to
+Fight and magic damage, moves to Ragnarok's top rank, which no longer raises
+Vigor by half. It still counts as an Earring.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

@@ -468,10 +468,10 @@ Ranks 1, 2 and 4 are stat points. Ranks 3 and 5 are effects.
 | Palidor | Float, Slow | Raises Speed by 1 | Raises Vigor by 1 | Walks faster outside battle | Raises Speed by 2 | Float in every battle |
 | Tritoch | Ice, Bolt, Poison | Raises Mag.Pwr by 1 | Raises Speed by 1 | Raises Speed by 1 | Raises Mag.Pwr by 2 | No Dark or Petrify; max MP +1/2 |
 | Odin / Raiden | Meteor, Bserk (Raiden also Quick) | Raises Vigor by 1 | Raises Speed by 1 | Fight always hits | Raises Vigor by 2 | Haste in every battle |
-| Bahamut | Flare, W Wind | Raises Mag.Pwr by 1 | Raises Vigor by 1 | Raises max HP by 1/4 | Raises Mag.Pwr by 2 | Fight and magic damage +1/4 |
+| Bahamut | Flare, W Wind | Raises Mag.Pwr by 1 | Raises Vigor by 1 | Raises max HP by 1/4 | Raises Mag.Pwr by 2 | Damage dealt can pass 9999 |
 | Alexandr | Dispel, Safe, Shell | Raises Stamina by 1 | Raises Vigor by 1 | Protects against instant death | Raises Stamina by 2 | Safe in every battle |
 | Crusader | Merton, Meteor | Raises all four stats by 1 | Raises all four stats by 1 | Raises max HP by 1/4 | Raises all four stats by 1 | Gauntlet and Genji Glove effects |
-| Ragnarok | Ultima, Warp | Raises Vigor by 1 | Raises Mag.Pwr by 1 | Raises max MP by 1/4 | Raises Vigor by 2 | Raises Vigor by half |
+| Ragnarok | Ultima, Warp | Raises Vigor by 1 | Raises Mag.Pwr by 1 | Raises max MP by 1/4 | Raises Vigor by 2 | Fight and magic damage +1/4 |
 | Kirin | Cure, Regen | Raises Mag.Pwr by 1 | Raises Stamina by 1 | Protects against Poison | Raises Mag.Pwr by 2 | Regen in every battle |
 | ZoneSeek | Shell, Haste | Raises Mag.Pwr by 1 | Raises Stamina by 1 | Protects against Mute | Raises Mag.Pwr by 2 | Shell in every battle |
 | Carbunkl | Rflect, Safe | Raises Stamina by 1 | Raises Mag.Pwr by 1 | Casts Shell when HP is low | Raises Stamina by 2 | 2 Boost Points at battle start |
@@ -495,6 +495,9 @@ Notes on the ranks:
 - Sraphim's healing bonus covers Cure, Life, a Blitz, Lore or Dance that
   heals, healing items, and Regen ticks the wearer receives. It does not cover
   MP.
+- Bahamut's top rank lets everything that character deals do up to 42,069
+  damage instead of 9999: attacks, spells, throws, summons and counters.
+  Healing still stops at 9999.
 - Sraphim, Golem and ZoneSeek are optional.
 
 ## Encounters, Exp. and Gil

@@ -65,7 +65,7 @@ Ot6RungLabelTbl:
         .byte   $95,$a2,$a0,$a8,$ab,$ff,$ff,$ff,$ca,$b5,$ff,$ff   ; Bahamut 2: Vigor   +1
         .byte   $91,$9e,$9d,$ff,$82,$9a,$a9,$ff,$ff,$ff,$ff,$ff   ; Bahamut 3: Red Cap
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b6,$ff,$ff   ; Bahamut 4: Mag.Pwr +2
-        .byte   $87,$9e,$ab,$a8,$ff,$91,$a2,$a7,$a0,$ff,$ff,$ff   ; Bahamut 5: Hero Ring
+        .byte   $8b,$a2,$a6,$a2,$ad,$ff,$81,$ab,$9e,$9a,$a4,$ff   ; Bahamut 5: Limit Break
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Alexandr 1: Stamina +1
         .byte   $95,$a2,$a0,$a8,$ab,$ff,$ff,$ff,$ca,$b5,$ff,$ff   ; Alexandr 2: Vigor   +1
         .byte   $8d,$a8,$ff,$83,$9e,$9a,$ad,$a1,$ff,$ff,$ff,$ff   ; Alexandr 3: No Death
@@ -80,7 +80,7 @@ Ot6RungLabelTbl:
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b5,$ff,$ff   ; Ragnarok 2: Mag.Pwr +1
         .byte   $8c,$a2,$a7,$9e,$ab,$af,$9a,$ff,$ff,$ff,$ff,$ff   ; Ragnarok 3: Minerva
         .byte   $95,$a2,$a0,$a8,$ab,$ff,$ff,$ff,$ca,$b6,$ff,$ff   ; Ragnarok 4: Vigor   +2
-        .byte   $87,$b2,$a9,$9e,$ab,$ff,$96,$ab,$a2,$ac,$ad,$ff   ; Ragnarok 5: Hyper Wrist
+        .byte   $87,$9e,$ab,$a8,$ff,$91,$a2,$a7,$a0,$ff,$ff,$ff   ; Ragnarok 5: Hero Ring
         .byte   $8c,$9a,$a0,$c5,$8f,$b0,$ab,$ff,$ca,$b5,$ff,$ff   ; Kirin 1: Mag.Pwr +1
         .byte   $92,$ad,$9a,$a6,$a2,$a7,$9a,$ff,$ca,$b5,$ff,$ff   ; Kirin 2: Stamina +1
         .byte   $8d,$a8,$ff,$8f,$a8,$a2,$ac,$a8,$a7,$ff,$ff,$ff   ; Kirin 3: No Poison

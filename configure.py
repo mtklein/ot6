@@ -607,6 +607,10 @@ TEST_ENV = {
     # eight branches from one snapshot, a battle each
     "battle_esperearring": "OT6_TIMEOUT=2400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    # #550: Bahamut's Limit Break and its five-digit numerals, from the play's
+    # save outside Narshe in the World of Ruin (the Ragnarok wearer's Ultima)
+    "battle_limitbreak": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-ragnarok-v1",
     # #534: Crusader's signature, the second weapon in the menu and its
     # swing, and the two-handed grip, against rank 4 from one snapshot
     "battle_espercrusader":
@@ -1103,6 +1107,10 @@ check("kit_pages",
       "python3 tools/kit_pages.py --selftest",
       ["tools/kit_pages.py", "tools/esper_ladder.py", "ff6/src/battle/ot6_paint.asm",
        "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
+# #550: the condensed numeral digits are generated; the checked-in .inc must
+# be what tools/numeral_font.py writes.
+check("numeral_font", "python3 tools/numeral_font.py",
+      ["tools/numeral_font.py", "ff6/src/battle/ot6_numeral_font.inc"])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.

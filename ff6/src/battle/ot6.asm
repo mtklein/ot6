@@ -130,3 +130,5 @@
 
 ; Relm's field Painter page's row leaf (#549), appended for the same reason.
         .include "ot6_paintpage.asm"
+
+        .include "ot6_numeral.asm"      ; #550: five-digit damage numerals

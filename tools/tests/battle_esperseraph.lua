@@ -90,7 +90,8 @@ local function installObservers()
     if armed and armed.sent and not armed.endF then armed.casts[#armed.casts + 1] = v end
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
   -- LOCKE's damage-healed cell: the word is whole once its high byte is written.  The amount is the first write
-  -- below $8000: the display then marks it ($8000 set, _c262ef) and clears it ($FFFF)
+  -- that is not yet marked: the display then marks it as a heal (H.numeralWord's coding, _c262ef) and clears it
+  -- ($FFFF)
   emu.addMemoryCallback(function(addr)
     if armed and armed.sent and not armed.endF and lockeS and (addr & 0xFFFF) == 0x33E5 + lockeS * 2 then
       local w = H.readWord(0x33E4 + lockeS * 2)
@@ -424,7 +425,7 @@ for _, c in ipairs(CASES) do
     local cs, hs = {}, {}
     for _, v in ipairs(c.casts) do cs[#cs + 1] = string.format("$%02X", v) end
     for _, v in ipairs(c.heals) do hs[#hs + 1] = tostring(v) end
-    for _, v in ipairs(c.heals) do if c.amt == nil and v < 0x8000 then c.amt = v end end
+    for _, v in ipairs(c.heals) do if c.amt == nil and not H.numeralWord(v).heal then c.amt = v end end
     H.log(string.format("[seraph] %s: Sraphim count %d, boost %d (pending %d at the confirm); cast %s; "
       .. "LOCKE healed %s; LOCKE HP %d at the confirm, %d/%d at TERRA's action end (%s)", c.name, c.count,
       c.boost, c.pendAtConfirm or -1, table.concat(cs, " "), table.concat(hs, ","), c.hp0 or -1, c.hpEnd,
