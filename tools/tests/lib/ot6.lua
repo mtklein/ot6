@@ -16888,8 +16888,12 @@ function Driver:button(actor)
         p.boostWant = math.min(3, pend + p.boostLeft)
         p.boostLeft, p.boostR, p.boostStart = 0, 0, pend
       end
+      -- the room R has is the bank plus a Portrait gift held (Ot6BankGift, #538): a gifted GOGO with one
+      -- point banked settled at the gift's own raise (battle_mimicdriver on v0.49's gate 3: "[boost] mimic
+      -- plan: wanted 2, the bank holds 1: going at 1", the copy's paid pips 0)
+      local gift = (M.readByte(BATTLE.RELM.GIFT) >> actor) & 1
       local step, why = M.boostStep({ want = p.boostWant, start = p.boostStart, pending = pend,
-        sent = p.boostR, bank = M.readByte(BATTLE.BP + actor * 2) })
+        sent = p.boostR, bank = M.readByte(BATTLE.BP + actor * 2) + gift })
       if why and why ~= p.boostSaid then
         p.boostSaid = why
         M.log(string.format("[%s] actor=%d [boost] %s plan: %s", self.tag or "fight", actor, p.kind, why))
