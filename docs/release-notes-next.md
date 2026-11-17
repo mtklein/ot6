@@ -43,6 +43,10 @@ still counts as an Earring.
 An Imp has joined Setzer's Hired Help: the third hire now walks in as an
 Imp with a halberd.
 
+A monster that comes back into a fight after dying, like the Piranhas at
+Baren Falls or one raised by Life, now returns with its full shields instead
+of still broken from the blow that killed it.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

@@ -121,31 +121,15 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         ; restores reveals that were earned (chips write them through), so a
         ; same-monster retract cycle keeps its reveals.
         lda     #$00
-        sta     OT6_BROKEN_TICKS,y         ; broken timer: a stale nonzero reload-starts
-                                ;   the monster broken (Ot6Gate skips its turn,
-                                ;   2x damage, the hud shield cell draws the
-                                ;   broken glyph)
         sta     OT6_REVEALED_ELEM,y         ; revealed weakness elements: stale bits, OR'd
                                 ;   with the codex below, draw weaknesses as
                                 ;   revealed from battle start instead of '?'
         sta     OT6_BOOST_REVEALED,y         ; revealed classes (monster half)
         sta     OT6_RVPEND_ELEM-8,y  ; pending reveals must not survive a
         sta     OT6_RVPEND_CLS-8,y   ;   Cmd_20 reload either
-        sta     OT6_BRKTICK-8,y      ; nor a pending or live break flash.
-        sta     OT6_BRKPAL-8,y       ;   these two sit past InitBP's shadow
-                                     ;   clear, so this is also their only
-                                     ;   power-on clear
         sta     OT6_DEBIL-8,y        ; nor a Debilitator's added weakness
-        jsr     Ot6HitBit            ; nor a held gauge (#539) or a breaking-
-        trb     OT6_HOLD             ;   hit mark (#542) on the body this
-        jsr     Ot6HitBit            ;   slot held before the reload
-        trb     OT6_HITBRK
-        jsr     Ot6HitBit            ; nor Relm's marks (#538)
-        trb     OT6_STILLMARK
-        trb     OT6_STILLHELD
-        trb     OT6_UNDERPAINT
-        jsr     Ot6HitBit            ; nor Shadow's pin (#546)
-        trb     OT6_PINNING
+        jsr     Ot6FreshBreak        ; nor the slot's break, its flash, a
+                                     ;   held gauge or any mark (below)
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa
@@ -165,6 +149,103 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         jsr     Ot6HpScale      ; ot6: difficulty transform (trash hp)
         plx
 done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a body's break state, fresh: the seed's and an arrival's shared half ]
+
+; the slot is not broken (a stale nonzero OT6_BROKEN_TICKS starts the body
+; broken: Ot6Gate skips its turn, 2x damage, the hud shield cell draws the
+; broken glyph), has no pending or live break flash (OT6_BRKTICK and
+; OT6_BRKPAL sit past InitBP's shadow clear, so the seed's call is also
+; their only power-on clear), no held gauge (#539) or breaking-hit mark
+; (#542), none of Relm's marks (#538) and no pin (#546).  monster rows
+; only (y >= $08).  a8, either index width; y = entity.  clobbers a
+; (b = 0); preserves x/y.
+.proc Ot6FreshBreak
+        .a8
+        lda     #$00
+        sta     OT6_BROKEN_TICKS,y
+        sta     OT6_BRKTICK-8,y
+        sta     OT6_BRKPAL-8,y
+        jsr     Ot6HitBit
+        trb     OT6_HOLD
+        trb     OT6_HITBRK
+        trb     OT6_STILLMARK
+        trb     OT6_STILLHELD
+        trb     OT6_UNDERPAINT
+        trb     OT6_PINNING
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a dead monster brought back into its slot starts fresh (#557) ]
+
+; Cmd_24's revive arms (MonsterDeath_00, restore at full hp, and _02, at
+; current hp: the AI's restore_monsters and its kin) put a monster back into
+; a slot without InitMonsters, so the seed never runs for it.  A body that
+; died broken (Baren Falls' Piranhas: one shield, ten hp, so the breaking
+; hit is the killing one) came back with its 0 shields and the broken timer
+; still running (Ot6Tick counts on while a monster is out), skipping turns,
+; taking double and drawing the broken glyph until the timer ran out and
+; Ot6Tick refilled it.  So a body in the died/escaped set ($3a3a, AfterAction1
+; sets it at wound/petrify/zombie) gets its full shields and a fresh break
+; state as it returns.  What stays: the reveals (the species' knowledge, in
+; the codex too) and a Debilitator's weakness, which vanilla's revive keeps
+; in $3be0 as well.  A monster only hidden (MonsterDeath_01/03/04: not in
+; $3a3a) and shown again is the same body stepping back in, and keeps its
+; state; one never shown yet (a formation's hidden members, Rizopas) was
+; seeded at battle start and is fresh already.
+; called from MonsterDeath_02 before its trb $3a3a.  a8/i8, y = entity,
+; a = the monster's bit ($3019,y).  preserves a/x/y.
+.proc Ot6Arrive
+        .a8
+        bit     $3a3a
+        beq     done            ; not back from the dead: nothing to renew
+        pha
+        lda     OT6_SHIELD_MAX,y
+        sta     OT6_SHIELD_CUR,y
+        jsr     Ot6FreshBreak
+        pla
+done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a monster Life or Reraise raises starts fresh too ]
+
+; the other way back from the dead: a wound cleared by status removal
+; (RemoveStatus_06/07, the Life family and ReraiseEffect's Life) reaches
+; _c2469c, vanilla's monster revive, which drops the body from $3a3a.  The
+; same renewal as Ot6Arrive, on the same test (still in $3a3a: counted dead),
+; and only when the wound is what this update clears ($f4 bit 7, the status
+; 1/2 clear mask; $3ee4 still holds it here, CalcStatus writes later), so a
+; zombie or a stone lifted from a monster that is not wounded keeps its
+; state.  characters never: y < $08 is a player character's revive, and
+; their break state does not exist.
+; called at _c2469c's head.  a16 (UpdateStatus' longa), either index width;
+; y = entity.  preserves x/y and the caller's flags; clobbers a (_c2469c
+; reloads it).
+.proc Ot6Revive
+        php
+        shorta
+        tya                     ; entity offset, width-neutral test
+        cmp     #$08
+        bcc     done            ; a character: vanilla's revive alone
+        lda     $3019,y
+        bit     $3a3a
+        beq     done            ; not counted dead: nothing to renew
+        lda     $f4
+        bpl     done            ; this update does not clear the wound
+        lda     $3ee4,y
+        bpl     done            ; nor was it wounded
+        lda     OT6_SHIELD_MAX,y
+        sta     OT6_SHIELD_CUR,y
+        jsr     Ot6FreshBreak
+done:   plp
+        rtl
 .endproc
 
 ; ------------------------------------------------------------------------------

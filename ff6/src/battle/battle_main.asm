@@ -12122,7 +12122,9 @@ RemoveStatusNoEffect:
 
 _c2469c:
 removeerase:
-@469c:  phx
+@469c:  jsl     Ot6Revive   ; ot6 #557: a monster back from the dead by
+                            ;   Life or Reraise starts fresh too
+        phx
         ldx     $3019,y     ; monster flag
         txa
         tsb     $2f2f       ; monsters that are not dead
@@ -13645,7 +13647,9 @@ MonsterDeath_00:
 
 ; $02: revive monsters at current hp
 MonsterDeath_02:
-@4fec:  trb     $3a3a       ; clear "monsters that have died/escaped" flag
+@4fec:  jsl     Ot6Arrive   ; ot6 #557: a body back from the dead starts
+                            ;   fresh (full shields, not broken, no marks)
+        trb     $3a3a       ; clear "monsters that have died/escaped" flag
         tsb     $2f2f       ; set "monsters that are not dead" flag
         tsb     $3a2b       ; battle script command byte 4
         tsb     $2f4f       ; monster can be targetted

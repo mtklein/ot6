@@ -437,6 +437,9 @@ TEST_ENV = {
     # rule), in the same battle
     "battle_shadowpin_edges": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
+    # #557: an arm Inferno restores after a broken death starts fresh
+    "battle_rejoin_inferno": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
     # #461: the same expedient, three bytes (Mimic, SwdTech, Slot)
     "battle_mimicboost":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
