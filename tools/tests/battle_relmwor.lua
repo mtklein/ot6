@@ -180,7 +180,10 @@ local function arm()
     -- (the gauge reset as her action starts), which on the v0.47 replay's
     -- draw came first and was read as the Gesture (build/attempts/
     -- wt/v047-noretarget/suites/b4: "mark $00 then ... mark $00 at its end")
-    if v == 0xFF and rec.gestured == nil and rec.gestLive ~= nil then
+    -- and before her Gesture mark: Ot6PaintApply writes the gauge, then the
+    -- mark (a write after the mark is the engine's; the gesture_fill mutant
+    -- passed on one: build/attempts/wt/v047-noretarget/relmmut2/)
+    if v == 0xFF and rec.gestured == nil and rec.gestLive ~= nil and (H.readByte(GEST) >> terra) & 1 == 0 then
       rec.gestured = { f = H.frame, gest = H.readByte(GEST), was = rec.gauge }
     elseif v == 0 and rec.gestured ~= nil and rec.full == nil then
       rec.full = H.frame      -- actioncounter's carry: the gauge is full
