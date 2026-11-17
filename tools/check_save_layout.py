@@ -28,6 +28,15 @@ unnoticed:
     resolves into the block has a row at its address, every row's width
     matches its range, rows do not overlap, and every row lies inside a
     scrap the doc declares (a "Scrap `$xxxx-$xxxx`" line).
+  Event switches (section "## Event switches"): a vanilla event switch OT6
+    claims (#552), one row each: the switch, its byte and bit in vanilla's
+    switch array ($1E80 + switch/8, bit switch%8), and the symbol the build
+    reads it through.  Checked: the byte and bit are the switch's, the byte
+    lies in the switch array ($1E80-$1F5F), the symbol assembles at that byte
+    (and its `<name>_BIT` equate, a `_FLAG` symbol's, is the bit), and every
+    OT6 symbol in the switch array has a row.  Such a symbol needs no
+    save-block field row: the switch array is vanilla's, read with vanilla's
+    encoding.
 
 Nothing is written.  Exit status 0 = clean.
 
@@ -61,6 +70,8 @@ ADDR = r"\$(1[6-9A-Fa-f][0-9A-Fa-f]{2})"
 ADDR_CELL = re.compile(r"^%s(?:-%s)?$" % (ADDR, ADDR))
 SCRAP = re.compile(r"Scrap\s+`%s-%s`" % (ADDR, ADDR))
 BAT_CELL = re.compile(r"^\$([0-7][0-9A-Fa-f]{3})(?:-\$([0-7][0-9A-Fa-f]{3}))?$")
+SWITCH_CELL = re.compile(r"^`?\$([0-9A-Fa-f]{4})`?$")
+SWITCH_LO, SWITCH_HI = 0x1E80, 0x1F5F
 HEADING = re.compile(r"^(#{2,3})\s+(.*?)\s*$")
 
 # ff6-en.dbg records, matched exactly as tools/tests/lib/compose.py does.
@@ -198,6 +209,57 @@ def parse_doc(text):
         rows.append({"start": start, "end": end, "width": int(width_cell),
                      "symbol": symbol, "line": i})
     return rows, scraps
+
+
+def parse_switches(text):
+    """[{switch, byte, bit, symbol, line}] of the event-switch table."""
+    out = []
+    for i, cells in table_rows(section(text, "Event switches")):
+        if len(cells) < 4:
+            continue
+        m = SWITCH_CELL.match(cells[0])
+        b = SWITCH_CELL.match(cells[1])
+        if not m or not b or not cells[2].strip("`").isdigit():
+            continue                      # header, separator, prose row
+        out.append({"switch": int(m.group(1), 16), "byte": int(b.group(1), 16),
+                    "bit": int(cells[2].strip("`")), "symbol": cells[3].strip("`").strip(), "line": i})
+    return out
+
+
+def check_switches(srows, syms, allsyms):
+    """The event-switch rows against the build; returns (problems, the symbols
+    they cover, which need no save-block field row)."""
+    problems, covered = [], set()
+    for r in srows:
+        if r["byte"] != SWITCH_LO + (r["switch"] >> 3) or r["bit"] != (r["switch"] & 7):
+            problems.append("%s:%d switch $%04X is byte $%04X bit %d, not $%04X bit %d"
+                            % (DOC, r["line"], r["switch"], SWITCH_LO + (r["switch"] >> 3),
+                               r["switch"] & 7, r["byte"], r["bit"]))
+        if not SWITCH_LO <= r["byte"] <= SWITCH_HI:
+            problems.append("%s:%d switch byte $%04X is outside the switch array $%04X-$%04X"
+                            % (DOC, r["line"], r["byte"], SWITCH_LO, SWITCH_HI))
+        addrs = syms.get(r["symbol"])
+        if not addrs:
+            problems.append("%s:%d switch $%04X: the build assembled no save-block symbol %s"
+                            % (DOC, r["line"], r["switch"], r["symbol"]))
+            continue
+        covered.add(r["symbol"])
+        if addrs != [r["byte"]]:
+            problems.append("%s:%d switch $%04X: %s assembles at %s, not the switch's byte $%04X"
+                            % (DOC, r["line"], r["switch"], r["symbol"],
+                               ", ".join("$%04X" % a for a in addrs), r["byte"]))
+        if r["symbol"].endswith("_FLAG"):
+            bit = allsyms.get(r["symbol"][:-len("_FLAG")] + "_BIT")
+            if bit is not None and bit != 1 << r["bit"]:
+                problems.append("%s:%d switch $%04X: %s_BIT is $%02X, not bit %d's $%02X"
+                                % (DOC, r["line"], r["switch"], r["symbol"][:-5], bit, r["bit"],
+                                   1 << r["bit"]))
+    for name, addrs in sorted(syms.items()):
+        if name not in covered and all(SWITCH_LO <= a <= SWITCH_HI for a in addrs):
+            problems.append("%s: symbol %s is in the event-switch array at %s but has no row in %s's "
+                            "Event switches table" % (DBG, name, ", ".join("$%04X" % a for a in addrs), DOC))
+            covered.add(name)
+    return problems, covered
 
 
 def parse_battery(text):
@@ -440,7 +502,9 @@ def check(repo, dbg_path, doc_path, rom_path):
         raise SystemExit("check_save_layout: %s has no battery map rows" % doc_path)
     if rom is None:
         raise SystemExit("check_save_layout: no built ROM at %s" % rom_path)
-    problems += check_data(rows, scraps, syms)
+    sprobs, covered = check_switches(parse_switches(text), syms, allsyms)
+    problems += sprobs
+    problems += check_data(rows, scraps, {k: v for k, v in syms.items() if k not in covered})
     problems += check_lengths(rows, allsyms)
     problems += check_battery(brows, magic, allsyms, sram_symbols(dbg),
                               source_literals(os.path.join(repo, SRC)), rom, allsyms)
@@ -476,6 +540,11 @@ SELF_DOC = """\
 | $1E27-$1E2B | 5 | OT6_LORELOAD | x |
 | $1E2F-$1E3F | 17 | OT6_SAVERSV | x |
 - Scrap `$1E1D-$1E3F` (35 bytes).
+
+## Event switches
+| Switch | Byte | Bit | Symbol | Meaning |
+|---|---|---|---|---|
+| $00E0 | $1E9C | 0 | OT6_LEO_FLAG | x |
 """
 SELF_DBG = (
     'sym\tname="OT6_LOADOUT",val=0x7E1E1D,type=lab\n'
@@ -483,6 +552,8 @@ SELF_DBG = (
     'sym\tname="OT6_LORELOAD",val=0x7E1E27,type=lab\n'
     'sym\tname="OT6_SAVERSV",val=0x7E1E2F,type=lab\n'
     'sym\tname="OT6_SAVERSV_LEN",val=0x11,type=equ\n'
+    'sym\tname="OT6_LEO_FLAG",val=0x7E1E9C,type=lab\n'
+    'sym\tname="OT6_LEO_BIT",val=0x1,type=equ\n'
     'sym\tname="OT6_CODEX_MAGIC",val=0x316000,type=lab\n'
     'sym\tname="OT6_ESPER_ROOT",val=0x317000,type=lab\n'
     'sym\tname="OT6_ESPER_LIVE",val=0x317C00,type=lab\n'
@@ -512,7 +583,10 @@ def _run_self(doc=SELF_DOC, dbg=SELF_DBG, rom=None, literals=()):
     rows, scraps = parse_doc(doc)
     brows, problems = parse_battery(doc)
     allsyms = parse_dbg_all(dbg)
-    problems += check_data(rows, scraps, parse_dbg(dbg))
+    syms = parse_dbg(dbg)
+    sprobs, covered = check_switches(parse_switches(doc), syms, allsyms)
+    problems += sprobs
+    problems += check_data(rows, scraps, {k: v for k, v in syms.items() if k not in covered})
     problems += check_lengths(rows, allsyms)
     problems += check_battery(brows, parse_magic(doc), allsyms, sram_symbols(dbg),
                               list(literals), rom, allsyms)
@@ -548,6 +622,14 @@ def selftest():
     red("width column says 3", doc=SELF_DOC.replace("| $1E1D-$1E1E | 2 |", "| $1E1D-$1E1E | 3 |"))
     # a reserve the code zeroes over a different length than the doc says
     red("OT6_SAVERSV_LEN is 16", dbg=SELF_DBG.replace("val=0x11,type=equ", "val=0x10,type=equ"))
+    # event switches (#552): a claimed switch's symbol off its byte, a row whose byte is not the
+    # switch's, a bit equate that disagrees, a switch symbol with no row, a row the build lacks
+    red("assembles at $1E9D", dbg=SELF_DBG.replace("0x7E1E9C", "0x7E1E9D"),
+        doc=SELF_DOC.replace("| $00E0 | $1E9C |", "| $00E0 | $1E9C |"))
+    red("is byte $1E9C bit 0, not $1E9D bit 0", doc=SELF_DOC.replace("| $00E0 | $1E9C |", "| $00E0 | $1E9D |"))
+    red("OT6_LEO_BIT is $02", dbg=SELF_DBG.replace('"OT6_LEO_BIT",val=0x1', '"OT6_LEO_BIT",val=0x2'))
+    red("Event switches table", doc=SELF_DOC.replace("| $00E0 | $1E9C | 0 | OT6_LEO_FLAG | x |\n", ""))
+    red("assembled no save-block symbol OT6_X_FLAG", doc=SELF_DOC.replace("| 0 | OT6_LEO_FLAG |", "| 0 | OT6_X_FLAG |"))
     # battery map: the codex moved by a page in the build (the mutant ROM
     # whose save-touching address drifted from the frozen layout)
     red("anchor OT6_CODEX_MAGIC is battery $2400",

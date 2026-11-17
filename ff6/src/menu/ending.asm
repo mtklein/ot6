@@ -4349,6 +4349,7 @@ _c3e002:
 CreateBigCharNameTask:
 @e022:  clr_a
         lda     zSelIndex
+Ot6LeoCastName = *                      ; (a seam for the negative's mutant)
         cmp     #CHAR_PROP::GOGO        ; ot6 #552: the revealed Leo's card
         bne     @row                    ;   reads "Leo" (row 14), a Gogo who
         lda     f:OT6_LEO_FLAG          ;   stayed a mystery "Gogo"

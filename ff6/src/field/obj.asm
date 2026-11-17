@@ -52,6 +52,7 @@ UnusedFirstObjTbl:
         bne     @510d
         rts
 @510d:  lda     $0795                   ; ot6 #552: the ending's portrait of
+Ot6LeoPortrait = *                      ; (a seam for the negative's mutant)
         cmp     #CHAR::GOGO             ;   Gogo is Leo's once the grave has
         bne     :+                      ;   revealed him (switch $00e0)
         lda     f:OT6_LEO_FLAG
@@ -1085,6 +1086,7 @@ OnVehicle:
         clc
         adc     $1a
         tax
+Ot6LeoRide = *                          ; (a seam for the negative's mutant)
         lda     $0879,y                 ; ot6 #552: Leo's sheet has no riding
         cmp     #MAP_SPRITE_GFX::LEO    ;   frames ($2e/$2f, tiles $1560-
         beq     @leo                    ;   $169f, past its end): the revealed

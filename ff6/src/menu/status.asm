@@ -203,15 +203,16 @@ DrawStatusGogoWindow:
         inx
         cpx     #$0040
         bne     @5e42
+Ot6LeoShockList = *                     ; (a seam for the negative's mutant)
         lda     f:OT6_LEO_FLAG          ; ot6 #552: the revealed Leo offers
         and     #OT6_LEO_BIT            ;   his own Shock, last in the list
-        beq     @leo
+        beq     :+
         lda     #BATTLE_CMD::SHOCK      ; (BattleCmdProp leaves Shock's
         sta     hWMDATA                 ;   GOGO flag clear, so the filter
         iny                             ;   above drops it even from his own
                                         ;   record once he has picked it:
                                         ;   it is listed exactly once)
-@leo:   iny
+:       iny
         tya
         sta     $7e9d89
         ldx     #$aa8d
@@ -259,17 +260,34 @@ DrawStatusGogoWindow:
         tya
         clc
         adc     #$0080
-        cmp     #BG_SCREEN::BG3C        ; ot6 #552: a 16th row (the revealed
-        bne     :+                      ;   Leo's Shock on a full roster) is
-        lda     #BG_SCREEN::BG3D        ;   tilemap row 32, which is screen D's
-:       tay                             ;   row 0 in the 64x64 BG3 map, not
-        shorta                          ;   screen C's (the HDMA shows it at
-                                        ;   line 196, the cursor's 16th row)
+        jsr     Ot6LeoRow16             ; ot6 #552: a 16th row
+        tay
+        shorta
         plx
         inx
         cpx     $e5
         bne     @5eba
         jmp     _c35f50
+
+; ------------------------------------------------------------------------------
+
+; [ the Gogo list's 16th row ]
+
+; ot6 #552 (docs/design/leo-reveal.md): A (16-bit) = the next row's BG3 text
+; position.  Vanilla's list holds at most 15 rows (the blank and the 14
+; commands a full roster's records hold); the revealed Leo's Shock makes a
+; 16th.  Its position, tilemap row 32, is screen D's row 0 in the 64x64 BG3
+; map (screens A B over C D), not the next $800 bytes (screen C, the left
+; half): the status menu's HDMA (StatusBG3ScrollHDMA) shows it at line 196,
+; the cursor's 16th position (GogoCmdListPos).
+
+.a16
+Ot6LeoRow16:
+        cmp     #BG_SCREEN::BG3C
+        bne     :+
+        lda     #BG_SCREEN::BG3D
+:       rts
+.a8
 
 ; ------------------------------------------------------------------------------
 

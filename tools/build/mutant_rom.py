@@ -6,7 +6,8 @@
 EDIT is PROC, which gets an `rts` ($60) as its first byte so a routine
 called with jsr does nothing, or SYMBOL=HEX, whose bytes at SYMBOL are
 replaced by HEX (a seam the source labels for this: Ot6SaveSign's VerCheck
-and SlotAt).  SYMBOL is a name in DBG (ff6-en.dbg).  Only for the
+and SlotAt), or SYMBOL+OFF=HEX, OFF bytes past SYMBOL (decimal or $hex:
+an operand inside a routine, e.g. Ot6LeoBattleRow+4=E0FFFF).  SYMBOL is a name in DBG (ff6-en.dbg).  Only for the
 negatives that prove a suite notices the change (#389); every symbol stays
 where the real build put it, so the real ff6-en.dbg still describes the
 mutant.
@@ -25,13 +26,15 @@ def main(argv):
     text = open(dbg, encoding="utf-8").read()
     for e in procs:
         p, _, hx = e.partition("=")
+        p, _, off = p.partition("+")
+        off = int(off[1:], 16) if off.startswith("$") else int(off or "0")
         m = re.search(r'\bname="%s",[^\n]*\bval=0x([0-9A-Fa-f]+)' % re.escape(p), text)
         if not m:
             print(f"mutant_rom: no symbol {p} in {dbg}")
             return 1
-        off = int(m.group(1), 16) & 0x3FFFFF
+        off = (int(m.group(1), 16) & 0x3FFFFF) + off
         new = bytes.fromhex(hx) if hx else b"\x60"
-        print(f"mutant_rom: {p} at ROM ${off:06X}: {rom[off:off + len(new)].hex()} -> {new.hex()}")
+        print(f"mutant_rom: {e.partition('=')[0]} at ROM ${off:06X}: {rom[off:off + len(new)].hex()} -> {new.hex()}")
         rom[off:off + len(new)] = new
     open(out, "wb").write(rom)
     return 0

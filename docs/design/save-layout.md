@@ -184,7 +184,37 @@ Every save the harness makes was zero there all along, because the harness
 pins an all-zeros fill.
 
 `$1E40-$1E7F` is vanilla's treasure bitfield and `$1E80-$1F5F` its event
-switches (all live game state); OT6 claims none of them.
+switches (all live game state).  OT6 claims no treasure bit and one event
+switch, with vanilla's encoding (the next section).
+
+## Event switches
+
+A vanilla event switch OT6 sets and reads for a rule of its own.  Each is a
+bit of vanilla's switch array (`$1E80` + switch/8, bit switch%8), written
+and read with vanilla's encoding, so it needs no reserve and no layout
+version: every save from any release holds the bit, and an older save holds
+0 there.  `tools/check_save_layout.py` checks each row against the build
+(the byte and bit are the switch's, the symbol assembles at that byte, its
+`_BIT` equate is the bit) and refuses an OT6 symbol in the switch array
+without a row.
+
+| Switch | Byte | Bit | Symbol | Meaning | Since | Old-save read |
+|---|---|---|---|---|---|---|
+| $00E0 | $1E9C | 0 | OT6_LEO_FLAG | General Leo's reveal has played (#552, [leo-reveal.md](leo-reveal.md)): set once by event command $9F (`Ot6LeoReveal`) at Leo's grave in the World of Ruin with Gogo in the party; read by the battle row, the equip masks, the Status screen's command list, the shop, the ending | v0.49 | 0 in every save before v0.49 (checked: the golden saves and every tracked checkpoint): Gogo unrevealed, and the scene can play |
+
+Taking a free switch.  A switch is free when nothing reads or writes it:
+no event script names it (`switch`, `if_switch`, `set_switch`,
+`clr_switch`, `loop_until`, an `if_any`/`if_all` list, an NPC's show
+switch), no assembly addresses its byte, and every save a player may hold
+reads 0 there.  Before taking one, scan the source and the built event
+script's raw command bytes for it (the set/clear opcodes `$D0`-`$D5` and
+the object script's `$E1`-`$E6` with its low byte, the world's `$C8`/`$C9`
+with its word, and the word, with or without bit 15, in a conditional's
+switch list), read it in every golden save and tracked checkpoint, and
+record both (#552's evidence: `build/attempts/wt/v049-leo/switch_scan.txt`,
+`switch_saves.txt`).  The range `$00E0`-`$00FF` was unreferenced in
+vanilla and is where OT6 takes from; `$00E0` is taken.  A taken switch stays
+taken: its meaning never changes, and a retired one is never reused.
 
 ## Vanilla fields OT6 uses
 
@@ -202,7 +232,7 @@ None is moved or re-encoded.
 | `$1D28`, `$1D29-$1D2B`, `$1D2C-$1D4B` | Blitzes, lores, rages learned | Read by the command menu, the divines and the loadouts |
 | `$1860-$1862` | Gil | Read by Setzer's coin attacks |
 | `$1EDE-$1EDF` | Characters available | Vanilla's random Shadow departure is gone (v0.16): the bit is no longer cleared after battle |
-| `$1E80-$1F5F` | Event switches | Read by OT6 code (`$00BF` Terra's return, `$0068` the tube room, `$00CA`, `$02E3` Shadow's initialization, and Relm's list: `$02E8` her recruitment, `$0240` Owzer's mansion after Chadarnook, `$00BA` Strago's return); OT6 sets no new switches; its three added save points ride vanilla's standing `$0632` |
+| `$1E80-$1F5F` | Event switches | Read by OT6 code (`$00BF` Terra's return, `$0068` the tube room, `$00CA`, `$02E3` Shadow's initialization, and Relm's list: `$02E8` her recruitment, `$0240` Owzer's mansion after Chadarnook, `$00BA` Strago's return); OT6 sets one switch of its own, `$00E0` (the section above); its three added save points ride vanilla's standing `$0632` |
 | `$1F6E` | Random battle counter | `Ot6DangerStep` scales the step and adds it there; zeroed at New Game (`Ot6NewGameClear`) |
 | `$1616-$1619` | Battle commands | Gau's join gives FIGHT, RAGE, MAGIC, ITEM (v0.8; vanilla RAGE, LEAP, MAGIC, ITEM). Set when he joins, so a save where he joined earlier keeps the old list |
 

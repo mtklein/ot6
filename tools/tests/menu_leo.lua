@@ -10,10 +10,13 @@
 --                slot (PortraitGfxPtrs entry $10 read, the record's graphics byte $10, the name LEO), the
 --                Status screen reads Leo's row (CharProp row 15: battle power, defense, magic defense, evade,
 --                magic block) and its command list ends in Shock, picked into his second row ($1617 = $1B);
---                the Equip menu offers that sword and he wears it, and still offers the bag's weapon GOGO
+--                the Item menu's details for that sword list slot 12 (before: not), the Equip menu offers it
+--                and he wears it; Thamasa's weapon shop draws him in Leo's sprite and palette (before: GOGO's), and still offers the bag's weapon GOGO
 --                could already wear.
 -- The items are chosen from the bag and the ROM's ItemProp at run time (a weapon with Leo's bit 15 and not
 -- GOGO's bit 12; a weapon with GOGO's bit 12), so the suite copes with whatever the play left in the bag.
+-- With a full roster the list is 16 rows, one past vanilla's 15: the 16th is drawn on BG3 screen D's row 0, where
+-- the status menu's HDMA shows the cursor's 16th position (the cells there change from before the reveal).
 -- Screenshots (build/states/shots/menu_leo_*): the main menu, the Status screen, the command list, the
 -- weapon list.  Nothing is written.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -23,6 +26,7 @@ local REC = 0x1600 + 37 * GOGO
 local SHOCK = 0x1B
 local ST_MAIN, ST_CHAR, ST_STATUS, ST_CMDLIST = 0x05, 0x06, 0x0C, 0x6A
 local GOGO_ROW, LEO_ROW = 12 * 22, 15 * 22                -- CharProp rows (22 bytes)
+local ROW16 = 0x7E7849 + 0x1800                           -- wBG3Tiles::ScreenD (menu_ram.inc)
 local function st() return H.menuRunning() and H.readByte(0x26) or -1 end
 local function ctl() if H.worldMode() then return H.worldHasControl() end return H.hasControl() end
 local function cmdByte(row) return H.readByte(REC + 0x16 + row) end
@@ -99,6 +103,10 @@ local function statusList(tag, row, pick, seen)
               local t = {}
               for _, c in ipairs(seen) do t[#t + 1] = string.format("%02X", c) end
               H.log(string.format("[menu_leo] %s: GOGO's command list (%d): %s", tag, n, table.concat(t, " ")))
+              -- the 16th row's text cells: BG3 screen D's row 0 (Ot6LeoRow16), the 64x64 map's row 32
+              local cells = {}
+              for i = 0, 13 do cells[#cells + 1] = string.format("%02X", H.readByte(ROW16 + i)) end
+              seen.row16 = table.concat(cells, "")
             end
             if not shotL and ph == 0 then shotL = true; H.screenshot("menu_leo_" .. tag .. "_cmdlist") end
             if shotL then
@@ -135,15 +143,108 @@ local function weaponList(tag, id, res)
     H.call(function() equipShot = nil end),
   })
 end
+-- the Item menu's details for an item (main menu row 0, the list's cursor $4B on its bag slot, A): an item a
+-- character can wear shows who can (item.asm @8515: the actor ids at $7E9D89, $FF-terminated); `out.who` gets them
+local function itemWho(tag, id, out)
+  local ph, phase = 0, "in"
+  -- the list is one column of 256 rows a press each (lib ot6_field.lua: 12 frames a press): a long walk
+  return H.withReset(H.driveUntil(function() return phase == "done" and not H.menuRunning() and ctl() end, 20000, {
+    H.call(function()
+      ph = (ph + 1) % 12
+      local s, held = st(), {}
+      if phase == "in" then
+        if s == -1 then
+          if ctl() then held = { "x" } end
+        elseif s == ST_MAIN then
+          held = H.readByte(0x4B) == 0 and { "a" } or { up = true }
+        elseif s == 0x08 or s == 0x19 then
+          -- $08 the list; A picks the slot up ($19), and A again on the same slot uses it: the details
+          local slot = H.invSlotOf(id)
+          if slot == nil then error(tag .. string.format(": $%02X is not in the bag", id), 0) end
+          held = H.readByte(0x4B) == slot and { "a" } or { [H.readByte(0x4B) < slot and "down" or "up"] = true }
+        elseif s == 0x64 and ph == 0 then
+          out.who = {}
+          for i = 0, 15 do
+            local c = H.readByte(0x7E9D89 + i)
+            if c == 0xFF then break end
+            out.who[#out.who + 1] = c
+          end
+          H.log(string.format("[menu_leo] %s: the Item menu's details for $%02X: who can equip {%s}", tag, id,
+            table.concat(out.who, ",")))
+          H.screenshot("menu_leo_" .. tag .. "_itemwho")
+          phase = "out"
+        end
+      end
+      if phase == "out" then
+        if s == -1 then phase = "done" else held = { "b" } end
+      end
+      if ph < 4 then H.setPad(held) else H.setPad({}) end
+    end),
+  }, tag .. ": the Item menu's details"), function() ph, phase = 0, "in" end)
+end
+-- Thamasa's weapon shop (344 (14,37) -> 345, shop 72; its first row, $3E, is of Leo's set and not GOGO's): Buy,
+-- the list's cursor on its first row, where each seated member's sprite stands in the can-equip pose or not;
+-- `out` counts the ROM reads of the revealed Leo's shop animation (Ot6ShopLeoAnim) and of Leo's sheet's
+-- frames (map sprite graphics $10, the offsets LoadShopCharGfx loads: Ot6LeoShopGfx)
+local shopReads = { anim = 0, sheet = 0 }
+local function shopArm()
+  local a = H.sym("Ot6ShopLeoAnim")
+  emu.addMemoryCallback(function() shopReads.anim = shopReads.anim + 1 end, emu.callbackType.read, a, a + 1)
+  local sp = H.sym("Ot6ShopLeoSprite")
+  emu.addMemoryCallback(function() shopReads.anim = shopReads.anim + 1 end, emu.callbackType.read, sp, sp + 8)
+  local sheet = 0xD50000 + 0x10 * 0x16A0 + 0x3C0
+  emu.addMemoryCallback(function() shopReads.sheet = shopReads.sheet + 1 end, emu.callbackType.read, sheet, sheet + 0x1F)
+end
+local function shop(tag, out)
+  local ph, phase = 0, "buy"
+  return H.seqStep({
+    H.cond(function() return H.worldMode() end, {
+      H.worldNavTo(251, 230, { maxFrames = 6000, playBattles = "tactical",
+        arrive = function() return (H.mapId() & 0x1FF) == 344 and not H.worldMode() end }),
+      H.waitUntil(function() return (H.mapId() & 0x1FF) == 344 and H.hasControl() end, 2400, tag .. ": Thamasa", 1),
+    }, {}),
+    H.crossDoor(14, 37, 345, 10, 47, tag .. ": Thamasa's weapon shop 344 (14,37) -> 345"),
+    H.call(function() shopReads.anim, shopReads.sheet = 0, 0 end),
+    H.shopTalk(11, 37, tag .. ": Thamasa's weapon shop"),
+    H.call(function() H.assertEq(H.shopId(), 72, tag .. ": the counter opened shop 72") end),
+    H.withReset(H.driveUntil(function() return phase == "done" end, 1800, {
+      H.call(function()
+        ph = ph + 1
+        if phase == "buy" then
+          -- the shop's first window: Buy is its first row; one A opens the list on its first row
+          H.setPad(ph > 20 and ph < 25 and { "a" } or {})
+          if ph > 40 then phase, ph = "look", 0 end
+        elseif phase == "look" then
+          H.setPad({})
+          if ph == 60 then
+            H.screenshot("menu_leo_" .. tag .. "_shop")
+            out.anim, out.sheet = shopReads.anim, shopReads.sheet
+            H.log(string.format("[menu_leo] %s: the shop's list, row 0 ($%02X): Ot6ShopLeoAnim read %d, Leo's "
+              .. "sheet read %d", tag, H.readByte(0x1869), out.anim, out.sheet))
+            phase = "done"
+          end
+        end
+      end),
+    }, tag .. ": the shop's list"), function() ph, phase = 0, "buy" end),
+    H.release(),
+    H.shopClose(tag .. ": Thamasa's weapon shop"),
+  })
+end
+
+local function lists(t, c) for _, v in ipairs(t or {}) do if v == c then return true end end return false end
+
 local preList, postList, againList = {}, {}, {}
+local preWho, postWho = {}, {}
+local preShop, postShop = {}, {}
 local preNew, postNew, postOld = {}, {}, {}
 local pre = {}
-H.run({ maxFrames = 60000 }, {
+H.run({ maxFrames = 120000 }, {
   -- ---- before the reveal ----------------------------------------------------------------------------------
   H.loadState("build/states/wor_leo_pre.mss.lua"),
   H.waitFrames(30),
   H.call(function()
     arm()
+    shopArm()
     H.assertEq(H.readByte(REC + 1), 0x0C, "before: slot 12 wears GOGO's sprite")
     H.assertEq(gogoPos() ~= nil, true, "before: GOGO in the active party")
     NEW = bagWeapon(function(m) return (m & 0x8000) ~= 0 and (m & 0x1000) == 0 end)
@@ -163,6 +264,15 @@ H.run({ maxFrames = 60000 }, {
   H.lazy(function() return weaponList("pre", NEW, preNew) end),
   H.call(function()
     H.assertEq(preNew.found, false, string.format("before: the Equip menu does not offer $%02X", NEW))
+  end),
+  H.lazy(function() return itemWho("pre", NEW, preWho) end),
+  shop("pre", preShop),
+  H.call(function()
+    H.assertEq(preShop.anim, 0, "before: the shop draws GOGO's own sprite (Ot6ShopLeoAnim unread)")
+    H.assertEq(preShop.sheet, 0, "before: and loads no frame of Leo's sheet")
+  end),
+  H.call(function()
+    H.assertEq(lists(preWho.who, GOGO), false, string.format("before: the Item menu does not list GOGO for $%02X", NEW))
   end),
 
   -- ---- after the reveal -----------------------------------------------------------------------------------
@@ -197,6 +307,12 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(n, 1, "after: Shock listed once")
     H.assertEq(#postList, #preList + 1, "after: the list is the one before plus Shock")
     H.assertEq(cmdByte(1), SHOCK, "after: Shock picked into his second command row ($1617)")
+    H.log(string.format("[menu_leo] the 16th row's cells (BG3 screen D, row 0): before %s, after %s", preList.row16,
+      postList.row16))
+    if #postList == 16 then
+      H.assertEq(postList.row16 ~= preList.row16, true, "after: the 16th row (Shock) is drawn where the HDMA shows "
+        .. "the cursor's 16th position (BG3 screen D's row 0)")
+    end
   end),
   -- once picked, the list still holds Shock exactly once (his own record now holds it)
   statusList("again", 2, nil, againList),
@@ -205,12 +321,21 @@ H.run({ maxFrames = 60000 }, {
     for _, c in ipairs(againList) do if c == SHOCK then n = n + 1 end end
     H.assertEq(n, 1, "once picked: Shock still listed once (his record's own Shock is not listed again)")
   end),
+  H.lazy(function() return itemWho("post", NEW, postWho) end),
+  H.call(function()
+    H.assertEq(lists(postWho.who, GOGO), true, string.format("after: the Item menu lists slot 12 for $%02X", NEW))
+  end),
   H.lazy(function() return weaponList("post", NEW, postNew) end),
   H.call(function()
     H.assertEq(postNew.found, true, string.format("after: the Equip menu offers $%02X (Leo's set)", NEW))
     H.assertEq(H.readByte(REC + 0x1F), NEW, string.format("after: he wears $%02X", NEW))
   end),
   H.lazy(function() return weaponList("old", OLD, postOld) end),
+  shop("post", postShop),
+  H.call(function()
+    H.assertEq(postShop.anim > 0, true, "after: the shop draws the slot with Leo's animation (Leo's palette)")
+    H.assertEq(postShop.sheet > 0, true, "after: from Leo's sheet")
+  end),
   H.call(function()
     H.assertEq(postOld.found, true, string.format("after: the Equip menu still offers $%02X (GOGO's)", OLD))
     H.log("[menu_leo] PASS: the menu shows Leo, reads his row, offers Shock and his whole set")
