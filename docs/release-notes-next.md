@@ -34,6 +34,10 @@ the same, so Shadow can slow an enemy and Gogo can stop it. A boost on a
 throw still multiplies its damage. An enemy that is stopped no longer gets
 to act on a turn it had already started.
 
+Maduin's and Bahamut's top Esper ranks now count as an Earring. With an
+Earring or Hero Ring worn as well, or with both ranks, magic damage rises by
+half, the same as wearing two Earrings.
+
 Locke's page in the field menu's Skills list is now Treasure Hunter, as he
 insists, where it used to say Thief.
 
