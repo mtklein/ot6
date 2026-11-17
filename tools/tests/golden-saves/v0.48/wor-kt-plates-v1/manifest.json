@@ -1,0 +1,12 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "battery.sram",
+  "slot": 3,
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "13ddb579e52a6dab0bf7e8ca24062c3139a11e223f2af80674c692053cfe10c7",
+  "provenance": "v0.48 release zip ot6-v0.48.zip (sha256 3f6d2ae0c9a220b02b56df0bbd3e99a8856eb28b0e772f5e77cc406c110d18a2), saves/70 - Kefka's Tower, two parties on the plates (before Kefka).srm, as published; a release artifact, not a capture",
+  "golden": {
+    "esper": "signed"
+  }
+}

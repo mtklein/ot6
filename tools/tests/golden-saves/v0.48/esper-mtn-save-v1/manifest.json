@@ -1,0 +1,12 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "battery.sram",
+  "slot": 3,
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "e1bb379553e6fda6307c94852b54a382647328362481f0bad2157f87dde67fb3",
+  "provenance": "v0.48 release zip ot6-v0.48.zip (sha256 3f6d2ae0c9a220b02b56df0bbd3e99a8856eb28b0e772f5e77cc406c110d18a2), saves/24 - Esper Mountain, save point.srm, as published; a release artifact, not a capture",
+  "golden": {
+    "esper": "signed"
+  }
+}

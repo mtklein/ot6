@@ -28,8 +28,8 @@ the [instruction booklet](docs/manual/ot6-manual.pdf), a printable PDF.
 
 ## Playing
 
-The latest release is [v0.47](https://github.com/mtklein/ot6/releases/tag/v0.47).
-`main` is v0.48 in development.
+The latest release is [v0.48](https://github.com/mtklein/ot6/releases/tag/v0.48).
+`main` is v0.49 in development.
 
 You need a Final Fantasy III (USA) 1.0 ROM with SHA-1
 `4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`. Each release has a BPS patch for
