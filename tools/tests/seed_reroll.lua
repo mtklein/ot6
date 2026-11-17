@@ -16,19 +16,22 @@
 -- logged `[seedprobe] 60 shift(s) sampled, 15 distinct first battle(s)`,
 -- with shift 1 (and 58, 59) on shift 0's key (be80) and shifts 2..5 on be90
 -- (build/attempts/wt/v046-land/replay1/seed_probe.log; until then shifts
--- 26..29 were on shift 0's be7C).  seedGap = 1 therefore puts attempt 2 on
--- attempt 1's first battle.  Attempt 1 raises a `nopath`-shaped message once its
+-- 26..29 were on shift 0's be7C).  v0.49's ROM moved it back: the probe
+-- logged `[seedprobe] 60 shift(s) sampled, 8 distinct first battle(s)`, shift
+-- 0 on be7C with shifts 26..29 and 55..58, shift 1 on be8C
+-- (build/attempts/wt/v049-land/lab/seed_probe.log).  seedGap = 26 therefore
+-- puts attempt 2 on attempt 1's first battle.  Attempt 1 raises a `nopath`-shaped message once its
 -- battle is up (a message, as segment_retry.lua injects, because the
--- classifier reads messages).  Attempt 2 at shift 1 must be re-rolled at
--- its seed store (to shift 8 today); the re-run attempt 2 then asserts exactly
+-- classifier reads messages).  Attempt 2 at shift 26 must be re-rolled at
+-- its seed store (to shift 33 today, be8C); the re-run attempt 2 then asserts exactly
 -- one re-roll, a first battle different from attempt 1's, and three body
--- runs.  A healthy tree reads PASS attempts=2/3.  If shift 1 stops
+-- runs.  A healthy tree reads PASS attempts=2/3.  If shift 26 stops
 -- reproducing attempt 1's battle (a changed fixture or walk), the
 -- rerollCount assert says so rather than passing vacuously: re-measure
 -- with the probe line above and pick a shift from its duplicates.
 --
 -- Shift 0 only, by design: the ladder above is the runner's own (attempt 2
--- at shift 1), so a run started at another OT6_SEED_SHIFT rebases it and
+-- at shift 26), so a run started at another OT6_SEED_SHIFT rebases it and
 -- the duplicate is not there to re-roll.  A draw sweep (OT6_SEED_SHIFT or K
 -- encounters used up) skips this suite; v036-fragile's shifts 7 and 13
 -- failed on that rebased ladder, not on a ROM draw
@@ -40,7 +43,7 @@ _G.SEED_REROLL_RUNS = (_G.SEED_REROLL_RUNS or 0) + 1
 local run = _G.SEED_REROLL_RUNS
 local attempt = #H.attemptFailures() + 1
 
-H.run({ maxFrames = 20000, retries = 3, seedGap = 1, watchdog = false }, {
+H.run({ maxFrames = 20000, retries = 3, seedGap = 26, watchdog = false }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
@@ -59,9 +62,9 @@ H.run({ maxFrames = 20000, retries = 3, seedGap = 1, watchdog = false }, {
     H.assertEq(prev ~= nil and prev.key ~= nil, true,
       "attempt 1's first battle is on record")
     H.assertEq(H.rerollCount(), 1,
-      "attempt 2 at shift 1 fought attempt 1's first battle and was re-rolled once")
+      "attempt 2 at shift 26 fought attempt 1's first battle and was re-rolled once")
     H.assertEq(run, 3, "the body ran three times: attempt 1, attempt 2 at shift "
-      .. "1 (re-rolled at its seed store), attempt 2 at the re-rolled shift")
+      .. "26 (re-rolled at its seed store), attempt 2 at the re-rolled shift")
     H.assertEq(fb.key ~= prev.key, true,
       "the re-rolled attempt fights a different first battle")
     H.log("[seed_reroll] a retry that repeated attempt 1's first battle was "
