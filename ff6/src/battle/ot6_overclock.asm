@@ -135,7 +135,7 @@ OT6_FACTORY_BIT  = 1 << ($68 & 7)
         asl
         inc     a
         sta     f:$7e0000+$3a70
-        jsl     Ot6PassesAdded  ; a firing whose body fell retargets
+        jsl     Ot6PassesAdded  ; #545: firings stay on the aim (ot6_passes.asm)
 @out:   plx
         pla
         rtl

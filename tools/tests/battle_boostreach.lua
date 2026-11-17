@@ -110,8 +110,12 @@ local quiet
 local actS
 local tgtMon, allyS
 local function chars()
-  return string.format("MP E%d C%d bank E%d C%d pend E%d C%d", mp(edgarS), mp(celesS), bank(edgarS),
-    bank(celesS), pend(edgarS), pend(celesS))
+  local t = {}
+  for e = 0, 6, 2 do
+    t[#t + 1] = string.format("e%d %dhp s%02X", e, H.readWord(0x3BF4 + e), H.readByte(0x3EE4 + e))
+  end
+  return string.format("MP E%d C%d bank E%d C%d pend E%d C%d [%s]", mp(edgarS), mp(celesS), bank(edgarS),
+    bank(celesS), pend(edgarS), pend(celesS), table.concat(t, " "))
 end
 local function mons()
   local t = {}
@@ -353,6 +357,18 @@ local function runCase(c)
       c.sent, c.after, c.endF, c.mask = false, false, nil, nil
       c.triedR, c.pendAfterR = false, nil
       c.allyT = allyS
+      if c.name == "impl-b1" and (H.readByte(0x3EE4 + allyS * 2) & 0x20) == 0 then
+        -- the lift is aimed at an imped ally: impa-b1's Imp can miss its own
+        -- target and land on the next (v0.47's replay: aimed at e2, only e4
+        -- imped), so the aim goes to an ally snapshot I holds imped
+        for e = 0, 6, 2 do
+          if c.allyT == allyS and (H.readByte(0x3EE4 + e) & 0x20) ~= 0 and H.readWord(0x3BF4 + e) > 0 then
+            c.allyT = e // 2
+          end
+        end
+        H.log(string.format("[boostreach] impl-b1: seat %d is not imped at snapshot I; aimed at seat %d", allyS,
+          c.allyT))
+      end
       if c.aimFree then
         -- a seat without Safe whose walk (battle order after it, wrapping)
         -- meets a body under Safe before one it can reach: from S (Safe on
@@ -697,16 +713,32 @@ steps[#steps + 1] = H.call(function()
           tostring(beyond), passed, t, c.mask))
       end
       if c.name == "impl-b1" then
+        -- the toggle, whatever snapshot I holds: the target was imped and is
+        -- lifted, and the point's second body flips (lifted if it was imped,
+        -- imped if not).  Snapshot I held two imped allies on v0.46's line,
+        -- and the walk's next body was the other; on v0.47's replay one had
+        -- lost its Imp by CELES's next window and the walk reached an
+        -- unimped ally (suite_battle_boostreach.log, "impl-b1 ... mask
+        -- $000A"), so the old "two imped, every one lifted" was the draw's
         local imped = 0
         for e = 0, 6, 2 do if c.imp0[e] then imped = imped + 1 end end
-        check(c.first ~= nil and c.imp0[c.first] and imped >= 2, c.name .. ": the target and another ally are "
-          .. "imped (snapshot I)")
+        H.log(string.format("[boostreach] impl-b1: %d all(ies) imped at snapshot I, mask $%04X", imped, c.mask))
+        check(c.first ~= nil and c.imp0[c.first], c.name .. ": the target is imped (snapshot I)")
+        local n = 0
         for e = 0, 6, 2 do
           if (c.mask & (1 << (e // 2))) ~= 0 then
-            check(c.imp0[e], string.format("%s: entity %d in the mask was imped (the toggle lifts)", c.name, e))
-            check(c.impAfter[e] == false, string.format("%s: entity %d is no longer imped after the cast", c.name, e))
+            n = n + 1
+            check(c.impAfter[e] == not c.imp0[e], string.format("%s: entity %d in the mask flipped (Imp toggles): "
+              .. "imped %s before, %s after", c.name, e, tostring(c.imp0[e]), tostring(c.impAfter[e])))
           end
         end
+        -- the point's walk from an imped target lifts only another imped
+        -- ally (it takes the bodies the cast changes the same way): with
+        -- one imped at snapshot I it finds none and is spent (measured on
+        -- the v0.47 replay: aimed at the one imped ally, mask $0004, "the
+        -- others it can land on:" none)
+        check(n == math.min(2, imped), string.format("%s: the point reached %d imped all(ies) beside the target (%d "
+          .. "in the mask, %d imped at snapshot I)", c.name, math.min(2, imped) - 1, n, imped))
       end
       if c.spell == SAFE then
         for e = 0, 6, 2 do

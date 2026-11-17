@@ -140,6 +140,10 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         trb     OT6_HOLD             ;   hit mark (#542) on the body this
         jsr     Ot6HitBit            ;   slot held before the reload
         trb     OT6_HITBRK
+        jsr     Ot6HitBit            ; nor Relm's marks (#538)
+        trb     OT6_STILLMARK
+        trb     OT6_STILLHELD
+        trb     OT6_UNDERPAINT
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa
@@ -656,6 +660,7 @@ merge:  jsr     Ot6Hold         ; #539: the gauge shows this hit with its hit
         beq     done            ; shieldless monster
         dec     a
         jsr     Ot6Conductor    ; #328: Ramuh's signature takes one more
+        jsr     Ot6Underpaint   ; #538: and Underpainting one more
         sta     OT6_SHIELD_CUR,y
         bne     done
         lda     #OT6_BREAK_TICKS
@@ -822,6 +827,7 @@ merge:  jsr     Ot6Hold         ; #539: the gauge shows this hit with its hit
         lda     OT6_SHIELD_CUR,y
         beq     done            ; shieldless monster
         dec     a
+        jsr     Ot6Underpaint   ; #538: Underpainting takes one more
         sta     OT6_SHIELD_CUR,y
         bne     done
         lda     #OT6_BREAK_TICKS
@@ -1798,6 +1804,7 @@ done:   rts
         bra     @store
 @none:  lda     #$00
 @store: sta     f:$7e0000+OT6_ATKCLASS
+        jsr     Ot6TintSwing    ; #538: a Tinted ally's colour
         plp
         rtl
 .endproc
@@ -2244,6 +2251,8 @@ one:    sep     #$41            ; carry and overflow
         beq     done
         dec     OT6_BROKEN_TICKS,x
         bne     done
+        jsr     Ot6StillHold            ; #538: Still Life holds it once more
+        bcs     done
         lda     OT6_SHIELD_MAX,x         ; recovered: shields back to max
         sta     OT6_SHIELD_CUR,x         ; (revealed weaknesses stay revealed)
 done:   rtl

@@ -90,7 +90,7 @@ local L = {
 -- (which happens inside Ot6FightBoost, before it touches $3a70) and closed
 -- by SaveForMimic -- battle_hits.lua's window, hooked into the dump
 local W = { open = false, closed = false, swings = 0, hits = 0,
-            hand = { [0] = 0, [1] = 0 }, bank = nil }
+            hand = { [0] = 0, [1] = 0 }, bank = nil, spent = 0 }
 
 H.run({ maxFrames = 150000 }, {
   H.loadState(ENTRY),
@@ -337,6 +337,14 @@ H.run({ maxFrames = 150000 }, {
     emu.addMemoryCallback(function()
       if W.open and W.swings > 0 then W.closed = true end
     end, emu.callbackType.exec, sSF, sSF)
+    -- #545: the volley ends when its body falls; the passes it had left
+    -- ($3a70 at Ot6PassSpentNone: the pass that found its body fallen was
+    -- entered, and counted at Ot6WeaponClass, ExecAttack's head; the ones
+    -- after it never are) are counted here
+    local sSP = H.sym("Ot6PassSpentNone")
+    emu.addMemoryCallback(function()
+      if W.open and not W.closed then W.spent = H.readByte(0x3A70) end
+    end, emu.callbackType.exec, sSP, sSP)
 
     emu.addEventCallback(function()
       if L.phase == "A" and (H.readByte(D.unctl) & 0x01) ~= 0 then
@@ -481,17 +489,25 @@ H.run({ maxFrames = 150000 }, {
     -- the passes the loop really ran, and the hits they really landed
     local wantPasses = H.fightPasses(want)
     H.assertEq(W.closed, true, "the provoked action resolved (SaveForMimic)")
-    H.assertEq(W.swings, wantPasses, string.format(
+    H.assertEq(W.swings + W.spent, wantPasses, string.format(
       "the multi-attack loop ran %d passes for the %d-pip dump ($3a70 + 1), "
-      .. "and NOT the %d an unboosted Fight runs",
-      wantPasses, want, H.fightPasses(0)))
-    H.assertEq(W.hand[0] == W.hand[1], true, string.format(
+      .. "and NOT the %d an unboosted Fight runs (%d run, %d spent once its body fell, #545)",
+      wantPasses, want, H.fightPasses(0), W.swings, W.spent))
+    local cut = W.spent > 0
+    H.assertEq(cut and math.abs(W.hand[0] - W.hand[1]) <= 1 or W.hand[0] == W.hand[1], true, string.format(
       "the passes alternate hands: %d main, %d off", W.hand[0], W.hand[1]))
     local main, off = H.fightHits(D.hands, want)
     H.assertEq(main + off, wantPasses // 2, string.format(
       "H.fightHits(%d, %d) = %d landed hits, half the %d passes: the other "
       .. "half are the EMPTY hand (#235)", D.hands, want, main + off,
       wantPasses))
+    if cut then
+      -- the volley that killed: the armed hand's passes run so far land
+      H.assertEq(W.hits == 0 or W.hits == W.hand[0] or W.hits == W.hand[1] or W.hits == W.hand[0] - 1 or W.hits == W.hand[1] - 1, true, string.format(
+        "a cut volley lands its armed hand's passes (less the spent one, which lands nothing) or none (landed %d; passes %d / %d)", W.hits, W.hand[0],
+        W.hand[1]))
+      main, off = W.hits, 0
+    end
     -- What the volley LANDED.  A whole action can miss (battle_hits.lua's
     -- measured shape: 0 or all, never between, because the whiffing half is
     -- the empty hand and not a die roll), so the measurement is asserted as
@@ -501,7 +517,7 @@ H.run({ maxFrames = 150000 }, {
       "the provoked volley landed 0 or %d hits and nothing between "
       .. "(measured %d); one landed hit is the OLD behaviour and is "
       .. "unreachable here", main + off, W.hits))
-    H.assertEq(W.hits ~= H.fightHits(D.hands, 0), true, string.format(
+    H.assertEq(W.swings <= H.fightPasses(0) or W.hits ~= H.fightHits(D.hands, 0), true, string.format(
       "and it is not the %d an unboosted Fight lands",
       (H.fightHits(D.hands, 0))))
 

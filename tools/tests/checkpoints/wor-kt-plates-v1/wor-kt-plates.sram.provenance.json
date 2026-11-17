@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "d234e913e8a12088e1d199d8dea1f947f90542767a9dba947ea017eeb063d360",
-  "generator_sig": "de9f177c030d018baabfe87af9cf8e810978ebb8441900d9df967765e44ce0d4 gen_wor_kt_plates build/checkpoints/wor-kt-goddess-v1/manifest.json build/checkpoints/wor-kt-goddess-v1/wor-kt-goddess.sram",
+  "payload_sha256": "e04ef922c63eba874f6419008da1bdfb2231efaa2069de9fc0e26baece274e8c",
+  "generator_sig": "6d06d2b55aa6b313c782a35764b906a6ed45843373316daaf6b734901dc8fe8b gen_wor_kt_plates build/checkpoints/wor-kt-goddess-v1/manifest.json build/checkpoints/wor-kt-goddess-v1/wor-kt-goddess.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-kt-goddess-v1/manifest.json",
-      "sha256": "2c827523cdcad73c860df6498beb12679ac7899d08add5c046442aa2505b9b8c"
+      "sha256": "20bf5498e5443b3318c5ea56b124cad8d1d02d811a7c53e8fc96ff6e38a30ba1"
     }
   ]
 }

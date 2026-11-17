@@ -128,6 +128,14 @@ local function toList()
   local btn
   if act ~= terra then
     btn = (st == ST_CMD) and "x" or "b"
+  elseif st == ST_CMD and pend(terra) == 0 and not W.raisedAtCmd then
+    -- a point raised at the command window, so the list opens folded: the
+    -- NMI's open fold stores 1 over whatever the main thread's HUD walk left
+    -- (its last store is a monster's MonsterOverlap seed, 0 for many
+    -- species: #538's replay drew one, and a fold at 0 stored the 0 already
+    -- there, so the bracket had nothing to undo)
+    W.raisedAtCmd = true
+    btn = "r"
   elseif st == ST_CMD then
     local want = cmdRowOf(terra, CMD_MAGIC)
     local cur = H.readByte(CMDROW + terra) & 3
@@ -184,6 +192,9 @@ H.run({ maxFrames = 40000 }, {
   end),
   H.driveUntil(listOpen, 20000, { H.call(toList) }, "TERRA's magic list open"),
   H.waitFrames(30),
+  H.call(function() H.assertEq(pend(terra), 1, "the list opened with a point pending (raised at the command window)") end),
+  press("l", "the opening L"),
+  H.call(function() H.assertEq(pend(terra), 0, "the opening L lowered it to 0") end),
   -- each boost change re-folds the open list inside the NMI (OT6_RESTAGE,
   -- Ot6RestageGate_ext); each scroll redraws rows through ListTextCmd_0f
   press("r", "the first R"),

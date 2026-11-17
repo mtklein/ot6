@@ -14,7 +14,8 @@
 -- Ot6ActionEnd):
 --   * the hires: 1 + boost of them, one a pass of the action, each paying
 --     its own fee, level x 50 (TakeGil at every pass), so the purse falls by
---     every fee; no MP; the bank +1 / -1;
+--     every fee; fewer only once its body has fallen (#545: the hires stay
+--     on it); no MP; the bank +1 / -1;
 --   * one target, and the class: every chip call on it carries the first
 --     physical class its row holds (slashing $01, else piercing $02, else
 --     bludgeoning $04), or none when the row holds no physical class --

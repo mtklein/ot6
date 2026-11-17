@@ -42,7 +42,7 @@
 -- reach of a RELM checkpoint sketches one (MonsterSketch read off the ROM:
 -- the Lizard's Imp and Remedy, the Drop's Muddle, NeckHunter's Imp, live
 -- elsewhere), so two more tries are a DECLARED EXPEDIENT
--- (tools/state_write_waivers.txt): at Cmd_0d's `lda $3400` (Cmd_0d + 39, the
+-- (tools/state_write_waivers.txt): at Cmd_0d's `lda $3400` (found by its bytes, the
 -- brush's drawn attack, byte-identical on the old ROM) the drawn attack is
 -- replaced by Imp ($23), Slow ($19), Slow 2 ($28), Break ($0C) or Scan
 -- ($18): each payoff of the first four is Magic-gated (reach, the tier
@@ -57,6 +57,10 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL, CMDROW = 0x202E, 0x890F
 local ST_CMD, ST_DEF, ST_TGT = 0x05, 0x27, 0x38
+-- Relm's Sketch command opens her painter's list (#538): the Tools-shell
+-- list state, mode $6168 = 5, cells at $4005 + 3i (two columns), the
+-- cursor's column and row per actor at $8963/$8967; Sketch is row $E8
+local ST_LIST, ROW_SKETCH = 0x30, 0xE8
 local BANK, PEND = 0x3E9C, 0x3E9D
 local CMD_SKETCH = 0x0D
 local RELM = 8
@@ -170,7 +174,19 @@ local function runTry(t)
           if H.readByte(MENU) ~= 0 then
             local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
             if a == relmS and not t.sent then
-              if st == ST_CMD then
+              if st == ST_LIST and H.readByte(0x6168) == 5 then
+                -- the list: walk the cursor to the Sketch row and take it
+                local want
+                for i = 0, 7 do if H.readByte(0x4005 + i * 3) == ROW_SKETCH then want = i; break end end
+                assert(want ~= nil, "RELM's painter's list holds the Sketch row")
+                local wc, wr = want % 2, want // 2
+                local cc, cr = H.readByte(0x8963 + relmS), H.readByte(0x8967 + relmS)
+                if cc ~= wc then held = wc > cc and "right" or "left"
+                elseif cr ~= wr then held = wr > cr and "down" or "up"
+                else held = "a" end
+              elseif st == ST_LIST or st == 0x2E or st == 0x2F then
+                held = nil       -- the list opening or closing: wait
+              elseif st == ST_CMD then
                 if pend(relmS) < 1 then held = "r"
                 else
                   local want, cur = cmdRow(relmS, CMD_SKETCH), H.readByte(CMDROW + relmS) & 3
@@ -388,10 +404,15 @@ local steps = {
     H.assertEntryContract("wor-locke-v1")
     MPB = H.sym("MagicProp") & 0x3FFFFF
     MSK = H.sym("MonsterSketch") & 0x3FFFFF
-    -- the declared injection (see the header): Cmd_0d + 39 is `lda $3400`
-    local ld = H.sym("Cmd_0d") + 39
-    H.assertEq(H.readRomByte(ld & 0x3FFFFF), 0xAD, "Cmd_0d + 39 is an lda abs")
-    H.assertEq(H.readRomWord((ld & 0x3FFFFF) + 1), 0x3400, "...of $3400, the brush's drawn attack")
+    -- the declared injection (see the header): Cmd_0d's `lda $3400`, found
+    -- by its bytes in the proc's first 64 (39 in until Relm's list put
+    -- Ot6PaintExec's jsl at its head, #538)
+    local ld = nil
+    for k = 0, 63 do
+      local a = (H.sym("Cmd_0d") + k) & 0x3FFFFF
+      if ld == nil and H.readRomByte(a) == 0xAD and H.readRomWord(a + 1) == 0x3400 then ld = H.sym("Cmd_0d") + k end
+    end
+    H.assertEq(ld ~= nil, true, "Cmd_0d holds `lda $3400`, the brush's drawn attack, in its first 64 bytes")
     emu.addMemoryCallback(function()
       local t = armed
       if t == nil or t.inject == nil or not t.sent or t.endF then return end

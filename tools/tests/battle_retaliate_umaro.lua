@@ -126,7 +126,7 @@ local W = nil                           -- the open window
 local function newWindow()
   return { f = H.frame, subj = SUBJ, bankBefore = bp(SUBJ), pendBefore = pend(SUBJ),
     hp = hp(SUBJ), mark = L.markAtStart, arm = nil, pendAtRoll = nil,
-    a70AtRoll = nil, a70 = 0, passes = 0, dumpBeforeRoll = false, rolled = false,
+    a70AtRoll = nil, a70 = 0, passes = 0, left = 0, dumpBeforeRoll = false, rolled = false,
     dmg = {}, entered = {}, charge = nil, bankAfter = nil, resolved = false }
 end
 
@@ -177,6 +177,15 @@ local function installObservers()
     if (H.readByte(0xB1) & 0x01) ~= 0 then return end
     W.passes = W.passes + 1
   end, emu.callbackType.exec, sExec, sExec)
+  -- #545: a pass whose body has fallen ends the action at its start (it
+  -- entered ExecAttack, counted above); the passes after it, $3a70 there,
+  -- are never entered, so the ladder is passes + left
+  local sSP = H.sym("Ot6PassSpentNone")
+  emu.addMemoryCallback(function()
+    if W == nil or W.resolved then return end
+    if (H.readByte(0xB1) & 0x01) ~= 0 then return end
+    W.left = H.readByte(0x3A70)
+  end, emu.callbackType.exec, sSP, sSP)
 
   emu.addMemoryCallback(function(_, v)
     if v == 0 or v == 0xFF or W == nil or W.resolved then return end
@@ -771,12 +780,13 @@ H.run({ maxFrames = 3000 + 2 * MAX_BRANCHES * (2 * BRANCH_IDLE * MAX_BRANCHES + 
           H.assertEq(w.a70, D.base + D.perBp * p, string.format(
             "f%d provoked Fight: $3a70 = %d + %d*%d, the swings ladder",
             w.f, D.base, D.perBp, p))
-          H.assertEq(w.passes, H.fightPasses(p), string.format(
-            "f%d provoked Fight: %d passes", w.f, H.fightPasses(p)))
+          H.assertEq(w.passes + w.left, H.fightPasses(p), string.format(
+            "f%d provoked Fight: %d passes (%d entered, %d left once its body fell, #545)", w.f, H.fightPasses(p),
+            w.passes, w.left))
         elseif ran == 0 then
           H.assertEq(w.a70, p, string.format(
             "f%d provoked Throw: $3a70 = %d, one extra throw per pip", w.f, p))
-          H.assertEq(w.passes, 1 + p, string.format(
+          H.assertEq(w.passes + w.left, 1 + p, string.format(
             "f%d provoked Throw: %d throws, and NOT the 1 an unboosted Throw "
             .. "runs", w.f, 1 + p))
           for _, d in ipairs(w.dmg) do

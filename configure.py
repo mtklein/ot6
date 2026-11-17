@@ -475,6 +475,17 @@ TEST_ENV = {
     # Continue, a walk and five to a dozen battles (about 40k frames)
     "battle_bserk": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #538: RELM's list in the World of Balance (the list, Sketch from it,
+    # Portrait, Tint), beside Esper Mountain's save point; three battles or
+    # more of a scripted turn or two each
+    "battle_relmkit": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #538: her whole list in the World of Ruin (Masterpiece, Varnish,
+    # Gesture and its limit, GOGO's Sketch, Underpainting, Still Life), on
+    # the world map past the Zone Eater; seven battles or more, one long
+    # (Still Life's 32-tick break)
+    "battle_relmwor": "OT6_TIMEOUT=7200 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
     # #382: LOCKE's Mug, Trickshot, Dismantle and Appraise, on the same plain
     # (four of his five later rows are learned there); the Continue, a walk
     # and seven or more battles of one scripted turn each

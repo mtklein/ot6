@@ -27,7 +27,8 @@
 -- What it holds, per Jackpot (at Ot6SetzerExec's entry and SETZER's
 -- Ot6ActionEnd; each pass at Ot6JackpotDice's entry and the dice effect's
 -- return; each roll as the effect sets the dice animation):
---   * two passes (the full boost's fixed throw, M.JACKPOT_ROLLS); a pass
+--   * two passes (the full boost's fixed throw, M.JACKPOT_ROLLS), fewer
+--     once the body it was aimed at has fallen (#545); a pass
 --     that finds a body rolls once, its face the first byte of the battle
 --     RNG table below 252 after $be, mod 6, and $be stops on that byte; a
 --     pass that finds none (the roll before felled the last body) rolls
@@ -106,7 +107,15 @@ local function checkJackpot(r, i)
   -- draw rule (the first byte of the battle RNG table below 252 after $be,
   -- mod 6; $be stops there), and one that finds none -- the rolls before it
   -- felled the last body -- rolls nothing and draws nothing
-  H.assertEq(#r.passes, H.JACKPOT_ROLLS, string.format("Jackpot %d: the throw's %d passes", i, H.JACKPOT_ROLLS))
+  -- #545: the rolls stay on the body aimed at (r.targets); once it has
+  -- fallen the rolls left are not thrown, so fewer passes run then
+  local aimDown = true
+  for b = 0, 5 do
+    if (r.targets >> b) & 1 == 1 and r.mon1[b].present and r.mon1[b].alive then aimDown = false end
+  end
+  H.assertEq(#r.passes == H.JACKPOT_ROLLS or (#r.passes >= 1 and #r.passes < H.JACKPOT_ROLLS and aimDown), true,
+    string.format("Jackpot %d: the throw's %d passes, fewer only once the body it was aimed at ($%02X) has fallen "
+      .. "(%d ran)", i, H.JACKPOT_ROLLS, r.targets, #r.passes))
   local rng = H.sym("RNGTbl") & 0x3FFFFF
   local aimed, empty, redraws = 0, 0, 0
   for k, q in ipairs(r.passes) do
@@ -198,7 +207,12 @@ local function checkJackpot(r, i)
       H.assertEq(r.mon1[b].sh, r.mon0[b].sh, string.format("Jackpot %d: slot %d's shields do not move", i, b))
     end
   end
-  return { empty = empty, redraws = redraws }
+  -- #545: the rolls a throw never threw once its body fell count as the
+  -- search's "empty" draw (before, such a roll ran as a pass that found no
+  -- body; now the throw ends there)
+  local cut = H.JACKPOT_ROLLS - #r.passes
+  if cut > 0 then H.log(string.format("[jackpot]   %d roll(s) not thrown: the body fell (#545)", cut)) end
+  return { empty = empty + cut, redraws = redraws }
 end
 
 -- A fixed pass (1-3) from the grave at the first battle key whose fight the
@@ -602,7 +616,7 @@ local search = H.seqStep({
         (S.foundAll or {}).redraw or 0, ENTRY))
       return
     end
-    H.assertEq(S.found.empty ~= nil, true, string.format("the search met a pass that finds no body within its %d "
+    H.assertEq(S.found.empty ~= nil, true, string.format("the search met a throw whose body fell before its last roll within its %d "
       .. "candidates (%d distinct)", #CAND, S.distinct))
     H.log(string.format("[jackpot] search: an empty pass at %s; a redraw in play %s; %d candidate(s), %d "
       .. "distinct, %d lost to a wipe before the first throw (entry shift %d)", S.found.empty,

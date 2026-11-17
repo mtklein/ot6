@@ -114,6 +114,11 @@ Reach spells also cover as many bodies as there are points, skipping anyone
 the spell would not change. Each point costs the spell's MP again, even if
 nobody is left for it.
 
+Extra hits stay on the enemy you picked. A boosted Fight, Pummel or Hired
+Help on one enemy stops when that enemy falls, and the hits left over are
+lost, so boost only as far as that enemy needs. An action that hits every
+enemy, like Coin Toss, keeps going until they are all down.
+
 Some characters have an ultimate, offered only at 3 BP. It can be used again
 whenever the bank holds three.
 
@@ -171,7 +176,7 @@ are in MP. Every character's first skill is theirs from the day they join.
 - **Economizer.** Won at the Colosseum with the Gem Box. Every spell its
   wearer casts costs 1 MP at any boost.
 
-### Locke, Thief (dagger)
+### Locke, Treasure Hunter (dagger)
 
 | Skill | MP | Effect | Learned |
 |---|---|---|---|
@@ -190,7 +195,9 @@ likelier. Three points always succeed and take the rare item if there is one,
 the common item if not. A boost never makes up an item the enemy lacks.
 Only the first shield Filch takes becomes a point for Locke. His skills are
 in the list behind Steal, the ones he has learned packed from the top in this
-table's order, down the left column and then the right.
+table's order, down the left column and then the right. In the field menu,
+Skills > Treasure Hunter shows all eight in the same order, with the ones
+still to learn marked locked.
 
 ### Edgar, Machinist (spear)
 
@@ -304,9 +311,27 @@ figure.
 
 ### Relm, Painter (brush)
 
-Sketch is her skill. A boost applies to whatever the sketch draws: it
-multiplies an attack with a number, and is dropped if the attack has none.
-Brushes hit the special type.
+Relm supports the party. Her Sketch command opens a list, with Sketch itself
+as the first row. Brushes hit the special type.
+
+| Row | MP | What it does | Learned |
+|---|---|---|---|
+| Sketch | 0 | as in FF6; a boost applies to whatever the sketch draws, and is dropped if the attack has no number | on joining |
+| Portrait | 12 | gives an ally one free point for their next boosted action; it shows as a pending point and works with an empty bank; refuses a boost | on joining |
+| Tint | 10 | pick one of the eight elements: for four of the ally's turns their weapon attacks carry it, with its weakness damage and its shield chip (an enemy that absorbs or nulls it does so) | level 18 |
+| Varnish | 14 | the next enemy attack that would hit the ally misses | level 24 |
+| Still Life | 24 | the enemy's break, this one or its next, lasts twice as long | Owzer's mansion |
+| Underpainting | 28 | the next weakness hit on the enemy takes two shields | level 36 |
+| Gesture | 30 | the ally's turn comes up now (not on herself, and not from a turn a Gesture gave) | level 42 |
+| Masterpiece | 99 | with 3 BP: every other ally gets Portrait's point | Strago's return |
+
+A boost on Tint, Varnish, Still Life, Underpainting or Gesture reaches one
+more body per point, each paying the price again. A green shield count marks
+an enemy Underpainting waits on, and a green shield one Still Life waits on
+or holds. Two banked points and a Portrait make a divine.
+
+Save before you Sketch: a missed Sketch can still corrupt your inventory or a
+save, as it always could.
 
 ### Shadow, Assassin (thrown blades)
 
@@ -365,7 +390,8 @@ MP and cannot wear Espers.
 
 Gogo joins in the Zone Eater. His Mimic is free, and a boost buys what it
 buys on the action he copies. Where it would buy nothing, the points are
-kept. Gogo cannot wear Espers.
+kept. Gogo cannot wear Espers. With Sketch among his commands he opens
+Relm's list, with the rows she has learned.
 
 ## Espers
 

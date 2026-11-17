@@ -230,6 +230,9 @@ tr.ult td.k::after { content: " \2605"; color: var(--blue); }
   font-family: var(--narrow); font-size: 7.6pt; letter-spacing: 0.15em; text-transform: uppercase;
   background: var(--ink); color: var(--paper); padding: 2pt 5pt 1.5pt;
 }
+/* Locke's chip: the job he won't own, struck, and the one he insists on */
+.charhead .job del { text-decoration-thickness: 1pt; opacity: 0.6; }
+.charhead .job .ahem { font-style: italic; text-transform: none; letter-spacing: 0.04em; }
 .charhead .arms { font-family: var(--narrow); font-size: 8pt; color: var(--blue); margin-left: auto; font-style: italic; padding-right: 0.3em; }
 .char p, .char li { font-size: 9.6pt; }
 

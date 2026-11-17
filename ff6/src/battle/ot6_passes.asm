@@ -1,5 +1,6 @@
 ; ------------------------------------------------------------------------------
-; OT6: a pass OT6 added goes to another body when its target has fallen
+; OT6: a pass OT6 added stays on its aim (#545; v0.24-v0.46: it went to
+; another body when its target had fallen)
 ;
 ; OT6 buys extra passes of an action through $3a70, the engine's one
 ; multi-hit counter (ot6_hitcount.asm's header): a boosted Fight or Capture
@@ -31,9 +32,30 @@
 ; weapon's follow-up spell: $ba bit 3) never reach this branch with a
 ; choice to make.  Only an action OT6 added passes to retargets, and only
 ; after its first pass.
+;
+; That was v0.46's rule.  Since #545 (OT6_PASSES_STAY below) a later pass
+; never moves: at each pass's start, before its name or animation,
+; battle_main's Ot6PassSpent masks the pass's starting targets (the previous
+; pass's) as ChooseTarget would, and with none standing ends the action
+; there (Ot6PassStays says which passes it asks: a later pass of a marked
+; action, not random every pass, not one that may hit the fallen).  A group
+; pass still re-splits over its survivors.  Ot6PassRetarget's monster-side
+; arm is then never taken; it stays for the switch's other setting.
 ; ------------------------------------------------------------------------------
 
 .segment "ot6_code"
+
+; ------------------------------------------------------------------------------
+; THE SWITCH (#545, the owner's trial, 2026-11-16: "single target attacks
+; should stay on that single target, all or random should stay all/random
+; respectively").  1: a pass OT6 added stays on the body the action was
+; aimed at; once that body has fallen (killed, fled or removed) the action's
+; remaining passes are spent, with no swing and no move to a second enemy
+; (Ot6PassStays below, battle_main's Ot6PassSpent).  A group stays on its
+; group while any of it stands; a pass that picks at random keeps picking.
+; 0: v0.46's rule, the retarget this header describes.  To reverse the
+; trial, set 0; nothing else changes.
+OT6_PASSES_STAY = 1
 
 ; ------------------------------------------------------------------------------
 
@@ -160,6 +182,11 @@
         bpl     vanilla         ; no passes OT6 added (0), or none of this
                                 ;   action's passes has targeted yet (bit 7,
                                 ;   Ot6PassTargeted): vanilla's rule
+.if ::OT6_PASSES_STAY
+        bra     keep            ; #545: a later pass never moves to another
+                                ;   body (Ot6PassSpent ends the action before
+                                ;   this, so this is a backstop)
+.endif
         lda     f:$7e0000+$3a31 ; the previous pass's monsters...
         bne     monsters
         lda     f:$7e0000+$3a30 ; ... or characters fighting as enemies
@@ -179,5 +206,70 @@ vanilla:
         clc
         rtl
 keep:   lda     #$04            ; Z clear: no retarget
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #545: must this pass find its aimed body standing? ]
+
+; jsl from battle_main's Ot6PassSpent at a pass's start (ExecAttack @31e9,
+; before the pass's name and animation).  carry set when the switch is on and
+; this is a later pass of an action OT6 added passes to (the mark's bit 7,
+; Ot6PassTargeted) that keeps its aim: not random every pass ($ba bit 6:
+; Offering, Quadra Slam/Slice, the Dragon Horn's jumps), not targeted from
+; scratch ($ba bit 7), not allowed a fallen body ($ba bit 3: a weapon's
+; follow-up spell), and targeting at all ($b3 bit 0).  Its caller then
+; ends the action when none of the pass's starting targets stands.
+; a8, any index width, db=$7e.  A clobbered.
+.proc Ot6PassStays
+        .a8
+.if ::OT6_PASSES_STAY
+        lda     f:$7e0000+OT6_PASSRETARGET
+        bpl     no              ; no passes OT6 added, or the first pass
+        lda     $ba
+        and     #$c8            ; random, from scratch, or may hit the fallen
+        bne     no
+        lda     $b3
+        lsr                     ; carry = $b3 bit 0, the pass targets
+        rtl
+no:
+.endif
+        clc
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #545: a spent Hired Help still walks Setzer home ]
+
+; jsl from ExecAttack once Ot6PassSpent has found the action spent.  A
+; hire's animation steps Setzer out on the first pass and brings him back
+; on the last (Ot6HireMark's L); the passes between leave his slot hidden
+; off the edge.  Ending a hire before
+; its last pass left him there, hidden and not targetable (the passretarget
+; draw on the first #545 ROM: a Revivify aimed at him never found him,
+; build/attempts/wt/v047-noretarget/suites/b1/).  So a hire's spent pass
+; runs as its last: ChooseTarget finds its body fallen and keeps the empty
+; mask (Ot6PassRetarget), the pass pays nothing (Ot6CoinPrice), and the
+; figure walks in, finds no one and Setzer comes home.  The mark's bit 6
+; says so to Ot6HireMark, which takes the next figure from $3a70 as it
+; stands, then zeroes it and sets L, so this pass is the last.  Every other
+; action ends at once (its caller zeroes $3a70).  out: carry set = run the
+; pass.  a8, any index width, db=$7e.  A clobbered.
+.proc Ot6PassSpentHire
+        .a8
+        lda     $3a7c           ; the queued command: Setzer's row ...
+        cmp     #$0f
+        bne     no
+        lda     f:$7e0000+OT6_SETZERROW
+        cmp     #OT6_SETZER_HIRE ; ... Hired Help
+        bne     no
+        lda     f:$7e0000+OT6_PASSRETARGET
+        ora     #$40            ; spent: this pass is the last
+        sta     f:$7e0000+OT6_PASSRETARGET
+        sec
+        rtl
+no:     clc
         rtl
 .endproc

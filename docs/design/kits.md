@@ -113,7 +113,7 @@ kept, #461, and a copy on a boss strips its four shields too).
 | Mog | (open: none of his dances stands above the others, owner 2026-10-26, #478) | — | no |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
 | Strago | Study | his Scan at 3 BP: reads every enemy and learns every lore any monster present could cast, 99 MP | yes (`ot6_analyze.asm`) |
-| Relm | Masterpiece | every other ally's next boosted action counts one point higher, 99 MP (kit-relm.md) | no (designed, #538) |
+| Relm | Masterpiece | every other ally's next boosted action counts one point higher (Portrait's gift), 99 MP | yes (`ot6_paint.asm`, #538) |
 | Gau | (none: a varied set of rages needs no divine, owner 2026-11-15; kit-gau.md §9) | — | no |
 
 Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
@@ -939,9 +939,10 @@ target): 1 + boost tosses, one pass of the action each (`Ot6SetzerEffect`
 adds the boost to the attack count), each at level × 30 gil, each its own
 hit on every body and its own ¤ chip on every ¤-weak one. Three points are
 four tosses and four chips a body. A toss after a body falls splits over
-the bodies left (`battle_passretarget`). A toss that finds no body standing (the
-tosses before it felled them all) pays nothing, and so does such a hire
-(`Ot6CoinPrice`, `battle_hirerefund`). The Coin Toss relic's GP Rain buys
+the bodies left (`battle_passretarget`). Once the tosses have felled them
+all, the tosses left are not thrown (#545, the owner's trial; see
+[multi-hit.md](multi-hit.md) §6). A toss or a hire that finds no body
+standing pays nothing (`Ot6CoinPrice`, `battle_hirerefund`). The Coin Toss relic's GP Rain buys
 tosses the same way (`Ot6RainPasses` in Cmd_18); before #319 its boost
 bought nothing (Ot6BoostDmg's multiplier runs before GP Rain's effect
 overwrites the damage). (Earlier the same day the boost doubled the coins,
@@ -963,10 +964,12 @@ Three points are four hires, four chips and 6,200 gil at L31; a hire
 lands 3,100 there (1,550 shielded, 6,200 on a Broken body), and its fee
 never passes 4,950 (L99), so the damage cannot wrap (the old one-hire x8
 fee wrapped from L82) and a hire that meets the cap on a Broken body still
-leaves every point its own hit. A hire that outlives its target goes to
-another monster, as every pass OT6 adds to an action does
-(`Ot6PassRetarget`; [multi-hit.md](multi-hit.md) §6), and one that finds
-none standing pays nothing.
+leaves every point its own hit. A hire stays on the body it was sent
+at: once that body falls the hires left are not paid or sent to another
+monster, as with every pass OT6 adds to a single-target action (#545, the
+owner's trial; `Ot6PassSpent`, [multi-hit.md](multi-hit.md) §6). The next
+figure walks in, finds no one and walks off, so Setzer comes home; it
+pays nothing.
 
 **Each hire is somebody new** (owner, 2026-10-02: a growing crew, not the
 same guy again). Setzer walks out of sight, and each hire walks in where
@@ -1030,8 +1033,8 @@ measurement below (one battle Rand, drawn again past 251, mod 6; the redraw
 takes the table's next byte, a fixed successor), each its own triple and
 its own hit.  Under three points the row greys and is refused; a throw
 whose boost was taken back after the pick rolls nothing and pays nothing.
-A roll whose target fell to the roll before goes to another monster; a pass
-that finds no body left is skipped: no triple, no dice, no draw. What one
+A roll whose target fell to the roll before is not rolled (#545): the
+throw ends there, with no triple, no dice and no draw. What one
 roll lands (the means at even odds; the 42-44 weights move them by under
 2%):
 
@@ -1086,7 +1089,8 @@ reads). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`,
 `battle_setzergrey` (the purse's grey and refusal), `battle_gprain` (the
 Coin Toss relic's GP Rain), `battle_hirerefund` (a hire past the last
 body pays nothing) and `battle_passretarget` (a hire, roll or swing whose
-body fell goes to another, and a toss re-splits over the survivors). The
+body fell ends its action and moves to no other body, and a toss re-splits
+over the survivors). The
 coin suites throw in the battles that deal a
 special-weak crowd (the engine's alive mask, so a petrified body is out)
 and assert that a toss split and chipped; the other battles are fought out
@@ -1223,6 +1227,7 @@ there).
   break, every fourth turn.*  `battle_assassinate`.  Interceptor is a
   passive.
 - **Setzer — Gambler/Merchant**: built; see "Setzer" above (#319).
+- **Relm — Painter (special ¤: brushes)**: built (#538); see "Relm" below.
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
   learned by fighting on each dance's terrain ✦, vanilla's rule.  No divine
   for now (owner, 2026-10-26, #478): none of his dances stands above the
@@ -1265,6 +1270,75 @@ there).
   background, each predicted from the tier MOG's start bought.
 - **Umaro — Berserker (bludgeoning: club, fists)**: see "Umaro" below
   (#380).
+
+## Relm — Painter (special ¤: brushes) (#538)
+
+Design, rulings and the owner's notes: [kit-relm.md](kit-relm.md).  Her
+kit buffs the party through OT6's own systems (boost points, shields,
+Break, the turn gauge), and it is a list behind the Sketch row, the shape
+Locke's is behind Steal: `OpenCmdMenuTbl[$0d]` opens the Tools-shell list
+(`Ot6PaintListOpen`, mode `w7e6168` = 5), the rows she has learned packed
+down the left column, then the right, each with its price and its own
+targeting byte; the confirm's row id rides `$3a7b` under command `$0d`, a
+free byte there, and `Cmd_0d`'s head runs it (`Ot6PaintExec`), Sketch's row
+falling through to vanilla.
+
+| # | Row (list) | MP | What it does | A boost point buys | Learned |
+|---|---|---|---|---|---|
+| 1 | Sketch ✦ | 0 | vanilla Sketch, bug and all | what the sketched attack's boost buys | join |
+| 2 | Portrait | 12 | the gift: the ally's next boosted action is charged one point less (`OT6_GIFT`); the ally's pending boost is raised by one at once, so it shows as an arrow and can be used with an empty bank | refuses the boost (R buzzes on the row; a point raised before is dropped, never charged) | recruitment (`$02E8`) |
+| 3 | Tint | 10 a body | a second list of the eight elements (mode 6, ids `$f0`-`$f7`): for four of the ally's turns their weapon swings (Fight, its boosted swings, Mug, Capture, Jump) carry that element, OR'd onto the weapon's own (`Ot6TintSwing`, `$11a1`): vanilla's weakness ×2, absorb and null apply, and a weakness chips (`Ot6Chip`) | one more ally, in battle order | level 18 |
+| 4 | Varnish | 14 a body | the next enemy action that would land on the ally misses, judged after CheckHit's own verdict (`Ot6VarnishGate`), every hit of that action on her | one more ally | level 24 |
+| 5 | Still Life (StillLife) | 24 a body | the body's break, this one or its next, lasts a second break's length (`OT6_STILL_TICKS` = 16 more ticks, decided at the break's end, `Ot6StillHold`); a break is lengthened once: a mark laid during the hold waits for the next break | one more enemy | Owzer's mansion after Chadarnook (`$0240`) |
+| 6 | Underpainting (Underpnt.) | 28 a body | the next weakness chip on the body (element or class, Tint's included) takes one more shield (`Ot6Underpaint`, beside Ramuh's Conductor) | one more enemy | level 36 |
+| 7 | Gesture | 30 a body | fills the ally's gauge: their turn comes at the next tick (`$3218` = `$ffff`); the turn it gives cannot Gesture (`OT6_GESTURED`: the row greys and refuses, a Mimic's copy does nothing) | one more ally | level 42 |
+| 8 | **Masterpiece** (Mstrpiece, divine, 3 BP) | 99 | every other ally standing (not Umaro) receives Portrait's gift | the divine itself: greyed and refused under three; taken back to fewer, nothing done and nothing charged | Strago's return (`$00BA`) |
+
+- **The named body must take the row**, else nobody does and nothing is
+  charged (no MP, the boost kept): a Gesture aimed at an ally whose turn is
+  full or queued, a Portrait on a gifted ally, a second Varnish coat, a
+  Still Life or Underpainting mark already laid.  A boost's further bodies
+  walk on from it, passing over the ones that cannot take it.
+- **The gift** is a mark, not a pip.  `Ot6ActionEnd`'s charge takes one
+  point less from a gifted actor and spends the mark (`Ot6GiftSpend`);
+  R's cap is the bank plus the gift (`Ot6BankGift`); a gift still held is
+  pending again at the end of each action (`Ot6GiftRaise`).  The three-point
+  cap stands, so two banked and a gift make a divine.  The engine's own
+  turns (Muddle, Berserk) spend nothing of it (`Ot6UnctlGift`), Bestow hands
+  only paid pips, and a refused boost keeps it.
+- **Display.**  A gift is an arrow in the ally's pip cell.  The shield line
+  draws Relm's paint green (text palette 6): the count while Underpainting
+  waits on the body, the emblem while Still Life waits, the broken shield
+  while Still Life waits on or holds the break.
+- **Tint's colour is the player's** (owner, 2026-11-15): Relm picks it from
+  the second list, so it can land on a body that absorbs or nulls it, and
+  vanilla's rules apply.  It is OR'd onto a weapon that has an element, so
+  the paint never takes a key away.
+- **GOGO** with Sketch opens her list with the rows Relm has learned, as
+  his Steal opens Locke's (#547).  The Fake Mustache's Sketch → Control
+  rewrite keeps vanilla Control and no list, as a gloved Locke's Capture
+  does: confirmed as intended (owner, 2026-11-16: "more of a commitment to
+  use").
+
+Battle RAM (`ot6_memory.inc`, cleared by `Ot6InitBP`, the monster masks
+also per slot by `Ot6SeedShields`): `OT6_TINT`, `OT6_TINTELEM` (per
+character), `OT6_GIFT`, `OT6_VARNISH`, `OT6_VARNISHING`, `OT6_GESTURED`,
+`OT6_STILLMARK`, `OT6_STILLHELD`, `OT6_UNDERPAINT`, `$eefe`-`$ef14`.
+
+Suites: `battle_relmkit` (ultros-won-v1: the list, Sketch from it,
+Portrait's gift, Tint's colour), `battle_relmwor` (wor-gogo-v1: the eight
+rows, Masterpiece, Varnish, Gesture and its limit, GOGO's list,
+Underpainting, Still Life); `relm_policy_selftest` (the driver's policy).
+
+The play driver (`Driver:relmLine`, `M.relmPolicy`), event battles only, in
+order: Masterpiece at three banked when a body is Broken or two allies hold
+two; Still Life on a Broken body with more than half its break left;
+Underpainting on a body at four shields or more whose weakness is revealed;
+Gesture while a body is Broken, on the strongest ally under half a gauge;
+Portrait while a body is Broken, on the ally with the most banked; Tint on
+the strongest ally whose weapon lacks a colour the target is weak to;
+Varnish when no ally holds a coat, on the lowest max HP; else her Fight.
+Each leaves 20 MP, and logs what it read (`[fight] actor=n RELM ...`).
 
 ## Umaro — Berserker (bludgeoning: club, fists) (#380)
 
@@ -1338,6 +1412,9 @@ plays Mimic.
   medic between his copies.  Fight is left off: his weapons (daggers and
   rods) and his vigor make a weak swing that the Mimic of a strong one
   outdoes.
+- **Sketch opens Relm's list** (#547): each command he picks gives its
+  owner's whole kit, as his Steal opens Locke's.  The rows are the ones Relm
+  has learned (her switches and her level).
 - **His keys** are the party's, through Mimic: the arc gives him no weapon
   (he has no Fight row to swing one), so his own turn keys nothing a copy
   does not.
