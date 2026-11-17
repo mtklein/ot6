@@ -433,6 +433,10 @@ TEST_ENV = {
     # SHADOW, SABIN, GOGO, beside Inferno); a long battle, played by hand
     "battle_shadowpin": "OT6_TIMEOUT=5400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
+    # #553: the trap's edges (a reflected Slow's hold, the mark cell's edge
+    # rule), in the same battle
+    "battle_shadowpin_edges": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
     # #461: the same expedient, three bytes (Mimic, SwdTech, Slot)
     "battle_mimicboost":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
