@@ -80,10 +80,12 @@ as one more earring piece, the way vanilla counts worn ones:
 (`$3c45`/`$3c44` bit 1). `Ot6EsperApply` runs the same three instructions
 per rung after the gear loop, so a rung and one worn Earrings or Hero Ring,
 or both rungs with nothing worn, make the double, and no count passes it.
-Until v0.47 a rung only set the single bit, so it added nothing beside a
+Until v0.48 a rung only set the single bit, so it added nothing beside a
 worn one. The Atlas Armlet's bit is a plain OR and never doubles.
 `battle_esperearring` holds the eight combinations by Ice's damage at
-`RelicDmgEffect` from one snapshot, and the help line's "Already held" never
+`RelicDmgEffect` from one snapshot, with one Fight by the caster where
+Bahamut's rung and a worn Hero Ring both carry the Atlas bit (+1/4, once),
+and the help line's "Already held" never
 shows under an earring rung (`menu_esperdetail`).
 
 **Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the

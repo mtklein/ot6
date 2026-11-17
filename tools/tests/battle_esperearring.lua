@@ -20,15 +20,17 @@
 --   rank           Maduin's rank, nothing worn     x1 1/4
 --   rank2          Bahamut's rank, nothing worn    x1 1/4, and the atlas bit
 --   rank+earring   Maduin's rank, Earrings worn    x1 1/2
---   rank2+hero     Bahamut's rank, Hero Ring worn  x1 1/2
+--   rank2+hero     Bahamut's rank, Hero Ring worn  x1 1/2, and one Fight: x1 1/4 (the atlas bit once)
 --   both           both ranks, nothing worn        x1 1/2, and the atlas bit
 --   both+two       both ranks, two Earrings worn   x1 1/2 (never past vanilla's two pieces)
 -- Measured: C's single and double bits at the battle's open ($3C45 / $3C44 bit 1, and the atlas bit, $3C44 bit 0),
 -- and every RelicDmgEffect pass C makes ($11B0 at its entry and at its plp/rts): each pass must be what the bits say
 -- (magic: +in/2 for the double, else +in/4 for the single; physical: +in/4 for the atlas bit), C's spell passes
 -- must carry the case's multiplier, and the first spell pass's input must be the same in every case (so the
--- multiplier, not the spell, moved).  A ROM with the pre-#551 fold (one earring rung, never a second) fails
--- rank+earring, rank2+hero, both and both+two (build/attempts/wt/v048-earring/).
+-- multiplier, not the spell, moved).  In rank2+hero, where the Hero Ring rung and the worn Hero Ring both carry
+-- the atlas bit, C also Fights once after the spell, so a physical pass is measured there: +1/4, never doubled.
+-- A ROM with the pre-#551 fold (one earring rung, never a second) fails rank+earring, rank2+hero and both
+-- (build/attempts/wt/v048-earring/).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -36,7 +38,7 @@ local NAMES = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CEL
   "SETZER", "MOG", "GAU" }
 local LIVE = 0x317C00
 local COSTS = { 10, 30, 75, 200, 500 }
-local CMD_MAGIC = 0x02
+local CMD_MAGIC, CMD_FIGHT = 0x02, 0x00
 local EARRINGS, HERO_RING, NONE = 0xC3, 0xC9, 0xFF
 local LADDER = H.sym("Ot6LadderTbl") & 0x3FFFFF
 local RELIC = H.sym("RelicDmgEffect")
@@ -63,7 +65,7 @@ local CASES = {
   { "rank", true, false, NONE, NONE, 4 },
   { "rank2", false, true, NONE, NONE, 4 },
   { "rank+earring", true, false, EARRINGS, NONE, 2 },
-  { "rank2+hero", false, true, HERO_RING, NONE, 2 },
+  { "rank2+hero", false, true, HERO_RING, NONE, 2, true },
   { "both", true, true, NONE, NONE, 2 },
   { "both+two", true, true, EARRINGS, EARRINGS, 2 },
 }
@@ -125,8 +127,8 @@ end
 
 local results = {}
 local function branch(cs, restore)
-  local name, r1, r2, s1, s2, mult = table.unpack(cs)
-  local r = { name = name, mult = mult, passes = {} }
+  local name, r1, r2, s1, s2, mult, fight = table.unpack(cs)
+  local r = { name = name, mult = mult, fight = fight, passes = {} }
   r.atlas = s1 == HERO_RING or s2 == HERO_RING or (r2 and RUNG[2].b4 & 0x01 ~= 0) or (r1 and RUNG[1].b4 & 0x01 ~= 0)
   results[#results + 1] = r
   local steps = {}
@@ -157,7 +159,9 @@ local function branch(cs, restore)
       r.lo & 1))
     cur = r
   end)
-  steps[#steps + 1] = H.kitBattle({ { who = C, cmd = CMD_MAGIC, spell = SPELL, boost = 0 } }, { maxFrames = 60000 })
+  local plan = { { who = C, cmd = CMD_MAGIC, spell = SPELL, boost = 0 } }
+  if fight then plan[2] = { who = C, cmd = CMD_FIGHT, boost = 0 } end
+  steps[#steps + 1] = H.kitBattle(plan, { maxFrames = 60000 })
   steps[#steps + 1] = H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {})
   steps[#steps + 1] = H.call(function() cur = nil; seatX = nil end)
   return H.seqStep(steps)
@@ -177,7 +181,7 @@ local function claims()
       r.name, single, double, wantS, wantD))
     claim(atlas == (r.atlas and 1 or 0), string.format("%s: atlas bit %d at the open (want %d: a Hero Ring rung or "
       .. "a worn Hero Ring)", r.name, atlas, r.atlas and 1 or 0))
-    local spells = 0
+    local spells, fights = 0, 0
     for _, p in ipairs(r.passes) do
       H.log(string.format("[earring] %s: pass spell %s, $11A2 %s: in %d -> out %d (%s: want %d)", r.name,
         hex(p.spell), hex(p.a2), p.inv, p.out, p.why, p.want))
@@ -195,9 +199,14 @@ local function claims()
         end
       end
       if p.phys then
+        fights = fights + 1
         claim(p.out == p.inv + (atlas == 1 and (p.inv >> 2) or 0), string.format("%s: a Fight pass x%s, not doubled",
           r.name, atlas == 1 and "1 1/4" or "1"))
       end
+    end
+    if r.fight then
+      claim(fights >= 1, string.format("%s: %s's Fight made %d physical pass(es) (the atlas bit measured where two "
+        .. "pieces carry it)", r.name, NAMES[C], fights))
     end
     claim(spells >= 1, string.format("%s: %s's spell made %d damage pass(es)", r.name, NAMES[C], spells))
   end
