@@ -655,14 +655,17 @@ measurements, `suites/` for the suites and their mutants).
   exit. Red on `ally_hobbled` (Ot6Pin's target test gone).
 - `battle_shadowpin_edges` (#553; `wor-kt-factory-v1`, Inferno's battle):
   a Slow bounced off SABIN's Reflect onto a monster holds its line when it
-  lands and shows the dagger at the script's end, as a direct Slow does; a
-  Stop that lands while a command of Inferno's turn waits in his list (his
-  Delta Hit turn's second command) leaves it there, and it runs once the
-  Stop ends; a marked line moved to columns 1 and 0 draws no mark into the
-  row above. Declared writes: Inferno's allowed statuses gain Stop (he
-  blocks it), and the marked monster's screen x. Red on `reflect_nopin`,
-  `stop_any_head` and `mark_no_edge`
-  (`build/attempts/wt/v048-shadow-fu/suites/`).
+  lands and shows the dagger at the script's end, as a direct Slow does
+  (with the hook gone the dagger shows with the status, some 590 frames
+  early); a marked line moved to columns 1 and 0 draws no mark into the row
+  above. The declared write is the marked monster's screen x. Red on
+  `reflect_nopin` and `mark_no_edge`
+  (`build/attempts/wt/v048-shadow-fu/edges/`, `suites/mut.py`).
+  `Ot6BrokenTurn`'s arm for a Stop that lands inside a turn already under
+  way (a head other than `$1f`) has no case yet: the only such turn in the
+  fixture is Inferno's Delta Hit turn, whose second command waits about 600
+  frames in his list, and Inferno blocks Stop; with the block lifted a lab
+  saw CYAN's Stop land after that command every time (it is queued ahead).
 - `shadowpin_policy_selftest`: `M.shadowPolicy`, fourteen checks, each red
   on its own mutant.
 
