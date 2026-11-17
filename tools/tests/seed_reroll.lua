@@ -19,7 +19,7 @@
 -- 26..29 were on shift 0's be7C).  v0.49's ROM moved it back: the probe
 -- logged `[seedprobe] 60 shift(s) sampled, 8 distinct first battle(s)`, shift
 -- 0 on be7C with shifts 26..29 and 55..58, shift 1 on be8C
--- (build/attempts/wt/v049-land/lab/seed_probe.log).  seedGap = 26 therefore
+-- (build/attempts/wt/v049-land/lab/seed_probe.log.gz).  seedGap = 26 therefore
 -- puts attempt 2 on attempt 1's first battle.  Attempt 1 raises a `nopath`-shaped message once its
 -- battle is up (a message, as segment_retry.lua injects, because the
 -- classifier reads messages).  Attempt 2 at shift 26 must be re-rolled at

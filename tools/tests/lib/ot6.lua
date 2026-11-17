@@ -18119,6 +18119,7 @@ function M.setzerBattle(plan, opts)
             M.readByte(0x3A75), table.concat(t, ", "), #m > 0 and table.concat(m, ", ") or "no body present"))
         end
         pulse("a")
+      elseif M.battleKeyWait() then pulse("a")   -- a battle dialogue's {key}
       else M.setPad({}) end
       return
     end
@@ -18407,6 +18408,20 @@ end
 -- plan's entries afresh (M.freshKitEntries).
 -- Nothing is written.  M.vars.kit[k] records each entry:
 -- { who, actor, boost (pending at the confirm), refusedSeen, frame }.
+-- A battle dialogue waiting for its keypress (btlgfx DlgTextCmd_07, the
+-- {key} of a battle event's text: v0.49's desert encounter beside Figaro
+-- stopped battle_spellboost_mp's kitBattle on "LOCKE: EDGAR, What's the
+-- matter?" for 60,000 frames, its window closed and the monsters standing,
+-- so nothing pressed A).  The loop runs DlgTextCmd_07 once a frame while it
+-- waits; M.battleKeyWait() is true within two frames of it.  Armed once.
+function M.battleKeyWait()
+  if not M.dlgKeyArmed then
+    M.dlgKeyArmed = true
+    emu.addMemoryCallback(function() M.dlgKeyFrame = M.frame end, emu.callbackType.exec, M.sym("DlgTextCmd_07"))
+  end
+  return M.dlgKeyFrame ~= nil and M.frame - M.dlgKeyFrame <= 2
+end
+
 function M.kitBattle(plan, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -18586,7 +18601,7 @@ function M.kitBattle(plan, opts)
       downHold = {}   -- (a reopened window's hold starts afresh, with a fresh cap)
       spendR = {}
       if care ~= nil then care.reset(); careActor = nil end
-      if M.readByte(0x3A77) == 0 then pulse("a") else M.setPad({}) end
+      if M.readByte(0x3A77) == 0 or M.battleKeyWait() then pulse("a") else M.setPad({}) end
       return
     end
     local a = M.readByte(ACTOR) & 3
