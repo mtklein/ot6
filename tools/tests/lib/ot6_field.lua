@@ -1444,10 +1444,14 @@ function M.advanceStory(pred, maxFrames, opts)
       aPhase = (aPhase + 1) % 8
       if M.frame - hb >= 600 then
         hb = M.frame
+        -- on the world map (or in its transitions) the field objects are not the party's and may never have
+        -- been written: no field position or alignment is read there (a power-on fill read 0,0 and true on a
+        -- zeroed console and junk under rand:1, gen_vector_crash's airship crash, v0.48)
+        local world = M.worldMode()
         M.log(string.format(
-          "story f%d map=%d (%d,%d) ctl=%s algn=%s dlg=%s batt=%s ev=%s%s",
-          M.frame, M.mapId(), M.fieldX(), M.fieldY(),
-          tostring(M.hasControl()), tostring(M.tileAligned()),
+          "story f%d map=%d %s ctl=%s algn=%s dlg=%s batt=%s ev=%s%s",
+          M.frame, M.mapId(), world and "(world)" or string.format("(%d,%d)", M.fieldX(), M.fieldY()),
+          tostring(M.hasControl()), world and "-" or tostring(M.tileAligned()),
           tostring(M.dialogWaiting()), tostring(M.battleLoadStarted()),
           tostring(M.eventRunning()),
           M.sceneTimer() and (" | " .. M.sceneTimerStr()) or ""))
