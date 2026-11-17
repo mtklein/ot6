@@ -807,7 +807,6 @@ OT6_SLOT_BAHAMUT  = 12
 ; "Limit Break" has the list.
 OT6_LIMIT = 42069
 .assert OT6_LIMIT >= 10000, error, "the Limit Break cap must be above 9999"
-.assert OT6_LIMIT <= 59999, error, "the damage numerals draw a ten-thousands digit of 1-5 only (Ot6NumMulti's glyph row)"
 .proc Ot6DmgCap
         .a16
         clc

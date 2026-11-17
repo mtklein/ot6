@@ -129,41 +129,35 @@ the Hyper Wrist; it still counts as an earring piece (#551).
 - *The numerals.* The numeral word carried heal in bit 15 and Miss in bit
   14 beside a value of at most 9999, so they are now ranges past any damage:
   damage `$0000-$bfff`, a heal `$c000 + v`, Miss `$f000`, none `$ffff`
-  (`ot6_numeral.asm`). A five-digit numeral looks like a four-digit one: the
-  same glyphs, bounce and timing, centred the same way, one sprite more.
-  Single-target numerals keep vanilla's four threads (#539 relies on them).
-  A fifth tile per thread has to come from tiles nothing else draws: not the
-  sprite animation area, which a later animation reloads while an earlier
-  hit's numeral is still up, and not tiles `$ee` and `$ff`, which the
-  battle's BG1 and BG2 tilemaps use as blanks (they share the sprites'
-  character base; a digit written to `$ee` filled the background with "1"s:
-  build/attempts/wt/v049-limitbreak/shots/bg_bug_3x.png). That leaves
-  nineteen tiles for twenty: threads 0-2 take five digits (thread 2 using
-  the status graphics' blank `$ec`, `$ed` and `$ef`) and thread 3 four. A
-  five-digit value skips thread 3 for thread 0, and a pass of four numerals
-  with a five-digit one among them takes the multi-target path, as five or
-  more always did; there the numerals appear together and the script waits
-  them out, as vanilla's five-target numerals do. Multi-target numerals
-  keep vanilla's ten slots and draw the ten-thousands digit (1-5, so
-  `OT6_LIMIT` stays at or below 59,999) from a glyph row in the slots'
-  unused tiles `$a8-$af`. The numeral's own frame carries one VRAM transfer
-  no larger than vanilla's; the rest goes the frame before.
-- *Sprites per line.* A five-digit numeral is 40 pixels in three 16-pixel
-  sprites, six 8-pixel slivers where four digits took four. The PPU draws
-  34 slivers a line; a row of monsters taking five-digit numerals beside
-  party sprites can pass it and lose part of a numeral (measured in
-  `battle_limitbreak`'s shots: 40 slivers on the busiest line with three
-  single numerals, 50 with four multi-target ones and four heals, where
-  four-digit numerals would make 34 and 42).
+  (`ot6_numeral.asm`). A five-digit number is drawn in the same two 16x16
+  sprites and four tiles as any numeral, with condensed digits: 6x8 glyphs
+  in the numerals' own style and palette indices (outline 12, fill 13, so
+  white damage and green healing are unchanged), a one-pixel stroke on a
+  4x6 grid, five of them spanning 30 pixels centred in the 32
+  (`tools/numeral_font.py`, which writes `ot6_numeral_font.inc`; a build
+  check holds the two together). Each position's digit is OR-ed into the
+  tile buffer from a pre-shifted pair of tiles, so a digit straddling two
+  tiles needs no shifting at run time. One to four digits keep vanilla's
+  glyphs. Every numeral, single or multi-target, keeps vanilla's sprites
+  (so OAM use and sprites per scanline are vanilla's), threads, VRAM
+  transfers and timing; only what goes into the buffer changes. (A first
+  design with a third sprite and a fifth tile ran neighbouring numerals
+  together and pushed busy scanlines past the PPU's 34 slivers:
+  build/attempts/wt/v049-limitbreak/shots/.)
 - *Tested.* `battle_limitbreak`: a holder's Ultima at 2 BP lands about
-  12,000 on each of four monsters, exactly in HP and on the numeral (the
-  multi-target path, the four having five digits); with one entry dropped,
-  three five-digit single numerals, none on thread 3, each thread's tiles
-  the digit glyphs; the same cast one count short of the rank lands 9999;
-  with heals added, the multi-target path draws them green; a staged 33,333
-  on a Broken body and on a weak one lands 42,069 and 32,767; a holder's
-  pass turned to a heal stops at 9999; at level 99 and Mag.Pwr 255 the
-  magic base saturates. Twelve mutants, one per arm, each go red.
+  12,000 on each of four monsters, exactly in HP and on the numeral; the
+  four take the single path, one a thread, and each five-digit numeral's
+  tiles match a reference rendering of the condensed digits pixel for
+  pixel; the busiest scanline carries as many slivers as the same scene at
+  9999; one count short of the rank the cast lands 9999 in vanilla's
+  glyphs; with heals added the multi-target path draws the five digits
+  condensed and the heals green; 9999 and 12345 side by side; a five-digit
+  numeral on the party's side; a staged 33,333 on a Broken body and on a
+  weak one lands 42,069 and 32,767; a holder's pass turned to a heal stops
+  at 9999; at level 99 and Mag.Pwr 255 the magic base saturates. Thirteen
+  mutants, one per arm (among them a wrong glyph byte, a wrong position
+  offset, a straddling digit's second tile missing, four digits condensed,
+  four numerals sent down the multi-target path), each go red.
 
 **Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
 member heals is 25% stronger. Rung 5: anyone the member revives comes back

@@ -1048,6 +1048,10 @@ check("esper_ladder",
       ["tools/esper_ladder.py", "docs/design/esper-rework.md", "ff6/src/menu/item_prop_en.dat",
        "ff6/src/text/item_name_en.json", "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg",
        copy_if_changed_from("build/ot6.sfc")])
+# #550: the condensed numeral digits are generated; the checked-in .inc must
+# be what tools/numeral_font.py writes.
+check("numeral_font", "python3 tools/numeral_font.py",
+      ["tools/numeral_font.py", "ff6/src/battle/ot6_numeral_font.inc"])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.

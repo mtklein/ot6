@@ -16794,8 +16794,8 @@ _writedamage:
         inc     $f0
 @635b:  dey2
         bpl     @62f7
-        jsl     Ot6NumRoute     ; ot6 #550: was ldy $f0 / cpy #5; four with a
-                                ;   five-digit one go multi too (ot6_numeral.asm)
+        ldy     $f0
+        cpy     #5
         jsr     ShowDmgNumerals
         jsr     ShowDmgNumeralsMulti
         lda     $f2
