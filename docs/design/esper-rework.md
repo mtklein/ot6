@@ -105,17 +105,33 @@ the Hyper Wrist; it still counts as an earring piece (#551).
   clears it first; no path loads a character mid-battle). `$ffff` means "no
   number", so the engine's own ceiling is 65,534; `ApplyDmgHP`, the net
   damage (`_c213a7`) and Golem's pool are 16-bit throughout.
-- *Who counts as the holder.* The attacker the engine charges with the hit:
-  the actor for its own action, whatever the command (Fight, Magic, a summon,
-  a throw, Jump's landing, a counter: each runs as the actor's own); a
-  muddled or berserk holder's hits on the party too. A bounced spell is
-  computed with the reflector as the attacker (`CalcReflectDmg`), so a
-  holder's spell bounced off an ally who is not a holder stops at 9999, and
-  a monster's spell bounced off a holder's Reflect does not. A controlled
-  monster's attack is the monster's. Gogo and Umaro wear no espers, so a
-  Mimic of a holder's action stops at 9999. A drain's heal to the attacker
-  is the heal side. Measured: a direct cast (`battle_limitbreak`); the rest
-  is read from the code.
+- *Who counts as the holder.* Whoever cast or struck. For the actor's own
+  action that is the attacker the engine charges with the hit, whatever the
+  command (Fight and its extra swings, Magic, a summon, a throw, Jump's
+  landing, a counter: each runs as the actor's own), a muddled or berserk
+  holder's hits on the party included. A bounced spell is computed with the
+  reflector as the attacker (`CalcReflectDmg`), so `Ot6ReflectBegin` notes
+  the caster for the bounce (`OT6_REFLCASTER`, cleared after its target
+  loop): a holder's spell bounced off anyone can pass 9999, and anyone
+  else's bounced off a holder cannot. A controlled monster's attack is the
+  monster's. Gogo and Umaro wear no espers, so a Mimic of a holder's action
+  stops at 9999. Every heal is the heal side, a drain's heal back to the
+  drainer included (9999). A fraction-of-HP heal turned to damage on an
+  undead body is damage, so a holder's can pass 9999 (intended).
+
+  | the hit | judged by | cap |
+  |---|---|---|
+  | the holder's own action, any command | the holder | 42,069 |
+  | the holder's spell bounced off anyone | the holder (the caster) | 42,069 |
+  | anyone else's spell bounced off the holder | its caster | 9999 |
+  | a controlled monster, a Mimic by Gogo | the monster, Gogo | 9999 |
+  | any heal, a drain's heal back | (the heal side) | 9999 |
+  | a monster's hit on the party | the monster | 9999 |
+
+  Measured (`battle_limitbreak`): the holder's Ultima, a boosted Fight's
+  two swings, both bounce directions, a monster's hit on the party. Read
+  from the code: counters, Jump, Mimic, control and drain (no route save
+  stages them for a holder).
 - *Doubling.* The weakness x2 (`CalcTargetDmg`) and the Broken x2
   (`Ot6BrokenDmg`) skipped the double at 32,768 and up (bit 15 set), which a
   9999 cap hid; both now saturate at `$ffff`, so a harder hit never lands
@@ -126,6 +142,10 @@ the Hyper Wrist; it still counts as an earring piece (#551).
   with MagPwr 112 and Crusader's Purifier (power 190) or 142 and Ultima; so
   `Ot6MagBase` saturates the base at `$ffff`. Reasoned from code; no route
   save reaches it.
+- *The Atma Weapon.* `UltimaEffect` scales the hit by HP and level and
+  kept the low 16 bits of the product over 64, then added one, so past
+  2^22 it wrapped and `$ffff` came back 0. `Ot6AtmaScale` saturates both,
+  to the bit vanilla's wherever nothing overflowed.
 - *The numerals.* The numeral word carried heal in bit 15 and Miss in bit
   14 beside a value of at most 9999, so they are now ranges past any damage:
   damage `$0000-$bfff`, a heal `$c000 + v`, Miss `$f000`, none `$ffff`
@@ -143,7 +163,11 @@ the Hyper Wrist; it still counts as an earring piece (#551).
   transfers and timing; only what goes into the buffer changes. (A first
   design with a third sprite and a fifth tile ran neighbouring numerals
   together and pushed busy scanlines past the PPU's 34 slivers:
-  build/attempts/wt/v049-limitbreak/shots/.)
+  build/attempts/wt/v049-limitbreak/shots/.) Where a crowded scene drops part
+  of a numeral, it is the PPU's 34 slivers a line and the same sprite load
+  vanilla's four digits make: shots2/multi_9999_beside_holder_3x.png shows
+  the same scene at 9999 and with five digits, both 42 slivers on the
+  busiest line.
 - *Tested.* `battle_limitbreak`: a holder's Ultima at 2 BP lands about
   12,000 on each of four monsters, exactly in HP and on the numeral; the
   four take the single path, one a thread, and each five-digit numeral's
@@ -151,13 +175,15 @@ the Hyper Wrist; it still counts as an earring piece (#551).
   pixel; the busiest scanline carries as many slivers as the same scene at
   9999; one count short of the rank the cast lands 9999 in vanilla's
   glyphs; with heals added the multi-target path draws the five digits
-  condensed and the heals green; 9999 and 12345 side by side; a five-digit
-  numeral on the party's side; a staged 33,333 on a Broken body and on a
-  weak one lands 42,069 and 32,767; a holder's pass turned to a heal stops
-  at 9999; at level 99 and Mag.Pwr 255 the magic base saturates. Thirteen
-  mutants, one per arm (among them a wrong glyph byte, a wrong position
-  offset, a straddling digit's second tile missing, four digits condensed,
-  four numerals sent down the multi-target path), each go red.
+  condensed and the heals green; 9999, 12345, 0 and Miss through each path,
+  a heal of 0 too; a five-digit numeral on the party's side; a staged
+  33,333 on a Broken body and on a weak one lands 42,069 and 32,767; a
+  holder's pass turned to a heal stops at 9999, and a monster's hit of
+  20,000 on the party at 9999; a bounce lands 20,000 when the holder cast
+  it and 9999 when it bounced off the holder; a boosted Fight's swings cap
+  one by one; the Atma scale and the magic base saturate at level 99;
+  `OT6_LIMITBREAK` holds exactly the holder's bit. Seventeen mutants, one
+  per arm, each go red.
 
 **Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
 member heals is 25% stronger. Rung 5: anyone the member revives comes back

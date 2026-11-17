@@ -619,8 +619,9 @@ H.run({ maxFrames = 150000 }, {
         local st = emu.getState()
         local x, y = st["cpu.x"] & 0xFF, st["cpu.y"] & 0xFF
         if y < 8 or (H.readByte(0x11A2) & 0x80) ~= 0 then return end
-        local d = H.readWord(0x33D0 + y)
-        if d >= 0x4000 then return end            -- $FFFF: no damage
+        local nw = H.numeralWord(H.readWord(0x33D0 + y))
+        if nw.none or nw.miss or nw.heal then return end   -- no damage
+        local d = nw.value
         hits[#hits + 1] = { seq = execSeq, x = x, y = y, d = d,
                             b1 = H.readByte(0xB1) }
       end)

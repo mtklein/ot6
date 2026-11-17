@@ -2303,9 +2303,8 @@ UltimaEffect:
         longa
         lda     $f0         ; original damage
         jsr     Mult24       ; a = original damage * [(current hp + 1) * level] / [max hp (hi byte) + 1] / 256
-        lda     #5
-        jsr     LsrA
-        inc
+        jsl     Ot6AtmaScale    ; ot6 #550: was lda #5 / jsr LsrA / inc,
+        nop3                    ;   which wrapped past 16 bits (ot6_esper.asm)
         sta     $f0         ; set calculated damage
         cmp     #501
         bcc     @0e73       ; branch if less than 501
@@ -8814,8 +8813,8 @@ CalcAttackEffect:
 CalcReflectDmg:
 @3483:  phx
         pha
-        jsr     ClearGfxParams
-        stz     $3a5a
+        jsl     Ot6ReflectBegin ; ot6 #550: was jsr ClearGfxParams / stz $3a5a;
+        nop2                    ;   also notes the caster for Ot6DmgCap
         shorta
         lda     #$22
         tsb     $11a3

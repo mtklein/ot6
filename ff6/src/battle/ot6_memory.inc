@@ -730,5 +730,13 @@ OT6_MARKSHOWN        := $ef1c
 OT6_LIMITBREAK       := $ef1d
 .assert OT6_LIMITBREAK = OT6_MARKSHOWN + 1, error, "the limit-break mask must follow the shown-mark mask"
 .assert OT6_LIMITBREAK <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+; The caster of the spell CalcReflectDmg is bouncing, $80 | its entity offset
+; (0 = no bounce running): set at that routine's entry (Ot6ReflectBegin) and
+; cleared after its target loop (Ot6ReflectNowhere), so Ot6DmgCap judges the
+; caster, not the reflector, and the byte never outlives the bounce.  InitBP
+; clears it too.
+OT6_REFLCASTER       := $ef1e
+.assert OT6_REFLCASTER = OT6_LIMITBREAK + 1, error, "the bounce's caster must follow the limit-break mask"
+.assert OT6_REFLCASTER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif

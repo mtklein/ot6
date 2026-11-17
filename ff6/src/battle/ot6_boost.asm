@@ -57,6 +57,7 @@
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_BPMARK    ; nor a boost display's marks (#540)
         sta     f:$7e0000+OT6_LIMITBREAK ; nor a Limit Break from the last
+        sta     f:$7e0000+OT6_REFLCASTER ; (nor a bounce's caster)
                                 ;   party (InitChars sets this one's, #550)
         sta     f:$7e0000+OT6_BPDEFER
         sta     f:$7e0000+OT6_PIPDIRTY

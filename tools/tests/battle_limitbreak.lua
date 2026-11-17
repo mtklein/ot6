@@ -55,7 +55,8 @@ local function stageCount(who, n)
   emu.write(a + 1, n >> 8, emu.memType.snesMemory)
 end
 
-local who, seat                         -- H (Ragnarok's wearer) and its battle slot
+local who, seat                         -- H (Ragnarok's wearer), and the acting character's battle slot
+local CASTER, CSPELL, REFLECTOR, FIGHTER  -- the reflect arms' caster (and its spell) and reflector, the fight arm's
 local snap, A0, B0, A, B
 local cur                               -- the case being recorded
 local inj                               -- the synthetic arm's injection, per case
@@ -123,6 +124,20 @@ end
 -- do the four tiles from t hold v as drawn: five digits condensed (the reference above), one to four vanilla's
 -- glyphs left-aligned, the rest blank.  Returns ok, and a description of the first mismatch.
 local function tilesHold(t, v)
+  if v == "miss" then                   -- vanilla's two Miss tiles in slots 1-2, slots 0 and 3 blank
+    for i = 0, 3 do
+      for w = 0, 15 do
+        local want = 0
+        if i == 1 or i == 2 then
+          want = wram7f(0xBC00 + (i - 1) * 32 + w * 2) | (wram7f(0xBC00 + (i - 1) * 32 + w * 2 + 1) << 8)
+        end
+        if vram(tileWord(t + i) + w) ~= want then
+          return false, string.format("Miss: tile %d word %d is %04X, vanilla's %04X", i, w, vram(tileWord(t + i) + w), want)
+        end
+      end
+    end
+    return true, "vanilla's Miss"
+  end
   local sv = tostring(v)
   if #sv == 5 then
     local ref = condensedWords(v)
@@ -174,6 +189,20 @@ local function oamOn(tile)
 end
 
 local function arm()
+  -- the reflect and fight arms go live at the actor's first damage pass under the planned command (the Ultima arms
+  -- at the cast's $3410 write, watch()); registered first, so the arms below see it on that same pass
+  emu.addMemoryCallback(function()
+    if not cur or cur.live or seat == nil or not (cur.reflect or cur.fight) then return end
+    if (emu.getState()["cpu.x"] & 0xFF) ~= seat * 2 or H.readByte(0x3A7C) ~= cur.cmd then return end
+    cur.live = true
+    for _, e in ipairs(cur.mons) do cur.hp0[e] = H.readWord(0x3BF4 + e) end
+  end, emu.callbackType.exec, H.sym("CalcTargetDmg"), H.sym("CalcTargetDmg"))
+  emu.addMemoryCallback(function()
+    if not cur or cur.live or seat == nil or not cur.reflect then return end
+    if (emu.getState()["cpu.x"] & 0xFF) ~= seat * 2 then return end
+    cur.live = true
+    for _, e in ipairs(cur.mons) do cur.hp0[e] = H.readWord(0x3BF4 + e) end
+  end, emu.callbackType.exec, H.sym("Ot6ReflectBegin"), H.sym("Ot6ReflectBegin"))
   local CAP = H.sym("Ot6DmgCap")
   -- the store after Ot6DmgCap: CalcMaxDmg's `jsl Ot6DmgCap / bra / .res 7 / sta $33d0,y`, found by its bytes
   local maxd = H.sym("CalcMaxDmg") & 0x3FFFFF
@@ -188,7 +217,8 @@ local function arm()
     if not cur or not cur.live then return end
     local s = emu.getState()
     local x, y = s["cpu.x"] & 0xFF, s["cpu.y"] & 0xFF
-    pendCap = { x = x, y = y, pre = (s["cpu.a"] & 0xFFFF) + H.readWord(0xF0) }
+    pendCap = { x = x, y = y, pre = (s["cpu.a"] & 0xFFFF) + H.readWord(0xF0),
+      refl = H.readByte(H.sym("OT6_REFLCASTER") & 0xFFFF) }
   end, emu.callbackType.exec, CAP, CAP)
   emu.addMemoryCallback(function()
     if not cur or not cur.live or not pendCap then return end
@@ -196,6 +226,7 @@ local function arm()
     local p = pendCap
     pendCap = nil
     p.total = s["cpu.a"] & 0xFFFF
+    cur.allcaps[#cur.allcaps + 1] = p
     if p.x ~= seat * 2 then return end
     cur.caps[#cur.caps + 1] = p
   end, emu.callbackType.exec, store, store)
@@ -258,11 +289,18 @@ local function arm()
   -- the fonts arm: the monsters' entries at H's pass's display set to 9999 and 12345 in turn
   emu.addMemoryCallback(function()
     if not cur or not cur.live or not inj or not inj.fonts or inj.fontsDone or #cur.caps == 0 then return end
+    local vs = { 9999, 12345, 0, "miss" }
     for i, e in ipairs(cur.mons) do
-      local v = (i % 2 == 1) and 9999 or 12345
-      emu.write(0x7E33D0 + e, v & 0xFF, emu.memType.snesMemory)
-      emu.write(0x7E33D1 + e, v >> 8, emu.memType.snesMemory)
-      inj.vals[e] = v
+      local v = vs[(i - 1) % 4 + 1]
+      if v == "miss" then                 -- no amount, and the engine's missed-target mask
+        H.writeWord(0x33D0 + e, 0xFFFF)
+        H.writeWord(0x3A5A, H.readWord(0x3A5A) | H.readWord(0x3018 + e))
+        inj.vals[e] = MISS
+      else
+        emu.write(0x7E33D0 + e, v & 0xFF, emu.memType.snesMemory)
+        emu.write(0x7E33D1 + e, v >> 8, emu.memType.snesMemory)
+        inj.vals[e] = v
+      end
     end
     inj.fontsDone = true
   end, emu.callbackType.exec, H.sym("_c262ef"), H.sym("_c262ef"))
@@ -275,18 +313,82 @@ local function arm()
       emu.write(0x7E33D1 + e, 0xFF, emu.memType.snesMemory)
     end
     for s2 = 0, 3 do
-      if not inj.rightAt and H.readByte(0x3ED8 + s2 * 2) ~= 0xFF then
-        emu.write(0x7E33D0 + s2 * 2, 12345 & 0xFF, emu.memType.snesMemory)
-        emu.write(0x7E33D1 + s2 * 2, 12345 >> 8, emu.memType.snesMemory)
-        inj.rightAt = s2
+      if H.readByte(0x3ED8 + s2 * 2) ~= 0xFF then
+        if not inj.rightAt then
+          emu.write(0x7E33D0 + s2 * 2, 12345 & 0xFF, emu.memType.snesMemory)
+          emu.write(0x7E33D1 + s2 * 2, 12345 >> 8, emu.memType.snesMemory)
+          inj.rightAt = s2
+        elseif not inj.heal0At then
+          H.writeWord(0x33E4 + s2 * 2, 0)                                  -- a heal of 0
+          inj.heal0At = s2
+        end
       end
     end
   end, emu.callbackType.exec, H.sym("_c262ef"), H.sym("_c262ef"))
+  -- the reflect arms: a bounce's damage pass (OT6_REFLCASTER set) given 20,000 where CalcMaxDmg starts
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not inj or not inj.reflect then return end
+    if (H.readByte(H.sym("OT6_REFLCASTER") & 0xFFFF) & 0x80) == 0 then return end
+    H.writeWord(0xF0, 20000)
+    inj.reflHit = true
+  end, emu.callbackType.exec, H.sym("CalcMaxDmg"), H.sym("CalcMaxDmg"))
+  -- the fight arm: each of the fighter's swings 10,000 heavier where CalcMaxDmg starts (a WoR swing is ~2,900)
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not cur.fight or (emu.getState()["cpu.x"] & 0xFF) ~= seat * 2 then return end
+    H.writeWord(0xF0, H.readWord(0xF0) + 10000)
+  end, emu.callbackType.exec, H.sym("CalcMaxDmg"), H.sym("CalcMaxDmg"))
+  -- the monhit arm: the first monster pass on a seated member after H's action given 20,000 at CalcMaxDmg
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not inj or not inj.monhit or inj.monhitAt or not cur.endF then return end
+    local st = emu.getState()
+    if (st["cpu.x"] & 0xFF) < 8 or (st["cpu.y"] & 0xFF) >= 8 then return end
+    H.writeWord(0xF0, 20000)
+    inj.monhitAt = { x = st["cpu.x"] & 0xFF, y = st["cpu.y"] & 0xFF, f = H.frame }
+  end, emu.callbackType.exec, H.sym("CalcMaxDmg"), H.sym("CalcMaxDmg"))
+  -- the atma arm: the first monster's pass runs the Atma Weapon's scale ($11A9 = 4, the weapon's special) on 60,000
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not inj or not inj.atma then return end
+    local y = emu.getState()["cpu.y"] & 0xFF
+    if y == inj.atma then
+      inj.special = inj.special or H.readByte(0x11A9)
+      emu.write(0x7E11A9, 0x04, emu.memType.snesMemory)
+    elseif inj.special then
+      emu.write(0x7E11A9, inj.special, emu.memType.snesMemory)
+    end
+  end, emu.callbackType.exec, H.sym("CalcTargetDmg"), H.sym("CalcTargetDmg"))
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not inj or not inj.atma then return end
+    H.writeWord(0xF0, 60000)
+  end, emu.callbackType.exec, H.sym("UltimaEffect"), H.sym("UltimaEffect"))
+  local AS = H.sym("Ot6AtmaScale")
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not inj or not inj.atma then return end
+    inj.atmaP = H.readWord(0xE8) | (H.readByte(0xEA) << 16)
+  end, emu.callbackType.exec, AS, AS)
+  local ue = H.sym("UltimaEffect") & 0x3FFFFF
+  local atmaStore
+  for o = 0, 0x40 do
+    if rom(ue + o) == 0x22 and rom(ue + o + 1) == (AS & 0xFF) and rom(ue + o + 2) == ((AS >> 8) & 0xFF) then
+      atmaStore = (H.sym("UltimaEffect") & 0xFF0000) | ((ue + o + 7) & 0xFFFF)
+    end
+  end
+  H.assertEq(atmaStore ~= nil and rom(atmaStore) == 0x85, true, "UltimaEffect's jsl Ot6AtmaScale, nop3, sta $f0")
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not inj or not inj.atma or inj.atmaOut then return end
+    inj.atmaOut = emu.getState()["cpu.a"] & 0xFFFF
+  end, emu.callbackType.exec, atmaStore, atmaStore)
   -- the multi arm: heal entries for the seated members, at the display of H's pass
   emu.addMemoryCallback(function()
     if not cur or not cur.live or not inj or not inj.multi or inj.multiDone then return end
     if #cur.caps == 0 then return end
-    local hv = { 2345, 9999, 88, 1 }
+    local hv = { 2345, 9999, 0, 1 }
+    local m3, m4 = cur.mons[3], cur.mons[4]
+    if m3 then H.writeWord(0x33D0 + m3, 0); inj.vals[m3] = 0 end
+    if m4 then
+      H.writeWord(0x33D0 + m4, 0xFFFF)
+      H.writeWord(0x3A5A, H.readWord(0x3A5A) | H.readWord(0x3018 + m4))
+      inj.vals[m4] = MISS
+    end
     for s = 0, 3 do
       if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
         emu.write(0x7E33E4 + s * 2, hv[s + 1] & 0xFF, emu.memType.snesMemory)
@@ -319,8 +421,8 @@ local function readSingle(n)
   n.up = n.up or H.frame
   if H.frame < n.up + 4 then return end
   n.seen = H.frame
-  local v = n.v >= HEAL and n.v - HEAL or n.v
-  n.ok, n.why = tilesHold(0xC0 + 4 * k, v)
+  local nw = H.numeralWord(n.v)
+  n.ok, n.why = tilesHold(0xC0 + 4 * k, nw.miss and "miss" or nw.value)
   n.sprA, n.sprB = oamOn(0xC0 + 4 * k), oamOn(0xC2 + 4 * k)
   n.green = (H.readByte(0x631A + k) & 0x80) ~= 0
 end
@@ -330,8 +432,8 @@ local function readMulti(m)
   m.up = m.up or H.frame
   if H.frame < m.up + 4 then return end
   m.seen = H.frame
-  local v = m.v >= HEAL and m.v - HEAL or m.v
-  m.ok, m.why = tilesHold(MULTI[m.t], v)
+  local nw = H.numeralWord(m.v)
+  m.ok, m.why = tilesHold(MULTI[m.t], nw.miss and "miss" or nw.value)
   m.sprA, m.sprB = oamOn(MULTI[m.t]), oamOn(MULTI[m.t] + 2)
   m.green = (H.readByte(0x7B3F + m.t) & 0x80) ~= 0
 end
@@ -374,17 +476,23 @@ local CASES = {
   { name = "holder", count = 500, shot = "limitbreak_frogs" },
   { name = "other", count = 499, shot = "limitbreak_frogs_9999" },
   { name = "multi", count = 500, multi = true, shot = "limitbreak_multi" },
+  { name = "multi4", count = 499, multi = true, shot = "limitbreak_multi_9999" },
   { name = "fonts", count = 500, fonts = true, shot = "limitbreak_fonts" },
   { name = "right", count = 500, right = true, shot = "limitbreak_right" },
   { name = "broken", count = 500, broken = true },
   { name = "weak", count = 500, weak = true },
-  { name = "heal", count = 500, heal = true },
+  { name = "heal", count = 500, heal = true, monhit = true },
   { name = "formula", count = 500, formula = true },
+  { name = "atma", count = 500, atma = true },
+  { name = "reflectA", count = 500, reflect = "A" },
+  { name = "reflectB", count = 500, reflect = "B" },
+  { name = "fight", count = 500, fight = true },
 }
 
 local function branch(cs, restore)
   local r = { name = cs.name, count = cs.count, shot = cs.shot, multi = cs.multi, formula = cs.formula, bases = {},
-    right = cs.right, fonts = cs.fonts,
+    right = cs.right, fonts = cs.fonts, reflect = cs.reflect, fight = cs.fight, atma = cs.atma, monhit = cs.monhit,
+    allcaps = {},
     caps = {}, nums = {}, mnums = {}, hp0 = {}, hp1 = {}, mons = {} }
   results[#results + 1] = r
   local steps = {}
@@ -394,20 +502,27 @@ local function branch(cs, restore)
     steps[#steps + 1] = H.waitFrames(2)
     steps[#steps + 1] = H.call(function() H.checkReq(req, "the snapshot on the map"); H.rearmInputInjection() end)
   end
+  local plan = {}
+  local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
   steps[#steps + 1] = H.call(function()
     A, B = A0, B0
-    stageCount(who, cs.count)
-    if cs.formula then                  -- level 99, Mag.Pwr 255: power x MagPwr x level past 2^21
-      emu.write(0x7E1600 + 37 * who + 0x08, 99, emu.memType.snesMemory)
-      emu.write(0x7E1600 + 37 * who + 0x1D, 255, emu.memType.snesMemory)
+    r.actor, r.holder = who, who
+    if cs.reflect then r.actor = CASTER; r.holder = cs.reflect == "A" and CASTER or REFLECTOR end
+    if cs.fight then r.actor, r.holder = FIGHTER, FIGHTER end
+    stageCount(r.holder, cs.count)
+    if cs.formula or cs.atma or cs.fight then   -- level 99 (and Mag.Pwr 255, or Vigor 255 for the Fight)
+      emu.write(0x7E1600 + 37 * r.actor + 0x08, 99, emu.memType.snesMemory)
+      emu.write(0x7E1600 + 37 * r.actor + (cs.fight and 0x1A or 0x1D), 255, emu.memType.snesMemory)
     end
-    H.log(string.format("[limit] %s: $%02X's count on Bahamut staged at %d", cs.name, who, cs.count))
+    H.log(string.format("[limit] %s: $%02X's count on Bahamut staged at %d; $%02X acts", cs.name, r.holder, cs.count,
+      r.actor))
   end)
   steps[#steps + 1] = open(cs.name)
   steps[#steps + 1] = H.call(function()
     seat = nil
-    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == who then seat = s end end
-    H.assertEq(seat ~= nil, true, cs.name .. ": H is in the battle")
+    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == r.actor then seat = s end end
+    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == r.holder then r.holderSeat = s end end
+    H.assertEq(seat ~= nil and r.holderSeat ~= nil, true, cs.name .. ": the actor and the holder are in the battle")
     r.mask = H.readByte(H.sym("OT6_LIMITBREAK") & 0xFFFF)
     for s = 0, 5 do
       if H.monStanding(s) then
@@ -425,21 +540,34 @@ local function branch(cs, restore)
     end
     if cs.weak then inj.weak = r.mons[1] end
     if cs.heal then inj.heal = r.mons[1] end
-    if cs.multi then inj.multi = true end
+    if cs.multi then inj.multi = true; inj.vals = {} end
+    if cs.monhit then inj.monhit = true end
+    if cs.atma then inj.atma = r.mons[1] end
+    if cs.reflect then
+      inj.reflect = true
+      for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == REFLECTOR then r.reflSeat = s end end
+      emu.write(0x7E3EF8 + r.reflSeat * 2, H.readByte(0x3EF8 + r.reflSeat * 2) | 0x80, emu.memType.snesMemory)  -- Reflect
+      plan[1] = { who = CASTER, cmd = CMD_MAGIC, spell = CSPELL, boost = 0, allySeat = r.reflSeat }
+    elseif cs.fight then
+      plan[1] = { who = FIGHTER, cmd = 0x00, boost = 1 }
+    else
+      plan[1] = { who = who, cmd = CMD_MAGIC, spell = ULTIMA, boost = (cs.formula or cs.atma) and 0 or 2 }
+    end
+    r.cmd = plan[1].cmd
     if cs.fonts then inj.fonts = true; inj.vals = {} end
     if cs.right then inj.right = true end
     H.log(string.format("[limit] %s: seat %d, OT6_LIMITBREAK %s, monsters %s staged at %d HP", cs.name, seat,
       hex(r.mask), table.concat(r.mons, ","), HP))
     cur = r
   end)
-  steps[#steps + 1] = H.kitBattle({ { who = who, cmd = CMD_MAGIC, spell = ULTIMA, boost = cs.formula and 0 or 2 } }, {
+  steps[#steps + 1] = H.kitBattle(proxy, {
     untilPlanDone = true, idle = "defend", maxFrames = 60000,
     planDone = function() return r.ended ~= nil end,
   })
   -- the kit's step ends once the cast is confirmed; the cast resolves and its numerals draw after
   steps[#steps + 1] = H.driveUntil(function() return r.ended ~= nil end, 9000, {
     H.call(function() H.setPad({}) end), H.waitFrames(1),
-  }, cs.name .. ": H's Ultima resolved and its numerals drawn")
+  }, cs.name .. ": the action resolved and its numerals drawn")
   steps[#steps + 1] = H.call(function()
     for _, e in ipairs(r.mons) do r.hp1[e] = H.readWord(0x3BF4 + e) end
     r.heals = inj.heals
@@ -447,6 +575,10 @@ local function branch(cs, restore)
     r.injBroken = inj.broken
     r.vals = inj.vals
     r.rightAt = inj.rightAt
+    r.heal0At = inj.heal0At
+    r.reflHit = inj.reflHit
+    r.monhitAt = inj.monhitAt
+    r.atmaP, r.atmaOut = inj.atmaP, inj.atmaOut
     cur = nil
   end)
   return H.seqStep(steps)
@@ -457,7 +589,7 @@ end
 local function watch()
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
-    if not cur or cur.live or seat == nil then return end
+    if not cur or cur.live or seat == nil or cur.reflect or cur.fight then return end
     if H.readByte(0x3A7C) == CMD_MAGIC and H.readByte(0x3A7D) == ULTIMA then
       cur.live = true
       for _, e in ipairs(cur.mons) do cur.hp0[e] = H.readWord(0x3BF4 + e) end
@@ -497,7 +629,8 @@ local function watch()
       end
     end
     if cur.endF and H.frame > cur.endF + 90 and not cur.ended and (not cur.shot or cur.shotDone
-        or H.frame > cur.endF + 600) then          -- (a shot whose numerals never came: the claims say so)
+        or H.frame > cur.endF + 600)               -- (a shot whose numerals never came: the claims say so)
+        and (not cur.monhit or inj.monhitAt or H.frame > cur.endF + 3000) then
       cur.ended = H.frame
     end
   end, emu.eventType.endFrame)
@@ -522,11 +655,12 @@ local function claims()
   for _, r in ipairs(results) do byName[r.name] = r end
   for _, r in ipairs(results) do
     local holder = r.count >= 500
-    claim(((r.mask >> seat) & 1) == (holder and 1 or 0), string.format("%s: OT6_LIMITBREAK %s at the open (H's bit %s)",
-      r.name, hex(r.mask), holder and "set" or "clear"))
+    local wantMask = holder and (1 << r.holderSeat) or 0
+    claim(r.mask == wantMask, string.format("%s: OT6_LIMITBREAK %s at the open, exactly the holder's bit (want %s)",
+      r.name, hex(r.mask), hex(wantMask)))
     local byY = {}
     for _, p in ipairs(r.caps) do byY[p.y] = p end
-    for _, e in ipairs(r.right and {} or r.mons) do
+    for _, e in ipairs((r.right or r.reflect or r.fight) and {} or r.mons) do
       local side = byY[e] or byY[e + 0x14]
       claim(side ~= nil, string.format("%s: H's Ultima reached the cap for entity %d", r.name, e))
       if side then
@@ -534,6 +668,7 @@ local function claims()
         local heal = side.y >= 0x14
         local want
         if r.name == "broken" and e == r.injBroken then want = LIMIT
+        elseif r.atma and e == r.mons[1] then want = LIMIT          -- the Atma scale saturated, then the cap
         elseif r.name == "weak" and e == r.mons[1] then want = 0x7FFF   -- x2 saturated at $FFFF, then an unbroken
                                                                           --   body's half (vanilla's skip: 16,666)
         elseif heal then want = math.min(pre, STD)
@@ -542,7 +677,7 @@ local function claims()
         claim(total == want, string.format("%s: entity %d's %s total %d (amount %d; want %d)", r.name, e,
           heal and "heal" or "damage", total, pre, want))
         local shown = (r.vals and r.vals[e]) or total
-        if not r.vals then
+        if not (r.vals and r.vals[e]) then
           if heal then
             claim(r.hp1[e] == math.min(HP, r.hp0[e] + total), string.format("%s: entity %d's HP %d -> %d, healed %d",
               r.name, e, r.hp0[e], r.hp1[e], total))
@@ -551,7 +686,7 @@ local function claims()
               r.name, e, r.hp0[e], r.hp1[e], r.hp0[e] - r.hp1[e], total))
           end
         end
-        local code = heal and (HEAL + shown) or shown
+        local code = (shown == MISS) and MISS or (heal and (HEAL + shown) or shown)
         local found = false
         for _, n in ipairs(r.nums) do
           if n.tgt == e // 2 and n.v == code and n.seen then
@@ -583,12 +718,78 @@ local function claims()
         .. "five-digit numerals, %d with 9999 (the same sprites)", byName.holder.slivers, r.slivers or -1))
     end
     if r.name == "fonts" then
-      local f4, f5 = 0, 0
+      local f4, f5, f0, fm = 0, 0, 0, 0
       for _, n in ipairs(r.nums) do
         if n.v == 9999 and n.ok then f4 = f4 + 1 end
         if n.v == 12345 and n.ok then f5 = f5 + 1 end
+        if n.v == 0 and n.ok then f0 = f0 + 1 end
+        if n.v == MISS and n.ok then fm = fm + 1 end
       end
-      claim(f4 >= 1 and f5 >= 1, string.format("fonts: %d 9999s in vanilla's glyphs and %d 12345s condensed", f4, f5))
+      claim(f4 >= 1 and f5 >= 1 and (#r.mons < 3 or f0 >= 1) and (#r.mons < 4 or fm >= 1), string.format("fonts: "
+        .. "single numerals drawn: %d 9999 (vanilla's), %d 12345 (condensed), %d damage 0, %d Miss (vanilla's)",
+        f4, f5, f0, fm))
+    end
+    if r.name == "multi" or r.name == "multi4" then
+      local m0, mm = 0, 0
+      for _, m in ipairs(r.mnums) do
+        if m.v == 0 and m.ok then m0 = m0 + 1 end
+        if m.v == MISS and m.ok then mm = mm + 1 end
+      end
+      claim((#r.mons < 3 or m0 >= 1) and (#r.mons < 4 or mm >= 1), string.format("%s: multi-target numerals drawn: "
+        .. "%d damage 0, %d Miss (vanilla's)", r.name, m0, mm))
+    end
+    if r.name == "right" then
+      local h0
+      for _, n in ipairs(r.nums) do if r.heal0At and n.tgt == r.heal0At and n.v == HEAL and n.seen then h0 = n end end
+      claim(h0 ~= nil, string.format("right: a heal of 0 on seat %s has its single numeral", tostring(r.heal0At)))
+      if h0 then drawn(r, "single", h0, "the heal of 0", true) end
+    end
+    if r.atma then
+      local q = r.atmaP and (r.atmaP >> 6)
+      claim(q ~= nil and q >= 0x10000, string.format("atma: the Atma scale's quotient %s is past 16 bits (vanilla "
+        .. "wrapped it to %s)", tostring(q), q and tostring(((q & 0xFFFF) + 1) & 0xFFFF) or "-"))
+      claim(q ~= nil and r.atmaOut == math.min(q + 1, 0xFFFF), string.format("atma: Ot6AtmaScale gave %s (want %s)",
+        tostring(r.atmaOut), q and tostring(math.min(q + 1, 0xFFFF)) or "-"))
+    end
+    if r.reflect then
+      local b = {}
+      for _, p in ipairs(r.allcaps) do if (p.refl & 0x80) ~= 0 then b[#b + 1] = p end end
+      claim(r.reflHit == true and #b >= 1, string.format("%s: %d bounced damage pass(es), 20,000 staged in each", r.name,
+        #b))
+      for _, p in ipairs(b) do
+        local want = r.reflect == "A" and math.min(p.pre, LIMIT) or STD
+        claim((p.refl & 0x7F) == seat * 2 and p.x == r.reflSeat * 2, string.format("%s: the pass runs with x = the "
+          .. "reflector (%d), OT6_REFLCASTER the caster (%s)", r.name, p.x, hex(p.refl)))
+        claim(p.total == want, string.format("%s: the bounce on entity %d totals %d (amount %d; want %d: the %s cast it)",
+          r.name, p.y, p.total, p.pre, want, r.reflect == "A" and "holder" or "non-holder"))
+      end
+    end
+    if r.fight then
+      local passes, sum, past, tgt = 0, 0, false, nil
+      for _, p in ipairs(r.caps) do
+        if p.y >= 8 and p.y < 0x14 then
+          passes = passes + 1
+          tgt = tgt or p.y
+          if p.y == tgt then sum = sum + p.total end
+          if p.pre > STD then past = true end
+          claim(p.total == math.min(p.pre, LIMIT), string.format("fight: a swing on entity %d totals %d (amount %d)",
+            p.y, p.total, p.pre))
+        end
+      end
+      claim(passes >= 2 and past, string.format("fight: %d swings, one past 9999 (the boosted Fight's extra swing)",
+        passes))
+      if tgt then
+        claim(r.hp0[tgt] - r.hp1[tgt] == math.min(r.hp0[tgt], sum), string.format("fight: entity %d's HP %d -> %d "
+          .. "(the swings on it total %d)", tgt, r.hp0[tgt], r.hp1[tgt], sum))
+      end
+    end
+    if r.monhit then
+      local hit
+      for _, p in ipairs(r.allcaps) do
+        if r.monhitAt and p.x == r.monhitAt.x and p.y == r.monhitAt.y and p.pre >= 20000 then hit = p end
+      end
+      claim(hit ~= nil and hit.total == STD, string.format("%s: a monster's hit of 20,000 on the party totals %s "
+        .. "(want 9999)", r.name, hit and tostring(hit.total) or "-"))
     end
     if r.name == "right" then
       local n0
@@ -596,8 +797,13 @@ local function claims()
       claim(n0 ~= nil, string.format("right: a party member's numeral shows 12345 (seat %s)", tostring(r.rightAt)))
       if n0 then drawn(r, "single", n0, "the party member's numeral", false) end
     end
-    if r.name == "multi" then
-      claim(#r.mnums >= 5, string.format("multi: %d multi-target numerals (five or more)", #r.mnums))
+    if r.name == "multi4" and byName.multi and byName.multi.slivers then
+      claim(r.slivers == byName.multi.slivers, string.format("the crowded multi-target scene's busiest scanline: %d "
+        .. "slivers with five-digit numerals, %d with a non-holder's 9999 (the same sprites)", byName.multi.slivers,
+        r.slivers or -1))
+    end
+    if r.name == "multi" or r.name == "multi4" then
+      claim(#r.mnums >= 5, string.format("%s: %d multi-target numerals (five or more)", r.name, #r.mnums))
       for s2 = 0, 3 do
         local hv = r.heals and r.heals[s2 * 2]
         if hv then
@@ -608,7 +814,7 @@ local function claims()
               drawn(r, "multi-target", m, string.format("seat %d's heal", s2), true)
             end
           end
-          claim(seen, string.format("multi: seat %d's heal %d has its numeral", s2, hv))
+          claim(seen, string.format("%s: seat %d's heal %d has its numeral", r.name, s2, hv))
         end
       end
     end
@@ -616,7 +822,9 @@ local function claims()
       claim(b.out == b.want, string.format("%s: the magic base for power %d, Mag.Pwr %d, level %d (product %d) is %d "
         .. "(want %d: power x 4 + product / 32, saturated at 65535)", r.name, b.pow, b.mag, b.lvl, b.prod, b.out, b.want))
     end
-    claim(#r.bases >= 1, string.format("%s: %d magic base(s) observed", r.name, #r.bases))
+    if not r.fight and not r.reflect then         -- (their bases are computed before the live window opens)
+      claim(#r.bases >= 1, string.format("%s: %d magic base(s) observed", r.name, #r.bases))
+    end
     if r.formula then
       local past = false
       for _, b in ipairs(r.bases) do if b.prod >= 2 ^ 21 then past = true end end
@@ -642,6 +850,26 @@ H.run({ maxFrames = 900000 }, {
       if B0 == nil and H.worldPassable(x + d[1], y + d[2]) then B0 = { x + d[1], y + d[2] } end
     end
     H.assertEq(B0 ~= nil, true, "a passable world tile beside the save")
+    -- the reflect arms' caster: a seated member who knows Fire, Ice or Bolt; their reflector: another seated member;
+    -- the fight arm's fighter: a seated member other than H holding a weapon
+    local seatedChars = {}
+    for c = 0, 11 do
+      local b = H.readByte(0x1850 + c)
+      if b ~= 0 and (b & 7) == H.readByte(0x1A6D) then seatedChars[#seatedChars + 1] = c end
+    end
+    for _, c in ipairs(seatedChars) do
+      for _, sp in ipairs({ 0x00, 0x01, 0x02 }) do
+        if CASTER == nil and H.knowsSpell(c, sp) then CASTER, CSPELL = c, sp end
+      end
+    end
+    for _, c in ipairs(seatedChars) do if REFLECTOR == nil and c ~= CASTER then REFLECTOR = c end end
+    for _, c in ipairs(seatedChars) do
+      if FIGHTER == nil and c ~= who and H.isWeapon(H.readByte(0x1600 + 37 * c + 0x1F)) then FIGHTER = c end
+    end
+    H.assertEq(CASTER ~= nil and REFLECTOR ~= nil and FIGHTER ~= nil, true,
+      "precondition: a seated caster of Fire, Ice or Bolt, another seated member, and a seated fighter besides H")
+    H.log(string.format("[limit] reflect arms: $%02X casts $%02X at $%02X; fight arm: $%02X", CASTER, CSPELL,
+      REFLECTOR, FIGHTER))
     H.log(string.format("[limit] H = $%02X; pacing (%d,%d) <-> (%d,%d)", who, A0[1], A0[2], B0[1], B0[2]))
     arm()
     watch()

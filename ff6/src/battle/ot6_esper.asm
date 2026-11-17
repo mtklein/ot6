@@ -797,12 +797,12 @@ OT6_SLOT_BAHAMUT  = 12
 ;
 ; "The attacker" is CalcMaxDmg's x, the one the engine charges with the hit:
 ; the actor for its own action, whatever command (Fight, Magic, a summon, a
-; throw, Jump's landing, a counter, Mimic's copy run as the mimic's own); a
-; bounced spell's reflector (CalcReflectDmg runs the bounce with x = the body
-; it bounced off), so a holder's spell bounced off an ally who is not a
-; holder caps at 9999, and a monster's spell bounced off a holder's Reflect
-; can pass it; the drained side of a drain swapped round for the attacker's
-; heal (the heal side, 9999).  Gogo and Umaro hold no espers (OT6_ESPER_CHARS),
+; throw, Jump's landing, a counter, Mimic's copy run as the mimic's own),
+; except a bounced spell's: CalcReflectDmg runs the bounce with x = the body
+; it bounced off, so there the caster is OT6_REFLCASTER's (Ot6ReflectBegin),
+; and a holder's spell bounced off anyone can pass 9999 while anyone else's
+; bounced off a holder cannot.  The drained side of a drain swapped round for
+; the attacker's heal is the heal side (9999).  Gogo and Umaro hold no espers (OT6_ESPER_CHARS),
 ; so their copies of a holder's action cap at 9999.  docs/design/esper-rework.md
 ; "Limit Break" has the list.
 OT6_LIMIT = 42069
@@ -820,25 +820,110 @@ OT6_LIMIT = 42069
         and     #$00ff
         cmp     #$0014
         bcs     @std            ; the heal side: 9999 for everyone
-        txa
+        phx
+        lda     OT6_REFLCASTER  ; a bounce: the caster, not the reflector
+        and     #$00ff
+        bit     #$0080
+        beq     :+
+        and     #$007f
+        tax
+:       txa
         and     #$00ff
         cmp     #$0008
-        bcs     @std            ; a monster's hit
+        bcs     @mon            ; a monster's hit
         sep     #$20
         .a8
         lda     $3018,x         ; the attacker's bit
         and     OT6_LIMITBREAK
-        rep     #$20            ; (z survives)
+        rep     #$20
         .a16
+        plx                     ; (plx sets z: test the bit after it; b
+        and     #$00ff          ;   is 0, from the txa above)
         beq     @std
         pla
         cmp     #OT6_LIMIT + 1
         bcc     @done
         lda     #OT6_LIMIT
         rtl
+@mon:   plx
 @std:   pla
         lda     #9999
 @done:  rtl
+.endproc
+
+; [ CalcReflectDmg's head ]
+;
+; jsl in place of its `jsr ClearGfxParams / stz $3a5a`: the same (the gfx
+; parameters $a0-$af cleared, $3a5a cleared as a word), and the caster (x,
+; the attacker ExecAttack runs) noted in OT6_REFLCASTER for Ot6DmgCap until
+; Ot6ReflectNowhere, after the bounce's target loop, clears it.  in: a16,
+; either index width, db=$7e, dp=0.  Preserves x/y; A clobbered (the caller
+; pushed it).
+.proc Ot6ReflectBegin
+        .a16
+        php
+        sep     #$20
+        .a8
+        txa
+        ora     #$80
+        sta     OT6_REFLCASTER
+        rep     #$20
+        .a16
+        stz     $a0
+        stz     $a2
+        stz     $a4
+        stz     $a6
+        stz     $a8
+        stz     $aa
+        stz     $ac
+        stz     $ae
+        stz     $3a5a
+        plp
+        rtl
+.endproc
+
+; [ the Atma Weapon's scale, saturated ]
+;
+; UltimaEffect scales the hit by (current HP + 1) * level / (max HP's high
+; byte + 1) / 256 over 64: Mult24 leaves the 24-bit product in $e8-$ea, and
+; vanilla took its low 16 bits after six shifts (LsrA with 5) and added one,
+; so a product past 2^22 wrapped and $ffff came back 0.  Under a 9999 cap the
+; wrap only lost damage past the cap now and then; with Limit Break and the
+; saturating doubles it could drop a holder's hit to a small number.  So the
+; quotient saturates at $ffff and so does the +1; where nothing overflows the
+; result is vanilla's to the bit.  LsrA shifts $ea as a word, so after its
+; six shifts only $ea's bits 0-1 (the product's 22-23) count, the rest being
+; $eb's (Ot6MagBase has the same reading for five shifts).
+;
+; jsl in place of `lda #5 / jsr LsrA / inc`.  in: a16, $e8-$ea the product.
+; out: A (a16) = the scaled damage; the caller stores it.  x/y kept.
+.proc Ot6AtmaScale
+        .a16
+        php
+        rep     #$30
+        .a16
+        .i16
+        phx
+        lda     $e8
+        ldx     #$0005
+:       lsr     $ea
+        ror
+        dex
+        bpl     :-
+        pha
+        lda     $ea
+        and     #$0003
+        beq     :+
+        pla
+        lda     #$ffff          ; the quotient is past 16 bits
+        bra     @out
+:       pla
+        inc     a
+        bne     @out
+        dec     a               ; $ffff + 1: stays $ffff
+@out:   plx
+        plp
+        rtl
 .endproc
 
 ; ------------------------------------------------------------------------------
