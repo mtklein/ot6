@@ -197,9 +197,9 @@ ram_scope zSkillsTextColor
         ram_byte Thief          ; the 8th skills row.  This byte was
                                 ; z80, which nothing in the tree referenced, so
                                 ; growing the scope moves no other address.
+        ram_byte Painter        ; the 9th, Relm's page (#549): z81 the same way
 end_ram_scope
 
-ram_byte z81
 ram_byte z82
 ram_byte z83
 ram_byte z84
