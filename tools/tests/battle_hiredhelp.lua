@@ -36,7 +36,7 @@
 -- and standing out of sight (its absolute screen position past the edge);
 -- each paid hire one drawn strike with the figure's weapon for the class;
 -- and at SETZER's Ot6ActionEnd his sheet, screen position, offsets and
--- pose ($61c0/$61c1) as at his Ot6SetzerExec.  The 2 and 3 BP hires (Leo,
+-- pose ($61c0/$61c1) as at his Ot6SetzerExec.  The 2 and 3 BP hires (the Imp,
 -- the fourth hire) are battle_hirecrew's.  The ROM's identity is logged.
 -- Negative controls (one byte-patched ROM a property, mutants2.py and its
 -- list beside each): build/attempts/wt/hire-sprite/round2/negative/,

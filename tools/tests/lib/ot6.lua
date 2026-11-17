@@ -19726,13 +19726,13 @@ end
 -- M.hireCrewCheck(r, tag) holds one H.setzerBattle record to the design
 -- and logs one line a pass, strike and end.
 local HC = nil
-M.HIRE_FIG_GFX = { [0] = 0x13, [1] = 0x0E, [2] = 0x10, [3] = 0x03, [5] = 0x14 }
-M.HIRE_FIG_NAME = { [0] = "merchant", [1] = "soldier", [2] = "Leo", [3] = "Shadow", [4] = "Interceptor", [5] = "ghost" }
+M.HIRE_FIG_GFX = { [0] = 0x13, [1] = 0x0E, [2] = 0x0F, [3] = 0x03, [5] = 0x14 }
+M.HIRE_FIG_NAME = { [0] = "merchant", [1] = "soldier", [2] = "Imp", [3] = "Shadow", [4] = "Interceptor", [5] = "ghost" }
 -- the weapon a figure swings by class (none, slashing, piercing, bludgeoning),
 -- item ids from kits.md; the Fight animation's number is id + 1
 M.HIRE_FIG_WEAPON = {
   [0] = { 0x00, 0x0B, 0x00, 0x34 }, [1] = { 0x0A, 0x0A, 0x1D, 0x46 },
-  [2] = { 0x14, 0x14, 0x22, 0x46 }, [3] = { 0x26, 0x2B, 0x26, 0x44 },
+  [2] = { 0x24, 0x24, 0x24, 0x46 }, [3] = { 0x26, 0x2B, 0x26, 0x44 },
   [5] = { 0x00, 0x0A, 0x1D, 0x4A },
 }
 local function romB(a) return M.readRomByte(a & 0x3FFFFF) end

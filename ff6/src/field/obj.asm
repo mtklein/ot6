@@ -51,7 +51,16 @@ UnusedFirstObjTbl:
         and     #$40
         bne     @510d
         rts
-@510d:  lda     $0795                   ; portrait index
+@510d:  lda     $0795                   ; ot6 #552: the ending's portrait of
+Ot6LeoPortrait = *                      ; (a seam for the negative's mutant)
+        cmp     #CHAR::GOGO             ;   Gogo is Leo's once the grave has
+        bne     :+                      ;   revealed him (switch $00e0)
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     :+
+        lda     #PORTRAIT::LEO
+        sta     $0795
+:       lda     $0795                   ; portrait index
         longa
         xba
         lsr3
@@ -127,9 +136,10 @@ UnusedFirstObjTbl:
 .endproc  ; InitPortrait
 ; ------------------------------------------------------------------------------
 
-; pointers to character portrait graphics (+$ed0000, first 16 only)
+; pointers to character portrait graphics (+$ed0000, first 16 only; ot6
+; #552: and Leo's, the 17th, for the ending's revealed Leo)
 PortraitGfxPtrs:
-        .repeat 16, i
+        .repeat 17, i
         .addr   PortraitGfx+$0320*i
         .endrep
 
@@ -1076,7 +1086,14 @@ OnVehicle:
         clc
         adc     $1a
         tax
-        lda     f:ObjVehicleTileTbl,x   ; get graphics position
+Ot6LeoRide = *                          ; (a seam for the negative's mutant)
+        lda     $0879,y                 ; ot6 #552: Leo's sheet has no riding
+        cmp     #MAP_SPRITE_GFX::LEO    ;   frames ($2e/$2f, tiles $1560-
+        beq     @leo                    ;   $169f, past its end): the revealed
+        lda     f:ObjVehicleTileTbl,x   ;   Leo rides a chocobo or Magitek
+        sta     $0877,y                 ;   armor in his walking frames
+        bra     Done
+@leo:   lda     f:ObjMoveTileTbl,x
         sta     $0877,y
         bra     Done
 
@@ -2330,6 +2347,7 @@ ChocoRightBtmRightTiles:
         sta     $0345,y
 
 ::DoneChoco:
+        jsr     Ot6LeoSaddle            ; ot6 #552
         jmp     DrawNextObj
 
 ChocoLeftYTbl := ::DrawChocoRight::ChocoRightYTbl
@@ -2350,6 +2368,33 @@ ChocoLeftBtmRightTiles:
         .word   $0000,$0010,$0020,$0030
 
 .endproc  ; DrawChocoLeft
+
+; ------------------------------------------------------------------------------
+
+; [ the revealed Leo in the saddle ]
+
+; ot6 #552 (docs/design/leo-reveal.md): Leo's sheet has no riding frames, so
+; UpdateObjFrame gives him his walking frames on a chocobo (Ot6LeoRide).  Seen
+; from the side, a walking frame's lower half is two straight legs standing
+; over the bird; the rider's lower sprite ($0345) is dropped instead, so he
+; sits in the saddle, head and shoulders above it.  Up and down keep both
+; halves, as every rider's do.  $da = the object, $d4 = its sprite slot.
+
+Ot6LeoSaddle:
+        ldy     $da
+        lda     $0868,y
+        bpl     :+                      ; the rider not shown
+        lda     $0879,y
+        cmp     #MAP_SPRITE_GFX::LEO
+        bne     :+
+        lda     $087f,y                 ; facing: 1 right, 3 left
+        lsr
+        bcc     :+
+        ldy     $d4
+Ot6LeoSaddleHide:                       ; (field_leoride counts it)
+        lda     #$ef                    ; off screen
+        sta     $0345,y
+:       rts
 
 ; ------------------------------------------------------------------------------
 

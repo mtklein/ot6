@@ -2354,17 +2354,10 @@ UpdateEquip:
         jsr     MultAB
         phx
         tax
-        lda     f:CharProp+10,x         ; battle power
-        sta     $11ac
-        sta     $11ad
-        longa
-        lda     f:CharProp+11,x         ; defense & magic defense
-        sta     $11ba
-        lda     f:CharProp+13,x         ; evade & magic block
-        shorta
-        sta     $11a8
-        xba
-        sta     $11aa
+        jsl     Ot6LeoBattleRow         ; ot6 #552: battle power, defense,
+                                        ;   magic defense, evade and magic
+                                        ;   block from the actor's CharProp
+                                        ;   row, Leo's for the revealed slot
         lda     f:CharProp+21,x         ; run factor
         and     #CHAR_RUN_FACTOR::MASK
         eor     #CHAR_RUN_FACTOR::MASK
@@ -6988,9 +6981,9 @@ UpdateEquipBattle:
         lda     $d8
         sta     $3c58,x     ; relic effects 4
         shorta
-        asl     $3a21,x     ;
-        asl3
-        ror     $3a21,x     ;
+        jsl     Ot6LeoActorMask         ; ot6 #552: bit 15 of the actor mask,
+                                        ;   the Merit Award's (vanilla) or the
+                                        ;   revealed Leo's
         pld
         jmp     FixImmuneStatus
 

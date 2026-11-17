@@ -179,3 +179,12 @@ CODE_EXT_INC = 1
 .global Ot6DanceList, Ot6DenseDanceOpen, Ot6DenseDanceStore, Ot6ToolsCursorStore
 
 .endif
+
+; #552: the grave in the World of Ruin's Thamasa reveals that Gogo is General
+; Leo (docs/design/leo-reveal.md).  Event switch $00E0 (byte $1e9c, bit 0)
+; says the reveal has played; the slot keeps actor $0C.  Read it with long
+; addressing: the field, menu and battle run with different data banks.
+OT6_LEO_SWITCH = $00e0
+OT6_LEO_FLAG := $7e1e80 + (OT6_LEO_SWITCH >> 3)
+OT6_LEO_BIT = 1 << (OT6_LEO_SWITCH & 7)
+.global Ot6LeoReveal, Ot6LeoBattleRow, Ot6LeoActorMask

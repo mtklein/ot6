@@ -979,7 +979,9 @@ pays nothing.
 same guy again). Setzer walks out of sight, and each hire walks in where
 he stood, swings the weapon that fits the target and walks off: the 0 BP
 hire is a merchant, and each point brings the next, tougher figure, an
-Imperial soldier, then General Leo. The fourth hire (3 BP) depends on
+Imperial soldier, then an Imp (owner, 2026-11-17: in place of General Leo,
+who is not to be seen before Gogo's reveal nor beside him after it,
+[leo-reveal.md](leo-reveal.md)). The fourth hire (3 BP) depends on
 Shadow (owner, 2026-10-02):
 - **Shadow**, FF6's own mercenary for hire, when he is there to hire:
   recruited and not left on the Floating Continent (event switch
@@ -1004,12 +1006,12 @@ lift counted). Every swap of the slot's graphics happens with the slot
 hidden and out of sight, and
 Setzer's pose is put back after the last hire as it was before the first.
 *Reason: the boost buys hires, and a hire should look hired. The figures
-are the ROM's own full battle sprite sets (Locke's disguises, Leo, Shadow,
-the train's ghosts), drawn in Setzer's own slot: no VRAM and no new art;
+are the ROM's own full battle sprite sets (Locke's disguises, the Imp
+status's, Shadow, the train's ghosts), drawn in Setzer's own slot: no VRAM and no new art;
 each figure's palette is loaded into Setzer's slot's palette while it
 stands in.* The weapon is a fixed one a figure and class (merchant: Dirk,
 Regal Cutlass or Mithril Rod; soldier: Mithril Blade, Mithril Pike or
-Morning Star; Leo: Crystal, Gold Lance or Morning Star; Shadow: Kodachi,
+Morning Star; Imp: Imp Halberd or Morning Star; Shadow: Kodachi,
 Ashura or Flail; ghost: Dirk, Mithril Blade, Mithril Pike or Bone Club);
 it is a picture only, the class is the hire's. A hire that finds no body
 still walks in, and leaves without a swing. The animation draws no Rand

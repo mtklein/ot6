@@ -42,6 +42,9 @@ digits when they need them. Bahamut's old top rank, the Hero Ring's boost to
 Fight and magic damage, moves to Ragnarok's top rank, which no longer raises
 Vigor by half. It still counts as an Earring.
 
+An Imp has joined Setzer's Hired Help: the third hire now walks in as an
+Imp with a halberd.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

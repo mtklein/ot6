@@ -132,3 +132,6 @@
         .include "ot6_paintpage.asm"
 
         .include "ot6_numeral.asm"      ; #550: five-digit damage numerals
+
+; General Leo's reveal (#552), appended for the same reason.
+        .include "ot6_leo.asm"

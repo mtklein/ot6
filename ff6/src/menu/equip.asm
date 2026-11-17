@@ -2295,7 +2295,8 @@ _c39c48:
         tax
         longa
         lda     f:CharEquipMaskTbl,x
-        sta     ze7
+        jsr     Ot6LeoEquipMask         ; ot6 #552: the revealed Leo adds his
+        sta     ze7                     ;   own set (bit 15)
         shorta
         lda     $11d8
         and     #$20
@@ -2306,6 +2307,48 @@ _c39c48:
         sta     ze7
         shorta
 @9c66:  rts
+
+; ------------------------------------------------------------------------------
+
+; [ the revealed Leo's equippability ]
+
+; ot6 #552 (docs/design/leo-reveal.md): A (16-bit) = an equip mask, X = the
+; actor times 2.  For Gogo's slot (actor $0c) after the reveal (event switch
+; $00e0) the mask gains bit 15, Leo's own (actor 15) and the Merit Award's,
+; so the Equip menu, Optimize and the shop's marks offer everything Gogo
+; can wear and the whole of Leo's set.  Preserves X and Y.
+
+.a16
+Ot6LeoEquipMask:
+        cpx     #CHAR_PROP::GOGO * 2
+        bne     :+
+        pha
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     :++
+        pla
+        ora     #$8000
+:       rts
+:       pla
+        rts
+
+; ot6 #552: A (16-bit) = an item's equip word, for the item menu's "who can
+; equip" list (actors 0-13).  An item of Leo's set (bit 15) lists the
+; revealed slot 12 as well.  Preserves X and Y.
+
+Ot6LeoItemMask:
+        bit     #$8000
+        beq     :+
+        pha
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     :++
+        pla
+        ora     #$1000
+:       rts
+:       pla
+        rts
+.a8
 
 ; ------------------------------------------------------------------------------
 
