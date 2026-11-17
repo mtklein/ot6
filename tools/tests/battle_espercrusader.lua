@@ -32,8 +32,9 @@
 --   rank 5:  the menu takes it; D's Fight computes damage for both hands; G's swing has the grip and no cut, from
 --            the same battle power, vigor and level, and more damage than rank 4's; S's swing takes no cut and
 --            loses nothing; J's still takes the real Glove's cut.
--- J also holds Ragnarok (499 / 500): at rank 5 its vigor is the Hyper Wrist's x1.5 of rank 4's and its Fight is one
--- aimed hit (#534: the signature was the Offering's four strikes).
+-- J also holds Ragnarok (499 / 500): at rank 5 its Fight is one aimed hit and its vigor is rank 4's (#534: the
+-- signature was the Offering's four strikes; then the Hyper Wrist's vigor x1.5; since #550 the Hero Ring, whose
+-- Fight +1/4 is the Atlas bit, $3C44 bit 0, set at rank 5; its earring piece is battle_esperearring's).
 -- Every claim is logged as ok or NOT before the verdict, so a red run names each one that fails.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -71,7 +72,7 @@ local function wearsGenji(c)
   end
   return false
 end
--- J's Ragnarok claims (the Hyper Wrist's vigor x1.5, no Offering) are the signature's own only when no relic worn
+-- J's Ragnarok claims (vigor unchanged, no Offering) are the signature's own only when no relic worn
 -- already carries the Hyper Wrist's bit (ItemProp+11 $80) or the Offering's (+12 $01): a member wearing one has
 -- them at rank 4 too (staged on SABIN, who wears a $D2: vigor 168 at both ranks, glove lab, crusader-v4-glove.log)
 local function ragnarokClean(c)
@@ -270,7 +271,8 @@ H.run({ maxFrames = 900000 }, {
       if cur.closed and cur.closed[a] then return end
       local p = { hand = lastHand[e], dmg = H.readWord(0x11B0), bp = H.readByte(0x11A6), vig = H.readByte(0x11AE),
         lvl = H.readByte(0x11AF), grip = (H.readByte(0xB3) & 0x40) == 0, genji = (H.readByte(0x3C58 + e) & 0x10) ~= 0,
-        offering = (H.readByte(0x3C58 + e) & 0x01) ~= 0, swings = H.readByte(0x3A70) }
+        offering = (H.readByte(0x3C58 + e) & 0x01) ~= 0, swings = H.readByte(0x3A70),
+        atlas = (H.readByte(0x3C44 + e) & 0x01) ~= 0 }
       table.insert(cur.passes[a], p)
       H.log(string.format("[crusader] %s: %s's damage pass, %s hand: battle power %d, vigor x2 %d, level %d, grip %s, "
         .. "Genji's one-weapon cut %s: damage before variance %d", cur.name, NAMES[a], p.hand == 1 and "off" or "main",
@@ -401,14 +403,14 @@ H.run({ maxFrames = 900000 }, {
       j4.dmg, tostring(j4.genji), tostring(j4.grip), j5.dmg, tostring(j5.genji), tostring(j5.grip)))
     check(j4.genji, "rank 4: J's swing takes the real Genji Glove's one-weapon cut (vanilla)")
     check(j5.genji, "rank 5: J's swing still takes the real Genji Glove's one-weapon cut (vanilla)")
-    -- J also holds Ragnarok (499 / 500): its signature is the Hyper Wrist's vigor x1.5, one aimed hit, no Offering
+    -- J also holds Ragnarok (499 / 500): its signature is the Hero Ring (#550), one aimed hit, no Offering, and no
+    -- Hyper Wrist's vigor x1.5 (the signature before #550)
     local hj4, hj5 = hands(R4, J), hands(R5, J)
-    local v = j4.vig // 2
-    local want = math.min(255, 2 * (v + (v >> 1)))
-    H.log(string.format("[crusader] J's Ragnarok: vigor x2 rank 4 %d, rank 5 %d (want %d); damage passes rank 4 %d/%d, "
-      .. "rank 5 %d/%d (main/off); Offering's bit rank 5 %s", j4.vig, j5.vig, want, hj4[0], hj4[1], hj5[0], hj5[1],
-      tostring(j5.offering)))
-    check(j5.vig == want and want > j4.vig, "rank 5: J's vigor is x1.5 rank 4's (Ragnarok's signature, Hyper Wrist)")
+    H.log(string.format("[crusader] J's Ragnarok: vigor x2 rank 4 %d, rank 5 %d; atlas bit rank 4 %s, rank 5 %s; "
+      .. "damage passes rank 4 %d/%d, rank 5 %d/%d (main/off); Offering's bit rank 5 %s", j4.vig, j5.vig,
+      tostring(j4.atlas), tostring(j5.atlas), hj4[0], hj4[1], hj5[0], hj5[1], tostring(j5.offering)))
+    check(j5.vig == j4.vig, "rank 5: J's vigor is rank 4's (no Hyper Wrist since #550)")
+    check(j5.atlas, "rank 5: J holds the Atlas bit (Ragnarok's signature, the Hero Ring's Fight +1/4)")
     check(not j5.offering and hj5[0] == 1 and hj5[1] == 0,
       "rank 5: J's Fight is one hit, aimed (no Offering: no four strikes, no random target)")
     H.assertEq(#bad, 0, "Crusader's signature's claims that failed: " .. table.concat(bad, "; "))

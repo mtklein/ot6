@@ -25113,7 +25113,8 @@ damage_set:
         tax
         lda     $14
         sta     w7e7b53,x
-        stz     w7e7b5d,x
+        nop3                    ; ot6 #550: was stz w7e7b5d,x (vanilla's only
+                                ;   use); it holds the ten-thousands digit now
         inc     $20         ; next character/monster
         iny2
         dec     $10

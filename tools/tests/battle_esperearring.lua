@@ -1,13 +1,13 @@
 -- @suite slow
 -- battle_esperearring.lua -- an esper rank that copies an earring counts as one earring piece (#551;
--- docs/design/esper-rework.md; ot6_esper.asm Ot6EsperApply): Maduin's Earrings and Bahamut's Hero Ring each add a
+-- docs/design/esper-rework.md; ot6_esper.asm Ot6EsperApply): Maduin's Earrings and Ragnarok's Hero Ring (Bahamut's until #550) each add a
 -- piece the way vanilla's CalcEquipEffect counts worn ones, the first setting the single-earring bit (relic effects
 -- 3, $11D7 bit 1, the battle's $3C45) and the second the double (relic effects 1, $11D5 bit 1, $3C44), and no count
 -- goes past the double.  RelicDmgEffect then raises a spell's damage by 1/4 for the single and 1/2 for the double.
 --
 -- Continue post-opera-v1.  C is the first seated member who knows Fire, Ice or Bolt (on this save CELES and Ice).
 -- The earring rungs are found by their bytes, not by esper: every ladder record whose relic-effects byte (+4)
--- carries $02 (two today: Maduin's rung 5, Bahamut's rung 5, whose $03 also carries the Atlas Armlet's +1/4 to
+-- carries $02 (two today: Maduin's rung 5, Ragnarok's rung 5, whose $03 also carries the Atlas Armlet's +1/4 to
 -- Fight); "rank" below means C's count on that stone is the rung's cost, "no rank" one short of it (rank 4: the
 -- same stat rungs, so the same Mag.Pwr in every case).  A snapshot on the world map; then one branch per case from
 -- it, each staging C's two counts on the live esper page ($317C00) and C's two relic slots ($1623/$1624) -- both
@@ -18,9 +18,9 @@
 --   none           no rank, no relic               magic x1
 --   earring        no rank, Earrings worn          x1 1/4 (vanilla's one piece, unchanged)
 --   rank           Maduin's rank, nothing worn     x1 1/4
---   rank2          Bahamut's rank, nothing worn    x1 1/4, and the atlas bit
+--   rank2          Ragnarok's rank, nothing worn    x1 1/4, and the atlas bit
 --   rank+earring   Maduin's rank, Earrings worn    x1 1/2
---   rank2+hero     Bahamut's rank, Hero Ring worn  x1 1/2, and one Fight: x1 1/4 (the atlas bit once)
+--   rank2+hero     Ragnarok's rank, Hero Ring worn  x1 1/2, and one Fight: x1 1/4 (the atlas bit once)
 --   both           both ranks, nothing worn        x1 1/2, and the atlas bit
 --   both+two       both ranks, two Earrings worn   x1 1/2 (never past vanilla's two pieces)
 -- Measured: C's single and double bits at the battle's open ($3C45 / $3C44 bit 1, and the atlas bit, $3C44 bit 0),
@@ -222,7 +222,7 @@ H.run({ maxFrames = 900000 }, {
         if b4 & 0x02 ~= 0 then RUNG[#RUNG + 1] = { slot = s, k = k, b4 = b4 } end
       end
     end
-    H.assertEq(#RUNG, 2, "two ladder rungs carry the earring bit (Maduin's Earrings, Bahamut's Hero Ring)")
+    H.assertEq(#RUNG, 2, "two ladder rungs carry the earring bit (Maduin's Earrings, Ragnarok's Hero Ring)")
     if RUNG[1].b4 & 0x01 ~= 0 then RUNG[1], RUNG[2] = RUNG[2], RUNG[1] end   -- the Hero Ring's second
     H.log(string.format("[earring] earring rungs: slot %d rung %d (+4 %s), slot %d rung %d (+4 %s)", RUNG[1].slot,
       RUNG[1].k + 1, hex(RUNG[1].b4), RUNG[2].slot, RUNG[2].k + 1, hex(RUNG[2].b4)))

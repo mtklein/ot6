@@ -423,7 +423,7 @@ H.run({ maxFrames = 60000 }, {
     })
   end)(),
   -- the earring branch, staged (#551): an owned stone's earring rung (+4 $02: Maduin's Earrings) left unreached
-  -- (that stone's count 499, rank 4) and another stone's earring rung reached (its count 500: Bahamut's Hero Ring,
+  -- (that stone's count 499, rank 4) and another stone's earring rung reached (its count 500: Ragnarok's Hero Ring,
   -- $03, owned or not).  Before #551 the reached rung's bits covered the unreached one and the line said "Already
   -- held"; an earring rung now adds a piece (the fold counts them up to vanilla's two-piece double), so the line
   -- must not show.

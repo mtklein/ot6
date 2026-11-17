@@ -7,9 +7,10 @@
 -- A snapshot on the world map; then one branch per case from it, each staging H's count on Bahamut (the live esper
 -- page, SRAM $317C00: 500, the signature, or 499, one short) and walking into a random battle (the same one every
 -- branch: the same snapshot, the same steps), where every present monster's HP and max HP are staged to 60,000 (so a
--- hit lands whole in HP rather than past it), and H casts Ultima at 3 BP through the real menu while the others
--- Defend.  Ultima from Ragnarok's list takes the boost's x8 (battle_ragnarok), about 23,000 a monster at this save's
--- levels: the precondition, asserted per hit, is that the amount reaching the cap is past 9999.  The staging (the
+-- hit lands whole in HP rather than past it), and H casts Ultima at 2 BP through the real menu while the others
+-- Defend.  Ultima from Ragnarok's list takes the boost's multiplier (battle_ragnarok): x4 at 2 BP, about 11,600 a
+-- monster at this save's levels (at 3 BP this save's cast landed on nobody: build/attempts/wt/v049-limitbreak/);
+-- the precondition, asserted per hit, is that the amount reaching the cap is past 9999.  The staging (the
 -- count, the HP; the synthetic arms' bytes below) is declared in state_write_waivers.txt: a mechanism test, not play.
 --   holder      count 500: each monster's total is the amount (or 42,069), its HP falls by exactly that, and its
 --               numeral (single-target: one to four monsters) carries that value and draws its digits: the thread's
@@ -75,14 +76,24 @@ local function digits(v)
   return t
 end
 
--- the OAM entries (y < $E0) on a tile, with x (9 bits) and attribute
+-- the OAM buffer as the battle NMI found it last (the frame's sprites, complete), and the entries (y < $E0) on a
+-- tile, with x (9 bits, signed: past 255 wraps to the left edge) and attribute
+local OAM = nil
+local function oamSnap()
+  local t = {}
+  for i = 0, 0x21F do t[i] = H.readByte(0x0300 + i) end
+  OAM = t
+end
 local function oamOn(tile)
   local out = {}
+  if not OAM then return out end
   for e = 0, 127 do
-    local o = 0x0300 + e * 4
-    if H.readByte(o + 1) < 0xE0 and H.readByte(o + 2) == tile and (H.readByte(o + 3) & 1) == 0 then
-      local hi = (H.readByte(0x0500 + (e >> 2)) >> ((e & 3) * 2)) & 1
-      out[#out + 1] = { e = e, x = H.readByte(o) + hi * 256, y = H.readByte(o + 1), a = H.readByte(o + 3) }
+    local o = e * 4
+    if OAM[o + 1] < 0xE0 and OAM[o + 2] == tile and (OAM[o + 3] & 1) == 0 then
+      local hi = (OAM[0x200 + (e >> 2)] >> ((e & 3) * 2)) & 1
+      local x = OAM[o] + hi * 256
+      if x >= 256 then x = x - 512 end
+      out[#out + 1] = { e = e, x = x, y = OAM[o + 1], a = OAM[o + 3] }
     end
   end
   return out
@@ -179,6 +190,8 @@ local function readSingle(n)
   if n.seen then return end
   local k = n.k
   if (H.readByte(0x631A + k) & 0x7F) == 0 then return end          -- not up yet
+  n.up = n.up or H.frame
+  if H.frame < n.up + 4 then return end                             -- its tiles and sprites a few frames on
   n.seen = H.frame
   n.slots = {}
   for i = 0, 4 do
@@ -193,6 +206,8 @@ end
 
 local function readMulti(m)
   if m.seen or H.readByte(0x7B3E) == 0 then return end
+  m.up = m.up or H.frame
+  if H.frame < m.up + 4 then return end
   m.seen = H.frame
   local t = m.t
   local base = ({ [0] = 0x60, 0x64, 0x68, 0x6C, 0x80, 0x84, 0x88, 0x8C, 0xA0, 0xA4 })[t]
@@ -235,7 +250,7 @@ local CASES = {
 }
 
 local function branch(cs, restore)
-  local r = { name = cs.name, count = cs.count, caps = {}, nums = {}, mnums = {}, hp0 = {}, hp1 = {}, mons = {} }
+  local r = { name = cs.name, count = cs.count, shot = cs.shot, multi = cs.multi, caps = {}, nums = {}, mnums = {}, hp0 = {}, hp1 = {}, mons = {} }
   results[#results + 1] = r
   local steps = {}
   if restore then
@@ -276,12 +291,19 @@ local function branch(cs, restore)
       hex(r.mask), table.concat(r.mons, ","), HP))
     cur = r
   end)
-  steps[#steps + 1] = H.kitBattle({ { who = who, cmd = CMD_MAGIC, spell = ULTIMA, boost = 3 } }, {
+  steps[#steps + 1] = H.kitBattle({ { who = who, cmd = CMD_MAGIC, spell = ULTIMA, boost = 2 } }, {
     untilPlanDone = true, idle = "defend", maxFrames = 60000,
     planDone = function() return r.ended ~= nil end,
   })
+  -- the kit's step ends once the cast is confirmed; the cast resolves and its numerals draw after
+  steps[#steps + 1] = H.driveUntil(function() return r.ended ~= nil end, 6000, {
+    H.call(function() H.setPad({}) end), H.waitFrames(1),
+  }, cs.name .. ": H's Ultima resolved and its numerals drawn")
   steps[#steps + 1] = H.call(function()
     for _, e in ipairs(r.mons) do r.hp1[e] = H.readWord(0x3BF4 + e) end
+    r.heals = inj.heals
+    r.injHit = inj.brokenHit or inj.weakHit or inj.healHit
+    r.injBroken = inj.broken
     cur = nil
   end)
   return H.seqStep(steps)
@@ -302,6 +324,10 @@ local function watch()
     if not cur or not cur.live or cur.endF then return end
     if (emu.getState()["cpu.x"] & 0xFF) == seat * 2 then cur.endF = H.frame end
   end, emu.callbackType.exec, ae, ae)
+  local nmi = H.sym("BattleNMI")
+  emu.addMemoryCallback(function()
+    if cur and cur.live then oamSnap() end
+  end, emu.callbackType.exec, nmi, nmi)
   emu.addEventCallback(function()
     if not cur or not cur.live then return end
     for _, n in ipairs(cur.nums) do readSingle(n) end
@@ -336,7 +362,8 @@ local function claims()
         local heal = side.y >= 0x14
         local want
         if r.name == "broken" and e == r.injBroken then want = LIMIT
-        elseif r.name == "weak" and e == r.mons[1] then want = LIMIT
+        elseif r.name == "weak" and e == r.mons[1] then want = 0x7FFF   -- x2 saturated at $FFFF, then an unbroken
+                                                                          --   body's half (vanilla's skip: 16,666)
         elseif heal then want = math.min(pre, STD)
         elseif holder then want = math.min(pre, LIMIT) else want = math.min(pre, STD) end
         claim(pre > STD, string.format("%s: entity %d's amount %d is past 9999 (the precondition)", r.name, e, pre))
@@ -395,8 +422,11 @@ local function claims()
             for i = 1, 5 do if not m.row[i] then rowOk = false end end
             claim(rowOk, string.format("%s: the glyph row holds 1-5 at $A9 $AA $AC $AD $AF", r.name))
             local a, b = m.sprA[1], m.sprB[1]
-            local x = five and m.sprX[ds[1]] and m.sprX[ds[1]][1]
             local dx = ({ -16, -8, -16, -8, -16 })[ds[1]]
+            local x = nil                           -- the glyph row's tiles are shared: the entry beside A
+            if five and a then
+              for _, o in ipairs(m.sprX[ds[1]] or {}) do if o.y == a.y and o.x - a.x == dx then x = o end end
+            end
             claim(a ~= nil and b ~= nil and b.x - a.x == 16 and (not five or (x ~= nil and x.x - a.x == dx and x.y == a.y)),
               string.format("%s: entity %d's multi sprites A x%s, B x%s%s", r.name, e, a and a.x or "-",
                 b and b.x or "-", five and (", ten-thousands x" .. (x and x.x or "-")) or ""))
@@ -458,12 +488,6 @@ H.run({ maxFrames = 900000 }, {
     local steps = {}
     for i, cs in ipairs(CASES) do
       steps[#steps + 1] = branch(cs, i > 1)
-      steps[#steps + 1] = H.call(function()
-        local r = results[#results]
-        r.heals = inj.heals
-        r.injHit = inj.brokenHit or inj.weakHit or inj.healHit
-        r.injBroken = inj.broken
-      end)
     end
     return H.seqStep(steps)
   end),

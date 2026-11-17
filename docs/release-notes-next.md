@@ -15,9 +15,17 @@ the same, so Shadow can slow an enemy and Gogo can stop it. A boost on a
 throw still multiplies its damage. An enemy stopped just as its turn comes
 up now loses that turn, instead of taking it the moment the stop ends.
 
-Maduin's and Bahamut's top Esper ranks now count as an Earring. With an
+Maduin's and Ragnarok's top Esper ranks now count as an Earring. With an
 Earring or Hero Ring worn as well, or with both ranks, magic damage rises by
 half, the same as wearing two Earrings.
+
+Bahamut's top Esper rank is now Limit Break: everything that character
+deals, from attacks and spells to throws, summons and counters, can do up to
+42,069 damage instead of stopping at 9999. Healing still stops at 9999, and
+everyone else's damage still stops at 9999. Damage numbers now show five
+digits when they need them. Bahamut's old top rank, the Hero Ring's boost to
+Fight and magic damage, moves to Ragnarok's top rank, which no longer raises
+Vigor by half. It still counts as an Earring.
 
 ## Saves
 

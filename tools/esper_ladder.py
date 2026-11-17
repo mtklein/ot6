@@ -530,6 +530,9 @@ def main():
             ("Shiva's signature loses the Gold Hairpin bit", t + (2 * 5 + 4) * REC + 6, 0x00, "Shiva rung 5"),
             ("Ifrit's rung 4 gives +1 vigor, not +2", t + (1 * 5 + 3) * REC + 10, 0x01, "Ifrit rung 4"),
             ("Phoenix's rung 3 label changes", lt + (25 * 5 + 2) * LABEL, 0x80, "Phoenix rung 3"),
+            # #550: Bahamut's signature is new code (no bytes); the Hero Ring's moved to Ragnarok's
+            ("Bahamut's signature keeps the Hero Ring's bits", t + (12 * 5 + 4) * REC + 4, 0x03, "Bahamut rung 5"),
+            ("Ragnarok's signature loses the Hero Ring's bits", t + (15 * 5 + 4) * REC + 4, 0x00, "Ragnarok rung 5"),
         ]
         ti = rom_off(sym(dbg_text, "Ot6RungDescIdx"))
         ts = rom_off(sym(dbg_text, "Ot6RungDescStr"))
