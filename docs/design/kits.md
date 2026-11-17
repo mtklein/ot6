@@ -1164,9 +1164,12 @@ stand.  Gogo's Throw and a Mimic of a throw get the same rule, so Shadow
 hobbles and Gogo's Mimic pins.  The smoke and the exit, a throw at an ally,
 Umaro's Throw, Interceptor and Assassinate are untouched, and the boost keeps
 buying the damage multiplier.  A Stopped monster's turn queued before the
-Stop landed is consumed, as a Broken one's is (`Ot6BrokenTurn`).  A mark
+Stop landed and not yet begun (its command list's head is the AI's turn,
+command `$1f`) is consumed, as a Broken one's is (`Ot6BrokenTurn`); commands
+a turn already in progress had queued are left to vanilla, held until the
+Stop ends.  A mark
 before the shield emblem shows the state: the font's dagger while a monster
-is Slowed, a knife standing in its shadow while it is Stopped, from any
+is Slowed, a knife standing point-down while it is Stopped, from any
 source; it changes with the hit's numeral and clears when the status ends
 (`Ot6Pin`, `Ot6StopTicks`, `Ot6MarkStage`, `ot6_pin.asm`).
 `battle_shadowpin` (Inferno's battle, party 3), `battle_shadowpin_immune`

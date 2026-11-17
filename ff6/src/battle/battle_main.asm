@@ -8874,6 +8874,10 @@ CalcReflectDmg:
         stz     $3a48
         jsr     _c235e3
         jsr     MagicStatusEffect
+        jsl     Ot6Pin          ; ot6: a throw hobbles or pins, and a Slow,
+                                ;   Stop or Haste holds the mark for its hit,
+                                ;   on a bounce as on a direct hit (#546);
+                                ;   x = the body it bounced off
         jsr     DoTargetEffect
         lda     $3a48
         bne     @3509

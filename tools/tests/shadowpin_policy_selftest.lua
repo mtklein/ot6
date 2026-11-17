@@ -46,10 +46,10 @@ end
 -- Stopped or Broken; the bag holds a Dirk (150 gil), a Shuriken (30) and a Fire Skean (500), all spare
 local function snap(f)
   local s = { event = true, row = true, mons = {}, bag = {
-    { id = 0x00, price = 150, throw = true, spare = true },
-    { id = 0x41, price = 30, throw = true, spare = true },
-    { id = 0xAB, price = 10, throw = true, spare = true },
-    { id = 0xE9, price = 5, throw = false, spare = true },
+    { id = 0x00, price = 150, sold = true, throw = true, spare = true },
+    { id = 0x41, price = 30, sold = true, throw = true, spare = true },
+    { id = 0xAB, price = 10, sold = true, throw = true, spare = true },
+    { id = 0xE9, price = 5, sold = true, throw = false, spare = true },
   } }
   s.mons[0] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 3000 }
   s.mons[1] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 5000 }
@@ -112,17 +112,18 @@ check("only what the bag can throw", "it.throw and ", "", function()
   local d = pick(snap())
   return d.item == 0x41
 end)
-check("not from the reserve", "and it.spare and", "and", function()
+check("not from the reserve", "it.throw and it.spare and", "it.throw and", function()
   local d = pick(snap(function(s) s.bag[2].spare = false end))
   return d.item == 0x00
 end)
-check("never a weapon no shop sells (price 2)", "it.price > 2 and ", "", function()
-  local d = pick(snap(function(s) s.bag[#s.bag + 1] = { id = 0x24, price = 2, throw = true, spare = true } end))
+check("never a weapon no shop sells (M.itemSold)", "it.spare and it.sold and", "it.spare and", function()
+  -- the Imp Halberd: no shop sells it; priced here below the Shuriken, so only the sold test can refuse it
+  local d = pick(snap(function(s) s.bag[#s.bag + 1] = { id = 0x24, price = 2, sold = false, throw = true, spare = true } end))
   return d.item == 0x41
 end)
 check("nothing to throw: the Fight", "if item == nil then return { kind = \"none\"",
   "if false then return { kind = \"none\"", function()
-  local d = pick(snap(function(s) s.bag = { { id = 0xAB, price = 10, throw = true, spare = true } } end))
+  local d = pick(snap(function(s) s.bag = { { id = 0xAB, price = 10, sold = true, throw = true, spare = true } } end))
   return d.kind == "none"
 end)
 print = rawPrint

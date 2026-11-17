@@ -2225,7 +2225,20 @@ one:    sep     #$41            ; carry and overflow
         bcc     @read
         lda     $3ef8,x         ; a Stopped monster (#546): a turn it queued
         bit     #STATUS3::STOP  ;   before the Stop landed (a pin, Fenrir's)
-        bne     @purge          ;   is consumed as a Broken one's is
+        beq     @read           ;   is consumed as a Broken one's is, but
+        lda     $32cc,x         ;   only a turn not yet begun: the list's
+        bmi     @read           ;   head is command $1f, the AI script's
+        phy                     ;   turn.  Commands its script has already
+        php                     ;   queued (the rest of a turn the Stop
+        shorti                  ;   landed in) are vanilla's: held while
+        .i8                     ;   Stopped ($3aa0 bit 4/6 at @016d) and
+        asl                     ;   run once the Stop ends
+        tay
+        lda     $3420,y         ; the head's command
+        plp
+        ply
+        cmp     #$1f
+        beq     @purge
 @read:  lda     $32cc,x         ; neither: the vanilla read
         rtl
 @purge: phy                     ; the caller's y, in the caller's width

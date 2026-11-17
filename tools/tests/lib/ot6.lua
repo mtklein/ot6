@@ -16131,15 +16131,19 @@ end
 --      is thrown at.
 -- What it throws: the cheapest throwable in the bag by its price (ItemProp, M.itemPrice; the battle bag's Throw
 -- flag $20, as MakeThrowList reads it), never a skean or a trick ($AB-$AF), from above the bag's reserve, and
--- never a weapon no shop sells (ItemProp's price 2: the Imp Halberd, Excalibur, the Atma Weapon and their kind,
--- which "cheapest" would otherwise pick first; measured, the Inferno lab threw an Imp Halberd).  No
--- throwable, no line: the Fight.  Random battles keep today's Fight and skean lines, so the legs' frame cost
+-- only what some shop sells (M.itemSold, ShopProp): an item no shop sells (the Imp Halberd, Excalibur, the Atma
+-- Weapon and their kind, whose price word reads 2) has no price to be cheap by, and "cheapest" would otherwise
+-- pick it first (measured, the Inferno lab threw an Imp Halberd).  The route's supply: SHADOW's house merchant
+-- in SABIN's scenario (shop 39: Shuriken, the Inviz and Shadow Edges; gen_sabin_world buys the Shuriken there,
+-- where SHADOW first joins), the Phantom Train's merchant (shop 85, gen_sabin_train's Shuriken), and Narshe's
+-- item shop (shop 44: Fire Skean, Water Edge, Bolt Edge, the skean line's, never thrown here).  No throwable,
+-- no line: the Fight.  Random battles keep today's Fight and skean lines, so the legs' frame cost
 -- stays put.  Opt-out: opts.shadowpin = false, or the lab lever M.SHADOWPIN_OFF (or a prelude's global SHADOWPIN_OFF).  Each line logs what it read.
 M.shadowLines = {}       -- every trap line this run, oldest first
 -- The policy itself, a pure function of a snapshot (shadowpin_policy_selftest holds it to the rules above):
 --   s.event   the battle is an event battle; s.row SHADOW's Throw row is there
 --   s.mons[slot] = { up, st3 (status 3), broken (break ticks), allowed ($3330's status-3 byte), hp }
---   s.bag     { { id, price, throw (the bag's Throw flag), spare (count above the reserve) }, ... }
+--   s.bag     { { id, price, sold (M.itemSold), throw (the bag's Throw flag), spare (count above the reserve) }, ... }
 -- -> nil, or { kind = "pin" | "hobble", slot, why, item, price }, or { kind = "none" } with nothing to throw
 function M.shadowPolicy(s)
   if not s.event or not s.row then return nil end
@@ -16161,7 +16165,7 @@ function M.shadowPolicy(s)
   if aim == nil then return nil end
   local item, price
   for _, it in ipairs(s.bag) do
-    if it.throw and it.spare and it.price > 2 and (it.id < 0xAB or it.id > 0xAF) and (price == nil or it.price < price) then
+    if it.throw and it.spare and it.sold and (it.id < 0xAB or it.id > 0xAF) and (price == nil or it.price < price) then
       item, price = it.id, it.price
     end
   end
@@ -16181,7 +16185,7 @@ function Driver:shadowLine(actor, boost)
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
     if id ~= 0xFF and M.readByte(BATTLE.BATTINV + i * 5 + 3) > 0 then
-      s.bag[#s.bag + 1] = { id = id, price = M.itemPrice(id),
+      s.bag[#s.bag + 1] = { id = id, price = M.itemPrice(id), sold = M.itemSold(id),
         throw = (M.readByte(BATTLE.BATTINV + i * 5 + 1) & 0x20) ~= 0, spare = self:battInvIdx(id) ~= nil }
     end
   end

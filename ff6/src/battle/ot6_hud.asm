@@ -814,8 +814,17 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
                                 ;   check grew the body past bcs reach)
         longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; reload prev (gate ate a)
-        dec     a               ; from the mark cell (#546), two before
-        dec     a               ;   the anchor
+        and     #$001f          ; the mark cell (#546), two before the
+        cmp     #$0002          ;   anchor, unless the old line sat in
+        lda     f:$7e0000+OT6_SHADOW+2,x         ;   column 0 or 1, where
+        dec     a               ;   it had none (@mark's edge rule): the
+        bcc     @nomark         ;   blank must not reach the row above
+        dec     a
+        sta     hVMADDL
+        lda     #$01ee
+        sta     hVMDATAL
+        bra     @blank6
+@nomark:
         sta     hVMADDL                          ; blank the old cells
         ; the blank word is vanilla's $01ee junk fill rather than $21ff.
         ; cells a line abandons (a move or a disable) are rewritten once,
@@ -835,7 +844,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; over live cells and the entry wipes sweep.  an abandoned cell is
         ; now word-identical to a cell this code never touched.
         lda     #$01ee
-        sta     hVMDATAL
+@blank6:
         sta     hVMDATAL
         sta     hVMDATAL
         sta     hVMDATAL

@@ -561,6 +561,13 @@ measurements, `suites/` for the suites and their mutants).
   `pinturn_noarm2.log`, the `no_stop_arm` mutant ROM). The arm is for
   monsters only: a Stopped character's queued command is left to vanilla.
   It covers every Stop on a monster, Fenrir's and the Stop spell's included.
+  It takes only a turn not yet begun: the list's head must be command `$1f`,
+  the AI script's turn (the case measured here). Commands a turn already in
+  progress had queued (a multi-command script the Stop landed inside) are
+  vanilla's, held while Stopped and run once the Stop ends (v0.48's review:
+  a Broken body loses the rest of such a turn, a Stopped one does not).
+  `battle_shadowpin` judges every Stop that lands on a pending turn and opens
+  entries 7 and 8 on one; red on the `no_stop_arm` mutant.
 - *The tick.* A pin's 8 ticks ran 1192 and 1131 frames on a body at normal
   speed (`[tick] f4244 ... 8 -> 7` to `[tick] f5249 ... 1 -> 0`, the Stop
   landing at f4057), about 144-149 frames a tick against DESIGN.md's 134.9.
