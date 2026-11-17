@@ -591,15 +591,33 @@ measurements, `suites/` for the suites and their mutants).
 - The mark cell is written only while it holds a mark; a free slot writes
   nothing there (so a neighbour's line that reaches the cell keeps it), and a
   mark that ends is blanked once, gated like a line move
-  (`OT6_MARKSHOWN`). A line anchored in column 0 or 1 has no mark cell.
+  (`OT6_MARKSHOWN`). A line anchored in column 0 or 1 has no mark cell (the
+  cell would wrap into the row above). No formation the game deals anchors
+  a line there: placed the way the battle places them at the open, per
+  battle type each formation allows, the leftmost anchor over the 468
+  reachable formations is column 2 (Kefka's Tower's Movers), and the only
+  line further left is an unused formation's untargetable cutscene body
+  (battle 390, `$17B`, column 1). `tools/check_hud_columns.py` checks it at
+  every build (#553), and `battle_shadowpin_edges` moves a marked line to
+  columns 1 and 0 to show the rule.
 - `Ot6Pin` holds any monster whose Slow, Stop or Haste an action changes, not
   only a throw's target, so a Slow spell's dagger shows at its script's end.
   A status timer running out (command `$29`, `_c25b06`) holds nothing, so the
-  knife goes the moment the Stop does.
+  knife goes the moment the Stop does. The hook also runs on a reflected
+  spell's bounce (`CalcReflectDmg`), so a Slow bounced off a Reflected ally
+  onto a monster shows its dagger at the script's end as a direct one does.
+  A throw is never reflected: the item paths set `$11a3`'s "ignore reflect"
+  (`CalcItemEffect`, and the item-spell path at `@18e3`), so the throw rule
+  itself never runs on a bounce.
 - The knife is font cell `$74`, between the pip cells, uploaded with the
   other fixed glyphs (slice B grows by one tile).
 - The driver line reads the battle as section 6 says, in event battles only,
-  and throws the cheapest throwable the bag already holds. Buying
+  with one difference: the hobble goes at any standing monster that takes
+  Slow, the one with the most HP left, not only at a boss (so a monster
+  called into the fight is hobbled too). It throws the cheapest throwable
+  the bag already holds that some shop sells: the stars first, then a spare
+  weapon by its price (the v0.48 line's Imperial Camp fight reached for a
+  Dirk once its three Shuriken were thrown). Buying
   throwables on the route (section 6, "Supply") is not built: it moves the
   line's shop stops and saves and is left for its own change.
 
@@ -635,6 +653,19 @@ measurements, `suites/` for the suites and their mutants).
 - `battle_shadowkit` gains the trap: every body the Fire Skean lands on is
   hobbled by the rule, and no ally is hobbled or pinned by the smoke or the
   exit. Red on `ally_hobbled` (Ot6Pin's target test gone).
-- `shadowpin_policy_selftest`: `M.shadowPolicy`, twelve checks, each red on
-  its own mutant.
+- `battle_shadowpin_edges` (#553; `wor-kt-factory-v1`, Inferno's battle):
+  a Slow bounced off SABIN's Reflect onto a monster holds its line when it
+  lands and shows the dagger at the script's end, as a direct Slow does
+  (with the hook gone the dagger shows with the status, some 590 frames
+  early); a marked line moved to columns 1 and 0 draws no mark into the row
+  above. The declared write is the marked monster's screen x. Red on
+  `reflect_nopin` and `mark_no_edge`
+  (`build/attempts/wt/v048-shadow-fu/edges/`, `suites/mut.py`).
+  `Ot6BrokenTurn`'s arm for a Stop that lands inside a turn already under
+  way (a head other than `$1f`) has no case yet: the only such turn in the
+  fixture is Inferno's Delta Hit turn, whose second command waits about 600
+  frames in his list, and Inferno blocks Stop; with the block lifted a lab
+  saw CYAN's Stop land after that command every time (it is queued ahead).
+- `shadowpin_policy_selftest`: `M.shadowPolicy`, fourteen checks, each red
+  on its own mutant.
 

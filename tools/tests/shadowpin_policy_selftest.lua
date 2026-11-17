@@ -51,8 +51,8 @@ local function snap(f)
     { id = 0xAB, price = 10, sold = true, throw = true, spare = true },
     { id = 0xE9, price = 5, sold = true, throw = false, spare = true },
   } }
-  s.mons[0] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 3000 }
-  s.mons[1] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 5000 }
+  s.mons[0] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 3000, species = 0x044 }
+  s.mons[1] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 5000, species = 0x001 }
   if f then f(s) end
   return s
 end
@@ -103,6 +103,18 @@ check("never hobble a Slow-immune one", "m.allowed & 0x04 ~= 0", "true", functio
 end)
 check("nobody standing to throw at: no line", "m and m.up and", "m and", function()
   return pick(snap(function(s) s.mons[0].up = false; s.mons[1].up = false end)) == nil
+end)
+-- the line names the body it aims at by the slot's live species, not the formation's opening line-up: the
+-- v0.48 line's Telstar battle logged "hobble slot 3 $FFFF" for a Soldier called in mid-battle (formation $03D
+-- opens with slot 0 alone)
+check("the line names the aimed body's species", "species = s.mons[aim.slot].species", "species = 0xFFFF",
+  function()
+  local d = pick(snap(function(s)
+    s.mons[0].up = false
+    s.mons[3] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 100, species = 0x001 }
+    s.mons[1].up = false
+  end))
+  return d.kind == "hobble" and d.slot == 3 and d.species == 0x001
 end)
 check("the cheapest throwable, never a skean", "(it.id < 0xAB or it.id > 0xAF)", "true", function()
   local d = pick(snap())

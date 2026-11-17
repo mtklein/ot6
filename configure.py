@@ -433,6 +433,10 @@ TEST_ENV = {
     # SHADOW, SABIN, GOGO, beside Inferno); a long battle, played by hand
     "battle_shadowpin": "OT6_TIMEOUT=5400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
+    # #553: the trap's edges (a reflected Slow's hold, the mark cell's edge
+    # rule), in the same battle
+    "battle_shadowpin_edges": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
     # #461: the same expedient, three bytes (Mimic, SwdTech, Slot)
     "battle_mimicboost":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
@@ -1023,6 +1027,26 @@ check("pearl_wind",
       "python3 tools/check_pearl_wind.py --selftest"
       " && python3 tools/check_pearl_wind.py",
       ["tools/check_pearl_wind.py", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
+# #553: every monster's shield line the game can deal starts at column 2 or
+# later, so Shadow's mark (anchor - 2, #546) always has its cell: the HUD's
+# placement modelled from the formation data per battle type, the model
+# held against the positions a lab read live, over the formations
+# check_shield_rows.py's reachability walk finds.
+check("hud_columns",
+      "python3 tools/check_hud_columns.py --selftest",
+      ["tools/check_hud_columns.py", "tools/check_shield_rows.py", "ff6/rom/ff6-en.dbg",
+       copy_if_changed_from("build/ot6.sfc"),
+       "ff6/src/field/map_prop.dat", "ff6/src/field/sub_battle_group.dat",
+       "ff6/src/field/rand_battle_group.dat",
+       "ff6/src/field/world_battle_group.dat",
+       "ff6/src/field/event_battle_group.dat",
+       "ff6/src/field/trigger/treasure_prop.dat",
+       "ff6/src/battle/cond_battle.dat", "ff6/src/battle/battle_monsters.dat",
+       "ff6/src/battle/ai_script.asm", "ff6/src/world/train_script.asm",
+       "ff6/src/world/ctrl.asm", "ff6/src/field/event.asm",
+       "ff6/src/menu/colosseum.asm", "ff6/include/const.inc",
+       "ff6/src/battle/battle_main.asm"] + sorted(glob("ff6/src/event/*.asm"))
+      + glob("src/event/*.asm", "ff6"))
 check("spell_grants",
       "python3 tools/check_spell_grants.py --selftest"
       " && python3 tools/check_spell_grants.py",
