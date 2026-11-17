@@ -27,8 +27,10 @@
 --      the mark is spent;
 --   7. Still Life on a body, TERRA's Break spell until it breaks, Still
 --      Life again once the break is held: the break lasted 32 ticks (its 16
---      and Still Life's 16, OT6_BROKEN_TICKS), and the second mark waits
---      for the next break;
+--      and Still Life's 16, OT6_BROKEN_TICKS), and the second mark, laid
+--      while the break is held, waits for the next break (a draw that keeps
+--      RELM's second cast in the queue until the hold has ended lays no
+--      mark during it: that battle is not counted);
 --   8. Tint on RELM herself: once her casting action has ended she holds
 --      all four turns (OT6_TINT_TURNS), as an ally would (#538 review: the
 --      casting action's own end counted one down; the replay read 3 on a
@@ -95,9 +97,16 @@ local function arm()
   end, emu.callbackType.write, 0x7E0000 + UPAINT, 0x7E0000 + UPAINT)
   emu.addMemoryCallback(function(_, v)
     if v ~= 0 and stage == 7 then shoot("relmwor_stilllife_mark", 20) end
+    -- stage 7: each mark laid on the body, and whether its break was held as it landed
+    if stage == 7 and target ~= nil and (v >> target) & 1 == 1 and (rec.smark or 0) & (1 << target) == 0 then
+      rec.marks = rec.marks or {}
+      rec.marks[#rec.marks + 1] = { f = H.frame, held = (H.readByte(SHELD) >> target) & 1 == 1 }
+    end
+    if stage == 7 then rec.smark = v end
   end, emu.callbackType.write, 0x7E0000 + SMARK, 0x7E0000 + SMARK)
   emu.addMemoryCallback(function(_, v)
     if v ~= 0 and stage == 7 then shoot("relmwor_stilllife_held", 20) end
+    if stage == 7 and target ~= nil and (v >> target) & 1 == 1 and rec.heldAt == nil then rec.heldAt = H.frame end
   end, emu.callbackType.write, 0x7E0000 + SHELD, 0x7E0000 + SHELD)
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xFF
@@ -466,6 +475,22 @@ local function judge()
   H.assertEq(reload, true, "Still Life reloaded the break at its end")
   H.assertEq(dec, 32, "the break lasted 32 ticks: its 16 and Still Life's 16")
   H.assertEq(H.readByte(SHELD) & (1 << target), 0, "the hold ended with the break")
+  -- the second Still Life is RELM's queued action, and a draw can hold it in the queue past the hold's end (the
+  -- v0.48 line at shift 13: confirmed at f56399, the hold f55825-f58031, still queued at the judge,
+  -- build/attempts/wt/v048-shadow-fu/relmwor/): then no mark was laid during the hold and the property is not
+  -- staged, so the battle is not counted and the next one is taken
+  local second
+  for _, m in ipairs(rec.marks or {}) do
+    if rec.heldAt ~= nil and m.f >= rec.heldAt then second = m; break end
+  end
+  if second == nil or not second.held then
+    H.log(string.format("[relmwor] the hold ran f%s-f%s and RELM's second Still Life %s: no mark laid during the "
+      .. "hold, not counted", tostring(rec.heldAt), tostring(rec.recovered),
+      second and string.format("landed at f%d, after it", second.f) or "had not landed"))
+    return false
+  end
+  H.log(string.format("[relmwor] the second mark landed at f%d, during the hold (f%d-f%d)", second.f, rec.heldAt,
+    rec.recovered))
   H.assertEq(H.readByte(SMARK) & (1 << target) ~= 0, true, "the mark laid during the hold waits for the next break")
   return true
 end
