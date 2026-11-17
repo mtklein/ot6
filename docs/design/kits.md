@@ -1138,28 +1138,41 @@ weapon in the bag, as in vanilla.
 | # | Skill | Effect | Break key | Source |
 |---|---|---|---|---|
 | ✦ | Throw | the signature verb: throws the item picked, which is spent; boost multiplies a damaging throw x2/x4/x8 | the item's | join |
-| 1 | Shuriken | a thrown star | pierce | the World of Ruin's Thamasa arsenal (shop 72); ten in the bag at `wor-ancient-v1` |
+| 1 | Shuriken | a thrown star | pierce | World of Balance weapon counters (Kohlingen, shop 17; Albrook, 25; the Phantom Train's ghost merchant, 85; and shop 39), then the World of Ruin's Thamasa arsenal (72); ten in the bag at `wor-ancient-v1` |
 | 2 | Ninja Star | a thrown star | pierce | the World of Ruin's Thamasa arsenal (shop 72) |
 | 3 | Tack Star | a thrown star | pierce | the Colosseum (the Ninja Star's prize, against the Chaos Drgn) |
-| 4 | Fire Skean | fire on every enemy | pierce and fire | the World of Ruin's Maranda weapon counter (shop 80) |
-| 5 | Water Edge | water on every enemy | pierce and water | the same |
-| 6 | Bolt Edge | bolt on every enemy | pierce and bolt | the same |
-| 7 | Shadow Edge, the smoke | Image (a double that turns physical hits aside) on the thrower; boost reaches allies | none | the same |
-| 8 | Inviz Edge, the exit | Vanish (physical hits miss) on the thrower; boost reaches allies | none | the same |
+| 4 | Fire Skean | fire on every enemy | pierce and fire | World of Balance counters (Kohlingen, shop 17; Jidoor, 20; Albrook, 25; the Phantom Train's ghost merchant, 85; and shop 44), then the World of Ruin's Maranda (80) |
+| 5 | Water Edge | water on every enemy | pierce and water | the same, less the ghost merchant |
+| 6 | Bolt Edge | bolt on every enemy | pierce and bolt | the same, less the ghost merchant |
+| 7 | Shadow Edge, the smoke | Image (a double that turns physical hits aside) on the thrower; boost reaches allies | none | Jidoor (shop 20), shop 39, Maranda (80) |
+| 8 | Inviz Edge, the exit | Vanish (physical hits miss) on the thrower; boost reaches allies | none | Kohlingen (shop 17), shop 39, Maranda (80) |
 | divine | **Assassinate** (3 BP) | a hit of his that breaks a non-boss, or lands on a Broken one, kills it | — | join |
 
 Interceptor is his passive (vanilla's: a physical attack on him is blocked
 and countered half the time).
 
-**The trap: throws that hobble and pin (#546).**  Designed, not built:
-[kit-shadow-pin.md](kit-shadow-pin.md).  Octopath's Leghold Trap, as FF6's
-Slow and Stop, keyed on Throw itself so it works in the World of Balance
-with whatever is in the bag: a throw hobbles (Slows) a free enemy and pins
-(Stops, for eight ticks, about two of its turns) one already Slowed; the pin
-uses up the hobble; a Broken enemy is never pinned; vanilla's immunities
-stand; a mark before the shield gauge shows the hobble and the pin.  The
-boost keeps buying the multiplier.  Until it is built, the table above and
-the paragraphs below describe the game as it is.
+**The trap: throws that hobble and pin (#546).**  Built
+([kit-shadow-pin.md](kit-shadow-pin.md)).  Octopath's Leghold Trap, as FF6's
+Slow and Stop, keyed on Throw itself (command `$08` by a character), so it
+works in the World of Balance with whatever is in the bag: every throw that
+lands on a monster hobbles it (Slow); a throw at a monster already Slowed,
+by anything, pins it (Stop for `OT6_PIN_TICKS` = 8 status ticks, about two
+of its turns; every other Stop keeps vanilla's 18) and uses up the hobble; a
+throw at a pinned monster deals its damage and nothing else; a Broken monster
+is hobbled if free and never pinned; vanilla's Slow and Stop immunities
+stand.  Gogo's Throw and a Mimic of a throw get the same rule, so Shadow
+hobbles and Gogo's Mimic pins.  The smoke and the exit, a throw at an ally,
+Umaro's Throw, Interceptor and Assassinate are untouched, and the boost keeps
+buying the damage multiplier.  A Stopped monster's turn queued before the
+Stop landed is consumed, as a Broken one's is (`Ot6BrokenTurn`).  A mark
+before the shield emblem shows the state: the font's dagger while a monster
+is Slowed, a knife standing in its shadow while it is Stopped, from any
+source; it changes with the hit's numeral and clears when the status ends
+(`Ot6Pin`, `Ot6StopTicks`, `Ot6MarkStage`, `ot6_pin.asm`).
+`battle_shadowpin` (Inferno's battle, party 3), `battle_shadowpin_immune`
+(the Ghost Train) and `battle_shadowkit` (the skean and the tricks) play it.
+The driver throws for it in event battles only (`M.shadowPolicy`,
+`shadowpin_policy_selftest`).
 
 **The skeans pierce (#383).**  A Fire Skean, Water Edge or Bolt Edge
 resolves as its spell (`$51`-`$53`: `ThrowToolsOffsetTbl` maps the items

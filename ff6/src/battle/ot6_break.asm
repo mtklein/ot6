@@ -144,6 +144,8 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         trb     OT6_STILLMARK
         trb     OT6_STILLHELD
         trb     OT6_UNDERPAINT
+        jsr     Ot6HitBit            ; nor Shadow's pin (#546)
+        trb     OT6_PINNING
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa
@@ -953,6 +955,8 @@ done:   rts
         tsb     OT6_HOLD
         jsr     Ot6LiveGauge
         sta     OT6_SHOWN-8,y
+        jsr     Ot6LiveMark     ; and the mark before it (#546): the odd byte
+        sta     OT6_SHOWN-7,y
 @held:  rts
 .endproc
 
@@ -1031,6 +1035,9 @@ done:   rts
         txa
         cmp     #$08
         bcc     @out            ; a character's numeral
+        lda     $3a7c
+        cmp     #$29            ; a status timer running out (_c25b06): no
+        beq     @out            ;   hit to wait for; its change shows live (#546)
         longa
         txa
         and     #$00ff
@@ -1121,7 +1128,12 @@ done:   rts
         sta     OT6_EVQ+2,x
         lda     OT6_RVPEND_ELEM-8,y
         sta     OT6_EVQ+3,x
-        lda     OT6_RVPEND_CLS-8,y
+        jsr     Ot6PendMark     ; the mark after this hit (#546), in the
+        asl                     ;   class byte's bits 4-5 (the four
+        asl                     ;   classes are bits 0-3)
+        asl
+        asl
+        ora     OT6_RVPEND_CLS-8,y
         sta     OT6_EVQ+4,x
         pla
         sta     OT6_EVTAIL
@@ -1196,9 +1208,16 @@ done:   rts
         lda     #$ff
         sta     OT6_BRKTICK,y   ; this hit broke it: the flash and the cleave
 @kept:  pla
+        lda     OT6_EVQ+4,x     ; the mark after this hit (#546): bits 4-5
+        lsr
+        lsr
+        lsr
+        lsr
+        sta     OT6_SHOWN+1,y
         lda     OT6_EVQ+3,x
         xba
         lda     OT6_EVQ+4,x
+        and     #$0f            ; the classes alone
         jsr     Ot6RevealSibs
 @skip:  ply
         rts
@@ -1250,6 +1269,8 @@ done:   rts
         lda     #$00
         sta     OT6_HOLD
 @commit:
+        stz     OT6_PINNING     ; a pin never outlives its action (#546):
+                                ;   UpdateStatus has run by every script's end
         jsr     Ot6RevealCommit
         ply
         plx
@@ -2199,7 +2220,13 @@ one:    sep     #$41            ; carry and overflow
         .a8
         lda     OT6_BROKEN_TICKS,x
         bne     @purge
-        lda     $32cc,x         ; not Broken: the vanilla read
+        txa                     ; width-neutral: a monster?
+        cmp     #$08
+        bcc     @read
+        lda     $3ef8,x         ; a Stopped monster (#546): a turn it queued
+        bit     #STATUS3::STOP  ;   before the Stop landed (a pin, Fenrir's)
+        bne     @purge          ;   is consumed as a Broken one's is
+@read:  lda     $32cc,x         ; neither: the vanilla read
         rtl
 @purge: phy                     ; the caller's y, in the caller's width
         php

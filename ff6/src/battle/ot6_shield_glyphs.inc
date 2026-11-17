@@ -2,8 +2,10 @@
 ; Ot6ShieldGlyphs: tile n-1 is the HUD count tile for n = 1..99, and
 ; tile 99 (n = 100) is the broken shield (2bpp, 16 bytes a tile).
 ; OT6_EMBLEM_TILE: the gauge's emblem, for Ot6BgGlyphData.
+; OT6_KNIFE_TILE: the pin's knife (#546), for Ot6BgGlyphData.
 
 .define OT6_EMBLEM_TILE $ff,$7e,$ff,$7e,$ff,$7e,$ff,$7e,$7e,$3c,$3c,$18,$18,$00,$00,$00
+.define OT6_KNIFE_TILE $24,$18,$24,$18,$ff,$7e,$7e,$3c,$3c,$18,$3c,$18,$18,$18,$7e,$00
 
 Ot6ShieldGlyphs:
 ; 1

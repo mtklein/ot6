@@ -24,6 +24,16 @@ every other ally a free point. She has Portrait and Tint when she joins and
 learns the rest by level and story; a boost on most rows reaches one more
 ally or enemy per point. Gogo with Sketch opens her list too.
 
+Shadow's throws now slow the enemy they hit. A throw at an enemy that is
+already slowed, by a throw or a spell, stops it for about two of its turns
+and uses up the slow. Broken enemies are slowed but never stopped, and
+enemies that ignore Slow or Stop still do. A small dagger before an enemy's
+shield shows it is slowed, and a knife shows it is stopped; they appear with
+the hit and go when the status ends. Gogo's Throw and a Mimic of a throw do
+the same, so Shadow can slow an enemy and Gogo can stop it. A boost on a
+throw still multiplies its damage. An enemy that is stopped no longer gets
+to act on a turn it had already started.
+
 Locke's page in the field menu's Skills list is now Treasure Hunter, as he
 insists, where it used to say Thief.
 

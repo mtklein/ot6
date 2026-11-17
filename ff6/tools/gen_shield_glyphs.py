@@ -70,6 +70,21 @@ EMBLEM = [
     "00000000",
 ]
 
+# the pin's mark (#546, ot6_hud.asm's OT6_KNIFE cell): a knife standing
+# point-down in its shadow, white blade with a black outline over a grey
+# grip, in palette 0 beside the emblem.  The hobble's mark is the battle
+# font's own dagger ($d8), so it needs no tile here.
+KNIFE = [
+    "00122100",
+    "00122100",
+    "13333331",
+    "01333310",
+    "00133100",
+    "00133100",
+    "00033000",
+    "01111110",
+]
+
 # the #397 emblem (grey body, rim, outline), which the broken tile cracks;
 # drawn in palette 7 it is the grey shield with a red rim
 BROKEN_BASE = [
@@ -158,8 +173,10 @@ def render():
         "; Ot6ShieldGlyphs: tile n-1 is the HUD count tile for n = 1..99, and",
         "; tile 99 (n = 100) is the broken shield (2bpp, 16 bytes a tile).",
         "; OT6_EMBLEM_TILE: the gauge's emblem, for Ot6BgGlyphData.",
+        "; OT6_KNIFE_TILE: the pin's knife (#546), for Ot6BgGlyphData.",
         "",
         ".define OT6_EMBLEM_TILE " + ",".join("$%02x" % x for x in encode(EMBLEM)),
+        ".define OT6_KNIFE_TILE " + ",".join("$%02x" % x for x in encode(KNIFE)),
         "",
         "Ot6ShieldGlyphs:",
     ]
