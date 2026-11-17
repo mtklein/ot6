@@ -130,24 +130,40 @@ the Hyper Wrist; it still counts as an earring piece (#551).
   14 beside a value of at most 9999, so they are now ranges past any damage:
   damage `$0000-$bfff`, a heal `$c000 + v`, Miss `$f000`, none `$ffff`
   (`ot6_numeral.asm`). A five-digit numeral looks like a four-digit one: the
-  same glyphs, bounce and timing, centred the same way. Single-target
-  numerals keep vanilla's four threads (#539 relies on them); each thread
-  now has five tiles, outside the sprite animation area that a later
-  animation reloads: threads 0 and 1 in `$c0-$c9`, threads 2 and 3 a triple
-  in `$ca-$cf` and a pair in the status graphics' four blank columns
-  (`$ec-$ef` over `$fc-$ff`, never drawn or rewritten in battle: the survey
-  in build/attempts/wt/v049-limitbreak/lab/). A third sprite shows the fifth
-  digit, overlapping the second's last tile exactly. Multi-target numerals
-  (five or more targets) keep vanilla's ten four-tile slots and draw the
-  ten-thousands digit (1-5, so `OT6_LIMIT` stays at or below 59,999) from a
-  glyph row in the slots' unused tiles `$a8-$af`. A five-digit numeral takes
-  three OAM entries; the third is drawn only below entry 112.
+  same glyphs, bounce and timing, centred the same way, one sprite more.
+  Single-target numerals keep vanilla's four threads (#539 relies on them).
+  A fifth tile per thread has to come from tiles nothing else draws: not the
+  sprite animation area, which a later animation reloads while an earlier
+  hit's numeral is still up, and not tiles `$ee` and `$ff`, which the
+  battle's BG1 and BG2 tilemaps use as blanks (they share the sprites'
+  character base; a digit written to `$ee` filled the background with "1"s:
+  build/attempts/wt/v049-limitbreak/shots/bg_bug_3x.png). That leaves
+  nineteen tiles for twenty: threads 0-2 take five digits (thread 2 using
+  the status graphics' blank `$ec`, `$ed` and `$ef`) and thread 3 four. A
+  five-digit value skips thread 3 for thread 0, and a pass of four numerals
+  with a five-digit one among them takes the multi-target path, as five or
+  more always did; there the numerals appear together and the script waits
+  them out, as vanilla's five-target numerals do. Multi-target numerals
+  keep vanilla's ten slots and draw the ten-thousands digit (1-5, so
+  `OT6_LIMIT` stays at or below 59,999) from a glyph row in the slots'
+  unused tiles `$a8-$af`. The numeral's own frame carries one VRAM transfer
+  no larger than vanilla's; the rest goes the frame before.
+- *Sprites per line.* A five-digit numeral is 40 pixels in three 16-pixel
+  sprites, six 8-pixel slivers where four digits took four. The PPU draws
+  34 slivers a line; a row of monsters taking five-digit numerals beside
+  party sprites can pass it and lose part of a numeral (measured in
+  `battle_limitbreak`'s shots: 40 slivers on the busiest line with three
+  single numerals, 50 with four multi-target ones and four heals, where
+  four-digit numerals would make 34 and 42).
 - *Tested.* `battle_limitbreak`: a holder's Ultima at 2 BP lands about
-  12,000 on each of four monsters, exactly in HP and on the numeral, five
-  digits drawn in each thread; the same cast one count short of the rank
-  lands 9999; with five or more numerals the multi-target path draws them;
-  a staged 33,333 on a Broken body and on a weak one lands 42,069 and
-  32,767; a holder's pass turned to a heal stops at 9999.
+  12,000 on each of four monsters, exactly in HP and on the numeral (the
+  multi-target path, the four having five digits); with one entry dropped,
+  three five-digit single numerals, none on thread 3, each thread's tiles
+  the digit glyphs; the same cast one count short of the rank lands 9999;
+  with heals added, the multi-target path draws them green; a staged 33,333
+  on a Broken body and on a weak one lands 42,069 and 32,767; a holder's
+  pass turned to a heal stops at 9999; at level 99 and Mag.Pwr 255 the
+  magic base saturates. Twelve mutants, one per arm, each go red.
 
 **Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
 member heals is 25% stronger. Rung 5: anyone the member revives comes back

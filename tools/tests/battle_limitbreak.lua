@@ -13,8 +13,11 @@
 -- the precondition, asserted per hit, is that the amount reaching the cap is past 9999.  The staging (the
 -- count, the HP; the synthetic arms' bytes below) is declared in state_write_waivers.txt: a mechanism test, not play.
 --   holder      count 500: each monster's total is the amount (or 42,069), its HP falls by exactly that, and its
---               numeral (single-target: one to four monsters) carries that value and draws its digits: the thread's
---               VRAM tiles are the digit glyphs, and its sprites are A, B and (five digits) C at +16 and +24
+--               numeral carries that value and draws its digits; four numerals with a five-digit one among them
+--               take the multi-target path (ot6_numeral.asm: the single threads have nineteen safe tiles, not twenty)
+--   single3     as holder, with the last monster's entry dropped at the display and the numeral counter set on
+--               thread 3 (both synthetic): three five-digit single numerals, none on thread 3; each thread's VRAM
+--               tiles are the digit glyphs, its sprites A, B and C at +16 and +24
 --   other       count 499: each total is 9999 and the HP falls by 9999; four digits, two sprites
 --   multi       count 500, and at the pass's display (_c262ef) each seated member gets a heal entry (2345, 9999, 88,
 --               1): five or more numerals, so the multi-target path draws them: each monster's five digits (its four
@@ -24,7 +27,10 @@
 --               weak to the spell's element and its amount set to 33,333 where Ot6WeakDouble doubles it: each total
 --               must be 42,069 (x2 saturates and the cap takes it; vanilla's skip left 33,333)
 --   heal        count 500; the first monster's pass is turned to the heal side ($F2 bit 0 at CalcMaxDmg): a holder's
---               heal of ~23,000 caps at 9999
+--               heal of ~12,000 caps at 9999
+--   formula     count 500, H's level and Mag.Pwr staged at 99 and 255 (the character record, before the battle) and the
+--               Ultima cast at 0 BP: power x MagPwr x level is past 2^21, where vanilla's base wrapped; in every branch
+--               each magic pass's base (Ot6MagBase's result) must be power x 4 + the product / 32, saturated at 65,535
 -- Screenshots (3x for the report) of the holder's four single numerals and of the multi numerals.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -50,13 +56,17 @@ local snap, A0, B0, A, B
 local cur                               -- the case being recorded
 local inj                               -- the synthetic arm's injection, per case
 
--- the single numeral layout (ot6_numeral.asm): per thread the A pair's and the B triple's first tile
-local TILE_A = { [0] = 0xC0, 0xC5, 0xEC, 0xEE }
-local TILE_B = { [0] = 0xC2, 0xC7, 0xCA, 0xCD }
-local TILE_C = { [0] = 0xC3, 0xC8, 0xCB, 0xCE }
+-- the single numeral layout (ot6_numeral.asm): per thread the A pair's, the B pair's and C's tile, and slot 4's
+local TILE_A = { [0] = 0xC0, 0xC5, 0xEC, 0xCC }
+local TILE_B = { [0] = 0xC2, 0xC7, 0xCA, 0xCE }
+local TILE_C = { [0] = 0xC3, 0xC8, 0xEE, 0x100 }     -- thread 3 has no C (0x100 matches no tile)
+local SLOT4 = { [0] = 0xC4, 0xC9, 0xEF }               -- thread 3 has four slots
 local function tileWord(t) return 0x2000 + t * 16 end
 -- slot i's tile for thread k: slots 0-1 the A pair, 2-4 the B triple
-local function slotTile(k, i) if i < 2 then return TILE_A[k] + i end return TILE_B[k] + i - 2 end
+local function slotTile(k, i)
+  if i < 2 then return TILE_A[k] + i elseif i < 4 then return TILE_B[k] + i - 2 end
+  return SLOT4[k]
+end
 -- the glyph for digit d, from the battle's decompressed status graphics ($7F:BC40, 32 bytes a digit)
 local function glyphIs(w, d)
   for b = 0, 15 do
@@ -125,6 +135,30 @@ local function arm()
     if p.x ~= seat * 2 then return end
     cur.caps[#cur.caps + 1] = p
   end, emu.callbackType.exec, store, store)
+  -- the magic formula's base, every pass: CalcMagicDmg's `jsl Ot6MagBase / sta $11b0`, found by its bytes
+  local MB = H.sym("Ot6MagBase")
+  local cmd_ = H.sym("CalcMagicDmg") & 0x3FFFFF
+  local mbStore
+  for o = 0, 0x40 do
+    if rom(cmd_ + o) == 0x22 and rom(cmd_ + o + 1) == (MB & 0xFF) and rom(cmd_ + o + 2) == ((MB >> 8) & 0xFF)
+       and rom(cmd_ + o + 3) == (MB >> 16) then mbStore = (H.sym("CalcMagicDmg") & 0xFF0000) | ((cmd_ + o + 4) & 0xFFFF) end
+  end
+  H.assertEq(mbStore ~= nil and rom(mbStore) == 0x8D, true, "CalcMagicDmg's jsl Ot6MagBase, then sta $11b0")
+  local pendMB
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live then return end
+    pendMB = { pow = H.readByte(0x11A6), mag = H.readByte(0x11AE), lvl = H.readByte(0x11AF) }
+  end, emu.callbackType.exec, MB, MB)
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not pendMB then return end
+    local p = pendMB
+    pendMB = nil
+    p.out = emu.getState()["cpu.a"] & 0xFFFF
+    p.prod = p.pow * p.mag * p.lvl
+    -- CalcMagicDmg: power x 4 (power alone at level 0) + the product / 32
+    p.want = math.min(0xFFFF, (p.lvl >= 1 and p.pow * 4 or p.pow) + (p.prod >> 5))
+    cur.bases[#cur.bases + 1] = p
+  end, emu.callbackType.exec, mbStore, mbStore)
   -- the synthetic arms
   emu.addMemoryCallback(function()
     if not cur or not cur.live or not inj or not inj.broken then return end
@@ -157,6 +191,14 @@ local function arm()
     local y = emu.getState()["cpu.y"] & 0xFF
     if y == inj.heal then emu.write(0x7E00F2, H.readByte(0xF2) | 0x01, emu.memType.snesMemory); inj.healHit = true end
   end, emu.callbackType.exec, H.sym("CalcMaxDmg"), H.sym("CalcMaxDmg"))
+  -- the single3 arm: the last monster's entry dropped ($FFFF) at the display, so three numerals take the single path
+  emu.addMemoryCallback(function()
+    if not cur or not cur.live or not inj or not inj.drop or inj.dropDone or #cur.caps == 0 then return end
+    emu.write(0x7E33D0 + inj.drop, 0xFF, emu.memType.snesMemory)
+    emu.write(0x7E33D1 + inj.drop, 0xFF, emu.memType.snesMemory)
+    emu.write(0x7E632E, 3, emu.memType.snesMemory)    -- the numeral counter on thread 3: the first five-digit
+    inj.dropDone = true                                --   numeral must move on to thread 0
+  end, emu.callbackType.exec, H.sym("_c262ef"), H.sym("_c262ef"))
   -- the multi arm: heal entries for the seated members, at the display of H's pass
   emu.addMemoryCallback(function()
     if not cur or not cur.live or not inj or not inj.multi or inj.multiDone then return end
@@ -176,8 +218,8 @@ local function arm()
     if not cur or not cur.live then return end
     local p = H.readWord(0x76)
     local n = { tgt = H.readByte(p + 1), v = H.readWord(p + 2), k = H.readByte(0x632E) & 3, f = H.frame }
-    cur.nums[#cur.nums + 1] = n
-  end, emu.callbackType.exec, H.sym("Ot6NumSingle_ext"), H.sym("Ot6NumSingle_ext"))
+    if n.v ~= 0xFFFF then cur.nums[#cur.nums + 1] = n end
+  end, emu.callbackType.exec, H.sym("Ot6NumPrep_ext"), H.sym("Ot6NumPrep_ext"))   -- once a numeral
   emu.addMemoryCallback(function()
     if not cur or not cur.live then return end
     local y = emu.getState()["cpu.y"] & 0xFFFF
@@ -195,6 +237,7 @@ local function readSingle(n)
   n.seen = H.frame
   n.slots = {}
   for i = 0, 4 do
+    if slotTile(k, i) == nil then n.slots[i] = "_"; break end
     local w = tileWord(slotTile(k, i))
     local g = nil
     for d = 0, 9 do if glyphIs(w, d) then g = d end end
@@ -241,16 +284,19 @@ end
 
 local results = {}
 local CASES = {
-  { name = "holder", count = 500, shot = "limitbreak_single" },
+  { name = "holder", count = 500 },
+  { name = "single3", count = 500, drop = true, shot = "limitbreak_single" },
   { name = "other", count = 499 },
   { name = "multi", count = 500, multi = true, shot = "limitbreak_multi" },
   { name = "broken", count = 500, broken = true },
   { name = "weak", count = 500, weak = true },
   { name = "heal", count = 500, heal = true },
+  { name = "formula", count = 500, formula = true },
 }
 
 local function branch(cs, restore)
-  local r = { name = cs.name, count = cs.count, shot = cs.shot, multi = cs.multi, caps = {}, nums = {}, mnums = {}, hp0 = {}, hp1 = {}, mons = {} }
+  local r = { name = cs.name, count = cs.count, shot = cs.shot, multi = cs.multi, formula = cs.formula, bases = {},
+    caps = {}, nums = {}, mnums = {}, hp0 = {}, hp1 = {}, mons = {} }
   results[#results + 1] = r
   local steps = {}
   if restore then
@@ -262,6 +308,10 @@ local function branch(cs, restore)
   steps[#steps + 1] = H.call(function()
     A, B = A0, B0
     stageCount(who, cs.count)
+    if cs.formula then                  -- level 99, Mag.Pwr 255: power x MagPwr x level past 2^21
+      emu.write(0x7E1600 + 37 * who + 0x08, 99, emu.memType.snesMemory)
+      emu.write(0x7E1600 + 37 * who + 0x1D, 255, emu.memType.snesMemory)
+    end
     H.log(string.format("[limit] %s: $%02X's count on Bahamut staged at %d", cs.name, who, cs.count))
   end)
   steps[#steps + 1] = open(cs.name)
@@ -287,11 +337,12 @@ local function branch(cs, restore)
     if cs.weak then inj.weak = r.mons[1] end
     if cs.heal then inj.heal = r.mons[1] end
     if cs.multi then inj.multi = true end
+    if cs.drop then inj.drop = r.mons[#r.mons] end
     H.log(string.format("[limit] %s: seat %d, OT6_LIMITBREAK %s, monsters %s staged at %d HP", cs.name, seat,
       hex(r.mask), table.concat(r.mons, ","), HP))
     cur = r
   end)
-  steps[#steps + 1] = H.kitBattle({ { who = who, cmd = CMD_MAGIC, spell = ULTIMA, boost = 2 } }, {
+  steps[#steps + 1] = H.kitBattle({ { who = who, cmd = CMD_MAGIC, spell = ULTIMA, boost = cs.formula and 0 or 2 } }, {
     untilPlanDone = true, idle = "defend", maxFrames = 60000,
     planDone = function() return r.ended ~= nil end,
   })
@@ -304,6 +355,7 @@ local function branch(cs, restore)
     r.heals = inj.heals
     r.injHit = inj.brokenHit or inj.weakHit or inj.healHit
     r.injBroken = inj.broken
+    r.dropped = inj.drop
     cur = nil
   end)
   return H.seqStep(steps)
@@ -333,10 +385,33 @@ local function watch()
     for _, n in ipairs(cur.nums) do readSingle(n) end
     for _, m in ipairs(cur.mnums) do readMulti(m) end
     if cur.shot and not cur.shotDone then
-      local up = (cur.multi and #cur.mnums > 0 and cur.mnums[1].seen) or (not cur.multi and #cur.nums > 0
-        and #cur.nums == #cur.mons and cur.nums[#cur.nums].seen)
+      local seenMon = 0
+      for _, n in ipairs(cur.nums) do if n.tgt >= 4 and n.seen then seenMon = seenMon + 1 end end
+      local up = (cur.multi and #cur.mnums > 0 and cur.mnums[1].seen ~= nil) or (not cur.multi and seenMon >= #cur.mons - ((inj and inj.drop) and 1 or 0))
       if up then cur.shotAt = cur.shotAt or (H.frame + 6) end
-      if cur.shotAt and H.frame >= cur.shotAt then H.screenshot(cur.shot); cur.shotDone = true end
+      if cur.shotAt and H.frame >= cur.shotAt then
+        H.screenshot(cur.shot); cur.shotDone = true
+        -- the sprite load per scanline at the shot (the PPU draws at most 32 sprites and 34 8-pixel slivers a line)
+        if OAM then
+          local sl, sp, worst = {}, {}, 0
+          for e = 0, 127 do
+            local y = OAM[e * 4 + 1]
+            local big = ((OAM[0x200 + (e >> 2)] >> ((e & 3) * 2 + 1)) & 1) == 1
+            local h = big and 32 or 16
+            if y < 0xE0 then
+              for l = y, y + h - 1 do
+                local ll = l & 0xFF
+                sl[ll] = (sl[ll] or 0) + h // 8
+                sp[ll] = (sp[ll] or 0) + 1
+              end
+            end
+          end
+          local wl
+          for l = 0, 223 do if (sl[l] or 0) > worst then worst, wl = sl[l], l end end
+          H.log(string.format("[limit] %s: the shot's busiest line, %s: %d slivers, %d sprites (the PPU's limits: 34, 32)",
+            cur.name, tostring(wl), worst, sp[wl or 0] or 0))
+        end
+      end
     end
     if cur.endF and H.frame > cur.endF + 90 and not cur.ended then cur.ended = H.frame end
   end, emu.eventType.endFrame)
@@ -355,8 +430,12 @@ local function claims()
     local byY = {}
     for _, p in ipairs(r.caps) do byY[p.y] = p end
     for _, e in ipairs(r.mons) do
-      local side = byY[e] or byY[e + 0x14]
+      local side = (e ~= r.dropped) and (byY[e] or byY[e + 0x14]) or nil
+      if e == r.dropped then claim(true, string.format("%s: entity %d's entry dropped at the display (synthetic)",
+        r.name, e)) end
+      if e ~= r.dropped then
       claim(side ~= nil, string.format("%s: H's Ultima reached the cap for entity %d", r.name, e))
+      end
       if side then
         local pre, total = side.pre, side.total
         local heal = side.y >= 0x14
@@ -435,6 +514,16 @@ local function claims()
         claim(found, string.format("%s: a numeral for entity %d carries %s", r.name, e, hex(code)))
       end
     end
+    if r.name == "holder" then
+      claim(#r.mons < 4 or #r.mnums >= 4, string.format("holder: four numerals with five digits among them take the "
+        .. "multi-target path (%d multi-target numerals)", #r.mnums))
+    end
+    if r.name == "single3" then
+      local five = 0
+      for _, n in ipairs(r.nums) do if n.v >= 10000 and n.v < HEAL then five = five + 1
+        claim(n.k ~= 3, string.format("single3: a five-digit numeral on thread %d (never 3)", n.k)) end end
+      claim(five == #r.mons - 1, string.format("single3: %d five-digit single numerals (want %d)", five, #r.mons - 1))
+    end
     if r.name == "multi" then
       claim(#r.mnums >= 5, string.format("multi: %d multi-target numerals (five or more)", #r.mnums))
       for s = 0, 3 do
@@ -456,6 +545,16 @@ local function claims()
           claim(seen, string.format("multi: seat %d's heal %d has its numeral", s, hv))
         end
       end
+    end
+    for _, b in ipairs(r.bases) do
+      claim(b.out == b.want, string.format("%s: the magic base for power %d, Mag.Pwr %d, level %d (product %d) is %d "
+        .. "(want %d: power x 4 + product / 32, saturated at 65535)", r.name, b.pow, b.mag, b.lvl, b.prod, b.out, b.want))
+    end
+    claim(#r.bases >= 1, string.format("%s: %d magic base(s) observed", r.name, #r.bases))
+    if r.formula then
+      local past = false
+      for _, b in ipairs(r.bases) do if b.prod >= 2 ^ 21 then past = true end end
+      claim(past, "formula: a base whose product is past 2^21 (vanilla wrapped it)")
     end
     if r.name == "broken" then claim(r.injHit == true, "broken: Ot6BrokenDmg doubled the staged 33,333") end
     if r.name == "weak" then claim(r.injHit == true, "weak: Ot6WeakDouble doubled the staged 33,333") end

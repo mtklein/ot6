@@ -24835,8 +24835,9 @@ magic_tmp_buf_clr:
 ;        v: numeral value
 
 GfxCmd_0b:
-@a4b3:  lda     w7e632e       ; damage numeral counter (next available numeral thread)
-        and     #$03
+@a4b3:  jsl     Ot6NumThread_ext ; ot6 #550: the counter's thread, and 0 for a
+        nop                     ;   five-digit value on thread 3 (was lda
+                                ;   w7e632e / and #$03; ot6_numeral.asm)
         sta     w7e632e
         tax
         stz     w7e631a,x     ; clear numeral data
@@ -24965,8 +24966,8 @@ _c1a5cb:
 
 ; pointers to damage numeral graphics in vram (top of tiles, where the numbers are)
 _c1a5d3:
-@a5d3:  .word   $2c00,$2c50,$2ca0,$2cd0 ; ot6 #550: each thread's slot 2 for
-                                ;   threads 2 and 3, slot 0 for 0 and 1
+@a5d3:  .word   $2c00,$2c50,$2ca0,$2cc0 ; ot6 #550: thread 2's slot 2, the
+                                ;   others' slot 0
                                 ;   (Ot6NumTfr, ot6_numeral.asm)
 
 ; ------------------------------------------------------------------------------

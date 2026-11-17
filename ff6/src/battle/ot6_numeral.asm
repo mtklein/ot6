@@ -24,29 +24,38 @@
 ; Ot6RevealPoll rely on the four and on the command's closing `inc $632e`, and
 ; both are as vanilla left them).  Each numeral is 16x16 sprites whose top
 ; tiles hold the digits and whose bottom tiles are blank.  Vanilla packed four
-; threads of four digit tiles into sprite tiles $c0-$cf (bottoms $d0-$df);
-; five digits need a fifth tile per thread, and only tiles outside the
-; animation area ($40-$bf, which every sprite animation reloads, even while
-; a numeral from an earlier hit is still up) are safe.  So a thread's five
-; slots are an A pair (slots 0-1) and a B triple (slots 2-4):
+; threads of four digit tiles into sprite tiles $c0-$cf (bottoms $d0-$df).
+; A fifth digit needs a fifth tile, and few are safe: the animation area
+; ($40-$bf) is reloaded by every sprite animation, even while an earlier
+; hit's numeral is still up; the battle's BG1 and BG2 share the sprites'
+; character base ($2000), and their tilemaps use tiles $ee and $ff as blanks
+; (btlgfx's `#$..ee` constants: a digit written to $ee filled the background
+; with "1"s, build/attempts/wt/v049-limitbreak/shots/bg_bug_3x.png); the
+; status graphics' other blank tiles, $ec, $ed and $ef over $fc-$fe, are
+; drawn by nothing.  That is nineteen safe tiles for twenty, so threads 0-2
+; take five digits and thread 3 four:
 ;
-;   thread   A pair    B triple   (bottoms: the row below each, blank)
-;     0      $c0-$c1   $c2-$c4
-;     1      $c5-$c6   $c7-$c9
-;     2      $ec-$ed   $ca-$cc    $ec-$ef/$fc-$ff are the status block's
-;     3      $ee-$ef   $cd-$cf    four blank columns (status_en.4bpp)
+;   thread   A (slots 0-1)   B (slots 2-3)   slot 4
+;     0      $c0-$c1         $c2-$c3         $c4
+;     1      $c5-$c6         $c7-$c8         $c9
+;     2      $ec-$ed         $ca-$cb         $ef (sprite $ee: blank, digit)
+;     3      $cc-$cd         $ce-$cf         --
 ;
-; Sprite A shows slots 0-1, sprite B slots 2-3 and, for five digits only,
-; sprite C slots 3-4, drawn eight pixels right of B so its slot 3 lands on
-; B's: the same tile at the same place, so nothing shows twice.  Digits are
+; A five-digit value never takes thread 3 (Ot6NumThread_ext moves it on to
+; thread 0), and a pass of four numerals with a five-digit one among them
+; uses the multi-target path, as five or more do (Ot6NumRoute), so no pass
+; needs four five-digit threads at once.  Sprite A shows slots 0-1, sprite B
+; slots 2-3 and, for five digits only, sprite C slots 3-4 (thread 2: blank
+; and slot 4), drawn eight pixels right of B, so its left half lands on B's
+; right (the same tile in the same place, or a blank).  Digits are
 ; left-aligned in the slots and the half width ($6326) is four pixels a
-; digit, as vanilla's: one to four digits draw exactly as before (A and B,
-; same tiles' contents, same places).  The digits reach the tiles in
-; GfxCmd_0b's two transfers, a frame apart, as before; the digits are drawn
-; before the first (Ot6NumPrep), so the second, on the numeral's own frame,
-; is one transfer no larger than vanilla's (Ot6NumTfr).  Slots 0-3 are
-; vanilla's 128-byte buffer ($60b3, same layout); slot 4 is a glyph number in
-; the thread's $632a, which vanilla only ever cleared.
+; digit, as vanilla's: one to four digits draw exactly as before.  The
+; digits reach the tiles in GfxCmd_0b's two transfers, a frame apart, as
+; before; they are drawn before the first (Ot6NumPrep), so the second, on
+; the numeral's own frame, is one transfer no larger than vanilla's
+; (Ot6NumTfr).  Slots 0-3 are vanilla's 128-byte buffer ($60b3, same
+; layout); slot 4 is a glyph number in the thread's $632a, which vanilla only
+; ever cleared.
 ;
 ; Multi-target numerals (five or more targets, GfxCmd_03, ten numerals).
 ; Vanilla's ten four-tile slots fill the animation area's rows $60, $80, $a0
@@ -74,24 +83,24 @@ OT6_NUM_MISS = $f000
 OT6_NUMGLYPH = $bc40            ; $7f: the ten digit glyphs, 32 bytes each
 OT6_NUMMISS  = $bc00            ; $7f: "Miss", two tiles
 
-; the tops of each thread's slots (VRAM word addresses): A pair, B triple
+; each thread's tiles as VRAM word addresses: the A pair, slot 4 (thread 3
+; has none), and the bottoms in row $d0 with their length in bytes (the
+; status block's bottoms are blank for good)
 Ot6NumTopA:
-        .word   $2c00, $2c50, $2ec0, $2ee0
-Ot6NumTopB:
-        .word   $2c20, $2c70, $2ca0, $2cd0
-; the bottoms of the slots that sit in rows $c0/$d0 (A's too for threads 0
-; and 1), and how many bytes they are
+        .word   $2c00, $2c50, $2ec0, $2cc0
+Ot6NumSlot4:
+        .word   $2c40, $2c90, $2ef0, $0000
 Ot6NumBot:
-        .word   $2d00, $2d50, $2da0, $2dd0
+        .word   $2d00, $2d50, $2da0, $2dc0
 Ot6NumBotLen:
-        .word   $00a0, $00a0, $0060, $0060
+        .word   $00a0, $00a0, $0040, $0080
 ; sprite tiles A, B and C per thread
 Ot6NumTileA:
-        .byte   $c0, $c5, $ec, $ee
+        .byte   $c0, $c5, $ec, $cc
 Ot6NumTileB:
-        .byte   $c2, $c7, $ca, $cd
+        .byte   $c2, $c7, $ca, $ce
 Ot6NumTileC:
-        .byte   $c3, $c8, $cb, $ce
+        .byte   $c3, $c8, $ee, $00
 ; the multi glyph row: per ten-thousands digit 1-5, the sprite's tile and its
 ; x offset from sprite A (-8: the glyph is the sprite's left half; -16: right)
 Ot6NumMultiTile:
@@ -297,14 +306,13 @@ Ot6NumBlank:
 ; once GfxCmd_0b has asked for one ($6316, cleared by the caller; $6317 the
 ; VRAM address from its tables).  GfxCmd_0b asks twice, a frame apart: first
 ; the bottoms ($2d00 + $40 * thread, vanilla's table), then the tops (its
-; second table, repointed to $2c00, $2c50, $2ca0, $2cd0).  Ot6NumPrep has
-; drawn the digits by the first, so the first frame carries everything but
-; four tiles: the thread's bottoms blanked, slot 4 (the glyph $632a names, or
-; a blank) and, for threads 2 and 3, the A pair (slots 0-1) in the status
-; block.  The second frame, the one the numeral appears on and the one
-; #539's reveal and its HUD redraw land on, carries one transfer no larger
-; than vanilla's: slots 0-3 (threads 0 and 1) or slots 2-3 (threads 2 and 3)
-; from the buffer.  (A first version moved all five slots on the second
+; second table, repointed to $2c00, $2c50, $2ca0, $2cc0).  Ot6NumPrep has
+; drawn the digits by the first, so the first frame carries the thread's
+; bottoms blanked, slot 4 (the glyph $632a names, or a blank) and, for
+; thread 2, the A pair (slots 0-1) in the status block.  The second frame,
+; the one the numeral appears on and the one #539's reveal and its HUD
+; redraw land on, carries one transfer no larger than vanilla's: slots 0-3
+; (threads 0, 1, 3) or slots 2-3 (thread 2) from the buffer.  (A first version moved all five slots on the second
 ; frame, in two or three transfers: about three scanlines of the NMI where
 ; vanilla's took one, on the frame #539's reveal redraws the HUD, whose flush
 ; runs late in the same NMI: build/attempts/wt/v049-limitbreak/lab/
@@ -322,12 +330,12 @@ Ot6NumBlank:
 ; the numeral's frame: one transfer, from $7e
         sta     f:$002116
         cmp     #$2ca0
-        bcs     :+
-        ldx     #$60b3          ; threads 0 and 1: slots 0-3
-        ldy     #$0080
-        bra     @top
-:       ldx     #$60b3 + $40    ; threads 2 and 3: slots 2-3
+        bne     :+
+        ldx     #$60b3 + $40    ; thread 2: slots 2-3
         ldy     #$0040
+        bra     @top
+:       ldx     #$60b3          ; threads 0, 1, 3: slots 0-3
+        ldy     #$0080
 @top:   txa
         sta     f:$004372
         tya
@@ -366,9 +374,8 @@ Ot6NumBlank:
         jsr     @dmaF0          ; the bottoms
         lda     1,s
         tax
-        lda     f:Ot6NumTopB,x
-        clc
-        adc     #$0020
+        lda     f:Ot6NumSlot4,x
+        beq     @pair           ; thread 3: four slots
         tay                     ; slot 4's tile
         txa
         lsr
@@ -399,7 +406,7 @@ Ot6NumBlank:
         jsr     @dmaF0
 @pair:  plx
         cpx     #$0004
-        bcc     @done           ; threads 0 and 1: slots 0-1 go with the tops
+        bne     @done           ; threads 0, 1, 3: slots 0-1 go with the tops
         lda     f:Ot6NumTopA,x
         tay
         lda     #$0040
@@ -815,5 +822,80 @@ Ot6NumMultiTileA:
         pla
         plp
         tdc
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a five-digit numeral's thread ]
+;
+; jsl from GfxCmd_0b's opening (btlgfx_main.asm @a4b3) in place of `lda
+; w7e632e / and #$03`: the thread is the counter's, as vanilla's, except that
+; a five-digit value (damage of 10,000 or more) never takes thread 3, which
+; has four slots; it takes thread 0, the next in turn.  The caller stores the
+; result in $632e and transfers it to x, so #539's poll sees the counter
+; reset (to 0, which it ignores) and then the command's closing inc, as for
+; any numeral.  in: a8 i16, db=$7e, ($76) the command (+2 the value word).
+; out: A (B = 0) = the thread.  y clobbered (the caller reloads it).
+.proc Ot6NumThread_ext
+        .a8
+        .i16
+        tdc
+        lda     $632e
+        and     #$03
+        cmp     #$03
+        bne     @out
+        rep     #$20
+        .a16
+        ldy     #$0002
+        lda     ($76),y
+        cmp     #10000
+        bcc     @keep
+        cmp     #OT6_NUM_HEAL
+        bcs     @keep
+        tdc                     ; thread 0
+        sep     #$20
+        .a8
+        rtl
+        .a16
+@keep:  lda     #$0003
+        sep     #$20
+        .a8
+@out:   rtl
+.endproc
+
+; [ which numeral path a pass takes ]
+;
+; jsl from _c262ef (battle_main.asm) in place of `ldy $f0 / cpy #5`: carry
+; set takes the multi-target path, as vanilla's five or more numerals do,
+; and also four numerals when one of them is a five-digit value, which the
+; four single threads cannot all show (above).  in: a16 i8, $f0 = the count.
+; out: y = the count, carry.  a and x kept.
+.proc Ot6NumRoute
+        .a16
+        .i8
+        ldy     $f0
+        cpy     #5
+        bcs     @out
+        cpy     #4
+        bne     @no
+        pha
+        phx
+        ldx     #$12
+@t:     lda     $33d0,x
+        cmp     #10000
+        bcc     @next
+        cmp     #OT6_NUM_HEAL
+        bcc     @yes
+@next:  dex
+        dex
+        bpl     @t
+        plx
+        pla
+@no:    clc
+@out:   rtl
+@yes:   plx
+        pla
+        sec
         rtl
 .endproc
