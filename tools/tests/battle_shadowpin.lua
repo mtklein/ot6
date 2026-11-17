@@ -307,7 +307,7 @@ end
 -- plays on until the pin wears off.
 -- Rough's turn must come up in the last few frames before GOGO's Mimic resolves: then it waits behind the
 -- Mimic, which is already in the action queue, and the pin lands on it pending.  GOGO, his command window held
--- open, chooses Mimic when no action is executing and Rough's gauge will fill (at its rate over the last eight
+-- open, chooses Mimic when Rough's gauge will fill (at its rate over the last eight
 -- frames) lagEst - 8 + offset frames from now, lagEst being the frames from that moment to the Mimic's
 -- resolution as the last try measured it (150 before any); the offsets walk the window either side.
 local OFFSETS = { 0, -6, 6, -12, 12, -18, 18, -24, 24, -30, 30, 36 }
@@ -344,7 +344,11 @@ local G1 = {
           -- GOGO's own command window up, held (the battle runs on meanwhile)
           if H.readByte(0x7BCA) == 0 or H.readByte(0x7BC2) ~= 0x05
              or H.readByte(0x3ED8 + 2 * (H.readByte(0x62CA) & 3)) ~= GOGO then return false end
-          if acting or r == nil or pendingTurn(r) then return false end
+          -- (an action executing is allowed: on v0.49's line (build/attempts/wt/v049-land/) one was running at
+          -- nearly every frame of GOGO's held window (lab/shadowpin_diag.log.gz: "acting true" at every 20-frame sample but two), gate 3's twelve
+          -- tries fired the gate once and met no pending turn (gate3/suite_battle_shadowpin.log); the Mimic then
+          -- queues behind it, and lagEst, measured per try, takes the queue in)
+          if r == nil or pendingTurn(r) then return false end
           local ttf = framesToFill(r)
           if ttf == nil or math.abs(ttf - (lagEst - 8 + off)) > 3 then return false end
           gateAt, fired = H.frame, true
