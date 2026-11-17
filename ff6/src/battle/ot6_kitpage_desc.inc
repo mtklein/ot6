@@ -38,10 +38,10 @@ Ot6ThiefPageDescStr:
         .byte   $8b,$9e,$9a,$ab,$a7,$9e,$9d,$ff,$a8,$a7,$ff,$85,$a5,$a8,$9a,$ad,$a2,$a7,$a0,$ff,$82,$a8,$a7,$ad,$a2,$a7,$9e,$a7,$ad,$00   ; Learned on Floating Continent
 
 Ot6PaintPageDescPtrs:
-        .word   $0000   ; Draws an enemy's attack{n}FF6 bug: save first
-        .word   $002c   ; Ally's next boost: 1 free point{n}A boost buys nothing
-        .word   $0061   ; Ally's weapon gets an element{n}4 turns; boost: +1 ally
-        .word   $0097   ; The ally's next enemy hit misses{n}Boost: +1 ally a point
+        .word   $0000   ; Draws an enemy's attack{n}Can glitch: save first
+        .word   $002f   ; Ally's next boost: 1 free point{n}A boost buys nothing
+        .word   $0064   ; Ally's weapon gets an element{n}4 turns; boost: +1 ally
+        .word   $009a   ; The next enemy hit on an ally{n}misses; boost: +1 ally
         .word   $00cf   ; A break lasts twice as long{n}Boost: +1 foe a point
         .word   $0101   ; Next weakness hit: 2 shields{n}Boost: +1 foe a point
         .word   $0134   ; An ally's turn comes up now{n}Boost: +1 ally a point
@@ -55,10 +55,10 @@ Ot6PaintPageDescPtrs:
         .word   $0218   ; Learned at level 42
         .word   $022c   ; Learned when Strago returns
 Ot6PaintPageDescStr:
-        .byte   $83,$ab,$9a,$b0,$ac,$ff,$9a,$a7,$ff,$9e,$a7,$9e,$a6,$b2,$c3,$ac,$ff,$9a,$ad,$ad,$9a,$9c,$a4,$01,$85,$85,$ba,$ff,$9b,$ae,$a0,$c1,$ff,$ac,$9a,$af,$9e,$ff,$9f,$a2,$ab,$ac,$ad,$00   ; Draws an enemy's attack{n}FF6 bug: save first
+        .byte   $83,$ab,$9a,$b0,$ac,$ff,$9a,$a7,$ff,$9e,$a7,$9e,$a6,$b2,$c3,$ac,$ff,$9a,$ad,$ad,$9a,$9c,$a4,$01,$82,$9a,$a7,$ff,$a0,$a5,$a2,$ad,$9c,$a1,$c1,$ff,$ac,$9a,$af,$9e,$ff,$9f,$a2,$ab,$ac,$ad,$00   ; Draws an enemy's attack{n}Can glitch: save first
         .byte   $80,$a5,$a5,$b2,$c3,$ac,$ff,$a7,$9e,$b1,$ad,$ff,$9b,$a8,$a8,$ac,$ad,$c1,$ff,$b5,$ff,$9f,$ab,$9e,$9e,$ff,$a9,$a8,$a2,$a7,$ad,$01,$80,$ff,$9b,$a8,$a8,$ac,$ad,$ff,$9b,$ae,$b2,$ac,$ff,$a7,$a8,$ad,$a1,$a2,$a7,$a0,$00   ; Ally's next boost: 1 free point{n}A boost buys nothing
         .byte   $80,$a5,$a5,$b2,$c3,$ac,$ff,$b0,$9e,$9a,$a9,$a8,$a7,$ff,$a0,$9e,$ad,$ac,$ff,$9a,$a7,$ff,$9e,$a5,$9e,$a6,$9e,$a7,$ad,$01,$b8,$ff,$ad,$ae,$ab,$a7,$ac,$c8,$ff,$9b,$a8,$a8,$ac,$ad,$c1,$ff,$ca,$b5,$ff,$9a,$a5,$a5,$b2,$00   ; Ally's weapon gets an element{n}4 turns; boost: +1 ally
-        .byte   $93,$a1,$9e,$ff,$9a,$a5,$a5,$b2,$c3,$ac,$ff,$a7,$9e,$b1,$ad,$ff,$9e,$a7,$9e,$a6,$b2,$ff,$a1,$a2,$ad,$ff,$a6,$a2,$ac,$ac,$9e,$ac,$01,$81,$a8,$a8,$ac,$ad,$c1,$ff,$ca,$b5,$ff,$9a,$a5,$a5,$b2,$ff,$9a,$ff,$a9,$a8,$a2,$a7,$ad,$00   ; The ally's next enemy hit misses{n}Boost: +1 ally a point
+        .byte   $93,$a1,$9e,$ff,$a7,$9e,$b1,$ad,$ff,$9e,$a7,$9e,$a6,$b2,$ff,$a1,$a2,$ad,$ff,$a8,$a7,$ff,$9a,$a7,$ff,$9a,$a5,$a5,$b2,$01,$a6,$a2,$ac,$ac,$9e,$ac,$c8,$ff,$9b,$a8,$a8,$ac,$ad,$c1,$ff,$ca,$b5,$ff,$9a,$a5,$a5,$b2,$00   ; The next enemy hit on an ally{n}misses; boost: +1 ally
         .byte   $80,$ff,$9b,$ab,$9e,$9a,$a4,$ff,$a5,$9a,$ac,$ad,$ac,$ff,$ad,$b0,$a2,$9c,$9e,$ff,$9a,$ac,$ff,$a5,$a8,$a7,$a0,$01,$81,$a8,$a8,$ac,$ad,$c1,$ff,$ca,$b5,$ff,$9f,$a8,$9e,$ff,$9a,$ff,$a9,$a8,$a2,$a7,$ad,$00   ; A break lasts twice as long{n}Boost: +1 foe a point
         .byte   $8d,$9e,$b1,$ad,$ff,$b0,$9e,$9a,$a4,$a7,$9e,$ac,$ac,$ff,$a1,$a2,$ad,$c1,$ff,$b6,$ff,$ac,$a1,$a2,$9e,$a5,$9d,$ac,$01,$81,$a8,$a8,$ac,$ad,$c1,$ff,$ca,$b5,$ff,$9f,$a8,$9e,$ff,$9a,$ff,$a9,$a8,$a2,$a7,$ad,$00   ; Next weakness hit: 2 shields{n}Boost: +1 foe a point
         .byte   $80,$a7,$ff,$9a,$a5,$a5,$b2,$c3,$ac,$ff,$ad,$ae,$ab,$a7,$ff,$9c,$a8,$a6,$9e,$ac,$ff,$ae,$a9,$ff,$a7,$a8,$b0,$01,$81,$a8,$a8,$ac,$ad,$c1,$ff,$ca,$b5,$ff,$9a,$a5,$a5,$b2,$ff,$9a,$ff,$a9,$a8,$a2,$a7,$ad,$00   ; An ally's turn comes up now{n}Boost: +1 ally a point

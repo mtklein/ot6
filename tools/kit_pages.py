@@ -54,10 +54,10 @@ THIEF = [
      "Learned on Floating Continent"),
 ]
 PAINT = [
-    ("Sketch", "Draws an enemy's attack{n}FF6 bug: save first", "Known from the start"),
+    ("Sketch", "Draws an enemy's attack{n}Can glitch: save first", "Known from the start"),
     ("Portrait", "Ally's next boost: 1 free point{n}A boost buys nothing", "Learned when Relm joins"),
     ("Tint", "Ally's weapon gets an element{n}4 turns; boost: +1 ally", "Learned at level 18"),
-    ("Varnish", "The ally's next enemy hit misses{n}Boost: +1 ally a point", "Learned at level 24"),
+    ("Varnish", "The next enemy hit on an ally{n}misses; boost: +1 ally", "Learned at level 24"),
     ("Still Life", "A break lasts twice as long{n}Boost: +1 foe a point", "Learned at Owzer's mansion"),
     ("Underpainting", "Next weakness hit: 2 shields{n}Boost: +1 foe a point", "Learned at level 36"),
     ("Gesture", "An ally's turn comes up now{n}Boost: +1 ally a point", "Learned at level 42"),
