@@ -601,6 +601,8 @@ set_script_mode EVENT
 .define give_blitz _e_cmd_impl $90
 ; OT6 (#379): learn the SwdTech n (0-7); $9e was unused in vanilla
 .define give_bushido_tech(n) _e_cmd_byte $9e, 1 << (n)
+; ot6 #552: General Leo's reveal -- the stats and switch $00E0 (EventCmd_9f)
+.define ot6_leo_reveal _e_cmd_impl $9f
 
 .mac wait_15f dur
         .ifblank dur

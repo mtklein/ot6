@@ -1678,7 +1678,9 @@ EventTrigger::_343:
         make_event_trigger {33, 25}, SavePoint
 
 EventTrigger::_344:
-        make_event_trigger {54, 18}, _cc0977
+        ; OT6 #552: Leo's grave in the World of Ruin, where Gogo in the party
+        ; reveals himself (Ot6LeoGrave; docs/design/leo-reveal.md)
+        make_event_trigger {54, 18}, Ot6LeoGrave
         make_event_trigger {22, 39}, _cb75bf
         make_event_trigger {23, 39}, _cb75d5
         make_event_trigger {20, 48}, _cb7d69

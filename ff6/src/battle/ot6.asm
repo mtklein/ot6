@@ -127,3 +127,6 @@
 
 ; Shadow's hobble and pin (#546), appended for the same reason.
         .include "ot6_pin.asm"
+
+; General Leo's reveal (#552), appended for the same reason.
+        .include "ot6_leo.asm"

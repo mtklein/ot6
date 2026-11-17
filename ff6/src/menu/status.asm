@@ -203,7 +203,15 @@ DrawStatusGogoWindow:
         inx
         cpx     #$0040
         bne     @5e42
-        iny
+        lda     f:OT6_LEO_FLAG          ; ot6 #552: the revealed Leo offers
+        and     #OT6_LEO_BIT            ;   his own Shock, last in the list
+        beq     @leo
+        lda     #BATTLE_CMD::SHOCK      ; (BattleCmdProp leaves Shock's
+        sta     hWMDATA                 ;   GOGO flag clear, so the filter
+        iny                             ;   above drops it even from his own
+                                        ;   record once he has picked it:
+                                        ;   it is listed exactly once)
+@leo:   iny
         tya
         sta     $7e9d89
         ldx     #$aa8d

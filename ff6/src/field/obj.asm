@@ -51,7 +51,15 @@ UnusedFirstObjTbl:
         and     #$40
         bne     @510d
         rts
-@510d:  lda     $0795                   ; portrait index
+@510d:  lda     $0795                   ; ot6 #552: the ending's portrait of
+        cmp     #CHAR::GOGO             ;   Gogo is Leo's once the grave has
+        bne     :+                      ;   revealed him (switch $00e0)
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     :+
+        lda     #PORTRAIT::LEO
+        sta     $0795
+:       lda     $0795                   ; portrait index
         longa
         xba
         lsr3
@@ -127,9 +135,10 @@ UnusedFirstObjTbl:
 .endproc  ; InitPortrait
 ; ------------------------------------------------------------------------------
 
-; pointers to character portrait graphics (+$ed0000, first 16 only)
+; pointers to character portrait graphics (+$ed0000, first 16 only; ot6
+; #552: and Leo's, the 17th, for the ending's revealed Leo)
 PortraitGfxPtrs:
-        .repeat 16, i
+        .repeat 17, i
         .addr   PortraitGfx+$0320*i
         .endrep
 
@@ -1076,7 +1085,13 @@ OnVehicle:
         clc
         adc     $1a
         tax
-        lda     f:ObjVehicleTileTbl,x   ; get graphics position
+        lda     $0879,y                 ; ot6 #552: Leo's sheet has no riding
+        cmp     #MAP_SPRITE_GFX::LEO    ;   frames ($2e/$2f, tiles $1560-
+        beq     @leo                    ;   $169f, past its end): the revealed
+        lda     f:ObjVehicleTileTbl,x   ;   Leo rides a chocobo or Magitek
+        sta     $0877,y                 ;   armor in his walking frames
+        bra     Done
+@leo:   lda     f:ObjMoveTileTbl,x
         sta     $0877,y
         bra     Done
 

@@ -5192,6 +5192,21 @@ EventCmd_9e:
 
 ; ------------------------------------------------------------------------------
 
+; [ event command $9f: General Leo's reveal ]
+
+; OT6 (#552, docs/design/leo-reveal.md): the grave scene in the World of
+; Ruin's Thamasa runs it after it gives slot 12 Leo's name, sprite and
+; palette.  Ot6LeoReveal writes the better of Gogo's and Leo's stats into the
+; record once and sets event switch $00E0.  Vanilla left $9f unused (it
+; locked the game up).
+
+EventCmd_9f:
+        jsl     Ot6LeoReveal
+        lda     #1
+        jmp     IncEventPtrContinue
+
+; ------------------------------------------------------------------------------
+
 EventCmd_66:
 EventCmd_67:
 EventCmd_68:
@@ -5201,7 +5216,6 @@ EventCmd_6e:
 EventCmd_6f:
 EventCmd_76:
 EventCmd_83:
-EventCmd_9f:
 EventCmd_a3:
 EventCmd_a4:
 EventCmd_a5:

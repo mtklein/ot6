@@ -113141,3 +113141,131 @@ _cce486:
         end_fixed_block
 
 ; ------------------------------------------------------------------------------
+
+; ------------------------------------------------------------------------------
+
+; OT6 #552 (docs/design/leo-reveal.md): Leo's grave in the World of Ruin's
+; Thamasa.  The event block is full, so the scene lives after the dialogue
+; pointers in bank $cc (segment ot6_event; ld65 refuses a build that
+; overflows the bank).  Examined with Gogo in the active party and the reveal
+; not yet played, Gogo says the grave is empty, and is Leo: the slot (actor
+; $0c, unchanged) takes Leo's name, sprite and palette, event command $9f
+; (Ot6LeoReveal) its stats and switch $00E0.  Without Gogo, or after the
+; reveal, the grave reads as vanilla's.
+
+.segment "ot6_event"
+
+OT6_LEO_DLG = $0c0c                     ; dlg1_en.json's last 17 entries
+OT6_LEO_SWITCH = $00e0                  ; code_ext.inc's OT6_LEO_SWITCH (the event
+                                        ;   module does not include it)
+
+.proc Ot6LeoGrave
+        if_any
+                switch $01B4=0
+                switch $01B0=0
+                goto EventReturn
+        if_switch OT6_LEO_SWITCH=1, Vanilla
+        set_case PARTY_CHARS
+        if_case CHAR::GOGO, Ot6LeoScene
+        if_switch OT6_LEO_SWITCH=1, EventReturn
+Vanilla:
+        dlg $0845, BOTTOM
+                ; General Leo…
+        return
+.endproc  ; Ot6LeoGrave
+
+.proc Ot6LeoScene
+        call _cac766                    ; the party out of its leader
+        obj_script SLOT_4                ; one at a time: the paths cross
+                speed NORMAL
+                move DOWN, 1
+                move LEFT, 2
+                dir UP
+                end
+        obj_script SLOT_2
+                speed NORMAL
+                move DOWN, 1
+                move LEFT, 1
+                dir UP
+                end
+        obj_script SLOT_3
+                speed NORMAL
+                move DOWN, 1
+                dir UP
+                end
+        obj_script SLOT_1
+                speed NORMAL
+                dir UP
+                end
+        wait_30f
+        dlg OT6_LEO_DLG
+                ; GOGO: You know, this grave is empty.
+        wait_30f
+        obj_script GOGO
+                dir DOWN
+                end
+        wait_30f
+        sfx 141
+        flash WHITE
+        obj_gfx GOGO, LEO
+        obj_pal GOGO, LEO
+        char_name GOGO, LEO
+        ot6_leo_reveal
+        wait_30f
+        dlg OT6_LEO_DLG+1
+                ; LEO: I've been watching you.
+        set_case PARTY_CHARS
+        if_case
+                case CHAR::CELES, Celes
+                case CHAR::TERRA, Terra
+                case CHAR::LOCKE, Locke
+                case CHAR::EDGAR, Edgar
+                case CHAR::SABIN, Sabin
+                case CHAR::CYAN, Cyan
+                case CHAR::SHADOW, Shadow
+                case CHAR::STRAGO, Strago
+                case CHAR::RELM, Relm
+                case CHAR::SETZER, Setzer
+                case CHAR::MOG, Mog
+                case CHAR::GAU, Gau
+                case CHAR::UMARO, Umaro
+                end_case
+        dlg OT6_LEO_DLG+2
+                ; LEO: Kefka's blade should have ended me.  I let the world
+                ; bury General Leo, and walked in your footsteps instead.
+        obj_script GOGO
+                dir UP
+                end
+        wait_30f
+        dlg OT6_LEO_DLG+3
+                ; LEO: The world I swore to protect lies in ruins.  I'll hide
+                ; no longer.  My sword is yours.
+        call _cacb95                    ; the party back into its leader
+        return
+Celes:  dlg OT6_LEO_DLG+4
+        return
+Terra:  dlg OT6_LEO_DLG+5
+        return
+Locke:  dlg OT6_LEO_DLG+6
+        return
+Edgar:  dlg OT6_LEO_DLG+7
+        return
+Sabin:  dlg OT6_LEO_DLG+8
+        return
+Cyan:   dlg OT6_LEO_DLG+9
+        return
+Shadow: dlg OT6_LEO_DLG+10
+        return
+Strago: dlg OT6_LEO_DLG+11
+        return
+Relm:   dlg OT6_LEO_DLG+12
+        return
+Setzer: dlg OT6_LEO_DLG+13
+        return
+Mog:    dlg OT6_LEO_DLG+14
+        return
+Gau:    dlg OT6_LEO_DLG+15
+        return
+Umaro:  dlg OT6_LEO_DLG+16
+        return
+.endproc  ; Ot6LeoScene

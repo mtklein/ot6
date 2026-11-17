@@ -3090,6 +3090,23 @@
     "{n}{relm}: I won't be done in by an older woman! {wait:8}{key}",
     "{n}{relm}: Wait a minute,{n}lover boy! {wait:8}{key}",
     "{n}{relm}: You can't just throw me aside! {wait:8}{key}",
-    "{n}{relm}: How about a nice portrait for you, hmm?! {wait:8}{key}"
+    "{n}{relm}: How about a nice portrait for you, hmm?! {wait:8}{key}",
+    "{gogo}: You know, this grave is{n}empty.",
+    "{gogo}: I've been watching you.",
+    "{gogo}: Kefka's blade should have{n}ended me. I let the world bury{n}General Leo, and walked in your{n}footsteps instead.",
+    "{gogo}: The world I swore to{n}protect lies in ruins. No more{n}hiding. My sword is yours.",
+    "{celes}: General Leo_!{n}I saw Kefka strike you down!",
+    "{terra}: Leo_? You're alive!",
+    "{locke}: General Leo?!{n}But_ we buried you!",
+    "{edgar}: The Empire's finest{n}general, behind a mime's mask?",
+    "{sabin}: Leo?! No wonder you{n}fight like a soldier!",
+    "{cyan}: General Leo_{n}The one honorable man of the{n}Empire_ thou livest!",
+    "{shadow}: _I wondered when{n}you'd say so.",
+    "{strago}: Leo?! Then whose{n}grave have I been tending?",
+    "{relm}: No way! I cried at your{n}funeral, you know!",
+    "{setzer}: Ha! A general dressed{n}up as a mime. What a bluff!",
+    "{mog}: Kupo?! General Leo?!",
+    "{gau}: Gau knew! You smell like{n}soldier!",
+    "{umaro}: Uhhhh_?"
   ]
 }

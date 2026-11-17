@@ -4349,9 +4349,18 @@ _c3e002:
 CreateBigCharNameTask:
 @e022:  clr_a
         lda     zSelIndex
+        cmp     #CHAR_PROP::GOGO        ; ot6 #552: the revealed Leo's card
+        bne     @row                    ;   reads "Leo" (row 14), a Gogo who
+        lda     f:OT6_LEO_FLAG          ;   stayed a mystery "Gogo"
+        and     #OT6_LEO_BIT
+        beq     @gogo
+        lda     #14
+        bra     @row
+@gogo:  lda     zSelIndex
+@row:   pha
         asl2
         sta     $e0
-        lda     zSelIndex
+        pla
         asl
         clc
         adc     $e0
