@@ -40,6 +40,7 @@ end
 
 -- ROM reads of the battle-stat bytes (CharProp+10..+14) of a row, counted
 local rowReads = { [GOGO_ROW] = 0, [LEO_ROW] = 0 }
+local equipShot, equipFrames = nil, 0     -- the Equip list's screenshot (weaponList)
 local portraitLeo = 0
 local armed = false
 local function arm()
@@ -51,9 +52,12 @@ local function arm()
       cp + row + 10, cp + row + 14)
   end
   emu.addEventCallback(function()
-    if equipShot and st() == 0x57 and H.menuListSettled() then
-      H.screenshot(equipShot)
-      equipShot = nil
+    if equipShot and H.menuRunning() and H.readByte(0x26) == 0x57 then
+      equipFrames = equipFrames + 1
+      if equipFrames == 30 then
+        H.screenshot(equipShot)
+        equipShot = nil
+      end
     end
   end, emu.eventType.endFrame)
   local pp = H.sym("PortraitGfxPtrs@menu_code") + 2 * 0x10
@@ -136,10 +140,9 @@ end
 
 -- the Equip menu's weapon list: equipWeapon reports whether the item was offered (opts.result.found) and,
 -- when it was, equips it; a screenshot the first frame the list is up and settled
-local equipShot = nil
 local function weaponList(tag, id, res)
   return H.seqStep({
-    H.call(function() equipShot = "menu_leo_" .. tag .. "_equip" end),
+    H.call(function() equipShot, equipFrames = "menu_leo_" .. tag .. "_equip", 0 end),
     H.equipWeapon(function() return gogoPos() end, id,
       { slot = 0, tag = string.format("%s: weapon $%02X", tag, id), result = res }),
     H.call(function() equipShot = nil end),
