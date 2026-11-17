@@ -1807,6 +1807,188 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         rtl
 .endproc
 
+;
+; [ can the caster pay for what one more point would buy?  (#555) ]
+;
+; The owner (#555, v0.47): "let's deny the boost rather than quietly step it
+; down."  R in a list raises the pending boost only when the caster's MP
+; pays what the row under the cursor costs at the raised boost: the next
+; tier of a spell family (Fire 2 -> Fire 3, 20 -> 51), the x2.5 of a
+; multiplied spell, lore, summon, Blitz, Tool or Dance, a reach row's price
+; again per point.  Before, the point was taken, the row went grey and its
+; confirm buzzed, so the point bought nothing until L took it back.  Now it
+; is refused where it is pressed, with the buzz and no arrow, as a boost that
+; buys nothing is (Ot6RowNoBoost).
+;
+; The rows: Magic ($0e), Lore ($1b), the esper's Summon ($16), the tools
+; shell ($30: Tools, Blitz, SwdTech, the thief's, Setzer's and Relm's lists)
+; and Dance ($21), each priced by the authority its row draws with
+; (Ot6MagicPrice, Ot6KitRowCost, Ot6DanceRowCost) at the raised boost, stored
+; for the call and put back.  Target select after a list pick moves no boost
+; (Ot6Boost), so the price there is the one the list showed.  On the command
+; window nothing is picked yet: R stands, and the list it opens prices and
+; greys every row at the boost it holds.
+;
+; in: A = the pending boost wanted, y = the character's entity offset.
+; out: carry set = refuse.  a8/i16, db=$7e.  Preserves A, X and Y.
+OT6_MENU_RETURN = $7a83         ; w7e7a83: the state target select returns to
+OT6_MENU_FLAGS  = $7a84         ; w7e7a84: the pick's targeting flags
+.proc Ot6RaiseUnpaid
+        .a8
+        .i16
+        pha                     ; [$04,s] the boost wanted
+        phx                     ; [$02,s] the caller's x
+        lda     OT6_BOOST_REVEALED,y
+        pha                     ; [$01,s] the boost pending now
+        lda     $04,s
+        sta     OT6_BOOST_REVEALED,y    ; price at the raised boost
+        tyx                     ; x = the caster, the leaves' own indexing
+        jsr     @price          ; A = the price; carry set = nothing priced
+        bcs     @pays
+        pha                     ; [$01,s] the price
+        lda     $3c09,x         ; MP high byte: 256 and up pays any price
+        bne     @pays1          ;   (99 is the ceiling but for Phoenix's 110)
+        lda     $3c08,x
+        cmp     $01,s           ; MP - price: carry set iff MP pays
+        bcs     @pays1
+        pla
+        pla                     ; the old boost back
+        sta     OT6_BOOST_REVEALED,y
+        plx
+        pla
+        sec                     ; refuse
+        rtl
+@pays1: pla
+@pays:  pla
+        sta     OT6_BOOST_REVEALED,y
+        plx
+        pla
+        clc
+        rtl
+
+; the price of what is under the cursor at the stored boost; x = y = the
+; caster.  out: A = the price, carry clear; carry set = nothing to price.
+@spell: pha
+        jsl     Ot6FoldSteps    ; the tier steps the stored boost buys
+        pla                     ;   (OT6_SCR_BIT, Ot6FoldTier's input)
+        jsl     Ot6MagicPrice
+        clc
+        rts
+@price: phy
+        longa
+        lda     $62ca
+        and     #$0003
+        tay                     ; y = the slot, for the cursor bytes
+        shorta0
+        lda     $7bc2
+        cmp     #$0e
+        beq     @lmagic
+        cmp     #$1b
+        beq     @llore
+        cmp     #$16
+        beq     @lsummon
+        cmp     #$21
+        beq     @ldance
+        cmp     #$30
+        beq     @lkit
+        ply
+        sec                     ; the command window, an Item list...
+        rts
+@lmagic:
+        lda     $8913,y         ; scroll
+        clc
+        adc     $891b,y         ; + cursor row
+        asl                     ; two columns
+        clc
+        adc     $8917,y         ; + column: the spell row
+        jsr     @row4           ; -> the caster's list row (esper's skipped)
+        lda     a:$0004,x       ; the spell id
+        bra     @lspell
+@llore: lda     $891f,y         ; scroll
+        clc
+        adc     $8927,y         ; + cursor row (one column)
+        jsr     @row4
+        lda     a:$00dc,x       ; the lore, 0-23 (Ot6RowNoBoost's @lore)
+        cmp     #$ff
+        beq     @lnone
+        clc
+        adc     #$8b
+        bra     @lspell
+@lsummon:
+        lda     #$00
+        jsr     @row4
+        lda     a:$0000,x       ; the esper index (Ot6FoldPrices' row 0)
+        cmp     #$1b
+        bcs     @lnone
+        adc     #$36            ; (carry clear)
+@lspell:
+        ply
+        tyx                     ; the caster again
+        bra     @spell
+@ldance:
+        lda     $893b,y         ; _c1849e: row * 2 + column
+        asl
+        clc
+        adc     $8937,y
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     $267e,x         ; the dance id
+        ply
+        tyx
+        cmp     #$ff
+        beq     @none
+        jsl     Ot6DanceRowCost
+        clc
+        rts
+@lkit:  lda     $895f,y         ; scroll
+        clc
+        adc     $8967,y         ; + row
+        asl
+        clc
+        adc     $8963,y         ; + column: the list index
+        longa
+        and     #$00ff
+        pha
+        asl
+        clc
+        adc     $01,s           ; * 3
+        tax
+        pla
+        shorta0
+        lda     $4005,x         ; the row's id (wItemList)
+        ply
+        tyx
+        cmp     #$ff
+        beq     @none
+        jsl     Ot6KitRowCost
+        clc
+        rts
+@lnone: ply
+        tyx
+@none:  sec
+        rts
+; A = a list row -> x = the caster's list + row * 4 (y = the slot on entry
+; and exit; the caster's entity offset is the slot * 2)
+@row4:  phy
+        pha
+        tya
+        asl
+        tay                     ; the caster's entity offset
+        pla
+        longa
+        and     #$00ff
+        asl
+        asl
+        clc
+        adc     $302c,y
+        tax
+        shorta0
+        ply
+        rts
+.endproc
+
 ; [ can a boost buy anything on this tool?  (#469) ]
 ;
 ; A Tool's boost buys Ot6BoostDmg's multiplier (cmd $09 is outside its gate),

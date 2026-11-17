@@ -14,8 +14,9 @@
 --     (the bank back to 3), and Jackpot at 3 BP again in the same battle;
 --   pass 2: Jackpot at 0, 1 and 2 BP: each refused at the list (three A
 --     presses, the list stays up, nothing queued);
---   pass 3: Jackpot picked at 3 BP, taken back to 2 at target select (L):
---     it rolls nothing, charges no MP and no points, and no HP moves;
+--   pass 3: Jackpot picked at 3 BP, then L at target select: a list's pick
+--     keeps its boost there (#555), so it executes at 3, rolls, is charged
+--     its price and the bank pays 3;
 --   then a staged redraw (below: $be written, a declared expedient) and
 --     a bounded search for the draws the passes above may not meet: a
 --     roll that meets a table byte past 251 and draws again (held when met),
@@ -460,30 +461,32 @@ local function candidateBattle()
   end, reset = function() step, wipedN = nil, 0 end }
 end
 
--- pass 3: Jackpot picked at 3 BP and taken back to 2 at target select (L):
--- it executes at 2, so Ot6JackpotDice zeroes the pending and rolls
--- nothing, Ot6AbilityCost priced it at 2 (no MP), and the bank pays nothing
+-- pass 3: Jackpot picked at 3 BP, then L at target select (#555): a pick
+-- from the list keeps the boost the list showed, so the L takes nothing
+-- back and the Jackpot executes at 3: it rolls, it is charged its price,
+-- and the bank pays the 3.  (Before #555 the L took a point back and the
+-- Jackpot, now under three, rolled nothing and cost nothing, while the
+-- list on screen still showed the row as it was picked.)
 local takeBack = keyed(3, function(wait) return H.seqStep({
   H.loadState(STATE),
   wait and H.waitFrames(wait) or H.call(function() end),
   H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave (100,14): face up, A"),
   H.release(),
-  H.setzerBattle({ { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3, takeBack = 2 } },
-    { untilPlanDone = true }),
+  H.setzerBattle({ { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3, takeBack = 2,
+    takeBackRefused = true } }, { untilPlanDone = true }),
   H.call(function()
     local recs = H.vars.setzer
-    H.assertEq(#recs, 1, "pass 3: the taken-back Jackpot executed once")
+    H.assertEq(#recs, 1, "pass 3: the Jackpot executed once")
     local r = recs[1]
     H.log(string.format("[jackpot] pass 3: row $%02X at %d BP, MP %d -> %d, bank %d -> %d, %d roll(s)", r.row,
       r.boost, r.mp0, r.mp1, r.bank0, r.bank1, #r.dice))
     H.assertEq(r.row, JACKPOT, "pass 3: the row is Jackpot")
-    H.assertEq(r.boost, 2, "pass 3: it executed at the 2 BP it was taken back to")
-    H.assertEq(#r.dice, 0, "pass 3: a Jackpot taken back under 3 BP rolls nothing")
-    H.assertEq(r.mp1, r.mp0, "pass 3: and charges no MP")
-    H.assertEq(r.bank1 >= r.bank0, true, string.format("pass 3: and no points (bank %d -> %d)", r.bank0, r.bank1))
-    for b, m in pairs(r.mon0) do
-      H.assertEq(r.mon1[b].hp, m.hp, string.format("pass 3: slot %d's HP did not move", b))
-    end
+    H.assertEq(r.boost, 3, "pass 3: L at target select took nothing back: it executed at the 3 BP it was "
+      .. "picked at (#555)")
+    H.assertEq(#r.dice > 0, true, "pass 3: and rolled, as a 3-BP Jackpot does")
+    H.assertEq(r.mp0 > r.mp1, true, "pass 3: and was charged its price")
+    H.assertEq(r.bank0 - r.bank1, 3, string.format("pass 3: and the bank paid 3 (bank %d -> %d)", r.bank0,
+      r.bank1))
   end),
 }) end)
 
