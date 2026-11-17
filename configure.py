@@ -670,6 +670,19 @@ TEST_ENV = {
     # random battle beside Esper Mountain's save point; no write
     "battle_bpdisplay": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #555: a spell's boost is the one its list showed (the target select's
+    # spread keys move nothing); four scripted turns beside Esper Mountain's
+    # save point, a battle or two
+    "battle_spellboost": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #555: R in a list adds no point the MP cannot pay for; TERRA at level 5
+    # in the Figaro desert, one or two battles
+    "battle_spellboost_mp": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/world-figaro-v1",
+    # #556: LOCKE alone and RELM alone on Kefka's Tower's first map (the
+    # Falcon's flight and party_menu 3 first); one battle each
+    "battle_alonerows": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-desert-v1",
     "battle_runicmonster": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-narshe-cliffs-v1",
     # #427: one Morph a battle, four battles at least (11-16k frames on the
