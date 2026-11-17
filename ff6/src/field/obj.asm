@@ -2347,6 +2347,7 @@ ChocoRightBtmRightTiles:
         sta     $0345,y
 
 ::DoneChoco:
+        jsr     Ot6LeoSaddle            ; ot6 #552
         jmp     DrawNextObj
 
 ChocoLeftYTbl := ::DrawChocoRight::ChocoRightYTbl
@@ -2367,6 +2368,33 @@ ChocoLeftBtmRightTiles:
         .word   $0000,$0010,$0020,$0030
 
 .endproc  ; DrawChocoLeft
+
+; ------------------------------------------------------------------------------
+
+; [ the revealed Leo in the saddle ]
+
+; ot6 #552 (docs/design/leo-reveal.md): Leo's sheet has no riding frames, so
+; UpdateObjFrame gives him his walking frames on a chocobo (Ot6LeoRide).  Seen
+; from the side, a walking frame's lower half is two straight legs standing
+; over the bird; the rider's lower sprite ($0345) is dropped instead, so he
+; sits in the saddle, head and shoulders above it.  Up and down keep both
+; halves, as every rider's do.  $da = the object, $d4 = its sprite slot.
+
+.proc Ot6LeoSaddle
+        ldy     $da
+        lda     $0868,y
+        bpl     Done                    ; the rider not shown
+        lda     $0879,y
+        cmp     #MAP_SPRITE_GFX::LEO
+        bne     Done
+        lda     $087f,y                 ; facing: 1 right, 3 left
+        lsr
+        bcc     Done
+        ldy     $d4
+        lda     #$ef                    ; off screen
+        sta     $0345,y
+Done:   rts
+.endproc  ; Ot6LeoSaddle
 
 ; ------------------------------------------------------------------------------
 

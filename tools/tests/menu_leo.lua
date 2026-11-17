@@ -13,6 +13,8 @@
 --                the Item menu's details for that sword list slot 12 (before: not), the Equip menu offers it
 --                and he wears it; Thamasa's weapon shop draws him in Leo's sprite and palette (before: GOGO's), and still offers the bag's weapon GOGO
 --                could already wear.
+-- Then Empty and Optimum: the game's own pick for him is a weapon he can wear, at least as strong as any GOGO
+-- alone could, and from Leo's set when that set holds the stronger.
 -- The items are chosen from the bag and the ROM's ItemProp at run time (a weapon with Leo's bit 15 and not
 -- GOGO's bit 12; a weapon with GOGO's bit 12), so the suite copes with whatever the play left in the bag.
 -- With a full roster the list is 16 rows, one past vanilla's 15: the 16th is drawn on BG3 screen D's row 0, where
@@ -231,11 +233,48 @@ local function shop(tag, out)
   })
 end
 
+-- Empty (H.emptyEquip), then Optimum (the Equip menu's options row, column 1, A): what the game's own pick puts
+-- on him; `out` gets his weapon after it
+local function optimum(tag, out)
+  local ph, phase = 0, "in"
+  return H.seqStep({
+    H.emptyEquip(GOGO, { tag = tag .. ": Empty" }),
+    H.withReset(H.driveUntil(function() return phase == "done" and not H.menuRunning() and ctl() end, 6000, {
+      H.call(function()
+        ph = (ph + 1) % 12
+        local s, held = st(), {}
+        if phase == "in" then
+          if s == -1 then
+            if ctl() then held = { "x" } end
+          elseif s == ST_MAIN then
+            held = H.readByte(0x4B) == 2 and { "a" } or { [H.readByte(0x4B) < 2 and "down" or "up"] = true }
+          elseif s == ST_CHAR then
+            local p = gogoPos()
+            held = H.readByte(0x4B) == p and { "a" } or { [H.readByte(0x4B) < p and "down" or "up"] = true }
+          elseif s == 0x36 then
+            if H.readByte(REC + 0x1F) ~= 0xFF then
+              phase = "out"
+            else
+              held = H.readByte(0x4B) == 1 and { "a" } or { [H.readByte(0x4B) < 1 and "right" or "left"] = true }
+            end
+          end
+        end
+        if phase == "out" then
+          if s == -1 then phase = "done" else held = { "b" } end
+        end
+        if ph < 4 then H.setPad(held) else H.setPad({}) end
+      end),
+    }, tag .. ": Optimum"), function() ph, phase = 0, "in" end),
+    H.call(function() out.weapon = H.readByte(REC + 0x1F) end),
+  })
+end
+
 local function lists(t, c) for _, v in ipairs(t or {}) do if v == c then return true end end return false end
 
 local preList, postList, againList = {}, {}, {}
 local preWho, postWho = {}, {}
 local preShop, postShop = {}, {}
+local opt = {}
 local preNew, postNew, postOld = {}, {}, {}
 local pre = {}
 H.run({ maxFrames = 120000 }, {
@@ -335,6 +374,28 @@ H.run({ maxFrames = 120000 }, {
   H.call(function()
     H.assertEq(postShop.anim > 0, true, "after: the shop draws the slot with Leo's animation (Leo's palette)")
     H.assertEq(postShop.sheet > 0, true, "after: from Leo's sheet")
+  end),
+  optimum("post", opt),
+  H.call(function()
+    -- the bag's strongest weapon (ItemProp+20, its power) GOGO could wear, and the strongest of Leo's set
+    local best = { gogo = 0, leo = 0 }
+    for slot = 0, 255 do
+      local id = H.readByte(0x1869 + slot)
+      if id ~= 0xFF and H.readByte(0x1969 + slot) > 0 and (itemProp(id, 0) & 7) == 1 then
+        local m, pw = itemProp(id, 1) | (itemProp(id, 2) << 8), itemProp(id, 20)
+        if (m & 0x1000) ~= 0 then best.gogo = math.max(best.gogo, pw) end
+        if (m & 0x8000) ~= 0 then best.leo = math.max(best.leo, pw) end
+      end
+    end
+    local w = opt.weapon
+    local m = itemProp(w, 1) | (itemProp(w, 2) << 8)
+    H.log(string.format("[menu_leo] Optimum: weapon $%02X (power %d, mask $%04X); the bag's best GOGO could wear %d, "
+      .. "the best of Leo's set %d", w, itemProp(w, 20), m, best.gogo, best.leo))
+    H.assertEq((m & 0x9000) ~= 0, true, "Optimum put on a weapon he can wear")
+    H.assertEq(itemProp(w, 20) >= best.gogo, true, "and one at least as strong as any GOGO alone could wear")
+    if best.leo > best.gogo then
+      H.assertEq((m & 0x8000) ~= 0, true, "Optimum reached into Leo's set when it held the stronger weapon")
+    end
   end),
   H.call(function()
     H.assertEq(postOld.found, true, string.format("after: the Equip menu still offers $%02X (GOGO's)", OLD))
