@@ -449,8 +449,10 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
 ; effect bytes OR'd into the same cells CalcEquipEffect fills (ItemProp +5 to
 ; +13 and +25), the stat points added to the words it adds a relic's boosts
 ; to.  The HP and MP boosts are bits CheckHPBoost reads largest-first, so the
-; largest of several applies.  An earring rung counts as one earring, never a
-; second: a character who already wears one gains nothing.  Every caller of
+; largest of several applies.  An earring rung counts as one more earring
+; piece, after the worn ones: with one worn Earring or Hero Ring, or with a
+; second earring rung, it makes vanilla's two-piece double, and no count goes
+; past that (#551).  Every caller of
 ; UpdateEquip (the menus, the field, battle init and re-derivation) sees the
 ; same result.
 ;
@@ -518,12 +520,15 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
         tsb     $11d3
         lda     f:Ot6LadderTbl+3,x      ; +8 status 3 set
         tsb     $11d4
-        lda     f:Ot6LadderTbl+4,x      ; +9 relic effects (HP/MP boosts, atlas)
-        and     #$fd                    ;   ...but the earring bit, which
-        tsb     $11d5                   ;   vanilla moves to $11d7 per piece
-        lda     f:Ot6LadderTbl+4,x
-        and     #$02
-        tsb     $11d7                   ; one earring, never a second
+        lda     f:Ot6LadderTbl+4,x      ; +9 relic effects (HP/MP boosts,
+        tsb     $11d5                   ;   atlas, earring)
+        lda     #$02                    ; then count the earring a piece, as
+        trb     $11d5                   ;   CalcEquipEffect does per item: the
+        beq     :+                      ;   first piece sets $11d7 (single),
+        tsb     $11d7                   ;   the second $11d5 (double), more
+        beq     :+                      ;   add nothing; a rung without the
+        tsb     $11d5                   ;   bit puts a held double back
+:
         lda     f:Ot6LadderTbl+5,x      ; +10
         tsb     $11d6
         lda     f:Ot6LadderTbl+6,x      ; +11
@@ -974,7 +979,8 @@ Ot6RungCostTbl:
 ; reached rung OR'd together cover this rung's.  A stat rung, or a signature
 ; that is new code (no bytes), is never "held": stats add, and each new
 ; signature sits on one esper only.  A larger max HP or max MP boost covers a
-; smaller one (only the largest applies).  Gear is not counted: the line is
+; smaller one (only the largest applies).  The earring bit is never held: a
+; second earring rung adds a piece (#551).  Gear is not counted: the line is
 ; about where to tour next on the ladder.
 ;
 ; in: A (a8) = esper (GenjuProp order), X (i16) = rung 0-4, Y (i16) = actor.
@@ -1148,7 +1154,10 @@ RD_ESPER = RD_FRAME + 4 ;   and the esper
 :       bit     #$20
         beq     :+
         ora     #$80                    ; MP 1/4 covers 1/8
-:       sta     RD_HELD+4
+; an earring rung adds a piece (Ot6EsperFold counts them up to vanilla's
+; double), so another earring rung never covers it
+:       and     #$fd
+        sta     RD_HELD+4
         longa
 ; covered?  each of this rung's bytes, less what is held, must be empty
         lda     RD_REC

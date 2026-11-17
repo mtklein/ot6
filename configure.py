@@ -571,6 +571,10 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "battle_espersigs":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    # #551: an earring rank counts as one earring piece, up to the double;
+    # eight branches from one snapshot, a battle each
+    "battle_esperearring": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     # #534: Crusader's signature, the second weapon in the menu and its
     # swing, and the two-handed grip, against rank 4 from one snapshot
     "battle_espercrusader":
