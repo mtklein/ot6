@@ -23,8 +23,8 @@ for i, v in enumerate((52, 38, 41, 36)):
     d[a(rec + 0x1a + i)] = max(d[a(rec + 0x1a + i)], v)
 # max HP +14 (Leo's base 50 over Gogo's 36), boost bits kept, capped at 9999; current HP the same, never from 0
 mx = d[a(rec + 0x0b)] | d[a(rec + 0x0c)] << 8
-base = min(9999, (mx & 0x3fff) + 14)
-mx = (mx & 0xc000) | base
+hp = min(9999, (mx & 0x3fff) + 14)
+mx = (mx & 0xc000) | hp
 d[a(rec + 0x0b)], d[a(rec + 0x0c)] = mx & 0xff, mx >> 8
 cur = d[a(rec + 0x09)] | d[a(rec + 0x0a)] << 8
 if cur:
