@@ -535,6 +535,9 @@ TEST_ENV = {
     # wt/hire-sprite: the 3 and 2 BP hires' figures (Defends bank the points)
     "battle_hirecrew": "OT6_TIMEOUT=2400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
+    # #552: the crew's third figure, the Imp, struck (monster HP staged)
+    "battle_hireimp": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     # the Config screen's version tab, from the Narshe exit spawn
     "menu_configversion":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/narshe-mission-v1",

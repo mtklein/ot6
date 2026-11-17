@@ -114,16 +114,16 @@ sprite and palette (`$2EAE`, `CharPalTbl`), the menu portrait and its
 palette, the party select, the Colosseum, the save and load screens, the
 final battle's order menu, the ending's map scenes.  A search for every
 place that picks a name, sprite, portrait or palette by actor instead of by
-the record found these, each now branching on the switch:
+the record found these three; the shop and the vignette now branch on the
+switch, and the cast card stays as the owner chose:
 
 - **The shop's "who can equip" sprites** pick by actor and load sheets 0-15
   into fixed VRAM slots: slot 12's frames come from Leo's sheet
   (`Ot6LeoShopGfx`) and its animation uses Leo's palette (`Ot6LeoShopAnim`,
   `Ot6ShopLeoAnim`).
-- **The ending's cast card** reads its big name by character index: row 14,
-  "Leo", built from the ending font's own letters (Locke's L, Terra's e,
-  Gogo's o), for the revealed slot (`Ot6LeoCastName`).  The card's art stays
-  Gogo's cloaked figure: there is no Leo art in the ending's graphics.
+- **The ending's cast card** reads "LEO as Gogo" (owner, 2026-11-17): the
+  small name is the record's (vanilla's `DrawEndingCharName`, by actor),
+  and the big name and the cloaked art stay vanilla's "Gogo".
 - **The ending's portrait vignette** loads portrait 12 by character: it
   loads Leo's ($10, the 17th pointer added to the field's table) once the
   switch is set (`Ot6LeoPortrait`).  The vignette plays only for a member
@@ -133,9 +133,10 @@ the record found these, each now branching on the switch:
   consistency.
 
 Gogo's own recruitment event writes his graphics, palette and name; it runs
-before any reveal can, so it never undoes one.  Setzer's Hired Help can
-summon a Leo figure into Setzer's slot (`Ot6HireGfxTbl`): with Leo in the
-party the screen shows two Leos for that blow.
+before any reveal can, so it never undoes one.  Setzer's Hired Help used to
+send General Leo as its third hire; since this change (owner, 2026-11-17)
+that hire is an Imp, always, so no Leo walks on before the reveal (it would
+hint that he lives) or beside him after (`Ot6HireGfxTbl`, kits.md).
 
 ### Riding
 
@@ -182,7 +183,8 @@ Continue, party changes and the parties of Kefka's Tower (`save_leo`).
 - `save_leo`: Reset, Continue, and the reveal is all still there.
 - `field_leoride`: the riding frames.
 - `ending_leo` (an instrument spliced into `gen_wor_kefka`): the cast card
-  and his scene with and without the reveal.
+  ("LEO as Gogo": the small name the record's, the big name row 12) and his
+  scene, with and without the reveal.
 
 ## Espers (the next step)
 

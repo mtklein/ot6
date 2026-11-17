@@ -584,8 +584,6 @@ EndingCharNameAnim:
         make_ending_char_name_anim "Gau",       $6c, $00
         make_ending_char_name_anim "Gogo",      $68, $00
         make_ending_char_name_anim "Umaro",     $64, $00
-        ; ot6 #552: row 14, the revealed Leo in Gogo's place
-        make_ending_char_name_anim "Leo",       $6c, $00
 .else
         make_ending_char_name_anim "Terra",     $40, $00
         make_ending_char_name_anim "Locke",     $50, $88
@@ -601,8 +599,6 @@ EndingCharNameAnim:
         make_ending_char_name_anim "Gau",       $6c, $00
         make_ending_char_name_anim "Gogo",      $68, $00
         make_ending_char_name_anim "Umaro",     $64, $00
-        ; ot6 #552: row 14, the revealed Leo in Gogo's place
-        make_ending_char_name_anim "Leo",       $6c, $00
 .endif
 
 ; "as"
@@ -716,16 +712,6 @@ EndingGogoNameAnim2:
 
 EndingUmaroNameAnim1:
 @8e89:  .addr   EndingUmaroNameSprite
-        .byte   $fe
-
-; ot6 #552 (docs/design/leo-reveal.md): the cast roll's "Leo", for the
-; slot the grave revealed (CreateBigCharNameTask picks row 14)
-EndingLeoNameAnim1:
-        .addr   EndingLeoNameSprite
-        .byte   $fe
-
-EndingLeoNameAnim2:
-        .addr   EndingBlankNameSprite
         .byte   $fe
 
 EndingUmaroNameAnim2:
@@ -1176,18 +1162,6 @@ EndingGogoNameSprite:
         .byte   $18,$10,$16,$31
         .byte   $20,$08,$0e,$31
         .byte   $20,$10,$1e,$31
-
-; ot6 #552: "Leo" from the font's own letters: Locke's capital L ($4e over
-; $6e,$6f), Terra's e ($04/$14) and Gogo's o ($0e/$1e), 32 pixels as "Gau"
-EndingLeoNameSprite:
-        .byte   7
-        .byte   $80,$00,$4e,$31
-        .byte   $00,$10,$6e,$31
-        .byte   $08,$10,$6f,$31
-        .byte   $10,$08,$04,$31
-        .byte   $10,$10,$14,$31
-        .byte   $18,$08,$0e,$31
-        .byte   $18,$10,$1e,$31
 
 EndingUmaroNameSprite:
 @92cd:  .byte   11

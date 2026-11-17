@@ -1,7 +1,7 @@
 -- @suite slow
 -- battle_hirecrew.lua -- SETZER's Hired Help at 3 and 2 BP (wt/hire-sprite,
 -- kits.md "Each hire is somebody new"): every boost point's hire is the
--- next figure -- the merchant, the Imperial soldier, General Leo, and the
+-- next figure -- the merchant, the Imperial soldier, an Imp, and the
 -- fourth: Shadow while he can be hired (event switch $02E3: recruited, and
 -- not left on the Floating Continent, whose escape's Jump clears it),
 -- Interceptor while Shadow is in the battle's party, a Phantom Train ghost

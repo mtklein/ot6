@@ -3,13 +3,15 @@
 --
 -- Not a script of its own: spliced into gen_wor_kefka (the line's last leg: Kefka, then the ending) right after
 -- its lib line, behind ENDING_LEO = { reveal = true|false }, and run from the leg's battery:
---   reveal = false   the battery as the line saved it (GOGO a mystery): the cast card's big name is "Gogo"
---                    (EndingCharNameAnim row 12 read) and his scene after it (map 254) draws slot 12 in his
---                    sprite and palette;
+--   reveal = false   the battery as the line saved it (GOGO a mystery): the cast card reads "<his name> as Gogo"
+--                    (the small name the record's, written to $7E9E89 by DrawEndingCharName; the big name
+--                    EndingCharNameAnim row 12) and his scene after it (map 254) draws slot 12 in his sprite
+--                    and palette;
 --   reveal = true    the battery staged as after the reveal (build/lab/stage_leo_battery.py: switch $00E0 set,
 --                    slot 12's name LEO, graphics $10, field palette 0 -- a declared state write, never route
---                    evidence): the big name is "Leo" (row 14), never row 12, and his scene draws Leo's sprite
---                    ($10) in Leo's palette (0).
+--                    evidence): the card reads "LEO as Gogo" (owner, 2026-11-17: the small name from the
+--                    record, vanilla's big "Gogo" over the cloaked art), and his scene draws Leo's sprite ($10)
+--                    in Leo's palette (0).
 -- A recruited member gets no portrait vignette (only one never recruited does), so neither run reads one.
 -- It writes nothing.  It counts those ROM reads, shoots the cast card (EndingState_46 and after) and his scene,
 -- and asserts when the run reaches The End
@@ -30,7 +32,12 @@ do
     if armed then return end
     armed = true
     local nameTbl = H.sym("EndingCharNameAnim")
-    for _, row in ipairs({ 12, 14 }) do
+    -- the small name: the six bytes DrawEndingCharName writes for the card (vanilla's path, by actor $0C)
+    emu.addMemoryCallback(function(a, v)
+      if E.cards > 0 and E.small == nil then E.smallBuf = E.smallBuf or {} end
+      if E.smallBuf and #E.smallBuf < 6 then E.smallBuf[#E.smallBuf + 1] = string.format("%02X", v) end
+    end, emu.callbackType.write, 0x7E9E89, 0x7E9E8E)
+    for _, row in ipairs({ 12 }) do
       local at = nameTbl + row * 6
       emu.addMemoryCallback(function() E.name[row] = (E.name[row] or 0) + 1 end, emu.callbackType.read, at, at + 1)
     end
@@ -66,14 +73,20 @@ do
       ENDING_LEO.reveal), H.readByte(0x1E9C) & 1, H.readByte(0x1601 + 37 * 12)))
   end
   local function judge()
-    H.log(string.format("[ending_leo] reveal %s: cast card ran %d time(s); big name row 12 (Gogo) read %d, row 14 "
-      .. "(Leo) read %d; his scene (map 254 after the card): object 12 graphics $%02X palette $%02X; vignette "
+    local small = table.concat(E.smallBuf or {}, " ")
+    local want = {}
+    for i = 2, 7 do want[#want + 1] = string.format("%02X", H.readByte(0x1600 + 37 * 12 + i)) end
+    want = table.concat(want, " ")
+    H.log(string.format("[ending_leo] reveal %s: the card's small name %s (slot 12's record %s)", tostring(
+      ENDING_LEO.reveal), small, want))
+    H.assertEq(small, want, "the card's small name is slot 12's record name")
+    if ENDING_LEO.reveal then H.assertEq(small, "8B 84 8E FF FF FF", "the card's small name is LEO") end
+    H.log(string.format("[ending_leo] reveal %s: cast card ran %d time(s); big name row 12 (Gogo) read %d; his "
+      .. "scene (map 254 after the card): object 12 graphics $%02X palette $%02X; vignette "
       .. "portrait 12 (Gogo) read %d, $10 (Leo) read %d", tostring(ENDING_LEO.reveal), E.cards, E.name[12] or 0,
-      E.name[14] or 0, E.gfx or -1, E.pal or -1, E.portrait[12] or 0, E.portrait[16] or 0))
+      E.gfx or -1, E.pal or -1, E.portrait[12] or 0, E.portrait[16] or 0))
     H.assertEq(E.cards > 0, true, "the ending ran Gogo's cast card")
-    local want, other = ENDING_LEO.reveal and 14 or 12, ENDING_LEO.reveal and 12 or 14
-    H.assertEq((E.name[want] or 0) > 0, true, string.format("the cast card's big name is row %d", want))
-    H.assertEq(E.name[other] or 0, 0, string.format("and never row %d", other))
+    H.assertEq((E.name[12] or 0) > 0, true, "the cast card's big name is row 12, \"Gogo\"")
     H.assertEq(E.gfx, ENDING_LEO.reveal and 0x10 or 0x0C, "his scene draws slot 12 in " .. (ENDING_LEO.reveal
       and "Leo's" or "Gogo's") .. " sprite")
     H.assertEq(E.pal, ENDING_LEO.reveal and 0x00 or 0x06, "in " .. (ENDING_LEO.reveal and "Leo's" or "Gogo's")

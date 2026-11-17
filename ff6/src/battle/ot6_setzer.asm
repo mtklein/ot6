@@ -668,7 +668,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; $b7, which CmdAnim_18 reads as the script's third byte and GP Rain's own
 ; animation never did:
 ;   %1fffccLF   1   a hire (with $b6 = the Hired Help row, Ot6CoinAnim's test)
-;               fff the figure: 0 merchant, 1 Imperial soldier, 2 General Leo,
+;               fff the figure: 0 merchant, 1 Imperial soldier, 2 an Imp,
 ;                   then the fourth hire: 3 Shadow while he is there to hire
 ;                   (event switch $02E3: recruited, and not left on the
 ;                   Floating Continent, Ot6ShadowHirable); 4 Interceptor
@@ -841,9 +841,9 @@ OT6_SW_SHADOW_INIT   = $1e80 + ($2e3 >> 3)
 ; Setzer walks off, each hire walks in where he stood, strikes, and walks
 ; off again.  The figure is drawn by Setzer's own sprite slot: the battle
 ; graphics engine draws a character slot from that slot's graphics buffer,
-; and the ROM holds the merchant, soldier, Leo, Shadow and the Phantom Train
-; ghosts as full battle sprite sets (Locke's disguises, Leo's Thamasa fight,
-; the train), so the slot is reloaded with the figure (status_pat_tfr's own
+; and the ROM holds the merchant, soldier, Imp, Shadow and the Phantom Train
+; ghosts as full battle sprite sets (Locke's disguises, the Imp status, the
+; train), so the slot is reloaded with the figure (status_pat_tfr's own
 ; swap, the one Imp and Morph use: $2eae,x is the graphics the slot should
 ; show, and LoadCharGfx loads the figure's own palette into the slot's) and
 ; put back after.  Every swap happens with the slot hidden (w7e61ac, the
@@ -895,7 +895,10 @@ OT6_HIRE_MAGI  = 12 + 1         ;   magitek's lift and $44
 
 ; the figures' battle graphics (CHAR_GFX); figure 4, Interceptor, has none
 Ot6HireGfxTbl:
-        .byte   CHAR_GFX::MERCHANT, CHAR_GFX::SOLDIER, CHAR_GFX::LEO, CHAR_GFX::SHADOW
+; (owner, 2026-11-17: the third figure is an Imp, not General Leo, who must
+; not walk on before the grave reveals him (#552) nor beside him after)
+Ot6HireImpSeam = * + 2                  ; (a seam for the negative's mutant)
+        .byte   CHAR_GFX::MERCHANT, CHAR_GFX::SOLDIER, CHAR_GFX::IMP, CHAR_GFX::SHADOW
         .byte   $ff, CHAR_GFX::GHOST
 
 ; the weapon each figure swings, by class (none, slashing, piercing,
@@ -903,7 +906,7 @@ Ot6HireGfxTbl:
 Ot6HireWeapTbl:
         .byte   $00+1, $0b+1, $00+1, $34+1     ; merchant: dirk, regal cutlass, dirk, mithril rod
         .byte   $0a+1, $0a+1, $1d+1, $46+1     ; soldier: mithrilblade, mithrilblade, mithril pike, morning star
-        .byte   $14+1, $14+1, $22+1, $46+1     ; Leo: crystal, crystal, gold lance, morning star
+        .byte   $24+1, $24+1, $24+1, $46+1     ; Imp: imp halberd, imp halberd, imp halberd, morning star
         .byte   $26+1, $2b+1, $26+1, $44+1     ; Shadow: kodachi, ashura, kodachi, flail
         .byte   $00, $00, $00, $00             ; (Interceptor: his own animation)
         .byte   $00+1, $0a+1, $1d+1, $4a+1     ; ghost: dirk, mithrilblade, mithril pike, bone club

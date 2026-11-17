@@ -19,6 +19,9 @@ Maduin's and Bahamut's top Esper ranks now count as an Earring. With an
 Earring or Hero Ring worn as well, or with both ranks, magic damage rises by
 half, the same as wearing two Earrings.
 
+An Imp has joined Setzer's Hired Help: the third hire now walks in as an
+Imp with a halberd.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44
