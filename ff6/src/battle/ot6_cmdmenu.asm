@@ -579,8 +579,10 @@
         pha                     ; [S+1] park the MP grey
         lda     $6168
         cmp     #$05
-        beq     @paint          ; Relm's list: the divine and Gesture's loop
-        cmp     #$04
+        bne     :+              ; Relm's list: the divine, Gesture's loop and
+        pla                     ;   the party-side rows' bodies
+        jml     Ot6PaintRowGrey
+:       cmp     #$04
         beq     @setzer         ; Setzer's table: the purse and the divine
         cmp     #$03
         beq     @thief          ; the thief submenu's own BP reason
@@ -626,7 +628,11 @@
         cmp     #OT6_BUMRUSH
         beq     @mark
         bra     @pass
-; In thief mode only Bestow has a BP precondition, and it is "hold one".
+; In thief mode only Bestow has a BP precondition, and it is "hold one";
+; and it has an ally precondition (#556): another body on the party side
+; standing that can take a point (Ot6BestowAnyAlly), else Ot6Bestow hands
+; nothing (alone, it could only be aimed at himself) and the turn and the MP
+; were spent for nothing.
 @thief: lda     $4005,y         ; this row's id (column 1; Qty at +1, Flags +2)
         cmp     #OT6_THIEF_MARK
         beq     @mark           ; the divine: a full boost pending
@@ -643,8 +649,10 @@
         lda     OT6_BP_CLASS,x  ; current bp
         plx                     ; restore caller X first: plx sets Z/N, so the
         cmp     #$01            ;   affordability test has to come after it
-        bcs     @pass           ; holds at least one pip: Bestow is reachable
-        pla                     ; 0 bp: nothing to give, so grey it
+        bcc     @bgrey          ; 0 bp: nothing to give
+        jsl     Ot6BestowAnyAlly        ; #556: and somebody to give it to
+        bcs     @pass           ; holds a pip and an ally can take it
+@bgrey: pla                     ; grey it
         ora     #$04            ; magic's disabled bit ($21|$04 = $25)
         rtl
 @pass:  pla                     ; MP grey (unchanged)
@@ -654,8 +662,6 @@
 @setzer:
         pla                     ; the MP grey
         jml     Ot6SetzerRowGrey
-@paint: pla                     ; the MP grey
-        jml     Ot6PaintRowGrey
 ; Master's Mark: fewer than three points pending, the divine's one gate
 ; (kits.md "Divines"); a boost pressed or taken back with the window up
 ; re-stages the row, so the grey follows R and L, as Jackpot's does

@@ -617,6 +617,55 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
+; [ is there an ally Bestow could hand a point to?  (#556) ]
+; Another character standing in the fight ($3a74) whose bank has room (under
+; Ot6ActionEnd's cap of 5): the bodies Ot6Bestow can hand a point to.  The
+; menu greys Bestow without one (Ot6BushidoRowGrey's thief arm), and the
+; confirm refuses it on the same verdict (Ot6KitConfirmMP).  The caster is
+; the menu's ($62ca).  out: carry set = there is one.  a8/i16, db=$7e.
+; preserves A, X and Y.  rtl.
+.proc Ot6BestowAnyAlly
+        .a8
+        .i16
+        pha
+        phx
+        phy
+        lda     $62ca
+        and     #$03
+        asl
+        longa
+        and     #$00ff
+        tax
+        lda     $3018,x
+        pha                     ; [$01,s] the caster's own bit
+        ldy     #$0000
+@seat:  longa
+        lda     $3018,y
+        cmp     $01,s
+        beq     @next           ; himself
+        and     $3a74
+        beq     @next           ; not standing
+        shorta
+        lda     OT6_BP_CLASS,y
+        cmp     #$05
+        bcc     @yes            ; room for a point
+@next:  shorta
+        iny
+        iny
+        cpy     #$0008
+        bcc     @seat
+        clc
+        bra     @out
+@yes:   sec
+@out:   longa                   ; (rep and pla leave the carry)
+        pla
+        shorta
+        ply
+        plx
+        pla
+        rtl
+.endproc
+
 ; [ Bestow, hand one boost point to an ally ]
 ;
 ; Both ends of this transfer are character rows of OT6_BP_CLASS, so unlike

@@ -429,8 +429,11 @@ Ot6PaintBanner:
 
 ; [ the painter arm of Ot6BushidoRowGrey: a row its gate refuses ]
 ; Masterpiece under three points pending (the divine's one gate, Master's
-; Mark's rule), and Gesture while the caster's own turn came from a Gesture
-; (no Gesture off a Gestured turn: the loop limit).  Read by the row's colour
+; Mark's rule), Gesture while the caster's own turn came from a Gesture
+; (no Gesture off a Gestured turn: the loop limit), and a party-side row
+; (Portrait, Tint, Varnish, Gesture) no body on the party side can take
+; (#556, Ot6PaintAnyFits: Portrait and Gesture never take the painter
+; herself, so with her alone they grey; Tint and Varnish can).  Read by the row's colour
 ; and by the confirm (Ot6KitConfirmMP), so a greyed row is a refused one.
 ; a8/i16.  in: A = the MP grey, Y = the row's wItemList offset.
 ; out: A = A | ($04 if refused).  preserves X and Y.  rtl.
@@ -450,10 +453,21 @@ Ot6PaintBanner:
         cmp     #OT6_PAINT_MASTER
         beq     @divine
         cmp     #OT6_PAINT_GESTURE
-        bne     @white
+        bne     @ally
         lda     f:Ot6CharBitTbl,x
         and     f:$7e0000+OT6_GESTURED
         bne     @grey
+        lda     $4005,y
+@ally:  cmp     #OT6_PAINT_PORTRAIT     ; #556: a party-side row with nobody
+        beq     @fits                   ;   on the party side it can take
+        cmp     #OT6_PAINT_TINT         ;   (Relm alone, or her allies down):
+        beq     @fits                   ;   grey, as the confirm refuses it
+        cmp     #OT6_PAINT_VARNISH      ;   (Ot6KitConfirmMP reads this verdict)
+        beq     @fits
+        cmp     #OT6_PAINT_GESTURE
+        bne     @white
+@fits:  jsl     Ot6PaintAnyFits
+        bcc     @grey
         bra     @white
 @divine:
         lda     OT6_BOOST_REVEALED,x
@@ -845,6 +859,55 @@ Ot6PaintBanner:
         rts
 @no:    clc
         rts
+.endproc
+
+; [ can any body on the party side take this row?  (#556) ]
+; The menu's question, asked of Ot6PaintFits for each seat, the predicate
+; the action itself applies (Ot6PaintReach), so the row's grey and what it
+; would do agree.  Tint's row asks for a colour (any colour fits the same
+; bodies).  OT6_SCR_IDX and OT6_SCR_SLOT2 are borrowed and put back.
+; in: A = the row's id; the caster is the menu's ($62ca).  out: carry set =
+; some seat fits.  a8/i16, db=$7e.  preserves A, X and Y.  rtl.
+.proc Ot6PaintAnyFits
+        .a8
+        .i16
+        phx
+        phy
+        pha                     ; [$05,s] the id
+        longa
+        lda     OT6_SCR_IDX
+        pha                     ; [$03,s]
+        lda     OT6_SCR_SLOT2
+        pha                     ; [$01,s]
+        lda     $62ca
+        and     #$0003
+        asl
+        sta     OT6_SCR_SLOT2   ; the caster's entity offset (a word)
+        shorta
+        lda     $05,s
+        cmp     #OT6_PAINT_TINT
+        bne     :+
+        lda     #OT6_PAINT_COLOUR       ; Tint's bodies are a colour's
+:       sta     OT6_SCR_IDX
+        stz     OT6_SCR_IDX+1
+        ldy     #$0000
+@seat:  jsr     Ot6PaintFits
+        bcs     @out            ; one fits
+        iny
+        iny
+        cpy     #$0008
+        bcc     @seat
+        clc                     ; none does
+@out:   longa                   ; (rep/sep and pla leave the carry)
+        pla
+        sta     OT6_SCR_SLOT2
+        pla
+        sta     OT6_SCR_IDX
+        shorta
+        pla
+        ply
+        plx
+        rtl
 .endproc
 
 ; [ can ally y take a gift? ]  not the caster (OT6_SCR_SLOT2), not Umaro

@@ -88,6 +88,12 @@ Locke's Filch, Sabin's Bum Rush and Cyan's Cleave on a boss.
 - While choosing a command, the R Button adds a point (up to 3, and no more
   than you hold). The L Button takes one back. Arrows and a glow show how
   many are pending, and the dots after each name show the bank.
+- In a list, R adds no point the character's MP cannot pay for on the row
+  under the cursor.
+- Once a spell or skill is picked from its list, its boost is the one the
+  list showed. At the target choice L and R spread a spell over a group, as
+  in FF6, and leave the boost alone. An action picked straight from the
+  command window, like Fight, can still be boosted there.
 - The arrows stay after the command is chosen, until the action starts; then
   the dots show the bank without the points it is spending. The point gained
   after an action shows when that character's next turn comes.

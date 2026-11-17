@@ -17713,7 +17713,7 @@ end
 -- hand since, and battle_jackpot its own).  A caller reads these after the
 -- battle; nothing it asked for (who, cmd, boost, row, slot...) is touched.
 M.KIT_ENTRY_STATE = { "opened", "seat", "presses", "lPresses", "tookBack", "allyPresses", "greyed",
-  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen" }
+  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen", "raised", "rPresses" }
 function M.freshKitEntries(plan)
   for _, q in ipairs(plan) do
     for _, f in ipairs(M.KIT_ENTRY_STATE) do q[f] = nil end
@@ -18247,16 +18247,20 @@ function M.setzerBattle(plan, opts)
       -- p.takeBack = n: the row picked at its boost, then taken back to n
       -- here, at target select (L lowers the pending boost), before the
       -- confirm
-      if p.takeBack ~= nil and M.readByte(0x3E9D + a * 2) > p.takeBack then
+      -- (p.takeBackRefused: the L presses are expected to be refused, #555:
+      -- a list's pick keeps its boost at target select; two are pressed and
+      -- the confirm goes on at whatever stands, p.tookBack = that boost)
+      if p.takeBack ~= nil and M.readByte(0x3E9D + a * 2) > p.takeBack
+         and not (p.takeBackRefused and (p.lPresses or 0) >= 2) then
         p.lPresses = (p.lPresses or 0) + 1
         M.assertEq(p.lPresses <= 8, true, "L at target select lowers the pending boost")
         pulse("l")
         return
       end
       if p.takeBack ~= nil and not p.tookBack then
-        p.tookBack = true
-        M.log(string.format("[setzer] f%d row $%02X taken back to %d BP at target select", M.frame,
-          type(p.row) == "number" and p.row or 0, M.readByte(0x3E9D + a * 2)))
+        p.tookBack = M.readByte(0x3E9D + a * 2)
+        M.log(string.format("[setzer] f%d row $%02X at %d BP after %d L press(es) at target select (asked %d)",
+          M.frame, type(p.row) == "number" and p.row or 0, p.tookBack, p.lPresses or 0, p.takeBack))
       end
       p.aim = p.aim or { g = M.newTargetGraph(), presses = 0 }
       local slot = p.slot
@@ -18359,6 +18363,11 @@ end
 --     defend = true    a Defend, which banks a point
 --     takeBack = n     at target select, L until the pending boost is n,
 --                      then the confirm (a pick taken back; p.tookBack)
+--     raiseTo = n      at target select, R until the pending boost is n (or
+--                      four presses), then the confirm (p.raised; opts.onTarget(p, a)
+--                      is called once there); lowerTo = n the same with L;
+--                      p.tgtPresses caps the taps (default 2)
+--     bank = n         fill the bank to at least n before the pick (default boost)
 --     peek = true      open the command's window (Magic or a Tools-shell
 --                      list), hand it to opts.onList, and back out
 --     confirmWhen = fn at the monster target select, the cursor on the
@@ -18406,6 +18415,15 @@ function M.kitBattle(plan, opts)
   local function pulse(btn)
     if cool > 0 then cool = cool - 1; M.setPad({}); return end
     M.setPad({ [btn] = true }); cool = 10
+  end
+  -- a held tap (#555): six frames down and fourteen up, so the battle's
+  -- main loop, which can run slower than the frame, sees the edge (a
+  -- one-frame pulse of R can fall between two of its frames).  True on the
+  -- frame a new tap begins.
+  local tapT = 0
+  local function tap(btn)
+    if tapT > 0 then tapT = tapT - 1; M.setPad(tapT >= 14 and { [btn] = true } or {}); return false end
+    tapT = 19; M.setPad({ [btn] = true }); return true
   end
   local function cmdRowOf(a, cmd)
     for r = 0, 3 do if M.readByte(0x202E + a * 12 + r * 3) == cmd then return r end end
@@ -18654,7 +18672,7 @@ function M.kitBattle(plan, opts)
       return
     end
     if st == 0x05 then
-      if M.readByte(0x3E9C + e) < (p.boost or 0) then
+      if M.readByte(0x3E9C + e) < math.max(p.boost or 0, p.bank or 0) then
         if M.readByte(0x3E9D + e) > 0 then pulse("l") else pulse("right") end
         return
       end
@@ -18691,6 +18709,19 @@ function M.kitBattle(plan, opts)
       local col = M.readByte(0x8917 + a)
       if absRow ~= wantRow then pulse(absRow < wantRow and "down" or "up"); return end
       if col ~= wantCol then pulse(col < wantCol and "right" or "left"); return end
+      -- p.listR = n: R pressed n times with the cursor on the spell (#555:
+      -- a point the MP cannot pay for is refused); the pending boost before
+      -- and after is kept on the entry (p.listR0, p.listR1)
+      if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
+        if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
+        if tapT == 0 then p.listRn = (p.listRn or 0) + 1 end
+        tap(p.listKey or "r")
+        return
+      end
+      if p.listR ~= nil and p.listR1 == nil and cool == 0 then
+        p.listR1 = M.readByte(0x3E9D + a * 2)
+        if opts.onListR then opts.onListR(p, a) end
+      end
       if p.refused == "list" then
         p.presses = (p.presses or 0) + (cool == 0 and 1 or 0)
         if p.presses > 3 then done(p, a, true); pulse("b"); return end
@@ -18765,6 +18796,24 @@ function M.kitBattle(plan, opts)
         M.assertEq(p.lPresses <= 8, true, "L at target select lowers the pending boost")
         pulse("l")
         return
+      end
+      -- p.raiseTo = n: picked at its boost, then raised to n here (R raises
+      -- the pending boost at target select, battle_lateboost), before the
+      -- confirm; a refused R (Ot6Boost's buzz) leaves it where it stands
+      if p.raised == nil and (p.raiseTo ~= nil or p.lowerTo ~= nil) then
+        local pd = M.readByte(0x3E9D + a * 2)
+        local want = (p.raiseTo ~= nil and pd < p.raiseTo) or (p.lowerTo ~= nil and pd > p.lowerTo)
+        if tapT > 0 or (want and (p.rPresses or 0) < (p.tgtPresses or 2)) then
+          if tapT == 0 then p.rPresses = (p.rPresses or 0) + 1 end
+          tap(p.raiseTo ~= nil and "r" or "l")
+          return
+        end
+      end
+      if (p.raiseTo ~= nil or p.lowerTo ~= nil) and p.raised == nil then
+        p.raised = M.readByte(0x3E9D + a * 2)
+        M.log(string.format("[kit] f%d entry %d at %d BP after %d %s press(es) at target select (asked %d)", M.frame,
+          k, p.raised, p.rPresses or 0, p.raiseTo and "R" or "L", p.raiseTo or p.lowerTo))
+        if opts.onTarget then opts.onTarget(p, a) end
       end
       if p.takeBack ~= nil and not p.tookBack then
         p.tookBack = true

@@ -8,8 +8,9 @@
 -- thief arm greys it under three and the confirm refuses it); at three every
 -- standing body is read as Appraise reads it (Ot6AnalyzeOne) and robbed as a
 -- 3-BP Steal robs (its rare item, else its common, no roll), each item into
--- the battle's obtained-items queue (BtlGfx $05); 99 MP.  Picked at three
--- and taken back (L at target select), it does nothing and costs nothing.
+-- the battle's obtained-items queue (BtlGfx $05); 99 MP.  Picked at three,
+-- L at target select takes nothing back (#555: a list's pick keeps the boost
+-- the list showed), so it runs at three.
 --
 -- Played: Continue fc-alcove-v1 (TERRA, LOCKE, EDGAR, SHADOW) and walk onto
 -- the continent into random battles (H.fcAlcoveToBattle / H.fcPace); LOCKE
@@ -22,9 +23,9 @@
 --      rare-else-common of each body that had any, in slot order;
 --      Ot6AnalyzeOne read every standing scannable body; 99 MP, the bank
 --      paid three;
---   2. picked at 3 BP, taken back to 2 at target select: no body's loot
---      moved, the queue did not grow, no MP and no points were charged:
---      the turn ends as an unboosted one and banks its pip (Jackpot's rule).
+--   2. picked at 3 BP, then L at target select (#555): the L is refused, and
+--      the Mark runs at 3 exactly as stage 1's confirmed one does (robbed,
+--      read, 99 MP, three points).
 -- A battle with no loot on the field, or where LOCKE cannot act or lacks
 -- 99 MP, is fought out and the next taken.
 -- Old-ROM red and mutants: build/attempts/wt/v032-locke-kit/.
@@ -116,40 +117,34 @@ local function judge()
   end
   H.log(string.format("[mark] stage %d: Master's Mark at %d BP (f%d): MP %d -> %d, bank %d -> %d, queue %d -> %d; %s",
     stage, r.pend, r.f, r.mp0, r.mp1, r.bank0, r.bank1, r.q0, r.q1, table.concat(t, " ")))
-  if stage == 1 then
-    local k = H.vars.kit
-    H.assertEq(k[1] ~= nil and k[1].refusedSeen, true, "at 2 BP the row was refused at the list")
-    H.assertEq(r.pend, 3, "the confirmed Master's Mark ran at 3 BP")
+  local function ranAtThree(tag)
+    H.assertEq(r.pend, 3, tag .. ": the confirmed Master's Mark ran at 3 BP")
     local want = {}
     for s = 0, 5 do
       local b, a = r.bodies[s], r.after[s]
       if b.live then
-        H.assertEq(a.rare == 0xFF and a.common == 0xFF, true, string.format("slot %d was robbed bare", s))
+        H.assertEq(a.rare == 0xFF and a.common == 0xFF, true, string.format("%s: slot %d was robbed bare", tag, s))
         if b.rare ~= 0xFF then want[#want + 1] = b.rare elseif b.common ~= 0xFF then want[#want + 1] = b.common end
-        if b.scan then H.assertEq(r.read[s], true, string.format("slot %d was read (Ot6AnalyzeOne)", s)) end
+        if b.scan then H.assertEq(r.read[s], true, string.format("%s: slot %d was read (Ot6AnalyzeOne)", tag, s)) end
       end
     end
-    H.assertEq(r.q1 - r.q0, #want, string.format("the queue gained one item per body with loot (%d)", #want))
-    H.assertEq(#r.queued, #want, "the action queued exactly those items")
+    H.assertEq(r.q1 - r.q0, #want, string.format("%s: the queue gained one item per body with loot (%d)", tag,
+      #want))
+    H.assertEq(#r.queued, #want, tag .. ": the action queued exactly those items")
     for i, id in ipairs(want) do
-      H.assertEq(r.queued[i], id, string.format("queued item %d is $%02X: the body's rare, else its common", i, id))
+      H.assertEq(r.queued[i], id, string.format("%s: queued item %d is $%02X: the body's rare, else its common", tag,
+        i, id))
     end
-    H.assertEq(r.mp0 - r.mp1, MARK_MP, "Master's Mark cost 99 MP")
-    H.assertEq(r.bank1, r.bank0 - 3, "the bank paid the full boost")
+    H.assertEq(r.mp0 - r.mp1, MARK_MP, tag .. ": Master's Mark cost 99 MP")
+    H.assertEq(r.bank1, r.bank0 - 3, tag .. ": the bank paid the full boost")
+  end
+  if stage == 1 then
+    local k = H.vars.kit
+    H.assertEq(k[1] ~= nil and k[1].refusedSeen, true, "at 2 BP the row was refused at the list")
+    ranAtThree("stage 1")
   else
-    H.assertEq(H.vars.kit[1] ~= nil, true, "the take-back entry was played")
-    H.assertEq(r.pend, 2, "taken back, the action ran at 2 BP")
-    for s = 0, 5 do
-      local b, a = r.bodies[s], r.after[s]
-      if b.live then
-        H.assertEq(a.rare == b.rare and a.common == b.common, true, string.format("slot %d's loot did not move", s))
-      end
-    end
-    H.assertEq(r.q1, r.q0, "the queue did not grow")
-    H.assertEq(#r.queued, 0, "nothing was queued")
-    H.assertEq(r.mp0 - r.mp1, 0, "a Master's Mark under three points costs nothing")
-    H.assertEq(r.bank1, math.min(r.bank0 + 1, 5), "no points were charged: the pending boost is cleared and the "
-      .. "turn banks an unboosted turn's pip")
+    H.assertEq(H.vars.kit[1] ~= nil, true, "the L-at-target entry was played")
+    ranAtThree("stage 2 (L at target select took nothing back, #555)")
   end
   return true
 end
@@ -175,7 +170,7 @@ local function decide()
     plan = { { who = LOCKE, cmd = CMD, row = MARK, boost = 2, refused = "list" },
              { who = LOCKE, cmd = CMD, row = MARK, boost = 3 } }
   else
-    plan = { { who = LOCKE, cmd = CMD, row = MARK, boost = 3, takeBack = 2 } }
+    plan = { { who = LOCKE, cmd = CMD, row = MARK, boost = 3, lowerTo = 2, tgtPresses = 2 } }
   end
 end
 

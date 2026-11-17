@@ -1165,9 +1165,11 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; through command select, the ability list and target select, then goes
 ; live the instant the target is confirmed.
 ;
-; during target select the spend is fully effective and stays legal:
-; Ot6QueueFold reads pending from CreateAction, which runs after target
-; select.  after the confirm, CreateAction has already frozen the tier,
+; during target select the spend is fully effective and stays legal for
+; an action picked off the command window (Fight...): Ot6QueueFold reads
+; pending from CreateAction, which runs after target select.  an action
+; picked from a list keeps the boost the list showed there (#555, below).
+; after the confirm, CreateAction has already frozen the tier,
 ; but Ot6ActionEnd still charges whatever pending reads at action end, so
 ; a spend there would be charged and buy nothing -- Ot6Boost gates input
 ; on Ot6CommittedSlot for exactly that reason.  Refusing silently rather
@@ -1224,6 +1226,35 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         pla
         rts                     ; latched spin: display only, silently
 :       pla
+        ; #555: at the target select of an action picked from a list (a
+        ; spell, a lore, a summon, a kit row, a dance, an item), the boost
+        ; is the one the list showed when the row was picked: its name, its
+        ; price and its grey are drawn there and nowhere else, and the list
+        ; stays on screen through the target select unchanged.  So L and R
+        ; leave the pending boost alone here.  On a spell that can be spread
+        ; over a group (MANUAL | MULTI_TARGET) they are vanilla's spread
+        ; keys, and moving the boost with them cast a tier the list did not
+        ; show: Fire 3 picked at 2 points, spread with L, cast Fire 2 for
+        ; one (the owner, v0.47).  There they are silent; elsewhere R or L
+        ; buzzes, as any refused boost does.  An action picked straight off
+        ; the command window (Fight, Capture...) has no list and keeps L/R.
+        pha
+        lda     $7bc2
+        cmp     #$38            ; target select
+        bne     @free
+        lda     OT6_MENU_RETURN ; the state it returns to: the picking list
+        cmp     #$05            ;   ($05, the command window: no list)
+        beq     @free
+        pla
+        and     #$30
+        beq     @held           ; no L/R edge
+        lda     OT6_MENU_FLAGS  ; the pick's targeting flags
+        and     #$21
+        cmp     #$21            ; MANUAL | MULTI_TARGET: L/R spread it
+        beq     @held
+        inc     $95             ; error buzz: the boost is the list's
+@held:  rts
+@free:  pla
         bit     #$10            ; R: boost up
         beq     @tryl
         jsl     Ot6RowNoBoost   ; #463: not on a row the boost buys nothing
@@ -1234,6 +1265,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         bcs     @deny
         jsr     Ot6BoostRoom    ; and never past the bank, plus a Portrait
         bcc     @deny           ;   gift held (#538)
+        jsl     Ot6RaiseUnpaid  ; #555: nor past what the MP pays for the
+        bcs     @deny           ;   action under the cursor at that boost
 @store: sta     OT6_BOOST_REVEALED,y
         inc     $6281           ; ching (spc $2c): boost committed
         bra     @refold
