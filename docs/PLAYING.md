@@ -114,8 +114,8 @@ Reach spells also cover as many bodies as there are points, skipping anyone
 the spell would not change. Each point costs the spell's MP again, even if
 nobody is left for it.
 
-Extra hits stay on the enemy you picked. A boosted Fight, Pummel or Hired
-Help on one enemy stops when that enemy falls, and the hits left over are
+Extra hits stay on the enemy you picked. A boosted Fight, Pummel, Hired
+Help or Jackpot on one enemy stops when that enemy falls, and the hits left over are
 lost, so boost only as far as that enemy needs. An action that hits every
 enemy, like Coin Toss, keeps going until they are all down.
 
@@ -329,6 +329,9 @@ A boost on Tint, Varnish, Still Life, Underpainting or Gesture reaches one
 more body per point, each paying the price again. A green shield count marks
 an enemy Underpainting waits on, and a green shield one Still Life waits on
 or holds. Two banked points and a Portrait make a divine.
+
+Wearing the Fake Mustache turns her Sketch into Control, as in FF6, and she
+has no list while it is on.
 
 Save before you Sketch: a missed Sketch can still corrupt your inventory or a
 save, as it always could.
