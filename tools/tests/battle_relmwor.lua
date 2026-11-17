@@ -321,6 +321,9 @@ local function closed()
   elseif stage == 4 then
     local ex = lastExec(relm * 2, GESTURE)
     if rec.gestured == nil and ex ~= nil and #endsOf(relm * 2, ex.f) > 0 then
+      -- the Gesture marked her (it took the row) yet wrote no gauge: the
+      -- judge says so; with no mark it found her turn full or queued
+      if (endsOf(relm * 2, ex.f)[1].gest >> terra) & 1 == 1 then return true end
       H.log("[relmwor] the Gesture found TERRA's turn already full or queued: not counted")
       rec.giveUp = true
       return true
@@ -383,6 +386,7 @@ local function judge()
     H.assertEq(hp1 >= t.hp0, true, "the turned action did not hurt her")
     return true
   elseif stage == 4 then
+    H.assertEq(rec.gestured ~= nil, true, "RELM's Gesture, which marked TERRA, filled her gauge ($FF before the mark)")
     local g = rec.gestured
     local e = endsOf(terra * 2, g.f)[1]
     H.log(string.format("[relmwor] Gesture on TERRA at f%d: gauge byte $%02X now, mark $%02X then; her next action "
