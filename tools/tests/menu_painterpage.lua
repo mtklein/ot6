@@ -215,12 +215,12 @@ local function assertList(tag)
   -- the frame: Window1 ({1,1} 7x4) gives the reference tiles
   H.assertEq(vcell(BG2A_V, 1, 22), vcell(BG2A_V, 1, 6), string.format(
     "%s: the list window closes at row 22: its bottom-left corner at BG2A {1,22}", tag))
-  H.assertEq(vcell(BG2A_V, 17, 22), vcell(BG2A_V, 9, 6), string.format(
-    "%s: ... and its bottom-right at {17,22}", tag))
+  H.assertEq(vcell(BG2A_V, 9, 22), vcell(BG2A_V, 9, 6), string.format(
+    "%s: ... and its bottom-right at {9,22}: vanilla's seven columns", tag))
   H.assertEq(vcell(BG2A_V, 1, 21), vcell(BG2A_V, 1, 5), string.format(
     "%s: the Painter row is inside the frame: left border at {1,21}", tag))
-  H.assertEq(vcell(BG2A_V, 17, 7), vcell(BG2A_V, 9, 1), string.format(
-    "%s: the list window's top-right corner stays at {17,7}", tag))
+  H.assertEq(vcell(BG2A_V, 9, 7), vcell(BG2A_V, 9, 1), string.format(
+    "%s: the list window's top-right corner is at {9,7}", tag))
   H.log(string.format("LIST OK (%s): %s, Painter %s, Treasure Hunter %s", tag, who,
     want == WHITE and "white" or "grey", H.readByte(THIEF_COLOR) == WHITE and "white" or "grey"))
 end

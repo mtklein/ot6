@@ -191,6 +191,44 @@ local function refuses(tag)
     end),
   })
 end
+-- the equipped esper's name (BG1 screen B {10,7}, eight cells, DrawEquipGenju)
+-- must not share a cell with any window frame: on the list, the list window's
+-- frame (BG2 screen A); on a page, any window border tile on BG2 screen B.  RELM wears
+-- Ragnarok, eight letters, the longest name a stone has.
+local BG1B_V, BG2A_V, BG2B_V = 0x0400, 0x1000, 0x1400
+local GENJUNAME = H.sym("GenjuName") & 0x3FFFFF
+local function frameTiles(base, x0, y0, x1, y1)
+  local t = {}
+  for x = x0, x1 do t[vcell(base, x, y0)] = true; t[vcell(base, x, y1)] = true end
+  for y = y0, y1 do t[vcell(base, x0, y)] = true; t[vcell(base, x1, y)] = true end
+  return t
+end
+local function assertEsperClear(char, tag, onList)
+  local e = H.readByte(0x1600 + 37 * char + 0x1e)
+  H.assertEq(e ~= 0xff, true, tag .. ": an esper is equipped")
+  local frames
+  if onList then
+    frames = frameTiles(BG2A_V, 1, 7, 9, 22)              -- the list window
+  else
+    -- a page shows BG2 screen B, where no list window is drawn: the frame
+    -- tiles every window border uses, read off the list screen's
+    -- Espers/Magic window (BG2A {1,1}-{9,6}), which stays in VRAM
+    frames = frameTiles(BG2A_V, 1, 1, 9, 6)
+  end
+  local text = ""
+  for k = 0, 7 do
+    local want = H.readRomByte(GENJUNAME + e * 8 + k)
+    local got = vcell(BG1B_V, 10 + k, 7)
+    H.assertEq(got & 0xff, want, string.format("%s: the esper's name letter %d at BG1B {%d,7}", tag, k + 1, 10 + k))
+    local under = vcell(onList and BG2A_V or BG2B_V, 10 + k, 7)
+    H.assertEq(frames[under] == nil, true, string.format(
+      "%s: the esper's name cell {%d,7} sits on no window frame (BG2 tile $%04X)", tag, 10 + k, under))
+    if want >= 0x80 and want <= 0x99 then text = text .. string.char(65 + want - 0x80)
+    elseif want >= 0x9a and want <= 0xb3 then text = text .. string.char(97 + want - 0x9a) end
+  end
+  H.log(string.format("ESPER OK (%s): '%s' at BG1B {10,7}-{17,7}, clear of every frame", tag, text))
+end
+
 local function opensPage(tag, shot)
   return H.seqStep({
     toPainter(tag .. ": cursor to Painter"),
@@ -199,6 +237,8 @@ local function opensPage(tag, shot)
     H.waitFrames(90),
     H.call(function()
       assertAllRows(tag)
+      local c = H.readByte(ZCHARID + H.readByte(ZSELINDEX))
+      if H.readByte(0x1600 + 37 * c + 0x1e) ~= 0xff then assertEsperClear(c, tag .. " page", false) end
       if shot then H.screenshot(shot) end
     end),
     H.pressButtons({ "b" }, 3),
@@ -238,7 +278,7 @@ local function battleCmds(char)
   end
 end
 
-H.run({ maxFrames = 200000 }, {
+H.run({ maxFrames = 300000 }, {
   H.bootCheckpoint("wor-gogo-v1"),
   H.waitUntil(function() return H.worldSettled() end, 1200, "world settled", 5),
   H.call(function()
@@ -277,7 +317,11 @@ H.run({ maxFrames = 200000 }, {
 
   -- 1. RELM's complete page; the others grey
   openSkills(CHAR_RELM, "RELM"),
-  H.call(function() assertColor(CHAR_RELM, WHITE, "RELM") end),
+  H.call(function()
+    assertColor(CHAR_RELM, WHITE, "RELM")
+    assertEsperClear(CHAR_RELM, "RELM's list", true)
+    H.screenshot("painterpage_esper_list")
+  end),
   opensPage("RELM complete", "painterpage_complete"),
   H.call(function()
     H.assertEq(H.readByte(ZCURSOR), ROW_PAINTER, "back on the list on Painter")
@@ -397,6 +441,49 @@ H.run({ maxFrames = 200000 }, {
       "in battle RELM with the Mustache has Control and no Sketch: no painter's list, as the field said")
     H.assertEq(has(g, CMD_SKETCH), true, "in battle GOGO has Sketch: his list opens, as the field said")
     H.log("BATTLE OK: the field menu and the battle agree")
+  end),
+  H.fightBattleByMenu(40000),
+  H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the map", 5),
+
+  -- 5. the Mustache moves to GOGO, who carries Sketch: grey there too, and Control in battle
+  H.unequipRelics(CHAR_RELM, { 4 }, { tag = "RELM: Mustache off" }),
+  H.waitUntil(function() return H.worldSettled() end, 1800, "back on the map", 5),
+  H.equipLoadout(CHAR_GOGO, { { 4, FAKE_MUSTACHE } }, { tag = "GOGO: Fake Mustache" }),
+  H.waitUntil(function() return H.worldSettled() end, 1800, "back on the map", 5),
+  H.call(function() H.assertEq(wears(CHAR_GOGO, FAKE_MUSTACHE), true, "GOGO wears the Fake Mustache") end),
+  -- Painter was the only row that opened his Skills menu (Tools gave way
+  -- above), so with it grey the menu itself refuses him, as a character with
+  -- no skill to show (CheckSkillValid)
+  openMain("GOGO with the Mustache: main menu"),
+  H.waitFrames(20),
+  mainRow(1, "GOGO with the Mustache: Skills"),
+  H.pressButtons({ "a" }, 2),
+  H.waitUntil(function() return st() == ST_CHAR end, 300, "GOGO with the Mustache: character select", 5),
+  H.waitFrames(10),
+  H.driveUntil(function() return st() == ST_CHAR and H.readByte(ZCHARID + H.readByte(ZCURSOR)) == CHAR_GOGO end,
+    900, { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "GOGO with the Mustache: the character"),
+  H.pressButtons({ "a" }, 2),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(st(), ST_CHAR, "GOGO with Sketch and the Mustache has no Skills row to open: A refuses him")
+    H.log("REFUSE OK (GOGO with Sketch and the Mustache: no Skills menu)")
+  end),
+  closeMenu("out"),
+  openSkills(CHAR_RELM, "RELM without the Mustache"),
+  H.call(function() assertColor(CHAR_RELM, WHITE, "RELM without the Mustache") end),
+  closeMenu("out"),
+  lap(),
+  H.waitUntil(function() return H.battleActive() end, 900, "second battle up", 5),
+  H.waitFrames(30),
+  H.call(function()
+    local r, g = battleCmds(CHAR_RELM), battleCmds(CHAR_GOGO)
+    local function has(t, c) for _, v in ipairs(t) do if v == c then return true end end return false end
+    H.log(string.format("battle commands: RELM %02X %02X %02X %02X, GOGO %02X %02X %02X %02X",
+      r[1], r[2], r[3], r[4], g[1], g[2], g[3], g[4]))
+    H.assertEq(has(g, CMD_CONTROL) and not has(g, CMD_SKETCH), true,
+      "in battle GOGO with Sketch and the Mustache has Control and no Sketch, as the field said")
+    H.assertEq(has(r, CMD_SKETCH), true, "RELM without it has Sketch again")
+    H.log("BATTLE OK: GOGO's Mustache agrees too")
   end),
   H.fightBattleByMenu(40000),
 })

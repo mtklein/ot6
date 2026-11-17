@@ -1,15 +1,21 @@
--- @suite savestate=celes_freed
--- menu_thiefpage.lua -- the field Skills->Thief page.
+-- @suite
+-- menu_thiefpage.lua -- the field Skills->Treasure Hunter page.
 --
--- The skills list has an 8th row, Treasure Hunter (the page's internal name
--- stays "thief"), gated like every other row by the
--- character's own battle commands, and A on it opens a field info page in
--- the Blitz page's shape: one column, name + MP price per row, B backs out,
--- A is a no-op.  Eight rows, the battle list's order read a column at a
--- time (ot6_thief.asm Ot6ThiefRowTbl): Steal, Filch and Bestow from the
--- moment Locke joins; Mug, Trickshot, Dismantle, Appraise and Master's Mark
--- once their story beat's event switch is set (#382), the Blitz page's
--- locked marker before that.
+-- The skills list's 8th row (the page's internal name stays "thief") reads
+-- Locke's battle command's name, BattleCmdName's Steal record ("TresHnt"),
+-- inside the list window's vanilla seven columns (#549, the owner: "the same
+-- abbrev we do in the combat menus, much like SwdTech above for cyan").  It is
+-- gated like every other row by the character's own battle commands, and by
+-- the relic rewrite battle makes: a worn Thief Glove turns Steal into
+-- Capture, which opens no list in battle, so the row greys and A on it
+-- refuses.  A on a white row opens a field info page in the Blitz page's
+-- shape: one column, name + MP price per row, B backs out, A is a no-op.
+-- Eight rows, the battle list's order read a column at a time (ot6_thief.asm
+-- Ot6ThiefRowTbl): Steal, Filch and Bestow from the moment Locke joins; Mug,
+-- Trickshot, Dismantle, Appraise and Master's Mark once their story beat's
+-- event switch is set (#382), the Blitz page's locked marker before that.
+-- The page's own title box reads "Treasure Hunter" in full (its own wide
+-- box, put back by B).
 --
 -- Names come from the ROM's own Ot6ThiefName records (one per row, in
 -- order).  Prices come from the same two authorities the battle charge
@@ -21,24 +27,31 @@
 -- row 15), name at column 3 flush against the cursor at x=8
 -- (cursor_x = 8*col - 16), price right-aligned at column 16.
 --
--- Fixture: celes_freed, the real just-freed-Celes save, after the Lete
--- River ($001A: Trickshot learned) and before his escape ($001E: Mug not
--- yet), so the page shows both kinds of row.  LOCKE carries
--- Steal (his own record) so his row is white and the page opens; CELES does
--- not, so her row is gray and A on it refuses.  Both paths run on one save
--- with zero memory writes.
+-- Boot: cold Continue of ultros-won-v1, beside Esper Mountain's save point
+-- (#549 moved it off the celes_freed savestate, which every ROM change
+-- stales, onto a tracked battery): TERRA, LOCKE, STRAGO, RELM seated, LOCKE
+-- with some of his later rows learned and Master's Mark not.  LOCKE carries
+-- Steal (his own record) so his row is white and the page opens; TERRA does
+-- not, so hers is grey and A on it refuses.  Then the Thief Glove: no save
+-- the line makes holds one, so one is put in the bag (a declared two-byte
+-- write, tools/state_write_waivers.txt), LOCKE puts it on through the Relic
+-- menu, his row is grey and refuses, and in the next random battle his
+-- command rows hold Capture ($06) and no Steal ($05): the field agrees with
+-- the battle.  The battle is fought through the Fight menu.
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/celes_freed.mss.lua"
 
 local ZMENUSTATE, ZCURSOR, ZSELINDEX = 0x26, 0x4b, 0x28
 local ZCHARID = 0x69                    -- zCharID::Slot1..4 (menu_ram.inc)
 local THIEF_ROW_COLOR = 0x80            -- zSkillsTextColor::Thief (menu_ram.inc)
-local CHAR_LOCKE, CHAR_CELES = 0x01, 0x06
+local CHAR_LOCKE, CHAR_TERRA = 0x01, 0x00   -- TERRA: the grey control
+local THIEF_GLOVE, CMD_CAPTURE = 0xcf, 0x06
+local RELIC_CAPTURE = 0x40              -- ItemProp+10 / $11d6: Steal -> Capture
 local BATTLE_CMD_STEAL = 0x05
 local ST_MAIN, ST_CHAR, ST_SKILLS, ST_THIEF = 0x05, 0x06, 0x0a, 0x30
 local SKILLS_ROW_THIEF = 7              -- Espers Magic SwdTech Blitz Lore Rage Dance THIEF
 
-local function st() return H.readByte(ZMENUSTATE) end
+local function st() return H.menuRunning() and H.readByte(ZMENUSTATE) or -1 end
 
 -- ---- the name on the list and on the page's title box (VRAM, what shows) ----
 -- Locke's row is "Treasure Hunter", the word he insists on in the story, on
@@ -51,7 +64,22 @@ local function st() return H.readByte(ZMENUSTATE) end
 local VR = emu.memType.snesVideoRam
 local function vcell(base, x, y) return emu.readWord((base + y * 32 + x) * 2, VR) end
 local BG2A_V, BG2B_V, BG3A_V, BG3B_V = 0x1000, 0x1400, 0x4000, 0x4400
-local TITLE = "Treasure Hunter"
+local TITLE = "Treasure Hunter"          -- the page's own title box
+-- the list row: the battle command window's name for Steal
+local CMDNAMES = H.sym("BattleCmdName") & 0x3FFFFF
+local function rowName()
+  local t = {}
+  for k = 0, 6 do t[#t + 1] = H.readRomByte(CMDNAMES + BATTLE_CMD_STEAL * 7 + k) end
+  return t
+end
+local function rowText()
+  local s = ""
+  for _, b in ipairs(rowName()) do
+    if b >= 0x80 and b <= 0x99 then s = s .. string.char(65 + b - 0x80)
+    elseif b >= 0x9a and b <= 0xb3 then s = s .. string.char(97 + b - 0x9a) else s = s .. "." end
+  end
+  return s
+end
 local function enc(ch)                  -- menu text codec, letters and space
   local b = ch:byte()
   if ch == " " then return 0xff end
@@ -230,13 +258,10 @@ local function assertThiefRow(i)
   assertRun(COST_COL + 2, y, MP_SUFFIX, string.format("thief row %d ' MP'", i))
 end
 
-local lockeSlot, celesSlot = nil, nil
+local lockeSlot, terraSlot = nil, nil
 
-H.run({ maxFrames = 30000 }, {
-  H.waitFrames(20),
-  H.loadState(STATE),
-  H.waitFrames(10),
-  H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
+H.run({ maxFrames = 120000 }, {
+  H.bootCheckpoint("ultros-won-v1"),
 
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
@@ -247,11 +272,11 @@ H.run({ maxFrames = 30000 }, {
       local id = H.readByte(ZCHARID + s)
       ids[#ids + 1] = string.format("slot %d = char $%02x", s, id)
       if id == CHAR_LOCKE and lockeSlot == nil then lockeSlot = s end
-      if id == CHAR_CELES and celesSlot == nil then celesSlot = s end
+      if id == CHAR_TERRA and terraSlot == nil then terraSlot = s end
     end
     H.log("party: " .. table.concat(ids, ", "))
-    H.assertEq(lockeSlot ~= nil, true, "celes_freed's party contains LOCKE")
-    H.assertEq(celesSlot ~= nil, true, "celes_freed's party contains CELES")
+    H.assertEq(lockeSlot ~= nil, true, "ultros-won-v1's party contains LOCKE")
+    H.assertEq(terraSlot ~= nil, true, "ultros-won-v1's party contains TERRA, the grey control")
     local function hasSteal(char)
       local rec = 0x1600 + 37 * char
       for i = 0, 3 do
@@ -261,17 +286,23 @@ H.run({ maxFrames = 30000 }, {
     end
     H.assertEq(hasSteal(CHAR_LOCKE), true,
       "LOCKE's own record carries BATTLE_CMD::STEAL -- nothing is installed")
-    H.assertEq(hasSteal(CHAR_CELES), false,
-      "CELES's record does not carry Steal -- she is the gray-row control")
+    H.assertEq(hasSteal(CHAR_TERRA), false,
+      "TERRA's record does not carry Steal -- she is the gray-row control")
     for i = 0, ROWS - 1 do
       H.log(string.format("thief row %d $%02X %s costs %d MP, %s", i, rowId(i), nameText(i), costOf(rowId(i)),
         learned(i) and "learned" or "not learned yet"))
     end
-    H.assertEq(learned(4), true, "the Lete River is behind this save: Trickshot is learned ($001A)")
-    H.assertEq(learned(3), false, "his escape is ahead of this save: Mug is not learned ($001E)")
+    local later, locked = 0, 0
+    for i = 3, ROWS - 1 do
+      if learned(i) then later = later + 1 else locked = locked + 1 end
+    end
+    H.assertEq(later > 0 and locked > 0, true, string.format(
+      "the save has later rows learned (%d) and rows still locked (%d): both kinds draw", later, locked))
+    H.assertEq(H.readByte(0x1600 + 37 * CHAR_LOCKE + 0x23) ~= THIEF_GLOVE
+      and H.readByte(0x1600 + 37 * CHAR_LOCKE + 0x24) ~= THIEF_GLOVE, true, "LOCKE wears no Thief Glove yet")
   end),
-  H.pressButtons({ "down" }, 2),            -- Items -> Skills
-  H.waitFrames(6),
+  H.driveUntil(function() return st() == ST_MAIN and H.readByte(ZCURSOR) == 1 end, 600,
+    { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "main menu cursor to Skills"),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_CHAR end, 300, "character select", 5),
   H.waitFrames(10),
@@ -283,15 +314,18 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     H.assertEq(H.readByte(THIEF_ROW_COLOR), 0x20,
       "Thief row white for LOCKE -- his own record carries Steal")
-    assertVText(BG3A_V, 2, 19, TITLE, "Skills list row 8")
-    H.assertEq(vcell(BG2A_V, 17, 7), vcell(BG2A_V, 9, 1),
-      "the list window is 15 tiles wide: its top-right corner at BG2A {17,7} "
+    for k, b in ipairs(rowName()) do
+      H.assertEq(vcell(BG3A_V, 1 + k, 19) & 0xff, b, string.format(
+        "Skills list row 8 reads the battle command's name '%s': letter %d at {%d,19}", rowText(), k, 1 + k))
+    end
+    H.assertEq(vcell(BG2A_V, 9, 7), vcell(BG2A_V, 9, 1),
+      "the list window is vanilla's 7 tiles wide: its top-right corner at BG2A {9,7} "
       .. "is the Espers/Magic window's corner tile ({9,1})")
     for y = 4, 6 do
       for x = 0, 31 do box0[#box0 + 1] = vcell(BG2B_V, x, y) end
     end
     H.screenshot("thiefpage_list")
-    H.log("LIST OK: Locke's row reads '" .. TITLE .. "' inside a 15-tile list window")
+    H.log("LIST OK: Locke's row reads '" .. rowText() .. "' (BattleCmdName) inside the 7-tile list window")
   end),
 
   H.driveUntil(function()
@@ -367,18 +401,18 @@ H.run({ maxFrames = 30000 }, {
   end),
 
   H.driveUntil(function()
-    return st() == ST_SKILLS and H.readByte(ZSELINDEX) == celesSlot
+    return st() == ST_SKILLS and H.readByte(ZSELINDEX) == terraSlot
   end, 900, { H.pressButtons({ "r" }, 2), H.waitFrames(30) },
-    "shoulder R to CELES"),
+    "shoulder R to TERRA"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.readByte(THIEF_ROW_COLOR), 0x24,
-      "Thief row gray for CELES -- no Steal in her record")
+      "Thief row gray for TERRA -- no Steal in her record")
   end),
   H.driveUntil(function()
     return st() == ST_SKILLS and H.readByte(ZCURSOR) == SKILLS_ROW_THIEF
   end, 900, { H.pressButtons({ "down" }, 2), H.waitFrames(6) },
-    "CELES's cursor to the Thief row"),
+    "TERRA's cursor to the Thief row"),
   H.pressButtons({ "a" }, 2),
   H.waitFrames(30),
   H.call(function()
@@ -388,4 +422,83 @@ H.run({ maxFrames = 30000 }, {
     H.log("GATING OK: white for the Steal owner and the page opens; gray for "
       .. "everyone else and A goes nowhere")
   end),
+
+  -- the Thief Glove: Capture in battle, so no page in the field
+  H.driveUntil(function() return H.hasControl() and not H.menuRunning() end, 1800,
+    { H.pressButtons({ "b" }, 3), H.waitFrames(30) }, "out of the menu"),
+  H.waitFrames(20),
+  H.call(function()
+    -- the static half: the glove's relic-effects byte carries the rewrite,
+    -- and no esper rung does (gear is the whole answer)
+    local ip, lad = H.sym("ItemProp") & 0x3FFFFF, H.sym("Ot6LadderTbl") & 0x3FFFFF
+    H.assertEq(H.readRomByte(ip + THIEF_GLOVE * 30 + 10) & RELIC_CAPTURE, RELIC_CAPTURE,
+      "the Thief Glove's relic-effects byte (ItemProp+10) carries Steal -> Capture ($40)")
+    for r = 0, 26 * 5 - 1 do
+      H.assertEq(H.readRomByte(lad + r * 14 + 5) & RELIC_CAPTURE, 0, string.format(
+        "esper ladder rung %d does not turn Steal into Capture", r))
+    end
+    -- the declared write (the header): one Thief Glove into an empty bag slot
+    local slot
+    for i = 0, 255 do
+      if slot == nil and H.readByte(0x1869 + i) == 0xff then slot = i end
+    end
+    H.assertEq(slot ~= nil, true, "the bag has an empty slot")
+    H.writeByte(0x1869 + slot, THIEF_GLOVE)
+    H.writeByte(0x1969 + slot, 1)
+    H.log(string.format("[thiefpage] declared: a Thief Glove in bag slot %d", slot))
+  end),
+  H.equipLoadout(CHAR_LOCKE, { { 4, THIEF_GLOVE } }, { tag = "LOCKE: Thief Glove" }),
+  H.waitUntil(function() return H.hasControl() and not H.menuRunning() end, 1800, "back in the field", 5),
+  H.driveUntil(function() return st() == ST_MAIN end, 1200,
+    { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu again"),
+  H.waitFrames(20),
+  H.driveUntil(function() return st() == ST_MAIN and H.readByte(ZCURSOR) == 1 end, 600,
+    { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "main menu cursor to Skills"),
+  H.pressButtons({ "a" }, 2),
+  H.waitUntil(function() return st() == ST_CHAR end, 300, "character select", 5),
+  H.waitFrames(10),
+  H.driveUntil(function() return st() == ST_CHAR and H.readByte(ZCURSOR) == lockeSlot end, 900,
+    { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "cursor onto LOCKE"),
+  H.pressButtons({ "a" }, 2),
+  H.waitUntil(function() return st() == ST_SKILLS end, 300, "LOCKE's skills list with the glove", 5),
+  H.waitFrames(20),
+  H.call(function()
+    H.assertEq(H.readByte(THIEF_ROW_COLOR), 0x24,
+      "with the Thief Glove LOCKE's row is grey: Capture in battle, no list")
+    H.screenshot("thiefpage_glove")
+  end),
+  H.driveUntil(function()
+    return st() == ST_SKILLS and H.readByte(ZCURSOR) == SKILLS_ROW_THIEF
+  end, 900, { H.pressButtons({ "down" }, 2), H.waitFrames(6) }, "cursor to the grey row"),
+  H.pressButtons({ "a" }, 2),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(st(), ST_SKILLS, "A on the gloved LOCKE's grey row refuses")
+    H.log("GLOVE OK: grey and refused with the Thief Glove on")
+  end),
+  H.driveUntil(function() return H.hasControl() and not H.menuRunning() end, 1800,
+    { H.pressButtons({ "b" }, 3), H.waitFrames(30) }, "out of the menu"),
+  H.paceToEncounter("thiefpage", 0, { { 6, 45 }, { 4, 45 } }),
+  H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
+  H.waitFrames(30),
+  H.call(function()
+    local cmds
+    for a = 0, 3 do
+      if H.readByte(0x3ED8 + a * 2) == CHAR_LOCKE then
+        cmds = {}
+        for r = 0, 3 do cmds[#cmds + 1] = H.readByte(0x202E + a * 12 + r * 3) end
+      end
+    end
+    H.assertEq(cmds ~= nil, true, "LOCKE is in the battle")
+    H.log(string.format("battle commands: LOCKE %02X %02X %02X %02X", cmds[1], cmds[2], cmds[3], cmds[4]))
+    local cap, steal = false, false
+    for _, c in ipairs(cmds) do
+      if c == CMD_CAPTURE then cap = true end
+      if c == BATTLE_CMD_STEAL then steal = true end
+    end
+    H.assertEq(cap and not steal, true,
+      "in battle the gloved LOCKE has Capture and no Steal: no list, as the field said")
+    H.log("BATTLE OK: the field menu and the battle agree")
+  end),
+  H.fightBattleByMenu(40000),
 })

@@ -24,6 +24,10 @@ Painter lists her eight rows in the order her battle list uses, with their
 MP prices, and marks the ones she has not learned yet as locked. Gogo sees
 the same page while he carries Sketch. The row is greyed out while the Fake
 Mustache is worn, since Relm then has Control in battle and no list.
+Locke's row in the same list now reads TresHnt, the name his battle command
+shows, and is greyed out while he wears the Thief Glove, since he then has
+Capture and no list. The list is back to its original width, so the name of
+an equipped Esper beside it is no longer drawn over its border.
 
 ## Saves
 

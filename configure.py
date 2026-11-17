@@ -494,6 +494,11 @@ TEST_ENV = {
     # (Still Life's 32-tick break)
     "battle_relmwor": "OT6_TIMEOUT=7200 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
+    # #549: LOCKE's Treasure Hunter page (moved off celes_freed onto this
+    # battery), his row greyed by a Thief Glove, and one random battle where
+    # his commands agree
+    "menu_thiefpage": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
     # #549: RELM's Painter page in the field Skills menu, early (three rows
     # learned) beside Esper Mountain's save point; menus only
     "menu_painterpage":

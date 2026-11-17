@@ -385,12 +385,12 @@ _c34c80:
         ldy     #near SkillsDanceText
         jsr     DrawPosKana
 .if LANG_EN
-        lda     zSkillsTextColor::Thief ; the 8th row, Locke's page
-        sta     zTextColor
-        ldy     #near SkillsThiefText
-        jsr     DrawPosKana
-        jmp     Ot6SkillsPainterRow     ; the 9th, Relm's, then TfrBG3ScreenAB
+        jmp     Ot6SkillsKitRows        ; the 8th row (Locke's, his battle
+                                        ;   command's name) and the 9th
+                                        ;   (Relm's), then TfrBG3ScreenAB
                                         ;   (ot6_painter_page.asm)
+        .res    10, $ea                 ; the bytes the 8th row's draw took
+                                        ;   here, kept so nothing moves
 .else
         jmp     TfrBG3ScreenAB
 .endif
@@ -511,7 +511,7 @@ DrawMagicMenu:
 .if LANG_EN
 
 SkillsOptionsWindow1:                   make_window BG2A, {1, 1}, {7, 4}
-SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {15, 14}
+SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {7, 14}
                                         ; 12 -> 14 for Painter at BG3A row
                                         ;   21 (#549); its frame closes at
                                         ;   row 22, over the empty spell
@@ -521,13 +521,12 @@ SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {15, 14}
                                         ;   height units per text row: at 10
                                         ;   the frame closed under Dance and
                                         ;   the Thief row floated outside it.
-                                        ; 7 -> 15 wide for "Treasure Hunter"
-                                        ;   (columns 2-16): the frame's right
-                                        ;   edge is column 17, one short of
-                                        ;   the LV/HP/MP labels at column 18,
-                                        ;   and what it covers of the
-                                        ;   character window is the portrait's
-                                        ;   corner, empty on this screen
+                                        ; vanilla's 7 wide again (#549, the
+                                        ;   owner): Locke's row reads his
+                                        ;   battle command's seven letters
+                                        ;   (TresHnt), and v0.47's 15-wide
+                                        ;   frame ran under the equipped
+                                        ;   esper's name at BG1B {10,7}
 SkillsCharWindow1:                      make_window BG2A, {1, 6}, {28, 5}
 SkillsMagicWindow1:                     make_window BG2A, {1, 13}, {28, 12}
 SkillsDescWindow1:                      make_window BG2A, {1, 1}, {28, 3}
@@ -3636,6 +3635,9 @@ SkillsRageText:                 pos_text SKILLS_LIST_RAGE
 SkillsDanceText:                pos_text SKILLS_LIST_DANCE
 .if LANG_EN
 SkillsThiefText:                pos_text SKILLS_LIST_THIEF      ; issue #68
+                                        ; (unread since #549: the row is
+                                        ;   BattleCmdName's; kept so nothing
+                                        ;   moves)
 .endif
 
 SkillsCharLabelTextList:

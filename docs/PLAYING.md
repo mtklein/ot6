@@ -196,8 +196,10 @@ the common item if not. A boost never makes up an item the enemy lacks.
 Only the first shield Filch takes becomes a point for Locke. His skills are
 in the list behind Steal, the ones he has learned packed from the top in this
 table's order, down the left column and then the right. In the field menu,
-Skills > Treasure Hunter shows all eight in the same order, with the ones
-still to learn marked locked.
+the Skills list's TresHnt row (the name his battle command shows) opens the
+Treasure Hunter page: all eight in the same order, with the ones still to
+learn marked locked. The Thief Glove turns Steal into Capture, as in FF6,
+and he has no list while it is on, so the row is greyed out then.
 
 ### Edgar, Machinist (spear)
 

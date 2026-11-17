@@ -46,25 +46,55 @@
 MENU_STATE_PAINTER = $31                ; vanilla $30-$32 are unused (menu_misc
                                         ;   .asm); $30 is the Thief page's
 OT6_RELIC_CONTROL  = $10                ; ItemProp+10 / $11d6: Sketch -> Control
+OT6_RELIC_CAPTURE  = $40                ;   and Steal -> Capture (Thief Glove)
 
 ; ------------------------------------------------------------------------------
 
-; [ the Skills list: draw the ninth row, then vanilla's tail ]
-; _c34c80's last jmp comes here.
-Ot6SkillsPainterRow:
+; [ the Skills list: draw the eighth and ninth rows, then vanilla's tail ]
+; _c34c80's tail comes here.  Locke's row reads his battle command's name,
+; BattleCmdName's Steal record ("TresHnt"), the string the battle command
+; window draws, so the two cannot drift and the row fits the list's vanilla
+; seven columns (the owner, #549: "the same abbrev we do in the combat
+; menus, much like SwdTech above for cyan").
+Ot6SkillsKitRows:
+        lda     zSkillsTextColor::Thief
+        sta     zTextColor
+        ldy_pos BG3A, {2, 19}
+        jsr     InitTextBuf             ; the position header; WMADD at the text
+        ldx     #BATTLE_CMD::STEAL * BattleCmdName::ITEM_SIZE
+        ldy     #BattleCmdName::ITEM_SIZE
+:       lda     f:BattleCmdName,x
+        sta     hWMDATA
+        inx
+        dey
+        bne     :-
+        stz     hWMDATA
+        jsr     DrawPosTextBuf
         lda     zSkillsTextColor::Painter
         sta     zTextColor
         ldy     #near SkillsPainterText
         jsr     DrawPosKana
         jmp     TfrBG3ScreenAB
 
-; [ the Skills list: the ninth row's colour ]
+; [ the Skills list: the eighth and ninth rows' colours, as battle has them ]
 ; _c34d3d's `lda 0,y` comes here (a jsr in its three bytes), after the scan
 ; has coloured the other eight and with Y the character's record.  The init
-; loop has already greyed the row.  out: A = the actor byte, as `lda 0,y`
-; left it (flags too).  a8/i16.  clobbers X.
+; loop has already greyed the Painter row.  Then the relic rewrite battle
+; makes (RelicCmdTbl1/2): a worn Thief Glove turns Steal into Capture, which
+; opens no list in battle (ot6_thief.asm's header: command $06 keeps vanilla
+; Capture), so the Treasure Hunter row greys as the Painter row does under
+; the Fake Mustache.  out: A = the actor byte, as `lda 0,y` left it (flags
+; too).  a8/i16.  clobbers X.
 Ot6SkillsPainterColor:
-        phy
+        lda     zSkillsTextColor::Thief
+        cmp     #$20
+        bne     @paint                  ; no Steal: grey already
+        lda     #OT6_RELIC_CAPTURE
+        jsr     Ot6WornRelicCmd
+        beq     @paint
+        lda     #$24                    ; Capture in battle: grey
+        sta     zSkillsTextColor::Thief
+@paint: phy
         ldx     #$0004
 @cmd:   lda     $0016,y                 ; battle commands
         cmp     #BATTLE_CMD::SKETCH
@@ -76,29 +106,43 @@ Ot6SkillsPainterColor:
         bra     @done                   ; no Sketch: grey
 @sketch:
         ply
-        phy
+        lda     #OT6_RELIC_CONTROL
+        jsr     Ot6WornRelicCmd
+        bne     @done                   ; Control in battle: stays grey
+        lda     #$20                    ; Sketch, and Sketch in battle: white
+        sta     zSkillsTextColor::Painter
+@done:  lda     0,y                     ; the instruction the hook replaced
+        rts
+
+; [ does a worn piece carry this relic command rewrite? ]
+; in: A = the $11d6 bit (OT6_RELIC_*), Y = the character's record.  out: Z
+; clear (A nonzero) when one of the six worn pieces' relic-effects byte
+; (ItemProp+10, the byte UpdateEquip ORs into $11d6 and the battle's
+; RelicCmdTbl rewrite tests) carries it.  The pieces are read as UpdateEquip
+; reads them ($ff included: its record is all zero).  a8/i16.  preserves Y;
+; clobbers X; no direct-page scratch (CheckShoulderBtns holds its next state
+; in $e0 across CheckSkillValid).
+Ot6WornRelicCmd:
+        pha                             ; [1,s] the bit
+        phy                             ; [3,s] the bit
         ldx     #$0006
-@gear:  lda     $001f,y                 ; the six worn pieces, as UpdateEquip
-        sta     hWRMPYA                 ;   reads them ($ff included: its
-        lda     #30                     ;   record is all zero)
+@gear:  lda     $001f,y
+        sta     hWRMPYA
+        lda     #30
         sta     hWRMPYB
         phx
         nop2
         ldx     hRDMPYL
         lda     f:ItemProp+10,x         ; relic effects, the $11d6 byte
         plx
-        and     #OT6_RELIC_CONTROL
-        bne     @control
+        and     $03,s
+        bne     @out
         iny
         dex
-        bne     @gear
-        ply
-        lda     #$20                    ; Sketch, and Sketch in battle: white
-        sta     zSkillsTextColor::Painter
-        bra     @done
-@control:
-        ply                             ; Control in battle: stays grey
-@done:  lda     0,y                     ; the instruction the hook replaced
+        bne     @gear                   ; (A = 0 when the loop ends)
+@out:   ply
+        sta     $01,s                   ; the answer over the bit
+        pla                             ; Z from the answer
         rts
 
 ; [ the Skills list's cursor positions: vanilla's eight, then Painter ]

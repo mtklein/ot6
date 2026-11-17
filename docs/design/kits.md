@@ -646,7 +646,10 @@ the left, Trickshot, Dismantle, Appraise and Master's Mark down the right
 (`Ot6ThiefRowTbl`), a row blank until it is learned, priced, with
 unaffordable rows greyed. The field Skills page lists the same eight in the
 same order, read a column at a time, with the Blitz page's locked marker on a
-row not learned yet. This
+row not learned yet; its row in the Skills list reads his battle command's
+name (`BattleCmdName`, "TresHnt", in the list's vanilla seven columns), and a
+worn Thief Glove greys it, since his command is then Capture with no list
+(#549, `menu_thiefpage`). This
 arrangement is forced, because **Locke has no spare command slot.**
 `char_prop.asm:160`
 records FIGHT, STEAL, MAGIC, ITEM; the apparently blank third row is MAGIC
