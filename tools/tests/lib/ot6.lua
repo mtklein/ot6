@@ -16142,9 +16142,12 @@ end
 M.shadowLines = {}       -- every trap line this run, oldest first
 -- The policy itself, a pure function of a snapshot (shadowpin_policy_selftest holds it to the rules above):
 --   s.event   the battle is an event battle; s.row SHADOW's Throw row is there
---   s.mons[slot] = { up, st3 (status 3), broken (break ticks), allowed ($3330's status-3 byte), hp }
+--   s.mons[slot] = { up, st3 (status 3), broken (break ticks), allowed ($3330's status-3 byte), hp,
+--                    species (OT6_SPECIES, $57C0: the body standing in the slot, one called in mid-battle
+--                    too, where the formation's opening line-up, M.monsterIds, reads $FFFF) }
 --   s.bag     { { id, price, sold (M.itemSold), throw (the bag's Throw flag), spare (count above the reserve) }, ... }
--- -> nil, or { kind = "pin" | "hobble", slot, why, item, price }, or { kind = "none" } with nothing to throw
+-- -> nil, or { kind = "pin" | "hobble", slot, species, why, item, price }, or { kind = "none" } with nothing to
+-- throw
 function M.shadowPolicy(s)
   if not s.event or not s.row then return nil end
   local pin, hobble
@@ -16170,7 +16173,8 @@ function M.shadowPolicy(s)
     end
   end
   if item == nil then return { kind = "none", why = "no throwable in the bag" } end
-  return { kind = kind, slot = aim.slot, why = aim.why, item = item, price = price }
+  return { kind = kind, slot = aim.slot, species = s.mons[aim.slot].species, why = aim.why, item = item,
+    price = price }
 end
 function Driver:shadowLine(actor, boost)
   if self.opts.shadowpin == false or M.SHADOWPIN_OFF or rawget(_G, "SHADOWPIN_OFF") then return nil end
@@ -16180,7 +16184,7 @@ function Driver:shadowLine(actor, boost)
   for slot = 0, 5 do
     local e = 8 + 2 * slot
     s.mons[slot] = { up = monAlive(slot), st3 = M.readByte(0x3EF8 + e), broken = M.readByte(0x3E88 + e),
-      allowed = M.readByte(0x3330 + e), hp = M.readWord(0x3BF4 + e) }
+      allowed = M.readByte(0x3330 + e), hp = M.readWord(0x3BF4 + e), species = M.readWord(0x57C0 + 2 * slot) }
   end
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
@@ -16198,7 +16202,7 @@ function Driver:shadowLine(actor, boost)
     end
     return nil
   end
-  local sp = M.monsterIds()[d.slot + 1] or 0
+  local sp = d.species or 0
   M.log(string.format("[shadow] %s slot %d $%03X: %s, $%02X (%d gil)", d.kind, d.slot, sp, d.why, d.item, d.price))
   M.shadowLines[#M.shadowLines + 1] = { kind = d.kind, slot = d.slot, species = sp, item = d.item, frame = M.frame }
   return { kind = "throw", item = d.item, row = row, boostLeft = boost, aim = d.slot, aimHard = d.slot, trap = d.kind }
