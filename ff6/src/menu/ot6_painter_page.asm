@@ -189,14 +189,14 @@ SkillsOption_08:
 
 ; [ menu state $31: painter page ]
 ; MenuState_30_Thief's shape: the cursor over the rows, B backs out to the
-; Skills list, A does nothing.  The description stays blank: the page stages
-; $ff in $7e9d89 for every row and LoadThiefDesc runs LoadBigText's $ff arm.
+; Skills list, A does nothing.  The help window shows the row's line
+; (Ot6PainterPageDesc).
 MenuState_31_Painter:
         lda     #$10
         trb     z45
         jsr     InitDMA1BG1ScreenA
         jsr     UpdateThiefCursor
-        jsr     LoadThiefDesc
+        jsr     Ot6PainterPageDesc
         lda     z08+1
         bit     #>JOY_B
         beq     @done
@@ -234,8 +234,6 @@ Ot6PainterTitleOff:
 Ot6PainterPageDraw:
         ldx     #$0000
 @lp:    stx     $e2                     ; row index 0..7 (word: $e2/$e3)
-        lda     #$ff
-        sta     f:$7e9d89,x             ; no description: LoadBigText's $ff arm
         lda     $e2
         asl
         inc
@@ -287,6 +285,49 @@ Ot6PainterDrawName:
         lda     $e5
         jsr     LoadArrayItem           ; write the 10-tile name into $7e9e8b
         jmp     DrawPosTextBuf
+
+; ---- the help window: the line of the row under the cursor (#549) ----
+; As the vanilla Skills pages do (LoadBlitzDesc), through LoadBigText's own
+; copy (LoadItemDesc: A = the line's index, $e7 the pointer table, $eb the
+; strings, WMADD at the help buffer).  The lines are tools/kit_pages.py's,
+; sixteen a page: the row's own when it is learned, row + 8 (how it is
+; learned) when not, by the same test the page's rows draw by.  Called every
+; frame, as the other pages' loaders are.
+Ot6ThiefPageDesc:
+        ldx     #near Ot6ThiefPageDescPtrs
+        stx     $e7
+        ldx     #near Ot6ThiefPageDescStr
+        stx     $eb
+        lda     #^Ot6ThiefPageDescPtrs
+        sta     $e9
+        lda     #^Ot6ThiefPageDescStr
+        sta     $ed
+        lda     $4b
+        jsl     Ot6ThiefPageRow         ; F0: the row's id, $ff if not learned
+        bra     Ot6KitPageDesc
+
+Ot6PainterPageDesc:
+        ldx     #near Ot6PaintPageDescPtrs
+        stx     $e7
+        ldx     #near Ot6PaintPageDescStr
+        stx     $eb
+        lda     #^Ot6PaintPageDescPtrs
+        sta     $e9
+        lda     #^Ot6PaintPageDescStr
+        sta     $ed
+        lda     $4b
+        jsl     Ot6PaintPageRow         ; F0: the row's id, $ff if not learned
+; in: A = the row's id or $ff; $4b = the row
+Ot6KitPageDesc:
+        cmp     #$ff                    ; carry set: not learned
+        clr_a                           ; B = 0: LoadItemDesc indexes in 16 bits
+        lda     $4b
+        and     #$07
+        bcc     :+                      ; learned: the row's own line
+        ora     #$08                    ; not yet: how it is learned
+:       ldx     #$9ec9
+        stx     hWMADDL
+        jmp     LoadItemDesc
 
 SkillsPainterText:              pos_text SKILLS_LIST_PAINTER
 SkillsPainterTitleText:         pos_text SKILLS_PAINTER_TITLE

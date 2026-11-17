@@ -649,7 +649,8 @@ same order, read a column at a time, with the Blitz page's locked marker on a
 row not learned yet; its row in the Skills list reads his battle command's
 name (`BattleCmdName`, "TresHnt", in the list's vanilla seven columns), and a
 worn Thief Glove greys it, since his command is then Capture with no list
-(#549, `menu_thiefpage`). This
+(#549, `menu_thiefpage`); the page's help window shows each row's line, or
+how it is learned, from `tools/kit_pages.py`'s table. This
 arrangement is forced, because **Locke has no spare command slot.**
 `char_prop.asm:160`
 records FIGHT, STEAL, MAGIC, ITEM; the apparently blank third row is MAGIC

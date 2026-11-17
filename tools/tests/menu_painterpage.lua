@@ -184,6 +184,48 @@ local function assertGeometry(what)
   end
 end
 
+
+-- ---- the help window: the line of the row under the cursor (#549) ----
+-- tools/kit_pages.py's table in the ROM, sixteen lines a page: row n's own
+-- when it is learned, line 8 + n (how it is learned) when not.  The help
+-- window draws the menu's help buffer ($7e9ec9), so the buffer is compared
+-- with the line the save's learned state calls for, byte for byte.
+local function romLine(ptrs, strs, idx)
+  local tp, ts = ptrs & 0x3FFFFF, strs & 0x3FFFFF
+  local off = H.readRomByte(tp + idx * 2) | (H.readRomByte(tp + idx * 2 + 1) << 8)
+  local t, k = {}, 0
+  while true do
+    local b = H.readRomByte(ts + off + k)
+    if b == 0 then break end
+    t[#t + 1] = b
+    k = k + 1
+  end
+  return t
+end
+local function helpWalk(ptrs, strs, isLearned, pageState, tag, shotRows)
+  local steps = {}
+  for i = 0, 7 do
+    steps[#steps + 1] = H.driveUntil(function() return st() == pageState and H.readByte(ZCURSOR) == i end, 900,
+      { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, tag .. ": cursor to row " .. i)
+    -- the help window types its line out; a row that is shot waits it out
+    steps[#steps + 1] = H.waitFrames((shotRows and shotRows[i]) and 150 or 12)
+    steps[#steps + 1] = H.call(function()
+      local lrn = isLearned(i)
+      local want = romLine(ptrs, strs, lrn and i or 8 + i)
+      H.assertEq(#want > 0, true, string.format("%s row %d: the table has a line", tag, i))
+      for k, b in ipairs(want) do
+        H.assertEq(H.readByte(0x9ec9 + k - 1), b, string.format(
+          "%s row %d (%s): the help window shows its %s line, byte %d", tag, i,
+          lrn and "learned" or "locked", lrn and "own" or "how-it-is-learned", k))
+      end
+      H.assertEq(H.readByte(0x9ec9 + #want), 0, string.format("%s row %d: the line ends there", tag, i))
+      if shotRows and shotRows[i] then H.screenshot(string.format("%s_help_row%d", tag, i)) end
+    end)
+  end
+  steps[#steps + 1] = H.call(function() H.log("HELP OK (" .. tag .. "): every row's help line, learned and locked") end)
+  return H.seqStep(steps)
+end
+
 local function hasCmd(char, cmd)
   local rec = 0x1600 + 37 * char
   for i = 0, 3 do
@@ -333,7 +375,6 @@ local steps = {
       H.assertEq(isLetter(vcell(BG3B_V, x, 5) & 0xff), false, string.format(
         "the title row holds only 'Painter': {%d,5}", x))
     end
-    H.assertEq(H.readByte(0x9ec9), 0xff, "the description buffer holds the blank marker")
     H.screenshot("painterpage_rows")
     H.log("RENDER OK: eight rows, the learned ones Ot6PaintName's names at Ot6PaintCostTbl's prices, "
       .. "the rest the locked marker, title 'Painter'")
@@ -349,6 +390,8 @@ local steps = {
   H.pressButtons({ "a" }, 2),
   H.waitFrames(30),
   H.call(function() H.assertEq(st(), ST_PAINTER, "A on a row does nothing: still on the page") end),
+  helpWalk(H.sym("Ot6PaintPageDescPtrs"), H.sym("Ot6PaintPageDescStr"), learned, ST_PAINTER, "painterpage",
+    { [0] = true, [2] = true, [3] = true, [7] = true }),
 
   -- B: back to the list, the cursor on Painter, nothing of the page left
   H.pressButtons({ "b" }, 3),

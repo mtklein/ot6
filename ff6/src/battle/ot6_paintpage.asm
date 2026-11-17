@@ -12,6 +12,9 @@
 ; right), and asks the same Ot6PaintRowKnown the list asks.
 ; in: A = the page row 0-7.  out: A = the row's id or $ff.  any widths, any
 ; db.  preserves X and Y.  rtl.
+; the two pages' help lines (tools/kit_pages.py --write)
+        .include "ot6_kitpage_desc.inc"
+
 .proc Ot6PaintPageRow
         php
         sep     #$20

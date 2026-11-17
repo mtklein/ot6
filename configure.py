@@ -1081,6 +1081,15 @@ check("esper_ladder",
       ["tools/esper_ladder.py", "docs/design/esper-rework.md", "ff6/src/menu/item_prop_en.dat",
        "ff6/src/text/item_name_en.json", "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg",
        copy_if_changed_from("build/ot6.sfc")])
+# #549: the field Treasure Hunter and Painter pages' help lines
+# (tools/kit_pages.py): sixteen a page, each within the help window (the
+# esper page's font rule; a second line clear of the page's title box), a
+# locked line naming the level Ot6PaintRowTbl teaches at, and the ROM's lines
+# the table's; the selftest's mutants move a ROM line and break the table.
+check("kit_pages",
+      "python3 tools/kit_pages.py --selftest",
+      ["tools/kit_pages.py", "tools/esper_ladder.py", "ff6/src/battle/ot6_paint.asm",
+       "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.

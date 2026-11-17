@@ -123,6 +123,48 @@ local function assertAllRows(tag)
   H.log(string.format("PAGE OK (%s): all eight rows, names and prices from the battle's tables", tag))
 end
 
+
+-- ---- the help window: the line of the row under the cursor (#549) ----
+-- tools/kit_pages.py's table in the ROM, sixteen lines a page: row n's own
+-- when it is learned, line 8 + n (how it is learned) when not.  The help
+-- window draws the menu's help buffer ($7e9ec9), so the buffer is compared
+-- with the line the save's learned state calls for, byte for byte.
+local function romLine(ptrs, strs, idx)
+  local tp, ts = ptrs & 0x3FFFFF, strs & 0x3FFFFF
+  local off = H.readRomByte(tp + idx * 2) | (H.readRomByte(tp + idx * 2 + 1) << 8)
+  local t, k = {}, 0
+  while true do
+    local b = H.readRomByte(ts + off + k)
+    if b == 0 then break end
+    t[#t + 1] = b
+    k = k + 1
+  end
+  return t
+end
+local function helpWalk(ptrs, strs, isLearned, pageState, tag, shotRows)
+  local steps = {}
+  for i = 0, 7 do
+    steps[#steps + 1] = H.driveUntil(function() return st() == pageState and H.readByte(ZCURSOR) == i end, 900,
+      { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, tag .. ": cursor to row " .. i)
+    -- the help window types its line out; a row that is shot waits it out
+    steps[#steps + 1] = H.waitFrames((shotRows and shotRows[i]) and 150 or 12)
+    steps[#steps + 1] = H.call(function()
+      local lrn = isLearned(i)
+      local want = romLine(ptrs, strs, lrn and i or 8 + i)
+      H.assertEq(#want > 0, true, string.format("%s row %d: the table has a line", tag, i))
+      for k, b in ipairs(want) do
+        H.assertEq(H.readByte(0x9ec9 + k - 1), b, string.format(
+          "%s row %d (%s): the help window shows its %s line, byte %d", tag, i,
+          lrn and "learned" or "locked", lrn and "own" or "how-it-is-learned", k))
+      end
+      H.assertEq(H.readByte(0x9ec9 + #want), 0, string.format("%s row %d: the line ends there", tag, i))
+      if shotRows and shotRows[i] then H.screenshot(string.format("%s_help_row%d", tag, i)) end
+    end)
+  end
+  steps[#steps + 1] = H.call(function() H.log("HELP OK (" .. tag .. "): every row's help line, learned and locked") end)
+  return H.seqStep(steps)
+end
+
 local function hasCmd(char, cmd)
   for i = 0, 3 do
     if H.readByte(0x1600 + 37 * char + 0x16 + i) == cmd then return true end
@@ -322,6 +364,15 @@ H.run({ maxFrames = 300000 }, {
     assertEsperClear(CHAR_RELM, "RELM's list", true)
     H.screenshot("painterpage_esper_list")
   end),
+  toPainter("RELM: cursor to Painter"),
+  H.pressButtons({ "a" }, 2),
+  H.waitUntil(function() return st() == ST_PAINTER end, 300, "RELM: the page for the help lines", 5),
+  H.waitFrames(60),
+  helpWalk(H.sym("Ot6PaintPageDescPtrs"), H.sym("Ot6PaintPageDescStr"), learned, ST_PAINTER, "painterpage_wor",
+    { [1] = true, [4] = true, [5] = true, [7] = true }),
+  H.pressButtons({ "b" }, 3),
+  H.waitUntil(function() return st() == ST_SKILLS end, 300, "RELM: back to the list", 5),
+  H.waitFrames(20),
   opensPage("RELM complete", "painterpage_complete"),
   H.call(function()
     H.assertEq(H.readByte(ZCURSOR), ROW_PAINTER, "back on the list on Painter")

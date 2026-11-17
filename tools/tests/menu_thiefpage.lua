@@ -258,6 +258,48 @@ local function assertThiefRow(i)
   assertRun(COST_COL + 2, y, MP_SUFFIX, string.format("thief row %d ' MP'", i))
 end
 
+
+-- ---- the help window: the line of the row under the cursor (#549) ----
+-- tools/kit_pages.py's table in the ROM, sixteen lines a page: row n's own
+-- when it is learned, line 8 + n (how it is learned) when not.  The help
+-- window draws the menu's help buffer ($7e9ec9), so the buffer is compared
+-- with the line the save's learned state calls for, byte for byte.
+local function romLine(ptrs, strs, idx)
+  local tp, ts = ptrs & 0x3FFFFF, strs & 0x3FFFFF
+  local off = H.readRomByte(tp + idx * 2) | (H.readRomByte(tp + idx * 2 + 1) << 8)
+  local t, k = {}, 0
+  while true do
+    local b = H.readRomByte(ts + off + k)
+    if b == 0 then break end
+    t[#t + 1] = b
+    k = k + 1
+  end
+  return t
+end
+local function helpWalk(ptrs, strs, isLearned, pageState, tag, shotRows)
+  local steps = {}
+  for i = 0, 7 do
+    steps[#steps + 1] = H.driveUntil(function() return st() == pageState and H.readByte(ZCURSOR) == i end, 900,
+      { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, tag .. ": cursor to row " .. i)
+    -- the help window types its line out; a row that is shot waits it out
+    steps[#steps + 1] = H.waitFrames((shotRows and shotRows[i]) and 150 or 12)
+    steps[#steps + 1] = H.call(function()
+      local lrn = isLearned(i)
+      local want = romLine(ptrs, strs, lrn and i or 8 + i)
+      H.assertEq(#want > 0, true, string.format("%s row %d: the table has a line", tag, i))
+      for k, b in ipairs(want) do
+        H.assertEq(H.readByte(0x9ec9 + k - 1), b, string.format(
+          "%s row %d (%s): the help window shows its %s line, byte %d", tag, i,
+          lrn and "learned" or "locked", lrn and "own" or "how-it-is-learned", k))
+      end
+      H.assertEq(H.readByte(0x9ec9 + #want), 0, string.format("%s row %d: the line ends there", tag, i))
+      if shotRows and shotRows[i] then H.screenshot(string.format("%s_help_row%d", tag, i)) end
+    end)
+  end
+  steps[#steps + 1] = H.call(function() H.log("HELP OK (" .. tag .. "): every row's help line, learned and locked") end)
+  return H.seqStep(steps)
+end
+
 local lockeSlot, terraSlot = nil, nil
 
 H.run({ maxFrames = 120000 }, {
@@ -348,9 +390,6 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(vcell(BG2B_V, 30, 4), vcell(BG2B_V, 30, 1),
       "the page's title box closes at BG2B {30,4}: the top-right corner tile")
     H.log("TITLE OK: the page's title box reads '" .. TITLE .. "' (BG2B {14,4}-{30,6})")
-    H.assertEq(H.readByte(0x9ec9), 0xff,
-      "description buffer holds the blank marker -- the thief rows have no "
-      .. "desc asset and must not show another page's text")
     H.screenshot("thiefpage_rows")
     H.log("RENDER OK: Skills->Thief for a REAL LOCKE -- eight rows, each learned "
       .. "one Ot6ThiefName's own name and the charge's own price, each other one "
@@ -368,6 +407,8 @@ H.run({ maxFrames = 120000 }, {
       "one column: two steps down is row 2 (Bestow)")
     for n = 0, ROWS - 1 do assertCursorGutter(n, "cursor on row 2") end
   end),
+  helpWalk(H.sym("Ot6ThiefPageDescPtrs"), H.sym("Ot6ThiefPageDescStr"), learned, ST_THIEF, "thiefpage",
+    { [0] = true, [3] = true, [6] = true, [7] = true }),
 
   H.pressButtons({ "b" }, 3),
   H.waitUntil(function() return st() == ST_SKILLS end, 300,

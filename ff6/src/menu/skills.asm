@@ -2344,11 +2344,12 @@ Ot6ThiefCursorPos:
         cursor_pos {8, 116 + yy * 12}
         .endrep
 
-; [ load thief description: always the empty string (see the header) ]
+; [ load thief description: the row's help line (#549) ]
+; Ot6ThiefPageDesc (ot6_painter_page.asm) picks the row's line, learned or
+; not, from tools/kit_pages.py's table; the $ff Ot6ThiefPageDraw still stages
+; is no longer read.
 LoadThiefDesc:
-        jmp     LoadBigText             ; $7e9d89[0..2] hold $ff (staged by
-                                        ;   Ot6ThiefPageDraw), so the $ff arm
-                                        ;   runs and no pointer table is read
+        jmp     Ot6ThiefPageDesc
 
 .endif   ; LANG_EN
 

@@ -244,9 +244,13 @@ Every ability is feasible. None needs new art, a new status or save data.
 - **MP display.** The list draws each row's price as the thief list does
   (two digits after a nine-letter name), live with the pending boost, and the
   wallet line shows Relm's MP while the list is up.
-- **Help text.** FF6's battle lists carry no help text, and neither does
-  the field page (Locke's has none either). The Narshe school and
-  PLAYING.md teach the rows.
+- **Help text.** FF6's battle lists carry no help text. The field page
+  does (#549, the owner: "essential for new ones"): the help window shows
+  the row's line, or how it is learned while it is locked, from
+  `tools/kit_pages.py`'s table (checked: a line a row, each within the
+  window, a locked level line naming `Ot6PaintRowTbl`'s level), drawn
+  through `LoadBigText` as the vanilla Skills pages draw theirs. Locke's
+  page has the same.
 - **The field page (#549).** Skills > Painter, the list's ninth row, below
   Locke's Treasure Hunter. The page is the Thief page's shape: the eight
   rows in `Ot6PaintRowTbl`'s order (the battle list's, read a column at a

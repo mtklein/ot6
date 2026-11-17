@@ -29,6 +29,10 @@ shows, and is greyed out while he wears the Thief Glove, since he then has
 Capture and no list. The list is back to its original width, so the name of
 an equipped Esper beside it is no longer drawn over its border.
 
+Both pages now explain each move. The window at the top of the screen
+says what the move under the cursor does, and for a move not learned yet,
+where or at what level it is learned.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44
