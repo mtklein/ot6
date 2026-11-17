@@ -429,6 +429,10 @@ TEST_ENV = {
     # and declares a two-byte command expedient (state_write_waivers.txt)
     "battle_mimic":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #546: Shadow's hobble and pin, in Inferno's battle (party 3: CYAN,
+    # SHADOW, SABIN, GOGO, beside Inferno); a long battle, played by hand
+    "battle_shadowpin": "OT6_TIMEOUT=5400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
     # #461: the same expedient, three bytes (Mimic, SwdTech, Slot)
     "battle_mimicboost":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
@@ -581,6 +585,10 @@ TEST_ENV = {
     "battle_esperladder":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     "battle_espersigs":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    # #551: an earring rank counts as one earring piece, up to the double;
+    # eight branches from one snapshot, a battle each
+    "battle_esperearring": "OT6_TIMEOUT=2400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
     # #534: Crusader's signature, the second weapon in the menu and its
     # swing, and the two-handed grip, against rank 4 from one snapshot

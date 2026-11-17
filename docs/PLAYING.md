@@ -341,13 +341,24 @@ save, as it always could.
 Shadow's skill is Throw. He throws the item you pick, and it is used up. A
 boost multiplies a damaging throw.
 
+Every throw that hits an enemy slows it. A throw at an enemy that is already
+slowed, by anything, stops it for about two of its turns instead, and the
+slow is used up, so it takes another two throws to stop it again. A throw at
+a stopped enemy only does damage. A broken enemy is slowed but never stopped.
+Enemies that ignore Slow or Stop still do. A dagger before an enemy's shield
+means it is slowed, by a throw or a spell; a knife in the same place means it
+is stopped. Each appears with the hit that causes it and goes when the status
+ends. Gogo's Throw and a Mimic of a throw work the same way, so Shadow can
+slow an enemy and Gogo can stop it.
+
 | Item | Where | Effect |
 |---|---|---|
-| Shuriken, Ninja Star | Thamasa weapon shop, World of Ruin | piercing |
+| Shuriken | the merchant at the house where Shadow joins, Kohlingen, Albrook, the Phantom Train; Thamasa in the World of Ruin | piercing |
+| Ninja Star | Thamasa weapon shop, World of Ruin | piercing |
 | Tack Star | Colosseum | piercing |
-| Fire Skean, Water Edge, Bolt Edge | Maranda weapon shop | piercing and the element, to every enemy |
-| Shadow Edge | Maranda weapon shop | casts Image on the thrower |
-| Inviz Edge | Maranda weapon shop | casts Vanish on the thrower |
+| Fire Skean, Water Edge, Bolt Edge | Narshe's item shop after Vector, Kohlingen, Jidoor, Albrook; Maranda in the World of Ruin (the Phantom Train sells Fire Skeans) | piercing and the element, to every enemy |
+| Shadow Edge | the merchant at the house where Shadow joins, Jidoor; Maranda in the World of Ruin | casts Image on the thrower |
+| Inviz Edge | the merchant at the house where Shadow joins, Kohlingen; Maranda in the World of Ruin | casts Vanish on the thrower |
 
 A boosted smoke or exit covers one more ally per point, so 3 points cover a
 party of four. Anyone who throws one gets this.

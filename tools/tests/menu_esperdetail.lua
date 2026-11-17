@@ -31,6 +31,8 @@
 -- unreached effect rung of another owned stone (Unicorn's Amulet covers Ramuh's Dark, Kirin's Poison) is set
 -- to 500 and the other stone's page revisited, which must show the second line on that rung; then a larger max
 -- HP/MP boost's slot is set to 500 so a smaller boost rung shows the line with no reached rung carrying its bit;
+-- then (#551) an owned stone's earring rung is left one count short and another stone's earring rung set reached,
+-- which must not show the line (an earring rung adds a piece; before #551 it read "Already held");
 -- then every slot but the first stone's is set to 500 for case 6.  Those writes
 -- are mechanism expedients for the drawing, not play.  Case 5 is red on a ROM whose help line reads the next
 -- rung's description and on one that never draws the second line (build/attempts/wt/v045-teach/mutants/).
@@ -155,7 +157,10 @@ local function implied(b)
   for bit, v in pairs(MPB) do if v <= mp then b = b | bit end end
   return b
 end
-local function heldLine(e, k, plain)
+-- the earring bit (+4 $02) is never held: an earring rung adds a piece, up to vanilla's two-piece double (#551,
+-- Ot6EsperFold), so another earring rung does not cover it.  stacked = false models the cover before #551 (the
+-- bit held like any other), for the staged earring case's non-vacuity check.
+local function heldLine(e, k, plain, stacked)
   local slot = slotOf(e)
   if rankAt(slot) > k then return false end                  -- reached: drawn white, nothing to add
   local mine, any = effBytes(slot * 5 + k), false
@@ -172,6 +177,7 @@ local function heldLine(e, k, plain)
     end
   end
   if not plain then held[4] = implied(held[4]) end
+  if stacked ~= false then held[4] = held[4] & ~0x02 end
   for i = 0, 9 do if (mine[i] & ~held[i]) & 0xFF ~= 0 then return false end end
   return true
 end
@@ -414,6 +420,48 @@ H.run({ maxFrames = 60000 }, {
           .. "by the larger boost", pick.slot, pick.kk + 1, pick.e, pick.k + 1))
       end),
       H.lazy(function() return visit(pick.e, "staged_boost", "held") end),
+    })
+  end)(),
+  -- the earring branch, staged (#551): an owned stone's earring rung (+4 $02: Maduin's Earrings) left unreached
+  -- (that stone's count 499, rank 4) and another stone's earring rung reached (its count 500: Bahamut's Hero Ring,
+  -- $03, owned or not).  Before #551 the reached rung's bits covered the unreached one and the line said "Already
+  -- held"; an earring rung now adds a piece (the fold counts them up to vanilla's two-piece double), so the line
+  -- must not show.
+  (function()
+    local pick
+    local function put(slot, n)
+      local a = LIVE + 0x10 + (leader * 26 + slot) * 2
+      emu.write(a, n & 0xFF, emu.memType.snesMemory)
+      emu.write(a + 1, n >> 8, emu.memType.snesMemory)
+    end
+    return H.seqStep({
+      H.call(function()
+        for _, e in ipairs(owned) do
+          for k = 0, 4 do
+            if not pick and (effBytes(slotOf(e) * 5 + k)[4] & 0x02) ~= 0 then
+              for sl = 0, 25 do
+                for kk = 0, 4 do
+                  if not pick and sl ~= slotOf(e) and (effBytes(sl * 5 + kk)[4] & 0x02) ~= 0 then
+                    pick = { e = e, k = k, slot = sl, kk = kk }
+                  end
+                end
+              end
+            end
+          end
+        end
+        H.assertEq(pick ~= nil, true, "an owned stone with an earring rung, and another stone's earring rung")
+        put(slotOf(pick.e), COSTS[pick.k + 1] - 1)
+        put(pick.slot, COSTS[pick.kk + 1])
+        H.assertEq(rankAt(slotOf(pick.e)) <= pick.k, true, "the owned stone's earring rung is not reached")
+        H.assertEq(rankAt(pick.slot) > pick.kk, true, "the other stone's earring rung is reached")
+        H.assertEq(heldLine(pick.e, pick.k, nil, false), true,
+          "the earring branch is not vacuous: the cover before #551 holds the rung (its bits are the other rung's)")
+        H.assertEq(heldLine(pick.e, pick.k), false, "an earring rung is never held by another earring rung")
+        H.log(string.format("[detail] staged: ladder slot %d set to %d (its rung %d carries the earring bit); esper "
+          .. "%d's rung %d (an earring rung) left unreached at %d: no 'already held' line", pick.slot,
+          COSTS[pick.kk + 1], pick.kk + 1, pick.e, pick.k + 1, COSTS[pick.k + 1] - 1))
+      end),
+      H.lazy(function() return visit(pick.e, "staged_earring", pick.k) end),
     })
   end)(),
   -- the cost of the help line's scan (Ot6RungDescText runs every frame the cursor is on a rung): every other ladder

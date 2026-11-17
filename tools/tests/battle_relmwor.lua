@@ -222,9 +222,14 @@ local function lastExec(x, id)
     if e.x == x and (id == nil or e.id == id) then return e end
   end
 end
+-- (an end counts 10 frames after its hook: Ot6ActionEnd's BP consume can land a frame or more after its entry,
+-- and a judge reading the bank at once saw it unpaid: the v0.48 line's stage 2, '[lab] f13493 ActionEnd x=2
+-- ... pend=3 bank=3' then 'Masterpiece at 3 pending: ... bank 3 -> 3' at f13494)
 local function endsOf(x, after)
   local n = {}
-  for _, e in ipairs(rec.ends or {}) do if e.x == x and e.f > (after or 0) then n[#n + 1] = e end end
+  for _, e in ipairs(rec.ends or {}) do
+    if e.x == x and e.f > (after or 0) and e.f + 10 <= H.frame then n[#n + 1] = e end
+  end
   return n
 end
 

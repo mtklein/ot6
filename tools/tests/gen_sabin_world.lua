@@ -67,6 +67,10 @@ local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 local function seq(steps) return H.cond(function() return true end, steps) end
 local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
 local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local SHURIKEN = 0x41
+-- SHADOW's ammunition (#546, kit-shadow-pin.md section 6, "Supply"): about level / 4 cheap throwables where he
+-- is seated, so his throws can hobble and pin in the event battles ahead (the driver's Driver:shadowLine)
+local function shurikenWant() return math.max(2, H.readByte(0x1600 + 37 * 5 + 8) // 4) end
 
 -- multiple-choice state (src/field/text.asm), same addresses gen_scenario
 -- uses: $056E = cursor row, $056F = option count.  $056F is only final once
@@ -416,6 +420,11 @@ H.run({ maxFrames = 90000 }, {
       H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.frame))
   end),
   H.buyItem(FENIX, function() return 14 - H.invCountOf(FENIX) end, "FENIX DOWN to 14"),
+  -- Shuriken for SHADOW, who joins here (#546): shop 39 sells them (30 gil), the first counter on his road
+  -- that does; the Phantom Train's merchant (shop 85, gen_sabin_train) is the next
+  H.call(function() H.assertEq(H.shopRowOf(39, SHURIKEN) ~= nil, true, "shop 39 sells Shuriken") end),
+  H.buyItem(SHURIKEN, function() return shurikenWant() - H.invCountOf(SHURIKEN) end,
+    "SHURIKEN to level / 4 (SHADOW's throws)"),
   H.buyItem(TONIC, function() return 86 - H.invCountOf(TONIC) end, "TONIC to 86"),
   -- out of the shop: B through the menu, then A through `_cb0bac`'s
   -- closing line ("See you around.", dlg $01BE) -- H.shopClose presses B only
@@ -447,8 +456,10 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(H.invCountOf(TONIC) >= 86, true,
       "SABIN leaves the house with 86 Tonics -- the L14 band plus the camp stretch's field care")
     H.assertEq(H.invCountOf(FENIX) >= 14, true, "Fenix Downs at 14 (~level)")
-    H.log(string.format("[shop] house merchant done: tonic=%d potion=%d fenix=%d gil=%d f%d",
-      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.gil(), H.frame))
+    H.assertEq(H.invCountOf(SHURIKEN) >= shurikenWant(), true,
+      string.format("Shuriken at %d (SABIN's level / 4) for SHADOW's throws", shurikenWant()))
+    H.log(string.format("[shop] house merchant done: tonic=%d potion=%d fenix=%d shuriken=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.invCountOf(SHURIKEN), H.gil(), H.frame))
   end),
 
   -- talk to the man: dlg, the dog gag, the name menu, then the Yes/No fork

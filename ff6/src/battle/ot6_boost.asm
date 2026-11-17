@@ -75,6 +75,14 @@
         sta     f:$7e0000+OT6_STILLMARK ;   colour (8-bit stores, one a byte)
         sta     f:$7e0000+OT6_STILLHELD
         sta     f:$7e0000+OT6_UNDERPAINT
+        sta     f:$7e0000+OT6_PINNING   ; nor Shadow's pin (#546): a stale
+        sta     f:$7e0000+OT6_MARKSHOWN ;   bit would give the next battle's
+        sta     f:$7e0000+OT6_MARKCELL+0 ;  first Stop the pin's length, or
+        sta     f:$7e0000+OT6_MARKCELL+1 ;  blank a mark cell nobody drew
+        sta     f:$7e0000+OT6_MARKCELL+2
+        sta     f:$7e0000+OT6_MARKCELL+3
+        sta     f:$7e0000+OT6_MARKCELL+4
+        sta     f:$7e0000+OT6_MARKCELL+5
         sta     f:$7e0000+OT6_TINT+0
         sta     f:$7e0000+OT6_TINT+1
         sta     f:$7e0000+OT6_TINT+2

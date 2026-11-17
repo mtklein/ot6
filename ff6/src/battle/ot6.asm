@@ -124,3 +124,6 @@
 ; Relm's kit, the painter's list behind Sketch (#538), appended for the same
 ; reason.
         .include "ot6_paint.asm"
+
+; Shadow's hobble and pin (#546), appended for the same reason.
+        .include "ot6_pin.asm"

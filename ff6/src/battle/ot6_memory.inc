@@ -702,4 +702,24 @@ OT6_UNDERPAINT       := $ef14
 .assert OT6_UNDERPAINT = OT6_GIFT + 6, error, "the painter's masks are six bytes"
 .assert OT6_UNDERPAINT <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; Shadow's hobble and pin (#546, ot6_pin.asm; docs/design/kit-shadow-pin.md).
+; All battle state, cleared by InitBP.  OT6_PINNING: the monsters a throw this
+; action is pinning (slot s = bit s), set by Ot6Pin where it queues the Stop
+; and consumed by Ot6StopTicks as the Stop lands (the pin's 8 ticks, not
+; vanilla's 18); also cleared per slot by Ot6SeedShields and whole at every
+; script's and action's end (Ot6ShowFlush), so a pin never outlives its
+; action.  OT6_MARKCELL: per slot, the mark the shield line should show
+; before its emblem (0 free, 1 hobbled: Slow, 2 pinned: Stop), written by
+; Ot6BgHudLine every frame a line is live (the held mark while the slot is
+; held, #539, else the live status).  OT6_MARKSHOWN: the slots whose mark
+; cell the nmi flush last wrote with a mark, so a mark that ends is blanked
+; once (slot s = bit s).  The held mark itself is OT6_SHOWN's odd byte.
+OT6_PINNING          := $ef15
+OT6_MARKCELL         := $ef16   ; 6 bytes, by monster slot
+OT6_MARKSHOWN        := $ef1c
+.assert OT6_PINNING = OT6_UNDERPAINT + 1, error, "the pin mask must follow the painter's masks"
+.assert OT6_MARKCELL = OT6_PINNING + 1, error, "the mark cells must follow the pin mask"
+.assert OT6_MARKSHOWN = OT6_MARKCELL + 6, error, "the shown-mark mask must follow the mark cells"
+.assert OT6_MARKSHOWN <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 .endif

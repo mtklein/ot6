@@ -70,6 +70,24 @@ counter the player does not choose); Palidor's signature, permanent Float
 under vanilla's hit-rate rule for it; and the immunities, which also block
 an Imp or a Berserk the player casts on purpose.
 
+**An earring rung counts as an earring (#551, owner, 2026-11-16).** The
+Earrings' magic damage +1/4 (Maduin's signature) and the Hero Ring's
+(Bahamut's, which also carries the Atlas Armlet's +1/4 to Fight) each count
+as one more earring piece, the way vanilla counts worn ones:
+`CalcEquipEffect` moves an item's earring bit (ItemProp +9 `$02`) to
+`$11d7` for the first piece and back to `$11d5` for the second, and
+`RelicDmgEffect` gives +1/4 for the single and +1/2 for the double
+(`$3c45`/`$3c44` bit 1). `Ot6EsperApply` runs the same three instructions
+per rung after the gear loop, so a rung and one worn Earrings or Hero Ring,
+or both rungs with nothing worn, make the double, and no count passes it.
+Until v0.48 a rung only set the single bit, so it added nothing beside a
+worn one. The Atlas Armlet's bit is a plain OR and never doubles.
+`battle_esperearring` holds the eight combinations by Ice's damage at
+`RelicDmgEffect` from one snapshot, with one Fight by the caster where
+Bahamut's rung and a worn Hero Ring both carry the Atlas bit (+1/4, once),
+and the help line's "Already held" never
+shows under an earring rung (`menu_esperdetail`).
+
 **Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
 member heals is 25% stronger. Rung 5: anyone the member revives comes back
 at full HP. Both are `Ot6SeraphHeal`, called in `CalcTargetDmg` once per
@@ -373,7 +391,9 @@ carries over.
 **Overlaps are deliberate where the theme wants them** (Unicorn's Amulet
 holds Kirin's Poison and Ramuh's Dark; Bahamut's rung 3 is Bismark's
 signature). Where a character already has an effect, a second copy adds
-nothing; the menu marks it "have" so a player tours toward new ones. Max
+nothing; the menu marks it "have" so a player tours toward new ones. The
+earring rungs are the exception: each counts as a piece, up to vanilla's
+two-piece double (#551, above). Max
 HP and max MP boosts are a special case: vanilla stores one HP boost and
 one MP boost in two bits each (`$160b`/`$160f`, `and #$c000` in
 `DoLevelUp`), so several cannot combine and the largest one applies.
@@ -557,7 +577,8 @@ cover, on any stone and this one's earlier rungs included, a second line
 says "Already held" (`Ot6RungDescText`). Gear does not
 count, and neither does an HP or MP boost a larger one makes moot (the
 bits differ; the largest applies): the line is a bit-for-bit cover over the
-ladder alone. The Narshe school's magicite ghost teaches the ladder
+ladder alone, less the earring bit, which another earring rung never covers
+since each adds a piece (#551). The Narshe school's magicite ghost teaches the ladder
 ([narshe-school.md](narshe-school.md), $0274). What is left of step 6:
 
 - **The status page's list of kept bonuses** (optional, as the doc says).
