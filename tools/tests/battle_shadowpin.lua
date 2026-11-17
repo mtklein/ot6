@@ -15,13 +15,19 @@
 -- puts magicite that teaches Slow on SHADOW, Stop on CYAN and Break on SABIN through the Skills menu (all
 -- three have Magic; GOGO's commands hold none), cares, and walks onto Inferno's trigger (event battle 114: Inferno, which takes Slow and not
 -- Stop, and his arms Rough and Striker, which take both; any random battle on the way is played by the
--- tactical driver).  In Inferno's battle the plan, through the real menu (H.kitBattle; the others Defend):
---   1. SHADOW casts Slow on Striker.   2. SABIN's Break (two points: three shields, no damage) breaks it.
---   3. SHADOW throws at the Broken, Slowed Striker: it stays hobbled, never pinned.
---   4. SHADOW throws at Rough: hobbled.            5. GOGO Mimics it: Rough pinned (Shadow hobbles, Gogo pins).
+-- tactical driver).  In Inferno's battle, through the real menu (H.kitBattle; the others Defend), in four groups,
+-- each played from a snapshot at the battle's open until its properties are seen:
+--   1. SHADOW throws at Rough: hobbled.            2. GOGO Mimics it: Rough pinned (Shadow hobbles, Gogo pins).
+--   3. SHADOW casts Slow on Striker.   4. SABIN's Break (two points: three shields, no damage) breaks it.
+--   5. SHADOW throws at the Broken, Slowed Striker: it stays hobbled, never pinned.
 --   6. SHADOW casts Slow on a free arm.            7. SHADOW throws at it: pinned by one throw.
 --   8. CYAN casts Stop on an arm: 18 ticks, vanilla's.
 --   9. 10. SHADOW throws at Inferno twice: hobbled, then still hobbled (Stop-immune), never Stopped.
+-- The Stop arm (Ot6BrokenTurn): a Stopped monster whose turn was queued and not yet begun (its command list's
+-- head is command $1f, the AI script's turn) loses that turn when ExecAction reaches it: no AI script runs and
+-- the list is empty after.  Group 1 confirms GOGO's Mimic while Rough is about to take a turn (see G1 below),
+-- each try at another gauge threshold, until a Stop has met a pending turn.  Every case is judged, and one or
+-- more must be seen.  A wipe replays the run from its boot (retries 4, counted).
 -- Every throw is judged by the rule from the target's state as Ot6Pin found it (stopped, slowed, broken, what
 -- it may take) against its status 3 at the script's end, so a draw that breaks an arm is judged as the rule
 -- says (a Broken arm is hobbled, never pinned).  The marks are read from VRAM (the cell two before each line's
@@ -36,6 +42,11 @@ local SPELL_SLOW, SPELL_STOP = 0x19, 0x20
 local DAGGER, KNIFE = 0x21D8, 0x2174
 local MARKCELL, HOLD, EVQ, SHADOWL = 0x7EEF16, 0x7EEE4D, 0x7EEE51, 0x7EECF1
 local PIN, STOPT, EVAPPLY, FLUSH = H.sym("Ot6Pin"), H.sym("Ot6StopTicks"), H.sym("Ot6EvApply"), H.sym("Ot6ShowFlush")
+local EXECACT, EXECAI, RANDAI = H.sym("ExecAction"), H.sym("ExecMonsterAction"), H.sym("RandMonsterAction")
+local ENDACT, NOACT = H.sym("EndAction"), H.sym("Ot6NoActionMark")
+local acting = false       -- an action is executing (ExecAction entered, EndAction not yet reached)
+local actStart = 0         -- the frame it entered
+local gaugeHist = {}       -- per monster entity: its gauge ($3218, a word counting up to the fill), last 9 frames
 local MAP_FACTORY, INFERNO_TILE = 410, { 31, 18 }
 
 local watching = false
@@ -47,6 +58,13 @@ local seat = {}            -- entity -> character
 local shots = {}           -- the screenshots taken, and the esper GOGO wore
 
 local function ent2slot(e) return (e - 8) // 2 end
+-- a monster's turn queued and not yet begun: its command list's head ($32CC) is command $1f (the AI's turn)
+local function pendingTurn(e)
+  local h = H.readByte(0x32CC + e)
+  return h < 0x80 and H.readByte(0x3420 + 2 * h) == 0x1F
+end
+local stoppedTurns = {}    -- { f, e, after }: ExecAction reached a Stopped monster whose head was a $1f turn
+local stoppedNow = nil     -- that monster's entity, until the frame ends
 local function markOf(st) if st & STOP ~= 0 then return 2 elseif st & SLOW ~= 0 then return 1 end return 0 end
 local function wordMark(w) if w == DAGGER then return 1 elseif w == KNIFE then return 2 end return 0 end
 
@@ -59,6 +77,7 @@ emu.addMemoryCallback(function()
   local kind
   if cmd == 0x08 then kind = "throw"
   elseif cmd == 0x02 and (atk == SPELL_SLOW or atk == SPELL_STOP) then kind = (atk == SPELL_SLOW) and "slow" or "stop"
+  elseif cmd == 0x02 and atk == 0x0C then kind = "break"   -- logged, not judged: a Break that hit (a miss never gets here)
   else return end
   local ev = { f = H.frame, kind = kind, x = x, y = y, who = seat[x], pre = H.readByte(0x3EF8 + y),
     broken = H.readByte(0x3E88 + y), allowed = H.readByte(0x3330 + y), species = H.monsterIds()[ent2slot(y) + 1] }
@@ -123,6 +142,71 @@ emu.addMemoryCallback(function()
   local off = H.readByte(EVQ + x + 1)
   applies[#applies + 1] = { f = H.frame, slot = off // 2, mark = (H.readByte(EVQ + x + 4) >> 4) & 3 }
 end, emu.callbackType.exec, EVAPPLY, EVAPPLY)
+-- the Stop arm: ExecAction meets a Stopped monster with a turn pending; the AI script must not run for it
+emu.addMemoryCallback(function() acting = false end, emu.callbackType.exec, ENDACT, ENDACT)
+emu.addMemoryCallback(function()
+  acting, actStart = true, H.frame
+  if not watching then return end
+  local x = emu.getState()["cpu.x"] & 0xFF
+  if x < 8 or x > 0x12 or H.readByte(0x3EF8 + x) & STOP == 0 or not pendingTurn(x) then return end
+  stoppedTurns[#stoppedTurns + 1] = { f = H.frame, e = x }
+  stoppedNow = x
+  H.log(string.format("[turn] f%d monster %d is Stopped with a turn pending as ExecAction reaches it", H.frame, x))
+end, emu.callbackType.exec, EXECACT, EXECACT)
+for _, at in ipairs({ EXECAI, RANDAI }) do
+  emu.addMemoryCallback(function()
+    if not watching then return end
+    local x = emu.getState()["cpu.x"] & 0xFF
+    if x == stoppedNow then
+      error(string.format("f%d: monster %d runs its AI script while Stopped; the turn it had pending should have "
+        .. "been consumed (Ot6BrokenTurn's Stop arm)", H.frame, x))
+    end
+  end, emu.callbackType.exec, at, at)
+end
+-- frames until monster e's gauge fills, at its rate over the last eight frames (nil: not filling)
+local function framesToFill(e)
+  local h = gaugeHist[e]
+  if h == nil or #h < 9 or h[9] < h[1] then return nil end
+  local rate = (h[9] - h[1]) / 8
+  if rate <= 0 then return nil end
+  return (0x10000 - h[9]) / rate
+end
+emu.addEventCallback(function()
+  if not watching then return end
+  for e = 8, 0x12, 2 do
+    local h = gaugeHist[e] or {}
+    h[#h + 1] = H.readWord(0x3218 + e)
+    if #h > 9 then table.remove(h, 1) end
+    gaugeHist[e] = h
+  end
+end, emu.eventType.endFrame)
+local pendSince = {}
+emu.addEventCallback(function()
+  if not watching then return end
+  for e = 8, 0x12, 2 do
+    local p = pendingTurn(e)
+    if p and not pendSince[e] then
+      pendSince[e] = H.frame
+    elseif not p and pendSince[e] then
+      H.log(string.format("[turnq] monster %d had a turn pending f%d-f%d (stopped %s)", e, pendSince[e], H.frame,
+        tostring(H.readByte(0x3EF8 + e) & STOP ~= 0)))
+      pendSince[e] = nil
+    end
+  end
+end, emu.eventType.endFrame)
+-- ExecAction's next call after Ot6BrokenTurn: the Stopped monster's list must be empty by now
+emu.addMemoryCallback(function()
+  if stoppedNow == nil then return end
+  local t = stoppedTurns[#stoppedTurns]
+  t.after = H.readByte(0x32CC + stoppedNow)
+  H.log(string.format("[turn] f%d monster %d's command list after Ot6BrokenTurn: head $%02X", H.frame, stoppedNow,
+    t.after))
+  if t.after ~= 0xFF then
+    error(string.format("f%d: monster %d is Stopped and its pending turn was not consumed (list head $%02X)",
+      H.frame, stoppedNow, t.after))
+  end
+  stoppedNow = nil
+end, emu.callbackType.exec, NOACT, NOACT)
 local function vramMark(l)
   local cur = H.readWord(SHADOWL + l * 14)
   if cur == 0 or (cur & 0x1F) < 2 then return nil end
@@ -143,6 +227,7 @@ emu.addEventCallback(function()
 end, emu.eventType.endFrame)
 
 local slotOf = {}
+local snapBattle, reqBattle    -- the snapshot at the battle's open, and a restore of it
 local function armState(sp)
   local s = slotOf[sp]
   if s == nil or (H.readByte(0x3A75) >> s) & 1 == 0 then return nil end
@@ -169,6 +254,13 @@ local function unstoppedArm()
   end
   return slotOf[STRIKER] or slotOf[ROUGH]
 end
+-- a Stop spell has landed (its 18 ticks), and a Stop has met a pending turn
+local function stopSpellSeen()
+  for _, ev in ipairs(events) do
+    if ev.kind == "stop" and ev.post ~= nil and ev.pre & STOP == 0 and ev.post & STOP ~= 0 then return true end
+  end
+  return false
+end
 
 -- Striker standing, and not Stopped; and whether a throw has found a Broken, hobbled body yet
 local function strikerUp() return armState(STRIKER) end
@@ -190,40 +282,155 @@ local SPELL_BREAK = 0x0C
 -- a hold that gives up after 2400 frames (about two of SHADOW's turns twice over): a gate the rule should open
 -- (an arm hobbled, a body free) that never opens plays the entry anyway, so a broken rule fails on the
 -- judgement below rather than stalling the battle into a wipe
-local function patient(fn)
-  local t0
+local function patient(fn, what, budget)
+  local t0, told
+  budget = budget or 2400
   return function()
     if fn() then return true end
     t0 = t0 or H.frame
-    return H.frame - t0 > 2400
+    if H.frame - t0 > budget then
+      if not told then told = true; H.log(string.format("[shadowpin] f%d %s: waited %d frames, played anyway", H.frame, what or "a gate", budget)) end
+      return true
+    end
+    return false
   end
 end
-local plan = {
-  -- 1. SHADOW casts Slow on Striker; 2. SABIN's Break, boosted two points, takes its three shields (OT6's
-  -- Break: no damage, no status); 3. SHADOW throws at the Broken, Slowed Striker: it stays hobbled, never pinned
-  -- (one knife: a Broken body takes double, and the arms die to a few)
-  { who = SHADOW, cmd = 0x02, spell = SPELL_SLOW, boost = 0, slotFn = strikerUp },
-  { who = SABIN, cmd = 0x02, spell = SPELL_BREAK, boost = 2, slotFn = strikerUp, hold = true,
-    when = patient(function() local _, st = armState(STRIKER); return st ~= nil and st & SLOW ~= 0 end) },
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, hold = true, slotFn = strikerUp,
-    when = patient(strikerBroken) },
-  -- 4. SHADOW hobbles Rough; 6. GOGO's Mimic of that throw pins it.  GOGO holds his window until the hobble has
-  -- landed and is the action Mimic would copy (SaveForMimic's command, $3F20, a Throw)
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[ROUGH] end },
-  { who = GOGO, cmd = 0x12, boost = 0, self = true, hold = true, when = patient(function()
-      local e = events[#events]
-      return e ~= nil and e.kind == "throw" and e.who == SHADOW and e.post ~= nil and e.pre & SLOW == 0
-        and e.post & SLOW ~= 0 and H.readByte(0x3F20) == 0x08
-    end) },
-  -- 6. SHADOW casts Slow on a free arm; 7. one throw pins it
-  { who = SHADOW, cmd = 0x02, spell = SPELL_SLOW, boost = 0, hold = true, slotFn = freeArm,
-    when = patient(function() return freeArm() ~= nil end) },
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = slowedArm },
-  -- 8. CYAN casts Stop on an arm: vanilla's 18 ticks
-  { who = CYAN, cmd = 0x02, spell = SPELL_STOP, boost = 0, slotFn = unstoppedArm },
-  -- 9. 10. SHADOW throws at Inferno twice: hobbled, then still hobbled (Stop-immune)
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[INFERNO] end },
-  { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[INFERNO] end },
+-- The battle is played in groups, each from a snapshot at the battle's open, so the party meets each property
+-- whole rather than after a long stretch of Defending against Inferno (the suite's first form, one plan, lost
+-- the battle on most seed shifts).  A group is tried until its properties are seen (up to `tries`, each try
+-- going back to the open and pausing there 97 frames longer than the try before, so it plays out differently;
+-- a try that runs out its frames is logged and dropped, its unresolved events with it).
+-- Group 1, the opening: 1. SHADOW hobbles Rough; 2. GOGO's Mimic of that throw pins it (no care window between
+-- them: a Potion queued there would be the action Mimic copies).  GOGO holds his window until the hobble has
+-- landed and is the action Mimic would copy (SaveForMimic's command, $3F20, a Throw), and then until Rough is
+-- about to take a turn (below), so the pin can land while Rough's turn is pending: the Stop arm's case.  The try
+-- plays on until the pin wears off.
+-- Rough's turn must come up in the last few frames before GOGO's Mimic resolves: then it waits behind the
+-- Mimic, which is already in the action queue, and the pin lands on it pending.  GOGO, his command window held
+-- open, chooses Mimic when no action is executing and Rough's gauge will fill (at its rate over the last eight
+-- frames) lagEst - 8 + offset frames from now, lagEst being the frames from that moment to the Mimic's
+-- resolution as the last try measured it (150 before any); the offsets walk the window either side.
+local OFFSETS = { 0, -6, 6, -12, 12, -18, 18, -24, 24, -30, 30, 36 }
+local DELAYS = #OFFSETS
+local lagEst, gateAt = 150, nil
+local try = 1
+local branchStart = 0
+-- the pin of event ev has worn off at least 30 frames ago (its knife's clearing is then on record)
+local function pinOver(ev)
+  if ev == nil or H.readByte(0x3EF8 + ev.y) & STOP ~= 0 then return false end
+  local fr = frames[ent2slot(ev.y)]
+  local last = fr and fr.live[#fr.live]
+  return last ~= nil and last.m ~= 2 and last.m ~= -1 and H.frame - last.f >= 30
+end
+local function gogoPinned()
+  for _, ev in ipairs(events) do
+    if ev.kind == "throw" and ev.who == GOGO and ev.post ~= nil and ev.post & STOP ~= 0 and ev.f >= branchStart then
+      return ev
+    end
+  end
+end
+local G1 = {
+  name = "1. the opening", tries = DELAYS, limit = 9000,
+  plan = function(i)
+    local off, fired = OFFSETS[i], false
+    return {
+      { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[ROUGH] end },
+      { who = GOGO, cmd = 0x12, boost = 0, self = true, hold = true, when = patient(function()
+          if fired then return true end   -- latched: the Mimic takes some frames of presses to choose
+          local e = events[#events]
+          local r = slotOf[ROUGH] and 8 + 2 * slotOf[ROUGH]
+          if not (e ~= nil and e.kind == "throw" and e.who == SHADOW and e.post ~= nil and e.pre & SLOW == 0
+            and e.post & SLOW ~= 0 and H.readByte(0x3F20) == 0x08) then return false end
+          -- GOGO's own command window up, held (the battle runs on meanwhile)
+          if H.readByte(0x7BCA) == 0 or H.readByte(0x7BC2) ~= 0x05
+             or H.readByte(0x3ED8 + 2 * (H.readByte(0x62CA) & 3)) ~= GOGO then return false end
+          if acting or r == nil or pendingTurn(r) then return false end
+          local ttf = framesToFill(r)
+          if ttf == nil or math.abs(ttf - (lagEst - 8 + off)) > 3 then return false end
+          gateAt, fired = H.frame, true
+          H.log(string.format("[shadowpin] try %d: GOGO goes with Rough %.0f frames from its turn (the Mimic's lag "
+            .. "%d, offset %d)", i, ttf, lagEst, off))
+          return true
+        end, string.format("2. the throw to Mimic, offset %d", off), 3000) },
+    }
+  end,
+  -- the case seen, and the pin has worn off (its knife's clearing is judged)
+  done = function() return #stoppedTurns >= 1 and pinOver(gogoPinned()) end,
+  -- this try is over: GOGO's pin has worn off
+  over = function() return pinOver(gogoPinned()) end,
+  care = function() return shots.gogoThrew == true or H.frame - branchStart > 3000 end,
+}
+-- Group 2: 3. SHADOW casts Slow on Striker; 4. SABIN's Break, boosted two points, takes its three shields
+-- (OT6's Break: no damage, no status); 5. SHADOW throws at the Broken, Slowed Striker: it stays hobbled, never
+-- pinned (one knife: a Broken body takes double, and the arms die to a few)
+local G2 = {
+  name = "2. the broken arm", tries = 6, limit = 8000,
+  plan = function()
+    return {
+      { who = SHADOW, cmd = 0x02, spell = SPELL_SLOW, boost = 0, slotFn = strikerUp },
+      { who = SABIN, cmd = 0x02, spell = SPELL_BREAK, boost = 2, slotFn = strikerUp, hold = true,
+        when = patient(function() local _, st = armState(STRIKER); return st ~= nil and st & SLOW ~= 0 end,
+          "4. Striker slowed") },
+      { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, hold = true, slotFn = strikerUp,
+        when = patient(strikerBroken, "5. Striker broken") },
+    }
+  end,
+  done = function() return brokenCaseSeen() end,
+  over = function() return brokenCaseSeen() end,
+}
+-- Group 3: 6. SHADOW casts Slow on a free arm; 7. one throw pins it; 8. CYAN casts Stop on the other arm:
+-- vanilla's 18 ticks.  The try plays on until the throw's pin wears off.
+local function spellPin()
+  local by = {}
+  for _, ev in ipairs(events) do
+    if ev.post ~= nil and not ev.dead and ev.f >= branchStart then
+      if ev.kind == "slow" and ev.post & SLOW ~= 0 then by[ev.y] = "slow"
+      elseif ev.kind == "throw" then
+        if ev.pre & STOP == 0 and ev.pre & SLOW ~= 0 and ev.post & STOP ~= 0 and by[ev.y] == "slow" then return ev end
+        if ev.post & SLOW ~= 0 and ev.pre & SLOW == 0 then by[ev.y] = "throw" end
+        if ev.post & STOP ~= 0 then by[ev.y] = nil end
+      end
+    end
+  end
+end
+local G3 = {
+  name = "3. a spell's hobble pinned, and Stop the spell", tries = 4, limit = 9000,
+  plan = function()
+    return {
+      { who = SHADOW, cmd = 0x02, spell = SPELL_SLOW, boost = 0, hold = true, slotFn = freeArm,
+        when = patient(function() return freeArm() ~= nil end, "6. a free arm") },
+      { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = slowedArm },
+      { who = CYAN, cmd = 0x02, spell = SPELL_STOP, boost = 0, slotFn = unstoppedArm },
+    }
+  end,
+  done = function() return stopSpellSeen() and pinOver(spellPin()) end,
+  over = function()
+    local ev = spellPin()
+    if ev ~= nil and not pinOver(ev) then return false end
+    for _, e in ipairs(events) do if e.post == nil then return false end end
+    local n = 0
+    for _, e in ipairs(events) do if e.f >= branchStart then n = n + 1 end end
+    return n >= 3
+  end,
+}
+-- Group 4: 9. 10. SHADOW throws at Inferno twice: hobbled, then still hobbled (Stop-immune)
+local function infernoThrows()
+  local n = 0
+  for _, ev in ipairs(events) do
+    if ev.kind == "throw" and ev.species == INFERNO and ev.post ~= nil and ev.f >= branchStart then n = n + 1 end
+  end
+  return n
+end
+local G4 = {
+  name = "4. Inferno", tries = 3, limit = 6000,
+  plan = function()
+    return {
+      { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[INFERNO] end },
+      { who = SHADOW, cmd = 0x08, row = KNIFE_ITEM, boost = 0, slotFn = function() return slotOf[INFERNO] end },
+    }
+  end,
+  done = function() return infernoThrows() >= 2 end,
+  over = function() return infernoThrows() >= 2 end,
 }
 emu.addEventCallback(function()
   if not watching then return end
@@ -240,7 +447,7 @@ end, emu.eventType.endFrame)
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 local K = H.worLegKit({ fight = {}, links = {}, names = H.SPLIT_NAMES })
-H.run({ maxFrames = 1200000 }, {
+H.run({ maxFrames = 1200000, retries = 4 }, {
   H.bootCheckpoint("wor-kt-factory-v1"),
   H.call(function()
     H.assertEq(H.activeParty(), 3, "party 3 walks (gen_wor_kt_factory left it on the factory's save point)")
@@ -272,7 +479,10 @@ H.run({ maxFrames = 1200000 }, {
       tostring(shots.stopEsper)))
     H.assertEq(shots.slowEsper ~= nil and shots.stopEsper ~= nil and shots.breakEsper ~= nil, true,
       "the party owns magicite teaching Slow, Stop and Break that party 3 may wear")
-    H.assertEq(H.invCountOf(KNIFE_ITEM) >= 7, true, "the bag holds seven Mithril Knives to throw")
+    H.assertEq(H.invCountOf(KNIFE_ITEM) >= 2, true, string.format("the bag holds two Mithril Knives to throw (%d): "
+      .. "a group throws two at most, and every group starts from the battle's open", H.invCountOf(KNIFE_ITEM)))
+    H.log(string.format("[shadowpin] the bag: %d Softs, %d Fenix Downs, %d Potions for the others' care",
+      H.invCountOf(0xF4), H.invCountOf(0xF0), H.invCountOf(0xE9)))
   end),
   H.lazy(function()
     return H.equipEsper(function() return (H.readByte(0x1850 + SHADOW) >> 3) & 3 end, shots.slowEsper,
@@ -312,28 +522,78 @@ H.run({ maxFrames = 1200000 }, {
     H.assertEq(slotOf[INFERNO] ~= nil and slotOf[ROUGH] ~= nil and slotOf[STRIKER] ~= nil, true,
       "Inferno and both arms are on the field")
     watching = true
+    snapBattle = H.requestSaveState()
   end),
-  -- no care window from SHADOW's hobble on Rough (entry 4) until GOGO's Mimic has thrown: a Potion queued
-  -- between them would be the action Mimic copies
-  -- the step ends once the plan is spent and its last throw, the second at Inferno, has landed; until then
-  -- the others (and SHADOW, once his entries are played) Defend, so the battle runs on
-  H.kitBattle(plan, { maxFrames = 200000, untilPlanDone = true, idle = "defend",
-    planDone = function()
-      local inferno = 0
-      for _, ev in ipairs(events) do
-        if ev.post == nil then return false end
-        if ev.kind == "throw" and ev.species == INFERNO then inferno = inferno + 1 end
+  H.waitFrames(2),
+  H.call(function() H.checkReq(snapBattle, "the snapshot at the battle's open") end),
+  H.lazy(function()
+    local steps = {}
+    local first = true
+    for _, G in ipairs({ G1, G2, G3, G4 }) do
+      for i = 1, G.tries do
+        local restore = not first
+        first = false
+        steps[#steps + 1] = H.cond(function() return not G.done() end, {
+          H.call(function()
+            if not restore then return end
+            -- back to the battle's open: an event the try left unresolved goes with it, and the marks' and
+            -- statuses' histories get a break so nothing pairs across it
+            local kept = {}
+            for _, ev in ipairs(events) do if ev.post ~= nil then kept[#kept + 1] = ev end end
+            events = kept
+            for _, fr in pairs(frames) do
+              fr.lastV, fr.lastL = nil, nil
+              fr.vram[#fr.vram + 1] = { f = H.frame, m = -1 }
+              fr.live[#fr.live + 1] = { f = H.frame, m = -1 }
+            end
+            stoppedNow, acting, pendSince, gaugeHist, gateAt = nil, false, {}, {}, nil
+            shots.gogoThrew = nil
+            H.setPad({})
+            reqBattle = H.requestLoadState(snapBattle.blob)
+          end),
+          H.waitFrames(2),
+          H.call(function()
+            if restore then H.checkReq(reqBattle, "the battle's open"); H.rearmInputInjection() end
+            try, branchStart = i, H.frame
+            H.log(string.format("[shadowpin] group %s, try %d of %d, from the battle's open", G.name, i, G.tries))
+          end),
+          -- each try after the first waits a little longer at the open, touching nothing (a player's pause):
+          -- the same snapshot and the same presses would play the same battle again
+          H.lazy(function()
+            H.setPad({})
+            return H.waitFrames(1 + (i - 1) * 97)
+          end),
+          H.lazy(function()
+            branchStart = H.frame
+            return H.kitBattle(G.plan(i), { maxFrames = G.limit + 2000, untilPlanDone = true, idle = "defend",
+              cureAllies = true, planDone = G.over, care = G.care,
+              giveUp = function()
+                if H.frame - branchStart <= G.limit then return false end
+                H.log(string.format("[shadowpin] group %s, try %d: %d frames without its properties; dropped",
+                  G.name, i, G.limit))
+                return true
+              end })
+          end),
+          H.call(function()
+            if G == G1 and gateAt ~= nil then
+              for _, ev in ipairs(events) do
+                if ev.kind == "throw" and ev.who == GOGO and ev.f >= gateAt then
+                  H.log(string.format("[shadowpin] try %d: the Mimic resolved %d frames after GOGO's window went", i,
+                    ev.f - gateAt))
+                  lagEst = ev.f - gateAt
+                  break
+                end
+              end
+              gateAt = nil
+            end
+            H.log(string.format("[shadowpin] group %s, try %d: %s; Stops met with a turn pending so far %d", G.name, i,
+              G.done() and "seen" or "not seen", #stoppedTurns))
+          end),
+        }, {})
       end
-      return inferno >= 2
-    end,
-    care = function()
-      if shots.gogoThrew or (shots.careT0 and H.frame - shots.careT0 > 2400) then return true end
-      shots.careT0 = shots.careT0 or ((function()
-        for _, r in ipairs(H.vars.kit or {}) do if r.entry >= 4 then return H.frame end end
-      end)())
-      for _, r in ipairs(H.vars.kit or {}) do if r.entry >= 4 then return false end end
-      return true
-    end }),
+    end
+    return H.seqStep(steps)
+  end),
   H.call(function()
     watching = false
     -- every throw, by the rule
@@ -363,7 +623,7 @@ H.run({ maxFrames = 1200000 }, {
         end
       elseif (ev.kind == "slow" or ev.kind == "stop") and ev.post ~= nil then
         if ev.kind == "slow" and ev.post & SLOW ~= 0 then hobbledBy[ev.y] = ev end
-        if ev.kind == "stop" then
+        if ev.kind == "stop" and ev.pre & STOP == 0 and ev.post & STOP ~= 0 then   -- a Stop spell that landed
           local st
           for _, s in ipairs(stops) do if s.e == ev.y and s.f >= ev.f and st == nil then st = s end end
           H.assertEq(st ~= nil and st.v, 18, "Stop the spell counts vanilla's 18 ticks")
@@ -371,16 +631,16 @@ H.run({ maxFrames = 1200000 }, {
         end
       end
     end
-    H.assertEq((seen.hobble or 0) >= 2, true, "4. 9. a first throw hobbles (two or more seen)")
-    H.assertEq((seen.pin or 0) >= 2, true, "5. 7. a throw at a hobbled arm pins it, the hobble used up (two or more)")
-    H.assertEq(seen.gogo ~= nil, true, "5. SHADOW's throw hobbles, GOGO's Mimic of it pins")
+    H.assertEq((seen.hobble or 0) >= 2, true, "1. 9. a first throw hobbles (two or more seen)")
+    H.assertEq((seen.pin or 0) >= 2, true, "2. 7. a throw at a hobbled arm pins it, the hobble used up (two or more)")
+    H.assertEq(seen.gogo ~= nil, true, "2. SHADOW's throw hobbles, GOGO's Mimic of it pins")
     H.assertEq(seen.spellpin ~= nil, true, "7. a Slow spell, then one throw, pins")
     H.assertEq(seen.vanillaStop, true, "8. a Stop spell keeps vanilla's 18 ticks")
     H.assertEq(seen.infernoHobble ~= nil, true, "9. a throw hobbles Inferno")
     H.assertEq(seen.immune ~= nil and seen.immune.species == INFERNO, true,
       "10. the throw at the hobbled, Stop-immune Inferno leaves him hobbled, not pinned")
     H.assertEq((seen["broken, hobbled already"] or 0) >= 1, true,
-      "3. a throw at a Broken, hobbled arm leaves it hobbled, never pinned")
+      "5. a throw at a Broken, hobbled arm leaves it hobbled, never pinned")
     H.log(string.format("[shadowpin] throws judged: hobble %d, pin %d, broken %d, pinned already %d, immune %d",
       seen.hobble or 0, seen.pin or 0, seen["broken, hobbled already"] or 0, seen["pinned already"] or 0,
       seen["stop-immune, hobbled already"] or 0))
@@ -425,6 +685,10 @@ H.run({ maxFrames = 1200000 }, {
       end
     end
     H.assertEq(cleared >= 2, true, string.format("two or more pins wore off and their knives cleared (%d)", cleared))
+    -- the Stop arm: each case was judged as it happened (no AI script, the list empty); one or more must be seen
+    H.log(string.format("[shadowpin] Stopped monsters met with a turn pending: %d", #stoppedTurns))
+    H.assertEq(#stoppedTurns >= 1, true,
+      "a Stop landed on a monster with a turn pending, and the turn was consumed (Ot6BrokenTurn's Stop arm)")
     H.log("[shadowpin] PASS: throws hobble and pin by the rule; Gogo's Mimic pins; the marks land with the hit")
   end),
 })

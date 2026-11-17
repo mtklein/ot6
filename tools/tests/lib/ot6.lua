@@ -18356,7 +18356,9 @@ end
 --     takeBack = n     at target select, L until the pending boost is n,
 --                      then the confirm (a pick taken back; p.tookBack)
 --     peek = true      open the command's window (Magic or a Tools-shell
---                      list), hand it to opts.onList, and back out }
+--                      list), hand it to opts.onList, and back out
+--     confirmWhen = fn at the monster target select, the cursor on the
+--                      target, wait (no input) until fn() is true }
 -- The bank is filled to the entry's boost by real Defends first, then R
 -- raises and L lowers the pending boost to exactly it.  Everyone else
 -- Defends while the plan has entries (opts.others = "fight": Fights a live
@@ -18366,11 +18368,15 @@ end
 -- others Fight, since the plan cannot be played); after it, everyone Fights a live
 -- monster until the battle ends (opts.idle = "defend": everyone keeps
 -- Defending instead; opts.untilPlanDone ends the step once the plan is spent
--- and opts.planDone(), when given, says its last action has resolved).
+-- and opts.planDone(), when given, says its last action has resolved;
+-- opts.giveUp(), when given, ends the step whenever it says so, the plan
+-- spent or not: a suite that branches from a snapshot).
 -- While the plan has entries, a window the others' care has work for (a
 -- raise, a Potion under half HP, the plan character's lost control:
 -- M.newSpinnerCare) goes to care instead (opts.care = false: never; a
--- function: no new care window while it returns false); a
+-- function: no new care window while it returns false; opts.cureAllies:
+-- care cures any member's taken control it has the item for, a Petrify
+-- with a Soft, not only the plan character's); a
 -- fight-out Fight (the plan spent, or its character out) raises the
 -- pending boost to the bank first, up to 3 (#470).  Each battle starts the
 -- plan's entries afresh (M.freshKitEntries).
@@ -18387,7 +18393,7 @@ function M.kitBattle(plan, opts)
   -- to the script (Defend or Fight) alone
   local care, careActor = nil, nil
   if opts.care ~= false and M.newSpinnerCare ~= nil then
-    care = M.newSpinnerCare({ name = "the plan's character", spinner = function()
+    care = M.newSpinnerCare({ name = "the plan's character", cureAllies = opts.cureAllies, spinner = function()
       local p = plan[k]
       if p == nil then return nil end
       for s = 0, 3 do if M.readByte(0x3ED8 + s * 2) == p.who then return s end end
@@ -18820,7 +18826,12 @@ function M.kitBattle(plan, opts)
       if r == "refuse" then
         M.assertEq(false, true, string.format("entry %d: the target select never reached monster %s (%d presses)",
           k, tostring(p.slot), aim and aim.presses or 0))
-      elseif r == "confirm" then done(p, a); pulse("a") end
+      elseif r == "confirm" then
+        -- p.confirmWhen: the cursor rests on the target, touching nothing, until confirmWhen() says so (#546's
+        -- suite: confirm while the battle is in a given state); the battle runs meanwhile
+        if p.confirmWhen ~= nil and not p.confirmWhen() then M.setPad({}); return end
+        done(p, a); pulse("a")
+      end
     elseif st == 0x27 then pulse("a")
     else M.setPad({}) end
   end
@@ -18840,6 +18851,7 @@ function M.kitBattle(plan, opts)
     M.driveUntil(function()
       if not M.battleLoadStarted() then return true end
       if opts.untilPlanDone and k > #plan and (opts.planDone == nil or opts.planDone()) then return true end
+      if opts.giveUp ~= nil and opts.giveUp() then return true end
       return false
     end, opts.maxFrames or 40000, {
       { tick = function() tick(); return "frame" end, reset = function() end },

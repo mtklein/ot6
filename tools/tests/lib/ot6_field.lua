@@ -2106,6 +2106,10 @@ end
 --   o.spinner()   the spinner's party entity (0..3), or nil
 --   o.name        his name for the messages (default "SETZER")
 --   o.carePct, o.hitFloor, o.denyMax   (50, 25, 6000)
+--   o.cureAllies  also cure an ally's taken control the same way (a Petrify
+--                 with a Soft in the bag), not only the spinner's, a
+--                 Zombie's and a hit's (battle_shadowpin: Inferno's arms
+--                 petrify the party while it Defends)
 -- C.window() plays one frame of a window that is not the spinner's own
 -- spin (MENU open); C.reset() forgets the window; C.taken = { since,
 -- name, n }; C.cared = { heal, raise, cure, hit }; C.partyLine().
@@ -2278,7 +2282,8 @@ function M.newSpinnerCare(o)
     for s = 0, 3 do if s ~= actor then order[#order + 1] = s end end
     for _, e in ipairs(order) do
       local c = seated(e) and M.controlTaken(e) or nil
-      if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit" or c.name == "Zombie") then
+      if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit" or c.name == "Zombie"
+         or (o.cureAllies and c.name ~= "Death")) then
         local cure = cureOf(c, e)
         if c.name == "Death" and cure and itemCell then
           return { plan = "raise", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }

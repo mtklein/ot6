@@ -610,12 +610,25 @@ measurements, `suites/` for the suites and their mutants).
   menu) make Striker Broken and hobbled, and a throw leaves it hobbled; a
   throw hobbles Rough and GOGO's Mimic of it pins it (8 ticks); a Slow spell
   and one throw pin; CYAN's Stop counts 18; two throws at Inferno hobble him
-  and leave him hobbled. Every throw is judged by the rule from the state
+  and leave him hobbled. v0.48's landing made it hold across seed shifts:
+  as one long plan it passed at the shift it was built on and lost the
+  battle or a precondition at most others (the party Defending against
+  Inferno for 20,000 frames: Petrify on members care did not cure, SABIN
+  dead before his Break landed). It now plays four groups, each from a
+  snapshot at the battle's open, each retried from that snapshot (a little
+  later each time) until its properties are seen; care cures any member's
+  Petrify (`kitBattle`'s `cureAllies`); a wipe replays from the boot
+  (retries 4). The first group also holds the Stop arm's case: GOGO's
+  Mimic is chosen when Rough's gauge will fill just before the Mimic
+  resolves, so the pin lands on Rough's pending turn, which must then be
+  consumed (no AI script, the list empty after `Ot6BrokenTurn`). Eleven
+  shifts pass on the merged ROM, and the eight mutants below go red
+  (`build/attempts/wt/v048-land/suites/battle_shadowpin_*`). Every throw is judged by the rule from the state
   Ot6Pin found; each mark appears two frames after its numeral's event and
   about 170 after the status was computed, and each knife goes within six
-  frames of its Stop ending. Red on seven mutants (`mut.py`): `rule_off`,
+  frames of its Stop ending. Red on eight mutants (`mut.py`): `rule_off`,
   `pin_never`, `pin_keeps_slow`, `pin_ticks`, `broken_pins`, `mark_live`,
-  `mark_none`.
+  `mark_none`, and `no_stop_arm` (the Stop arm's test off).
 - `battle_shadowpin_immune` (`train_b68_entry`; battle 68): two throws at the
   Ghost Train, which blocks both, leave it with neither and no mark. Red on
   `immune_off` (its MonsterProp +22 cleared).
