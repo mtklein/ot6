@@ -137,6 +137,13 @@ local function arm()
     local x = emu.getState()["cpu.x"] & 0xFF
     rec.ends = rec.ends or {}
     rec.ends[#rec.ends + 1] = { x = x, f = H.frame, gest = H.readByte(GEST) }
+    -- stage 4: TERRA's gauge as RELM's Gesture ends (full: $00, or $FF the
+    -- tick before it carries); a Gesture that fills nothing leaves it where
+    -- her own fill had it
+    if stage == 4 and relm ~= nil and terra ~= nil and x == relm * 2 and rec.gestLive ~= nil
+       and rec.gaugeAtEnd == nil then
+      rec.gaugeAtEnd = H.readByte(0x3219 + terra * 2)
+    end
     if relm ~= nil and x == relm * 2 then rec.gestLive = nil end
     if stage == 5 and gogo ~= nil and relm ~= nil and x == relm * 2 and rec.giveUp == nil then
       local ex = rec.execs and rec.execs[#rec.execs]
@@ -378,6 +385,8 @@ local function judge()
     H.log(string.format("[relmwor] Gesture on TERRA at f%d: gauge byte $%02X now, mark $%02X then; her next action "
       .. "ended f%d (mark $%02X at its end, $%02X now)", g.f, H.readByte(0x3219 + terra * 2), g.gest, e.f, e.gest,
       H.readByte(GEST)))
+    H.assertEq(rec.gaugeAtEnd == 0 or rec.gaugeAtEnd == 0xFF, true, string.format("TERRA's gauge was full as "
+      .. "RELM's Gesture ended ($%02X)", rec.gaugeAtEnd or -1))
     H.assertEq(rec.full ~= nil and rec.full - g.f <= 4, true, string.format("her gauge was full within four frames "
       .. "of the Gesture (f%s)", tostring(rec.full)))
     H.assertEq(e.gest & (1 << terra) ~= 0, true, "her granted turn held the Gesture mark")
@@ -453,13 +462,25 @@ end
 -- again, and wait out the break
 local function stillTail()
   return H.cond(function() return stage == 7 and mode == "play" end, {
+    -- the hold, or the break's end without one (a ROM that holds nothing:
+    -- the judge's own asserts then say so, rather than a timeout here)
     H.kitBattle({}, { untilPlanDone = true, idle = "defend", maxFrames = 12000,
-      planDone = function() return target ~= nil and (H.readByte(SHELD) >> target) & 1 == 1 end }),
+      planDone = function()
+        if target == nil then return false end
+        if (H.readByte(SHELD) >> target) & 1 == 1 then return true end
+        if ticks(target) == 0 then rec.recovered = rec.recovered or H.frame; return true end
+        return false
+      end }),
     H.call(function()
       plan = { { who = RELM, cmd = CMD, row = STILL, slot = target } }
     end),
-    H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 8000,
-      planDone = function() return target ~= nil and (H.readByte(SMARK) >> target) & 1 == 1 end }),
+    H.cond(function() return rec.recovered == nil end, {
+      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 8000,
+        planDone = function()
+          if target ~= nil and ticks(target) == 0 then rec.recovered = rec.recovered or H.frame; return true end
+          return target ~= nil and (H.readByte(SMARK) >> target) & 1 == 1
+        end }),
+    }, {}),
     H.kitBattle({}, { untilPlanDone = true, idle = "defend", maxFrames = 12000,
       planDone = function()
         if target ~= nil and ticks(target) == 0 and (H.readByte(SHELD) >> target) & 1 == 0 then
