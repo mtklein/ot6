@@ -3,7 +3,7 @@
 --   1. the cabin without GOGO (STRAGO, RELM, TERRA, LOCKE: the save has LOCKE waiting
 --      aboard in a Ribbon, which a regroup refuses (#506), so he is the one seated), Thamasa, Leo's grave (344 (54,18), facing up, A):
 --      vanilla's line ($0845, "General Leo...") and nothing else;
---   2. the cabin with GOGO again (STRAGO, RELM, GOGO, TERRA), the state `wor_leo_pre` in Thamasa's street, the
+--   2. the cabin with GOGO again, leading (GOGO, STRAGO, RELM, TERRA), the state `wor_leo_pre` in Thamasa's street, the
 --      grave: the reveal scene played through, every dialogue page pressed on, in its order (GOGO's line,
 --      LEO's, the first reactor's -- TERRA's in this party --, LEO's two); slot 12's record (actor $0C kept,
 --      graphics $10, the name LEO, the four stats the higher of the two rows, max HP +14) and switch $00E0;
@@ -131,13 +131,14 @@ H.run({ maxFrames = 600000 }, {
 
   -- ---- 2. with GOGO: the reveal ----------------------------------------------------------------------------
   -- @@stage reveal
-  regroup({ STRAGO, RELM, GOGO, TERRA }),
+  regroup({ GOGO, STRAGO, RELM, TERRA }),
   liftOff(),
   H.flyTo(FALCON[1], FALCON[2], { what = "the Falcon down by Thamasa with GOGO", fight = FIGHT }),
   enterFrom(THAMASA_DOOR, MAP_THAMASA, "Thamasa with GOGO"),
   H.call(function()
     before = snap()
     H.log(recLine("before the grave"))
+    H.assertEq(H.readByte(0x0879 + 41 * GOGO), 0x0C, "GOGO's field object wears his own sprite before the grave")
   end),
   H.saveState("wor_leo_pre.mss"),
   examine("reveal"),
@@ -183,7 +184,14 @@ H.run({ maxFrames = 600000 }, {
   H.worldNavTo(FALCON[1], FALCON[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     avoid = { THAMASA_DOOR } }),
   H.waitUntil(function() return H.worldSettled() and H.worldAligned() end, 1200, "settled by the Falcon", 5),
-  H.call(function() H.screenshot("leo_worldmap") end),
+  H.call(function()
+    H.screenshot("leo_worldmap")
+    -- the leader on the world map: graphics and palette from the field object and $1f70 (world_start.asm)
+    H.log(string.format("[leo] the world map's leader: graphics $%02X, palette $%02X", H.readByte(0x11FB),
+      H.readByte(0x11FC)))
+    H.assertEq(H.readByte(0x11FB), 0x10, "the world map draws the leader, LEO, in Leo's sprite")
+    H.assertEq(H.readByte(0x11FC), 0x00, "in Leo's palette (map sprite palette 0)")
+  end),
   H.saveGame({ slot = 3, baseline = false, tag = "the save after the reveal" }),
   H.call(function()
     H.assertSavedSlotWorld(FALCON[1], FALCON[2], "the save after the reveal", 3, 1)
