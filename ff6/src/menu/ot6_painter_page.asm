@@ -7,8 +7,9 @@
 ; order read a column at a time, each learned row its name and price and each
 ; other one the locked marker.  The page has the Thief page's shape and
 ; geometry (rows 1/3/.../15 of BG1 screen A, name at column 3 against the
-; cursor at x=8, price at column 16) and shares its cursor tables; there is no
-; help line, as there is none on Locke's page.
+; cursor at x=8, price at column 16) and shares its cursor tables; the help
+; window at the top shows the line of the row under the cursor, as Locke's
+; page does (Ot6PainterPageDesc, below).
 ;
 ;   the rows    Ot6PaintPageRow (bank F0): Ot6PaintRowTbl's id when
 ;               Ot6PaintRowKnown says the row is learned (the switch or level

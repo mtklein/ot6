@@ -496,6 +496,13 @@ def check(rom, dbg_text, c):
         if rec != want:
             problems.append("%s rung %d (%s): Ot6LadderTbl holds %s, the table says %s"
                             % (name, k, label, rec.hex(" "), want.hex(" ")))
+        # #549: the relic-effects byte (record +5, ItemProp+10's) bits that turn a command into a no-list one,
+        # Sketch -> Control ($10) and Steal -> Capture ($40): the field Skills rows grey from worn gear alone,
+        # so no rung may carry them
+        if len(rec) > 5 and rec[5] & 0x50:
+            problems.append("%s rung %d (%s): Ot6LadderTbl's relic-effects byte $%02X carries $10/$40 (Sketch -> "
+                            "Control, Steal -> Capture), which the Skills page rows read from gear alone"
+                            % (name, k, label, rec[5]))
         lab = rom[lt + i * LABEL: lt + (i + 1) * LABEL]
         if list(lab) != encode(c, label):
             problems.append("%s rung %d: the menu label is not %r" % (name, k, label))
@@ -533,6 +540,8 @@ def main():
             # #550: Bahamut's signature is new code (no bytes); the Hero Ring's moved to Ragnarok's
             ("Bahamut's signature keeps the Hero Ring's bits", t + (12 * 5 + 4) * REC + 4, 0x03, "Bahamut rung 5"),
             ("Ragnarok's signature loses the Hero Ring's bits", t + (15 * 5 + 4) * REC + 4, 0x00, "Ragnarok rung 5"),
+            ("Ramuh's rung 1 turns Sketch into Control", t + 0 * REC + 5, 0x10, "carries $10/$40"),
+            ("Ramuh's rung 1 turns Steal into Capture", t + 0 * REC + 5, 0x40, "carries $10/$40"),
         ]
         ti = rom_off(sym(dbg_text, "Ot6RungDescIdx"))
         ts = rom_off(sym(dbg_text, "Ot6RungDescStr"))

@@ -265,7 +265,7 @@ Every ability is feasible. None needs new art, a new status or save data.
   rung carries that bit, which `menu_painterpage_wor` checks. The code is
   `ot6_painter_page.asm`, its own segment after the vanilla menu bank: the
   hooks are same-size operand changes, so no menu-bank address moves. The
-  list window grows two rows (`{15, 14}`, its frame closing at row 22); the
+  list window grows two rows (`{7, 14}`, its frame closing at row 22); the
   nine-row cursor table and jump table are copies in the new segment, and
   menu state `$31` (vanilla-unused, as `$30` was for Locke's) runs the page.
 - **Names.** Rows are nine letters to leave the price a gap, as "Mstr.Mark"

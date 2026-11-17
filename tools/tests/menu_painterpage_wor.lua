@@ -23,8 +23,9 @@
 --      because in battle she has Control and no painter's list.  The test
 --      reads the six worn pieces' relic-effects byte (ItemProp+10, bit $10),
 --      the byte the battle's command rewrite tests; checked here: the Fake
---      Mustache's record carries the bit and no rung of the esper ladder
---      (Ot6LadderTbl's +5, the same byte) does, so gear is the whole answer;
+--      Mustache's record carries the bit (that no rung of the esper ladder,
+--      Ot6LadderTbl's +5, the same byte, does is the build's esper_ladder
+--      check), so gear is the whole answer;
 --   4. the field menu and the battle agree: in the next random battle
 --      RELM's command rows hold Control ($0E) and no Sketch ($0D), and
 --      GOGO's hold Sketch.  The battle is then fought through the Fight menu.
@@ -76,9 +77,7 @@ local ROWTBL = H.sym("Ot6PaintRowTbl") & 0x3FFFFF
 local NAMES = H.sym("Ot6PaintName") & 0x3FFFFF
 local COSTS = H.sym("Ot6PaintCostTbl") & 0x3FFFFF
 local ITEMPROP = H.sym("ItemProp") & 0x3FFFFF
-local LADDER = H.sym("Ot6LadderTbl") & 0x3FFFFF
 local ID0, REC, ROWS, NAME_SIZE = 0xe8, 4, 8, 10
-local LADDER_RECS, LADDER_REC = 26 * 5, 14   -- ot6_esper.asm: 26 espers x 5 rungs x OT6_REC
 local RELIC_CONTROL = 0x10                   -- ItemProp+10 / $11d6: Sketch -> Control
 local RELM_LEVEL = 0x1600 + 37 * CHAR_RELM + 8
 local function rowId(i) return H.readRomByte(ROWTBL + i * REC) end
@@ -344,11 +343,7 @@ H.run({ maxFrames = 300000 }, {
     -- the static half of the Mustache arm
     H.assertEq(H.readRomByte(ITEMPROP + FAKE_MUSTACHE * 30 + 10) & RELIC_CONTROL, RELIC_CONTROL,
       "the Fake Mustache's relic-effects byte (ItemProp+10) carries Sketch -> Control ($10)")
-    for r = 0, LADDER_RECS - 1 do
-      H.assertEq(H.readRomByte(LADDER + r * LADDER_REC + 5) & RELIC_CONTROL, 0, string.format(
-        "esper ladder rung %d (stone %d, rung %d) does not turn Sketch into Control: gear is the whole answer", r,
-        r // 5, r % 5))
-    end
+    -- (that no esper rung carries the bit is the build's esper_ladder check)
     local x, y = H.worldX(), H.worldY()
     home = { x, y }
     for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do

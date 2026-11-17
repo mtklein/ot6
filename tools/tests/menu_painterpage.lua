@@ -35,8 +35,8 @@
 --   2. the cursor reaches row 8 (y = 164, the row's text row) and wraps;
 --   3. A on RELM's row opens menu state $31, which draws the eight rows as
 --      above, the geometry of menu_thiefpage (odd rows 1-15, nothing in the
---      gutter or past the price), the title "Painter" at BG3B {23,5}, a
---      blank description;
+--      gutter or past the price), the title "Painter" at BG3B {23,5}, and
+--      the help window's line for the row under the cursor (below);
 --   4. the page's cursor walks one column of eight;
 --   5. B returns to the list with the cursor on Painter, the title row
 --      blank and BG1 screen A clean in VRAM; then Espers opens with its own

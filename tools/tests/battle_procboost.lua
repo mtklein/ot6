@@ -121,6 +121,15 @@ local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eigh
 -- played on try 1 (build/attempts/wt/v044-crusader/procboost/pb_fix3.log), so tries 2 and 3 are reserves
 -- for another's action landing first, each costing a window (ROUND_FRAMES, runBudget counts them).
 local RAGE_TRIES = 3
+-- the magic, throw and rod cases' tries, for the same reason: on v0.49's
+-- line (#555's list gate moved the draws) the magic and throw cases' only try
+-- found the battle won by another member's queued action before the cast or
+-- the throw ran, "magic try 1: the battle was won at f2800 before the action
+-- ran (no attack observed): not measured" and the same for the throw at f6301
+-- (build/attempts/wt/v048-spellboost/quick/suite_quick_battle_procboost.log);
+-- tries 2 and 3 each spend one more of the actor's windows first, and a
+-- preempted try is never counted as the case.
+local PREEMPT_TRIES = 3
 -- Veldt encounters taken for GAU's window (#411).  The Veldt deals by sector (GetVeldtBattle), not from a
 -- four-word pool, so the budget is measured, not read off odds: 80 encounters (the first 16 of the line, each at five
 -- seed shifts) gave GAU's window ready in 76 and not in 4
@@ -940,7 +949,7 @@ end
 -- hands on #397's replay) procs whichever hand's swing rolled it
 local function isCast(c, k) return k.b5 == CMD_MAGIC and c.castSpells ~= nil and c.castSpells[k.b6] == true end
 local CASES = {
-  { name = "magic", char = TERRA, verb = "magic", spell = FIRE, tries = 1 },
+  { name = "magic", char = TERRA, verb = "magic", spell = FIRE, tries = PREEMPT_TRIES },
   { name = "fight", char = TERRA, verb = "fight", tries = FIGHT_TRIES,
     -- measured once a roll came up under $40 (the verdict holds every such
     -- roll to its cast) or a cast was seen; a try whose first swing felled
@@ -959,8 +968,8 @@ local CASES = {
       end
       return false
     end },
-  { name = "throw", char = SHADOW, verb = "throw", item = MITHRIL_KNIFE, tries = 1 },
-  { name = "rod", char = LOCKE, verb = "item", item = ICE_ROD, tries = 1 },
+  { name = "throw", char = SHADOW, verb = "throw", item = MITHRIL_KNIFE, tries = PREEMPT_TRIES },
+  { name = "rod", char = LOCKE, verb = "item", item = ICE_ROD, tries = PREEMPT_TRIES },
   { name = "magicite", char = LOCKE, verb = "item", item = MAGICITE, tries = MAGICITE_TRIES,
     -- measured, and some try so far drew again (the redraw arm ran)
     done = function(c)

@@ -469,15 +469,11 @@ H.run({ maxFrames = 120000 }, {
     { H.pressButtons({ "b" }, 3), H.waitFrames(30) }, "out of the menu"),
   H.waitFrames(20),
   H.call(function()
-    -- the static half: the glove's relic-effects byte carries the rewrite,
-    -- and no esper rung does (gear is the whole answer)
-    local ip, lad = H.sym("ItemProp") & 0x3FFFFF, H.sym("Ot6LadderTbl") & 0x3FFFFF
+    -- the static half: the glove's relic-effects byte carries the rewrite
+    -- (that no esper rung does is the build's esper_ladder check)
+    local ip = H.sym("ItemProp") & 0x3FFFFF
     H.assertEq(H.readRomByte(ip + THIEF_GLOVE * 30 + 10) & RELIC_CAPTURE, RELIC_CAPTURE,
       "the Thief Glove's relic-effects byte (ItemProp+10) carries Steal -> Capture ($40)")
-    for r = 0, 26 * 5 - 1 do
-      H.assertEq(H.readRomByte(lad + r * 14 + 5) & RELIC_CAPTURE, 0, string.format(
-        "esper ladder rung %d does not turn Steal into Capture", r))
-    end
     -- the declared write (the header): one Thief Glove into an empty bag slot
     local slot
     for i = 0, 255 do

@@ -5,6 +5,9 @@
 ; (menu/ot6_painter_page.asm).
 ; ------------------------------------------------------------------------------
 
+; the two pages' help lines (tools/kit_pages.py --write)
+        .include "ot6_kitpage_desc.inc"
+
 ; [ the field Painter page: row n's id, or $ff when it is not learned yet ]
 ; The twin of Ot6ThiefPageRow (ot6_thief.asm).  The page draws the eight rows
 ; in this table's order, which is the battle list's read a column at a time
@@ -12,8 +15,6 @@
 ; right), and asks the same Ot6PaintRowKnown the list asks.
 ; in: A = the page row 0-7.  out: A = the row's id or $ff.  any widths, any
 ; db.  preserves X and Y.  rtl.
-; the two pages' help lines (tools/kit_pages.py --write)
-        .include "ot6_kitpage_desc.inc"
 
 .proc Ot6PaintPageRow
         php

@@ -46,8 +46,8 @@ soldier!
 CYAN: General Leo...
 They said thou hadst fallen
 at Thamasa!
-SHADOW: ...A dead man
-walking. Fitting company.
+SHADOW: ...I wondered when
+you'd say so.
 STRAGO: Leo?! Then whose
 grave have I been tending?
 RELM: No way!
