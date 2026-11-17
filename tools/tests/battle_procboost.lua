@@ -693,9 +693,21 @@ local function tryCase(c, n)
       c.spend = n - 1
       tick, phase, held, spent, deferring, shut = 0, "reach", nil, 0, nil, 0
     end),
-    H.driveUntil(function() return skip or phase == "sent" end, 6000 + (n - 1) * ROUND_FRAMES, {
+    H.driveUntil(function() return skip or phase == "sent" or c.preemptF ~= nil end, 6000 + (n - 1) * ROUND_FRAMES, {
       H.call(function()
         if phase == "reach" then
+          -- the bench's own turns won the battle while this actor's windows
+          -- were being spent (v0.49's line, gau_joined: rage entry 0's try 2
+          -- spent one of GAU's windows and the party felled the last monster
+          -- first, then waited 12,690 frames on the world map for a window;
+          -- build/attempts/wt/v049-land/gate1/suite_battle_procboost.log):
+          -- the action never ran, so the try measured nothing and is not
+          -- counted, as a battle won after the confirm is not
+          if H.readByte(0x3A77) == 0 or not H.battleActive() then
+            c.preemptF = H.frame
+            H.setPad({})
+            return
+          end
           -- bench the other windows until this actor's opens.  Try n gives
           -- the actor's first n-1 windows to the bench, so each try acts
           -- after n-1 more rounds of everyone's turns.  The idle waits this
