@@ -590,6 +590,10 @@ TEST_ENV = {
     # eight branches from one snapshot, a battle each
     "battle_esperearring": "OT6_TIMEOUT=2400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    # #550: Bahamut's Limit Break and its five-digit numerals, from the play's
+    # save outside Narshe in the World of Ruin (the Ragnarok wearer's Ultima)
+    "battle_limitbreak": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-ragnarok-v1",
     # #534: Crusader's signature, the second weapon in the menu and its
     # swing, and the two-handed grip, against rank 4 from one snapshot
     "battle_espercrusader":
