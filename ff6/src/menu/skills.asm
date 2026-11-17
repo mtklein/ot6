@@ -47,7 +47,11 @@ UpdateSkillsCursor:
 @4b56:  jsr     MoveCursor
 
 InitSkillsCursor:
+.if LANG_EN
+@4b59:  ldy     #near Ot6SkillsCursorPos ; nine rows (ot6_painter_page.asm)
+.else
 @4b59:  ldy     #near SkillsCursorPos
+.endif
         jsr     UpdateCursorPos
         clr_a
         lda     zSelIndex         ; selected character
@@ -65,12 +69,13 @@ InitSkillsCursor:
 ; NOTE: this is the only cursor that doesn't have an initial position of (0,0)
 SkillsCursorProp:
 .if LANG_EN
-        cursor_prop {0, 1}, {1, 8}, NO_X_WRAP   ; + the Thief row
+        cursor_prop {0, 1}, {1, 9}, NO_X_WRAP   ; + Thief and Painter
 .else
         cursor_prop {0, 1}, {1, 7}, NO_X_WRAP
 .endif
 
-; skills cursor positions
+; skills cursor positions (EN: no longer read; InitSkillsCursor reads the
+; nine-row copy, Ot6SkillsCursorPos, and these bytes stay so nothing moves)
 SkillsCursorPos:
 @4b74:  cursor_pos {0, 20}
         cursor_pos {0, 36}
@@ -380,12 +385,15 @@ _c34c80:
         ldy     #near SkillsDanceText
         jsr     DrawPosKana
 .if LANG_EN
-        lda     zSkillsTextColor::Thief ; the 8th row, Locke's page
-        sta     zTextColor
-        ldy     #near SkillsThiefText
-        jsr     DrawPosKana
-.endif
+        jmp     Ot6SkillsKitRows        ; the 8th row (Locke's, his battle
+                                        ;   command's name) and the 9th
+                                        ;   (Relm's), then TfrBG3ScreenAB
+                                        ;   (ot6_painter_page.asm)
+        .res    10, $ea                 ; the bytes the 8th row's draw took
+                                        ;   here, kept so nothing moves
+.else
         jmp     TfrBG3ScreenAB
+.endif
 
 ; ------------------------------------------------------------------------------
 
@@ -411,7 +419,7 @@ _c34d3d:
 @4d41:  sta     zSkillsTextColor,x
         inx
 .if LANG_EN
-        cpx     #$0008      ; + zSkillsTextColor::Thief
+        cpx     #$0009      ; + zSkillsTextColor::Thief, ::Painter
 .else
         cpx     #$0007
 .endif
@@ -434,7 +442,12 @@ _c34d3d:
         dex
         bne     @4d50
         ply
+.if LANG_EN
+        jsr     Ot6SkillsPainterColor   ; the Painter row's colour, then this
+                                        ;   `lda 0,y` (ot6_painter_page.asm)
+.else
         lda     0,y                     ; espers always disabled for gogo
+.endif
         cmp     #CHAR_PROP::GOGO
         bne     @4d77
         lda     #$24
@@ -498,19 +511,22 @@ DrawMagicMenu:
 .if LANG_EN
 
 SkillsOptionsWindow1:                   make_window BG2A, {1, 1}, {7, 4}
-SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {15, 12}
+SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {7, 14}
+                                        ; 12 -> 14 for Painter at BG3A row
+                                        ;   21 (#549); its frame closes at
+                                        ;   row 22, over the empty spell
+                                        ;   window's frame
                                         ; 10 -> 12, one more text row (Thief
                                         ;   at BG3A row 19).  The window's 2
                                         ;   height units per text row: at 10
                                         ;   the frame closed under Dance and
                                         ;   the Thief row floated outside it.
-                                        ; 7 -> 15 wide for "Treasure Hunter"
-                                        ;   (columns 2-16): the frame's right
-                                        ;   edge is column 17, one short of
-                                        ;   the LV/HP/MP labels at column 18,
-                                        ;   and what it covers of the
-                                        ;   character window is the portrait's
-                                        ;   corner, empty on this screen
+                                        ; vanilla's 7 wide again (#549, the
+                                        ;   owner): Locke's row reads his
+                                        ;   battle command's seven letters
+                                        ;   (TresHnt), and v0.47's 15-wide
+                                        ;   frame ran under the equipped
+                                        ;   esper's name at BG1B {10,7}
 SkillsCharWindow1:                      make_window BG2A, {1, 6}, {28, 5}
 SkillsMagicWindow1:                     make_window BG2A, {1, 13}, {28, 12}
 SkillsDescWindow1:                      make_window BG2A, {1, 1}, {28, 3}
@@ -2328,11 +2344,12 @@ Ot6ThiefCursorPos:
         cursor_pos {8, 116 + yy * 12}
         .endrep
 
-; [ load thief description: always the empty string (see the header) ]
+; [ load thief description: the row's help line (#549) ]
+; Ot6ThiefPageDesc (ot6_painter_page.asm) picks the row's line, learned or
+; not, from tools/kit_pages.py's table; the $ff Ot6ThiefPageDraw still stages
+; is no longer read.
 LoadThiefDesc:
-        jmp     LoadBigText             ; $7e9d89[0..2] hold $ff (staged by
-                                        ;   Ot6ThiefPageDraw), so the $ff arm
-                                        ;   runs and no pointer table is read
+        jmp     Ot6ThiefPageDesc
 
 .endif   ; LANG_EN
 
@@ -3619,6 +3636,9 @@ SkillsRageText:                 pos_text SKILLS_LIST_RAGE
 SkillsDanceText:                pos_text SKILLS_LIST_DANCE
 .if LANG_EN
 SkillsThiefText:                pos_text SKILLS_LIST_THIEF      ; issue #68
+                                        ; (unread since #549: the row is
+                                        ;   BattleCmdName's; kept so nothing
+                                        ;   moves)
 .endif
 
 SkillsCharLabelTextList:

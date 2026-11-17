@@ -37,8 +37,12 @@ CODE_EXT_INC = 1
 .global Ot6PaintExec             ;   Cmd_0d's execute-side dispatch (the rows)
 .global Ot6KitConfirm            ;   the tools-shell confirm in modes 4-6
 .global Ot6VarnishGate           ;   CheckHit's exit: a coat turns a hit
-.global Ot6PaintPageRow          ;   the field page's rows
+.global Ot6PaintPageRow          ;   the field Painter page's rows: id or $ff
 .global Ot6PaintName             ;   the list's 10-letter names
+.global Ot6ThiefPageDescPtrs, Ot6ThiefPageDescStr  ; #549: the field pages'
+.global Ot6PaintPageDescPtrs, Ot6PaintPageDescStr  ;   help lines (kit_pages.py)
+.global Ot6PaintBase             ;   a row's base price: the list's Qty, and
+                                 ;   the field Painter page's price column
 .global Ot6SetzerListOpen        ; setzer's kit: slot -> tools-shell table
 .global Ot6SetzerConfirm         ;   the Slot row chains to the reels
 .global Ot6SetzerExec            ;   Cmd_0f's dispatch (coin toss/hired help/jackpot)

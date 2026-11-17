@@ -127,3 +127,6 @@
 
 ; Shadow's hobble and pin (#546), appended for the same reason.
         .include "ot6_pin.asm"
+
+; Relm's field Painter page's row leaf (#549), appended for the same reason.
+        .include "ot6_paintpage.asm"

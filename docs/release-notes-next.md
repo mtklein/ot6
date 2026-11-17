@@ -20,6 +20,20 @@ he fights alone, boosted or not; before, it was usable whenever he held a
 point and spent his turn and its MP on nothing. Relm's Portrait and Gesture
 are greyed the same way when no ally can take them.
 
+Relm's skills now have a page in the field menu, like Locke's. Skills >
+Painter lists her eight rows in the order her battle list uses, with their
+MP prices, and marks the ones she has not learned yet as locked. Gogo sees
+the same page while he carries Sketch. The row is greyed out while the Fake
+Mustache is worn, since Relm then has Control in battle and no list.
+Locke's row in the same list now reads TresHnt, the name his battle command
+shows, and is greyed out while he wears the Thief Glove, since he then has
+Capture and no list. The list is back to its original width, so the name of
+an equipped Esper beside it is no longer drawn over its border.
+
+Both pages now explain each move. The window at the top of the screen
+says what the move under the cursor does, and for a move not learned yet,
+where or at what level it is learned.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

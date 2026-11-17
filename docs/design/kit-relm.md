@@ -190,7 +190,10 @@ each is paid for (a stone worn, a turn and MP spent).
 Relm wearing it keeps Control only, with no painter's list, as a gloved
 Locke gets Capture: the owner's call (2026-11-16), "more of a commitment
 to use". Gogo, who can carry Sketch, opens Relm's whole list from it
-(#547), with her learned rows.
+(#547), with her learned rows. The field Skills menu agrees (#549): the
+Painter row is white for whoever carries Sketch and greyed, like any row
+its character has no command for, while a worn piece turns Sketch into
+Control, so a mustached Relm has no page as she has no list.
 
 **The Fanatics' Tower** is magic-only: `InitCmdList` drops every row but
 Magic, Item and Mimic (kits.md, "The World of Ruin"), so Relm's kit is off
@@ -241,10 +244,30 @@ Every ability is feasible. None needs new art, a new status or save data.
 - **MP display.** The list draws each row's price as the thief list does
   (two digits after a nine-letter name), live with the pending boost, and the
   wallet line shows Relm's MP while the list is up.
-- **Help text.** FF6's battle lists carry no help text; the field Skills
-  page lists the eight rows with the locked marker on rows not yet learned,
-  as `menu_thiefpage` does for Locke. The Narshe school and PLAYING.md teach
-  them.
+- **Help text.** FF6's battle lists carry no help text. The field page
+  does (#549, the owner: "essential for new ones"): the help window shows
+  the row's line, or how it is learned while it is locked, from
+  `tools/kit_pages.py`'s table (checked: a line a row, each within the
+  window, a locked level line naming `Ot6PaintRowTbl`'s level), drawn
+  through `LoadBigText` as the vanilla Skills pages draw theirs. Locke's
+  page has the same.
+- **The field page (#549).** Skills > Painter, the list's ninth row, below
+  Locke's Treasure Hunter. The page is the Thief page's shape: the eight
+  rows in `Ot6PaintRowTbl`'s order (the battle list's, read a column at a
+  time), each learned row its `Ot6PaintName` name and its `Ot6PaintBase`
+  price (the price the battle list draws at no boost; Sketch's 0 blank, as
+  the battle's two blanks), each other row the Blitz page's locked marker,
+  learned by `Ot6PaintPageRow`, which asks `Ot6PaintRowKnown` as the list
+  does. The title "Painter" fits the shared seven-tile box. The row is
+  white for whoever carries Sketch (Relm, or a Gogo who took it) and grey
+  while a worn piece's relic-effects byte (ItemProp+10, the `$11d6` bit
+  the battle's command rewrite tests) turns Sketch into Control; no esper
+  rung carries that bit, which `menu_painterpage_wor` checks. The code is
+  `ot6_painter_page.asm`, its own segment after the vanilla menu bank: the
+  hooks are same-size operand changes, so no menu-bank address moves. The
+  list window grows two rows (`{15, 14}`, its frame closing at row 22); the
+  nine-row cursor table and jump table are copies in the new segment, and
+  menu state `$31` (vanilla-unused, as `$30` was for Locke's) runs the page.
 - **Names.** Rows are nine letters to leave the price a gap, as "Mstr.Mark"
   does: Sketch, Portrait, Tint, Varnish, StillLife, Underpnt., Gesture,
   Mstrpiece. The banner (13 letters) prints the full names; "Underpainting"
@@ -559,7 +582,7 @@ states (World of Ruin).
 
 | # | Step | Suite | Mutant it must fail | Moves the line | Size |
 |---|---|---|---|---|---|
-| 1 | The list behind Sketch and Control, names, banners, prices, greys, the field page, the known-test (switch or level), Sketch's row unchanged | `battle_relmkit` (rows at each fixture; Sketch from row 1 still sketches), `menu_relmpage` | `OpenCmdMenuTbl[$0d]` left vanilla; a row keyed on the wrong switch | no (the driver never Sketches) | M, ~250 bytes F0, ~10 C1 |
+| 1 | The list behind Sketch and Control, names, banners, prices, greys, the field page, the known-test (switch or level), Sketch's row unchanged | `battle_relmkit` (rows at each fixture; Sketch from row 1 still sketches), `menu_painterpage`, `menu_painterpage_wor` (#549) | `OpenCmdMenuTbl[$0d]` left vanilla; a row keyed on the wrong switch | no (the driver never Sketches) | M, ~250 bytes F0, ~10 C1 |
 | 2 | Portrait and Masterpiece: `OT6_GIFT`, the window raise, R cap, charge, Bestow, pip palette | `battle_portrait` (a 0-bank ally casts Fire at one point for nothing and Fire 2's price; two banked plus the gift is Cleave; Def. keeps the gift; Bestow hands only paid pips; Masterpiece gifts three, greyed under three) | the charge ignores the gift (charges full pending) | no | M, ~150 bytes |
 | 3 | Tint | `battle_tint` (an unkeyed claw Fight on a revealed fire-weak body chips each swing and lands the control's damage; a keyed swing chips once; Throw does not) | Tint chips on keyed hits too; Tint adds the element to `$11a1` | no | S, ~80 bytes |
 | 4 | Varnish | `battle_varnish` (a monster spell misses and clears it; Image takes a physical hit and leaves it; Runic absorbs and leaves it; a Cure lands) | the bit is never cleared | no | S, ~40 bytes |
@@ -585,6 +608,5 @@ full peak (the note at the top).  Open after the build:
 - **The Fake Mustache.**  Built as vanilla, and confirmed (owner,
   2026-11-16, "more of a commitment to use"): a Relm wearing it gets Control
   and no list, as a gloved Locke gets Capture.
-- **The field Skills page** for her list (Locke has one) is not built: the
-  Skills menu's eighth row is Locke's, and a ninth needs the window
-  regrown.  The battle list and PLAYING.md carry the rows meanwhile.
+- **The field Skills page** for her list is built (#549): Skills > Painter,
+  the ninth row, the list window regrown by two rows.

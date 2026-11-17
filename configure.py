@@ -494,6 +494,19 @@ TEST_ENV = {
     # (Still Life's 32-tick break)
     "battle_relmwor": "OT6_TIMEOUT=7200 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
+    # #549: LOCKE's Treasure Hunter page (moved off celes_freed onto this
+    # battery), his row greyed by a Thief Glove, and one random battle where
+    # his commands agree
+    "menu_thiefpage": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #549: RELM's Painter page in the field Skills menu, early (three rows
+    # learned) beside Esper Mountain's save point; menus only
+    "menu_painterpage":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #549: her whole page, GOGO's with Sketch, the Fake Mustache, and one
+    # random battle on the World of Ruin's map where the battle agrees
+    "menu_painterpage_wor": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
     # #382: LOCKE's Mug, Trickshot, Dismantle and Appraise, on the same plain
     # (four of his five later rows are learned there); the Continue, a walk
     # and seven or more battles of one scripted turn each
@@ -1081,6 +1094,15 @@ check("esper_ladder",
       ["tools/esper_ladder.py", "docs/design/esper-rework.md", "ff6/src/menu/item_prop_en.dat",
        "ff6/src/text/item_name_en.json", "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg",
        copy_if_changed_from("build/ot6.sfc")])
+# #549: the field Treasure Hunter and Painter pages' help lines
+# (tools/kit_pages.py): sixteen a page, each within the help window (the
+# esper page's font rule; a second line clear of the page's title box), a
+# locked line naming the level Ot6PaintRowTbl teaches at, and the ROM's lines
+# the table's; the selftest's mutants move a ROM line and break the table.
+check("kit_pages",
+      "python3 tools/kit_pages.py --selftest",
+      ["tools/kit_pages.py", "tools/esper_ladder.py", "ff6/src/battle/ot6_paint.asm",
+       "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.

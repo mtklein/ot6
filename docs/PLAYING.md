@@ -202,8 +202,11 @@ the common item if not. A boost never makes up an item the enemy lacks.
 Only the first shield Filch takes becomes a point for Locke. His skills are
 in the list behind Steal, the ones he has learned packed from the top in this
 table's order, down the left column and then the right. In the field menu,
-Skills > Treasure Hunter shows all eight in the same order, with the ones
-still to learn marked locked.
+the Skills list's TresHnt row (the name his battle command shows) opens the
+Treasure Hunter page: all eight in the same order, with the ones still to
+learn marked locked. The window at the top says what the row under the
+cursor does, or where it is learned. The Thief Glove turns Steal into Capture, as in FF6,
+and he has no list while it is on, so the row is greyed out then.
 
 ### Edgar, Machinist (spear)
 
@@ -336,8 +339,13 @@ more body per point, each paying the price again. A green shield count marks
 an enemy Underpainting waits on, and a green shield one Still Life waits on
 or holds. Two banked points and a Portrait make a divine.
 
+In the field menu, Skills > Painter shows all eight rows in the same order,
+with their prices, and the ones still to learn marked locked. The window at
+the top says what the row under the cursor does, or how it is learned.
+
 Wearing the Fake Mustache turns her Sketch into Control, as in FF6, and she
-has no list while it is on.
+has no list while it is on. Skills > Painter is greyed out while she wears
+it.
 
 Save before you Sketch: a missed Sketch can still corrupt your inventory or a
 save, as it always could.
@@ -411,7 +419,7 @@ MP and cannot wear Espers.
 Gogo joins in the Zone Eater. His Mimic is free, and a boost buys what it
 buys on the action he copies. Where it would buy nothing, the points are
 kept. Gogo cannot wear Espers. With Sketch among his commands he opens
-Relm's list, with the rows she has learned.
+Relm's list, with the rows she has learned, and Skills > Painter shows it.
 
 ## Espers
 
