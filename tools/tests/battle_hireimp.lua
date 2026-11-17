@@ -68,8 +68,18 @@ H.run({ maxFrames = 200000 }, {
         step = step or H.setzerBattle({ { row = "defend" }, { row = HIRE, boost = 2 } }, {})
         local r = step:tick()
         if r == "done" then
-          for _, rec in ipairs(H.vars.setzer) do if rec.row == HIRE then got = rec end end
-          if got == nil then H.log("[hireimp] the battle ended before the hire; again") end
+          -- a hire whose third pass found no one to strike is played again in the next battle (gate 3 at
+          -- ce985aaa: "pass 3: mark $A2 -- the Imp (class bits 0)", two strikes paid,
+          -- build/attempts/wt/v049-land/gate3/suite_battle_hireimp.log); the battle that is judged had all three
+          for _, rec in ipairs(H.vars.setzer) do
+            if rec.row == HIRE and rec.costs ~= nil and #rec.costs == 3 then got = rec
+            elseif rec.row == HIRE and not rec.saidShort then
+              rec.saidShort = true
+              H.log(string.format("[hireimp] the hire struck %d time(s), the Imp's pass found no one; again",
+                rec.costs and #rec.costs or 0))
+            end
+          end
+          if got == nil then H.log("[hireimp] no hire with three strikes in this battle; again") end
           step = nil
         end
         return r
