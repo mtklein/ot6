@@ -37,7 +37,7 @@ OT6_LEO_LEO_ROW = CHAR_PROP::LEO * $16
 ; lower on MP (10 against 12); levels add the same to both, so the record
 ; takes the positive difference of each base (HP +14, MP nothing), capped
 ; at 9999/999 with the boost bits (14-15) kept, and current HP/MP gain the
-; same.  Preserves A, X, Y and the flags' widths.
+; same (never from 0).  Preserves A, X, Y and the flags' widths.
 
 .proc Ot6LeoReveal
         php
@@ -100,10 +100,12 @@ Grow:   lda     f:CharProp+OT6_LEO_LEO_ROW,x
         ora     1,s
         sta     $160b,y
         lda     $1609,y                 ; current: up by the gain (the boosted
-        clc                             ;   max rose by at least as much)
-        adc     3,s
-        jsr     Cap
-        sta     $1609,y
+        beq     :+                      ;   max rose by at least as much), but
+        clc                             ;   never from 0: a Wounded member
+        adc     3,s                     ;   stays down (the scene needs Gogo
+        jsr     Cap                     ;   standing, EventCmd_ee; this holds
+        sta     $1609,y                 ;   whatever calls it)
+:
         pla
         pla
         shorta

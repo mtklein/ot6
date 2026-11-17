@@ -3,6 +3,9 @@
 --   1. the cabin without GOGO (STRAGO, RELM, TERRA, LOCKE: the save has LOCKE waiting
 --      aboard in a Ribbon, which a regroup refuses (#506), so he is the one seated), Thamasa, Leo's grave (344 (54,18), facing up, A):
 --      vanilla's line ($0845, "General Leo...") and nothing else;
+--   1b. the cabin four times more, GOGO second, third, fourth, and in a party of two (RELM, GOGO), each saved in
+--      Thamasa's street before the grave (wor_leo_pre_slot2/3/4, wor_leo_pre_two: field_leostage plays the scene
+--      from each);
 --   2. the cabin with GOGO again, leading (GOGO, STRAGO, RELM, TERRA), the state `wor_leo_pre` in Thamasa's street, the
 --      grave: the reveal scene played through, every dialogue page pressed on, in its order (GOGO's line,
 --      LEO's, the first reactor's -- TERRA's in this party --, LEO's two); slot 12's record (actor $0C kept,
@@ -29,6 +32,20 @@ local REC = 0x1600 + 37 * GOGO
 local SW_LEO = 0x00E0                        -- code_ext.inc OT6_LEO_SWITCH
 local DLG_VANILLA, DLG_LEO = 0x0845, 0x0C0C  -- "General Leo..."; event_main.asm OT6_LEO_DLG
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
+-- the scene's first line as the ROM encodes it (DlgPtrs, the bank after DlgBankInc's split): "{gogo}: You
+-- know,{n}this grave is empty." -- the text the dialogue index shows, not only the index
+-- (tools/check_leo_reveal.py ties OT6_LEO_DLG to dlg1_en.json at build time)
+local FIRST_LINE = "0e82d9bf44ed50660183aec6e19997863e46494d526500"
+local function dlgBytes(id, n)
+  local function rb(a) return H.readRomByte(a & 0x3FFFFF) end
+  local inc, ptrs = H.sym("DlgBankInc"), H.sym("DlgPtrs")
+  local split = rb(inc) | (rb(inc + 1) << 8)
+  local p = rb(ptrs + 2 * id) | (rb(ptrs + 2 * id + 1) << 8)
+  local a = ((id < split) and 0xCD0000 or 0xCE0000) | p
+  local t = {}
+  for i = 0, n - 1 do t[#t + 1] = string.format("%02x", rb(a + i)) end
+  return table.concat(t)
+end
 
 -- the record as the log reads it
 local function recLine(tag)
@@ -56,7 +73,15 @@ local function examine(tag)
     H.navTo(GRAVE[1], GRAVE[2], { maxFrames = 3000 }),
     H.waitUntil(function() return settled() end, 600, tag .. ": on the grave's tile", 1),
     H.call(function() shown = {}; n = 0 end),
-    H.faceAndHoldA("up", function() return H.dialogWaiting() end, 1200, tag .. ": face the grave, A"),
+    -- the first page is recorded as it opens, under the held A (the loop below starts after the release)
+    -- (stopped as soon as a dialogue window opens, $ba: its A presses would page on through it)
+    H.faceAndHoldA("up", function()
+      if H.readByte(0x00BA) == 1 then
+        if #shown == 0 then shown[1] = H.readWord(0x00D0) & 0x1FFF end
+        return true
+      end
+      return false
+    end, 1200, tag .. ": face the grave, A"),
     H.release(),
     H.driveUntil(function()
       n = n + 1
@@ -68,7 +93,7 @@ local function examine(tag)
           if id ~= last then
             last = id
             pages = pages + 1
-            shown[#shown + 1] = id
+            if not (pages == 1 and shown[1] == id) then shown[#shown + 1] = id end
             H.log(string.format("[leo] %s: dialogue $%04X open (page %d) f%d", tag, id, pages, H.frame))
             H.screenshot(string.format("%s_%02d_%04x", tag, pages, id))
           end
@@ -90,6 +115,26 @@ local function assertShown(tag, want)
   for _, id in ipairs(want) do exp[#exp + 1] = string.format("$%04X", id) end
   H.log(string.format("[leo] %s: dialogue shown %s", tag, table.concat(got, " ")))
   H.assertEq(table.concat(got, " "), table.concat(exp, " "), tag .. ": the dialogue the grave showed, in order")
+end
+
+-- a party shape before the grave: the cabin, the flight down, Thamasa's street (the state), back to the Falcon
+local function shape(members, state)
+  return H.seqStep({
+    regroup(members),
+    liftOff(),
+    H.flyTo(FALCON[1], FALCON[2], { what = "the Falcon down by Thamasa: " .. state, fight = FIGHT }),
+    enterFrom(THAMASA_DOOR, MAP_THAMASA, "Thamasa: " .. state),
+    H.call(function()
+      H.assertEq(sw(SW_LEO), 0, state .. ": switch $00E0 clear")
+      H.log(string.format("[leo] %s: GOGO in party 1 at position %d of %d", state,
+        (H.readByte(0x1850 + GOGO) >> 3) & 3, #members))
+    end),
+    H.saveState(state .. ".mss"),
+    H.navTo(22, 47, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT }),
+    outToWorld("down", "off Thamasa's edge: " .. state),
+    H.worldNavTo(FALCON[1], FALCON[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+      avoid = { THAMASA_DOOR } }),
+  })
 end
 
 local before = nil
@@ -129,6 +174,15 @@ H.run({ maxFrames = 600000 }, {
   H.worldNavTo(FALCON[1], FALCON[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     avoid = { THAMASA_DOOR } }),
 
+  -- ---- 1b. the other party shapes, saved before the grave for field_leostage ------------------------------
+  -- @@stage shapes
+  -- GOGO second, third and fourth in the order, and a party of two: each the cabin's own regroup, the flight
+  -- down, Thamasa's street (a state), and back to the Falcon.  Nothing is examined here.
+  shape({ STRAGO, GOGO, RELM, TERRA }, "wor_leo_pre_slot2"),
+  shape({ STRAGO, RELM, GOGO, TERRA }, "wor_leo_pre_slot3"),
+  shape({ STRAGO, RELM, TERRA, GOGO }, "wor_leo_pre_slot4"),
+  shape({ RELM, GOGO }, "wor_leo_pre_two"),
+
   -- ---- 2. with GOGO: the reveal ----------------------------------------------------------------------------
   -- @@stage reveal
   regroup({ GOGO, STRAGO, RELM, TERRA }),
@@ -145,6 +199,8 @@ H.run({ maxFrames = 600000 }, {
   H.call(function()
     -- the first reactor in the scene's case order (CELES, TERRA, ...): TERRA's line in this party
     assertShown("the reveal", { DLG_LEO, DLG_LEO + 1, DLG_LEO + 5, DLG_LEO + 2, DLG_LEO + 3 })
+    H.assertEq(dlgBytes(DLG_LEO, #FIRST_LINE // 2), FIRST_LINE, "dialogue $0C0C is the scene's first line, "
+      .. "\"{gogo}: You know, this grave is empty.\"")
     H.log(recLine("after the reveal"))
     H.assertEq(sw(SW_LEO), 1, "the reveal set switch $00E0")
     H.assertEq(H.readByte(REC), 0x0C, "the slot keeps actor $0C (Mimic, the picker and the final order key on it)")

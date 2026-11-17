@@ -603,6 +603,10 @@ set_script_mode EVENT
 .define give_bushido_tech(n) _e_cmd_byte $9e, 1 << (n)
 ; ot6 #552: General Leo's reveal -- the stats and switch $00E0 (EventCmd_9f)
 .define ot6_leo_reveal _e_cmd_impl $9f
+; ot6 #552: drop a Wounded, Petrified or Zombie Gogo from the PARTY_CHARS case (EventCmd_ee)
+.define ot6_leo_able _e_cmd_impl $ee
+; ot6 #552: Gogo's object becomes slot 1 for the scene (EventCmd_ed)
+.define ot6_leo_lead _e_cmd_impl $ed
 
 .mac wait_15f dur
         .ifblank dur

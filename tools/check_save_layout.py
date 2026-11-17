@@ -31,7 +31,9 @@ unnoticed:
   Event switches (section "## Event switches"): a vanilla event switch OT6
     claims (#552), one row each: the switch, its byte and bit in vanilla's
     switch array ($1E80 + switch/8, bit switch%8), and the symbol the build
-    reads it through.  Checked: the byte and bit are the switch's, the byte
+    reads it through.  Checked: the byte and bit are the switch's, every
+    `<name>_SWITCH` equate the modules assemble (the code's and the event
+    script's) is the row's switch, the byte
     lies in the switch array ($1E80-$1F5F), the symbol assembles at that byte
     (and its `<name>_BIT` equate, a `_FLAG` symbol's, is the bit), and every
     OT6 symbol in the switch array has a row.  Such a symbol needs no
@@ -224,6 +226,27 @@ def parse_switches(text):
         out.append({"switch": int(m.group(1), 16), "byte": int(b.group(1), 16),
                     "bit": int(cells[2].strip("`")), "symbol": cells[3].strip("`").strip(), "line": i})
     return out
+
+
+def switch_values(dbg_text, name):
+    """Every value a symbol of this name has in the dbg (one per module that defines it)."""
+    return sorted({int(m.group(1), 16) for m in
+                   re.finditer(r'\bname="%s",[^\n]*\bval=0x([0-9A-Fa-f]+)' % re.escape(name), dbg_text)})
+
+
+def check_switch_equates(srows, dbg_text):
+    """Each claimed switch's `<name>_SWITCH` equate, in every module that defines one (the code's
+    code_ext.inc and the event script's own), is the row's switch (#552)."""
+    problems = []
+    for r in srows:
+        if not r["symbol"].endswith("_FLAG"):
+            continue
+        name = r["symbol"][:-len("_FLAG")] + "_SWITCH"
+        vals = switch_values(dbg_text, name)
+        if vals and vals != [r["switch"]]:
+            problems.append("%s:%d switch $%04X: %s is %s in the build" % (DOC, r["line"], r["switch"], name,
+                                                                      ", ".join("$%04X" % v for v in vals)))
+    return problems
 
 
 def check_switches(srows, syms, allsyms):
@@ -504,6 +527,7 @@ def check(repo, dbg_path, doc_path, rom_path):
         raise SystemExit("check_save_layout: no built ROM at %s" % rom_path)
     sprobs, covered = check_switches(parse_switches(text), syms, allsyms)
     problems += sprobs
+    problems += check_switch_equates(parse_switches(text), dbg)
     problems += check_data(rows, scraps, {k: v for k, v in syms.items() if k not in covered})
     problems += check_lengths(rows, allsyms)
     problems += check_battery(brows, magic, allsyms, sram_symbols(dbg),
@@ -554,6 +578,8 @@ SELF_DBG = (
     'sym\tname="OT6_SAVERSV_LEN",val=0x11,type=equ\n'
     'sym\tname="OT6_LEO_FLAG",val=0x7E1E9C,type=lab\n'
     'sym\tname="OT6_LEO_BIT",val=0x1,type=equ\n'
+    'sym\tname="OT6_LEO_SWITCH",val=0xE0,type=equ\n'
+    'sym\tname="OT6_LEO_SWITCH",val=0xE0,type=equ\n'
     'sym\tname="OT6_CODEX_MAGIC",val=0x316000,type=lab\n'
     'sym\tname="OT6_ESPER_ROOT",val=0x317000,type=lab\n'
     'sym\tname="OT6_ESPER_LIVE",val=0x317C00,type=lab\n'
@@ -586,6 +612,7 @@ def _run_self(doc=SELF_DOC, dbg=SELF_DBG, rom=None, literals=()):
     syms = parse_dbg(dbg)
     sprobs, covered = check_switches(parse_switches(doc), syms, allsyms)
     problems += sprobs
+    problems += check_switch_equates(parse_switches(doc), dbg)
     problems += check_data(rows, scraps, {k: v for k, v in syms.items() if k not in covered})
     problems += check_lengths(rows, allsyms)
     problems += check_battery(brows, parse_magic(doc), allsyms, sram_symbols(dbg),
@@ -629,6 +656,7 @@ def selftest():
     red("is byte $1E9C bit 0, not $1E9D bit 0", doc=SELF_DOC.replace("| $00E0 | $1E9C |", "| $00E0 | $1E9D |"))
     red("OT6_LEO_BIT is $02", dbg=SELF_DBG.replace('"OT6_LEO_BIT",val=0x1', '"OT6_LEO_BIT",val=0x2'))
     red("Event switches table", doc=SELF_DOC.replace("| $00E0 | $1E9C | 0 | OT6_LEO_FLAG | x |\n", ""))
+    red("OT6_LEO_SWITCH is $00E0, $00E1", dbg=SELF_DBG + 'sym\tname="OT6_LEO_SWITCH",val=0xE1,type=equ\n')
     red("assembled no save-block symbol OT6_X_FLAG", doc=SELF_DOC.replace("| 0 | OT6_LEO_FLAG |", "| 0 | OT6_X_FLAG |"))
     # battery map: the codex moved by a page in the build (the mutant ROM
     # whose save-touching address drifted from the frozen layout)

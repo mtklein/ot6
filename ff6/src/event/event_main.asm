@@ -113144,20 +113144,26 @@ _cce486:
 
 ; ------------------------------------------------------------------------------
 
-; OT6 #552 (docs/design/leo-reveal.md): Leo's grave in the World of Ruin's
+;  OT6 #552 (docs/design/leo-reveal.md): Leo's grave in the World of Ruin's
 ; Thamasa.  The event block is full, so the scene lives after the dialogue
-; pointers in bank $cc (segment ot6_event; ld65 refuses a build that
-; overflows the bank).  Examined with Gogo in the active party and the reveal
-; not yet played, Gogo says the grave is empty, and is Leo: the slot (actor
-; $0c, unchanged) takes Leo's name, sprite and palette, event command $9f
-; (Ot6LeoReveal) its stats and switch $00E0.  Without Gogo, or after the
-; reveal, the grave reads as vanilla's.
+; pointers in bank $cc (segment ot6_event; the .assert at its end and ld65
+; refuse a build that overflows the bank).  Examined with Gogo in the active
+; party, standing (not Wounded, Petrified or a Zombie: EventCmd_ee), and the
+; reveal not yet played, Gogo says the grave is empty, and is Leo: the slot
+; (actor $0c, unchanged) takes Leo's name, sprite and palette, event command
+; $9f (Ot6LeoReveal) its stats and switch $00E0.  Otherwise the grave reads
+; as vanilla's.
 
 .segment "ot6_event"
 
-OT6_LEO_DLG = $0c0c                     ; dlg1_en.json's last 17 entries
-OT6_LEO_SWITCH = $00e0                  ; code_ext.inc's OT6_LEO_SWITCH (the event
-                                        ;   module does not include it)
+; the scene's 17 lines, dlg1_en.json's entries from OT6_LEO_DLG on;
+; tools/check_leo_reveal.py checks each entry's text against this index and
+; each line's width (so an entry appended elsewhere cannot shift them
+; silently)
+OT6_LEO_DLG = $0c0c
+; code_ext.inc's OT6_LEO_SWITCH (the event module does not include it);
+; check_save_layout.py holds both to save-layout.md's row
+OT6_LEO_SWITCH = $00e0
 
 .proc Ot6LeoGrave
         if_any
@@ -113166,6 +113172,7 @@ OT6_LEO_SWITCH = $00e0                  ; code_ext.inc's OT6_LEO_SWITCH (the eve
                 goto EventReturn
         if_switch OT6_LEO_SWITCH=1, Vanilla
         set_case PARTY_CHARS
+        ot6_leo_able                    ; a fallen Gogo is not there
         if_case CHAR::GOGO, Ot6LeoScene
         if_switch OT6_LEO_SWITCH=1, EventReturn
 Vanilla:
@@ -113174,34 +113181,42 @@ Vanilla:
         return
 .endproc  ; Ot6LeoGrave
 
+; Staging, for any party of one to four with Gogo anywhere in its order: the
+; party steps out of its leader (vanilla's _cac766), Gogo becomes slot 1 at
+; the grave's stone (EventCmd_ed: the others keep slots 2-4 in order), and
+; the others step down and aside one at a time, facing him: slot 2 below him
+; (54,19), slot 3 (53,19), slot 4 (52,19).  At the end they walk back into
+; him, slot 2 first, before vanilla's _cacb95 hides them and update_party
+; puts the slots back as the party's order has them.
 .proc Ot6LeoScene
         call _cac766                    ; the party out of its leader
-        obj_script SLOT_4                ; one at a time: the paths cross
+        ot6_leo_lead                    ; Gogo is slot 1, at the stone
+        obj_script SLOT_4               ; one at a time: the paths cross
                 speed NORMAL
                 move DOWN, 1
                 move LEFT, 2
                 dir UP
                 end
-        obj_script SLOT_2
+        obj_script SLOT_3
                 speed NORMAL
                 move DOWN, 1
                 move LEFT, 1
                 dir UP
                 end
-        obj_script SLOT_3
+        obj_script SLOT_2
                 speed NORMAL
                 move DOWN, 1
                 dir UP
                 end
         obj_script SLOT_1
-                speed NORMAL
                 dir UP
                 end
         wait_30f
         dlg OT6_LEO_DLG
-                ; GOGO: You know, this grave is empty.
+                ; GOGO: You know,
+                ; this grave is empty.
         wait_30f
-        obj_script GOGO
+        obj_script SLOT_1
                 dir DOWN
                 end
         wait_30f
@@ -113233,14 +113248,29 @@ Vanilla:
         dlg OT6_LEO_DLG+2
                 ; LEO: Kefka's blade should have ended me.  I let the world
                 ; bury General Leo, and walked in your footsteps instead.
-        obj_script GOGO
+        obj_script SLOT_1
                 dir UP
                 end
         wait_30f
         dlg OT6_LEO_DLG+3
-                ; LEO: The world I swore to protect lies in ruins.  I'll hide
-                ; no longer.  My sword is yours.
-        call _cacb95                    ; the party back into its leader
+                ; LEO: The world I swore to protect lies in ruins.  No more
+                ; hiding.  My sword is yours.
+        call _cb2e34                    ; walk through each other (vanilla's pass_off)
+        obj_script SLOT_2               ; back into him, one at a time
+                speed NORMAL
+                move UP, 1
+                end
+        obj_script SLOT_3
+                speed NORMAL
+                move RIGHT, 1
+                move UP, 1
+                end
+        obj_script SLOT_4
+                speed NORMAL
+                move RIGHT, 2
+                move UP, 1
+                end
+        call _cacb95                    ; hidden, and the slots as the party has them
         return
 Celes:  dlg OT6_LEO_DLG+4
         return
@@ -113269,3 +113299,6 @@ Gau:    dlg OT6_LEO_DLG+15
 Umaro:  dlg OT6_LEO_DLG+16
         return
 .endproc  ; Ot6LeoScene
+
+; the bank's end: the dialogue pointers and this scene share bank $cc's tail
+.assert * <= EventScript + $030000, error, "ot6_event overflows bank $cc"

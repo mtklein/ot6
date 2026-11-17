@@ -11,13 +11,14 @@
 -- (tools/state_write_waivers.txt) -- the party object's vehicle bits set to a chocobo with its rider shown
 -- (what `vehicle SLOT_1, {CHOCOBO, SHOW_RIDER}` writes, EventCmd_44), and the party walked left and right
 -- by the pad.  Asserted: every frame's rider pose ($0877, the object's graphics position) is one of the
--- walking frames ($07/$08 left, $47/$48 right) and never a riding one ($2E/$2F/$6E/$6F).  A mechanism test
+-- walking frames ($07/$08 left, $47/$48 right) and never a riding one ($2E/$2F/$6E/$6F), and that facing
+-- sideways the rider's lower sprite is dropped (Ot6LeoSaddleHide runs), so he sits in the saddle.  A mechanism test
 -- of the frame choice, not a claim about play.  Screenshots: facing left and right.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local GOGO = 12
 local MAP_THAMASA = 344
-local poses, bad = {}, {}
+local poses, bad, hidden = {}, {}, 0
 local function pobj() return H.readWord(0x0803) end
 H.run({ maxFrames = 30000 }, {
   H.loadState("build/states/wor_leo.mss.lua"),
@@ -33,6 +34,8 @@ H.run({ maxFrames = 30000 }, {
     H.writeByte(o, (H.readByte(o) & 0x1F) | 0xA0)   -- chocobo ($20), rider shown ($80): EventCmd_44's write
     H.log(string.format("[leoride] the party object's vehicle bits := $%02X (a chocobo, rider shown; declared)",
       H.readByte(o) & 0xE0))
+    local hide = H.sym("Ot6LeoSaddleHide")
+    emu.addMemoryCallback(function() hidden = hidden + 1 end, emu.callbackType.exec, hide, hide)
     emu.addEventCallback(function()
       local p = H.readByte(0x0877 + pobj())
       poses[p] = (poses[p] or 0) + 1
@@ -53,6 +56,8 @@ H.run({ maxFrames = 30000 }, {
     local walked = 0
     for _, p in ipairs({ 0x07, 0x08, 0x47, 0x48 }) do walked = walked + (poses[p] or 0) end
     H.assertEq(walked > 0, true, "the sideways rides drew his walking frames")
+    H.log(string.format("[leoride] the rider's lower sprite dropped on %d frame(s) (Ot6LeoSaddleHide)", hidden))
+    H.assertEq(hidden > 0, true, "sideways on the chocobo, his lower half is dropped: he sits in the saddle")
     H.log("[leoride] PASS: on a chocobo, Leo's sheet shows his walking frames, never the frames it lacks")
   end),
 })

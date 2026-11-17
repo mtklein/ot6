@@ -2380,21 +2380,21 @@ ChocoLeftBtmRightTiles:
 ; sits in the saddle, head and shoulders above it.  Up and down keep both
 ; halves, as every rider's do.  $da = the object, $d4 = its sprite slot.
 
-.proc Ot6LeoSaddle
+Ot6LeoSaddle:
         ldy     $da
         lda     $0868,y
-        bpl     Done                    ; the rider not shown
+        bpl     :+                      ; the rider not shown
         lda     $0879,y
         cmp     #MAP_SPRITE_GFX::LEO
-        bne     Done
+        bne     :+
         lda     $087f,y                 ; facing: 1 right, 3 left
         lsr
-        bcc     Done
+        bcc     :+
         ldy     $d4
+Ot6LeoSaddleHide:                       ; (field_leoride counts it)
         lda     #$ef                    ; off screen
         sta     $0345,y
-Done:   rts
-.endproc  ; Ot6LeoSaddle
+:       rts
 
 ; ------------------------------------------------------------------------------
 

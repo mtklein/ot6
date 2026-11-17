@@ -7,18 +7,22 @@
 --                    (the small name the record's, written to $7E9E89 by DrawEndingCharName; the big name
 --                    EndingCharNameAnim row 12) and his scene after it (map 254) draws slot 12 in his sprite
 --                    and palette;
---   reveal = true    the battery staged as after the reveal (build/lab/stage_leo_battery.py: switch $00E0 set,
---                    slot 12's name LEO, graphics $10, field palette 0 -- a declared state write, never route
---                    evidence): the card reads "LEO as Gogo" (owner, 2026-11-17: the small name from the
+--   reveal = true    the battery staged as after the reveal (tools/tests/ending_leo_stage.py: switch $00E0 set,
+--                    slot 12's name LEO, graphics $10, field palette 0, the stats and max HP Ot6LeoReveal writes --
+--                    a declared state write, never route evidence): the card reads "LEO as Gogo" (owner, 2026-11-17: the small name from the
 --                    record, vanilla's big "Gogo" over the cloaked art), and his scene draws Leo's sprite ($10)
 --                    in Leo's palette (0).
 -- A recruited member gets no portrait vignette (only one never recruited does), so neither run reads one.
+-- Why an instrument, not a suite: each run plays gen_wor_kefka's whole leg (the final battle, the ending:
+-- ~177,000 frames), and the revealed run needs a staged battery no graph leg makes (the line never plays the
+-- reveal: it is a branch); qualification proves it composes and starts (check_instruments.py).
 -- It writes nothing.  It counts those ROM reads, shoots the cast card (EndingState_46 and after) and his scene,
 -- and asserts when the run reaches The End
 -- ($bb).  Run:
 --   python3 -c 'import sys; sys.path.insert(0,"tools"); import check_instruments as c; \
 --     print(c.splice(open("tools/tests/gen_wor_kefka.lua").read(), "ENDING_LEO = { reveal = true }\n" + \
 --     open("tools/tests/ending_leo.lua").read()))' > build/lab/ending_leo_reveal.lua
+--   python3 tools/tests/ending_leo_stage.py       # -> build/lab/ck/wor-kt-plates-v1
 --   OT6_SRAM_CHECKPOINT=build/lab/ck/wor-kt-plates-v1 tools/tests/run.sh build/lab/ending_leo_reveal.lua <log>
 ENDING_LEO = ENDING_LEO or { reveal = false }
 do

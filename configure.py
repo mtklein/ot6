@@ -1013,6 +1013,13 @@ check("save_layout",
       ["tools/check_save_layout.py", "docs/design/save-layout.md",
        copy_if_changed_from("build/ot6.sfc")]
       + glob("src/**/*.asm", "ff6") + glob("src/**/*.inc", "ff6"))
+# #552: Leo's grave scene: OT6_LEO_DLG names the scene's 17 dialogue entries
+# (each checked by its opening text), every line fits the box with the widest
+# names a player can give, and the code's and the event script's
+# OT6_LEO_SWITCH agree; the selftest runs one mutant per rule.
+check("leo_reveal",
+      "python3 tools/check_leo_reveal.py --selftest && python3 tools/check_leo_reveal.py",
+      ["tools/check_leo_reveal.py", "ff6/src/text/dlg1_en.json", copy_if_changed_from("build/ot6.sfc")])
 # #305: the natural magic and the Esper spell lists are the planned ones
 # (kits.md, magicite.md, magicite-tube-six.md), and none grants a higher
 # spell tier (guidelines.md, "Stronger spells come from boosting, never from

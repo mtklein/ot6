@@ -5207,6 +5207,43 @@ EventCmd_9f:
 
 ; ------------------------------------------------------------------------------
 
+; [ event command $ee: can Gogo play the grave's scene? ]
+
+; OT6 (#552): after `set_case PARTY_CHARS`, drops Gogo (character 12: $1eb5
+; bit 4) from the case mask when he is Wounded, Petrified or a Zombie
+; (status 1 bits 7, 6, 1), so the grave reads as vanilla's, as though he were
+; not there.  Vanilla left $ee unused (it locked the game up).
+
+EventCmd_ee:
+        lda     $1614+CHAR_PROP::GOGO*$25       ; Gogo's status 1
+        and     #$c2
+        beq     :+
+        lda     $1eb5
+        and     #$ef
+        sta     $1eb5
+:       lda     #1
+        jmp     IncEventPtrContinue
+
+; ------------------------------------------------------------------------------
+
+; [ event command $ed: Gogo leads the scene ]
+
+; OT6 (#552): after `update_party` (GetTopChar: $07fb the party's top
+; character, the other slots cleared), makes Gogo's object the top one and
+; asks for the objects' sort ($0798; the event waits for it), which lists the
+; party's objects from $0803: slot 1 is then Gogo, and slots 2-4 the others
+; in object order, the leader among them.  `update_party` puts the top
+; character back.
+
+EventCmd_ed:
+        ldy     #CHAR_PROP::GOGO*$29            ; Gogo's object
+        sty     $07fb
+        lda     #1
+        sta     $0798                           ; sort the objects again
+        jmp     IncEventPtrContinue
+
+; ------------------------------------------------------------------------------
+
 EventCmd_66:
 EventCmd_67:
 EventCmd_68:
@@ -5222,8 +5259,6 @@ EventCmd_a5:
 EventCmd_e5:
 EventCmd_e6:
 EventCmd_ec:
-EventCmd_ed:
-EventCmd_ee:
 EventCmd_fc:
 EventCmd_ff:
 @b91a:  rts

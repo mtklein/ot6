@@ -14,39 +14,52 @@ after the dialogue pointers: segment `ot6_event`).  Map 340, the World of
 Balance's Thamasa, keeps vanilla's trigger.
 
 - The reveal already played (switch `$00E0` set), or Gogo not in the active
-  party: vanilla's line, "General Leo...".
-- Otherwise `Ot6LeoScene`: the party steps out of its leader (vanilla's
-  `_cac766`) and spreads below the grave one member at a time, then
+  party, or Gogo there but Wounded, Petrified or a Zombie (event command
+  `$EE`, `ot6_leo_able`, drops him from the party case): vanilla's line,
+  "General Leo...".
+- Otherwise `Ot6LeoScene`.  The party steps out of its leader (vanilla's
+  `_cac766`); Gogo becomes slot 1 (event command `$ED`, `ot6_leo_lead`: his
+  object made the top one and the objects re-sorted, so slots 2-4 are the
+  others), standing at the stone (54,18) whatever his place in the party's
+  order; the others step down and aside one at a time, facing up at him:
+  slot 2 below him (54,19), slot 3 (53,19), slot 4 (52,19), as many as the
+  party has.  Then
 
 ```
-GOGO: You know, this grave is
-empty.
-        (Gogo turns to the party; a chime and a white flash; Gogo is Leo)
+GOGO: You know,
+this grave is empty.
+        (Gogo turns down to face the others; a chime and a white flash;
+         Gogo is Leo)
 LEO: I've been watching you.
         (the first of these in the party, in this order:)
 CELES: General Leo...!
-I saw Kefka strike you down!
+They said Kefka
+struck you down!
 TERRA: Leo...? You're alive!
 LOCKE: General Leo?!
 But... we buried you!
 EDGAR: The Empire's finest
 general, behind a mime's mask?
-SABIN: Leo?! No wonder you
-fight like a soldier!
+SABIN: Leo?!
+No wonder you fight like a
+soldier!
 CYAN: General Leo...
-The one honorable man of the
-Empire... thou livest!
-SHADOW: ...I wondered when
-you'd say so.
+They said thou hadst fallen
+at Thamasa!
+SHADOW: ...A dead man
+walking. Fitting company.
 STRAGO: Leo?! Then whose
 grave have I been tending?
-RELM: No way! I cried at your
-funeral, you know!
-SETZER: Ha! A general dressed
-up as a mime. What a bluff!
-MOG: Kupo?! General Leo?!
-GAU: Gau knew! You smell like
-soldier!
+RELM: No way!
+I cried at your funeral,
+you know!
+SETZER: Ha! A general
+dressed up as a mime.
+What a bluff!
+MOG: Kupo?!
+General Leo?!
+GAU: Gau knew!
+You smell like soldier!
 UMARO: Uhhhh...?
 LEO: Kefka's blade should have
 ended me. I let the world bury
@@ -58,12 +71,18 @@ protect lies in ruins. No more
 hiding. My sword is yours.
 ```
 
-  and the party steps back into its leader.  The speaker names are the
-  record's names (`{gogo}` prints whatever the player named Gogo, then
-  LEO).  The dialogue is `dlg1_en.json`'s last 17 entries, `$0C0C`-`$0C1C`
-  (`OT6_LEO_DLG` in event_main.asm); every line fits the box's width
-  (218 pixels at most, measured from the font's width table).  The sword
-  on the grave is part of the map's background and stays where it is.
+  and the others walk back into him, slot 2 first, before vanilla's
+  `_cacb95` hides them and `update_party` restores the party's own leader.
+  Only Terra, Locke, Relm and Strago saw Leo fall and buried him in vanilla,
+  so only they speak of it as witnesses; the others speak of what they were
+  told or of what they see.  The speaker names are the record's names
+  (`{gogo}` prints whatever the player named Gogo, then LEO).  The dialogue
+  is `dlg1_en.json`'s entries `$0C0C`-`$0C1C` (`OT6_LEO_DLG`);
+  `tools/check_leo_reveal.py` (in qualification as `leo_reveal`) holds the
+  index to the entries' texts and every line to the box's 218 pixels with
+  the widest six-letter name in every name token (LEO for `{gogo}` after the
+  first line).  The sword on the grave is part of the map's background and
+  stays where it is.
 
 The transformation is the scene's own commands plus one new one:
 `obj_gfx GOGO, LEO` (the field object and the record's graphics byte,
@@ -83,7 +102,7 @@ below change.
 | What | How | Where |
 |---|---|---|
 | Vigor, speed, stamina, magic power | The higher of the record's and Leo's CharProp row, written once (Leo's 52/38/41/36 against Gogo's 25/30/20/26).  OT6 never grows these four, so the write is for good | `Ot6LeoReveal` |
-| Max HP | Leo's base HP is 50, Gogo's 36, and every level adds the same to both, so max HP gains 14 (capped at 9999, the boost bits kept) and current HP the same | `Ot6LeoReveal` |
+| Max HP | Leo's base HP is 50, Gogo's 36, and every level adds the same to both, so max HP gains 14 (capped at 9999, the boost bits kept) and current HP the same, never from 0 | `Ot6LeoReveal` |
 | Max MP | Gogo's base (12) is above Leo's (10): unchanged | `Ot6LeoReveal` |
 | Battle power, defense, magic defense, evade, magic block | Read from Leo's row (60/63/41/22/21) whenever the switch is set, in the menu's stats and in battle | `Ot6LeoBattleRow` (UpdateEquip) |
 | Run factor | Gogo's (normal); Leo's is low | unchanged |
@@ -132,6 +151,11 @@ switch, and the cast card stays as the owner chose:
   definition, is shown by his map scene instead; the branch stands for
   consistency.
 
+After the reveal, vanilla's lines that print Gogo's name print LEO: the
+ending's "LEO! Watch CELES and do exactly what she does!", the airship's
+"LEO: ......".  Accepted (#552 review): they are the record's name, as for
+any renamed character.
+
 Gogo's own recruitment event writes his graphics, palette and name; it runs
 before any reveal can, so it never undoes one.  Setzer's Hired Help used to
 send General Leo as its third hire; since this change (owner, 2026-11-17)
@@ -168,11 +192,17 @@ Continue, party changes and the parties of Kefka's Tower (`save_leo`).
 ## Tests
 
 - `gen_wor_leo`, a branch leg from `wor-gogo-v1` that nothing boots: the
-  grave without Gogo (vanilla's line only, the record untouched), the reveal
-  scene with him (the dialogue in order, the record, the switch), the grave
-  again (vanilla's line), a save on the world map with Leo leading (his
-  sprite and palette on the world map).  States `wor_leo_pre` (before) and
-  `wor_leo` (after).
+  grave without Gogo (vanilla's line only, the record untouched), four more
+  party shapes saved before the grave (Gogo second, third, fourth, and a
+  party of two), the reveal scene with him leading (the dialogue in order,
+  its first line's encoded text, the record, the switch), the grave again
+  (vanilla's line), a save on the world map with Leo leading (his sprite
+  and palette on the world map).  States `wor_leo_pre`, `wor_leo_pre_slot2`,
+  `_slot3`, `_slot4`, `_two` (before) and `wor_leo` (after).
+- `field_leostage`: the scene from each shape (Gogo at the stone facing the
+  others, each other member on its own tile below facing him, the pages in
+  order, everyone back on the leader's tile at the end), and a fallen Gogo
+  (vanilla's line, the switch clear; raised by the field care, the scene).
 - `menu_leo`: before and after, the Status screen's battle-stat row and
   command list (Shock, once, drawn in the 16th row), the Equip menu's offer
   (a weapon of Leo's set, and one Gogo already could), the Item menu's
@@ -181,8 +211,12 @@ Continue, party changes and the parties of Kefka's Tower (`save_leo`).
   Shock free, keyless, on every enemy, multiplied by its boost; Mimic of
   Shock.
 - `save_leo`: Reset, Continue, and the reveal is all still there.
-- `field_leoride`: the riding frames.
-- `ending_leo` (an instrument spliced into `gen_wor_kefka`): the cast card
+- `field_leoride`: the riding frames, and the lower half dropped in the
+  saddle (`Ot6LeoSaddleHide`).
+- `ending_leo` (an instrument spliced into `gen_wor_kefka`, its revealed
+  battery staged by `tools/tests/ending_leo_stage.py`; an instrument because
+  each run plays the whole last leg and the revealed one needs a staged
+  battery no graph leg makes): the cast card
   ("LEO as Gogo": the small name the record's, the big name row 12) and his
   scene, with and without the reveal.
 

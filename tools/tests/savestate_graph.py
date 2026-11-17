@@ -1234,12 +1234,15 @@ STATES = [
     # (250,229) again: a branch beside wor_ebot (#552).  Leo's grave without
     # GOGO (vanilla's line), then with him: the reveal, the grave's line
     # again, and a save on the world map (docs/design/leo-reveal.md).
-    # Nothing boots it; the suites menu_leo, battle_leo and save_leo boot
-    # its states.
-    # also: wor_leo_pre, the party with GOGO in Thamasa's street before the
-    # grave (the suites' state before the reveal).
+    # Nothing boots it; the suites menu_leo, battle_leoshock, save_leo,
+    # field_leoride and field_leostage boot its states.
+    # also: wor_leo_pre, the party with GOGO leading in Thamasa's street
+    # before the grave (the suites' state before the reveal), and the other
+    # party shapes there: GOGO second, third, fourth, and a party of two.
     S("wor_leo", gen="gen_wor_leo", prev="wor_gogo",
-      checkpoint="wor-gogo-v1", timeout=7200, also=["wor_leo_pre"]),
+      checkpoint="wor-gogo-v1", timeout=7200,
+      also=["wor_leo_pre", "wor_leo_pre_slot2", "wor_leo_pre_slot3",
+            "wor_leo_pre_slot4", "wor_leo_pre_two"]),
 
     # wor-ebot-v1 -> the World of Ruin map on the Falcon's tile by the Opera
     # House (30,182): the cabin (CELES, RELM, GOGO, STRAGO), the catwalk, the
