@@ -1335,6 +1335,13 @@ falling through to vanilla.
   rewrite keeps vanilla Control and no list, as a gloved Locke's Capture
   does: confirmed as intended (owner, 2026-11-16: "more of a commitment to
   use").
+- **The field page** (#549): Skills > Painter, the list's ninth row, lists
+  the same eight in the same order, read a column at a time, with their
+  prices and the locked marker on a row not learned yet, as Locke's page
+  does.  The row is white for whoever carries Sketch and greyed while a
+  worn piece turns Sketch into Control, so the field menu offers no page
+  where the battle offers no list (`ot6_painter_page.asm`,
+  `menu_painterpage`, `menu_painterpage_wor`).
 
 Battle RAM (`ot6_memory.inc`, cleared by `Ot6InitBP`, the monster masks
 also per slot by `Ot6SeedShields`): `OT6_TINT`, `OT6_TINTELEM` (per
@@ -1519,8 +1526,8 @@ player prunes the kit all game. Same model, different collection verbs:
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —
-  the full owner ruling is in `vanilla-destructive-bugs.md`).  **Designed,
-  not built** (#538): the party's supporter, a list behind Sketch of
+  the full owner ruling is in `vanilla-destructive-bugs.md`).  Built
+  (#538, v0.47): the party's supporter, a list behind Sketch of
   Portrait, Tint, Varnish, Still Life, Underpainting, Gesture and the divine
   Masterpiece, learned by story beats and level.
   [kit-relm.md](kit-relm.md) is the canonical Relm document.

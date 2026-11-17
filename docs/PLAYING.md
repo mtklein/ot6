@@ -330,8 +330,12 @@ more body per point, each paying the price again. A green shield count marks
 an enemy Underpainting waits on, and a green shield one Still Life waits on
 or holds. Two banked points and a Portrait make a divine.
 
+In the field menu, Skills > Painter shows all eight rows in the same order,
+with their prices, and the ones still to learn marked locked.
+
 Wearing the Fake Mustache turns her Sketch into Control, as in FF6, and she
-has no list while it is on.
+has no list while it is on. Skills > Painter is greyed out while she wears
+it.
 
 Save before you Sketch: a missed Sketch can still corrupt your inventory or a
 save, as it always could.
@@ -405,7 +409,7 @@ MP and cannot wear Espers.
 Gogo joins in the Zone Eater. His Mimic is free, and a boost buys what it
 buys on the action he copies. Where it would buy nothing, the points are
 kept. Gogo cannot wear Espers. With Sketch among his commands he opens
-Relm's list, with the rows she has learned.
+Relm's list, with the rows she has learned, and Skills > Painter shows it.
 
 ## Espers
 

@@ -19,6 +19,12 @@ Maduin's and Bahamut's top Esper ranks now count as an Earring. With an
 Earring or Hero Ring worn as well, or with both ranks, magic damage rises by
 half, the same as wearing two Earrings.
 
+Relm's skills now have a page in the field menu, like Locke's. Skills >
+Painter lists her eight rows in the order her battle list uses, with their
+MP prices, and marks the ones she has not learned yet as locked. Gogo sees
+the same page while he carries Sketch. The row is greyed out while the Fake
+Mustache is worn, since Relm then has Control in battle and no list.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

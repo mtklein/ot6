@@ -54,8 +54,8 @@ local ZCHARID = 0x69                    -- zCharID::Slot1..4 (menu_ram.inc)
 local THIEF_COLOR, PAINTER_COLOR = 0x80, 0x81   -- zSkillsTextColor::Thief, ::Painter
 local CHAR_LOCKE, CHAR_RELM = 0x01, 0x08
 local CMD_STEAL, CMD_SKETCH = 0x05, 0x0d
-local ST_MAIN, ST_CHAR, ST_SKILLS, ST_PAINTER = 0x05, 0x06, 0x0a, 0x31
-local ROW_ESPERS, ROW_PAINTER = 0, 8
+local ST_MAIN, ST_CHAR, ST_SKILLS, ST_PAINTER, ST_THIEF = 0x05, 0x06, 0x0a, 0x31, 0x30
+local ROW_ESPERS, ROW_THIEF, ROW_PAINTER = 0, 7, 8
 local WHITE, GREY = 0x20, 0x24
 local NAMES_CH = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES", "STRAGO",
   "RELM", "SETZER", "MOG", "GAU", "GOGO", "UMARO" }
@@ -298,6 +298,15 @@ local steps = {
       H.assertEq(H.readRomByte(tbl + n * 2 + 1), H.readRomByte(old + n * 2 + 1), string.format(
         "the nine-row copy keeps vanilla's row %d", n))
     end
+    -- and the jump table: the copy keeps vanilla's eight entries, Painter's is new
+    local jt, ojt = H.sym("Ot6SkillsOptionTbl") & 0x3FFFFF, H.sym("SkillsOptionTbl") & 0x3FFFFF
+    for n = 0, 7 do
+      H.assertEq(H.readRomByte(jt + n * 2) | H.readRomByte(jt + n * 2 + 1) << 8,
+        H.readRomByte(ojt + n * 2) | H.readRomByte(ojt + n * 2 + 1) << 8, string.format(
+        "the nine-entry Skills jump table keeps vanilla's entry %d", n))
+    end
+    H.assertEq(H.readRomByte(jt + 16) | H.readRomByte(jt + 17) << 8, H.sym("SkillsOption_08") & 0xFFFF,
+      "entry 8 is SkillsOption_08, the Painter page")
     H.screenshot("painterpage_list")
   end),
   H.pressButtons({ "down" }, 2),
@@ -384,6 +393,26 @@ for k = 1, 3 do
   steps[#steps + 1] = H.call(function() assertList("slot " .. target) end)
   steps[#steps + 1] = H.cond(function() return slots[target] ~= nil and not hasCmd(slots[target], CMD_SKETCH) end,
     refusesGreyRow("character " .. k .. " after RELM"), {})
+  -- LOCKE's Treasure Hunter page in and out under the nine-row list
+  steps[#steps + 1] = H.cond(function() return slots[target] ~= nil and hasCmd(slots[target], CMD_STEAL) end, {
+    toRow(ROW_THIEF, "cursor to Treasure Hunter"),
+    H.pressButtons({ "a" }, 2),
+    H.waitUntil(function() return st() == ST_THIEF end, 300, "the Treasure Hunter page", 5),
+    H.waitFrames(60),
+    H.call(function() assertVText(BG3B_V, 15, 5, "Treasure Hunter", "the Treasure Hunter page's title") end),
+    H.pressButtons({ "b" }, 3),
+    H.waitUntil(function() return st() == ST_SKILLS end, 300, "B back from Treasure Hunter", 5),
+    H.waitFrames(30),
+    H.call(function()
+      H.assertEq(H.readByte(ZCURSOR), ROW_THIEF, "back on the list on Treasure Hunter")
+      for x = 15, 29 do
+        H.assertEq(isLetter(vcell(BG3B_V, x, 5) & 0xff), false, string.format(
+          "B from Treasure Hunter cleared its title: {%d,5}", x))
+      end
+      assertList("LOCKE after Treasure Hunter")
+      H.log("THIEF OK: Treasure Hunter's page in and out, the nine-row list intact")
+    end),
+  }, {})
 end
 -- and round to RELM again: her row white, the page opens
 steps[#steps + 1] = toChar(function() return relmSlot end, "R round to RELM")
