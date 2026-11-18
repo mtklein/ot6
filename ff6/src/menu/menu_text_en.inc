@@ -84,6 +84,7 @@ MENU_TEXT_INC = 1
 .define SKILLS_LIST_RAGE                BG3A, {2, 15}, {"Rage"}
 .define SKILLS_LIST_DANCE               BG3A, {2, 17}, {"Dance"}
 .define SKILLS_LIST_THIEF               BG3A, {2, 19}, {"Treasure Hunter"}
+.define SKILLS_LIST_PAINTER             BG3A, {2, 21}, {"Painter"}
 
 .define SKILLS_MP_COST                  BG3B, {23, 5}, {"MP_    "}
 .define SKILLS_LORE_TITLE               BG3B, {23, 5}, {"Lore"}
@@ -94,6 +95,7 @@ MENU_TEXT_INC = 1
 .define SKILLS_BUSHIDO_TITLE            BG3B, {23, 5}, {"SwdTech"}
 .define SKILLS_THIEF_TITLE              BG3B, {15, 5}, {"Treasure Hunter"}
 .define SKILLS_THIEF_TITLE_BLANK        BG3B, {15, 5}, {"               "}
+.define SKILLS_PAINTER_TITLE            BG3B, {23, 5}, {"Painter"}
 
 .define SKILLS_CHAR_LEVEL               BG1B, {18, 7}, {"LV"}
 .define SKILLS_CHAR_HP                  BG1B, {18, 9}, {"HP"}

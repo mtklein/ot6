@@ -128,18 +128,27 @@ local function toList()
   local btn
   if act ~= terra then
     btn = (st == ST_CMD) and "x" or "b"
-  elseif st == ST_CMD and pend(terra) == 0 and not W.raisedAtCmd then
-    -- a point raised at the command window, so the list opens folded: the
-    -- NMI's open fold stores 1 over whatever the main thread's HUD walk left
-    -- (its last store is a monster's MonsterOverlap seed, 0 for many
-    -- species: #538's replay drew one, and a fold at 0 stored the 0 already
-    -- there, so the bracket had nothing to undo)
-    W.raisedAtCmd = true
-    btn = "r"
   elseif st == ST_CMD then
     local want = cmdRowOf(terra, CMD_MAGIC)
     local cur = H.readByte(CMDROW + terra) & 3
-    if cur == want then btn = "a" else btn = (cur < want) and "down" or "up" end
+    if cur ~= want then
+      btn = (cur < want) and "down" or "up"
+    elseif pend(terra) == 0 then
+      -- a point raised at the command window, on Magic, so the list opens
+      -- folded: the NMI's open fold stores 1 over whatever the main thread's
+      -- HUD walk left (its last store is a monster's MonsterOverlap seed, 0
+      -- for many species: #538's replay drew one, and a fold at 0 stored
+      -- the 0 already there, so the bracket had nothing to undo).  R is
+      -- pressed on the Magic row and again until the point is pending: one
+      -- R pressed wherever the cursor stood, once, opened the list at 0 on
+      -- v0.49's line ("the list opened with a point pending: got 0",
+      -- build/attempts/wt/v049-land/gate3/suite_battle_nmiscratch.log)
+      W.rPresses = (W.rPresses or 0) + 1
+      H.assertEq(W.rPresses <= 8, true, "R at the command window raises TERRA's pending boost")
+      btn = "r"
+    else
+      btn = "a"
+    end
   else
     btn = "b"
   end

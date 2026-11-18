@@ -437,6 +437,9 @@ TEST_ENV = {
     # rule), in the same battle
     "battle_shadowpin_edges": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
+    # #557: an arm Inferno restores after a broken death starts fresh
+    "battle_rejoin_inferno": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
     # #461: the same expedient, three bytes (Mimic, SwdTech, Slot)
     "battle_mimicboost":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
@@ -494,6 +497,19 @@ TEST_ENV = {
     # (Still Life's 32-tick break)
     "battle_relmwor": "OT6_TIMEOUT=7200 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
+    # #549: LOCKE's Treasure Hunter page (moved off celes_freed onto this
+    # battery), his row greyed by a Thief Glove, and one random battle where
+    # his commands agree
+    "menu_thiefpage": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #549: RELM's Painter page in the field Skills menu, early (three rows
+    # learned) beside Esper Mountain's save point; menus only
+    "menu_painterpage":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #549: her whole page, GOGO's with Sketch, the Fake Mustache, and one
+    # random battle on the World of Ruin's map where the battle agrees
+    "menu_painterpage_wor": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
     # #382: LOCKE's Mug, Trickshot, Dismantle and Appraise, on the same plain
     # (four of his five later rows are learned there); the Continue, a walk
     # and seven or more battles of one scripted turn each
@@ -534,6 +550,9 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     # wt/hire-sprite: the 3 and 2 BP hires' figures (Defends bank the points)
     "battle_hirecrew": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
+    # #552: the crew's third figure, the Imp, struck (monster HP staged)
+    "battle_hireimp": "OT6_TIMEOUT=2400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     # the Config screen's version tab, from the Narshe exit spawn
     "menu_configversion":
@@ -594,6 +613,10 @@ TEST_ENV = {
     # eight branches from one snapshot, a battle each
     "battle_esperearring": "OT6_TIMEOUT=2400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/post-opera-v1",
+    # #550: Bahamut's Limit Break and its five-digit numerals, from the play's
+    # save outside Narshe in the World of Ruin (the Ragnarok wearer's Ultima)
+    "battle_limitbreak": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-ragnarok-v1",
     # #534: Crusader's signature, the second weapon in the menu and its
     # swing, and the two-handed grip, against rank 4 from one snapshot
     "battle_espercrusader":
@@ -670,6 +693,19 @@ TEST_ENV = {
     # random battle beside Esper Mountain's save point; no write
     "battle_bpdisplay": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #555: a spell's boost is the one its list showed (the target select's
+    # spread keys move nothing); four scripted turns beside Esper Mountain's
+    # save point, a battle or two
+    "battle_spellboost": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
+    # #555: R in a list adds no point the MP cannot pay for; TERRA at level 5
+    # in the Figaro desert, one or two battles
+    "battle_spellboost_mp": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/world-figaro-v1",
+    # #556: LOCKE alone and RELM alone on Kefka's Tower's first map (the
+    # Falcon's flight and party_menu 3 first); one battle each
+    "battle_alonerows": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-desert-v1",
     "battle_runicmonster": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-narshe-cliffs-v1",
     # #427: one Morph a battle, four battles at least (11-16k frames on the
@@ -1010,6 +1046,13 @@ check("save_layout",
       ["tools/check_save_layout.py", "docs/design/save-layout.md",
        copy_if_changed_from("build/ot6.sfc")]
       + glob("src/**/*.asm", "ff6") + glob("src/**/*.inc", "ff6"))
+# #552: Leo's grave scene: OT6_LEO_DLG names the scene's 17 dialogue entries
+# (each checked by its opening text), every line fits the box with the widest
+# names a player can give, and the code's and the event script's
+# OT6_LEO_SWITCH agree; the selftest runs one mutant per rule.
+check("leo_reveal",
+      "python3 tools/check_leo_reveal.py --selftest && python3 tools/check_leo_reveal.py",
+      ["tools/check_leo_reveal.py", "ff6/src/text/dlg1_en.json", copy_if_changed_from("build/ot6.sfc")])
 # #305: the natural magic and the Esper spell lists are the planned ones
 # (kits.md, magicite.md, magicite-tube-six.md), and none grants a higher
 # spell tier (guidelines.md, "Stronger spells come from boosting, never from
@@ -1068,6 +1111,19 @@ check("esper_ladder",
       ["tools/esper_ladder.py", "docs/design/esper-rework.md", "ff6/src/menu/item_prop_en.dat",
        "ff6/src/text/item_name_en.json", "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg",
        copy_if_changed_from("build/ot6.sfc")])
+# #549: the field Treasure Hunter and Painter pages' help lines
+# (tools/kit_pages.py): sixteen a page, each within the help window (the
+# esper page's font rule; a second line clear of the page's title box), a
+# locked line naming the level Ot6PaintRowTbl teaches at, and the ROM's lines
+# the table's; the selftest's mutants move a ROM line and break the table.
+check("kit_pages",
+      "python3 tools/kit_pages.py --selftest",
+      ["tools/kit_pages.py", "tools/esper_ladder.py", "ff6/src/battle/ot6_paint.asm",
+       "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
+# #550: the condensed numeral digits are generated; the checked-in .inc must
+# be what tools/numeral_font.py writes.
+check("numeral_font", "python3 tools/numeral_font.py",
+      ["tools/numeral_font.py", "ff6/src/battle/ot6_numeral_font.inc"])
 # #292/#397: the HUD's shield-count tiles are generated (counts 1-9 from the
 # battle font's numerals); the checked-in .inc must be what the generator
 # writes.

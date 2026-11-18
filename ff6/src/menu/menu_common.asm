@@ -346,7 +346,13 @@ MenuStateTbl:
 .else
         .addr   MenuState_30
 .endif
+.if LANG_EN
+        .addr   MenuState_31_Painter    ; Relm's Painter page (#549), $31
+                                        ;   vanilla-unused as $30 was
+                                        ;   (ot6_painter_page.asm)
+.else
         .addr   MenuState_31
+.endif
         .addr   MenuState_32
         .addr   MenuState_33
         .addr   MenuState_34

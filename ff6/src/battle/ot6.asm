@@ -127,3 +127,16 @@
 
 ; Shadow's hobble and pin (#546), appended for the same reason.
         .include "ot6_pin.asm"
+
+; Relm's field Painter page's row leaf (#549), appended for the same reason.
+        .include "ot6_paintpage.asm"
+
+        .include "ot6_numeral.asm"      ; #550: five-digit damage numerals
+
+; General Leo's reveal (#552), appended for the same reason.
+        .include "ot6_leo.asm"
+
+; v0.49 appended three modules here (the Painter page's leaf, the numerals,
+; Leo's reveal); the bank's code is reached by jsl with 16-bit operands
+; inside it, so all of it must stay in bank $f0.
+.assert * <= $f10000, error, "ot6_code overflows bank $f0"

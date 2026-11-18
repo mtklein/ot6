@@ -88,6 +88,12 @@ Locke's Filch, Sabin's Bum Rush and Cyan's Cleave on a boss.
 - While choosing a command, the R Button adds a point (up to 3, and no more
   than you hold). The L Button takes one back. Arrows and a glow show how
   many are pending, and the dots after each name show the bank.
+- In a list, R adds no point the character's MP cannot pay for on the row
+  under the cursor.
+- Once a spell or skill is picked from its list, its boost is the one the
+  list showed. At the target choice L and R spread a spell over a group, as
+  in FF6, and leave the boost alone. An action picked straight from the
+  command window, like Fight, can still be boosted there.
 - The arrows stay after the command is chosen, until the action starts; then
   the dots show the bank without the points it is spending. The point gained
   after an action shows when that character's next turn comes.
@@ -196,8 +202,11 @@ the common item if not. A boost never makes up an item the enemy lacks.
 Only the first shield Filch takes becomes a point for Locke. His skills are
 in the list behind Steal, the ones he has learned packed from the top in this
 table's order, down the left column and then the right. In the field menu,
-Skills > Treasure Hunter shows all eight in the same order, with the ones
-still to learn marked locked.
+the Skills list's TresHnt row (the name his battle command shows) opens the
+Treasure Hunter page: all eight in the same order, with the ones still to
+learn marked locked. The window at the top says what the row under the
+cursor does, or where it is learned. The Thief Glove turns Steal into Capture, as in FF6,
+and he has no list while it is on, so the row is greyed out then.
 
 ### Edgar, Machinist (spear)
 
@@ -330,8 +339,13 @@ more body per point, each paying the price again. A green shield count marks
 an enemy Underpainting waits on, and a green shield one Still Life waits on
 or holds. Two banked points and a Portrait make a divine.
 
+In the field menu, Skills > Painter shows all eight rows in the same order,
+with their prices, and the ones still to learn marked locked. The window at
+the top says what the row under the cursor does, or how it is learned.
+
 Wearing the Fake Mustache turns her Sketch into Control, as in FF6, and she
-has no list while it is on.
+has no list while it is on. Skills > Painter is greyed out while she wears
+it.
 
 Save before you Sketch: a missed Sketch can still corrupt your inventory or a
 save, as it always could.
@@ -405,7 +419,7 @@ MP and cannot wear Espers.
 Gogo joins in the Zone Eater. His Mimic is free, and a boost buys what it
 buys on the action he copies. Where it would buy nothing, the points are
 kept. Gogo cannot wear Espers. With Sketch among his commands he opens
-Relm's list, with the rows she has learned.
+Relm's list, with the rows she has learned, and Skills > Painter shows it.
 
 ## Espers
 
@@ -454,10 +468,10 @@ Ranks 1, 2 and 4 are stat points. Ranks 3 and 5 are effects.
 | Palidor | Float, Slow | Raises Speed by 1 | Raises Vigor by 1 | Walks faster outside battle | Raises Speed by 2 | Float in every battle |
 | Tritoch | Ice, Bolt, Poison | Raises Mag.Pwr by 1 | Raises Speed by 1 | Raises Speed by 1 | Raises Mag.Pwr by 2 | No Dark or Petrify; max MP +1/2 |
 | Odin / Raiden | Meteor, Bserk (Raiden also Quick) | Raises Vigor by 1 | Raises Speed by 1 | Fight always hits | Raises Vigor by 2 | Haste in every battle |
-| Bahamut | Flare, W Wind | Raises Mag.Pwr by 1 | Raises Vigor by 1 | Raises max HP by 1/4 | Raises Mag.Pwr by 2 | Fight and magic damage +1/4 |
+| Bahamut | Flare, W Wind | Raises Mag.Pwr by 1 | Raises Vigor by 1 | Raises max HP by 1/4 | Raises Mag.Pwr by 2 | Damage dealt can pass 9999 |
 | Alexandr | Dispel, Safe, Shell | Raises Stamina by 1 | Raises Vigor by 1 | Protects against instant death | Raises Stamina by 2 | Safe in every battle |
 | Crusader | Merton, Meteor | Raises all four stats by 1 | Raises all four stats by 1 | Raises max HP by 1/4 | Raises all four stats by 1 | Gauntlet and Genji Glove effects |
-| Ragnarok | Ultima, Warp | Raises Vigor by 1 | Raises Mag.Pwr by 1 | Raises max MP by 1/4 | Raises Vigor by 2 | Raises Vigor by half |
+| Ragnarok | Ultima, Warp | Raises Vigor by 1 | Raises Mag.Pwr by 1 | Raises max MP by 1/4 | Raises Vigor by 2 | Fight and magic damage +1/4 |
 | Kirin | Cure, Regen | Raises Mag.Pwr by 1 | Raises Stamina by 1 | Protects against Poison | Raises Mag.Pwr by 2 | Regen in every battle |
 | ZoneSeek | Shell, Haste | Raises Mag.Pwr by 1 | Raises Stamina by 1 | Protects against Mute | Raises Mag.Pwr by 2 | Shell in every battle |
 | Carbunkl | Rflect, Safe | Raises Stamina by 1 | Raises Mag.Pwr by 1 | Casts Shell when HP is low | Raises Stamina by 2 | 2 Boost Points at battle start |
@@ -481,6 +495,9 @@ Notes on the ranks:
 - Sraphim's healing bonus covers Cure, Life, a Blitz, Lore or Dance that
   heals, healing items, and Regen ticks the wearer receives. It does not cover
   MP.
+- Bahamut's top rank lets everything that character deals do up to 42,069
+  damage instead of 9999: attacks, spells, throws, summons and counters.
+  Healing still stops at 9999.
 - Sraphim, Golem and ZoneSeek are optional.
 
 ## Encounters, Exp. and Gil

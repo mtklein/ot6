@@ -684,9 +684,21 @@ local function tryCase(c, n)
       c.spend = n - 1
       tick, phase, held, spent, deferring, shut = 0, "reach", nil, 0, nil, 0
     end),
-    H.driveUntil(function() return skip or phase == "sent" end, 6000 + (n - 1) * ROUND_FRAMES, {
+    H.driveUntil(function() return skip or phase == "sent" or c.preemptF ~= nil end, 6000 + (n - 1) * ROUND_FRAMES, {
       H.call(function()
         if phase == "reach" then
+          -- the battle ended while this actor's windows were being spent
+          -- (v0.49's gate 1, gau_joined: rage entry 0's try 2 spent one of
+          -- GAU's windows, the battle ended, and the try waited 12,690 frames
+          -- on the world map for a window;
+          -- build/attempts/wt/v049-land/gate1/suite_battle_procboost.log):
+          -- the action never ran, so the try measured nothing and is not
+          -- counted, as a battle won after the confirm is not
+          if H.readByte(0x3A77) == 0 or not H.battleActive() then
+            c.preemptF = H.frame
+            H.setPad({})
+            return
+          end
           -- bench the other windows until this actor's opens.  Try n gives
           -- the actor's first n-1 windows to the bench, so each try acts
           -- after n-1 more rounds of everyone's turns.  The idle waits this
@@ -748,7 +760,17 @@ local function tryCase(c, n)
         -- lab: "timeout after 6000 frames driving toward rage entry 0
         -- resolves" over "Got Potion x1").  What the action did is recorded
         -- by then; the next try restores the snapshot.
-        if armed == c and c.endF == nil and H.readByte(0x3A75) == 0 then
+        -- ($3A77, the engine's count of enemies in the fight, stored once at
+        -- the end of the recount; $3A75, the mask, is zeroed and rebuilt bit
+        -- by bit there, and on v0.49's line a frame began inside that
+        -- rebuild: "$3A75 <- 00" at f11689 and its four bits back at f11690
+        -- with every monster standing, read as a won battle for rage
+        -- entries 0, 3 and 4 on all three tries;
+        -- build/attempts/wt/v049-land/lab/procboost_diag.log.gz.  The magic
+        -- and throw cases' "the battle was won ... before the action ran" on
+        -- #555's quick run, build/attempts/wt/v048-spellboost/quick/
+        -- suite_quick_battle_procboost.log, read the same mask)
+        if armed == c and c.endF == nil and H.readByte(0x3A77) == 0 then
           -- ...or the battle was won before the action ran at all: another
           -- member's queued action felled the last monster after the
           -- confirm (#534's replay, gau_joined: rage entry 0 over "Got Potion

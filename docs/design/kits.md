@@ -646,7 +646,11 @@ the left, Trickshot, Dismantle, Appraise and Master's Mark down the right
 (`Ot6ThiefRowTbl`), a row blank until it is learned, priced, with
 unaffordable rows greyed. The field Skills page lists the same eight in the
 same order, read a column at a time, with the Blitz page's locked marker on a
-row not learned yet. This
+row not learned yet; its row in the Skills list reads his battle command's
+name (`BattleCmdName`, "TresHnt", in the list's vanilla seven columns), and a
+worn Thief Glove greys it, since his command is then Capture with no list
+(#549, `menu_thiefpage`); the page's help window shows each row's line, or
+how it is learned, from `tools/kit_pages.py`'s table. This
 arrangement is forced, because **Locke has no spare command slot.**
 `char_prop.asm:160`
 records FIGHT, STEAL, MAGIC, ITEM; the apparently blank third row is MAGIC
@@ -975,7 +979,9 @@ pays nothing.
 same guy again). Setzer walks out of sight, and each hire walks in where
 he stood, swings the weapon that fits the target and walks off: the 0 BP
 hire is a merchant, and each point brings the next, tougher figure, an
-Imperial soldier, then General Leo. The fourth hire (3 BP) depends on
+Imperial soldier, then an Imp (owner, 2026-11-17: in place of General Leo,
+who is not to be seen before Gogo's reveal nor beside him after it,
+[leo-reveal.md](leo-reveal.md)). The fourth hire (3 BP) depends on
 Shadow (owner, 2026-10-02):
 - **Shadow**, FF6's own mercenary for hire, when he is there to hire:
   recruited and not left on the Floating Continent (event switch
@@ -1000,12 +1006,12 @@ lift counted). Every swap of the slot's graphics happens with the slot
 hidden and out of sight, and
 Setzer's pose is put back after the last hire as it was before the first.
 *Reason: the boost buys hires, and a hire should look hired. The figures
-are the ROM's own full battle sprite sets (Locke's disguises, Leo, Shadow,
-the train's ghosts), drawn in Setzer's own slot: no VRAM and no new art;
+are the ROM's own full battle sprite sets (Locke's disguises, the Imp
+status's, Shadow, the train's ghosts), drawn in Setzer's own slot: no VRAM and no new art;
 each figure's palette is loaded into Setzer's slot's palette while it
 stands in.* The weapon is a fixed one a figure and class (merchant: Dirk,
 Regal Cutlass or Mithril Rod; soldier: Mithril Blade, Mithril Pike or
-Morning Star; Leo: Crystal, Gold Lance or Morning Star; Shadow: Kodachi,
+Morning Star; Imp: Imp Halberd or Morning Star; Shadow: Kodachi,
 Ashura or Flail; ghost: Dirk, Mithril Blade, Mithril Pike or Bone Club);
 it is a picture only, the class is the hire's. A hire that finds no body
 still walks in, and leaves without a swing. The animation draws no Rand
@@ -1335,6 +1341,13 @@ falling through to vanilla.
   rewrite keeps vanilla Control and no list, as a gloved Locke's Capture
   does: confirmed as intended (owner, 2026-11-16: "more of a commitment to
   use").
+- **The field page** (#549): Skills > Painter, the list's ninth row, lists
+  the same eight in the same order, read a column at a time, with their
+  prices and the locked marker on a row not learned yet, as Locke's page
+  does.  The row is white for whoever carries Sketch and greyed while a
+  worn piece turns Sketch into Control, so the field menu offers no page
+  where the battle offers no list (`ot6_painter_page.asm`,
+  `menu_painterpage`, `menu_painterpage_wor`).
 
 Battle RAM (`ot6_memory.inc`, cleared by `Ot6InitBP`, the monster masks
 also per slot by `Ot6SeedShields`): `OT6_TINT`, `OT6_TINTELEM` (per
@@ -1519,8 +1532,8 @@ player prunes the kit all game. Same model, different collection verbs:
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —
-  the full owner ruling is in `vanilla-destructive-bugs.md`).  **Designed,
-  not built** (#538): the party's supporter, a list behind Sketch of
+  the full owner ruling is in `vanilla-destructive-bugs.md`).  Built
+  (#538, v0.47): the party's supporter, a list behind Sketch of
   Portrait, Tint, Varnish, Still Life, Underpainting, Gesture and the divine
   Masterpiece, learned by story beats and level.
   [kit-relm.md](kit-relm.md) is the canonical Relm document.

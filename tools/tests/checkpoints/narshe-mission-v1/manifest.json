@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "060c2b8cfdb0220c6adba41776bf742c913896cbb4d22710814c024769f1eaa2",
+  "sha256": "01ff6e709eb29c402add317f311af642e590ca823a5ebe12d5f223718f19c0ab",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "060c2b8cfdb0220c6adba41776bf742c913896cbb4d22710814c024769f1eaa2",
-    "generator_sig": "182945064dc7c48802f3268f6615487011664fb14e9f00158b5148dcf4a94f75 gen_narshe_mission build/checkpoints/terra-returned-v1/manifest.json build/checkpoints/terra-returned-v1/terra-returned.sram",
+    "payload_sha256": "01ff6e709eb29c402add317f311af642e590ca823a5ebe12d5f223718f19c0ab",
+    "generator_sig": "8aab30552bdec08696f18d2a3778a613f0c55b1693d1e81eed2620609d61aaf1 gen_narshe_mission build/checkpoints/terra-returned-v1/manifest.json build/checkpoints/terra-returned-v1/terra-returned.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/terra-returned-v1/manifest.json",
-        "sha256": "6a3abfd14a65c1d23b11cf802c2a582fbd8c83e2a8f0ef1c97928ce258b18487"
+        "sha256": "8c05e9d02407ee81f6fcbb63607a1675484bed3f694e2422997374556df839fa"
       }
     ]
   }

@@ -318,6 +318,34 @@ PartyCharAnim_0c:
         .addr   PartyCharSprite_0c
         .byte   $ff
 
+; ot6 #552 (docs/design/leo-reveal.md): the shop's sprite for the revealed
+; Leo -- Gogo's slot in the shop's VRAM (LoadShopCharGfx loads Leo's sheet
+; there) in Leo's palette (PartyCharSprite_10's attribute, $35)
+Ot6ShopLeoAnim:
+        .addr   Ot6ShopLeoSprite
+        .byte   $10
+        .addr   Ot6ShopLeoSprite
+        .byte   $10
+        .addr   Ot6ShopLeoSprite
+        .byte   $ff
+
+        .addr   Ot6ShopLeoSprite
+        .byte   $10
+        .addr   Ot6ShopLeoAltSprite
+        .byte   $10
+        .addr   Ot6ShopLeoSprite
+        .byte   $ff
+
+Ot6ShopLeoSprite:
+        .byte   2
+        .byte   $80,$01,$c0,$35
+        .byte   $80,$11,$c2,$35
+
+Ot6ShopLeoAltSprite:
+        .byte   2
+        .byte   $80,$00,$c4,$35
+        .byte   $80,$10,$c6,$35
+
 PartyCharAnim_0d:
 @ea2f:  .addr   PartyCharSprite_0d
         .byte   $10

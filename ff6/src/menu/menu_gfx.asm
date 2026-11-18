@@ -471,6 +471,7 @@ LoadShopCharGfx:
         lda     f:_c36e27,x
         cmp     #$ffff
         beq     @6dea
+        jsr     Ot6LeoShopGfx           ; ot6 #552: Leo's sheet for slot 12
         pha
         lda     #$16a0
         shorta
@@ -521,6 +522,33 @@ LoadShopCharGfx:
         bra     @6dd7
 
 ; ------------------------------------------------------------------------------
+
+; [ the revealed Leo's shop sprite tiles ]
+
+; ot6 #552 (docs/design/leo-reveal.md): A (16-bit) = a frame's offset into
+; the pair of sheets $e3, $e3+1 (offsets below $16a0 are the first sheet's).
+; For the pair 12-13 after the reveal, slot 12's frames come from Leo's
+; sheet (graphics $10), four sheets on: every sheet before Leo's is $16a0
+; bytes, as this loader's stride already assumes.  Umaro's half is unchanged.
+
+.a16
+Ot6LeoShopGfx:
+        pha
+        lda     $e3
+        and     #$00ff
+        cmp     #CHAR_PROP::GOGO
+        bne     :+
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     :+
+        lda     1,s
+        cmp     #$16a0
+        bcs     :+
+        clc
+        adc     #(MAP_SPRITE_GFX::LEO - CHAR_PROP::GOGO) * $16a0
+        sta     1,s
+:       pla
+        rts
 
 ; [  ]
 

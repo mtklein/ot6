@@ -100,6 +100,10 @@ break reveals no
 weaknesses. On recovery (`Ot6Tick`), shields reset to `shield_max`. `OT6_BREAK_TICKS` is
 `$10` (`ot6_break.asm:1`), which measures **2159 frames** — about 36 s of
 battle time — for an on-stage monster (`probe_ifritbreak.lua`, deleted).
+A body that returns from death is fresh: a monster the AI restores
+(`Ot6Arrive`, Cmd_24) or Life or Reraise raises (`Ot6Revive`) comes back
+with full shields, not Broken and with no marks, keeping only its revealed
+weaknesses (#557).
 
 **Shielded resistance.** Every hit is judged on the enemy's state before it
 lands. While an enemy still has shields it takes reduced damage (×0.5), and

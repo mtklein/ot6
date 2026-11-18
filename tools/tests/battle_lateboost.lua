@@ -1,35 +1,42 @@
 -- @suite savestate=worldmap_narshe
 -- battle_lateboost: where the boost window closes.
 --
--- During target select, boosting is legal and fully effective: DESIGN.md
--- prices boost "when confirming an action", and Ot6QueueFold hooks into
--- CreateAction, which runs after target select, so the tier folds, the
--- points are charged, and tier damage lands.  After the target is
--- confirmed, points must not be taken: CreateAction has already frozen
--- the tier, but Ot6ActionEnd charges whatever pending reads when the
--- action ends, so Ot6Boost gates on $32cc,y = $ff, the actor's
--- pending-action command-list pointer ($ff = nothing queued).
+-- A pick from a list freezes its boost (#555): the list draws the tier's
+-- name, its price and its grey from the pending boost, and it stays on
+-- screen, unchanged, through the target select, so a boost moved there
+-- would cast and charge something the list did not show.  And at the target
+-- select of a spell that can be spread over a group, L and R are FF6's
+-- spread keys: the owner (v0.47) picked Fire 3 at two points, spread it with
+-- L, and cast Fire 2 for one.  So once a row is picked from a list, Ot6Boost
+-- leaves the pending boost alone at its target select (silently on a spread,
+-- with the buzz elsewhere); an action picked straight off the command window
+-- keeps L/R there (battle_spellboost case 4).
 --
--- This test pins both halves: the accepted spend must still pay in full,
--- and the post-commit spend must move neither pending nor bp.  The second
--- is the negative control; without it the test would pass just as well if
--- boosting had been disabled outright.
+-- After the target is confirmed, points must not be taken either:
+-- CreateAction has already frozen the tier, but Ot6ActionEnd charges
+-- whatever pending reads when the action ends, so Ot6Boost gates on $32cc,y
+-- = $ff, the actor's pending-action command-list pointer ($ff = nothing
+-- queued).
+--
+-- This test pins the three moments: R in the list is the accepted spend
+-- (Fire -> Fire 2, 20 MP against her real pool, a ching), R at the target
+-- cursor after that pick moves nothing and makes no ching (#555), and R
+-- after the confirm moves neither pending nor bp and stays silent; the cast
+-- is the Fire 2 the list showed, charged the 1 point it used.  The bank is
+-- earned (1 bp at open plus 1 regen from a real zero-MP Tonic turn = 2), so
+-- bp 2 > pending 1 leaves headroom: a refused R can only be the gate under
+-- test and not the bp cap.
 --
 -- On worldmap_narshe TERRA owns Magic with Fire, cast through the real
 -- menu, cursor walking to Fire by real d-pad edges against the live
--- $8913/$8917/$891B bytes.  The bank is earned (1 bp at open plus 1 regen
--- from a real zero-MP Tonic turn = 2): one R at the target cursor is the
--- accepted spend (pending 1 folds Fire -> Fire 2, 20 MP against her real
--- 29, the tier her wallet buys), and the post-commit refusal still tests
--- something because bp 2 > pending 1 leaves headroom, so a refused R can
--- only be the commit gate and not the bp cap.
+-- $8913/$8917/$891B bytes.
 --
---   asserts: no pending on entering target select and $32cc still $ff;
---   R at the target cursor raises pending (and chings); the committed
---   action really freezes ($32cc leaves $ff) with the menu still open;
---   post-commit R moves neither pending nor bp and stays silent; the
---   target-select spend folded the executed spell (Fire -> Fire 2) and
---   charged exactly the 1 point the fold used.
+--   asserts: R on Fire in the list raises pending to 1 (and chings); the
+--   target select opens with it at 1 and $32cc still $ff; R at the target
+--   cursor leaves it at 1 with no ching; the committed action really freezes
+--   ($32cc leaves $ff) with the menu still open; post-commit R moves neither
+--   pending nor bp and stays silent; the list's spend folded the executed
+--   spell (Fire -> Fire 2) and charged exactly the 1 point the fold used.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
@@ -209,24 +216,31 @@ H.run({ maxFrames = 60000 }, {
       if v ~= 0 then ching = ching + 1 end
     end, emu.callbackType.write, 0x7e6281, 0x7e6281)
   end),
+  -- accepted: R on Fire in the open list buys Fire 2, which her pool pays
+  H.pressButtons({ "r" }, 6), H.waitFrames(20),
+  H.call(function()
+    H.log(string.format("in the list on Fire: pend=%d bp=%d ching=%d", pend(terra), bp(terra), ching))
+    H.assertEq(pend(terra), 1, "R on Fire in the list raises pending")
+    H.assertEq(ching, 1, "...and the accepted boost chings")
+  end),
   H.driveUntil(function() return st() == ST_TGT end, 600, {
     H.pressButtons({ "a" }, 6), H.waitFrames(24),
   }, "target select up"),
   H.call(function()
-    H.assertEq(pend(terra), 0, "no boost pending on entering target select")
+    H.assertEq(pend(terra), 1, "the pick carries its boost into target select")
     H.assertEq(cmdptr(terra), 0xff,
       "action still uncommitted at the target cursor ($32cc = $ff)")
   end),
-  -- accepted: boosting at the target cursor is legal and must pay
+  -- frozen (#555): the list's pick keeps the boost it showed
   H.pressButtons({ "r" }, 6), H.waitFrames(20),
   H.call(function()
     pendAtTarget, bpAtTarget = pend(terra), bp(terra)
-    H.log(string.format("at target cursor: pend=%d bp=%d ching=%d",
+    H.log(string.format("at target cursor after R: pend=%d bp=%d ching=%d",
       pendAtTarget, bpAtTarget, ching))
-    H.assertEq(pendAtTarget, 1, "R at the target cursor still raises pending")
-    H.assertEq(ching, 1, "...and each accepted boost chings")
+    H.assertEq(pendAtTarget, 1, "R at the target cursor of a list pick leaves the boost the list showed (#555)")
+    H.assertEq(ching, 1, "...and makes no ching")
     H.assertEq(bpAtTarget > pendAtTarget, true,
-      "bp headroom remains -- the refusal below can only be the commit gate")
+      "bp headroom remains -- the refusals here can only be the gates under test")
   end),
   H.driveUntil(function() return st() ~= ST_TGT end, 600, {
     H.pressButtons({ "a" }, 6), H.waitFrames(24),
@@ -262,7 +276,7 @@ H.run({ maxFrames = 60000 }, {
     local folded = false
     for _, v in ipairs(execd) do if v == FIRE2 then folded = true end end
     H.assertEq(folded, true,
-      "the target-select spend DID fold the spell (Fire -> Fire 2)")
+      "the list's spend DID fold the spell (Fire -> Fire 2)")
     -- charged for one point, which is what was delivered.
     H.assertEq(bp(terra), bpAtTarget - 1,
       "charged exactly the 1 point the fold used, no post-commit theft")

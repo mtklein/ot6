@@ -13,8 +13,8 @@ carries what the doc does not: each rung's menu label (its effect bytes are
 not read).  An effect is the
 ten bytes Ot6LadderTbl carries for it (ItemProp +5..+13 and +25, the bits a
 relic would set), or no bytes for the rungs that are new code (the
-signatures Conductor, Facet, Rebirth, Fenrir's Stop and Slow immunity and
-Sraphim's full revives, and Sraphim's rung 3, healing +25%: Ot6SeraphHeal).
+signatures Conductor, Facet, Rebirth, Fenrir's Stop and Slow immunity,
+Sraphim's full revives and Bahamut's Limit Break, and Sraphim's rung 3, healing +25%: Ot6SeraphHeal).
 
   python3 tools/esper_ladder.py --labels     write ff6/src/battle/ot6_esper_labels.inc and ot6_esper_desc.inc
   python3 tools/esper_ladder.py              check build/ot6.sfc against SPEC
@@ -79,10 +79,10 @@ SPEC = [
     ("Tritoch", "Mag", "Spd", plus("Speed   +1", spd=1),
      eff("Jewel+Orb", p1=S1["dark"] | S1["petrify"], r9=0x40)),
     ("Odin", "Vig", "Spd", eff("Sniper Sight", r11=0x10), eff("RunningShoes", s3=0x08)),
-    ("Bahamut", "Mag", "Vig", eff("Red Cap", r9=0x04), eff("Hero Ring", r9=0x03)),
+    ("Bahamut", "Mag", "Vig", eff("Red Cap", r9=0x04), eff("Limit Break")),
     ("Alexandr", "Stm", "Vig", eff("No Death", p1=S1["death"]), eff("Guard Ring", s3=0x40)),
     ("Crusader", "All", "All", eff("Red Cap", r9=0x04), eff("Gaunt+Genji", r12=0x18)),
-    ("Ragnarok", "Vig", "Mag", eff("Minerva", r9=0x20), eff("Hyper Wrist", r11=0x80)),
+    ("Ragnarok", "Vig", "Mag", eff("Minerva", r9=0x20), eff("Hero Ring", r9=0x03)),
     ("Kirin", "Mag", "Stm", eff("No Poison", p1=S1["poison"]), eff("Cure Ring", s3=0x02)),
     ("ZoneSeek", "Mag", "Stm", eff("No Mute", p2=S2["mute"]), eff("Auto Shell", s3=0x20)),
     ("Carbunkl", "Stm", "Mag", eff("Barrier Ring", r13=0x01), eff("Facet")),
@@ -137,7 +137,6 @@ DESC = {
     "Atlas Armlet": "Raises Fight damage by 1/4",
     "Earrings": "Raises magic damage by 1/4",
     "Hero Ring": "Fight and magic damage +1/4",
-    "Hyper Wrist": "Raises Vigor by half",
     "Gold Hairpin": "Halves the MP spells cost",
     "Black Belt": "Sometimes counters an attack",
     "MithrilGlove": "Casts Safe when HP is low",
@@ -160,6 +159,7 @@ DESC = {
     "Heal +25%": "Healing done is 25% stronger",
     "Full Revive": "Revives allies at full HP",
     "Rebirth": "Starts every battle with Life 3",
+    "Limit Break": "Damage dealt can pass 9999",
 }
 # the help line's second line, under an unreached rung whose effect this character already holds from
 # another rung (Ot6RungDescText's cover test over the ladder's effect bytes).  The esper page's title window
@@ -496,6 +496,13 @@ def check(rom, dbg_text, c):
         if rec != want:
             problems.append("%s rung %d (%s): Ot6LadderTbl holds %s, the table says %s"
                             % (name, k, label, rec.hex(" "), want.hex(" ")))
+        # #549: the relic-effects byte (record +5, ItemProp+10's) bits that turn a command into a no-list one,
+        # Sketch -> Control ($10) and Steal -> Capture ($40): the field Skills rows grey from worn gear alone,
+        # so no rung may carry them
+        if len(rec) > 5 and rec[5] & 0x50:
+            problems.append("%s rung %d (%s): Ot6LadderTbl's relic-effects byte $%02X carries $10/$40 (Sketch -> "
+                            "Control, Steal -> Capture), which the Skills page rows read from gear alone"
+                            % (name, k, label, rec[5]))
         lab = rom[lt + i * LABEL: lt + (i + 1) * LABEL]
         if list(lab) != encode(c, label):
             problems.append("%s rung %d: the menu label is not %r" % (name, k, label))
@@ -530,6 +537,11 @@ def main():
             ("Shiva's signature loses the Gold Hairpin bit", t + (2 * 5 + 4) * REC + 6, 0x00, "Shiva rung 5"),
             ("Ifrit's rung 4 gives +1 vigor, not +2", t + (1 * 5 + 3) * REC + 10, 0x01, "Ifrit rung 4"),
             ("Phoenix's rung 3 label changes", lt + (25 * 5 + 2) * LABEL, 0x80, "Phoenix rung 3"),
+            # #550: Bahamut's signature is new code (no bytes); the Hero Ring's moved to Ragnarok's
+            ("Bahamut's signature keeps the Hero Ring's bits", t + (12 * 5 + 4) * REC + 4, 0x03, "Bahamut rung 5"),
+            ("Ragnarok's signature loses the Hero Ring's bits", t + (15 * 5 + 4) * REC + 4, 0x00, "Ragnarok rung 5"),
+            ("Ramuh's rung 1 turns Sketch into Control", t + 0 * REC + 5, 0x10, "carries $10/$40"),
+            ("Ramuh's rung 1 turns Steal into Capture", t + 0 * REC + 5, 0x40, "carries $10/$40"),
         ]
         ti = rom_off(sym(dbg_text, "Ot6RungDescIdx"))
         ts = rom_off(sym(dbg_text, "Ot6RungDescStr"))

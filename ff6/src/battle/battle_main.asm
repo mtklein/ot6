@@ -1913,10 +1913,9 @@ CalcTargetDmg:
         bit     $11a1
         beq     @0c1e
         jsl     Ot6Chip                 ; ot6: weakness hit chips shields
-        lda     $f1
-        bmi     @0c1e
-        asl     $f0
-        rol     $f1
+        jsl     Ot6WeakDouble           ; ot6 #550: x2, saturating at $ffff
+        nop4                            ;   (was lda $f1 / bmi / asl / rol:
+                                        ;   32,768 and up went undoubled)
 @0c1e:  jsl     Ot6HitJoin              ; ot6: class chip, then broken double
         lda     $11a9       ; item special effect
         cmp     #$04
@@ -1985,12 +1984,9 @@ CalcMaxDmg:
         inc
         beq     @0c8b       ; branch if it's $ffff (no damage)
         dec
-@0c8b:  clc
-        adc     $f0         ; add damage
-        bcs     @0c95       ; branch on overflow
-        cmp     #10000
-        bcc     @0c98       ; branch if less than 10,000
-@0c95:  lda     #9999       ; cap at 9999
+@0c8b:  jsl     Ot6DmgCap   ; ot6 #550: add damage, cap at 9999, or at
+        bra     @0c98       ;   OT6_LIMIT for a Limit Break holder's damage
+        .res    7, $ea      ;   (ot6_esper.asm; same size as vanilla's)
 @0c98:  sta     $33d0,y     ; set damage taken/healed
         plp
         .a8
@@ -2307,9 +2303,8 @@ UltimaEffect:
         longa
         lda     $f0         ; original damage
         jsr     Mult24       ; a = original damage * [(current hp + 1) * level] / [max hp (hi byte) + 1] / 256
-        lda     #5
-        jsr     LsrA
-        inc
+        jsl     Ot6AtmaScale    ; ot6 #550: was lda #5 / jsr LsrA / inc,
+        nop3                    ;   which wrapped past 16 bits (ot6_esper.asm)
         sta     $f0         ; set calculated damage
         cmp     #501
         bcc     @0e73       ; branch if less than 501
@@ -2359,17 +2354,10 @@ UpdateEquip:
         jsr     MultAB
         phx
         tax
-        lda     f:CharProp+10,x         ; battle power
-        sta     $11ac
-        sta     $11ad
-        longa
-        lda     f:CharProp+11,x         ; defense & magic defense
-        sta     $11ba
-        lda     f:CharProp+13,x         ; evade & magic block
-        shorta
-        sta     $11a8
-        xba
-        sta     $11aa
+        jsl     Ot6LeoBattleRow         ; ot6 #552: battle power, defense,
+                                        ;   magic defense, evade and magic
+                                        ;   block from the actor's CharProp
+                                        ;   row, Leo's for the revealed slot
         lda     f:CharProp+21,x         ; run factor
         and     #CHAR_RUN_FACTOR::MASK
         eor     #CHAR_RUN_FACTOR::MASK
@@ -6993,9 +6981,9 @@ UpdateEquipBattle:
         lda     $d8
         sta     $3c58,x     ; relic effects 4
         shorta
-        asl     $3a21,x     ;
-        asl3
-        ror     $3a21,x     ;
+        jsl     Ot6LeoActorMask         ; ot6 #552: bit 15 of the actor mask,
+                                        ;   the Merit Award's (vanilla) or the
+                                        ;   revealed Leo's
         pld
         jmp     FixImmuneStatus
 
@@ -7563,9 +7551,8 @@ _initdamage:
         lda     #$04
         longa
         jsr     LsrA
-        clc
-        adc     $11b0
-        sta     $11b0
+        jsl     Ot6MagBase              ; ot6 #550: was clc / adc $11b0,
+        sta     $11b0                   ;   which wrapped past 2^21
         shorta
         jsl     Ot6BoostDmg             ; ot6: boosted action multiplier
         rts
@@ -8819,8 +8806,8 @@ CalcAttackEffect:
 CalcReflectDmg:
 @3483:  phx
         pha
-        jsr     ClearGfxParams
-        stz     $3a5a
+        jsl     Ot6ReflectBegin ; ot6 #550: was jsr ClearGfxParams / stz $3a5a;
+        nop2                    ;   also notes the caster for Ot6DmgCap
         shorta
         lda     #$22
         tsb     $11a3
@@ -12135,7 +12122,9 @@ RemoveStatusNoEffect:
 
 _c2469c:
 removeerase:
-@469c:  phx
+@469c:  jsl     Ot6Revive   ; ot6 #557: a monster back from the dead by
+                            ;   Life or Reraise starts fresh too
+        phx
         ldx     $3019,y     ; monster flag
         txa
         tsb     $2f2f       ; monsters that are not dead
@@ -13658,7 +13647,9 @@ MonsterDeath_00:
 
 ; $02: revive monsters at current hp
 MonsterDeath_02:
-@4fec:  trb     $3a3a       ; clear "monsters that have died/escaped" flag
+@4fec:  jsl     Ot6Arrive   ; ot6 #557: a body back from the dead starts
+                            ;   fresh (full shields, not broken, no marks)
+        trb     $3a3a       ; clear "monsters that have died/escaped" flag
         tsb     $2f2f       ; set "monsters that are not dead" flag
         tsb     $3a2b       ; battle script command byte 4
         tsb     $2f4f       ; monster can be targetted
@@ -16776,8 +16767,8 @@ _writedamage:
         inc
         beq     @6345
         dec
-        ora     #$8000
-        sta     $33e4,y
+        ora     #OT6_NUM_HEAL   ; ot6 #550: a heal's code, past any damage
+        sta     $33e4,y         ;   (was bit 15: ot6_numeral.asm)
         inc     $f2
         lda     $33d0,y
         inc
@@ -16791,7 +16782,7 @@ _writedamage:
 @6345:  lda     $3018,y
         bit     $3a5a
         beq     @6353
-        lda     #$4000
+        lda     #OT6_NUM_MISS   ; ot6 #550: Miss's code (was bit 14)
         sta     $33d0,y
 @6353:  lda     $33d0,y     ; damage taken
         inc

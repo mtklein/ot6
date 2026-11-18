@@ -322,10 +322,12 @@ local function installObservers()
     local w = (lastLo[a - 1] or 0) | (value << 8)
     if w == 0xFFFF then return end
     local t = armed.inStand and armed.standNums or armed.srcNums
-    t[#t + 1] = string.format("%d", w & 0x3FFF) .. ((w & 0x4000) ~= 0 and "m" or "")
-    -- the stand-in's HP damage numerals, for the multiplier verdict
-    if armed.inStand and (w & 0x4000) == 0 and (w & 0x3FFF) > 0 then
-      armed.standDmg[#armed.standDmg + 1] = w & 0x3FFF
+    local nw = H.numeralWord(w)
+    t[#t + 1] = nw.miss and "0m" or string.format("%d", nw.value)
+    -- the stand-in's HP damage numerals, for the multiplier verdict (a heal's
+    -- word is coded, and a raw amount is the damage before the display marks it)
+    if armed.inStand and not nw.miss and not nw.heal and nw.value > 0 then
+      armed.standDmg[#armed.standDmg + 1] = nw.value
     end
   end, emu.callbackType.write, 0x7E33D0, 0x7E33E3)
   -- A drain's numeral is not its damage: the drain caps it (FixDrainDmg and

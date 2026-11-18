@@ -48,8 +48,9 @@ in the Equip list.
 free of cost: it halves every physical hit the holder makes (`CalcDmg`'s
 `lsr $11b0`: Fight, Jump, Throw, Tools, physical Blitz and SwdTech, Black
 Belt counters), forces random targets, and drops criticals and weapon
-procs. It is now the Hyper Wrist's vigor x1.5 (`$11d7 & $80`, applied at the
-end of `UpdateEquip`). The x1.5 cannot wrap: `UpdateEquipBattle` reads vigor's
+procs. It was then the Hyper Wrist's vigor x1.5 (`$11d7 & $80`, applied at the
+end of `UpdateEquip`) until v0.49, when the Hero Ring moved there from
+Bahamut (#550, below). The x1.5 could not wrap: `UpdateEquipBattle` reads vigor's
 low byte, so it would at 171 before the x1.5, and a holder's vigor is at
 most 100 (the highest base of a member who can wear espers, SABIN's 47; the
 ladder's 19 for one member, every Vig rung and Crusader's; and the gear's
@@ -60,8 +61,8 @@ or nearly dead knight steps in front of the blow and can die.
 `Ot6KnightGate` (CoverEffect's True Knight walk) lets a knight who does not
 wear the relic cover only at half its max HP or more and never while near
 fatal; the True Knight relic itself stays vanilla.
-`battle_espercrusader` holds Ragnarok's (one aimed hit at x1.5 vigor,
-against rank 4) and `battle_esperknight` Golem's (below half no cover, above
+`battle_espercrusader` holds Ragnarok's (one aimed hit, vigor unchanged
+and the Atlas bit set, against rank 4) and `battle_esperknight` Golem's (below half no cover, above
 half a cover).
 
 Accepted as they are: Terrato's rung 3, the Black Belt's counter (a
@@ -72,7 +73,8 @@ an Imp or a Berserk the player casts on purpose.
 
 **An earring rung counts as an earring (#551, owner, 2026-11-16).** The
 Earrings' magic damage +1/4 (Maduin's signature) and the Hero Ring's
-(Bahamut's, which also carries the Atlas Armlet's +1/4 to Fight) each count
+(Ragnarok's since #550, Bahamut's before; it also carries the Atlas Armlet's
++1/4 to Fight) each count
 as one more earring piece, the way vanilla counts worn ones:
 `CalcEquipEffect` moves an item's earring bit (ItemProp +9 `$02`) to
 `$11d7` for the first piece and back to `$11d5` for the second, and
@@ -84,9 +86,104 @@ Until v0.48 a rung only set the single bit, so it added nothing beside a
 worn one. The Atlas Armlet's bit is a plain OR and never doubles.
 `battle_esperearring` holds the eight combinations by Ice's damage at
 `RelicDmgEffect` from one snapshot, with one Fight by the caster where
-Bahamut's rung and a worn Hero Ring both carry the Atlas bit (+1/4, once),
+the Hero Ring rung and a worn Hero Ring both carry the Atlas bit (+1/4, once),
 and the help line's "Already held" never
 shows under an earring rung (`menu_esperdetail`).
+
+**Limit Break, Bahamut's signature (#550, owner, 2026-11-16).** A character
+holding Bahamut's rank 5 deals damage up to 42,069 instead of 9999
+(`OT6_LIMIT`, one constant). Everyone else's damage, and every heal, stays at
+9999. Ragnarok's rank 5 took the Hero Ring that Bahamut's had, in place of
+the Hyper Wrist; it still counts as an earring piece (#551).
+
+- *The cap.* The engine has one cap, `CalcMaxDmg`'s, on the running total a
+  target takes or is healed by in one pass; `Ot6DmgCap` replaces its
+  `cmp #10000 / lda #9999` (same size). Past 9999 it caps at `OT6_LIMIT` only
+  on the damage side (the target's cell, `y < $14`) and only when the
+  attacker (`x`, a character) has its bit in `OT6_LIMITBREAK`, which
+  `Ot6EsperBattleInit` sets per seated character at battle start (InitBP
+  clears it first; no path loads a character mid-battle). `$ffff` means "no
+  number", so the engine's own ceiling is 65,534; `ApplyDmgHP`, the net
+  damage (`_c213a7`) and Golem's pool are 16-bit throughout.
+- *Who counts as the holder.* Whoever cast or struck. For the actor's own
+  action that is the attacker the engine charges with the hit, whatever the
+  command (Fight and its extra swings, Magic, a summon, a throw, Jump's
+  landing, a counter: each runs as the actor's own), a muddled or berserk
+  holder's hits on the party included. A bounced spell is computed with the
+  reflector as the attacker (`CalcReflectDmg`), so `Ot6ReflectBegin` notes
+  the caster for the bounce (`OT6_REFLCASTER`, cleared after its target
+  loop): a holder's spell bounced off anyone can pass 9999, and anyone
+  else's bounced off a holder cannot. A controlled monster's attack is the
+  monster's. Gogo and Umaro wear no espers, so a Mimic of a holder's action
+  stops at 9999. Every heal is the heal side, a drain's heal back to the
+  drainer included (9999). A fraction-of-HP heal turned to damage on an
+  undead body is damage, so a holder's can pass 9999 (intended).
+
+  | the hit | judged by | cap |
+  |---|---|---|
+  | the holder's own action, any command | the holder | 42,069 |
+  | the holder's spell bounced off anyone | the holder (the caster) | 42,069 |
+  | anyone else's spell bounced off the holder | its caster | 9999 |
+  | a controlled monster, a Mimic by Gogo | the monster, Gogo | 9999 |
+  | any heal, a drain's heal back | (the heal side) | 9999 |
+  | a monster's hit on the party | the monster | 9999 |
+
+  Measured (`battle_limitbreak`): the holder's Ultima, a boosted Fight's
+  two swings, both bounce directions, a monster's hit on the party. Read
+  from the code: counters, Jump, Mimic, control and drain (no route save
+  stages them for a holder).
+- *Doubling.* The weakness x2 (`CalcTargetDmg`) and the Broken x2
+  (`Ot6BrokenDmg`) skipped the double at 32,768 and up (bit 15 set), which a
+  9999 cap hid; both now saturate at `$ffff`, so a harder hit never lands
+  for less. On an unbroken body the shield's half comes after the double.
+- *The magic formula.* `CalcMagicDmg`'s base wraps once power x MagPwr x
+  level reaches 2^21. No monster can (MagPwr x1.5 x level is at most 3,285 in
+  the monster data, needing power 638), but a character at level 99 can,
+  with MagPwr 112 and Crusader's Purifier (power 190) or 142 and Ultima; so
+  `Ot6MagBase` saturates the base at `$ffff`. Reasoned from code; no route
+  save reaches it.
+- *The Atma Weapon.* `UltimaEffect` scales the hit by HP and level and
+  kept the low 16 bits of the product over 64, then added one, so past
+  2^22 it wrapped and `$ffff` came back 0. `Ot6AtmaScale` saturates both,
+  to the bit vanilla's wherever nothing overflowed.
+- *The numerals.* The numeral word carried heal in bit 15 and Miss in bit
+  14 beside a value of at most 9999, so they are now ranges past any damage:
+  damage `$0000-$bfff`, a heal `$c000 + v`, Miss `$f000`, none `$ffff`
+  (`ot6_numeral.asm`). A five-digit number is drawn in the same two 16x16
+  sprites and four tiles as any numeral, with condensed digits: 6x8 glyphs
+  in the numerals' own style and palette indices (outline 12, fill 13, so
+  white damage and green healing are unchanged), a one-pixel stroke on a
+  4x6 grid, five of them spanning 30 pixels centred in the 32
+  (`tools/numeral_font.py`, which writes `ot6_numeral_font.inc`; a build
+  check holds the two together). Each position's digit is OR-ed into the
+  tile buffer from a pre-shifted pair of tiles, so a digit straddling two
+  tiles needs no shifting at run time. One to four digits keep vanilla's
+  glyphs. Every numeral, single or multi-target, keeps vanilla's sprites
+  (so OAM use and sprites per scanline are vanilla's), threads, VRAM
+  transfers and timing; only what goes into the buffer changes. (A first
+  design with a third sprite and a fifth tile ran neighbouring numerals
+  together and pushed busy scanlines past the PPU's 34 slivers:
+  build/attempts/wt/v049-limitbreak/shots/.) Where a crowded scene drops part
+  of a numeral, it is the PPU's 34 slivers a line and the same sprite load
+  vanilla's four digits make: shots2/multi_9999_beside_holder_3x.png shows
+  the same scene at 9999 and with five digits, both 42 slivers on the
+  busiest line.
+- *Tested.* `battle_limitbreak`: a holder's Ultima at 2 BP lands about
+  12,000 on each of four monsters, exactly in HP and on the numeral; the
+  four take the single path, one a thread, and each five-digit numeral's
+  tiles match a reference rendering of the condensed digits pixel for
+  pixel; the busiest scanline carries as many slivers as the same scene at
+  9999; one count short of the rank the cast lands 9999 in vanilla's
+  glyphs; with heals added the multi-target path draws the five digits
+  condensed and the heals green; 9999, 12345, 0 and Miss through each path,
+  a heal of 0 too; a five-digit numeral on the party's side; a staged
+  33,333 on a Broken body and on a weak one lands 42,069 and 32,767; a
+  holder's pass turned to a heal stops at 9999, and a monster's hit of
+  20,000 on the party at 9999; a bounce lands 20,000 when the holder cast
+  it and 9999 when it bounced off the holder; a boosted Fight's swings cap
+  one by one; the Atma scale and the magic base saturate at level 99;
+  `OT6_LIMITBREAK` holds exactly the holder's bit. Seventeen mutants, one
+  per arm, each go red.
 
 **Sraphim, the healer's stone (owner, 2026-11-14).** Rung 3: everything the
 member heals is 25% stronger. Rung 5: anyone the member revives comes back
@@ -380,9 +477,9 @@ bytes, `ItemProp+5` to `+13`).
 | Terrato | Quake, Quartr | Mag / Stm | counters physical attacks (Black Belt) | max HP +50% (Muscle Belt) |
 | Tritoch | Ice, Bolt, Poison | Mag / Spd | +1 speed | immune to Dark and Petrify (Jewel Ring), and max MP +50% (Crystal Orb) |
 | Odin / Raiden | Meteor, Bserk (Raiden: + Quick) | Vig / Spd | Fight never misses (Sniper Sight) | Haste in every battle (RunningShoes) |
-| Bahamut | Flare, W Wind | Mag / Vig | max HP +25% (Red Cap) | Fight and spells deal more damage (Hero Ring) |
+| Bahamut | Flare, W Wind | Mag / Vig | max HP +25% (Red Cap) | †*Limit Break*: the member's damage can pass 9999, up to 42,069 (healing stays at 9999) |
 | Phoenix | Life, Antdot | Stm / Spd | immune to Doom's countdown and Zombie | †*Rebirth*: enters every battle under Life 3 |
-| Ragnarok | Ultima, Warp | Vig / Mag | max MP +25% (Minerva) | vigor x1.5 (Hyper Wrist) |
+| Ragnarok | Ultima, Warp | Vig / Mag | max MP +25% (Minerva) | Fight and spells deal more damage (Hero Ring) |
 | Crusader | Merton, Meteor | all four +1 at rungs 1, 2 and 4 | max HP +25% (Red Cap) | Gauntlet (two-handed grip) and Genji Glove (two weapons) both allowed |
 
 Odin and Raiden share one counter: Raiden replaces Odin, and the progress

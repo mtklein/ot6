@@ -1916,7 +1916,10 @@ InitShopCharSprites:
         plb
         longa
         lda     f:PartyCharAnimTbl,x
-        sta     near wTaskAnimPtr,y
+        cpx     #CHAR_PROP::GOGO * 2    ; ot6 #552: the revealed Leo in
+        bne     :+                      ;   Leo's palette
+        jsr     Ot6LeoShopAnim
+:       sta     near wTaskAnimPtr,y
         shorta
         plx
         lda     f:ShopCharSpriteXTbl,x
@@ -1936,6 +1939,20 @@ InitShopCharSprites:
 @c0ec:  rts
 
 ; ------------------------------------------------------------------------------
+
+; ot6 #552: A (16-bit) = Gogo's shop animation; Leo's once revealed
+.a16
+Ot6LeoShopAnim:
+        pha
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     :+
+        pla
+        lda     #near Ot6ShopLeoAnim
+        rts
+:       pla
+        rts
+.a8
 
 ShopCharSpriteXTbl:
 @c0ed:  .byte   $18,$38,$58,$78,$98,$b8,$d8

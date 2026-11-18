@@ -2,12 +2,13 @@
 -- battle_preview.lua -- the un-made choice shows its boost. With BP
 -- pending, opening Terra's magic list renders the folded tier in Fire's
 -- row (Ot6PreviewList_ext folds the render-scoped id): the price shown is
--- the folded tier's, and the row greys when she cannot pay it.
+-- the folded tier's, and R adds no point she cannot pay for.
 
---   asserts: pending 0/1/2 render tier 1/2/3 with prices 4/20/51 live in
---   the same open list; the unaffordable folded row is greyed and refuses
---   the confirm (state stays in-list, $32cc stays $ff); both cheaper
---   tiers stay ungreyed on the same wallet; the walk is self-restoring
+--   asserts: pending 0/1 render tier 1/2 with prices 4/20 live in the
+--   same open list; R toward pending 2 (Fire 3, 51 MP, more than her pool)
+--   is refused in the list (#555: pending stays 1, Fire 2 at 20, never
+--   greyed, nothing committed); both cheaper tiers stay ungreyed on the
+--   same wallet; the walk is self-restoring
 --   and idempotent (L back down restores each price exactly); and the
 --   menu still works, with a re-folded cast landing at the tier the wallet
 --   buys (Fire 2, $05).  Screenshots are taken for the visual record.
@@ -274,37 +275,24 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(rowGreyed(terra, FIRE), false,
       "a solvent caster's folded row is NOT greyed")
   end),
-  boostTo(2, "R climbs to 2"),
-  H.waitFrames(40),
+  -- pending 2 would buy Fire 3 (51 MP), which her pool (asserted under 51
+  -- above) cannot pay: since #555, R in a list adds no point the MP cannot
+  -- pay for on the row under the cursor, so the row is never left greyed by
+  -- a boost.  Before #555 the point was taken and the row went grey (this
+  -- suite's old claim, true to v0.48).  Three R presses, each held 6 frames.
+  H.pressButtons({ "r" }, 6), H.waitFrames(30),
+  H.pressButtons({ "r" }, 6), H.waitFrames(30),
+  H.pressButtons({ "r" }, 6), H.waitFrames(40),
   H.call(function()
-    H.log(string.format("pending 2: tier %d, price %d MP, greyed=%s (mp=%d)",
-      fireTier(), rowCost(terra, FIRE), tostring(rowGreyed(terra, FIRE)),
-      mp(terra)))
-    H.assertEq(fireTier(), 3, "two boosts preview Fire 3")
-    H.assertEq(pend(terra), 2, "still just a preview: boost not consumed")
-    H.assertEq(rowCost(terra, FIRE), FIRE3_MP,
-      "...priced as Fire 3 -- 51 MP")
-    H.assertEq(rowGreyed(terra, FIRE), true,
-      "the real pool cannot pay Fire 3's 51, so the boosted row is greyed")
-    H.screenshot("preview_grey")
-  end),
-  -- ...and the refusal is behavioral, not just a palette bit: A on the
-  -- greyed row must leave the list open and commit nothing.
-  H.pressButtons({ "a" }, 6), H.waitFrames(30),
-  H.pressButtons({ "a" }, 6), H.waitFrames(30),
-  H.call(function()
-    H.assertEq(H.readByte(MSTATE), ST_MAGIC,
-      "A on the greyed folded row is refused -- the list stays open")
-    H.assertEq(cmdptr(terra), 0xff,
-      "and nothing was committed ($32cc still $ff)")
-  end),
-  boostTo(1, "L drops back to 1 (the recheck must un-grey, live)"),
-  H.waitFrames(40),
-  H.call(function()
-    H.assertEq(rowCost(terra, FIRE), FIRE2_MP, "re-priced as Fire 2")
-    H.assertEq(rowGreyed(terra, FIRE), false,
-      "...and un-greyed: the SAME wallet pays Fire 2, so the grey was the "
-      .. "fold's price and not the caster's poverty (live both ways)")
+    H.log(string.format("after three R presses toward 2: pending %d, tier %d, price %d MP, greyed=%s (mp=%d)",
+      pend(terra), fireTier(), rowCost(terra, FIRE), tostring(rowGreyed(terra, FIRE)), mp(terra)))
+    H.assertEq(H.readByte(MSTATE), ST_MAGIC, "the list is still open")
+    H.assertEq(pend(terra), 1, "R toward Fire 3 is refused: her MP cannot pay 51, so the pending stays 1 (#555)")
+    H.assertEq(fireTier(), 2, "...the row still reads Fire 2")
+    H.assertEq(rowCost(terra, FIRE), FIRE2_MP, "...priced at Fire 2's 20")
+    H.assertEq(rowGreyed(terra, FIRE), false, "...and not greyed: a boost never greys a row")
+    H.assertEq(cmdptr(terra), 0xff, "and nothing was committed ($32cc still $ff)")
+    H.screenshot("preview_refused")
   end),
   boostTo(0, "L drops the pending to 0"),
   H.waitFrames(40),

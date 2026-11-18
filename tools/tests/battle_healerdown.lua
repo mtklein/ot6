@@ -11,6 +11,8 @@
 --   * the healer's death is POKED (hp=0 + status1 $80, the same pair the
 --     engine's own dead_sub/SetStatus1 leaves), because arranging a real
 --     targeted kill would couple this test to formation AI luck;
+--   * the healer's max HP is POKED to 256, so the raise (1/8, 32 HP)
+--     clears any hit of the formation and the raise rule wants it;
 --   * a Fenix Down is ensured in the battle inventory the same way, as the
 --     whole five-byte record LoadItemProp builds (itemRecord below) --
 --     first_battle's bag holds none, and an id-and-qty poke left the row
@@ -135,6 +137,15 @@ H.run({ maxFrames = 60000 }, {
 
     -- kill the healer (expedient write pair; the engine's own corpse shape)
     H.writeWord(0x3BF4 + healerEnt * 2, 0)
+    -- ...and a max HP whose eighth (the Fenix Down's raise) clears any hit
+    -- this formation deals, so the driver's raise rule (#165/#168: no raise
+    -- into a certain re-kill) wants the revive on every draw.  On v0.49's
+    -- line the healer's 63 raised to 7 against a measured 8 hit and nobody
+    -- raised (build/attempts/wt/v049-land/gate1/suite_battle_healerdown.log:
+    -- "Fenix Down would put entity 0 at 7 HP (1/8 of 63), the living enemy's
+    -- smallest hit 8"); v0.48's draw met a 6 hit.  The property is who may
+    -- raise, not whether a raise pays.
+    H.writeWord(0x3C1C + healerEnt * 2, 256)
     H.writeByte(0x3EE4 + healerEnt * 2, st1(healerEnt) | 0x80)
     H.assertEq(hp(healerEnt), 0, "the healer is down")
     H.log(string.format("healer = chid %02X in entity %d, killed; fenix=%d",

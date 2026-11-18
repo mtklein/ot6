@@ -24873,9 +24873,10 @@ GfxCmd_0b:
         cmp     #$ff
         bne     @a510
         rts
-@a510:  sta     $1e         ; $1e = hi byte of numeral value
-        and     #$40
-        beq     @a531       ; branch if not displaying "miss"
+@a510:  jsl     Ot6NumSingle_ext ; ot6 #550: Miss, a heal or up to five digits,
+        bra     @a589           ;   five condensed into the same four tiles
+                                ;   (ot6_numeral.asm); vanilla's two branches
+                                ;   below are unreached, kept for the size
 
 ; miss
         longa
@@ -25016,12 +25017,9 @@ damage_set:
         cmp     #$ff
         bne     @a627
         jmp     @a6eb
-@a627:  and     #$40
-        beq     @a655
-
-;
-        phb
-        lda     #$7f
+@a627:  jsl     Ot6NumMulti_ext ; ot6 #550: as Ot6NumSingle_ext, into this
+        jmp     @a6bd           ;   target's slot (ot6_numeral.asm); vanilla's
+                                ;   two branches below are unreached
         pha
         plb
         phy

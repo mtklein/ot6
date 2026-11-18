@@ -293,6 +293,17 @@ local function pulse()
     end
     -- back in the list after a pick was taken: the next pick
     if not XLIST[rec.lastSt or 0] and rec.pressed == rec.pi then rec.pi = rec.pi + 1 end
+    -- ...unless the list came back from the second pick's target select
+    -- with nothing queued: the engine closed that target select itself
+    -- (v0.49's gate 1, the second X-Magic round's branch 10: menu state $38
+    -- to $0E with no button down and $32CC still $FF, Fire's row lit and
+    -- the pool 417; build/attempts/wt/v049-land/lab/mpfizzle_diag.log.gz),
+    -- and the list asks for the second spell again, as a player sees it
+    if rec.pi > #rec.picks and rec.queued == nil then
+      H.log(string.format("[mpfizzle] f%d: the second pick's target select closed with nothing queued: "
+        .. "the second spell is picked again", H.frame))
+      rec.pi, rec.pressed = #rec.picks, nil
+    end
     local p = rec.picks[rec.pi]
     if p then
       btn = steerTo(a, p.cell)

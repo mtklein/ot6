@@ -84,6 +84,7 @@ MENU_TEXT_INC = 1
 .define SKILLS_LIST_RAGE                BG3A, {2, 15}, {$91,$9a,$a0,$9e,$00}  ; Rage
 .define SKILLS_LIST_DANCE               BG3A, {2, 17}, {$83,$9a,$a7,$9c,$9e,$00}  ; Dance
 .define SKILLS_LIST_THIEF               BG3A, {2, 19}, {$93,$ab,$9e,$9a,$ac,$ae,$ab,$9e,$ff,$87,$ae,$a7,$ad,$9e,$ab,$00}  ; Treasure Hunter
+.define SKILLS_LIST_PAINTER             BG3A, {2, 21}, {$8f,$9a,$a2,$a7,$ad,$9e,$ab,$00}  ; Painter
 
 .define SKILLS_MP_COST                  BG3B, {23, 5}, {$8c,$8f,$c7,$ff,$ff,$ff,$ff,$00}  ; MP_    
 .define SKILLS_LORE_TITLE               BG3B, {23, 5}, {$8b,$a8,$ab,$9e,$00}  ; Lore
@@ -94,6 +95,7 @@ MENU_TEXT_INC = 1
 .define SKILLS_BUSHIDO_TITLE            BG3B, {23, 5}, {$92,$b0,$9d,$93,$9e,$9c,$a1,$00}  ; SwdTech
 .define SKILLS_THIEF_TITLE              BG3B, {15, 5}, {$93,$ab,$9e,$9a,$ac,$ae,$ab,$9e,$ff,$87,$ae,$a7,$ad,$9e,$ab,$00}  ; Treasure Hunter
 .define SKILLS_THIEF_TITLE_BLANK        BG3B, {15, 5}, {$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$00}  ;                
+.define SKILLS_PAINTER_TITLE            BG3B, {23, 5}, {$8f,$9a,$a2,$a7,$ad,$9e,$ab,$00}  ; Painter
 
 .define SKILLS_CHAR_LEVEL               BG1B, {18, 7}, {$8b,$95,$00}  ; LV
 .define SKILLS_CHAR_HP                  BG1B, {18, 9}, {$87,$8f,$00}  ; HP

@@ -1356,7 +1356,8 @@ UseItem:
         stz     $e0
         longa
         lda     f:ItemProp+1,x          ; equippable characters
-        ldx     z0
+        jsr     Ot6LeoItemMask          ; ot6 #552: Leo's own set lists the
+        ldx     z0                      ;   revealed slot 12 too
 @8529:  lsr
         bcc     @8537                   ; skip characters that can't equip this item
         pha

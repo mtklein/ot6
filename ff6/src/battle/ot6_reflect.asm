@@ -34,6 +34,7 @@
         php
         sep     #$20
         .a8
+        stz     OT6_REFLCASTER  ; #550: the bounce's damage is done
         phx
         ldx     #$09
 @scan:  lda     $a0,x           ; the bounce's target record

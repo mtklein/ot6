@@ -15,6 +15,7 @@ CODE_EXT_INC = 1
 .global Ot6ListIcon_ext, Ot6MagitekIcon_ext, Ot6LoreIcon_ext
 .global Ot6ToolListIcon_ext
 .global Ot6BgHud_ext, Ot6BgHudFlush_ext, Ot6PipGlyph_ext
+.global Ot6NumSingle_ext, Ot6NumMulti_ext  ; #550 five-digit numerals
 .global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
 .global Ot6WeaponSpellQueued, Ot6WeaponSpellPass
 .global Ot6CodexSaveAs          ; copy slot-local weakness knowledge on Save As
@@ -37,8 +38,12 @@ CODE_EXT_INC = 1
 .global Ot6PaintExec             ;   Cmd_0d's execute-side dispatch (the rows)
 .global Ot6KitConfirm            ;   the tools-shell confirm in modes 4-6
 .global Ot6VarnishGate           ;   CheckHit's exit: a coat turns a hit
-.global Ot6PaintPageRow          ;   the field page's rows
+.global Ot6PaintPageRow          ;   the field Painter page's rows: id or $ff
 .global Ot6PaintName             ;   the list's 10-letter names
+.global Ot6ThiefPageDescPtrs, Ot6ThiefPageDescStr  ; #549: the field pages'
+.global Ot6PaintPageDescPtrs, Ot6PaintPageDescStr  ;   help lines (kit_pages.py)
+.global Ot6PaintBase             ;   a row's base price: the list's Qty, and
+                                 ;   the field Painter page's price column
 .global Ot6SetzerListOpen        ; setzer's kit: slot -> tools-shell table
 .global Ot6SetzerConfirm         ;   the Slot row chains to the reels
 .global Ot6SetzerExec            ;   Cmd_0f's dispatch (coin toss/hired help/jackpot)
@@ -174,3 +179,12 @@ CODE_EXT_INC = 1
 .global Ot6DanceList, Ot6DenseDanceOpen, Ot6DenseDanceStore, Ot6ToolsCursorStore
 
 .endif
+
+; #552: the grave in the World of Ruin's Thamasa reveals that Gogo is General
+; Leo (docs/design/leo-reveal.md).  Event switch $00E0 (byte $1e9c, bit 0)
+; says the reveal has played; the slot keeps actor $0C.  Read it with long
+; addressing: the field, menu and battle run with different data banks.
+OT6_LEO_SWITCH = $00e0
+OT6_LEO_FLAG := $7e1e80 + (OT6_LEO_SWITCH >> 3)
+OT6_LEO_BIT = 1 << (OT6_LEO_SWITCH & 7)
+.global Ot6LeoReveal, Ot6LeoBattleRow, Ot6LeoActorMask
