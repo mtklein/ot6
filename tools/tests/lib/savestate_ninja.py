@@ -96,6 +96,16 @@ SELF = "tools/tests/lib/savestate_ninja.py"
 # it with them unset, so a lab's exported variable cannot leak into
 # qualification.  The VAR=value splices before it still pass through.
 LAB_UNSET = "env -u OT6_LEVERS -u OT6_POLICY -u OT6_POLICY_FORMS"
+# The same fence as a shell statement, for a rule whose command is a whole
+# shell line ($cmd: configure.py's generic `rule sh`, which runs the tagged
+# suites, the golden saves, the negatives and the instruments) (#548).
+LAB_UNSET_SH = "unset OT6_LEVERS OT6_POLICY OT6_POLICY_FORMS;"
+# The rules of the root build.ninja that never start an emulator; every
+# other rule must carry the fence (lever_fence, below): a new rule is
+# fenced or named here, never silently open.
+UNFENCED_RULES = {"copy_if_changed", "ca65", "checkpoint_authored",
+                  "copy_if_lua_changed", "copy_if_rom_identity_changed",
+                  "quick_copy", "configure"}
 GRAPH = "tools/tests/savestate_graph.py"
 OUT = "build/build.ninja"
 ROM = "build/ot6.sfc"
@@ -857,6 +867,80 @@ def coverage_report(states, root, booted):
     return 1 if errors else 0
 
 
+def lever_fence(text):
+    """The rules in a ninja file's text that can start an emulator and do
+    not unset the lab levers first: [(rule, command)].  A rule is fenced
+    when its command carries LAB_UNSET or begins with LAB_UNSET_SH."""
+    open_rules, rule = [], None
+    for line in text.splitlines():
+        m = re.match(r"rule (\S+)$", line)
+        if m:
+            rule = m.group(1)
+            continue
+        if rule and line.startswith("  command = "):
+            cmd = line[len("  command = "):]
+            if (rule not in UNFENCED_RULES and LAB_UNSET not in cmd
+                    and not cmd.startswith(LAB_UNSET_SH)):
+                open_rules.append((rule, cmd))
+            rule = None
+    return open_rules
+
+
+def lever_fence_check(path):
+    """--lever-fence: the written graph's rules all fence the lab levers
+    (#548 item 4: the generic `rule sh` ran the tagged suites, the golden
+    saves and the instruments without it), the fence hides an exported
+    lever from a $cmd line, and the check sees a rule without it."""
+    import subprocess
+    text = path.read_text()
+    bad = 0
+
+    def check(name, ok):
+        nonlocal bad
+        print(f"  {'pass' if ok else 'FAIL'}  {name}")
+        bad += 0 if ok else 1
+    rules = re.findall(r"^rule (\S+)$", text, re.M)
+    gaps = lever_fence(text)
+    for rule, cmd in gaps:
+        print(f"  open rule {rule}: {cmd[:120]}")
+    check(f"every rule of {path} that can start an emulator unsets the lab "
+          f"levers ({len(rules)} rules, {len(UNFENCED_RULES & set(rules))} "
+          f"named as never starting one)", not gaps)
+    check("...the generic sh rule and the suite rule among them",
+          "sh" in rules and "suitetest" in rules
+          and not {r for r, _ in gaps} & {"sh", "suitetest"})
+    # negatives: each fenced rule with its fence removed is caught
+    for r in ("sh", "suitetest", "generate"):
+        body = re.search(rf"^rule {r}\n  command = (.*)$", text, re.M)
+        if not body:
+            check(f"NEGATIVE rule {r} present to strip", False)
+            continue
+        cmd = body.group(1)
+        stripped = cmd.replace(LAB_UNSET + " ", "").replace(LAB_UNSET_SH + " ", "")
+        mutant = text.replace(f"rule {r}\n  command = {cmd}",
+                              f"rule {r}\n  command = {stripped}")
+        check(f"NEGATIVE rule {r} without its fence is reported",
+              stripped != cmd and r in {x for x, _ in lever_fence(mutant)})
+    mutant = text + "\nrule new_emulator_rule\n  command = tools/tests/run.sh $in\n"
+    check("NEGATIVE a new rule nobody fenced is reported",
+          "new_emulator_rule" in {x for x, _ in lever_fence(mutant)})
+    # the statement form works on a $cmd line: an exported lever is gone,
+    # a VAR=value splice inside the command still reaches it
+    probe = 'X=kept sh -c \'echo "${OT6_LEVERS-}|${OT6_POLICY-}|${OT6_POLICY_FORMS-}|$X"\''
+    leak = dict(os.environ, OT6_LEVERS="WORST_LIFT_OFF", OT6_POLICY="naive",
+                OT6_POLICY_FORMS="1A")
+    got = subprocess.run(f"{LAB_UNSET_SH} {probe}", shell=True, env=leak,
+                         capture_output=True, text=True).stdout.strip()
+    check("the statement fence hides an exported lever and policy, keeps a "
+          "splice", got == "|||kept")
+    got = subprocess.run(probe, shell=True, env=leak, capture_output=True,
+                         text=True).stdout.strip()
+    check("NEGATIVE without it the lever reaches the run",
+          got == "WORST_LIFT_OFF|naive|1A|kept")
+    print(f"lever fence: {'OK' if not bad else f'{bad} FAILURE(S)'}")
+    return 1 if bad else 0
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=ROOT,
@@ -875,9 +959,14 @@ def main(argv):
     ap.add_argument("--booted", nargs="*", default=[], metavar="KEY",
                     help="with --coverage: checkpoints suites Continue "
                          "(configure.py's TEST_ENV)")
+    ap.add_argument("--lever-fence", type=Path, metavar="NINJA",
+                    help="check every rule of a written build.ninja that "
+                         "can start an emulator unsets the lab levers")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
+    if args.lever_fence:
+        return lever_fence_check(args.lever_fence)
     if args.authored:
         return write_authored(Path(args.authored[0]), Path(args.authored[1]))
 

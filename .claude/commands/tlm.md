@@ -96,7 +96,9 @@ problem remains. Before planning, know and report in one short block: uncommitte
 unpushed work and where it belongs; release drift (README claiming a
 published version with no tag and GitHub release, release/* ahead of main);
 VERSION may name the explicitly identified next development version; open
-issues and the current milestone; worktrees and `wt/*` branches, with
+issues (no milestones: releases are cut as convenient when
+something is worth playtesting, and the owner makes the v1.0 call; owner,
+2026-11-21); worktrees and `wt/*` branches, with
 whether each is finished, mid-stream or dead; live.py up with all three
 machines; px13's pending reboot (`/var/run/reboot-required.pkgs`; it
 installs security updates itself but never reboots -- restart it at a
@@ -109,7 +111,7 @@ session), read under the tracked policy above, and in
 
 # 2. Launching agents
 
-Delegate whatever unit is coherent: a lab, an arc, a milestone's issues, a
+Delegate whatever unit is coherent: a lab, an arc, a group of issues, a
 redesign of a tool. Label an agent's issues active when you launch it
 (`tools/stream/live.py --active N...`) and clear them (`--inactive N...`) on
 merge or close: live.py's grid lists the active ones for the owner. Size it by what one agent can hold and check, not by

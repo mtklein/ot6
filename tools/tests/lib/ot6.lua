@@ -502,6 +502,8 @@ function M.requestSaveState()
     M.pendingStateReqs = M.pendingStateReqs - 1
     local ok, err = pcall(function() req.blob = emu.createSavestate() end)
     req.ok = ok and type(req.blob) == "string" and #req.blob > 0
+    -- which game cells the snapshot's machine had written (M.writtenFlags)
+    req.written = M.writtenFlags and M.writtenFlags()
     -- render on demand (#394): a state whose PPU palette address is not
     -- known to be a drawn frame's carries the flag (ppu.icaStale); kept, so a
     -- fixture made from it fails the run by name (M.emitBlob)
@@ -3344,14 +3346,16 @@ function M.inFoldTbl(id)
 end
 
 -- Ot6FoldSteps: the tier steps a boost buys this actor, 0-2, and 3 for
--- TERRA at 3 BP once she has rejoined in the World of Ruin (event switch
--- $00BF), whose three-step Fire folds into Ultima (kits.md).  actor is a
--- battle seat 0-3; nil asks for the general rule (no fourth fold).
+-- TERRA (or a GOGO, whose Magic opens her kit: #547) at 3 BP once she has
+-- rejoined in the World of Ruin (event switch $00BF), whose three-step Fire
+-- folds into Ultima (kits.md).  actor is a battle seat 0-3; nil asks for
+-- the general rule (no fourth fold).
 M.ULTIMA = 0x14
 function M.foldSteps(actor, boost)
   boost = math.max(0, math.min(boost or 0, 3))
   if boost < 3 then return boost end
-  if actor ~= nil and M.readByte(0x3ED8 + actor * 2) == 0
+  local id = actor ~= nil and M.readByte(0x3ED8 + actor * 2)
+  if (id == 0 or id == 0x0C)
       and (M.readByte(0x1E80 + (0xBF >> 3)) & (1 << (0xBF & 7))) ~= 0 then
     return 3
   end
@@ -3386,11 +3390,20 @@ end
 -- 2.5x.  One function so the driver cannot charge a fold 2.5x on top of
 -- its tier, which would be charging twice for one boost.
 -- STRAGO's Scan at the full boost is his study (#432), priced at the shared
--- ceiling whatever his relics (Ot6MagicPrice's first arm)
+-- ceiling whatever his relics (Ot6MagicPrice's first arm); a GOGO who
+-- carries Lore studies too (#547, Ot6StudyCaster)
 M.STUDY_SPELL, M.STUDY_BOOST, M.STUDY_MP, M.STRAGO_ID = 0x18, 3, 99, 0x07
+-- Ot6GogoCarries: seat `actor` is GOGO (actor $0C, revealed or not) and his
+-- record holds command `cmd` among its four
+function M.gogoCarries(actor, cmd)
+  if actor == nil or M.readByte(0x3ED8 + actor * 2) ~= 0x0C then return false end
+  local rec = 0x1600 + 37 * M.readByte(0x3ED9 + actor * 2) + 0x16
+  for i = 0, 3 do if M.readByte(rec + i) == cmd then return true end end
+  return false
+end
 function M.isStudy(id, boost, actor)
   return id == M.STUDY_SPELL and (boost or 0) >= M.STUDY_BOOST and actor ~= nil
-    and M.readByte(0x3ED8 + actor * 2) == M.STRAGO_ID
+    and (M.readByte(0x3ED8 + actor * 2) == M.STRAGO_ID or M.gogoCarries(actor, 0x0C))
 end
 M.LORE_PEARL_WIND, M.LORE_DISCHORD = 8, 16   -- $1D29 bit order
 -- STRAGO's battle Lore list (#512): not every lore he knows, but his five-slot loadout (OT6_LORELOAD, $1E27+0..4,
@@ -3704,12 +3717,13 @@ local function boostPlanSaid(o, want, boost, ok, why)
     ok and why or (why .. " (falling back to Fight)")))
 end
 
--- Edgar's Overclock (ot6_overclock.asm): EDGAR's Tool at a full 3-BP boost,
--- once he has learned it (event switch $0068), fires twice and costs the
--- two firings, capped at 99 -- the ROM's Ot6ToolPrice.  actor = battle
--- seat 0-3, base = the tool's unboosted price.
+-- Edgar's Overclock (ot6_overclock.asm): EDGAR's Tool (or a GOGO's: #547)
+-- at a full 3-BP boost, once he has learned it (event switch $0068), fires
+-- twice and costs the two firings, capped at 99 -- the ROM's Ot6ToolPrice.
+-- actor = battle seat 0-3, base = the tool's unboosted price.
 function M.overclocks(actor, boost)
-  return boost >= 3 and actor ~= nil and M.readByte(0x3ED8 + actor * 2) == 4
+  local id = actor ~= nil and M.readByte(0x3ED8 + actor * 2)
+  return boost >= 3 and (id == 4 or id == 0x0C)
     and (M.readByte(0x1E80 + (0x68 >> 3)) & (1 << (0x68 & 7))) ~= 0
 end
 function M.toolPrice(actor, base, boost, id)
@@ -6879,7 +6893,7 @@ local EXEC_CMD_NAME = {
   [0x00] = "Fight", [0x01] = "Item", [0x02] = "Magic", [0x03] = "Morph",
   [0x04] = "Revert", [0x05] = "Steal", [0x06] = "Capture", [0x07] = "SwdTech",
   [0x08] = "Throw", [0x09] = "Tools", [0x0A] = "Blitz", [0x0B] = "Runic",
-  [0x0C] = "Lore", [0x0D] = "Sketch", [0x0E] = "Control", [0x0F] = "Slot",
+  [0x0C] = "Lore", [0x0D] = "Painter", [0x0E] = "Control", [0x0F] = "Slot",
   [0x10] = "Rage", [0x11] = "Leap", [0x12] = "Mimic", [0x13] = "Dance",
   [0x14] = "Row", [0x15] = "Def", [0x16] = "Jump", [0x17] = "XMagic",
   [0x18] = "GPRain", [0x19] = "Summon", [0x1A] = "Health", [0x1B] = "Shock",
@@ -22854,6 +22868,20 @@ end
 -- is no longer logged as a map stood on.
 M.traceMapSet = false
 M.onWrite(function() M.traceMapSet = true end, 0x1F64, 0x1F65)
+-- Which of those cells the game has written, as one record a snapshot keeps
+-- (M.requestSaveState) and a replay restores: a load counts as written only
+-- for a machine that had written them.  The segment runner's boot snapshot
+-- is taken at frame 1 of a Continue, before the game wrote the map id, so a
+-- retry that restored it used to read power-on RAM as a map (`[tiles]
+-- map=61 n=1 xy=0:0` under the rand:1 fill where the reference logs map=0,
+-- wor_nikeah_plain v0.46 and wor_kt_doom v0.49, #548).
+function M.writtenFlags()
+  return { map = M.traceMapSet, hp = M.battleHpSet, present = M.battleCueSet.present, lit = M.battleCueSet.lit }
+end
+function M.restoreWritten(w)
+  M.traceMapSet, M.battleHpSet = w.map, w.hp
+  M.battleCueSet.present, M.battleCueSet.lit = w.present, w.lit
+end
 function M.traceOnLoad(first)
   M.traceMapSet = true
   if M.TRACE_HOLD == false then return end
@@ -23797,6 +23825,10 @@ local function resetLibState()
   guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
   traceMap, traceSet, traceCount = nil, {}, 0
   M.traceHoldUntil, M.traceFlushes = -1, {}
+  -- the boot snapshot is the machine before the game wrote its map or a
+  -- battle (frame 1 of a Continue): the load just made does not count as
+  -- written (#548)
+  if RUN.s0written then M.restoreWritten(RUN.s0written) end
   recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
   execActor, execActorCmd, execDone, execMon, execMonDone = nil, nil, {}, nil, nil
   execParty, execSkipped = nil, {}
@@ -24398,6 +24430,7 @@ function M.run(opts, steps)
     if RUN.s0 and RUN.s0.done and not RUN.s0blob then
       if RUN.s0.ok then
         RUN.s0blob = RUN.s0.blob
+        RUN.s0written = RUN.s0.written
         M.log(string.format("[retry] boot snapshot captured at f%d "
           .. "(%d bytes): the machine as the body's first step found it",
           M.frame, #RUN.s0blob))

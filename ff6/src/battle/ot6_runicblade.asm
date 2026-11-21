@@ -43,7 +43,10 @@ OT6_CHAR_CELES = $06
         .a8
         lda     $3ed8,x         ; character id
         cmp     #OT6_CHAR_CELES
-        bne     @plain
+        beq     :+
+        cmp     #OT6_CHAR_GOGO  ; #547: a Gogo's Runic is a RunicBlade too
+        bne     @plain          ;   (ot6_gogo.asm)
+:
         lda     OT6_BOOST_REVEALED,x
         cmp     #$03            ; the divine's one gate: a full boost
         bcc     @plain

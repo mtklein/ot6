@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "5ee91ac1b07814236a03139dec6a15dd1f916eda9ff7f473b061dc3b1b88ee49",
-  "generator_sig": "196fd3d25c666aa1837d9fdf7d077af1a68a88bfa2faec0b7f375da7a72f9537 gen_wor_kt_goddess build/checkpoints/wor-kt-poltergeist-v1/manifest.json build/checkpoints/wor-kt-poltergeist-v1/wor-kt-poltergeist.sram",
+  "payload_sha256": "79c783063faba7424eb3f820dcf49bac33d41e2f938571403838717098dc8322",
+  "generator_sig": "78714d657a190afebb3751d267e917c54164cc9e0aba36bf8f68f5916e435435 gen_wor_kt_goddess build/checkpoints/wor-kt-poltergeist-v1/manifest.json build/checkpoints/wor-kt-poltergeist-v1/wor-kt-poltergeist.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-kt-poltergeist-v1/manifest.json",
-      "sha256": "2766278c37dd47cbe75a9d2cb489167e0d452549edc910e88dba3df25aa69930"
+      "sha256": "635f42268eac8a82b7f8f806d99cccf5b5d5f2f589d917c048c5060a32dc2475"
     }
   ]
 }
