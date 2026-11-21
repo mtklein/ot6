@@ -503,6 +503,26 @@ compensation curve would have corrected the wrong way.
 Cost: one table (24 bytes), one proc, two `jsl` shims in bank `$C2`, three
 spliced data bytes. No new RAM.
 
+### 5.3 One animation per use (#554, v0.50)
+
+Each strike is a whole pass, and each pass queued its own battle animation,
+so Pummel's flurry played twice (Bum Rush's four times) and read as the move
+used twice (owner, 2026-11-17). The name box was already once per action
+(ShowAttackName's `$b2` bit 0). Since v0.50 the animation plays once for the
+first strike, and each later strike shows only its numeral, a beat after the
+one before (`Ot6FoldAnim` rewrites the later passes' queued `$06` animation
+command to `$04`, `Ot6GfxCmdFold`: a 24-frame wait, the earlier numerals
+retired, the data block stepped past). The passes are unchanged: chips, the
+breaking hit (#542) and staying on the aim (#545) are per pass as before, and
+the shield gauge and break presentation ride the numerals (#539), so each
+strike's chip and break land with its numeral. Same treatment for all three;
+an Overclocked Drill is two groups of two. Measured on one wor-gau-v1 battle
+each (lab, `build/attempts/wt/v050-multihit-anim/`): a Pummel's script ran
+478 frames from its name to the script's end before, 311 after; a Bum
+Rush's four blows land their numerals 27 frames apart after one ~490-frame
+animation. `battle_hitcount` asserts the Pummel script (one animation, one
+folded strike, two numerals) and `battle_bumrush` the Bum Rush one.
+
 ---
 
 ## 6. Interactions, decided
