@@ -161,9 +161,11 @@ run.sh captures all output to a log (second arg; default
 Every `run.sh` invocation creates a unique directory under
 `build/test-runs/`; `OT6_WORKER=<id>` is only a readable label, never an
 isolation key. Mesen's config home, saves, composed script, working log,
-and decoded artifacts live in that directory; completed logs and artifacts
-are atomically published under `build/states/` (`OT6_ARTIFACT_DIR`
-overrides). Failed workspaces are retained and reported; `OT6_KEEP_RUNS=1`
+and decoded artifacts live in that directory; completed logs, screenshots
+and artifacts are atomically published from it. A state lands in
+`build/states/` only from the graph's generate edge that names it; any
+other run publishes no state unless it names a directory of its own with
+`OT6_ARTIFACT_DIR` (#536; docs/TOOLING.md "The build"). Failed workspaces are retained and reported; `OT6_KEEP_RUNS=1`
 retains successful ones.
 
 No worker owns a copy of the emulator. Every worker execs one shared
@@ -211,7 +213,7 @@ H.run({ maxFrames = 60000 }, {              -- frame budget failsafe -> exit 2
   H.call(function()
     H.assertEq(H.readByte(0x7E3E44), 2, "guard shields")
     H.screenshot("my_tag")                  -- -> build/states/shots/my_tag.png
-    H.saveState("my_state.mss")             -- -> build/states/my_state.mss
+    H.saveState("my_state.mss")             -- -> $OT6_ARTIFACT_DIR/my_state.mss
   end),
 })
 ```
@@ -383,8 +385,10 @@ global and asserts which boot actually ran (`H.lastState` is set by
 
 Scripts cannot write files. The harness base64-encodes blobs to stdout as
 `[b64:<tag>] <chunk>` lines (`H.emitBlob`); run.sh reassembles them:
-`*.mss` tags -> `build/states/<tag>` plus a `<tag>.lua` sidecar; anything
-else -> `build/states/shots/<tag>`.
+`*.mss` tags -> `<tag>` plus a `<tag>.lua` sidecar, in `build/states/`
+from the generate edge that names them, in `OT6_ARTIFACT_DIR` from any
+other run that sets it, nowhere otherwise; anything else ->
+`build/states/shots/<tag>` (or `$OT6_ARTIFACT_DIR/shots/`).
 
 ## Determinism (by construction)
 

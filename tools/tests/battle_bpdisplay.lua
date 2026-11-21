@@ -23,7 +23,14 @@
 -- Each row is read from VRAM (the party window's map, $7834 + 64*row) every
 -- frame; a cell that disagrees with the rule for six frames running is a
 -- violation (the nmi flush rewrites one row a frame, the lowest changed one
--- first, and every row at least every four frames).  Coverage is asserted too: the
+-- first, and every row at least every four frames).  A reversion is a cell
+-- that has shown the rule's face and then shows another before the rule moves
+-- (a lag only ever trails a change; c1122cce's bug painted the right face and
+-- then the text engine's stale copy over it for six frames).  An alternating
+-- cell never makes a run of six, and its frames are too few to stand out of
+-- the lag in a total (the old bound of 60 such frames passed with c1122cce
+-- reverted as on main, #548), but it reverts every few frames: a row may
+-- revert at most REV_EPISODES times.  Coverage is asserted too: the
 -- battle shows a confirmed boost's arrows with that character's window shut,
 -- a withheld regen point, and boosted actions beginning and spending.
 --
@@ -45,10 +52,15 @@ local vram = emu.memType.snesVideoRam
 local function bank(c) return H.readByte(0x3E9C + c * 2) end
 local function pend(c) return H.readByte(0x3E9D + c * 2) end
 
-local W = { viol = {}, queuedArrows = 0, withheld = 0, begins = 0, spent = 0, kept = 0, frames = 0, mismRow = {} }
--- frames a row may disagree with the rule past the grace across the whole
--- battle, every run counted (a run of six is a violation by itself)
-local MISM_TOTAL = 60
+local W = { viol = {}, queuedArrows = 0, withheld = 0, begins = 0, spent = 0, kept = 0, frames = 0, mismRow = {},
+  revRow = {}, revMax = {}, revs = {} }
+-- reversions a row may make in the battle.  Not zero: a window's open still
+-- flickers the cell of the character it opens for (its withheld face back
+-- for up to five frames after the earned one showed; 1-5 a row in 24 draws
+-- on v0.50, the frame trace in build/attempts/wt/v050-tooling/548-5/), a
+-- display bug of c1122cce's class left to the ROM; an alternating cell, a
+-- second writer fighting the flush, makes one every few frames
+local REV_EPISODES = 8
 local st = {}
 for c = 0, 3 do st[c] = { begun = false, owed = false, mism = 0, seen = false } end
 
@@ -193,8 +205,15 @@ local function sample()
       -- build/attempts/wt/v046-break-feel/bpw): a begun action is judged
       -- from 16 frames after its script starts drawing
       local settling = s.begun and (s.drawn == nil or H.frame < s.drawn + 16)
-      if s.seen and s.sync ~= false and not settling then
+      -- a reversion: the cell showed the rule's face (want or alt) since the
+      -- rule last moved, and now shows neither
+      local key = want .. "|" .. tostring(alt)
+      if key ~= s.ruleKey then s.ruleKey, s.shown, s.rev = key, false, 0 end
+      local judged = s.seen and s.sync ~= false and not settling
+      if not judged then s.shown, s.rev = false, 0 end
+      if judged then
         if got == want or got == alt then
+          s.shown, s.rev = true, 0
           s.mism = 0
           if s.begun and p > 0 then
             if got == want then s.pipsIn = s.pipsIn + 1 else s.arrowsIn = s.arrowsIn + 1 end
@@ -205,6 +224,19 @@ local function sample()
           end
           if s.owed and not s.begun and got == want and b > 0 then W.withheld = W.withheld + 1 end
         else
+          if s.shown or (s.rev or 0) > 0 then
+            s.rev = (s.rev or 0) + 1
+            W.revMax[r] = math.max(W.revMax[r] or 0, s.rev)
+          end
+          if s.shown then
+            W.revRow[r] = (W.revRow[r] or 0) + 1
+            if #W.revs < 20 then
+              W.revs[#W.revs + 1] = string.format("f%d row %d (slot %d): showed %s, now %s, the rule still %s%s "
+                .. "(bank %d, pending %d, begun %s, regen not yet shown %s)", H.frame, r, c, s.lastGot, got, want,
+                alt and (" or " .. alt) or "", b, p, tostring(s.begun), tostring(s.owed))
+            end
+          end
+          s.shown = false
           s.mism = s.mism + 1
           -- every mismatched frame past the grace, run or no run: a cell that
           -- alternates right and wrong never makes a run of six (review)
@@ -216,6 +248,7 @@ local function sample()
           end
         end
       end
+      s.lastGot = got
     end
   end
 end
@@ -241,15 +274,21 @@ H.run({ maxFrames = 200000 }, {
       .. "frames a queued boost's arrows showed with its window shut %d; frames a regen point was "
       .. "withheld %d; violations %d", W.frames, W.begins, W.spent, W.kept, W.queuedArrows, W.withheld, #W.viol))
     for i = 1, math.min(#W.viol, 20) do H.log("[bpdisplay] violation: " .. W.viol[i]) end
-    local worst, rows = 0, {}
-    for r = 0, 3 do
-      rows[#rows + 1] = string.format("row %d %d", r, W.mismRow[r] or 0)
-      worst = math.max(worst, W.mismRow[r] or 0)
-    end
+    local rows = {}
+    for r = 0, 3 do rows[#rows + 1] = string.format("row %d %d", r, W.mismRow[r] or 0) end
     H.log("[bpdisplay] frames a cell disagreed with the rule past the grace, all told: " .. table.concat(rows, ", "))
+    local rrows = {}
+    for r = 0, 3 do
+      rrows[#rrows + 1] = string.format("row %d %d (longest %d)", r, W.revRow[r] or 0, W.revMax[r] or 0)
+    end
+    H.log("[bpdisplay] times a cell left the rule's face before the rule moved (reversions): "
+      .. table.concat(rrows, ", "))
+    for i = 1, #W.revs do H.log("[bpdisplay] reversion: " .. W.revs[i]) end
     H.assertEq(#W.viol, 0, "every pip cell followed the rule on every frame (#540)")
-    H.assertEq(worst <= MISM_TOTAL, true, string.format(
-      "no row disagreed with the rule on more than %d frames past the grace in all (worst %d)", MISM_TOTAL, worst))
+    local revWorst = 0
+    for r = 0, 3 do revWorst = math.max(revWorst, W.revRow[r] or 0) end
+    H.assertEq(revWorst <= REV_EPISODES, true, string.format("no pip cell left the rule's face before the rule "
+      .. "moved more than %d times (worst row %d; the first: %s)", REV_EPISODES, revWorst, W.revs[1] or "none"))
     H.assertEq(W.begins >= 2 and W.spent >= 2, true,
       "coverage: at least two boosted actions began and spent their points")
     H.assertEq(W.queuedArrows > 0, true,
