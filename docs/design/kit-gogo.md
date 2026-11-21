@@ -112,4 +112,9 @@ Assassinate's gate on his Throw); SwdTech, Rage and Dance (Cyan's window
 and Cleave, Gau's loadout, Mog's dances); then a fifth from
 `gen_wor_leo`'s state after the reveal (Setzer's table, Overclock and the
 Assassinate gate for the revealed slot).  `battle_relmwor` covers his
-Painter list.  Old-ROM red and mutants: `build/attempts/wt/v050-gogo-kits/`.
+Painter list.  Each Gogo arm has a byte-patch mutant (its `cmp #$0C`, or
+Study's `lda #$0C`, made never to match), and each goes red at its own
+round, as main's ROM does at R1 (Slot opens the bare reels):
+`build/attempts/wt/v050-gogo-kits/mutants/`.  Across encounter histories
+(one to three encounters used up first) and a seed shift it passed every
+time (`sweep/`).
