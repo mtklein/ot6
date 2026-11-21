@@ -28,8 +28,10 @@
 ;     on command $18, whose OpenCmdMenuTbl slot is target select: a Setzer
 ;     wearing it gets vanilla GP Rain and no table, as a gloved Locke gets
 ;     Capture and no thief list.
-;   * anyone else with the Slot command (a Gogo) gets the reels straight away:
-;     the table is Setzer's job, and Gogo masters none.
+;   * a Gogo with the Slot command opens the same table (#547: each command
+;     he picks opens its owner's whole kit; ot6_gogo.asm): his level prices
+;     the coins, his own pending boost buys the tosses, hires and Jackpot,
+;     and the hires walk in where he stood.
 ;
 ; The row ids are AttackName pad slots, as the thief rows' are: $59-$5c are
 ; the last four of the empty pad after Joker Doom ($55) and the thief rows
@@ -74,8 +76,8 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; Jackpot's row is there once it is learned (OT6_JACKPOT_SW).
 ;
 ; entry: jsl from the C1 stub, db=$7e, a8/i16.  out: carry set = the table is
-; built (the stub opens the Tools shell), carry clear = not Setzer (the stub
-; opens the reels).  clobbers a/x/y.
+; built (the stub opens the Tools shell), carry clear = neither Setzer nor
+; Gogo (the stub opens the reels).  clobbers a/x/y.
 .proc Ot6SetzerListOpen
         .a8
         .i16
@@ -89,7 +91,9 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         lda     $3ed8,x         ; character id
         cmp     #OT6_CHAR_SETZER
         beq     @table
-        clc                     ; not Setzer: the reels, as before
+        cmp     #OT6_CHAR_GOGO  ; #547: a Gogo with Slot gets the table too
+        beq     @table          ;   (ot6_gogo.asm)
+        clc                     ; anyone else: the reels, as before
         rtl
 @table: ldx     #$0000
 @pad:   lda     #$ff

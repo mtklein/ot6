@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "1ecd2171803d85326ead776e94b2b18411c4039e6ec6aec7f3bc011cdf49271d",
-  "generator_sig": "e5eac37b3d5e59bccda000dee36e80d75c4b7cf5d075ae17093d9de881392107 gen_wor_dino build/checkpoints/wor-colosseum-v1/manifest.json build/checkpoints/wor-colosseum-v1/wor-colosseum.sram",
+  "payload_sha256": "a91eb9b6e723d629deaebebb2356a1e23462c93f21fc2a415a496e1a325ba14b",
+  "generator_sig": "f643a7d6cadc7099f6e58f759750da45c11c054b8c2b70fcfe42953131ac263f gen_wor_dino build/checkpoints/wor-colosseum-v1/manifest.json build/checkpoints/wor-colosseum-v1/wor-colosseum.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-colosseum-v1/manifest.json",
-      "sha256": "b28e2fb1f610deaffd050a510415218c56d82a3849f0898f0148ce623dba562d"
+      "sha256": "53a8f20bd6b4b479c71c721e27124d35848ae528291592b43670d5ccc458e383"
     }
   ]
 }

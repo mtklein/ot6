@@ -36,7 +36,8 @@ OT6_FACTORY_SW   = $1e80 + ($68 >> 3)   ; switch $0068: the tube room's exit
 OT6_FACTORY_BIT  = 1 << ($68 & 7)
 
 ; [ does this character's Tool overclock? ]
-; EDGAR, Overclock learned, and a full 3-BP boost pending.
+; EDGAR (or a Gogo with Tools, #547), Overclock learned, and a full 3-BP
+; boost pending.
 ; in: x = entity offset (either width), db = $7e, a8.  out: carry set = yes.
 ; clobbers A; preserves X and Y.
 .proc Ot6Overclocks
@@ -46,7 +47,10 @@ OT6_FACTORY_BIT  = 1 << ($68 & 7)
         bcs     @no
         lda     $3ed8,x         ; character id
         cmp     #OT6_CHAR_EDGAR
-        bne     @no
+        beq     :+
+        cmp     #OT6_CHAR_GOGO  ; #547: a Gogo's Tools overclock too
+        bne     @no             ;   (ot6_gogo.asm)
+:
         lda     OT6_BOOST_REVEALED,x
         cmp     #$03            ; the divine's one gate: a full boost
         bcc     @no

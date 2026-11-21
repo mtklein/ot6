@@ -13,7 +13,8 @@
 > until the build rewrites them.  (Built in v0.47: the sections below are
 > rewritten to the build; `kits.md` "Relm" is the summary.)
 >
-> **Gogo (owner, 2026-11-15):** a Gogo with Sketch opens Relm's whole list,
+> **Gogo (owner, 2026-11-15):** a Gogo with Painter (vanilla's Sketch
+> command, renamed 2026-11-21) opens Relm's whole list,
 > not plain Sketch: each command he picks gives its owner's full kit, as far
 > as is reasonable (#547).
 
@@ -51,9 +52,10 @@ tables). Nothing here was played.
 
 ## 1. The kit
 
-Relm's command rows stay FIGHT, SKETCH, MAGIC, ITEM (`char_prop.asm:239`).
-Like Locke behind Steal and Setzer behind Slot, her kit is a list behind
-the Sketch row, with Sketch as the first row.
+Relm's command rows stay FIGHT, PAINTER, MAGIC, ITEM (`char_prop.asm:239`;
+command `$0d`, vanilla's Sketch, named Painter since the owner's call of
+2026-11-21).  Like Locke behind TresHnt and Setzer behind Slot, her kit is a
+list behind the Painter row, with Sketch as the first row.
 
 | # | Row (list / banner) | What it does | Target | MP | A boost point buys | Lasts | Ends | Stacking | Learned |
 |---|---|---|---|---|---|---|---|---|---|
@@ -185,14 +187,14 @@ On the same lightning-weak hit, Ramuh's Conductor and Underpainting each
 take their extra shield, three in all; they come from different sources and
 each is paid for (a stone worn, a turn and MP spent).
 
-**The Fake Mustache.** The relic turns Sketch into Control
+**The Fake Mustache.** The relic turns Painter into Control
 (vanilla's RelicCmdTbl rewrite, which Locke's Thief Glove also uses). A
 Relm wearing it keeps Control only, with no painter's list, as a gloved
 Locke gets Capture: the owner's call (2026-11-16), "more of a commitment
-to use". Gogo, who can carry Sketch, opens Relm's whole list from it
+to use". Gogo, who can carry Painter, opens Relm's whole list from it
 (#547), with her learned rows. The field Skills menu agrees (#549): the
-Painter row is white for whoever carries Sketch and greyed, like any row
-its character has no command for, while a worn piece turns Sketch into
+Painter row is white for whoever carries Painter and greyed, like any row
+its character has no command for, while a worn piece turns Painter into
 Control, so a mustached Relm has no page as she has no list.
 
 **The Fanatics' Tower** is magic-only: `InitCmdList` drops every row but
@@ -207,8 +209,8 @@ Every ability is feasible. None needs new art, a new status or save data.
 
 - **Open.** `OpenCmdMenuTbl[$0d]` points at a C1 stub, `_c1_paint_open`,
   the twin of `_c1_thief_open` and `_c1_slot_open`: `jsl Ot6PaintListOpen`,
-  then `jmp OpenToolsWindow`, for whoever holds Sketch (no character test:
-  a Gogo with Sketch opens it too, #547). Control (`$0e`) is vanilla's.
+  then `jmp OpenToolsWindow`, for whoever holds Painter (no character test:
+  a Gogo with Painter opens it too, #547). Control (`$0e`) is vanilla's.
   `Ot6PaintListOpen` copies `Ot6ThiefListOpen` (`ot6_thief.asm:225`): eight
   cells, two columns of four, each row's id, flat price and its own
   targeting byte, and mode `w7e6168 = 5`.
@@ -259,9 +261,9 @@ Every ability is feasible. None needs new art, a new status or save data.
   the battle's two blanks), each other row the Blitz page's locked marker,
   learned by `Ot6PaintPageRow`, which asks `Ot6PaintRowKnown` as the list
   does. The title "Painter" fits the shared seven-tile box. The row is
-  white for whoever carries Sketch (Relm, or a Gogo who took it) and grey
+  white for whoever carries Painter (Relm, or a Gogo who took it) and grey
   while a worn piece's relic-effects byte (ItemProp+10, the `$11d6` bit
-  the battle's command rewrite tests) turns Sketch into Control; no esper
+  the battle's command rewrite tests) turns Painter into Control; no esper
   rung carries that bit, which `menu_painterpage_wor` checks. The code is
   `ot6_painter_page.asm`, its own segment after the vanilla menu bank: the
   hooks are same-size operand changes, so no menu-bank address moves. The

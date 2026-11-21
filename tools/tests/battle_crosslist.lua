@@ -1,6 +1,10 @@
 -- @suite savestate=figaro_cleared
 -- battle_crosslist.lua -- Tools shows Cure 2.
 
+-- TERRA's pool is topped up with a Sleeping Bag on the world map when she
+-- arrives under her max (the replay brings her here at 19 of 34), and the R
+-- below is asserted to be one her pool pays for.
+--
 -- What is asserted:
 --   1. the cycle ran.  OT6_RESTAGE saw $80 and $7ba5 went mid-cycle
 --      ($8x) during the R->B window, so the test cannot pass by boost or the
@@ -104,6 +108,66 @@ local function windowOf(who, onCmd)
   return btn and { [btn] = true } or {}
 end
 
+-- ---- TERRA's MP, topped up the way a player would ---------------------------
+-- What TERRA's pool holds on arrival is the line's play, not this suite's: the
+-- replay of 87dae4e9 (and main's own at 8a8868d2) brings her here at 19 of 34
+-- MP, where the old capture had 34 (build/attempts/wt/v050-gogo-kits/fix3/).
+-- So the suite stages it as a player does on the world map: a Sleeping Bag on
+-- her from the field Item menu when her pool is under its max, and then
+-- asserts what it needs.  The field Item path is careKernel's (lib/ot6_field
+-- .lua): $05 main (Item row 0) -A-> $08 list ($4B the bag slot) -A-> $19
+-- picked up -A on the same slot-> $70 target ($4B the menu slot, $69+slot the
+-- character) -A-> used.  BAG_NOCARE (a lab global, for the negative only)
+-- skips the bag.
+local SLEEPING_BAG = 0xF6
+local function sleepingBagOn(char, what)
+  local ph, n0, done = 0, nil, false
+  local function st() return H.menuRunning() and H.readByte(0x26) or -1 end
+  local function steer(cur, want)
+    if cur == want then return { "a" } end
+    return { [cur < want and "down" or "up"] = true }
+  end
+  local function ctl() return H.hasControl() or (H.worldMode() and H.worldHasControl()) end
+  local function full() return H.charMp(char) >= H.charMaxMp(char) end
+  return H.cond(function() return not full() and BAG_NOCARE == nil end, {
+    H.withReset(H.driveUntil(function()
+      return done and not H.menuRunning() and ctl()
+    end, 6000, {
+      H.call(function()
+        n0 = n0 or H.invCountOf(SLEEPING_BAG)
+        if n0 == 0 then error(what .. ": TERRA's pool is under its max and the bag holds no Sleeping Bag", 0) end
+        ph = (ph + 1) % 12
+        if H.invCountOf(SLEEPING_BAG) < n0 then done = true end
+        local s, held = st(), {}
+        if done then
+          if s ~= -1 then held = { "b" } end
+        elseif s == -1 then
+          if ctl() then held = { "x" } end
+        elseif s == 0x05 then
+          held = steer(H.readByte(0x4B), 0)
+        elseif s == 0x08 then
+          held = steer(H.readByte(0x4B), H.invSlotOf(SLEEPING_BAG))
+        elseif s == 0x19 then
+          held = (H.readByte(0x4B) == H.invSlotOf(SLEEPING_BAG)) and { "a" } or { "b" }
+        elseif s == 0x70 then
+          local t
+          for k = 0, 3 do if H.readByte(0x69 + k) == char then t = k end end
+          if t ~= nil then held = steer(H.readByte(0x4B), t) end
+        end
+        if ph < 4 then H.setPad(held) else H.setPad({}) end
+      end),
+    }, what .. ": a Sleeping Bag on TERRA"), function() ph, n0, done = 0, nil, false end),
+    H.call(function()
+      H.log(string.format("[bag] %s: a Sleeping Bag on TERRA: MP %d/%d", what, H.charMp(char), H.charMaxMp(char)))
+    end),
+  }, {
+    H.call(function()
+      H.log(string.format("[bag] %s: no Sleeping Bag (TERRA MP %d/%d%s)", what, H.charMp(char), H.charMaxMp(char),
+        BAG_NOCARE ~= nil and ", BAG_NOCARE" or ""))
+    end),
+  })
+end
+
 H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
@@ -116,6 +180,8 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(120),
   -- pace one pool's stretch of the dismount row, not the clock (#306)
   H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
+  sleepingBagOn(0x00, "crosslist"),
+  H.waitUntil(function() return H.worldSettled() and H.worldHasControl() end, 1500, "the world map after the bag", 5),
   H.call(function() P.plan() end),
   H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
     H.call(function() H.setPad(P.pad()) end),
@@ -173,6 +239,18 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("pre-R: pend=%d bp=%d stage=%02x",
       H.readByte(0x3e9d + terra*2), H.readByte(0x3e9c + terra*2),
       H.readByte(STAGE)))
+    -- the R must be one the game takes (#555: a point the pool cannot pay
+    -- for is refused): whichever of her rows the cursor rests on, its price
+    -- at one point is in her pool
+    local pool = H.readWord(0x3c08 + terra*2)
+    for i = 0, 53 do
+      local id = H.readByte(0x2092 + terra * 0x13C + i * 4)
+      if id ~= 0xFF then
+        local price = H.battleSpellPrice(terra, id, 1)
+        H.assertEq(price <= pool, true, string.format(
+          "TERRA's pool (%d MP) pays spell $%02X at one point (%d MP), so the R is taken", pool, id, price))
+      end
+    end
   end),
 
   H.hold({ "r" }),

@@ -8,8 +8,9 @@
 -- point back.  On the command window nothing is picked yet: R stands there, and the list it opens shows every
 -- row at that boost, greyed where the pool falls short, and refuses it (the A buzzes).
 --
--- Played: Continue world-figaro-v1 (TERRA at level 5, a pool of about 30 MP: Fire 2's 20 but not Fire 3's 51),
--- meet an encounter on the desert row beside the save, and play through the real menu (H.kitBattle), banking
+-- Played: Continue world-figaro-v1 (TERRA at level 5, a pool of 34 MP when full: Fire 2's 20 but not Fire 3's 51;
+-- a Sleeping Bag tops her up first when she arrives under it, and the pool the cases need is asserted), meet an
+-- encounter on the desert row beside the save, and play through the real menu (H.kitBattle), banking
 -- points by Defending first:
 --   1. two points raised on the command window, then Magic: the Fire row reads Fire 3's price, grey, and its
 --      A is refused (the list tells the truth; the boost stands there);
@@ -178,10 +179,76 @@ local function countWhenListed()
   end
 end
 
+-- ---- TERRA's MP, topped up the way a player would ---------------------------
+-- What TERRA's pool holds on arrival is the line's play, not this suite's: the
+-- replay of 87dae4e9 (and main's own at 8a8868d2) brings her here at 19 of 34
+-- MP, where the old capture had 34 (build/attempts/wt/v050-gogo-kits/fix3/).
+-- So the suite stages it as a player does on the world map: a Sleeping Bag on
+-- her from the field Item menu when her pool is under its max, and then
+-- asserts what it needs.  The field Item path is careKernel's (lib/ot6_field
+-- .lua): $05 main (Item row 0) -A-> $08 list ($4B the bag slot) -A-> $19
+-- picked up -A on the same slot-> $70 target ($4B the menu slot, $69+slot the
+-- character) -A-> used.  BAG_NOCARE (a lab global, for the negative only)
+-- skips the bag.
+local SLEEPING_BAG = 0xF6
+local function sleepingBagOn(char, what)
+  local ph, n0, done = 0, nil, false
+  local function st() return H.menuRunning() and H.readByte(0x26) or -1 end
+  local function steer(cur, want)
+    if cur == want then return { "a" } end
+    return { [cur < want and "down" or "up"] = true }
+  end
+  local function ctl() return H.hasControl() or (H.worldMode() and H.worldHasControl()) end
+  local function full() return H.charMp(char) >= H.charMaxMp(char) end
+  return H.cond(function() return not full() and BAG_NOCARE == nil end, {
+    H.withReset(H.driveUntil(function()
+      return done and not H.menuRunning() and ctl()
+    end, 6000, {
+      H.call(function()
+        n0 = n0 or H.invCountOf(SLEEPING_BAG)
+        if n0 == 0 then error(what .. ": TERRA's pool is under its max and the bag holds no Sleeping Bag", 0) end
+        ph = (ph + 1) % 12
+        if H.invCountOf(SLEEPING_BAG) < n0 then done = true end
+        local s, held = st(), {}
+        if done then
+          if s ~= -1 then held = { "b" } end
+        elseif s == -1 then
+          if ctl() then held = { "x" } end
+        elseif s == 0x05 then
+          held = steer(H.readByte(0x4B), 0)
+        elseif s == 0x08 then
+          held = steer(H.readByte(0x4B), H.invSlotOf(SLEEPING_BAG))
+        elseif s == 0x19 then
+          held = (H.readByte(0x4B) == H.invSlotOf(SLEEPING_BAG)) and { "a" } or { "b" }
+        elseif s == 0x70 then
+          local t
+          for k = 0, 3 do if H.readByte(0x69 + k) == char then t = k end end
+          if t ~= nil then held = steer(H.readByte(0x4B), t) end
+        end
+        if ph < 4 then H.setPad(held) else H.setPad({}) end
+      end),
+    }, what .. ": a Sleeping Bag on TERRA"), function() ph, n0, done = 0, nil, false end),
+    H.call(function()
+      H.log(string.format("[bag] %s: a Sleeping Bag on TERRA: MP %d/%d", what, H.charMp(char), H.charMaxMp(char)))
+    end),
+  }, {
+    H.call(function()
+      H.log(string.format("[bag] %s: no Sleeping Bag (TERRA MP %d/%d%s)", what, H.charMp(char), H.charMaxMp(char),
+        BAG_NOCARE ~= nil and ", BAG_NOCARE" or ""))
+    end),
+  })
+end
+
 local tries = 0
 H.run({ maxFrames = 600000 }, {
   H.bootCheckpoint("world-figaro-v1"),
+  H.waitUntil(function() return H.worldMode() and H.worldHasControl() end, 3000, "world control after the Continue", 5),
+  sleepingBagOn(TERRA, "spellboost_mp"),
   H.call(function()
+    -- the cases' precondition (the header): case 2's pool pays Fire 2, and once it has, case 3's is under it
+    local p, f2 = H.charMp(TERRA), baseMp(FIRE2)
+    H.assertEq(p >= f2 and p - f2 < f2, true, string.format(
+      "TERRA's pool (%d MP) pays Fire 2 (%d) for case 2 and is under it again for case 3", p, f2))
     arm()
     emu.addEventCallback(countWhenListed, emu.eventType.startFrame)
     start()

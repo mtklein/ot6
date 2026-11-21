@@ -322,8 +322,21 @@
         shorta                  ; 8-bit A
         ldx     #$0006          ; party entity offsets 6,4,2,0
 @slot:  lda     $3ed8,x         ; actor id
-        cmp     #$0c
-        bcs     @next           ; empty/special/gogo/umaro: no esper to grant
+        cmp     #OT6_CHAR_GOGO
+        bne     @own
+        lda     #$0c            ; #547: a Gogo carrying Lore has Strago's two
+        jsl     Ot6GogoCarries  ;   Magic-row spells, Scan (Analyze) and
+        bcc     @gnext          ;   Bserk once Strago has learned it
+        lda     #OT6_ANALYZE_SPELL      ;   (ot6_gogo.asm).  Gogo's list takes
+        jsr     @add            ;   every spell the union holds
+        lda     f:$7e0000+OT6_BLUE_CELL ; (AddToSpellList_00), so the
+        cmp     #$ff            ;   slot is his: no one else knows them
+        bne     @gnext          ;   unless they did already
+        lda     #OT6_BLUE_SPELL
+        jsr     @add
+@gnext: jmp     @next
+@own:   cmp     #$0c
+        bcs     @next           ; empty/special/umaro: no esper to grant
         cmp     #OT6_CHAR_STRAGO
         bne     :+
         lda     #OT6_ANALYZE_SPELL      ; Strago's Analyze has a slot too

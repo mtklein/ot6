@@ -18274,8 +18274,9 @@ _c1_thief_open:
 ; the thief submenu above.  OpenCmdMenuTbl[$0f] hits this stub instead of the
 ; reels; bank $f0 fills wItemList with Slot / Coin Toss / Hired Help /
 ; Jackpot and raises setzer mode w7e6168=4 (carry set), and the Slot row's
-; confirm chains on to the reels.  Anyone else with the Slot command (a Gogo)
-; gets the reels straight away (carry clear), as before.
+; confirm chains on to the reels.  A Gogo with Slot opens the same table
+; (#547); anyone else with the Slot command gets the reels straight away
+; (carry clear), as before.
 _c1_slot_open:
         jsl     Ot6SetzerListOpen
         bcc     @reels
