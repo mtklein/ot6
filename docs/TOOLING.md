@@ -36,6 +36,28 @@ Don't edit `tools/tests/run.sh` or any other shell script while a `ninja`
 or `run.sh` is executing it: bash reads scripts incrementally, and the
 running instances resume at shifted offsets and fail.
 
+`build/states` is the graph's. A run publishes a state there only from
+the generate edge that names it (`OT6_EXPECT_ARTIFACT`); a lab, a hand
+run, a suite or an instrument publishes none and says so (`publish: no
+graph edge named this run's states`), so a lab script cannot overwrite
+its tree's captures (#536, `run.sh --publish-selftest`). To keep a hand
+run's states, give it a directory of its own: `OT6_ARTIFACT_DIR=build/lab/x`.
+Screenshots still land in `build/states/shots`; `OT6_NO_PUBLISH=1`
+publishes nothing at all. Every graph rule that can start an emulator
+unsets the lab levers and measuring policies (`OT6_LEVERS`, `OT6_POLICY`,
+`OT6_POLICY_FORMS`) first, the generic `sh` rule included
+(`build/checks/lever_fence.ok`, #548).
+
+Most checks are narrow: `ninja build/checks/<name>.ok` builds what that
+check reads. The checks that read the line's saves or logs (`check_states`,
+`audit_equipment`, `audit_party_hp`, `audit_supplies`, `audit_chests`, and
+at a release `checkpoint_drift` and `play_current`) depend on every
+state's stamp, so asking for one alone plays the whole line first
+(`instruments` and `check_mog_gear` need only the states they boot). `break_coverage_ratchet` is not one of them: its
+verdict is ROM data, so it runs `audit_break_coverage.py --gate` and reads
+no log; the tuning claim is `python3 tools/audit_break_coverage.py` after
+the line has played.
+
 ### Qualifying from a fresh clone
 
 `sh tools/gate.sh` runs ninja and nothing else, so a fresh clone needs three
