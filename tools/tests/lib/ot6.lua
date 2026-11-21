@@ -1503,6 +1503,31 @@ function M.partyCureBoost(bank, deep, cands, restoreAt, price, threshold)
   return top, string.format("boost %d (the bank's most): a share of %d against %d needed", top, share or 0, need)
 end
 
+-- The Muddle rule's second cure-hit (#558): a cure-hit already in flight on a muddled member stops blocking a
+-- second one when that member's own Fight can kill a standing ally outright -- one miss, or one Freeze on the
+-- hitter, and the ally is dead (the v0.49 line's wor_kt_doom wipe: CYAN muddled, SABIN's hit missed, SHADOW's held
+-- by Frozen, SHADOW and GOGO killed from full HP).  The ally is any standing member but the muddled one and the
+-- actor deciding (who is the one to hit).  o = { inFlight = { [e] = true }, status2 = { [e] = byte },
+-- hp = { [e] = HP }, actor, estimate = f(e, a) -> nil or { top, lethal } (Driver:allyFightEstimate) }.
+-- Clears the freed entries of o.inFlight and returns { { e, a, est }, ... }, one per muddled member freed.
+function M.muddleLethalFree(o)
+  local freed = {}
+  for e = 0, 3 do
+    if o.inFlight[e] and ((o.status2[e] or 0) & M.ST2_MUDDLE) ~= 0 then
+      for a = 0, 3 do
+        if a ~= e and a ~= o.actor and (o.hp[a] or 0) > 0 and o.inFlight[e] then
+          local est = o.estimate(e, a)
+          if est and (est.lethal or (est.top or 0) >= o.hp[a]) then
+            o.inFlight[e] = nil
+            freed[#freed + 1] = { e = e, a = a, est = est }
+          end
+        end
+      end
+    end
+  end
+  return freed
+end
+
 function M.liftFilterHeals(heals, hp, maxhp, cost)
   local keep = {}
   for _, h in ipairs(heals) do
@@ -14260,21 +14285,12 @@ function Driver:makePlanRules(actor)
     -- killed SHADOW from 4956/4956 and GOGO from 4483/4483 while the rule waited on the one in flight.  The second
     -- hit is still held to the muddled member's unmuddle floor (M.muddleRule), so it never kills him.
     if M.MUDDLE_ONEHIT_OFF ~= true then
-      for e, _ in pairs(inFlight) do
-        if ((s2[e] or 0) & M.ST2_MUDDLE) ~= 0 then
-          for a = 0, 3 do
-            if a ~= e and a ~= actor and (hpNow[a] or 0) > 0 and inFlight[e] then
-              local est = self:allyFightEstimate(e, a)
-              if est and (est.lethal or (est.top or 0) >= hpNow[a]) then
-                inFlight[e] = nil
-                local said = string.format("[%s] actor=%d: entity %d is MUDDLED and its Fight can kill entity %d "
-                  .. "outright (%s, %d HP): a second cure-hit goes in behind actor %d's (#558)", self.tag or "fight",
-                  actor, e, a, est.lethal or string.format("priced to %d", est.top or 0), hpNow[a], flightBy[e] or -1)
-                if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-              end
-            end
-          end
-        end
+      for _, f in ipairs(M.muddleLethalFree({ inFlight = inFlight, status2 = s2, hp = hpNow, actor = actor,
+          estimate = function(e, a) return self:allyFightEstimate(e, a) end })) do
+        local said = string.format("[%s] actor=%d: entity %d is MUDDLED and its Fight can kill entity %d "
+          .. "outright (%s, %d HP): a second cure-hit goes in behind actor %d's (#558)", self.tag or "fight",
+          actor, f.e, f.a, f.est.lethal or string.format("priced to %d", f.est.top or 0), hpNow[f.a], flightBy[f.e] or -1)
+        if said ~= self.healSaid then self.healSaid = said; M.log(said) end
       end
     end
     for e, _ in pairs(inFlight) do
@@ -21089,9 +21105,14 @@ function Driver:watchDamage()
   self.brkDrop = self.brkDrop or { brk = {}, pend = {} }
   -- this frame's passes by slot (#548), drained here
   local passesOn = {}
+  -- only passes of this frame or the one before it: the observers record whenever ApplyDmg runs, and a pass left
+  -- from a stretch when no driver drained the list (between battles, or a suite's own scripted turns) must not
+  -- fold into the drop a later frame sees
   for _, q in ipairs(M.passes or {}) do
-    passesOn[q.slot] = passesOn[q.slot] or {}
-    table.insert(passesOn[q.slot], q)
+    if q.frame >= M.frame - 1 then
+      passesOn[q.slot] = passesOn[q.slot] or {}
+      table.insert(passesOn[q.slot], q)
+    end
   end
   if M.passes then M.passes = {} end
   for s = 0, 5 do

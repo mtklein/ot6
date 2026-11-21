@@ -416,6 +416,47 @@ do
   check(b == 1, "an unknown restore keeps the floor: got " .. b)
 end
 
+-- 7. M.muddleLethalFree (#558): the second cure-hit.  Entity 0 muddled with a cure-hit in flight; its Fight on
+-- entity 1 priced to 5000 (or lethal), entity 1 at 4956.  Each check also runs against a mutant of the function's
+-- own source (one edit made here), under which it must fail.
+do
+  local f = assert(io.open("tools/tests/lib/ot6.lua", "rb")); local lib = f:read("a"); f:close()
+  local a0 = lib:find("\nfunction M%.muddleLethalFree%(")
+  local b0 = lib:find("\nend\n", a0, true)
+  local src = lib:sub(a0 + 1, b0 + 4)
+  local function mutant(from, to)
+    local p = from:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+    local s2, k = src:gsub(p, (to:gsub("%%", "%%%%")))
+    assert(k == 1, "mutant '" .. from .. "' occurs " .. k .. " times")
+    return assert(load("local M = setmetatable({}, { __index = ... })\n" .. s2 .. "\nreturn M.muddleLethalFree",
+      "mutant", "t", _G))(H)
+  end
+  local function case(est, hp1, s2_0, actor)
+    return { inFlight = { [0] = true }, status2 = { [0] = s2_0 or H.ST2_MUDDLE }, hp = { [0] = 5000, [1] = hp1,
+      [2] = 3000, [3] = 0 }, actor = actor or 2, estimate = function(e, a) return a == 1 and est or nil end }
+  end
+  local checks = {
+    { "a Fight that kills an ally outright frees a second hit", "(est.top or 0) >= o.hp[a]", "(est.top or 0) > 99999",
+      function(F) local o = case({ top = 5000 }, 4956); return #F(o) == 1 and o.inFlight[0] == nil end },
+    { "a weapon that can kill outright frees it too", "est.lethal or", "false or",
+      function(F) local o = case({ top = 100, lethal = "hand 1's weapon can kill outright" }, 4956)
+        return #F(o) == 1 end },
+    { "a Fight that cannot kill keeps the one in flight", "(est.top or 0) >= o.hp[a]", "true",
+      function(F) local o = case({ top = 900 }, 4956); return #F(o) == 0 and o.inFlight[0] == true end },
+    { "an ally already down is no victim", "(o.hp[a] or 0) > 0", "true",
+      function(F) local o = case({ top = 5000 }, 0); return #F(o) == 0 end },
+    { "a member not muddled frees nothing", "((o.status2[e] or 0) & M.ST2_MUDDLE) ~= 0", "true",
+      function(F) local o = case({ top = 5000 }, 4956, 0); return #F(o) == 0 end },
+    { "the deciding actor is not counted as the victim", "a ~= o.actor and", "",
+      function(F) local o = case({ top = 5000 }, 4956, nil, 1); return #F(o) == 0 end },
+  }
+  for _, c in ipairs(checks) do
+    check(c[4](H.muddleLethalFree), "muddleLethalFree: " .. c[1])
+    local ok, r = pcall(c[4], mutant(c[2], c[3]))
+    check(not ok or r ~= true, "muddleLethalFree MUTANT passed: " .. c[1])
+  end
+end
+
 print(string.format("heal_arrival_selftest: PASS -- %d checks: the arrival's arithmetic on Tzen, the White "
   .. "Dragon and Wrexsoul, the in-time lift, the arrival's estimate, the X-Potion that gives way to the Cure, "
   .. "the queued hit that cancels a cure, the spend past a late self-heal, Love Token's guard and the Fight it "

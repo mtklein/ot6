@@ -501,7 +501,7 @@ H.run({ maxFrames = 120000 }, {
   -- is staged there, at most TRIES_A battles.  A asks only for a decision of a member with a Fight row, a living
   -- ally and a long gauge; nothing in it reads B's battle.
   H.repeatN(TRIES_A, {
-    H.cond(function() return doomedA == nil or hp(doomedA) ~= 0 end, {
+    H.cond(function() return doomedA == nil end, {
       H.cond(function() return not H.battleLoadStarted() end, {
         H.call(function()
           battlesA = battlesA + 1
