@@ -96,14 +96,118 @@ Ot6HitCountTbl:
         adc     f:$7e0000+$3a70 ; add, so a future +1 source composes
         sta     f:$7e0000+$3a70
         jsl     Ot6PassesAdded  ; #545: strikes stay on the aim (ot6_passes.asm)
-@done:  lda     $01,s           ; a Tool (item ids $a3-$aa)?  Edgar's
-        cmp     #$a3            ;   Overclock doubles its firings
-        bcc     @out            ;   (ot6_overclock.asm)
-        cmp     #$ab
-        bcs     @out
-        jsl     Ot6OverclockPasses
+        jsr     tool
+        lda     f:Ot6HitCountTbl+1,x ; #554: one animation per this many
+        inc     a               ;   strikes (Ot6FoldAnim); set after every
+        sta     f:$7e0000+OT6_FOLDN ; adder, since Ot6PassesAdded clears it
+        lda     #$00
+        sta     f:$7e0000+OT6_FOLDPASS ; the first pass animates
+        bra     @out
+@done:  jsr     tool
 @out:   pla                     ; the ability id, back to the caller
         plx
         plp
+        rtl
+
+tool:   lda     $03,s           ; (under the return) a Tool (item ids
+        cmp     #$a3            ;   $a3-$aa)?  Edgar's Overclock doubles its
+        bcc     :+              ;   firings (ot6_overclock.asm); x kept
+        cmp     #$ab
+        bcs     :+
+        jsl     Ot6OverclockPasses
+:       rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #554: one animation per move use ]
+
+; A fixed multi-hit's strikes are whole passes (above), and each pass
+; queues its own battle animation: Pummel's flurry played twice and read as
+; the move used twice (owner, 2026-11-17).  So the animation plays once for
+; the first strike of each group of OT6_FOLDN, and the strikes after it keep
+; their pass and their numerals, which land a beat apart.
+;
+; jsl from CalcAttackEffect right after `jsr _c235ad` has queued the pass's
+; animation command ([$06, command, attack id], at queue offset $3a71).
+; While the action carries OT6's added passes (OT6_PASSRETARGET) and its
+; strikes fold (OT6_FOLDN, Ot6HitCount), the pass that starts a group keeps
+; its animation and the next OT6_FOLDN - 1 have it rewritten to command $04,
+; Ot6GfxCmdFold (btlgfx_main.asm): no animation, a beat, the earlier
+; strike's numerals retired, and the gfx data pointer stepped as $06's
+; would be.  Everything else about the pass is untouched: its targeting,
+; damage, chips and break (the numerals carry #539's presentation), and the
+; passes stay real.  An Overclocked Drill (four passes) is two groups of two.
+; A pass that never reaches the queue (spent, #545) counts nothing.
+;
+; a8, either index width (CalcAttackEffect: i8), db=$7e.  Preserves a/x/y/p.
+.proc Ot6FoldAnim
+        php
+        rep     #$10
+        .i16
+        phx
+        sep     #$20
+        .a8
+        pha
+        lda     f:$7e0000+OT6_PASSRETARGET
+        beq     @out            ; no passes OT6 added to this action
+        lda     f:$7e0000+OT6_FOLDN
+        beq     @out            ; not a fixed multi-hit: every pass animates
+        lda     f:$7e0000+OT6_FOLDPASS
+        bne     @fold
+        lda     f:$7e0000+OT6_FOLDN ; the group's first strike animates;
+        dec     a               ;   the next N - 1 fold
+        sta     f:$7e0000+OT6_FOLDPASS
+        bra     @out
+@fold:  dec     a
+        sta     f:$7e0000+OT6_FOLDPASS
+        lda     f:$7e0000+$3a71 ; this pass's animation command
+        rep     #$20
+        .a16
+        and     #$00ff
+        tax
+        sep     #$20
+        .a8
+        lda     f:$7e0000+$2d6e,x
+        cmp     #$06            ; (always: $b4 is $06 for every action)
+        bne     @out
+        lda     #$04            ; Ot6GfxCmdFold
+        sta     f:$7e0000+$2d6e,x
+@out:   pla
+        plx
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #554: battle script command $04, a folded strike ]
+
+; btlgfx's GfxCmdTbl entry $04 (vanilla's no-op, never queued) goes to
+; Ot6GfxCmdFold (ot6_c1), which jsl's here and then steps the gfx data
+; pointer as GfxCmd_06 would (NextGfxCmdData), so the pass's data block is
+; consumed without an animation.  Here: a beat of OT6_FOLD_BEAT frames, the
+; earlier strike's numeral having just landed (DmgNumBounceTbl reaches its
+; floor at its 23rd frame), then every live numeral thread is retired, so
+; this strike's numerals, the commands that follow, do not draw over the
+; earlier ones on the same body.  a8/i16 (btlgfx), dp 0.  clobbers a/x.
+OT6_FOLD_BEAT = 24
+
+.proc Ot6GfxCmdFold_ext
+        .a8
+        .i16
+        lda     #OT6_FOLD_BEAT
+@wait:  pha
+        jsl     WaitFrame_far
+        pla
+        dec     a
+        bne     @wait
+        ldx     #$0000          ; the four numeral threads: off
+@off:   lda     #$00
+        sta     f:$7e631a,x     ; w7e631a: enable / green
+        sta     f:$7e6322,x     ; w7e6322: frame counter
+        inx
+        cpx     #$0004
+        bne     @off
         rtl
 .endproc

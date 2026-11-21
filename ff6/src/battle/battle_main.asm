@@ -8749,6 +8749,8 @@ CalcAttackEffect:
         lda     #$20        ; flash screen (critical)
         tsb     $a0
 @3414:  jsr     _c235ad
+        jsl     Ot6FoldAnim     ; ot6 #554: a fixed multi-hit's later strikes
+                                ;   show no animation (ot6_hitcount.asm)
         longa
         lda     $11b0
         jsr     ApplyDmgMult

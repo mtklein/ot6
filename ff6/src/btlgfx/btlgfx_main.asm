@@ -22058,7 +22058,8 @@ GfxCmdTbl:
         .addr   GfxCmd_01
         .addr   GfxCmd_02
         .addr   GfxCmd_03
-        .addr   GfxCmd_04
+        .addr   Ot6GfxCmdFold   ; ot6 #554: vanilla's no-op $04, never queued,
+                                ;   is a fixed multi-hit's later strike
         .addr   GfxCmd_05
         .addr   GfxCmd_06
         .addr   GfxCmd_07
@@ -49221,3 +49222,13 @@ Ot6BtlGfx04_c1:
         jsl     BtlGfx_04
         jsl     Ot6ScriptEnd_ext
         rtl
+
+; [ ot6 #554: battle script command $04, a folded strike ]
+
+; GfxCmdTbl's $04 (a same-size .addr edit; vanilla's no-op, never queued):
+; a fixed multi-hit's strike after the first shows no animation, only a
+; beat (Ot6GfxCmdFold_ext, ot6_hitcount.asm), and its data block is stepped
+; past as GfxCmd_06 would.
+Ot6GfxCmdFold:
+        jsl     Ot6GfxCmdFold_ext
+        jmp     NextGfxCmdData
