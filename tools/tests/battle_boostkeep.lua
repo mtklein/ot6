@@ -118,10 +118,24 @@ end
 -- ---- observers ---------------------------------------------------------------
 local armed, installed = nil, false
 local function ev(c, s) c.log[#c.log + 1] = string.format("f%d %s", H.frame, s) end
+-- Ot6Boost's answer to an R: a ching ($6281) when the point is taken, a buzz
+-- ($95, a direct-page `inc`, watched in both banks' views) when refused
+-- (battle_spellboost_mp's attribution).  An R that draws neither was not
+-- read at all (on 87dae4e9's fire-out-v1 capture, bestow-r's and loud-r's
+-- one tap each drew no sound and left the pending at 0:
+-- build/attempts/wt/v050-gogo-kits/fix3/bk_lab_new.out), so the tap is made
+-- again until the game answers it.
+local snd = { ching = 0, buzz = 0 }
 local drawnT = {}      -- the thief list's drawn price per row id
 local function installObservers()
   if installed then return end
   installed = true
+  emu.addMemoryCallback(function(_, v) if v ~= 0 then snd.ching = snd.ching + 1 end end,
+    emu.callbackType.write, 0x7E6281, 0x7E6281)
+  for _, page in ipairs({ 0x000000, 0x7E0000 }) do
+    emu.addMemoryCallback(function(_, v) if v ~= 0 then snd.buzz = snd.buzz + 1 end end,
+      emu.callbackType.write, page + 0x95, page + 0x95)
+  end
   emu.addMemoryCallback(function(_, v)
     if H.readByte(0x6168) == 3 then drawnT[H.readByte(0x4005 + (emu.getState()["cpu.y"] & 0xFFFF))] = v end
   end, emu.callbackType.write, 0x7E575C, 0x7E575C)
@@ -204,14 +218,22 @@ local function spellIdx(s, id)
     if H.readByte(0x2092 + s * 0x13C + i * 4) == id then return i end
   end
 end
+local R_TAPS = type(BOOSTKEEP_RTAPS) == "number" and BOOSTKEEP_RTAPS or 4   -- (a lab lever, for the negative)
 local function onRow(c, s)
   if c.rowR and not c.triedR then
-    c.triedR, c.pendBeforeR = true, pend(s)
+    c.triedR, c.pendBeforeR, c.rTaps, c.snd0 = true, pend(s), 1, { snd.ching, snd.buzz }
     return "r"
   end
   if c.rowR and c.pendAfterR == nil then
-    c.pendAfterR = pend(s)
-    ev(c, string.format("R on the row: pending %d -> %d", c.pendBeforeR, c.pendAfterR))
+    local ching, buzz = snd.ching - c.snd0[1], snd.buzz - c.snd0[2]
+    if ching + buzz == 0 and c.rTaps < R_TAPS then
+      ev(c, string.format("R tap %d drew no ching and no buzz: not read, tapped again", c.rTaps))
+      c.rTaps = c.rTaps + 1
+      return "r"
+    end
+    c.pendAfterR, c.rHeard = pend(s), ching + buzz > 0
+    ev(c, string.format("R on the row: pending %d -> %d (%d tap(s), %d ching(s), %d buzz(es))", c.pendBeforeR,
+      c.pendAfterR, c.rTaps, ching, buzz))
   end
   return "a"
 end
@@ -700,6 +722,8 @@ steps[#steps + 1] = H.call(function()
     -- what the case played: the actor's action, at the case's boost; R on
     -- the row raised it (rowR = 1) or was refused (rowR = 0)
     if c.rowR then
+      check(c.rHeard == true, string.format("%s: the game answered the R on the row (a ching or a buzz) within %d taps",
+        c.name, R_TAPS))
       H.assertEq(c.pendBeforeR, 0, c.name .. ": nothing pending when R was pressed on the row")
       check(c.pendAfterR == c.rowR, string.format("%s: R on the row left the pending at %s (%s)", c.name,
         tostring(c.pendAfterR), c.rowR == 0 and "refused: the boost buys nothing here" or "raised: it buys"))

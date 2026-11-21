@@ -97,8 +97,11 @@ and to be used more than once a fight; each entry below gives its reason.
 Mimic copies a divine's action, not its price, but the gate is the boost:
 a Gogo's copy takes the full boost from Gogo's own bank where the copy reads
 it (a Jackpot; a Bum Rush, which under three of Gogo's points is Pummel at
-the boost he has), and is free where it does not (a Cleave: the boost is
-kept, #461, and a copy on a boss strips its four shields too).
+the boost he has; since #547 an Overclock, a RunicBlade, an Assassinate on
+a Throw and Terra's Ultima fold, which answer for Gogo as for their
+owners), and is free where it does not (a Cleave: the boost is kept, #461,
+and a copy on a boss strips its four shields too).  Gogo's own commands
+open the same divines: [kit-gogo.md](kit-gogo.md).
 
 | Character | Divine | What three points buy | Built |
 |---|---|---|---|
@@ -924,8 +927,8 @@ first row is Slot itself; Slot's row closes the list and opens the reels
 exactly as the command window did, so the reels, their boost ladder and
 their charge are unchanged. *Reason: Locke's thief list is the precedent,
 and it keeps Magic.* A Coin Toss relic still turns Slot into GP Rain (no
-table), as a Thief Glove turns Steal into Capture; a Gogo with Slot gets
-the reels straight away (the table is Setzer's job). The row ids are the
+table), as a Thief Glove turns Steal into Capture; a Gogo with Slot opens
+the same table (#547, [kit-gogo.md](kit-gogo.md)). The row ids are the
 last AttackName pad slots: Coin Toss `$59`, Hired Help `$5a`, Jackpot
 `$5b`, Slot `$5c` (Slot never queues, and `$5c` is the id Ot6Oblivion keys
 Cleave on). `ot6_setzer.asm` has the machinery.
@@ -1297,8 +1300,11 @@ there).
 
 Design, rulings and the owner's notes: [kit-relm.md](kit-relm.md).  Her
 kit buffs the party through OT6's own systems (boost points, shields,
-Break, the turn gauge), and it is a list behind the Sketch row, the shape
-Locke's is behind Steal: `OpenCmdMenuTbl[$0d]` opens the Tools-shell list
+Break, the turn gauge), and it is a list behind her command, **Painter**
+(command `$0d`, vanilla's Sketch; the owner, 2026-11-21: the command
+window and the Skills list read Painter, and Sketch is the list's first
+row, as Steal is TresHnt's), the shape Locke's is behind Steal:
+`OpenCmdMenuTbl[$0d]` opens the Tools-shell list
 (`Ot6PaintListOpen`, mode `w7e6168` = 5), the rows she has learned packed
 down the left column, then the right, each with its price and its own
 targeting byte; the confirm's row id rides `$3a7b` under command `$0d`, a
@@ -1336,16 +1342,19 @@ falling through to vanilla.
   the second list, so it can land on a body that absorbs or nulls it, and
   vanilla's rules apply.  It is OR'd onto a weapon that has an element, so
   the paint never takes a key away.
-- **GOGO** with Sketch opens her list with the rows Relm has learned, as
-  his Steal opens Locke's (#547).  The Fake Mustache's Sketch → Control
+- **GOGO** with Painter opens her list with the rows Relm has learned, as
+  his Steal opens Locke's (#547, [kit-gogo.md](kit-gogo.md)).  The Fake
+  Mustache's Painter → Control
   rewrite keeps vanilla Control and no list, as a gloved Locke's Capture
   does: confirmed as intended (owner, 2026-11-16: "more of a commitment to
   use").
 - **The field page** (#549): Skills > Painter, the list's ninth row, lists
   the same eight in the same order, read a column at a time, with their
   prices and the locked marker on a row not learned yet, as Locke's page
-  does.  The row is white for whoever carries Sketch and greyed while a
-  worn piece turns Sketch into Control, so the field menu offers no page
+  does.  The row reads BattleCmdName's record (`Ot6SkillsCmdRow`), the
+  command window's own string, as Locke's TresHnt row does, so the two
+  cannot drift.  It is white for whoever carries Painter and greyed while a
+  worn piece turns it into Control, so the field menu offers no page
   where the battle offers no list (`ot6_painter_page.asm`,
   `menu_painterpage`, `menu_painterpage_wor`).
 
@@ -1414,17 +1423,25 @@ what a full boost buys.
 `battle_umaro` (a synthetic mechanism test: one seat of battle 67 staged as
 him, as `battle_retaliate_umaro` does) checks the divine and the class.
 
-## Gogo — Mime (no weapon of his own: Mimic's keys are the party's) (#270)
+## Gogo — Mime (no weapon of his own: Mimic's keys are the party's) (#270, #547)
 
 Gogo joins in the Zone Eater's belly (World of Ruin, v0.34) with Mimic and
 three empty rows; the Status menu fills them from the commands the party
 has met (measured, `wor-gogo-v1`'s play: Fight, Magic, Item, Steal,
-SwdTech, Throw, Tools, Blitz, Runic, Lore, Sketch, Slot, Dance, Rage).  He
+SwdTech, Throw, Tools, Blitz, Runic, Lore, Painter, Slot, Dance, Rage).  He
 joins at the party's level less a few (L42 against TERRA and CELES's L49-50,
-route-wor-gogo.md section 0, finding 4).  OT6 adds nothing to his kit's rules; what it
-settles is which three rows a player would give him, and how the driver
-plays Mimic.
+route-wor-gogo.md section 0, finding 4).
 
+- **Each command opens its owner's whole kit** (#547, owner 2026-11-15:
+  "we basically want to let him have access to everything cool about each
+  character"; [kit-gogo.md](kit-gogo.md) is the survey and the engine
+  limits).  Slot opens Setzer's table (Coin Toss, Hired Help, Jackpot);
+  Tools overclock, Runic is a RunicBlade, his Throw assassinates and his
+  Fire folds into Ultima at 3 BP; carrying Lore he has Strago's Scan and
+  Bserk on his Magic row and studies with Scan at 3 BP; Steal, Painter,
+  Blitz, SwdTech, Rage and Dance open Locke's, Relm's, Sabin's, Cyan's,
+  Gau's and Mog's lists as they did.  Morph and Leap stay Terra's and Gau's
+  (engine limits, kit-gogo.md section 3).
 - **Mimic is free** (mp-economy.md; the guidelines): the copy keeps the
   copied action's price at 0 and its boost buys what the copied action's
   boost buys (`Ot6MimicFold`, `battle_mimic`); a boost the copy cannot
@@ -1441,9 +1458,6 @@ plays Mimic.
   medic between his copies.  Fight is left off: his weapons (daggers and
   rods) and his vigor make a weak swing that the Mimic of a strong one
   outdoes.
-- **Sketch opens Relm's list** (#547): each command he picks gives its
-  owner's whole kit, as his Steal opens Locke's.  The rows are the ones Relm
-  has learned (her switches and her level).
 - **His keys** are the party's, through Mimic: the arc gives him no weapon
   (he has no Fight row to swing one), so his own turn keys nothing a copy
   does not.
@@ -1459,6 +1473,7 @@ confirm is latched on his own seat and is confirmed as it stands.
 leg's snapshot at the Opera House's catwalk switch (`wor_opera_switch`:
 the Dirt Dragon's fight; mimicreplace runs for his seat, the copy is free,
 the pips pending are the plan's) with `MIMIC_OFF` as the control.
+`battle_gogokits` plays his kits.
 
 ## Curated kits (the Ochette/Hikari pair)
 
@@ -1502,7 +1517,8 @@ player prunes the kit all game. Same model, different collection verbs:
     "lores learned this battle", less what he knows, and the victory
     teaches them.  The full boost is the only gate; under it Scan is Scan.
     99 MP, the shared ceiling (`Ot6MagicPrice`).  An engine pick spends no
-    boost, so it never studies; a Gogo's copy is a plain Scan.  It rides the
+    boost, so it never studies; a Gogo's copy studies when he carries Lore (#547),
+    else it is a plain Scan.  It rides the
     Magic row, so it works in the Fanatics' Tower, where no species casts a
     lore.  *Placement: the Lore window's 24 records are one per lore id, so
     it takes no extra row; Analyze is his row and Study its top rung, the
@@ -1533,7 +1549,8 @@ player prunes the kit all game. Same model, different collection verbs:
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —
   the full owner ruling is in `vanilla-destructive-bugs.md`).  Built
-  (#538, v0.47): the party's supporter, a list behind Sketch of
+  (#538, v0.47): the party's supporter, a list behind her Painter command
+  (Sketch its first row) of
   Portrait, Tint, Varnish, Still Life, Underpainting, Gesture and the divine
   Masterpiece, learned by story beats and level.
   [kit-relm.md](kit-relm.md) is the canonical Relm document.
@@ -1551,6 +1568,6 @@ v0.35, Crusader at v0.38.
 One stop bears on every kit: the Fanatics' Tower (v0.30) is magic-only.
 `battle_main.asm` @5354 turns Fight into Magic and removes every command
 but Magic, Item and Mimic, so Blitz, SwdTech, Tools, Slot, Lore, Rage,
-Sketch, Dance, Steal, Runic and Throw, and any divine that lives on one of
+Painter, Dance, Steal, Runic and Throw, and any divine that lives on one of
 those rows, are off for its randoms, MagiMaster and the Holy Dragon.  A kit verb planned for those fights needs either a
 Magic-row form or an explicit exception in that rewrite.

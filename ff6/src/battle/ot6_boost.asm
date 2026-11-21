@@ -2148,8 +2148,10 @@ OT6_ULTIMA_ID   = $14
         bcc     @out
         beq     @two
         lda     $3ed8,x         ; three points: TERRA, after her WoR return,
-        bne     @two            ;   folds a step further (char id 0)
-        lda     f:$7e0000+OT6_ULTIMA_SW
+        beq     :+              ;   folds a step further (char id 0), and so
+        cmp     #OT6_CHAR_GOGO  ;   does a Gogo's Magic (#547, ot6_gogo.asm)
+        bne     @two
+:       lda     f:$7e0000+OT6_ULTIMA_SW
         and     #OT6_ULTIMA_BIT
         beq     @two
         lda     #$03
@@ -2573,9 +2575,8 @@ OT6_ULTIMA_ID   = $14
         cmp     #OT6_ANALYZE_SPELL      ; Strago's Scan at the full boost is
         bne     @plain                  ;   his study (#432, ot6_analyze.asm),
         pha                             ;   priced at the shared ceiling
-        lda     $3ed8,x
-        cmp     #OT6_CHAR_STRAGO
-        bne     :+
+        jsl     Ot6StudyCaster  ; Strago, or a Gogo carrying Lore (#547)
+        bcc     :+
         lda     OT6_BOOST_REVEALED,x
         cmp     #OT6_STUDY_BOOST
         bcc     :+

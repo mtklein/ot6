@@ -675,6 +675,12 @@ TEST_ENV = {
     # #270: the driver's Mimic line for GOGO, on the Dirt Dragon from the
     # wor_opera leg's snapshot at the Opera House's catwalk switch
     "battle_mimicdriver": "OT6_TIMEOUT=3600",
+    # #547: GOGO's commands open their owners' kits; the cabin seats him with
+    # TERRA, RELM and SHADOW beside the Falcon by Maranda, the SwordBreaker
+    # the Colosseum won in his hand; five rounds of battles, the last from
+    # gen_wor_leo's state after the reveal
+    "battle_gogokits": "OT6_TIMEOUT=7200 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-colosseum-v1",
     # #476: a locked-in Dance step on another dancer's background rolls on
     # its start's ladder; the cabin seats MOG beside GOGO
     "battle_dancestep": "OT6_TIMEOUT=7200 "
@@ -1140,6 +1146,14 @@ check("kit_pages",
       "python3 tools/kit_pages.py --selftest",
       ["tools/kit_pages.py", "tools/esper_ladder.py", "ff6/src/battle/ot6_paint.asm",
        "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
+# #547: item descriptions fit the help window in pixels (FontWidth, the
+# esper page's rule) and battle command names fit their windows' seven
+# cells (the Fake Mustache's line names Painter; Relm's command is Painter);
+# the selftest widens a line and lengthens a name.
+check("text_widths",
+      "python3 tools/check_text_widths.py --selftest && python3 tools/check_text_widths.py",
+      ["tools/check_text_widths.py", "tools/esper_ladder.py", "ff6/src/text/item_desc_en.json",
+       "ff6/src/text/item_name_en.json", "ff6/src/text/battle_cmd_name_en.json", "ff6/src/gfx/font_gfx.asm"])
 # #550: the condensed numeral digits are generated; the checked-in .inc must
 # be what tools/numeral_font.py writes.
 check("numeral_font", "python3 tools/numeral_font.py",
