@@ -33,14 +33,18 @@ interpreting runs.
   background jobs in the app and runs in live.py. A notification that
   carries no result gets one line: "FYI: " and what that agent is doing now
   (owner, 2026-09-29; the app requires a visible reply).
-- **You -> critic (optional):** `tools/critic.sh` (local qwen via ollama).
+- **You -> critic (optional):** `tools/critic.sh` (qwen via ollama on the mbp;
+  from px13, `ssh -fN -L 11434:127.0.0.1:11434 mbp.local` first.
+  `CRITIC_MODEL=inkling-2-mini:latest` is a second model there).
   Different weights, zero project context; self-contained prompts with raw
   evidence.
 - **You -> GitHub:** `gh`. GitHub Issues is the issue tracker; releases carry the zip.
 - **Owner -> your work:** `tools/stream/live.py` (launch config `ot6-live`)
   is how the owner watches runs: the worker grid, per-worker detail, the
   route map. The owner opens it from their phone over Tailscale, so run it
-  with `--bind 0.0.0.0` (http://mbp:8611/). It must be up and truthful
+  on px13, where the TLM session runs (owner, 2026-11-21), as
+  `python3 tools/stream/live.py --bind 0.0.0.0 --peer mbp.local --peer air.local`
+  (http://px13:8611/). It must be up and truthful
   whenever runs happen, and especially whenever you ask the owner for help.
 - **Second machine:** an M4 MacBook Air at `ssh air.local` (key auth;
   `eval "$(/opt/homebrew/bin/brew shellenv zsh)"` in non-login shells;
@@ -71,7 +75,7 @@ interpreting runs.
   docs/TOOLING.md "The machine-wide emulator limit"); a bigger batch queues
   inside run.sh instead of swamping the machine (owner, 2026-10-06: agents
   can't be trusted to keep a reasonable load). `python3
-  tools/stream/live.py --place N --claim <branch>` (on the Mac, where
+  tools/stream/live.py --place N --claim <branch>` (on px13, where
   live.py runs) says where the next N should go -- slots less what runs now
   and live claims, px13 first, then mini, then the Air, then the Pro -- and holds them
   for a couple of minutes so agents asking at once don't double-book.

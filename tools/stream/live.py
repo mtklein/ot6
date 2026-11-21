@@ -16,7 +16,7 @@ tailing its growing run.log:
   [ot6] <text>          every other log line, shown as notes too
 
 Serves one page on --port (default 8611), to this machine only unless
---bind 0.0.0.0 (then a phone on the same Wi-Fi opens http://mbp.local:8611/).  Latency is Mesen's stdout block
+--bind 0.0.0.0 (then a phone on the same Wi-Fi opens http://px13:8611/).  Latency is Mesen's stdout block
 buffering: bursts every second or so.
 
 More machines: `--peer air.local` (repeatable; `host:path` when the repo is

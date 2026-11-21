@@ -8,4 +8,4 @@ mini.local  excluded: out of the pool (coordinator, 2026-10-11)
 
 # Where live.py serves (tools/stream/live.py --port); status asks it which
 # machines it watches.  127.0.0.1 is used when this is the local host.
-live mbp.local:8611
+live px13.local:8611
