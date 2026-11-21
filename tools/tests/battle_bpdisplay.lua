@@ -57,14 +57,17 @@ local W = { viol = {}, queuedArrows = 0, withheld = 0, begins = 0, spent = 0, ke
   revRow = {}, revMax = {}, revs = {}, revWithheld = 0 }
 -- reversions a row may make in the battle.  Not zero: the menu's staged copy
 -- of the party window can land over the flush's cell for up to three frames
--- as a boost is raised, spent or begun (0-3 a row in 12 draws on the fixed
--- ROM; build/attempts/wt/v050-multihit-anim/bpd/).  The withheld point's
--- face coming back after the earned one showed (a window's open staged the
--- names before $7bca was set: 41 of 66 reversions in the same 12 draws before
--- Ot6WindowOpenNames, 0 of 25 after) is asserted absent on its own (#548); an
--- alternating cell, a second writer fighting the flush, makes one every few
--- frames
-local REV_EPISODES = 4
+-- as a boost is raised, spent or begun.  Measured with Ot6WindowOpenNames:
+-- at most 2 a row in 24 draws on the graph's ultros-won-v1 capture
+-- (PACE_BURN 0-7 x shift 0,4,9, build/attempts/wt/v050-multihit-anim/bpd/
+-- fix24/), at most 3 in 12 on the tracked battery (bpd/fix2/); the bound is
+-- the worst seen.  Before it, the withheld point's face came back after the
+-- earned one showed (a window's open staged the names before $7bca was set):
+-- every one of the same 24 draws is red, on that assertion (22) or the
+-- six-frame violation (2), and rows reverted up to 4 times (bpd/nofix24/).
+-- An alternating cell, a second writer fighting the flush, makes one every
+-- few frames
+local REV_EPISODES = 3
 local st = {}
 for c = 0, 3 do st[c] = { begun = false, owed = false, mism = 0, seen = false } end
 
