@@ -712,11 +712,6 @@ local body = {
   H.call(function()
     say("wor", "boot")
     install()
-    -- the command window's name for Relm's command (the owner, 2026-11-21)
-    local base = (H.sym("BattleCmdName") & 0x3FFFFF) + 0x0D * 7
-    local t = {}
-    for i = 0, 6 do t[#t + 1] = H.readRomByte(base + i) end
-    H.assertEq(hx(t), "8F 9A A2 A7 AD 9E AB", "BattleCmdName's record $0D reads \"Painter\"")
   end),
   H.call(function()
     H.assertEq(H.invCountOf(SWORDBREAKER) >= 1, true,
@@ -749,6 +744,11 @@ for i = 1, BURN do
 end
 for _, r in ipairs(ROUNDS) do body[#body + 1] = playRound(r) end
 body[#body + 1] = H.call(function()
+  -- the command window's name for Relm's command (the owner, 2026-11-21)
+  local base = (H.sym("BattleCmdName") & 0x3FFFFF) + 0x0D * 7
+  local t = {}
+  for i = 0, 6 do t[#t + 1] = H.readRomByte(base + i) end
+  H.assertEq(hx(t), "8F 9A A2 A7 AD 9E AB", "BattleCmdName's record $0D reads \"Painter\"")
   H.log(string.format("[gogokits] PASS: GOGO's Slot, Tools, Magic, Lore, Runic, Steal, Blitz, Throw and SwdTech "
     .. "open their owners' kits, in %d battles", battles))
 end)
