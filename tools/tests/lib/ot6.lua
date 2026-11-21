@@ -21118,7 +21118,12 @@ function Driver:watchDamage()
         end
         w.norm = w.norm + norm
         w.raceNorm = (w.raceNorm or 0) + race
-        w.n = w.n + n
+        -- still one hit a frame: the per-hit figure (dmgHit.per, the race's median) stays what its consumers
+        -- were tuned on.  Counting the passes as hits (n) halved it on Genji frames, and wor_kefka's deaths over
+        -- six shifts went 8 -> 16 (main against the branch, build/attempts/wt/v050-line-deaths/labI/); with one
+        -- hit a frame and the per-pass shield reading kept, 10 (labJ/tally_j4.txt), the same play as the frame
+        -- rule's (labJ/tally_j1.txt).  The pass count is in the [brkpass] line.
+        w.n = w.n + 1
       end
     end
     self.monHpLast[s] = hp
