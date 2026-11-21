@@ -320,8 +320,8 @@ figure.
 
 ### Relm, Painter (brush)
 
-Relm supports the party. Her Sketch command opens a list, with Sketch itself
-as the first row. Brushes hit the special type.
+Relm supports the party. Her Painter command opens a list, with Sketch as
+the first row. Brushes hit the special type.
 
 | Row | MP | What it does | Learned |
 |---|---|---|---|
@@ -343,8 +343,8 @@ In the field menu, Skills > Painter shows all eight rows in the same order,
 with their prices, and the ones still to learn marked locked. The window at
 the top says what the row under the cursor does, or how it is learned.
 
-Wearing the Fake Mustache turns her Sketch into Control, as in FF6, and she
-has no list while it is on. Skills > Painter is greyed out while she wears
+Wearing the Fake Mustache turns her Painter command into Control, as in FF6,
+and she has no list while it is on. Skills > Painter is greyed out while she wears
 it.
 
 Save before you Sketch: a missed Sketch can still corrupt your inventory or a
@@ -418,8 +418,22 @@ MP and cannot wear Espers.
 
 Gogo joins in the Zone Eater. His Mimic is free, and a boost buys what it
 buys on the action he copies. Where it would buy nothing, the points are
-kept. Gogo cannot wear Espers. With Sketch among his commands he opens
-Relm's list, with the rows she has learned, and Skills > Painter shows it.
+kept. Gogo cannot wear Espers.
+
+Each command you give Gogo brings its owner's whole kit, with the rows the
+owner has learned:
+
+- Slot opens Setzer's list: Coin Toss, Hired Help and Jackpot.
+- Tools: a 3 BP Tool fires twice (Overclock).
+- Runic: a 3 BP Runic sends spells back (RunicBlade).
+- Throw: a 3 BP Throw kills the enemy it breaks (Assassinate).
+- Magic: Fire at 3 BP is Ultima once Terra has rejoined.
+- Lore: Strago's lores, and Scan and Bserk on his Magic list; Scan at 3 BP
+  studies, as Strago's does.
+- TresHnt, Painter, Blitz, SwdTech, Rage and Dance open Locke's, Relm's,
+  Sabin's, Cyan's, Gau's and Mog's lists, divines included.
+
+Morph and Leap stay Terra's and Gau's.
 
 ## Espers
 

@@ -667,6 +667,12 @@ TEST_ENV = {
     # #270: the driver's Mimic line for GOGO, on the Dirt Dragon from the
     # wor_opera leg's snapshot at the Opera House's catwalk switch
     "battle_mimicdriver": "OT6_TIMEOUT=3600",
+    # #547: GOGO's commands open their owners' kits; the cabin seats him with
+    # TERRA, RELM and SHADOW beside the Falcon by Maranda, the SwordBreaker
+    # the Colosseum won in his hand; five rounds of battles, the last from
+    # gen_wor_leo's state after the reveal
+    "battle_gogokits": "OT6_TIMEOUT=7200 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-colosseum-v1",
     # #476: a locked-in Dance step on another dancer's background rolls on
     # its start's ladder; the cabin seats MOG beside GOGO
     "battle_dancestep": "OT6_TIMEOUT=7200 "

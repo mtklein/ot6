@@ -37,8 +37,9 @@
 ; knows, and the victory screen teaches them as it does a lore seen cast
 ; (battle_main.asm @5eca).  The full boost is the only gate.  The price is
 ; the shared ceiling, 99 MP (Ot6MagicPrice).  A pick the engine makes
-; (Muddle, Charm, Berserk) spends no boost, so it never studies; a Gogo's
-; copy is a Scan (the study is Strago's).  A Scan aimed at the party reads
+; (Muddle, Charm, Berserk) spends no boost, so it never studies.  A Gogo
+; carrying Lore studies too, with his own Scan or a Mimic of Strago's (#547,
+; Ot6StudyCaster in ot6_gogo.asm); any other Gogo's copy is a Scan.  A Scan aimed at the party reads
 ; nothing at any boost, so Ot6QueueFold drops its boost and prices it as
 ; plain Scan.
 ; ------------------------------------------------------------------------------
