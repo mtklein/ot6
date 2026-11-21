@@ -1519,7 +1519,20 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         .a8
         .i16
         lda     f:$7e7bca
-        beq     @out
+        bne     Ot6BpWindowOpen
+        rts
+.endproc
+
+; [ #548: a window is opening for $62ca's character ]  the same clear,
+; without asking $7bca: window_open stages the names (Ot6WindowOpenNames_ext)
+; before it sets $7bca, and a row staged then with the point still withheld
+; was copied over the flush's for a few frames (battle_bpdisplay's
+; reversions: `f2702 PipGlyph 7bca=00 62ca=03 mark=E0` stages row 3 at p1,
+; then the flush's p2, then p1 again; build/attempts/wt/v050-multihit-anim/).
+; a8/i16, any db.  preserves x/y; clobbers a (b = 0).
+.proc Ot6BpWindowOpen
+        .a8
+        .i16
         phx
         lda     f:$7e62ca
         and     #$03
@@ -1537,8 +1550,9 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         and     f:$7e0000+OT6_BPMARK
         sta     f:$7e0000+OT6_BPMARK
         plx
-@out:   rts
+        rts
 .endproc
+
 
 .proc Ot6PipFace
         .a8
@@ -3718,3 +3732,16 @@ Ot6MarkWordTbl:
         .word   $01ee
         .word   (OT6_GAUGE_ATTR << 8) | $d8
         .word   (OT6_GAUGE_ATTR << 8) | OT6_KNIFE
+
+; ------------------------------------------------------------------------------
+
+; window_open's DrawCharNames, through Ot6WindowOpenNames (ot6_c1), inside
+; its jsr: the opening character's point shows, then the names are staged,
+; and back through a C1 rts.  a8/i16 (btlgfx).
+.proc Ot6WindowOpenNames_ext
+        .a8
+        .i16
+        jsr     Ot6BpWindowOpen
+        jsr_c1  DrawCharNames
+        jml     f:GfxCmd_00     ; a C1 rts: back to window_open
+.endproc

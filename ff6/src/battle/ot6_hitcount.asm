@@ -184,9 +184,10 @@ tool:   lda     $03,s           ; (under the return) a Tool (item ids
 ; [ #554: battle script command $04, a folded strike ]
 
 ; btlgfx's GfxCmdTbl entry $04 (vanilla's no-op, never queued) goes to
-; Ot6GfxCmdFold (ot6_c1), which jsl's here and then steps the gfx data
-; pointer as GfxCmd_06 would (NextGfxCmdData), so the pass's data block is
-; consumed without an animation.  Here: a beat of OT6_FOLD_BEAT frames, the
+; Ot6GfxCmdFold (ot6_c1), which jml's here inside ExecGfxCmd's jsr; this
+; ends by stepping the gfx data pointer as GfxCmd_06 would (NextGfxCmdData),
+; so the pass's data block is consumed without an animation, and returns
+; through a C1 rts (GfxCmd_00).  Here: a beat of OT6_FOLD_BEAT frames, the
 ; earlier strike's numeral having just landed (DmgNumBounceTbl reaches its
 ; floor at its 23rd frame), then every live numeral thread is retired, so
 ; this strike's numerals, the commands that follow, do not draw over the
@@ -209,5 +210,6 @@ OT6_FOLD_BEAT = 24
         inx
         cpx     #$0004
         bne     @off
-        rtl
+        jsr_c1  NextGfxCmdData  ; the pass's data block, as GfxCmd_06 steps it
+        jml     f:GfxCmd_00     ; a C1 rts: back to ExecGfxCmd's caller
 .endproc

@@ -17,6 +17,8 @@ CODE_EXT_INC = 1
 .global Ot6BgHud_ext, Ot6BgHudFlush_ext, Ot6PipGlyph_ext
 .global Ot6NumSingle_ext, Ot6NumMulti_ext  ; #550 five-digit numerals
 .global Ot6GfxCmdFold_ext       ; #554: a folded strike's beat (ot6_hitcount)
+.global Ot6WindowOpenNames_ext  ; #548: a window's open stages the names (ot6_hud)
+.global DrawCharNames, NextGfxCmdData   ; btlgfx, for those two (jsr_c1)
 .global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
 .global Ot6WeaponSpellQueued, Ot6WeaponSpellPass
 .global Ot6CodexSaveAs          ; copy slot-local weakness knowledge on Save As
