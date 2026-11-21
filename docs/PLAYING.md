@@ -428,7 +428,8 @@ owner has learned:
 - Runic: a 3 BP Runic sends spells back (RunicBlade).
 - Throw: a 3 BP Throw kills the enemy it breaks (Assassinate).
 - Magic: Fire at 3 BP is Ultima once Terra has rejoined.
-- Lore: Strago's lores, and Scan and Bserk on his Magic list; Scan at 3 BP
+- Lore: Strago's lores. With Magic among his commands too, he also has
+  Strago's Scan, and Bserk once Strago has learned it; Scan at 3 BP
   studies, as Strago's does.
 - TresHnt, Painter, Blitz, SwdTech, Rage and Dance open Locke's, Relm's,
   Sabin's, Cyan's, Gau's and Mog's lists, divines included.

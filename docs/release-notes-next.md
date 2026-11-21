@@ -9,8 +9,9 @@ Each command you give Gogo now brings its owner's whole kit. Slot opens
 Setzer's list (Coin Toss, Hired Help and Jackpot) instead of the bare reels.
 With 3 BP his Tools fire twice (Overclock), his Runic sends spells back
 (RunicBlade), his Throw kills the enemy it breaks (Assassinate), and his Fire
-becomes Ultima once Terra has rejoined. With Lore he also has Strago's Scan
-and Bserk on his Magic list, and Scan with 3 BP studies the enemies' lores.
+becomes Ultima once Terra has rejoined. With Lore and Magic both he also has
+Strago's Scan, and Bserk once Strago has learned it; Scan with 3 BP studies
+the enemies' lores.
 His TresHnt, Painter, Blitz, SwdTech, Rage and Dance lists were already their
 owners'. Morph and Leap stay Terra's and Gau's.
 

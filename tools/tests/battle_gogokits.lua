@@ -10,7 +10,8 @@
 -- suite gives GOGO the commands through the field Status menu, as a player
 -- does, and plays them through the real battle menu (H.kitBattle).
 --
--- Played, nothing written: Continue wor-colosseum-v1 (beside the Falcon by
+-- Played, with two declared stagings (state_write_waivers.txt; below):
+-- Continue wor-colosseum-v1 (beside the Falcon by
 -- Maranda), board, and in the Falcon's cabin seat GOGO, TERRA, RELM and
 -- SHADOW (no STRAGO and no CELES: both cast Scan, and the Lore round reads
 -- whether GOGO's own Lore brings it); in the Equip menu put the SwordBreaker
@@ -31,15 +32,22 @@
 --       and Jackpot, learned (switch $00CA);
 --     * Fire at 3 BP is Ultima (TERRA's fourth fold, switch $00BF), priced
 --       as Ultima;
---     * Jackpot at 3 BP throws two rolls for 99 MP;
---     * Debilitator at 3 BP fires twice (Overclock, switch $0068) for 80 MP,
+--     * Jackpot at 3 BP throws two rolls for 99 MP (one, when the first
+--       felled the body aimed at: a pass stays on its aim, #545);
+--     * Debilitator at 3 BP fires twice (Overclock, switch $0068) for the
+--       two firings' price (H.toolPrice, 80 MP),
 --       and its Ot6AssassinateGate visits stop at the command test (the
 --       Throw negative).
 --   R2 Magic, Lore, Runic
 --     * his Magic list holds Scan, and Bserk once STRAGO has learned it;
 --     * his Lore rows are STRAGO's loadout (H.loreList) and Aqua Rake;
 --     * Scan at 3 BP on a monster is Study: 99 MP, and Ot6StudyOne adds
---       exactly the present species' lores STRAGO lacks;
+--       exactly the present species' lores STRAGO lacks, and the victory
+--       teaches them.  STRAGO already knows every lore this plain's casters
+--       cast (the Crawler's, the Sprinter's Pearl Wind), so the first
+--       staging unlearns those in $1D29 at the open of the battle GOGO
+--       studies in (battle_study's expedient), and puts them back if no
+--       study taught them; a battle with no caster present waits;
 --     * Runic at 3 BP is a RunicBlade: TERRA's Fire cast into it comes back
 --       at her as a counter.
 --   R3 Throw, TresHnt (Steal), Blitz
@@ -48,22 +56,25 @@
 --     * Blitz opens SABIN's list with Bum Rush, and Bum Rush at 3 BP is four
 --       blows for 99 MP;
 --     * a Shuriken thrown at 3 BP passes Ot6AssassinateGate's actor and
---       command test (SHADOW's divine on GOGO's Throw); a hit of it on a
---       Broken non-boss marks Death there.
+--       command test (SHADOW's divine on GOGO's Throw) and marks Death on
+--       the Broken non-boss it hits; at 2 BP it marks none.  The second
+--       staging breaks every standing non-boss monster (OT6_BROKEN_TICKS) as
+--       GOGO's 2- or 3-BP throw begins: no party here breaks one on cue.
 --   R4 SwdTech, Rage, Dance
 --     * SwdTech opens CYAN's window with Cleave on its 3 BP row, and Cleave
 --       at 3 BP runs Cleave for 99 MP;
 --     * his Rage list is GAU's loadout; his dances are MOG's.
 --   R5 from gen_wor_leo's state after Leo's reveal (#552: the slot keeps
 --     actor $0C, so every kit stays his): Slot, Tools, Throw -- SETZER's
---     table, Overclock, and the Assassinate gate on his Throw.
+--     table, Overclock, and Assassinate on his Throw (staged as in R3).
 -- And: BattleCmdName's record $0D reads "Painter" (the owner, 2026-11-21:
 -- Relm's command is Painter; GOGO's Painter list is battle_relmwor's).
 -- Old-ROM red and mutants: build/attempts/wt/v050-gogo-kits/.
 --
 -- Lever, for evidence only (the suite runs BURN 0; a lab sets the global
 -- GOGOKITS_BURN ahead of the file): the walker fights that many encounters
--- by the landing first, to vary the encounter history (TESTING.md).
+-- by the landing first, and again after R5's state loads, to vary the
+-- encounter history (TESTING.md).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, SHADOW, RELM, GOGO, STRAGO = 0x00, 0x03, 0x08, 0x0C, 0x07
@@ -74,6 +85,7 @@ local FIRE, SCAN, BSERK, ULTIMA = 0x00, 0x18, 0x21, 0x14
 local SLOT_ROWS = { 0x5C, 0x59, 0x5A, 0x5B }              -- Slot, Coin Toss, Hired Help, Jackpot
 local JACKPOT, DEBIL, SHURIKEN, BUMRUSH, CLEAVE = 0x5B, 0xA7, 0x41, 0x64, 0x5C
 local SWORDBREAKER = 0x07
+local BREAK_TICKS = 16                                     -- a staged break's length (OT6_BROKEN_TICKS)
 local ITEMLIST, MODE = 0x4005, 0x6168
 local LISTPTR = { [0] = 0x208E, [1] = 0x21CA, [2] = 0x2306, [3] = 0x2442 }
 local RUNICBLADE = 0x7EEDD4                                -- OT6_RUNICBLADE (ot6_memory.inc)
@@ -257,6 +269,23 @@ local function install()
     for m = 0, 5 do if present(m) then want = want | studyRow(species(m)) end end
     cur = { cmd = H.readByte(0xB5), atk = H.readByte(0xB6), pend = H.readByte(0x3E9D + s * 2), mp0 = mpOf(s),
       passes = 0, dice = 0, gate = 0, marks = 0, studied = 0, want = want & ~lores() & 0xFFFFFF, f = H.frame }
+    if cur.cmd == CMD.TOOLS then
+      cur.toolPrice = H.toolPrice(s, H.abilityCost(cur.atk), cur.pend, cur.atk)
+    end
+    if cur.cmd == CMD.THROW and cur.pend >= 2 then
+      -- the declared staging (state_write_waivers.txt): every standing
+      -- non-boss monster is Broken as GOGO's 2- or 3-BP throw begins, so the
+      -- divine has a body it may kill (no draw on this plain lets the party
+      -- break one on cue); OT6_BROKEN_TICKS is what Ot6AssassinateGate reads
+      cur.staged = 0
+      for m = 0, 5 do
+        local e = 8 + m * 2
+        if present(m) and H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3AA1 + e) & 0x04) == 0 then
+          H.writeByte(0x3E88 + e, BREAK_TICKS)
+          cur.staged = cur.staged | (1 << m)
+        end
+      end
+    end
     if cur.cmd == CMD.MAGIC then
       -- the model's prices, read while the seat's relics are the battle's
       cur.fire3, cur.ultima0 = H.battleSpellPrice(s, FIRE, 3), H.battleSpellPrice(s, ULTIMA, 0)
@@ -361,7 +390,7 @@ local ROUNDS = {
       end, check = function()
         local g = got.slot
         H.log(string.format("[gogokits] R1 GOGO's Slot: mode %d, rows %s", g.mode, hx(keys(g.rows))))
-        H.assertEq(sw(0xCA), 1, "R1 precondition: Jackpot is learned (switch $00CA, SETZER's return)")
+        H.assertEq(sw(0xCA), 1, "R1 precondition: Jackpot is learned (switch $00CA, SETZER's return in gen_wor_kohlingen)")
         H.assertEq(g.mode, 4, "R1: GOGO's Slot opens SETZER's table (w7e6168 = 4), not the bare reels")
         local want = {}
         for _, id in ipairs(SLOT_ROWS) do want[id] = true end
@@ -370,7 +399,7 @@ local ROUNDS = {
     { tag = "ultima", e = { cmd = CMD.MAGIC, spell = FIRE, boost = 3 },
       done = function() return lastAct(CMD.MAGIC, nil, 3) ~= nil end, check = function()
         local a = lastAct(CMD.MAGIC, nil, 3)
-        H.assertEq(sw(0xBF), 1, "R1 precondition: TERRA has rejoined in the World of Ruin (switch $00BF)")
+        H.assertEq(sw(0xBF), 1, "R1 precondition: TERRA has rejoined in the World of Ruin (switch $00BF, gen_wor_terra)")
         H.assertEq(a.atk, ULTIMA, "R1: GOGO's Fire at 3 BP folds into Ultima ($14), TERRA's fourth fold")
         H.assertEq(a.mp0 - a.mp1, a.ultima0, "R1: and costs Ultima's own price")
         H.assertEq(a.fire3, a.ultima0, "R1: as the driver's model prices GOGO's 3-BP Fire")
@@ -388,9 +417,10 @@ local ROUNDS = {
     { tag = "overclock", e = { cmd = CMD.TOOLS, row = DEBIL, boost = 3 },
       done = function() return lastAct(CMD.TOOLS, DEBIL, 3) ~= nil end, check = function()
         local a = lastAct(CMD.TOOLS, DEBIL, 3)
-        H.assertEq(sw(0x68), 1, "R1 precondition: Overclock is learned (switch $0068)")
+        H.assertEq(sw(0x68), 1, "R1 precondition: Overclock is learned (switch $0068, the Magitek factory in gen_esper_tubes)")
         H.assertEq(a.passes, 2, "R1: GOGO's Debilitator at 3 BP fires twice (Overclock)")
-        H.assertEq(a.mp0 - a.mp1, 80, "R1: and costs the two firings, 80 MP")
+        H.assertEq(a.mp0 - a.mp1, a.toolPrice, string.format(
+          "R1: and costs the two firings, the model's price (H.toolPrice: %d MP)", a.toolPrice))
         H.assertEq(a.gate, 0, "R1: a 3-BP Tool of GOGO's stops at Ot6AssassinateGate's command test")
       end },
   } },
@@ -400,7 +430,8 @@ local ROUNDS = {
         -- later in the round teaches more)
         local load = {}
         for i = 1, 5 do load[i] = H.readByte(0x1E27 + i - 1) end
-        got.magic2 = { gogo = magicSet(s), lore = loreRows(s), others = {}, loreWant = H.loreList(lores(), load),
+        got.magic2 = { gogo = magicSet(s), lore = loreRows(s), others = {},
+          loreWant = H.loreList(got.openLores or lores(), load),
           bserk = H.readByte(0x1A6E + STRAGO * 0x36 + BSERK) == 0xFF }
         for id, os in pairs(seatOf) do if id ~= GOGO then got.magic2.others[id] = magicSet(os) end end
       end, check = function()
@@ -416,9 +447,13 @@ local ROUNDS = {
         H.assertEq(hx(keys(g.lore)), hx(keys(g.loreWant)), "R2: GOGO's Lore rows are STRAGO's loadout and Aqua Rake")
       end },
     { tag = "study", e = { cmd = CMD.MAGIC, spell = SCAN, boost = 3 },
-      done = function() return lastAct(CMD.MAGIC, SCAN, 3) ~= nil end, check = function()
+      done = function() return got.studyLearned ~= nil end, check = function()
         local a = lastAct(CMD.MAGIC, SCAN, 3)
+        H.assertEq(a.want ~= 0, true, string.format("R2 precondition: a present species could teach a lore "
+          .. "STRAGO lacks when GOGO studied (want $%06X; the staging cleared $%06X)", a.want, got.studyCleared or 0))
         H.assertEq(a.mp0 - a.mp1, 99, "R2: GOGO's Scan at 3 BP is Study, at the shared ceiling, 99 MP")
+        H.assertEq(got.studyLearned & a.want, a.want, string.format(
+          "R2: the victory taught them ($1D29 holds $%06X of $%06X)", got.studyLearned & a.want, a.want))
         H.assertEq(a.studied & a.want, a.want, string.format(
           "R2: the study added every lore the present species could teach (want $%06X, wrote $%06X)", a.want,
           a.studied))
@@ -450,7 +485,7 @@ local ROUNDS = {
         local g = got.blitz
         H.log(string.format("[gogokits] R3 GOGO's Blitz: mode %d, rows %s; $1D28 $%02X", g.mode, hx(keys(g.rows)),
           H.readByte(0x1D28)))
-        H.assertEq(H.readByte(0x1D28) & 0x80, 0x80, "R3 precondition: SABIN has learned Bum Rush ($1D28 bit 7)")
+        H.assertEq(H.readByte(0x1D28) & 0x80, 0x80, "R3 precondition: SABIN has learned Bum Rush ($1D28 bit 7, Duncan in gen_wor_gau)")
         H.assertEq(g.mode, 1, "R3: GOGO's Blitz opens SABIN's list (w7e6168 = 1)")
         H.assertEq(g.rows[BUMRUSH], true, "R3: and it holds Bum Rush ($64)")
       end },
@@ -463,10 +498,18 @@ local ROUNDS = {
     { tag = "assassinate", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 3 },
       done = function() return lastAct(CMD.THROW, nil, 3) ~= nil end, check = function()
         local a = lastAct(CMD.THROW, nil, 3)
+        H.assertEq(a.staged ~= 0, true, "R3 staging: a standing non-boss monster was Broken as the throw began")
         H.assertEq(a.gate > 0, true, "R3: GOGO's 3-BP Throw passes Ot6AssassinateGate's actor and command test "
           .. "(SHADOW's divine)")
-        H.log(string.format("[gogokits] R3 the throw's Death marks: %d (a hit on a Broken non-boss marks one)",
-          a.marks))
+        H.assertEq(a.marks > 0, true, string.format("R3: and marks Death on the Broken non-boss it hits (%d mark(s), "
+          .. "staged $%02X)", a.marks, a.staged))
+      end },
+    { tag = "assassinate2", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 2 },
+      done = function() return lastAct(CMD.THROW, nil, 2) ~= nil end, check = function()
+        local a = lastAct(CMD.THROW, nil, 2)
+        H.assertEq(a.staged ~= 0, true, "R3 staging: a standing non-boss monster was Broken as the 2-BP throw began")
+        H.assertEq(a.gate > 0, true, "R3: the 2-BP throw reaches the gate's boost test too")
+        H.assertEq(a.marks, 0, "R3: and under the full boost it marks no Death (the divine's one gate)")
       end },
   } },
   { tag = "R4", cmds = { { 1, CMD.SWDTECH }, { 2, CMD.RAGE }, { 3, CMD.DANCE } }, entries = {
@@ -474,7 +517,7 @@ local ROUNDS = {
         got.swdtech = { mode = H.readByte(MODE), r2 = H.readByte(ITEMLIST + 2 * 6) }
       end, check = function()
         local g = got.swdtech
-        H.assertEq(H.readByte(0x1CF7) & 0x80, 0x80, "R4 precondition: CYAN has learned Cleave ($1CF7 bit 7)")
+        H.assertEq(H.readByte(0x1CF7) & 0x80, 0x80, "R4 precondition: CYAN has learned Cleave ($1CF7 bit 7, the Phantom Train farewell in gen_sabin_train)")
         H.assertEq(g.mode, 2, "R4: GOGO's SwdTech opens CYAN's window (w7e6168 = 2)")
         H.assertEq(g.r2, CLEAVE, "R4: its 3 BP row is Cleave ($5C)")
       end },
@@ -497,12 +540,13 @@ local ROUNDS = {
       done = function() return got.r5from and lastAct(CMD.TOOLS, DEBIL, 3, got.r5from) ~= nil end, check = function()
         local a = lastAct(CMD.TOOLS, DEBIL, 3, got.r5from)
         H.assertEq(a.passes, 2, "R5: the revealed LEO's Debilitator at 3 BP fires twice")
-        H.assertEq(a.mp0 - a.mp1, 80, "R5: for 80 MP")
+        H.assertEq(a.mp0 - a.mp1, a.toolPrice, string.format("R5: for the two firings' price (%d MP)", a.toolPrice))
       end },
     { tag = "assassinate5", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 3 },
       done = function() return got.r5from and lastAct(CMD.THROW, nil, 3, got.r5from) ~= nil end, check = function()
         local a = lastAct(CMD.THROW, nil, 3, got.r5from)
         H.assertEq(a.gate > 0, true, "R5: the revealed LEO's 3-BP Throw passes Ot6AssassinateGate's actor test")
+        H.assertEq(a.marks > 0, true, string.format("R5: and marks Death on the Broken non-boss it hits (%d)", a.marks))
       end },
   } },
 }
@@ -590,8 +634,29 @@ local function decide()
     .. "L%d, MP %d, bank %d", battles, round.tag, fw[1], fw[2], fw[3], fw[4], fw[5], fw[6], s, K.lv(GOGO), mpOf(s),
     H.readByte(0x3E9C + s * 2)))
   if round.tag == "R4" and not got.r4data then r4Data(); got.r4data = true end
+  local skip = {}
+  got.openLores = lores()
+  if round.tag == "R2" and got.studyLearned == nil then
+    -- the lores the present species cast (Ot6StudyTbl rows): STRAGO knows
+    -- every one this plain's casters know (the Crawler's, the Sprinter's
+    -- Pearl Wind), so the declared staging (state_write_waivers.txt, the
+    -- battle_study expedient) unlearns them for the study to teach again
+    local rows = 0
+    for m = 0, 5 do if present(m) then rows = rows | studyRow(species(m)) end end
+    if rows == 0 then
+      skip.study = true
+      H.log("[gogokits] no present species casts a lore: the study waits for another battle")
+    elseif rows & ~lores() & 0xFFFFFF == 0 then
+      got.studyCleared, got.studyBattle = rows & lores(), battles
+      for b = 0, 2 do
+        H.writeByte(0x1D29 + b, H.readByte(0x1D29 + b) & ~((got.studyCleared >> (8 * b)) & 0xFF))
+      end
+      H.log(string.format("[gogokits] staged: lores $%06X unlearned for the study -> $1D29 $%06X", got.studyCleared,
+        lores()))
+    end
+  end
   for _, en in ipairs(round.entries) do
-    if not entryDone(en) and (en.after == nil or entryDone(round.entries[(function()
+    if not entryDone(en) and not skip[en.tag] and (en.after == nil or entryDone(round.entries[(function()
           for i, x in ipairs(round.entries) do if x.tag == en.after then return i end end
         end)()])) then
       local p = {}
@@ -687,6 +752,16 @@ local function playRound(r)
         H.assertEq(H.readByte(REC + 1), 0x10, "R5: slot 12 wears Leo's sprite")
         H.assertEq((H.readByte(0x1850 + GOGO) & 7) ~= 0, true, "R5: LEO is in the party")
       end),
+      H.lazy(function()
+        local t = {}
+        for i = 1, BURN do
+          t[#t + 1] = worldBattle("R5 BURN " .. i)
+          t[#t + 1] = H.fightBattleByMenu(60000)
+          t[#t + 1] = H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
+            "R5 BURN: back on the world map", 5)
+        end
+        return H.seqStep(t)
+      end),
     }, {}),
     H.call(function() round = r end),
     H.release(),
@@ -717,6 +792,20 @@ local function playRound(r)
       H.call(function()
         if cur ~= nil then closeAct() end
         if got.bounce == nil and bounceSeen() then got.bounce = true end
+        -- the study's settlement: a 3-BP Scan this battle taught the staged
+        -- lores at the victory, or (no study, or no victory) they are put back
+        if got.studyCleared ~= nil and got.studyLearned == nil and got.studyBattle == battles then
+          local a = lastAct(CMD.MAGIC, SCAN, 3)
+          if a ~= nil and a.f > 0 and a.want ~= 0 and (lores() & a.want) == a.want then
+            got.studyLearned = lores()
+            H.log(string.format("[gogokits] the victory taught the studied lores: $1D29 $%06X", lores()))
+          elseif (lores() & got.studyCleared) ~= got.studyCleared then
+            for b = 0, 2 do
+              H.writeByte(0x1D29 + b, H.readByte(0x1D29 + b) | ((got.studyCleared >> (8 * b)) & 0xFF))
+            end
+            H.log(string.format("[gogokits] no study taught them this battle: lores $%06X put back", got.studyCleared))
+          end
+        end
       end),
     }, r.tag .. ": every entry played"),
     H.call(function()
