@@ -225,10 +225,27 @@ local function pipCells()
 end
 
 local watchGlyph, glyphFirstF, glyphMenu = nil, nil, nil
+-- the knight's row as Ot6PipStage stages it (OT6_PIPROWW, the word the nmi
+-- flush lays in both bands), with his bank and the display marks, per frame:
+-- the face a delivery changes, observed apart from OT6_PIPPEND itself
+local PIPIDX = {}
+for n, t in pairs(PIP) do PIPIDX[t] = n end
+local faces = {}
+local function sampleFace()
+  if not knight then return end
+  for r = 0, 3 do
+    if H.readByte(0x64D6 + r) == knight then
+      faces[H.frame] = { idx = PIPIDX[H.readByte(0xEEF3 + r * 2)], bank = bp(knight),
+        mark = H.readByte(0xEEF1), pend = pend(knight) }
+    end
+  end
+end
+
 local function sample()
   pinField()
   sampleNumeral()
   if knight then lastBp = bp(knight) end
+  sampleFace()
   if watchGlyph and not glyphFirstF then
     local lo, hi = pipCells()
     if lo and ((lo & 0xFF) == watchGlyph or (hi & 0xFF) == watchGlyph) then
@@ -389,6 +406,10 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(#armsFor(knight, nf, nf) >= 1, true,
       string.format("it is delivered to the blocker on the numeral frame f%d "
         .. "-- the frame the player sees the blow land on him", nf))
+    -- (was `> 32`, OT6_PIPTAIL's length: the live cell then faded after 32
+    -- frames, so an arm at the commit was gone before a numeral 33+ frames
+    -- later.  Since #540 the cell has no tail; the deferral matters for any
+    -- numeral after the commit, which is what this bound asks)
     H.assertEq(nf - c.f > 0, true,
       string.format("and the gap the deferral closes is real: %d frames "
         .. "from the commit to the numeral", nf - c.f))
@@ -549,6 +570,7 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.driveUntil(function() return H.readByte(PIPPEND) == 0 end, 6000, DRIVE,
     "the pending pip is delivered (numeral frame, or Ot6ActionEnd's backstop)"),
+  H.waitFrames(6),                               -- the row's staging after it
   H.call(function()
     local arms = armsFor(knight, H.vars.stagedF, H.frame)
     H.assertEq(#arms >= 1, true,
@@ -566,15 +588,28 @@ H.run({ maxFrames = 60000 }, {
       viaNumeral and "the numeral frame (the damage/'Miss' path)"
                   or "Ot6ActionEnd's backstop (a numeral-less action)"))
 
-    -- whichever path pays the pip, the first clear after the staging is
-    -- that delivery: nothing else cleared the byte first.
-    local clearedAt = nil
-    for _, w in ipairs(pendWrites) do
-      if w.v == 0 and w.f >= H.vars.stagedF then clearedAt = w.f; break end
+    -- the delivery, seen on screen's source rather than in OT6_PIPPEND: the
+    -- knight's staged row shows one pip fewer than his bank allows the frame
+    -- before it, and one more within three frames of it (the staging runs
+    -- once a main-loop frame), with his bank, pending and marks unmoved
+    -- (the staging write lands at stagedF; the row is held from the next
+    -- staging, so the frame before the delivery shows the held face)
+    local b4, af, aff = faces[at - 1], nil, nil
+    for f = at, at + 3 do
+      if faces[f] and b4 and faces[f].idx ~= b4.idx then af = faces[f]; aff = f; break end
     end
-    H.assertEq(clearedAt, at,
-      "6a: OT6_PIPPEND's first clear after the staging is the blocker's "
-      .. "delivery -- the paint spent it, nothing else cleared it")
+    local tl = {}
+    for f = at - 2, at + 40 do
+      if faces[f] then tl[#tl + 1] = string.format("f%d:p%s/b%d/m%02X/q%d", f, tostring(faces[f].idx), faces[f].bank,
+        faces[f].mark, faces[f].pend) end
+    end
+    H.log(string.format("6a: the knight's row face %s at f%d, then %s; %s",
+      b4 and ("p" .. tostring(b4.idx)) or "?", at - 1, af and ("p" .. tostring(af.idx) .. " at f" .. aff) or "unchanged",
+      table.concat(tl, " ")))
+    H.assertEq(b4 ~= nil and af ~= nil and af.idx == (b4.idx or -9) + 1, true,
+      "6a: the knight's row gained its pip within three frames of the delivery (OT6_PIPROWW)")
+    H.assertEq(af.bank == b4.bank and af.pend == b4.pend and af.mark == b4.mark, true,
+      "6a: and nothing else moved the face: bank, pending and marks the same either side")
   end),
 
   -- 6b. the backstop, isolated: switch the numeral trigger off and stage
