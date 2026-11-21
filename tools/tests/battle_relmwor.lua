@@ -580,23 +580,21 @@ H.run({ maxFrames = 2500000 }, {
     H.cond(function() return mode == "play" end, {
       H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, onList = onList,
         planDone = function() return stage == 7 and broken() or closed() end,
-        -- stage 5's RELM holds her window for GOGO's Defend to resolve.  On
-        -- v0.50's replay it never did: his queued Defend was reallocated
-        -- (`"kind":"mimic","event":"unresolved","reason":"queue_reallocated"`
-        -- at f34291), RELM held from f34896, GOGO fell at f48396 and the hold
-        -- ran out the kit's 60000 frames (build/attempts/
-        -- wt/v050-multihit-anim/qual2_battle_relmwor_red.log).  A GOGO who
-        -- is down, or whose Defend has not ended 6000 frames after it was
-        -- confirmed, gives no turn to Gesture: not counted
+        -- stage 5's RELM holds her window until GOGO's Defend has ended and
+        -- his gauge is filling again.  v0.50's replay on the wor-gogo-v1
+        -- capture: his Defend ran and ended ('f34373 ExecCmd x=04 b5=15',
+        -- 'f34380 ActionEnd x=04'), her window opened at f34896 with his
+        -- gauge nearly full ('f34800 gogo ... gauge3219=EB'), and from
+        -- f35100 his turn sat full behind her held window ('gauge3219=00
+        -- 3aa0=8F 7bca=01 62ca=01 7bc2=05') until he fell at f48396 and the
+        -- kit ran out its 60000 frames (build/attempts/wt/v050-multihit-anim/
+        -- qual2_battle_relmwor_red.log, ab/relmwor_dbg.log).  A GOGO who has
+        -- fallen gives no turn to Gesture: not counted.  (Giving up on his
+        -- full gauge instead fired in every stage-5 battle, 40 of 40:
+        -- ab/relmwor_fullarm_v2_red.log.)
         giveUp = function()
-          if stage ~= 5 or rec.giveUp or gogo == nil then return false end
-          local k = H.vars.kit and H.vars.kit[1]
-          rec.g0 = rec.g0 or H.frame
-          local stale = k ~= nil and k.frame ~= nil and H.frame > math.max(k.frame, rec.g0) + 6000
-            and #endsOf(gogo * 2, 0) == 0
-          if up(gogo) and not stale then return false end
-          H.log(string.format("[relmwor] GOGO %s before RELM's Gesture: not counted",
-            up(gogo) and "had no Defend end in 6000 frames" or "fell"))
+          if stage ~= 5 or rec.giveUp or gogo == nil or up(gogo) then return false end
+          H.log("[relmwor] GOGO fell while RELM held her window: not counted")
           rec.giveUp = true
           return true
         end }),
