@@ -277,7 +277,9 @@ done:   plp
 ; whatever the hit roll).  The 3-BP boost is the divine's one gate (kits.md
 ; "Divines"); it can be used again in the same battle.  Anything else leaves
 ; the attack as it was: an attacker who is not Shadow (char id $03, $3ed8
-; keyed by the entity offset since offset = slot*2), an action boosted by
+; keyed by the entity offset since offset = slot*2) and not a Gogo throwing
+; (#547: Throw is Shadow's command, so a Gogo's Throw, command $08 in $b5,
+; carries the divine; his other commands do not), an action boosted by
 ; fewer than three points (OT6_BOOST_REVEALED, still pending until
 ; Ot6ActionEnd charges it), a counterattack (Interceptor's, which no
 ; ActionEnd charges), a character target, an unbroken target, or a
@@ -305,7 +307,13 @@ done:   plp
         bcs     done            ; monster attacker: never
         lda     $3ed8,x         ; attacker char id
         cmp     #$03            ; CHAR::SHADOW
-        bne     done            ; not shadow: dormant
+        beq     @who
+        cmp     #OT6_CHAR_GOGO  ; #547: a Gogo's Throw (Shadow's command;
+        bne     done            ;   ot6_gogo.asm), or his Mimic of one
+        lda     $b5
+        cmp     #$08            ; Throw
+        bne     done            ; anyone else, or Gogo's other commands: dormant
+@who:
         lda     OT6_BOOST_REVEALED,x
         cmp     #$03            ; the divine's one gate: a full 3-BP boost
         bcc     done            ;   on the action this hit belongs to

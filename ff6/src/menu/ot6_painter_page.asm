@@ -52,17 +52,32 @@ OT6_RELIC_CAPTURE  = $40                ;   and Steal -> Capture (Thief Glove)
 ; ------------------------------------------------------------------------------
 
 ; [ the Skills list: draw the eighth and ninth rows, then vanilla's tail ]
-; _c34c80's tail comes here.  Locke's row reads his battle command's name,
-; BattleCmdName's Steal record ("TresHnt"), the string the battle command
-; window draws, so the two cannot drift and the row fits the list's vanilla
-; seven columns (the owner, #549: "the same abbrev we do in the combat
-; menus, much like SwdTech above for cyan").
+; _c34c80's tail comes here.  Each row reads its character's battle command
+; name, the string the battle command window draws, so the two cannot drift
+; and the rows fit the list's vanilla seven columns (the owner, #549: "the
+; same abbrev we do in the combat menus, much like SwdTech above for cyan"):
+; Locke's BattleCmdName's Steal record ("TresHnt") and Relm's Sketch record
+; ("Painter", the owner, 2026-11-21: the command is Painter, and Sketch is
+; one row of its list, as Steal is of TresHnt's).
 Ot6SkillsKitRows:
         lda     zSkillsTextColor::Thief
         sta     zTextColor
         ldy_pos BG3A, {2, 19}
-        jsr     InitTextBuf             ; the position header; WMADD at the text
         ldx     #BATTLE_CMD::STEAL * BattleCmdName::ITEM_SIZE
+        jsr     Ot6SkillsCmdRow
+        lda     zSkillsTextColor::Painter
+        sta     zTextColor
+        ldy_pos BG3A, {2, 21}
+        ldx     #BATTLE_CMD::SKETCH * BattleCmdName::ITEM_SIZE
+        jsr     Ot6SkillsCmdRow
+        jmp     TfrBG3ScreenAB
+
+; [ one Skills row: a BattleCmdName record at a BG3 position ]
+; in: X = the record's offset in BattleCmdName, Y = the text position.
+Ot6SkillsCmdRow:
+        phx
+        jsr     InitTextBuf             ; the position header; WMADD at the text
+        plx
         ldy     #BattleCmdName::ITEM_SIZE
 :       lda     f:BattleCmdName,x
         sta     hWMDATA
@@ -70,12 +85,7 @@ Ot6SkillsKitRows:
         dey
         bne     :-
         stz     hWMDATA
-        jsr     DrawPosTextBuf
-        lda     zSkillsTextColor::Painter
-        sta     zTextColor
-        ldy     #near SkillsPainterText
-        jsr     DrawPosKana
-        jmp     TfrBG3ScreenAB
+        jmp     DrawPosTextBuf
 
 ; [ the Skills list: the eighth and ninth rows' colours, as battle has them ]
 ; _c34d3d's `lda 0,y` comes here (a jsr in its three bytes), after the scan
@@ -330,7 +340,6 @@ Ot6KitPageDesc:
         stx     hWMADDL
         jmp     LoadItemDesc
 
-SkillsPainterText:              pos_text SKILLS_LIST_PAINTER
 SkillsPainterTitleText:         pos_text SKILLS_PAINTER_TITLE
 
 .endif

@@ -84,7 +84,6 @@ MENU_TEXT_INC = 1
 .define SKILLS_LIST_RAGE                BG3A, {2, 15}, {"Rage"}
 .define SKILLS_LIST_DANCE               BG3A, {2, 17}, {"Dance"}
 .define SKILLS_LIST_THIEF               BG3A, {2, 19}, {"Treasure Hunter"}
-.define SKILLS_LIST_PAINTER             BG3A, {2, 21}, {"Painter"}
 
 .define SKILLS_MP_COST                  BG3B, {23, 5}, {"MP_    "}
 .define SKILLS_LORE_TITLE               BG3B, {23, 5}, {"Lore"}

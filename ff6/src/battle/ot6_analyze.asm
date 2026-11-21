@@ -133,13 +133,13 @@ OT6_STUDY_MP      = 99          ; the shared ceiling
 
 ; [ the study: one body's lores, pending for the victory screen ]
 ; a8/i16, x = attacker, y = monster entity offset, db = $7e.  Learns only when
-; the attacker is Strago with the full boost pending.  preserves x/y.
+; the attacker is Strago (or a Gogo carrying Lore, #547) with the full boost
+; pending.  preserves x/y.
 .proc Ot6StudyOne
         .a8
         .i16
-        lda     $3ed8,x         ; the attacker's actor
-        cmp     #OT6_CHAR_STRAGO
-        bne     @done
+        jsl     Ot6StudyCaster  ; Strago, or a Gogo carrying Lore (#547)
+        bcc     @done
         lda     OT6_BOOST_REVEALED,x
         cmp     #OT6_STUDY_BOOST
         bcc     @done
