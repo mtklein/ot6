@@ -579,7 +579,27 @@ H.run({ maxFrames = 2500000 }, {
     H.call(decide),
     H.cond(function() return mode == "play" end, {
       H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, onList = onList,
-        planDone = function() return stage == 7 and broken() or closed() end }),
+        planDone = function() return stage == 7 and broken() or closed() end,
+        -- stage 5's RELM holds her window for GOGO's Defend to resolve.  On
+        -- v0.50's replay it never did: his queued Defend was reallocated
+        -- (`"kind":"mimic","event":"unresolved","reason":"queue_reallocated"`
+        -- at f34291), RELM held from f34896, GOGO fell at f48396 and the hold
+        -- ran out the kit's 60000 frames (build/attempts/
+        -- wt/v050-multihit-anim/qual2_battle_relmwor_red.log).  A GOGO who
+        -- is down, or whose Defend has not ended 6000 frames after it was
+        -- confirmed, gives no turn to Gesture: not counted
+        giveUp = function()
+          if stage ~= 5 or rec.giveUp or gogo == nil then return false end
+          local k = H.vars.kit and H.vars.kit[1]
+          rec.g0 = rec.g0 or H.frame
+          local stale = k ~= nil and k.frame ~= nil and H.frame > math.max(k.frame, rec.g0) + 6000
+            and #endsOf(gogo * 2, 0) == 0
+          if up(gogo) and not stale then return false end
+          H.log(string.format("[relmwor] GOGO %s before RELM's Gesture: not counted",
+            up(gogo) and "had no Defend end in 6000 frames" or "fell"))
+          rec.giveUp = true
+          return true
+        end }),
       stillTail(),
       H.call(function()
         if not closed() then
