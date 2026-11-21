@@ -407,6 +407,16 @@ for _, f in ipairs(FIXTURES) do
   local co
   steps[#steps + 1] = H.loadState(f.state)
   steps[#steps + 1] = H.waitFrames(30)
+  -- staged (declared, state_write_waivers.txt): the Config's battle mode set to Wait ($1D4D bit 3, the bit
+  -- config.asm's ChangeConfigOption_00 sets), as a player walking every list would, so the monsters stand still
+  -- while a list is open.  In Active mode the walks ran with the battle's clock going: the v0.50 line's
+  -- fc_landing capture wiped TERRA, LOCKE and EDGAR from full HP during the stones fixture's walks, and STRAGO was
+  -- petrified mid-walk on wob_esper_mtn_hunt (build/attempts/wt/v050-line-deaths/suites/).
+  steps[#steps + 1] = H.call(function()
+    H.log(string.format("[dense] %s: battle mode staged to Wait ($1D4D $%02X -> $%02X)", f.tag, H.readByte(0x1D4D),
+      H.readByte(0x1D4D) | 0x08))
+    H.writeByte(0x1D4D, H.readByte(0x1D4D) | 0x08)
+  end)
   steps[#steps + 1] = H.cond(function() return H.worldMode() end, {
     H.waitUntil(function() return H.worldHasControl() end, 3000, f.tag .. ": world control", 5),
     worldPace(f.tag),

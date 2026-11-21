@@ -61,6 +61,7 @@ tools/tests/battle_counterboost.lua	.writeWord(	2
 tools/tests/battle_counterfold.lua	.writeByte(	5
 tools/tests/battle_dancemp.lua	.writeWord(	3
 tools/tests/battle_densekits.lua	.writeByte(	3	quarantine: #541 sequel, two synthetic arms -- the story never takes back a thief row nor shrinks a list under a remembered cursor, so Mug's event switch ($001E) is cleared mid-battle to give LOCKE's list a middle gap and a cursor past its end, and MOG's Dance cursor is put on the last cell before his window reopens; the property is the packing and the open clamp
+tools/tests/battle_denselists.lua	.writeByte(	1	quarantine: #558 precondition staging -- the Config's battle mode set to Wait ($1D4D bit 3, a setting a player picks in the Config menu) so the monsters stand still while the lists are walked; in Active mode the walks lost members and once the party to the battle's clock
 tools/tests/battle_dlgmenu.lua	.writeByte(	2	quarantine: #292 review, synthetic step -- one monster slot's shield-count upload planted pending mid-dialogue (OT6_SHWANT/OT6_SHPEND), because a count change landing while a battle dialogue is up is not a thing a fixture produces on cue; the property is that the nmi holds the upload until the dialogue and its re-lay are done
 tools/tests/battle_bumrushmimic.lua	.writeByte(	3
 tools/tests/battle_bumrushmimic.lua	.writeWord(	1
