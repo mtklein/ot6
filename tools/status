@@ -20,7 +20,7 @@ It reports on the main tree of whatever checkout it runs from.
             `git push --dry-run` of origin/main onto itself, which talks to
             GitHub through the credential helper (keychain included) and
             writes nothing
-  issues    open issues in the lowest open vX.Y milestone
+  issues    every open issue (no milestones), the active ones marked
   live      live.py answering on its port (tools/machines.txt), the
             machines it watches and whether each is up
   machines  each machine in tools/machines.txt, one ssh each, in parallel:
@@ -458,22 +458,18 @@ def infra_checks(root):
 
 
 def issue_checks(repo):
-    rc, so, se = run(["gh", "api", f"repos/{repo}/milestones?state=open&per_page=100"], timeout=20)
-    if rc != 0:
-        return [(PROBLEM, "issues", "gh api milestones failed: " + last_line(se))]
-    ms = [m for m in json.loads(so) if re.match(r"v\d+\.\d+", m["title"])]
-    if not ms:
-        return [(INFO, "issues", "no open vX.Y milestone")]
-    cur = min(ms, key=lambda m: vkey(m["title"].split()[0]))
-    rc, so, se = run(["gh", "api", f"repos/{repo}/issues?milestone={cur['number']}"
-                      "&state=open&per_page=100"], timeout=20)
+    # No milestones (owner, 2026-11-21): releases are cut when something is
+    # worth playtesting, so the backlog is every open issue.
+    rc, so, se = run(["gh", "api", f"repos/{repo}/issues?state=open&per_page=100"],
+                     timeout=20)
     if rc != 0:
         return [(PROBLEM, "issues", "gh api issues failed: " + last_line(se))]
     items = sorted(json.loads(so), key=lambda i: i["number"])
-    out = [(INFO, "issues", f"milestone {cur['title']}: {len(items)} open")]
+    out = [(INFO, "issues", f"{len(items)} open")]
     for i in items:
         kind = "PR " if "pull_request" in i else ""
-        out.append((INFO, "issues", f"  {kind}#{i['number']} {i['title'][:90]}"))
+        act = " [active]" if any(l["name"] == "active" for l in i.get("labels", [])) else ""
+        out.append((INFO, "issues", f"  {kind}#{i['number']}{act} {i['title'][:90]}"))
     return out
 
 

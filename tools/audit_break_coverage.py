@@ -162,10 +162,18 @@ WALKED = {}
 TILESEEN = {}
 
 
+# --gate: the build gate's verdict alone (#536).  The verdict (tier 1, and
+# every pool formation resolving to bodies) is ROM data only; the claim is a
+# report.  So the gate reads no logs, and its edge (configure.py
+# break_coverage_ratchet) depends on no state: `ninja` of it alone builds
+# the ROM, not the line.  Without --gate the claim is read from whatever
+# generator logs build/states holds.
+GATE = '--gate' in sys.argv[1:]
 # `ninja quick`'s runs (quick_<state>.log, suite_quick_<test>.log) played
 # from tracked checkpoints, not the qualified play (#363): not evidence here
-LOGS = sorted(p for p in glob.glob(os.path.join(ROOT, 'build', 'states', '*.log'))
-              if not os.path.basename(p).startswith(('quick_', 'suite_quick_')))
+LOGS = [] if GATE else sorted(
+    p for p in glob.glob(os.path.join(ROOT, 'build', 'states', '*.log'))
+    if not os.path.basename(p).startswith(('quick_', 'suite_quick_')))
 FOUGHT = fought_by_map(LOGS)
 # a world's walked sectors count once its logs record the world trace
 # (#288): the blind trace wrote only the field coordinates of map-change
@@ -253,7 +261,7 @@ for m in range(len(props)//33):
     g = sbg[m]
     forms = sorted(group_forms(g))
     lines = pool_report(f'map {m}', forms, m in MAGIC_ONLY_MAPS)
-    tag = '' if m in CLAIMED_FIELD else '  [UNCLAIMED/UNTUNED]'
+    tag = '' if GATE or m in CLAIMED_FIELD else '  [UNCLAIMED/UNTUNED]'
     if m not in CLAIMED_FIELD:
         unclaimed.append(m)
     if lines:
@@ -270,19 +278,22 @@ for sec in range(512):
     forms = sorted(group_forms(g))
     lines = pool_report(f'sector {sec}', forms)
     if lines:
-        tag = '' if claimed else '  [UNCLAIMED/UNTUNED]'
+        tag = '' if GATE or claimed else '  [UNCLAIMED/UNTUNED]'
         print(f'world group {g:3d} (first sector {sec}):{tag}')
         for l in lines: print(l)
 
 nfought = sum(len(v) for v in FOUGHT.values())
-print(f'tuning claim, from {len(LOGS)} generator log(s) in build/states '
-      f'({nfought} map+formation pairs fought): {len(CLAIMED_FIELD)} field '
-      f'maps {sorted(CLAIMED_FIELD)}; world sector bytes: '
-      f'{len([s for s in CLAIMED_WORLD_SECTORS if s < 256])} of the WoB, '
-      f'{len([s for s in CLAIMED_WORLD_SECTORS if s >= 256])} of the WoR '
-      f'(walked sectors known for world(s) {sorted(WALKED) or "none"}); '
-      f'{len(unclaimed)} battle-enabled maps UNCLAIMED')
-if not LOGS:
+if GATE:
+    print('tuning claim: not read (--gate); run without --gate for it')
+else:
+    print(f'tuning claim, from {len(LOGS)} generator log(s) in build/states '
+          f'({nfought} map+formation pairs fought): {len(CLAIMED_FIELD)} field '
+          f'maps {sorted(CLAIMED_FIELD)}; world sector bytes: '
+          f'{len([s for s in CLAIMED_WORLD_SECTORS if s < 256])} of the WoB, '
+          f'{len([s for s in CLAIMED_WORLD_SECTORS if s >= 256])} of the WoR '
+          f'(walked sectors known for world(s) {sorted(WALKED) or "none"}); '
+          f'{len(unclaimed)} battle-enabled maps UNCLAIMED')
+if not LOGS and not GATE:
     print('  (no generator logs: nothing is claimed until the route is played)')
 
 # Every formation a walked pool can deal must resolve to bodies: a word

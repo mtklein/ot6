@@ -10,7 +10,13 @@
 # * All emulator/script output goes to the logfile
 #   (default: build/states/last_run.log).
 # * [b64:<tag>] payloads emitted by the script (savestates, screenshots) are
-#   decoded into build/states/ and build/states/shots/ afterwards.
+#   decoded afterwards.  Screenshots land in build/states/shots/.  A state
+#   (*.mss and its .lua sidecar) is published only where the run was told to
+#   put it (#536): a graph edge names its own (OT6_EXPECT_ARTIFACT) and only
+#   those land in build/states; a caller's own OT6_ARTIFACT_DIR (anywhere
+#   but build/states) takes every state the run emitted; any other run (a
+#   lab, a hand run, a suite) publishes no state, and says so.
+#   OT6_NO_PUBLISH=1 publishes nothing at all.  `run.sh --publish-selftest`.
 # * Every invocation gets a fresh workspace under build/test-runs/.  OT6_WORKER
 #   is only a diagnostic label.  Every worker execs one shared read-only
 #   Mesen bundle and is kept apart by CFFIXED_USER_HOME (XDG_CONFIG_HOME on
@@ -47,6 +53,144 @@ ROM="${OT6_ROM:-$ROOT/build/ot6.sfc}"
 PASS_RE='^\[ot6\] PASS \(frame '
 FAIL_RE='^\[ot6\] FAIL: '
 verdict_spoken() { grep -qE "$PASS_RE|$FAIL_RE" "$1"; }
+
+# Publish complete files only.  The invocation workspace remains the source of
+# truth until decoding is finished; rename within each destination directory
+# prevents readers from observing a partially copied log or artifact.
+publish_file() {
+  src=$1 dest=$2
+  tmp="$dest.tmp.$$"
+  cp "$src" "$tmp" && mv -f "$tmp" "$dest"
+}
+# Each published .mss gets <state>.mss.emulator beside it: this run's
+# [emulator] log line, verbatim, which savestate_stamp.sh write records in
+# the stamp, so the log and the stamp name the same binary by construction.
+publish_emulator() {  # <published path> <run log>
+  case "$1" in *.mss)
+    grep '^\[emulator\]' "$2" | tail -n 1 > "$1.emulator.tmp.$$" &&
+      mv -f "$1.emulator.tmp.$$" "$1.emulator" ;;
+  esac
+}
+# publish_artifacts <artifact dir> <publish dir> <run log> <verdict>: where a
+# passing run's decoded artifacts go when it leaves its workspace (#536).
+#
+# build/states is the graph's: only a generating edge writes a state there,
+# and only its own.  OT6_EXPECT_ARTIFACT, set by savestate_ninja.py's
+# generate rules, names the states the invoking edge is for.  A script that
+# generates several states emits every sibling on every invocation, and each
+# sibling is its own edge running this same script, so publishing the whole
+# workspace would let one edge rewrite another's declared outputs with fresh
+# mtimes; the siblings this run emitted are discarded, and the published copy
+# is always the one whose own edge scheduled it.
+#
+# A run with no edge behind it (a lab, a hand run, a suite, an instrument)
+# publishes no state into build/states: a lab script that left out
+# OT6_NO_PUBLISH used to overwrite its tree's moogle_* and narshe_battle
+# captures (the v044 mg-lab.sh).  A caller that wants the states names its
+# own directory, OT6_ARTIFACT_DIR (a sweep's per-seed dir, fill_line.py's
+# wave), which takes everything the run emitted.  Screenshots and other
+# forensic output (shots/) publish either way; OT6_NO_PUBLISH=1 publishes
+# nothing.
+publish_artifacts() {
+  _art=$1 _pub=$2 _runlog=$3 _verdict=$4
+  [ "$_verdict" -eq 0 ] || return 0
+  [ -z "${OT6_NO_PUBLISH:-}" ] || return 0
+  mkdir -p "$_pub/shots" "$ROOT/build/states"
+  if [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
+    for src in $OT6_EXPECT_ARTIFACT; do
+      pub="$_pub/$src"   # before publish_file, which reuses $src
+      publish_file "$_art/$src" "$pub"
+      publish_emulator "$pub" "$_runlog"
+    done
+  elif [ "$(cd "$_pub" && pwd -P)" = "$(cd "$ROOT/build/states" && pwd -P)" ]; then
+    _kept=""
+    for src in "$_art"/*; do
+      [ -f "$src" ] && _kept="$_kept $(basename "$src")"
+    done
+    [ -z "$_kept" ] || echo "publish: no graph edge named this run's states, so build/states" \
+      "keeps its own (#536):$_kept -- set OT6_ARTIFACT_DIR to a directory of your own to keep them"
+  else
+    for src in "$_art"/*; do
+      [ -f "$src" ] || continue
+      pub="$_pub/$(basename "$src")"
+      publish_file "$src" "$pub"
+      publish_emulator "$pub" "$_runlog"
+    done
+  fi
+  for src in "$_art/shots"/*; do
+    [ -f "$src" ] || continue
+    publish_file "$src" "$_pub/shots/$(basename "$src")"
+  done
+}
+
+# --publish-selftest: the rules above on a scratch tree, without Mesen.  Each
+# case is a fresh workspace that emitted two states (a.mss, b.mss and their
+# sidecars) and a screenshot, over a build/states holding the graph's own
+# a.mss; the case reads what landed where.
+if [ "${1:-}" = "--publish-selftest" ]; then
+  fails=0
+  _st=$(mktemp -d)
+  ppass() { printf '  pass  %s\n' "$1"; }
+  pfail() { printf '  FAIL  %s\n' "$1"; fails=$(( fails + 1 )); }
+  pcase() {  # <label> <verdict> <want: relpaths under the scratch root> [VAR=value...]
+    _label=$1 _v=$2 _want=$3; shift 3
+    rm -rf "$_st/root" "$_st/art"
+    mkdir -p "$_st/root/build/states" "$_st/art/shots"
+    for f in a.mss a.mss.lua b.mss b.mss.lua; do echo "new $f" > "$_st/art/$f"; done
+    echo png > "$_st/art/shots/x.png"
+    echo "old a.mss" > "$_st/root/build/states/a.mss"
+    echo '[emulator] abc' > "$_st/log"
+    _pubdir="$_st/root/build/states"
+    for kv in "$@"; do
+      case "$kv" in OT6_ARTIFACT_DIR=*) _pubdir="$_st/root/${kv#OT6_ARTIFACT_DIR=}" ;; esac
+    done
+    ( unset OT6_NO_PUBLISH OT6_EXPECT_ARTIFACT OT6_ARTIFACT_DIR
+      for kv in "$@"; do export "$kv"; done
+      ROOT="$_st/root"
+      publish_artifacts "$_st/art" "$_pubdir" "$_st/log" "$_v" > "$_st/out" )
+    _got=$(cd "$_st/root" && find . -type f ! -name '*.emulator' | sed 's|^\./||' | sort | tr '\n' ' ')
+    _wnt=$(printf '%s\n' $_want | sort | tr '\n' ' ')
+    if [ "$_got" = "$_wnt" ]; then ppass "$_label"
+    else pfail "$_label"; printf '        got:  %s\n        want: %s\n' "$_got" "$_wnt"; fi
+  }
+  pcase "a run with no edge publishes no state into build/states, only its shot" 0 \
+        "build/states/a.mss build/states/shots/x.png"
+  if [ "$(cat "$_st/root/build/states/a.mss")" = "old a.mss" ]; then
+    ppass "...the graph's own a.mss is untouched"
+  else pfail "...the graph's own a.mss was overwritten"; fi
+  if grep -q "keeps its own (#536): a.mss a.mss.lua b.mss b.mss.lua" "$_st/out"; then
+    ppass "...and the run says which states it kept back"
+  else pfail "...the run did not name the states it kept back"; fi
+  pcase "OT6_ARTIFACT_DIR naming build/states itself publishes no state either" 0 \
+        "build/states/a.mss build/states/shots/x.png" OT6_ARTIFACT_DIR=build/states
+  pcase "a graph edge publishes exactly the states it names" 0 \
+        "build/states/a.mss build/states/a.mss.lua build/states/shots/x.png" \
+        "OT6_EXPECT_ARTIFACT=a.mss a.mss.lua"
+  if [ "$(cat "$_st/root/build/states/a.mss")" = "new a.mss" ] &&
+     [ "$(cat "$_st/root/build/states/a.mss.emulator")" = "[emulator] abc" ]; then
+    ppass "...with the run's bytes and its [emulator] line beside the .mss"
+  else pfail "...the edge's state did not land whole"; fi
+  pcase "a caller's own OT6_ARTIFACT_DIR takes every state the run emitted" 0 \
+        "build/states/a.mss own/a.mss own/a.mss.lua own/b.mss own/b.mss.lua own/shots/x.png" \
+        OT6_ARTIFACT_DIR=own
+  pcase "OT6_NO_PUBLISH=1 publishes nothing, even from an edge" 0 \
+        "build/states/a.mss" OT6_NO_PUBLISH=1 "OT6_EXPECT_ARTIFACT=a.mss a.mss.lua"
+  pcase "a failing run publishes nothing" 1 \
+        "build/states/a.mss" "OT6_EXPECT_ARTIFACT=a.mss a.mss.lua"
+  # the negative: the rule this replaced (no edge: publish everything unless
+  # OT6_NO_PUBLISH) overwrites the graph's capture in the first case
+  rm -rf "$_st/root" && mkdir -p "$_st/root/build/states"
+  echo "old a.mss" > "$_st/root/build/states/a.mss"
+  for src in "$_st/art"/*; do [ -f "$src" ] && cp "$src" "$_st/root/build/states/"; done
+  if [ "$(cat "$_st/root/build/states/a.mss")" = "new a.mss" ]; then
+    ppass "NEGATIVE the old publish-everything rule overwrites the graph's a.mss"
+  else pfail "NEGATIVE the old rule did not overwrite: the case above proves nothing"; fi
+  rm -rf "$_st"
+  if [ "$fails" -ne 0 ]; then
+    echo "run.sh --publish-selftest: $fails FAILURE(S)"; exit 1
+  fi
+  echo "run.sh --publish-selftest: OK"; exit 0
+fi
 
 # --verdict-selftest: falsify the PASS/FAIL parsing without launching Mesen.
 if [ "${1:-}" = "--verdict-selftest" ]; then
@@ -664,14 +808,6 @@ if [ "$verdict" -eq 0 ] && [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
   done
 fi
 
-# Publish complete files only.  The invocation workspace remains the source of
-# truth until decoding is finished; rename within each destination directory
-# prevents readers from observing a partially copied log or artifact.
-publish_file() {
-  src=$1 dest=$2
-  tmp="$dest.tmp.$$"
-  cp "$src" "$tmp" && mv -f "$tmp" "$dest"
-}
 # Checkpoint creation is intentionally a separate, explicit operation.  Mesen
 # flushes battery SRAM only while shutting down, so the complete 32 KiB file
 # becomes available here, after the Lua script has exercised the real Save UI.
@@ -724,47 +860,7 @@ $ancestors"
   fi
 fi
 publish_file "$RUN_LOG" "$LOG"
-# OT6_NO_PUBLISH=1 runs a generator for its verdict only, leaving build/states
-# untouched.
-#
-# A generating edge publishes only its own artifacts.  OT6_EXPECT_ARTIFACT is
-# set by savestate_ninja.py's `generate` rule, naming the one state the
-# invoking ninja edge is for.  A script that generates several states emits
-# every sibling state on every invocation, and each sibling is its own ninja
-# edge running this same script, so publishing the whole workspace would let
-# one edge rewrite another edge's declared outputs with fresh mtimes.  The
-# sibling copies this run just emitted are discarded rather than moved: the
-# published copy is always the one whose own edge scheduled it.  Screenshots
-# publish either way, since they are forensic output with no edge of their own.
-# Each published .mss gets <state>.mss.emulator beside it: this run's
-# [emulator] log line, verbatim, which savestate_stamp.sh write records in
-# the stamp, so the log and the stamp name the same binary by construction.
-publish_emulator() {
-  case "$1" in *.mss)
-    grep '^\[emulator\]' "$RUN_LOG" | tail -n 1 > "$1.emulator.tmp.$$" &&
-      mv -f "$1.emulator.tmp.$$" "$1.emulator" ;;
-  esac
-}
-if [ "$verdict" -eq 0 ] && [ -z "${OT6_NO_PUBLISH:-}" ]; then
-  if [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
-    for src in $OT6_EXPECT_ARTIFACT; do
-      pub="$PUBLISH/$src"   # before publish_file, which reuses $src
-      publish_file "$ART/$src" "$pub"
-      publish_emulator "$pub"
-    done
-  else
-    for src in "$ART"/*; do
-      [ -f "$src" ] || continue
-      pub="$PUBLISH/$(basename "$src")"
-      publish_file "$src" "$pub"
-      publish_emulator "$pub"
-    done
-  fi
-  for src in "$ART/shots"/*; do
-    [ -f "$src" ] || continue
-    publish_file "$src" "$PUBLISH/shots/$(basename "$src")"
-  done
-fi
+publish_artifacts "$ART" "$PUBLISH" "$RUN_LOG" "$verdict"
 
 grep '^\[ot6\]' "$RUN_LOG"
 
