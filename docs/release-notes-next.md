@@ -10,6 +10,9 @@ still lands on its own, with its own damage number and shield chip, one
 after another once the animation ends; before, the whole animation played
 again for every hit, which looked like the move being used twice.
 
+The boost pips beside a character's name no longer flicker back to the old
+count for a moment when that character's command window opens.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44
