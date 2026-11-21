@@ -89,7 +89,11 @@ H.run({ maxFrames = 80000 }, {
     gAllowed = allowed
     watching = true
   end),
-  H.kitBattle(plan, { maxFrames = 30000, untilPlanDone = true }),
+  -- The others Fight the train and their care answers any member's lost control (cureAllies), not Defend: the
+  -- train's Evil Toot can open the battle by Muddling SABIN and SHADOW and Berserking CYAN, and on the v0.50
+  -- line's capture the Defending party wiped before SHADOW's first window ("05:350/0020 03:282/0020 02:349/0010"
+  -- at f1271, a wipe at f5386: build/attempts/wt/v050-line-deaths/suites/).
+  H.kitBattle(plan, { maxFrames = 30000, untilPlanDone = true, others = "fight", cureAllies = true }),
   H.driveUntil(function() return #throws >= 2 and throws[2].post ~= nil end, 3000,
     { { tick = function() H.setPad({}); return "frame" end, reset = function() end } }, "the second throw lands"),
   H.call(function()

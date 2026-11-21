@@ -208,6 +208,8 @@ local function openWindow(k, slot, tag)
   end
   error(tag .. ": the member's " .. k.st .. " window never came up", 0)
 end
+-- per fixture: a worn stone seen on a member's magic walk, the Up checks made, the walks a lost control ended
+local stoneSeen, upChecked, lostMid = {}, {}, {}
 local function closeWindow(k, slot)
   for _ = 1, 40 do
     if st() ~= k.st and st() ~= ST_ESPER then return end
@@ -256,7 +258,22 @@ local function walk(kindName, slot, want, tag)
     if j == 0 and sc == 0 then break end
     press(k.cols == 2 and "left" or "up")
   end
+  -- a member who lost control during the walk (Petrify, Zombie or Death: the same mask the walks test at a
+  -- member's start) keeps a window the engine closes at the next press (v0.50 line's wob_esper_mtn_hunt capture:
+  -- STRAGO petrified while his list was walked, "st 0E ... s1 40", and Up took the menu to $14, $01, $0F;
+  -- build/attempts/wt/v050-line-deaths/suites/): its walk ends there, said, and the fixture's other members
+  -- carry the summon check (asserted per fixture below)
+  if (H.readByte(0x3EE4 + slot * 2) & 0xC2) ~= 0 then
+    H.log(string.format("[dense] %s slot %d lost control during its %s walk (status1 $%02X): the rest of its walk "
+      .. "is the engine's window, not the list's; ended here", tag, slot, kindName, H.readByte(0x3EE4 + slot * 2)))
+    lostMid[tag] = (lostMid[tag] or 0) + 1
+    if kindName == "magic" and H.readByte(LISTPTR[slot]) ~= 0xFF then stoneSeen[tag] = true end
+    closeWindow(k, slot)
+    return 0
+  end
   if kindName == "magic" and H.readByte(LISTPTR[slot]) ~= 0xFF then
+    stoneSeen[tag] = true
+    upChecked[tag] = (upChecked[tag] or 0) + 1
     press("up")
     idle(10)
     H.assertEq(st(), ST_ESPER, tag .. ": Up from the first cell opens the worn stone's summon")
@@ -344,12 +361,13 @@ local function walks(tag)
           H.log(string.format("[dense] %s slot %d magic: %d cells walked, %d confirmed", tag, slot, #want, c))
         end
       end
-      if cmdRow(slot, CMD_LORE) then
+      -- (and after each walk, the same test: a member petrified during its magic walk has no lore window)
+      if cmdRow(slot, CMD_LORE) and (H.readByte(0x3EE4 + slot * 2) & 0xC2) == 0 then
         local want = expectedLores()
         local c = walk("lore", slot, want, tag)
         H.log(string.format("[dense] %s slot %d lore: %d rows walked, %d confirmed", tag, slot, #want, c))
       end
-      if cmdRow(slot, CMD_RAGE) then
+      if cmdRow(slot, CMD_RAGE) and (H.readByte(0x3EE4 + slot * 2) & 0xC2) == 0 then
         local want = expectedRages()
         H.assertEq(H.readByte(0x3A9A), #want, tag .. ": the rage count is the packed list's length")
         local c = walk("rage", slot, want, tag)
@@ -405,6 +423,13 @@ for _, f in ipairs(FIXTURES) do
       H.setPad(pad or {})
     end),
   }, f.tag .. ": the windows walked")
+  steps[#steps + 1] = H.call(function()
+    if stoneSeen[f.tag] then
+      H.assertEq((upChecked[f.tag] or 0) >= 1, true, string.format("%s: the summon's Up was checked on a member "
+        .. "wearing a stone (%d check(s); %d walk(s) ended by a lost control)", f.tag, upChecked[f.tag] or 0,
+        lostMid[f.tag] or 0))
+    end
+  end)
   steps[#steps + 1] = H.release()
 end
 
