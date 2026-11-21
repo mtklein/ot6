@@ -1723,7 +1723,12 @@ def weekly_quota():
     tokens) whose stream-json carries the plan-usage endpoint's structured
     limits.  Returns {"percent", "resets_at", "session_percent",
     "session_resets_at"}."""
-    exe = shutil.which("claude") or "/opt/homebrew/bin/claude"
+    # A systemd unit's PATH has neither the Linux installer's ~/.local/bin
+    # nor Homebrew's bin; look in both.
+    exe = shutil.which("claude") or next(
+        (p for p in (os.path.expanduser("~/.local/bin/claude"),
+                     "/opt/homebrew/bin/claude") if os.path.exists(p)),
+        "claude")
     # Without the CLAUDE* variables of the session that started live.py: a
     # child of a session reports no limits once that session moves on (the
     # banner read "16 hrs old" on 2026-11-07 while a clean run read 75%).
