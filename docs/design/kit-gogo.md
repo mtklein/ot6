@@ -53,6 +53,16 @@ both states.
 | Rage | Gau | **already his**: Gau's loadout, one list for every rager (`Ot6RageList`, `ot6_rage.asm:152`, `$257E`), and the coin and special ladder at his own tier (`Ot6RageTierStore`, `ot6_rage.asm:564`).  Gau has no divine (owner, 2026-11-15) | unchanged; Leap is an engine limit (section 3) |
 | Control | (the Fake Mustache's Painter) | vanilla Control | unchanged |
 
+Two of these commands also need the right weapon in hand, by vanilla's
+rule for everyone: SwdTech greys unless the weapon carries the SwdTech bit
+and Runic unless it carries the Runic bit (`UpdateCmdList`,
+`battle_main.asm:14094`, reads the weapon's `$3BA4`; `UpdateCmd_02`, `:14189`,
+and `UpdateCmd_01`, `:14198`).  Of the weapons Gogo can hold, the
+SwordBreaker and the Graedus open SwdTech, and his daggers, the
+SwordBreaker, the Graedus, the Imp Halberd and the Magus Rod open Runic
+(ItemProp's equip and weapon-flag bytes).  The SwordBreaker is sold at
+Maranda in the World of Ruin and won at the Colosseum.
+
 The other commands Gogo can pick (Fight, Item, Capture, Jump, X-Magic, GP
 Rain, Summon, Possess, and the revealed Leo's Shock) belong to no one's kit.
 
@@ -90,13 +100,16 @@ free as every copy is.  Under three of his points each is its plain self.
 
 ## 5. Tests
 
-`battle_gogokits` (wor-gogo-v1, the Falcon's cabin seats GOGO, TERRA, RELM
-and SABIN, so no seated member lends Scan): four rounds, each its three
+`battle_gogokits` (wor-colosseum-v1, the Falcon's cabin seats GOGO, TERRA,
+RELM and SHADOW, so no seated member lends Scan, and GOGO holds the
+SwordBreaker the Colosseum won): four rounds, each its three
 commands set in his Status menu and played through the real battle menu --
 Magic, Slot and Tools (no Scan without Lore, Setzer's table, Ultima,
 Jackpot, Overclock, and the Throw-only Assassinate gate's negative); Magic,
 Lore and Runic (Scan and Bserk, the lore loadout, Study, RunicBlade and its
 bounce); Throw, Steal and Blitz (Locke's rows, Sabin's list and Bum Rush,
 Assassinate's gate on his Throw); SwdTech, Rage and Dance (Cyan's window
-and Cleave, Gau's loadout, Mog's dances).  `battle_relmwor` covers his
+and Cleave, Gau's loadout, Mog's dances); then a fifth from
+`gen_wor_leo`'s state after the reveal (Setzer's table, Overclock and the
+Assassinate gate for the revealed slot).  `battle_relmwor` covers his
 Painter list.  Old-ROM red and mutants: `build/attempts/wt/v050-gogo-kits/`.
