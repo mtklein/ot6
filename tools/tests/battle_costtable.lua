@@ -36,7 +36,9 @@
 --      rulings the design locks: the 99 cap, the flattening it causes
 --      for dear rows, Bum Rush already sitting at the cap, and the
 --      exempt columns -- the eight SwdTech rows, Steal and Rage -- held
---      flat across all four levels. The ceiling constant is read out of
+--      flat across all four levels.  Mantra and NoiseBlaster, whose boost
+--      buys nothing, are flat too, and Debilitator pays base x (1 + boost),
+--      a weakness per point: each read off the ROM, not declared (#530). The ceiling constant is read out of
 --      Ot6BoostPriceFor itself, so a ROM that capped somewhere else
 --      fails here rather than in a play test.
 --   4c. WHO reaches the escalation, disassembled out of the built ROM
@@ -427,21 +429,57 @@ H.run({ maxFrames = 20000 }, {
       return (H.readRomByte(rec + 4) & 0x80) ~= 0 or H.readRomByte(rec + 6) == 0
           or NO_NUMBER_FX[H.readRomByte(rec + 9)] == true
     end
-    local rows, blitzFlat = {}, {}
+    -- A Tool is priced by Ot6ToolPrice (ot6_overclock.asm), read here off its bytes rather than declared (#530:
+    -- the table printed NoiseBlaster escalating 6 15 38 94 while the ROM keeps it flat).  Three arms: the tool
+    -- Ot6ToolNoBoost names (`cmp #id / beq`: NoiseBlaster, whose boost buys nothing) is the row's base at every
+    -- boost; the tool Ot6ToolPrice compares against before its per-point arm (`cmp #id / bne / jsl Ot6CostFor /
+    -- jsl Ot6PerPointPrice`: Debilitator, a weakness per point) pays base x (1 + boost); the rest take the x2.5.
+    local function jslB(addr) return { 0x22, addr & 0xff, (addr >> 8) & 0xff, (addr >> 16) & 0xff } end
+    local function at(ofs, bytes)
+      for i, b in ipairs(bytes) do if H.readRomByte(ofs + i - 1) ~= b then return false end end
+      return true
+    end
+    local nb = romOfs(H.sym("Ot6ToolNoBoost"))
+    H.assertEq(H.readRomByte(nb) == 0xc9 and H.readRomByte(nb + 2) == 0xf0, true,
+      "Ot6ToolNoBoost still opens `cmp #id / beq` -- the flat tool is read out of it below")
+    local flatTool = H.readRomByte(nb + 1)
+    local tp, perPointTool = romOfs(H.sym("Ot6ToolPrice")), nil
+    local _ = H.sym("Ot6PerPointPrice")
+    for i = 0, 0x3f do
+      if H.readRomByte(tp + i) == 0xc9 and H.readRomByte(tp + i + 2) == 0xd0
+         and at(tp + i + 4, jslB(H.sym("Ot6CostFor"))) and at(tp + i + 8, jslB(H.sym("Ot6PerPointPrice"))) then
+        perPointTool = H.readRomByte(tp + i + 1)
+        break
+      end
+    end
+    H.assertEq(perPointTool ~= nil, true, "Ot6ToolPrice still has its per-point arm "
+      .. "(`cmp #id / bne / jsl Ot6CostFor / jsl Ot6PerPointPrice`) -- read the tool out of it")
+    local rows, blitzFlat, toolFlat, toolPer = {}, {}, {}, {}
     for _, kit in ipairs({ { "Blitz", BLITZ, true }, { "SwdTech", SWDTECH, false },
                            { "Tools", TOOLS, true } }) do
       for _, r in ipairs(kit[2]) do
-        local escalates = kit[3]
+        local escalates, perPoint = kit[3], false
         if kit[1] == "Blitz" then
           escalates = not noNumber(r[1])
           if not escalates then blitzFlat[#blitzFlat + 1] = r[3] end
+        elseif kit[1] == "Tools" then
+          escalates = r[1] ~= flatTool
+          perPoint = r[1] == perPointTool
+          if not escalates then toolFlat[#toolFlat + 1] = r[3] end
+          if perPoint then toolPer[#toolPer + 1] = r[3] end
         end
-        rows[#rows + 1] = { kit[1], r[3], r[1], nil, escalates }
+        rows[#rows + 1] = { kit[1], r[3], r[1], nil, escalates, perPoint }
       end
     end
     H.assertEq(table.concat(blitzFlat, ","), "Mantra", string.format(
       "exactly one Blitz is flat by Ot6SpellNoNumber's rules (MagicProp +4/+6/+9), and it is Mantra; found %d: %s",
       #blitzFlat, table.concat(blitzFlat, ",")))
+    H.assertEq(table.concat(toolFlat, ","), "NoiseBlaster", string.format(
+      "exactly one Tool is flat by Ot6ToolNoBoost (its boost buys nothing), and it is NoiseBlaster; found %d: %s "
+      .. "(Ot6ToolNoBoost names item $%02X)", #toolFlat, table.concat(toolFlat, ","), flatTool))
+    H.assertEq(table.concat(toolPer, ","), "Debilitator", string.format(
+      "exactly one Tool is priced per point by Ot6ToolPrice, and it is Debilitator; found %d: %s "
+      .. "(Ot6ToolPrice's per-point arm names item $%02X)", #toolPer, table.concat(toolPer, ","), perPointTool or 0))
     rows[#rows + 1] = { "Steal", "Steal", nil, steal, false }
     rows[#rows + 1] = { "Possess", "Dance", nil, dance, true }
     rows[#rows + 1] = { "Possess", "Rage", nil, rage, false }
@@ -454,9 +492,13 @@ H.run({ maxFrames = 20000 }, {
         if k == key then return H.readRomByte(tbl + i * 2 + 1) end
       end
     end
+    -- base x (1 + boost), capped at 99 and never below the base (Ot6PerPointPrice)
+    local function perPointPrice(b, n) return math.max(b, math.min(ANCHOR, b * (1 + n))) end
     local WHYFLAT = {
       Mantra  = "its special effect ($15) writes the heal after the multiplier, so a boost buys nothing "
              .. "(Ot6SpellNoNumber) and Ot6BlitzPrice charges the base",
+      NoiseBlaster = "Ot6ToolNoBoost: its Confuse moves no number, so a boost buys nothing and Ot6ToolPrice "
+             .. "charges the base",
       SwdTech = "its boost bought the row, and the row is charged at its "
              .. "own price (cmd $07 is in Ot6BoostDmg's gate)",
       Steal   = "cmd $05 is in Ot6BoostDmg's gate: the boost buys the "
@@ -470,9 +512,9 @@ H.run({ maxFrames = 20000 }, {
       local b = r[4] or liveCost(r[3])
       H.assertEq(b ~= nil and b > 0, true, r[2] .. " has a base price")
       local c = {}
-      for n = 0, 3 do c[n + 1] = r[5] and boosted(b, n) or b end
+      for n = 0, 3 do c[n + 1] = not r[5] and b or r[6] and perPointPrice(b, n) or boosted(b, n) end
       H.log(string.format("boost   %-8s %-13s %3d %3d %3d %3d%s",
-        r[1], r[2], c[1], c[2], c[3], c[4], r[5] and "" or "   (flat)"))
+        r[1], r[2], c[1], c[2], c[3], c[4], not r[5] and "   (flat)" or r[6] and "   (per point)" or ""))
       H.assertEq(c[1], b, r[2] .. ": boost 0 is the base price, untouched")
       if not r[5] then
         exempt = exempt + 1
@@ -498,8 +540,11 @@ H.run({ maxFrames = 20000 }, {
           .. "there at every boost (#219, ruling 1: accepted, not a bug)")
       end
     end
-    H.assertEq(exempt, 11, "eleven rows are exempt from the escalation (eight SwdTech, Steal, Rage, Mantra)")
+    H.assertEq(exempt, 12,
+      "twelve rows are exempt from the escalation (eight SwdTech, Steal, Rage, Mantra, NoiseBlaster)")
     H.assertEq(flatKinds.Mantra, 1, "Mantra is the one flat Blitz: its boost buys nothing (Ot6SpellNoNumber)")
+    H.assertEq(flatKinds.NoiseBlaster, 1,
+      "NoiseBlaster is the one flat Tool: its boost buys nothing (Ot6ToolNoBoost)")
     H.assertEq(flatKinds.SwdTech, 8, "the eight SwdTech rows are flat")
     H.assertEq(flatKinds.Steal, 1,
       "Steal is flat -- the chance-verb exemption, and NOT merely unasserted: "
