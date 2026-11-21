@@ -102,19 +102,20 @@ free as every copy is.  Under three of his points each is its plain self.
 
 `battle_gogokits` (wor-colosseum-v1, the Falcon's cabin seats GOGO, TERRA,
 RELM and SHADOW, so no seated member lends Scan, and GOGO holds the
-SwordBreaker the Colosseum won): four rounds, each its three
-commands set in his Status menu and played through the real battle menu --
-Magic, Slot and Tools (no Scan without Lore, Setzer's table, Ultima,
-Jackpot, Overclock, and the Throw-only Assassinate gate's negative); Magic,
-Lore and Runic (Scan and Bserk, the lore loadout, Study, RunicBlade and its
-bounce); Throw, Steal and Blitz (Locke's rows, Sabin's list and Bum Rush,
-Assassinate's gate on his Throw); SwdTech, Rage and Dance (Cyan's window
-and Cleave, Gau's loadout, Mog's dances); then a fifth from
-`gen_wor_leo`'s state after the reveal (Setzer's table, Overclock and the
-Assassinate gate for the revealed slot).  `battle_relmwor` covers his
-Painter list.  Each Gogo arm has a byte-patch mutant (its `cmp #$0C`, or
-Study's `lda #$0C`, made never to match), and each goes red at its own
-round, as main's ROM does at R1 (Slot opens the bare reels):
-`build/attempts/wt/v050-gogo-kits/mutants/`.  Across encounter histories
-(one to three encounters used up first) and a seed shift it passed every
-time (`sweep/`).
+SwordBreaker the Colosseum won): four rounds, each its three commands set
+in his Status menu and played through the real battle menu -- Magic, Slot
+and Tools (no Scan without Lore, Setzer's table, Ultima, Jackpot,
+Overclock, and a Tool stopping at the Assassinate gate's command test);
+Magic, Lore and Runic (Scan and Bserk, the lore loadout, Study, RunicBlade
+and its bounce); Throw, Steal and Blitz (Locke's rows, Sabin's list and Bum
+Rush, Assassinate's Death mark at 3 BP and none at 2); SwdTech, Rage and
+Dance (Cyan's window and Cleave, Gau's loadout, Mog's dances); then a fifth
+from `gen_wor_leo`'s state after the reveal (Setzer's table, Overclock and
+Assassinate for the revealed slot).  Two declared stagings: Strago already
+knows every lore the plain's casters cast, so those are unlearned for the
+battle Gogo studies in (the victory teaches them back); and no party there
+breaks a body on cue, so every standing non-boss is Broken as Gogo's 2- or
+3-BP throw begins.  `battle_relmwor` covers his Painter list.  Each Gogo
+arm has a byte-patch mutant (its `cmp #$0C`, Study's `lda #$0C`, the study's
+own full-boost test, Jackpot's second roll), each red in the suite:
+`build/attempts/wt/v050-gogo-kits/mutants/r3/`.

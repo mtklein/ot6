@@ -10,7 +10,7 @@
 -- suite gives GOGO the commands through the field Status menu, as a player
 -- does, and plays them through the real battle menu (H.kitBattle).
 --
--- Played, with two declared stagings (state_write_waivers.txt; below):
+-- Played, with three declared stagings (state_write_waivers.txt; below):
 -- Continue wor-colosseum-v1 (beside the Falcon by
 -- Maranda), board, and in the Falcon's cabin seat GOGO, TERRA, RELM and
 -- SHADOW (no STRAGO and no CELES: both cast Scan, and the Lore round reads
@@ -32,8 +32,11 @@
 --       and Jackpot, learned (switch $00CA);
 --     * Fire at 3 BP is Ultima (TERRA's fourth fold, switch $00BF), priced
 --       as Ultima;
---     * Jackpot at 3 BP throws two rolls for 99 MP (one, when the first
---       felled the body aimed at: a pass stays on its aim, #545);
+--     * Jackpot at 3 BP throws two rolls for 99 MP; the third staging
+--       raises every present monster's HP to 30,000 as the Jackpot begins
+--       (battle_hireimp's expedient): a roll lands at most 9,999, so the
+--       body aimed at outlasts the first and the second is thrown at it (a
+--       pass stays on its aim, #545);
 --     * Debilitator at 3 BP fires twice (Overclock, switch $0068) for the
 --       two firings' price (H.toolPrice, 80 MP),
 --       and its Ot6AssassinateGate visits stop at the command test (the
@@ -269,6 +272,15 @@ local function install()
     for m = 0, 5 do if present(m) then want = want | studyRow(species(m)) end end
     cur = { cmd = H.readByte(0xB5), atk = H.readByte(0xB6), pend = H.readByte(0x3E9D + s * 2), mp0 = mpOf(s),
       passes = 0, dice = 0, gate = 0, marks = 0, studied = 0, want = want & ~lores() & 0xFFFFFF, f = H.frame }
+    if cur.cmd == CMD.SLOT and cur.atk == JACKPOT and cur.pend >= 3 then
+      -- the third declared staging: every present monster's HP raised to
+      -- 30,000 as the Jackpot begins (battle_hireimp's expedient), so the
+      -- first roll (at most 9,999) never fells the body and the second roll
+      -- is always thrown at it (a pass stays on its aim, #545)
+      for m = 0, 5 do
+        if present(m) and H.readWord(0x3BF4 + 8 + m * 2) > 0 then H.writeWord(0x3BF4 + 8 + m * 2, 30000) end
+      end
+    end
     if cur.cmd == CMD.TOOLS then
       cur.toolPrice = H.toolPrice(s, H.abilityCost(cur.atk), cur.pend, cur.atk)
     end
@@ -407,11 +419,9 @@ local ROUNDS = {
     { tag = "jackpot", e = { cmd = CMD.SLOT, row = JACKPOT, boost = 3 },
       done = function() return lastAct(CMD.SLOT, JACKPOT, 3) ~= nil end, check = function()
         local a = lastAct(CMD.SLOT, JACKPOT, 3)
-        -- two rolls at the body aimed at; once the first has felled it the
-        -- second is not thrown (#545: a pass stays on its aim, ot6_passes.asm)
-        H.assertEq(a.dice == 2 or (a.dice == 1 and a.aim ~= nil and (a.liveEnd & a.aim) == 0), true, string.format(
-          "R1: GOGO's Jackpot at 3 BP throws two rolls (%d thrown at monsters $%02X; standing after: $%02X)", a.dice,
-          a.aim or 0, a.liveEnd))
+        -- two rolls at the body aimed at, which the staging keeps standing
+        H.assertEq(a.dice, 2, string.format("R1: GOGO's Jackpot at 3 BP throws two rolls (at monsters $%02X; "
+          .. "standing after: $%02X)", a.aim or 0, a.liveEnd))
         H.assertEq(a.mp0 - a.mp1, 99, "R1: and costs 99 MP")
       end },
     { tag = "overclock", e = { cmd = CMD.TOOLS, row = DEBIL, boost = 3 },
@@ -647,7 +657,7 @@ local function decide()
       skip.study = true
       H.log("[gogokits] no present species casts a lore: the study waits for another battle")
     elseif rows & ~lores() & 0xFFFFFF == 0 then
-      got.studyCleared, got.studyBattle = rows & lores(), battles
+      got.studyCleared, got.studyBattle, got.studyFrame = rows & lores(), battles, H.frame
       for b = 0, 2 do
         H.writeByte(0x1D29 + b, H.readByte(0x1D29 + b) & ~((got.studyCleared >> (8 * b)) & 0xFF))
       end
@@ -796,7 +806,15 @@ local function playRound(r)
         -- lores at the victory, or (no study, or no victory) they are put back
         if got.studyCleared ~= nil and got.studyLearned == nil and got.studyBattle == battles then
           local a = lastAct(CMD.MAGIC, SCAN, 3)
-          if a ~= nil and a.f > 0 and a.want ~= 0 and (lores() & a.want) == a.want then
+          if a ~= nil and a.want ~= 0 and a.f >= got.studyFrame then
+            -- the cast itself, judged now: a Scan that did not study fails
+            -- here, not at the round's budget
+            H.assertEq(a.mp0 - a.mp1, 99, "R2: GOGO's Scan at 3 BP is Study, at the shared ceiling, 99 MP")
+            H.assertEq(a.studied, a.want, string.format(
+              "R2: the study added exactly the lores the present species could teach (want $%06X, wrote $%06X)",
+              a.want, a.studied))
+          end
+          if a ~= nil and a.want ~= 0 and a.f >= got.studyFrame and (lores() & a.want) == a.want then
             got.studyLearned = lores()
             H.log(string.format("[gogokits] the victory taught the studied lores: $1D29 $%06X", lores()))
           elseif (lores() & got.studyCleared) ~= got.studyCleared then
