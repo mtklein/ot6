@@ -5,15 +5,12 @@
 -- the party window. the ability-list icon assert lives in battle_break,
 -- whose drive reliably traverses the list.
 --
--- THE PIP HALF READS THE LIVE CELL, NOT ROW 0.  The party window has
--- exactly one bp-pip cell.  Ot6PipStage moves it -- to the active
--- character while a menu is open, to whoever just spent or gained bp for
--- OT6_PIPTAIL frames after -- and the flush blanks the row it leaves to
--- $21ff on the way (ot6_hud.asm @pipline).  So which row holds pips on
--- any one frame is where the line happens to be parked, and this file
--- used to pin row 0 at $2173: it passed on a glyph nothing had blanked
--- yet, the same luck visual_f2 lost when #236 moved its fight by a hair
--- (#240).  It now follows OT6_PIPPREV through H.livePipCell(), the way
+-- THE PIP HALF READS THE CELL THE FLUSH PAINTED LAST.  Before #540 the
+-- party window had one bp-pip cell that moved between rows, and this file
+-- pinned row 0 at $2173: it passed on a glyph nothing had blanked yet, the
+-- same luck visual_f2 lost when #236 moved its fight by a hair (#240).
+-- Since #540 every row has its cell, painted one dirty row a frame; this
+-- file follows OT6_PIPPREV (the row painted last) through H.livePipCell(), the way
 -- visual_f2 does, and keeps what it always asked: the opening bank is
 -- Ot6InitBP's 1, nobody spends or banks in this idle stretch, so every
 -- frame the line is live it must show exactly the one-pip cluster

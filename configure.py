@@ -646,6 +646,12 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gau-v1",
     # #388 review: GOGO's Mimic of it under three points runs Pummel, from the
     # factory's save in Kefka's Tower (party 3: SABIN and GOGO together)
+    # #554: Bum Rush's four blows play one animation (staged HP so all land)
+    "battle_foldbumrush": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gau-v1",
+    # #554: the Drill's strikes fold; Overclocked, two groups of two
+    "battle_folddrill": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_bumrushmimic": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-kt-factory-v1",
     "battle_breakspell": "OT6_TIMEOUT=1800 "

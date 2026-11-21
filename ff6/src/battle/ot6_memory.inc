@@ -249,12 +249,11 @@ OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
                                 ;   until Ot6PipPending clears it on the
                                 ;   damage numeral, because that commit
                                 ;   precedes the numeral by many frames.
-                                ;   Ot6PipPending (ot6_hud.asm) moves
-                                ;   it into the live cell on the numeral frame,
-                                ;   as Ot6RevealCommit/Ot6RevealPoll do
-                                ;   for weakness reveals.  A stale value would
-                                ;   paint a spurious pip on the first numeral
-                                ;   of the next battle, so InitBP clears it.
+                                ;   Ot6PipPending (ot6_hud.asm) clears it on
+                                ;   the numeral frame, as Ot6RevealCommit/
+                                ;   Ot6RevealPoll commit weakness reveals.  A
+                                ;   stale value would hold a row a pip short
+                                ;   into the next battle, so InitBP clears it.
 ; the break flash.  One byte per monster slot, stride 2 and indexed by
 ; the slot offset 0,2..10 like OT6_RVPEND_* (so a chip holding the
 ; entity offset in y writes OT6_BRKTICK-8,y and the walkers read

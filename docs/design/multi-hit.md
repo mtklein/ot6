@@ -516,12 +516,26 @@ retired, the data block stepped past). The passes are unchanged: chips, the
 breaking hit (#542) and staying on the aim (#545) are per pass as before, and
 the shield gauge and break presentation ride the numerals (#539), so each
 strike's chip and break land with its numeral. Same treatment for all three;
-an Overclocked Drill is two groups of two. Measured on one wor-gau-v1 battle
-each (lab, `build/attempts/wt/v050-multihit-anim/`): a Pummel's script ran
-478 frames from its name to the script's end before, 311 after; a Bum
-Rush's four blows land their numerals 27 frames apart after one ~490-frame
-animation. `battle_hitcount` asserts the Pummel script (one animation, one
-folded strike, two numerals) and `battle_bumrush` the Bum Rush one.
+an Overclocked Drill is two groups of two.
+
+Measured in a lab (`build/attempts/wt/v050-multihit-anim/graphlab/`), one
+battle each, Continuing the graph's own captures of this branch's line
+(Pummel and Bum Rush: wor-gau-v1; Drill: fc-alcove-v1), with v0.49's ROM as
+"before" on the same capture. Declared lab writes, presentation only: every
+monster staged to 30000 HP so each strike lands on a standing body, and for
+the Drill the bag's Debilitator made a Drill (no battery on the route holds
+one). From the name to the script's end: Pummel 477 frames before, 311
+after; Drill 375 before, 260 after. Bum Rush after: one animation (the
+first numeral at +567 frames), then the four numerals 27 frames apart, the
+script ending at +655; before, four animations, the last numeral at +2033
+(`battle_foldbumrush` on v0.49's ROM, `foldsuites/`).
+
+Asserted: `battle_hitcount` (a played Pummel: one animation, one folded
+strike, two numerals), `battle_foldbumrush` (Bum Rush's four blows, staged
+HP: one animation, three folded strikes each a beat of at least 24 frames
+after the last) and `battle_folddrill` (the Drill, and the Overclocked Drill
+as two groups of two, a declared Drill in the bag). Each is red on v0.49's
+ROM; the beat is red on a ROM with a one-frame beat.
 
 ---
 
