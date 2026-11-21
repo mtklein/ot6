@@ -51,7 +51,23 @@ for _,pulses in ipairs({false,true}) do
   check(dropped,"existing watchdog bounds unanswered exact boost")
 end
 H.BOOST_PULSES=false
-for _,args in ipairs({{0,4,5},{0,1.5,5},{4,0,5},{0,0,6}}) do
+for _,args in ipairs({{0,4,5},{0,1.5,5},{4,0,5},{0,0,6},{0,0,5,2}}) do
   check(H.exactBoostStep(table.unpack(args))=="drop","malformed exact boost rejected")
+end
+-- A Portrait gift held (Ot6BankGift, #538/#558) is room for R: the exact step reads bank + gift, and the
+-- command window's own step through the driver reads the gift cell ($EF0E, one bit a member).
+check(H.exactBoostStep(1,2,1,1)=="r","a gift makes the second point buyable")
+check(H.exactBoostStep(1,2,1,0)=="drop","without the gift the bank alone cannot buy it")
+for k in pairs(mem) do mem[k]=nil end
+mem[0x7BCA],mem[0x7BC2],mem[0x3BF4],mem[0x3E9C],mem[0x3E9D],mem[0xEF0E]=1,5,100,1,1,1
+do
+  local d=H.newFightDriver("gift exact boost",{}).driver
+  d.plan,d.planActor={kind="fight",row=0,boostLeft=2,exactBoost=true,boostWant=2},0
+  local got=d:button(0)
+  check(d.plan~=nil and got and got[1]=="r","a gifted member's exact plan presses R past its bank")
+  mem[0xEF0E]=0
+  d.plan,d.planActor={kind="fight",row=0,boostLeft=2,exactBoost=true,boostWant=2},0
+  got=d:button(0)
+  check(d.plan==nil and got==nil,"the same plan with no gift is dropped")
 end
 print(string.format("race_boost_selftest: PASS -- %d checks",n))

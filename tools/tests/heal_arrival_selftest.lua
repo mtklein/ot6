@@ -395,6 +395,28 @@ do
   check(p ~= nil and p.kind == "magic", "makePlan runs the cover: a cast, got " .. tostring(p and p.kind))
 end
 
+-- 6. M.partyCureBoost (#558): the party cure's boost sized on purpose.  Restores by tier (least, single
+-- target): Cure 2 at 1 point 600, Cure 3 at 2 points 1400; the spread share is half.
+do
+  local least = { [1] = 600, [2] = 1400, [3] = 1400 }
+  local function at(b) return least[b] end
+  local cands = { { e = 0, hp = 900, maxhp = 1800 }, { e = 1, hp = 1000, maxhp = 1700 } }
+  local b = H.partyCureBoost(3, false, cands, at, { [0] = 200, [1] = 200 }, 50)
+  check(b == 1, "a share that covers what each needs stays at the floor: got " .. b)
+  b = H.partyCureBoost(3, false, cands, at, { [0] = 700, [1] = 700 }, 50)
+  check(b == 2, "two rounds of 700 against 900 HP want 500 a head, more than Cure 2's 300 share: got " .. b)
+  b = H.partyCureBoost(1, false, cands, at, { [0] = 700, [1] = 700 }, 50)
+  check(b == 1, "the bank caps the boost: got " .. b)
+  b = H.partyCureBoost(3, true, cands, at, { [0] = 0, [1] = 0 }, 50)
+  check(b == 2, "a deep party starts at the old floor of 2: got " .. b)
+  b = H.partyCureBoost(3, false, { { e = 0, hp = 1790, maxhp = 1800 }, { e = 1, hp = 1690, maxhp = 1700 } }, at,
+    { [0] = 5000, [1] = 5000 }, 50)
+  check(b == 1, "never more than lifts each to max HP: got " .. b)
+  b = H.partyCureBoost(3, false, cands, function() return nil end, { [0] = 700, [1] = 700 }, 50)
+  check(b == 1, "an unknown restore keeps the floor: got " .. b)
+end
+
 print(string.format("heal_arrival_selftest: PASS -- %d checks: the arrival's arithmetic on Tzen, the White "
   .. "Dragon and Wrexsoul, the in-time lift, the arrival's estimate, the X-Potion that gives way to the Cure, "
-  .. "the queued hit that cancels a cure, the spend past a late self-heal, Love Token's guard and the Fight it turns", n))
+  .. "the queued hit that cancels a cure, the spend past a late self-heal, Love Token's guard and the Fight it "
+  .. "turns, the party cure's boost", n))

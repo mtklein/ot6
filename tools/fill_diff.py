@@ -206,7 +206,13 @@ OBSERVATIONS = ("[ot6] [tiles] ",)
 # carries moves without the play moving
 NORM = [(re.compile(r"\b\d+ bytes\b"), "N bytes"),
         (re.compile(r"sha=[0-9a-f]+"), "sha=X"),
-        (re.compile(r"\b\d+(\.\d+)?s wall\b"), "Ns wall")]
+        (re.compile(r"\b\d+(\.\d+)?s wall\b"), "Ns wall"),
+        # a path into a tree names the tree (the two trees compared live in
+        # different directories) and run.sh's per-run workspace, whose name
+        # carries a random suffix (build/test-runs/wor_kt_doom.3E0KfXgo/):
+        # neither is the play (#558)
+        (re.compile(r"(?:/[^\s/'\"]+)*?/build/test-runs/[^\s/'\"]+"), "<tree>/build/test-runs/<run>"),
+        (re.compile(r"(?:/[^\s/'\"]+)+?/build/"), "<tree>/build/")]
 
 
 def ot6_lines(path):
@@ -504,6 +510,18 @@ def selftest():
         rep, bad = diff_trees(ref, fil, out=[].append)
         b = next(e for e in rep if e.get("state") == "b")
         check("a differing [tiles] line is an observation", "play" not in b and b["observations"] == 1)
+        # each tree's own path, and a run's workspace, are not the play (#558)
+        shot = ("[ot6] [retry] attempt 1/3 FAILED class=wipe frame=9 shift=0 screenshot="
+                "{}/build/test-runs/b.{}/artifacts/shots/a.png: GAME OVER\n")
+        (ref / "build/states/b.log").write_text(log + shot.format(ref, "3E0KfXgo"))
+        (fil / "build/states/b.log").write_text(log + shot.format(fil, "Zq81LmPa"))
+        rep, bad = diff_trees(ref, fil, out=[].append)
+        b = next(e for e in rep if e.get("state") == "b")
+        check("tree paths and run workspaces are normalised", "play" not in b)
+        (fil / "build/states/b.log").write_text(log + shot.format(fil, "Zq81LmPa").replace("class=wipe", "class=nopath"))
+        rep, bad = diff_trees(ref, fil, out=[].append)
+        b = next(e for e in rep if e.get("state") == "b")
+        check("...and the rest of such a line still counts", b.get("play", {}).get("line") == 4)
     print("fill_diff selftest: " + ("OK" if not fails else f"{len(fails)} FAILURE(S)"))
     return 1 if fails else 0
 

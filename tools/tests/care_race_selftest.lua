@@ -858,6 +858,20 @@ do
   check(run(true) == "false true true true true",
     "MUTANT the pre-#542 rule reads the breaking hit's drop broken")
 end
+-- 42c. #548: one frame's drop read per pass.  Three passes on one frame: a shielded swing (100), the breaking
+-- swing (100, judged on the body before it: shielded), a broken swing (400).  The frame rule priced the 600 as
+-- one shielded hit; the passes read 100 + 100 + 400/4 = 300 over three hits.  A drop no pass accounts for falls
+-- back to the frame's verdict.
+do
+  local qs = { { drop = 100, broken = false }, { drop = 100, broken = false }, { drop = 400, broken = true } }
+  local norm, race, n, sum = H.dropFromPasses(qs, 600, 2, false)
+  check(norm == 300 and n == 3 and sum == 600 and race == 300,
+    string.format("three passes on one frame: %s %s %s %s", norm, race, n, sum))
+  norm, race, n, sum = H.dropFromPasses({ { drop = 100, broken = false } }, 500, 2, true)
+  check(norm == 200 and n == 2 and sum == 100, "the rest of the drop takes the frame's verdict: " .. norm .. " " .. n)
+  norm, race, n = H.dropFromPasses({ { drop = -50, broken = false } }, 0, 2, false)
+  check(norm == 0 and n == 0, "a pass that healed counts no hit")
+end
 
 -- 43. An unknown continuation cannot obtain an instantaneous saving Cure.
 do

@@ -611,13 +611,16 @@ measurements, `suites/` for the suites and their mutants).
   itself never runs on a bounce.
 - The knife is font cell `$74`, between the pip cells, uploaded with the
   other fixed glyphs (slice B grows by one tile).
-- The driver line reads the battle as section 6 says, in event battles only,
-  with one difference: the hobble goes at any standing monster that takes
-  Slow, the one with the most HP left, not only at a boss (so a monster
-  called into the fight is hobbled too). It throws the cheapest throwable
-  the bag already holds that some shop sells: the stars first, then a spare
-  weapon by its price (the v0.48 line's Imperial Camp fight reached for a
-  Dirk once its three Shuriken were thrown). Buying
+- The driver line reads the battle as section 6 says, in event battles only.
+  The hobble goes at a boss (death-immune, `$3AA1` bit 2) that takes Slow,
+  the one with the most HP left; a pin at any Slowed body. Until v0.50 it
+  hobbled any standing monster, and the v0.48 and v0.49 lines' Imperial Camp
+  fight threw a Dirk at a 100-HP Soldier called in once the boss was low
+  (#553). It throws the cheapest throwable the bag already holds that some
+  shop sells, the stars first; a weapon only while the bag holds two above
+  its reserve, so one is always kept (#553: the Dirk; the Cranes fight's
+  kept Mithril Knife). A slot whose live species reads `$FFFF` is never
+  aimed at. Buying
   throwables on the route (section 6, "Supply") is not built: it moves the
   line's shop stops and saves and is left for its own change.
 
