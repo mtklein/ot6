@@ -115,7 +115,14 @@ H.run({ maxFrames = 900000 }, {
       cur.tier, cur.beast = H.readByte(RAGETIER + gs * 2), H.readByte(0x33A8 + gs * 2)  -- his own cell
     end
     -- his battle MP on every live frame after the first possessed turn began (the fallback reading above)
-    if b and inBattle and gs ~= nil and cur.cmd10 >= 2 and batMp(gs) ~= 0xFFFF then cur.bmpLast = batMp(gs) end
+    -- (not once the battle is won: v0.50's replay drew a win before the third Cmd_10, and the victory's level-up
+    -- took the battle MP 311 -> 325 before the teardown, 'got 325 ($145), want 303 ($12F)',
+    -- build/attempts/wt/v050-multihit-anim/qual5_battle_ragedriver_red.log; the monsters' live mask $3A75 empties
+    -- at the last kill, before the rewards)
+    if b and inBattle and gs ~= nil and cur.cmd10 >= 2 and batMp(gs) ~= 0xFFFF and H.readByte(0x3A75) ~= 0
+       and recLevel() == cur.lv0 then
+      cur.bmpLast = batMp(gs)
+    end
     if b and not inBattle then
       inBattle, cur, nr0 = true, fresh(), #H.rages
       cur.mp0, cur.lv0 = recMp(), recLevel()
