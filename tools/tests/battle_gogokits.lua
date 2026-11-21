@@ -268,7 +268,10 @@ local function install()
   end, emu.callbackType.exec, pt, pt)
   local jd = H.sym("Ot6JackpotDice")
   emu.addMemoryCallback(function()
-    if cur and not cur.ended and (cpu()["cpu.y"] & 0xFF) == gseat() * 2 then cur.dice = cur.dice + 1 end
+    if cur and not cur.ended and (cpu()["cpu.y"] & 0xFF) == gseat() * 2 then
+      cur.dice = cur.dice + 1
+      cur.aim = cur.aim or H.readByte(0xB9)       -- the first roll's monster mask: the body aimed at
+    end
   end, emu.callbackType.exec, jd, jd)
   local gb = findGateBoost()
   emu.addMemoryCallback(function()
@@ -375,11 +378,11 @@ local ROUNDS = {
     { tag = "jackpot", e = { cmd = CMD.SLOT, row = JACKPOT, boost = 3 },
       done = function() return lastAct(CMD.SLOT, JACKPOT, 3) ~= nil end, check = function()
         local a = lastAct(CMD.SLOT, JACKPOT, 3)
-        -- two rolls; a second finds nobody once the first has felled the
-        -- whole side, and is not thrown (#545, ot6_passes.asm)
-        H.assertEq(a.dice == 2 or (a.dice == 1 and a.liveEnd == 0), true, string.format(
-          "R1: GOGO's Jackpot at 3 BP throws two rolls (%d thrown, monsters standing after: $%02X)", a.dice,
-          a.liveEnd))
+        -- two rolls at the body aimed at; once the first has felled it the
+        -- second is not thrown (#545: a pass stays on its aim, ot6_passes.asm)
+        H.assertEq(a.dice == 2 or (a.dice == 1 and a.aim ~= nil and (a.liveEnd & a.aim) == 0), true, string.format(
+          "R1: GOGO's Jackpot at 3 BP throws two rolls (%d thrown at monsters $%02X; standing after: $%02X)", a.dice,
+          a.aim or 0, a.liveEnd))
         H.assertEq(a.mp0 - a.mp1, 99, "R1: and costs 99 MP")
       end },
     { tag = "overclock", e = { cmd = CMD.TOOLS, row = DEBIL, boost = 3 },
