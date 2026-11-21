@@ -502,6 +502,8 @@ function M.requestSaveState()
     M.pendingStateReqs = M.pendingStateReqs - 1
     local ok, err = pcall(function() req.blob = emu.createSavestate() end)
     req.ok = ok and type(req.blob) == "string" and #req.blob > 0
+    -- which game cells the snapshot's machine had written (M.writtenFlags)
+    req.written = M.writtenFlags and M.writtenFlags()
     -- render on demand (#394): a state whose PPU palette address is not
     -- known to be a drawn frame's carries the flag (ppu.icaStale); kept, so a
     -- fixture made from it fails the run by name (M.emitBlob)
@@ -22691,6 +22693,20 @@ end
 -- is no longer logged as a map stood on.
 M.traceMapSet = false
 M.onWrite(function() M.traceMapSet = true end, 0x1F64, 0x1F65)
+-- Which of those cells the game has written, as one record a snapshot keeps
+-- (M.requestSaveState) and a replay restores: a load counts as written only
+-- for a machine that had written them.  The segment runner's boot snapshot
+-- is taken at frame 1 of a Continue, before the game wrote the map id, so a
+-- retry that restored it used to read power-on RAM as a map (`[tiles]
+-- map=61 n=1 xy=0:0` under the rand:1 fill where the reference logs map=0,
+-- wor_nikeah_plain v0.46 and wor_kt_doom v0.49, #548).
+function M.writtenFlags()
+  return { map = M.traceMapSet, hp = M.battleHpSet, present = M.battleCueSet.present, lit = M.battleCueSet.lit }
+end
+function M.restoreWritten(w)
+  M.traceMapSet, M.battleHpSet = w.map, w.hp
+  M.battleCueSet.present, M.battleCueSet.lit = w.present, w.lit
+end
 function M.traceOnLoad(first)
   M.traceMapSet = true
   if M.TRACE_HOLD == false then return end
@@ -23634,6 +23650,10 @@ local function resetLibState()
   guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
   traceMap, traceSet, traceCount = nil, {}, 0
   M.traceHoldUntil, M.traceFlushes = -1, {}
+  -- the boot snapshot is the machine before the game wrote its map or a
+  -- battle (frame 1 of a Continue): the load just made does not count as
+  -- written (#548)
+  if RUN.s0written then M.restoreWritten(RUN.s0written) end
   recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
   execActor, execActorCmd, execDone, execMon, execMonDone = nil, nil, {}, nil, nil
   execParty, execSkipped = nil, {}
@@ -24235,6 +24255,7 @@ function M.run(opts, steps)
     if RUN.s0 and RUN.s0.done and not RUN.s0blob then
       if RUN.s0.ok then
         RUN.s0blob = RUN.s0.blob
+        RUN.s0written = RUN.s0.written
         M.log(string.format("[retry] boot snapshot captured at f%d "
           .. "(%d bytes): the machine as the body's first step found it",
           M.frame, #RUN.s0blob))
