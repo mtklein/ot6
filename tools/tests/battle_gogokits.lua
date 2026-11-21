@@ -80,6 +80,7 @@ local RUNICBLADE = 0x7EEDD4                                -- OT6_RUNICBLADE (ot
 local LANDING = { 69, 183 }                                 -- the Falcon's tile by Maranda (wor-colosseum-v1's)
 local BURN = type(GOGOKITS_BURN) == "number" and GOGOKITS_BURN or 0
 local MAX_BATTLES = 30
+local ROUND_BATTLES = 8                                    -- a round's entries all played within this many
 local DANGER = 1 / 3
 local FIGHT = {}
 H.NAV_REFIRE_HOLD = true
@@ -535,7 +536,7 @@ local function r4Data()
 end
 
 -- ---- the battle loop -------------------------------------------------------------
-local round, battles, entryOf = nil, 0, {}
+local round, battles, entryOf, roundBattles = nil, 0, {}, 0
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 local function entryDone(en)
@@ -561,8 +562,22 @@ local function danger()
 end
 local castsAt = 0
 local function decide()
-  battles = battles + 1
-  H.assertEq(battles <= MAX_BATTLES, true, string.format("the four rounds within %d battles", MAX_BATTLES))
+  battles, roundBattles = battles + 1, roundBattles + 1
+  H.assertEq(battles <= MAX_BATTLES, true, string.format("the five rounds within %d battles", MAX_BATTLES))
+  -- a round whose entries a ROM never lets him play (the old ROM's Slot opens
+  -- the bare reels: no table, no Jackpot row) fails here, naming them
+  if roundBattles > ROUND_BATTLES then
+    local left = {}
+    for _, en in ipairs(round.entries) do if not entryDone(en) then left[#left + 1] = en.tag end end
+    H.assertEq(#left, 0, string.format("%s: every entry played within %d battles (never played: %s)", round.tag,
+      ROUND_BATTLES, table.concat(left, ", ")))
+  end
+  -- a Runic at 3 BP that raised no RunicBlade fails at once: the bounce
+  -- that would follow it can never come
+  local ra = lastAct(CMD.RUNIC, nil, 3, got.r5from)
+  if round.tag == "R2" and ra ~= nil then
+    H.assertEq(ra.blade, true, "R2: GOGO's Runic at 3 BP is a RunicBlade (his OT6_RUNICBLADE bit)")
+  end
   findSeats()
   handed, plan, entryOf = nil, {}, {}
   H.assertEq(gseat() ~= nil, true, "GOGO is seated")
@@ -657,6 +672,7 @@ end
 local REC = 0x1600 + 37 * GOGO
 local function playRound(r)
   return H.seqStep({
+    H.call(function() roundBattles = 0 end),
     H.cond(function() return r.leo end, {
       H.loadState("build/states/wor_leo.mss.lua"),
       H.waitFrames(30),
