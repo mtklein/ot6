@@ -69,7 +69,10 @@
 ; re-reads one monster slot a frame, and only in a battle where a body with a
 ; row stands (OT6_FUSEPOLL), into bit 0 of OT6_FUSE; a slot whose gauge is
 ; held (#539) is not re-read, so the sign goes out with the hit that breaks
-; the boss, not when its damage is computed.
+; the boss, not when its damage is computed.  In every other battle the cost
+; is one byte test a frame (the poll's gate) and one a live line (the
+; mark's): the battle loop's timing is sensitive to less (a 17-cycle test a
+; line moved a suite's battle by frames, battle_hitcount on this branch).
 ;
 ; The counter half (ot6_break.asm Ot6AIStoryOp): a `dlg` that is a fuse's
 ; announce is no story (Ot6FuseLineTbl), so the Gold Dragon's arming block

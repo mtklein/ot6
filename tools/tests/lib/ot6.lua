@@ -19183,7 +19183,7 @@ end
 -- W.cells() reads the script's and the trigger's cells; W.slot() the boss's
 -- slot.  W.pin = { boss = hp or nil, party = true } holds HP while set: a
 -- DECLARED write of the mechanism suites (the boss's HP where its script's
--- line needs it, the party's at its maximum so no draw ends the case).
+-- line needs it, every standing member's at 9,999 so no draw ends the case).
 -- The library itself writes nothing: `write` = { byte = fn(addr, v), word =
 -- fn(addr, v) } is the calling suite's own pair of writers, declared there
 -- (tools/state_write_waivers.txt), and every staging goes through it.
@@ -19294,8 +19294,10 @@ function M.fuseWatch(species, write)
       if W.pin.boss and M.readWord(0x3BF4 + e) > 0 then write.word(0x3BF4 + e, W.pin.boss) end
       if W.pin.party then
         for i = 0, 3 do
-          local hp, mx = M.readWord(0x3BF4 + 2 * i), M.readWord(0x3C1C + 2 * i)
-          if M.readByte(0x3ED8 + 2 * i) ~= 0xFF and hp > 0 and hp < mx then write.word(0x3BF4 + 2 * i, mx) end
+          -- (9,999, above any member's own maximum where that is lower: a blow that takes a whole HP bar at once,
+          -- AtmaWeapon's Meteo on a Floating Continent party, would otherwise fell the member it lands on)
+          local hp = M.readWord(0x3BF4 + 2 * i)
+          if M.readByte(0x3ED8 + 2 * i) ~= 0xFF and hp > 0 and hp < 9999 then write.word(0x3BF4 + 2 * i, 9999) end
         end
       end
     end

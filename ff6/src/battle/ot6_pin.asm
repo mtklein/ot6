@@ -216,7 +216,9 @@ OT6_MARK_STATUS = STATUS3::SLOW | STATUS3::STOP | STATUS3::HASTE
         bra     @put
 @live:  lda     $3f00,y         ; status 3 (+8: the monster half)
         jsr     Ot6MarkOf
-@put:   pha                     ; #561: a lit fuse shows its mark here too
+@put:   bit     OT6_FUSEPOLL    ; #561: a body with a fuse in this battle
+        bpl     @store          ;   (bit 7)?  one test a line while not
+        pha                     ; a lit fuse shows its mark here too
         lda     OT6_FUSE,y      ;   (bit 0, the hud's poll; ot6_fuse.asm)
         lsr
         pla
