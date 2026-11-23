@@ -1,0 +1,12 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "battery.sram",
+  "slot": 3,
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "8513d5d054bbc09f440653458d0dd3d6238bb7e2a91b498755276808b0f8a310",
+  "provenance": "a synthetic fixture for a six-class codex page (#566), not a release save: golden-saves/v0.46/kolts-summit-v1 with slot 3's codex magic ($2800-$2801) set to $394F ('O9') and every byte of its revealed-class table ($2990-$2B0F) set to $3F: all six classes revealed for every species; nothing else differs (tools/golden_saves.py synthetic rebuilds it)",
+  "golden": {
+    "esper": "signed"
+  }
+}

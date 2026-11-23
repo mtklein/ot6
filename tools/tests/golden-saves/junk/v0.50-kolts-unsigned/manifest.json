@@ -1,0 +1,12 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "battery.sram",
+  "slot": 3,
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "71475771b200b4adae993b428eec9d32759316036bb9cb574c66e95a09ff6e2d",
+  "provenance": "a synthetic fixture for a codex page with no magic (#566), not a release save: golden-saves/v0.50/kolts-summit-v1 with slot 3's codex magic ($2800-$2801) zeroed and its two tables left as the release wrote them; nothing else differs (tools/golden_saves.py synthetic rebuilds it)",
+  "golden": {
+    "esper": "signed"
+  }
+}
