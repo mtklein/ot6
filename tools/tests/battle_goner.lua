@@ -22,6 +22,9 @@
 --   outside   above the line (50,000): a break two turns into his opening rotation, before any line: nothing is
 --             cancelled and the script's cells stand; then, under the line, the fuse lights and fires as in the
 --             first case.
+-- The low line's block (under 7,680) is not played here: with his HP held at 7,000 the Fight that broke him
+-- killed him ("after the break: ... HP 0", build/attempts/wt/v051-fuse/failed/gonerlow.log).  Its row is checked
+-- against the script by battle_fuse, and the cancel it gets is this one's.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers": there Goner
 -- came on his first turn back with no new line (build/attempts/wt/v051-fuse/measure/goner.log).
 -- A mechanism test, not play.
