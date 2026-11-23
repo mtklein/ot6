@@ -34,13 +34,14 @@
 -- No species row is pinned: the visits below are where the line fields each
 -- class, and the log says what each run's rows gave.
 --   sword   vargas_entry    a sword in a hand, at VARGAS's fight
+--   ranged  vargas_entry    EDGAR's AutoCrossbow (Tools), at VARGAS once he
+--                           stands alone (the tool reaches every monster)
 --   blunt   vargas_entry    a member whose weapon went back to the bag
 --                           through Equip -> Rmove: an empty hand is Blunt
 --                           (Ot6WeapClassTbl[$FF]; GAU's is not: battle_sixgau)
 --   dagger  kolts_cave      a dagger in a hand (or put there from the bag,
 --                           through Equip); the cave's first encounter
 --   spear   ultros1_entry   a spear in a hand, at ULTROS
---   ranged  ultros1_entry   EDGAR's AutoCrossbow (Tools), at ULTROS
 --   katana  cyan_defence    CYAN's katana at the Doma soldiers
 -- At VARGAS's fight the target select does not reach him while an Ipooh
 -- stands, so a side that needs him is played from a second snapshot, taken
@@ -252,7 +253,10 @@ end
 -- an attack of the class this party can make now: a seated member's Fight
 -- with a main hand of the class (an empty hand has the fist's, GAU's the
 -- fangs': H.handClass), else a Tools owner's row for a tool of the class in
--- the bag.  nil when the party has neither.
+-- the bag that his MP pays (Ot6AbilityCostTbl: the confirm refuses a row the
+-- pool cannot cover; EDGAR reaches ULTROS with 1 MP on main's line,
+-- build/attempts/wt/v051-six-classes/newsuites/dev/chip5.log).  nil when the
+-- party has neither.
 local function attackFor(bit)
   for e = 0, 3 do
     if seated(e) and cmdRow(e, CMD_FIGHT) then
@@ -265,7 +269,7 @@ local function attackFor(bit)
   for e = 0, 3 do
     if seated(e) and cmdRow(e, CMD_TOOLS) then
       for id = 0xA3, 0xAA do
-        if H.weaponClass(id) == bit and bagHas(id) then
+        if H.weaponClass(id) == bit and bagHas(id) and (H.abilityCost(id) or 0) <= H.readWord(0x3C08 + e * 2) then
           return { e = e, c = H.readByte(0x3ED8 + e * 2), cmd = CMD_TOOLS, row = id, item = id,
             what = string.format("uses Tools row $%02X", id) }
         end
@@ -296,6 +300,9 @@ local function branch(cls, side)
     H.call(function()
       -- (a visit with two snapshots says which one this side is played from)
       local when = B.whenFor and B.whenFor(cls.bit, side == "weak") or "blob"
+      -- (a Tools row reaches every monster: played from the snapshot where one stands, when the visit has one)
+      local atk = attackFor(cls.bit)
+      if atk ~= nil and atk.cmd == CMD_TOOLS and B.late ~= nil then when = "late" end
       B.load = H.requestLoadState(B[when])
     end),
     H.waitFrames(3),
@@ -306,7 +313,7 @@ local function branch(cls, side)
       local bit = cls.bit
       local atk = attackFor(bit)
       H.assertEq(atk ~= nil, true, string.format("the party can make a %s attack: a main hand of the class, or a "
-        .. "Tools owner with a tool of it (hands: %s)", cls.name, (function()
+        .. "Tools owner with a tool of it in the bag and the MP for it (hands: %s)", cls.name, (function()
           local p = {}
           for q = 0, 3 do p[#p + 1] = string.format("c%d:$%02X", H.readByte(0x3ED8 + q * 2), H.readByte(0x3CA8 + q * 2)) end
           return table.concat(p, " ")
@@ -569,7 +576,7 @@ local function vargas(tag, prep, names)
     H.waitFrames(5),
     H.call(function() H.checkReq(B.lreq, tag .. ": the later snapshot"); B.late = B.lreq.blob end),
     cases(names),
-    H.call(function() B.canAim, B.whenFor = nil, nil end),
+    H.call(function() B.canAim, B.whenFor, B.late = nil, nil, nil end),
   }, {})
 end
 
@@ -661,7 +668,7 @@ H.run({ maxFrames = 400000 }, {
   H.call(function()
     armWatches()
   end),
-  vargas("vargas", H.waitFrames(1), { "sword" }),
+  vargas("vargas", H.waitFrames(1), { "sword", "ranged" }),
   -- blunt: one member's weapon goes back to the bag through Equip -> Rmove
   vargas("vargas, a hand emptied", H.seqStep({
     H.call(function()
@@ -676,7 +683,7 @@ H.run({ maxFrames = 400000 }, {
     H.call(function() H.assertEq(hand(strip.who), 0xFF, "blunt: the main hand is empty") end),
   }), { "blunt" }),
   kolts({ "dagger" }),
-  ultros({ "spear", "ranged" }),
+  ultros({ "spear" }),
   doma({ "katana" }),
   H.call(function()
     local said, n = {}, 0
