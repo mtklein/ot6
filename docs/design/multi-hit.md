@@ -291,9 +291,9 @@ transcription of that output and go stale if nobody re-runs it.
 | Retort | `$56` | 1 | `$53` single | — | 56 | 10 | — (counter) |
 | Slash | `$57` | 1 | `$53` single | Katana | 8 | 13 | 13.0 |
 | **Quadra Slam** | `$58` | **4** | `$53` single | Katana | 72 | 16 | **4.0** |
-| Empowerer | `$59` | 2 | `$53` single | — | 49 | 18 | 9.0 |
+| Empowerer | `$59` | 2 | `$53` single | — | 49 | 18 | — (chips nothing) |
 | Stunner | `$5a` | 1 | `$7a` one-side | Katana | 97 | 28 | 28.0 |
-| **Quadra Slice** | `$5b` | **4** | `$53` single | wind | 70 | 50 | **12.5** |
+| **Quadra Slice** | `$5b` | **4** | `$53` single | wind | 70 | 50 | **12.5** (wind) |
 | Cleave | `$5c` | 1 | `$7a` one-side | Katana | 0 | 99 | — (execute) |
 
 **Blitz** (magic ids `$5d-$64`)
@@ -335,7 +335,7 @@ Read straight off §3.1, and printed per character by `audit_multihit.py`:
 
 | character | multi-hit | probe without spending BP |
 |---|---|---|
-| **Cyan** | Quadra Slam ×4, Quadra Slice ×4, Empowerer ×2 | yes, three of them |
+| **Cyan** | Quadra Slam ×4, Quadra Slice ×4, Empowerer ×2 | yes, two of them: Quadra Slam chips Katana, Quadra Slice wind; Empowerer has no class and chips nothing (#379) |
 | **Sabin** | Pummel ×2, Bum Rush ×4 | yes, from level 1 at 4 MP |
 | **Edgar** | Drill ×2 | yes, once Figaro's sand dive is done |
 | everyone else | **none** | one chip per action |
@@ -407,7 +407,7 @@ everywhere else. Stated per tech:
 | **Quadra Slam** `$58` | **×4** | Vanilla's. 16 MP for four Katana chips into one body is the best rate-per-MP in the game after Pummel, and it arrives at LV15, which is where a party first meets 4-and-5-shield bosses. |
 | Empowerer `$59` | ×2 | Vanilla's, at quarter power, and it is a drain. Left as it is: the two hits are a consequence of the drain effect rather than a probing choice, and repricing a drain belongs to the MP economy. |
 | Stunner `$5a` | ×1 | Already breadth: one Katana chip on every body. P3 says breadth and rate should be different abilities, and Quadra Slam is the rate one. |
-| **Quadra Slice** `$5b` | **×4** | Vanilla's. The late-ladder repeat of Quadra Slam at 50 MP, which prices it as burst rather than as a probe: 12.5 MP per chip against Quadra Slam's 4.0. |
+| **Quadra Slice** `$5b` | **×4** | Vanilla's. The late-ladder repeat of Quadra Slam at 50 MP, which prices it as burst rather than as a probe: 12.5 MP per chip (wind shields; it carries no class, #379) against Quadra Slam's 4.0. |
 | Cleave `$5c` | ×1 | It refuses a target that is not already Broken, so it never chips at all. It is the rule P1 is named after. |
 
 Two behaviours are worth recording rather than changing:
