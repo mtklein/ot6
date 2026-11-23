@@ -183,18 +183,24 @@ def assign(masks, order, count, how, ev=None, stage=None, binds=None):
                 if count is not None and out[sp] & b:
                     count[b] += 1
             continue
-        if sp in pins.EVERY and old == 15:
-            out[sp] = C.SWORD | C.DAGGER | C.BLUNT | C.RANGED | C.KATANA | C.SPEAR
-            kids_of[sp] = {o: sum(CHILDREN[o]) for o in (S, P, B, X)}
-            how[sp] = "any weapon breaks it: all four -> all six"
+        if sp in pins.EVERY and old:
+            # "every hand breaks it": every class its four-class weaknesses' weapons went to,
+            # which is all six once slash, pierce and bludgeon are among them
+            out[sp] = 0
+            for o in (S, P, B, X):
+                if old & o:
+                    out[sp] |= sum(CHILDREN[o])
+            kids_of[sp] = {o: sum(CHILDREN[o]) for o in (S, P, B, X) if old & o}
+            how[sp] = "every hand breaks it: every class its four-class weaknesses went to"
             for b in NEW_NAME:
                 if count is not None:
                     count[b] += 1
             continue
         kinds, src = pins.PIN.get(sp, ({}, ""))
         hard = src.startswith("wob") or src.startswith("opening")
-        pin = {o: C.KIND_CLASS[k] for o, k in kinds.items() if old & o and hard}
-        soft = {o: C.KIND_CLASS[k] for o, k in kinds.items() if old & o and not hard}
+        firm = getattr(pins, "HARD", {}).get(sp, ())
+        pin = {o: C.KIND_CLASS[k] for o, k in kinds.items() if old & o and (hard or o in firm)}
+        soft = {o: C.KIND_CLASS[k] for o, k in kinds.items() if old & o and not (hard or o in firm)}
         olds = [o for o in (S, P, B, X) if old & o]
         tally = count if count is not None else collections.Counter()
         fights = ev.get(sp, ())
@@ -250,6 +256,11 @@ def compute():
     # with no Ot6ShieldTbl row), split by the same rule after the rows
     floor_old = {sp: gbf.classify(names[sp] if sp < len(names) else "")[0] for sp in range(gbf.CODEX_WIDTH)}
     floor, fkids = assign(floor_old, sorted(floor_old), collections.Counter(count), {})
+    # a species with a row never reads the floor; its floor byte follows the row
+    # (the row's first class in bit order) so the two never disagree
+    for sp, m in new.items():
+        if m and sp in floor:
+            floor[sp] = m & -m
     # what a four-class save's revealed bits mean: per species id, for each of
     # the four classes, the six-class bits its weakness became (0: it had none)
     sel = {sp: [kids.get(sp, fkids[sp]).get(o, 0) for o in (S, P, B, X)] for sp in range(gbf.CODEX_WIDTH)}
