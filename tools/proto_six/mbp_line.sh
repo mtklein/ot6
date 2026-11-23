@@ -13,21 +13,22 @@
 eval "$(/opt/homebrew/bin/brew shellenv zsh)"
 set -u
 SHA=$1
-J=${2:-12}
-W=~/work/ot6-proto-six
+J=${2:-6}
+W=${3:-~/work/ot6-proto-six}
+BR=${4:-wt/proto-six-classes}
 if [ ! -d $W/.git ]; then
   git clone -q https://github.com/mtklein/ot6 $W || exit 1
   cp ~/ot6/"Final Fantasy III (USA).sfc" $W/ || exit 1
 fi
 cd $W || exit 1
-git fetch -q origin wt/proto-six-classes && git checkout -q $SHA || exit 1
+git fetch -q origin $BR && git checkout -q $SHA || exit 1
 python3 configure.py > /dev/null || exit 1
 mkdir -p build
 rm -f build/LINE_DONE
 ninja build/ot6.sfc > build/rom.log 2>&1 || { tail -5 build/rom.log; exit 1; }
 shasum -a 256 build/ot6.sfc > build/rom.sha
 # the first output of every generate edge
-grep -E ': generate(_capture)? ' build.ninja | awk '{print $2}' > build/line-targets.txt
+grep -E ': generate(_capture)? ' build.ninja | awk '{print $2}' | grep -v '/quick_' > build/line-targets.txt
 echo "line: start $(date -u +%FT%TZ) sha=$(git rev-parse HEAD) rom=$(cut -c1-12 build/rom.sha) targets=$(wc -l < build/line-targets.txt) -j$J" > build/line.log
 ninja -k 0 -j$J $(cat build/line-targets.txt) >> build/line.log 2>&1
 rc=$?

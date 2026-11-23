@@ -4358,6 +4358,9 @@ end
 -- "club" UMARO's Charge and Throw, "hire" every class a hire may swing.
 function M.kitClass(which)
   local k = ({ thief = 0, coin = 1, club = 2, hire = 3 })[which]
+  if type(OT6_SYMS) == "table" and OT6_SYMS["Ot6KitClassTbl"] == nil then
+    return ({ 0x02, 0x08, 0x04, 0x07 })[k + 1]    -- v0.50: pierce, special, bludgeon, the three a hire swung
+  end
   return M.readRomByte((M.sym("Ot6KitClassTbl") & 0x3FFFFF) + k) & 0x7F
 end
 
@@ -7634,6 +7637,70 @@ M.BUMRUSH, M.CLEAVE = 0x64, 0x5C      -- the two divines Driver:divineLine plays
 function M.blitzChips(slot, id)
   local b = BATTLE.BLITZ_SHAPE[id]
   return (b.hits or 1) * hitChips(slot, M.blitzClass(id), b.elem or M.spellElement(id))
+end
+
+-- #566's instrument: the weapon keys the party holds as a battle opens, one
+-- [keys] line a battle (log only; nothing reads it back into play).
+--   hands  the classes of the weapons in the seated members' hands (an empty
+--          main hand is a fist; a member in Magitek armor swings none)
+--   kit    hands, plus the class-bearing skills they could use now: Pummel
+--          (Blitz), Dispatch (SwdTech), TERRA's TekMissile (Magitek), the
+--          Tools and thrown stars and skeans in the bag (Tools, Throw), and
+--          LOCKE's Mug or Trickshot once he knows one
+-- and each standing gauged body's class row (the ROM's, $3EA4), with whether
+-- hands and kit hold one of its classes.  A body with no class row at all
+-- counts in neither tally.
+function M.keyLine(tag)
+  local hands, kit, who = 0, 0, {}
+  local function bag(id)
+    for s = 0, 255 do
+      if M.readByte(0x1869 + s) == id and M.readByte(0x1969 + s) > 0 then return true end
+    end
+    return false
+  end
+  for e = 0, 3 do
+    local c = M.readByte(BATTLE.BCHID + e * 2)
+    local mx = M.readWord(0x3C1C + e * 2)
+    if c < 16 and mx > 0 and mx ~= 0xFFFF then
+      local h, k = 0, 0
+      if cmdRow(e, BATTLE.CMD_MAGITEK) then
+        if c == 0 then k = k | M.skillClass(0x8A) end
+      else
+        local r, l = handsOf(e)
+        h = M.weaponClass(r) | (l and M.weaponClass(l) or 0)
+      end
+      if cmdRow(e, BATTLE.CMD_BLITZ) then k = k | M.skillClass(0x5D) end
+      if cmdRow(e, BATTLE.CMD_SWDTECH) then k = k | M.skillClass(0x55) end
+      if cmdRow(e, BATTLE.CMD_TOOLS) then
+        for id = 0xA3, 0xAA do if bag(id) then k = k | M.weaponClass(id) end end
+      end
+      if cmdRow(e, BATTLE.CMD_THROW) then
+        for id = 0x41, 0x43 do if bag(id) then k = k | M.weaponClass(id) end end
+        for id = 0xAB, 0xAD do if bag(id) then k = k | M.skillClass(0x51 + id - 0xAB) end end
+      end
+      if c == 1 and cmdRow(e, BATTLE.LOCKE.CMD)
+         and (M.lockeKnows(BATTLE.LOCKE.MUG) or M.lockeKnows(BATTLE.LOCKE.TRICK)) then
+        k = k | M.kitClass("thief")
+      end
+      hands, kit = hands | h, kit | h | k
+      who[#who + 1] = string.format("e%d:c%d:$%02X/$%02X", e, c, h, h | k)
+    end
+  end
+  local bodies, n, noHand, noKit = {}, 0, 0, 0
+  for s = 0, 5 do
+    if M.monStanding(s) then
+      local row, sh = M.readByte(0x3EA4 + s * 2) & 0x7F, M.readByte(0x3E41 + s * 2)
+      local sp = M.readWord(0x57C0 + s * 2)
+      if sh > 0 and row ~= 0 then
+        n = n + 1
+        if (row & hands) == 0 then noHand = noHand + 1 end
+        if (row & kit) == 0 then noKit = noKit + 1 end
+      end
+      bodies[#bodies + 1] = string.format("s%d:$%03X:row$%02X:sh%d", s, sp, row, sh)
+    end
+  end
+  return string.format("[%s] [keys] form=$%03X hands=$%02X kit=$%02X party=%s bodies=%s gauged=%d nohand=%d nokit=%d",
+    tag, M.readWord(0x11E0) & 0x3FF, hands, kit, table.concat(who, ","), table.concat(bodies, ","), n, noHand, noKit)
 end
 
 -- The one monster an untargeted attack lands on: the focus list's first
@@ -22094,6 +22161,10 @@ function Driver:frame()
     -- first fights"; the audit reads these lines)
     M.log(string.format("[%s] [open] party HP as the battle opens: %s", self.tag or "fight",
       table.concat(said, ", ")))
+    do
+      local ok, line = pcall(M.keyLine, self.tag or "fight")     -- #566: log only, never a failure
+      M.log(ok and line or string.format("[%s] [keys] unread: %s", self.tag or "fight", tostring(line)))
+    end
   end
   self:watchStatuses()
   self:watchLeavers()
