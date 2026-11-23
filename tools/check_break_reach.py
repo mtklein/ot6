@@ -168,7 +168,7 @@ AREAS = {
     # enable bit set and reachable; battle 149 is the map-384 (66,11)
     # trap-switch Ninja ambush.
     "sealed-gate": {
-        "doc": "docs/design/break-coverage-sealed-gate.md SS1-2, SS5",
+        "doc": "docs/design/break-coverage-gate.md",
         "min_formations": 13,   # 3 unique per map x4 maps + the Ninja
         "steps": [
             {

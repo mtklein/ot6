@@ -251,7 +251,11 @@ def main():
 
     reach = load_reach(root)
     data = reach.Data(root)
-    mp = read(root, MAGIC_PROP)
+    # the .dat with OT6's element overrides applied (battle_main.asm's MagicProp
+    # splice, which check_break_reach reads: Quadra Slice's wind, #379), so the
+    # element column is the record the ROM ships
+    mp = bytes(data.magic)
+    assert len(mp) == len(read(root, MAGIC_PROP))
     ip = data.items
     anames = names(root, ATTACK_NAMES)
     bnames = names(root, BUSHIDO_NAMES)
