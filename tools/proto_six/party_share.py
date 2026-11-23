@@ -98,7 +98,7 @@ STAGES = [
 
 def old_weapon_classes():
     """v0.50's Ot6WeapClassTbl: item id -> four-class mask."""
-    text = subprocess.run(["git", "show", "v0.50:ff6/src/battle/ot6_class.asm"], cwd=ROOT, check=True,
+    text = subprocess.run(["git", "show", "origin/main:ff6/src/battle/ot6_class.asm"], cwd=ROOT, check=True,
                           capture_output=True, text=True).stdout
     return _weapon_table(text, {"OT6_SLASH": S, "OT6_PIERCE": P, "OT6_BLUDG": B, "OT6_SPECIAL": X})
 

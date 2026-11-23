@@ -107,7 +107,7 @@ Ot6KitClassTbl:
 
 
 def main():
-    old = subprocess.run(["git", "show", "v0.50:ff6/src/battle/ot6_class.asm"], cwd=ROOT, check=True,
+    old = subprocess.run(["git", "show", "origin/main:ff6/src/battle/ot6_class.asm"], cwd=ROOT, check=True,
                          capture_output=True, text=True).stdout.splitlines()
     out, item, mode, classes = [], 0, None, {}
     for line in old:

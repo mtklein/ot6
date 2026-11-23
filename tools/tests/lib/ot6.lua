@@ -7652,6 +7652,11 @@ end
 -- counts in neither tally.
 function M.keyLine(tag)
   local hands, kit, who = 0, 0, {}
+  -- what the masks were read from, so a log can be re-read under another
+  -- class table: each member's hand items and skill letters (B Blitz, S
+  -- SwdTech, M TekMissile, T a thief's hit), and the bag's Tools, stars and
+  -- skeans a Tools or Throw owner could use
+  local src, bagSaid = {}, {}
   local function bag(id)
     for s = 0, 255 do
       if M.readByte(0x1869 + s) == id and M.readByte(0x1969 + s) > 0 then return true end
@@ -7662,28 +7667,38 @@ function M.keyLine(tag)
     local c = M.readByte(BATTLE.BCHID + e * 2)
     local mx = M.readWord(0x3C1C + e * 2)
     if c < 16 and mx > 0 and mx ~= 0xFFFF then
-      local h, k = 0, 0
+      local h, k, s = 0, 0, string.format("c%d", c)
       if cmdRow(e, BATTLE.CMD_MAGITEK) then
-        if c == 0 then k = k | M.skillClass(0x8A) end
+        if c == 0 then k = k | M.skillClass(0x8A); s = s .. ":M" end
       else
         local r, l = handsOf(e)
         h = M.weaponClass(r) | (l and M.weaponClass(l) or 0)
+        s = s .. string.format(":r%02X", r) .. (l and string.format(":l%02X", l) or "")
       end
-      if cmdRow(e, BATTLE.CMD_BLITZ) then k = k | M.skillClass(0x5D) end
-      if cmdRow(e, BATTLE.CMD_SWDTECH) then k = k | M.skillClass(0x55) end
+      if cmdRow(e, BATTLE.CMD_BLITZ) then k = k | M.skillClass(0x5D); s = s .. ":B" end
+      if cmdRow(e, BATTLE.CMD_SWDTECH) then k = k | M.skillClass(0x55); s = s .. ":S" end
       if cmdRow(e, BATTLE.CMD_TOOLS) then
-        for id = 0xA3, 0xAA do if bag(id) then k = k | M.weaponClass(id) end end
+        for id = 0xA3, 0xAA do
+          if bag(id) then k = k | M.weaponClass(id); bagSaid[id] = true end
+        end
+        s = s .. ":tools"
       end
       if cmdRow(e, BATTLE.CMD_THROW) then
-        for id = 0x41, 0x43 do if bag(id) then k = k | M.weaponClass(id) end end
-        for id = 0xAB, 0xAD do if bag(id) then k = k | M.skillClass(0x51 + id - 0xAB) end end
+        for id = 0x41, 0x43 do
+          if bag(id) then k = k | M.weaponClass(id); bagSaid[id] = true end
+        end
+        for id = 0xAB, 0xAD do
+          if bag(id) then k = k | M.skillClass(0x51 + id - 0xAB); bagSaid[id] = true end
+        end
+        s = s .. ":throw"
       end
       if c == 1 and cmdRow(e, BATTLE.LOCKE.CMD)
          and (M.lockeKnows(BATTLE.LOCKE.MUG) or M.lockeKnows(BATTLE.LOCKE.TRICK)) then
-        k = k | M.kitClass("thief")
+        k = k | M.kitClass("thief"); s = s .. ":T"
       end
       hands, kit = hands | h, kit | h | k
       who[#who + 1] = string.format("e%d:c%d:$%02X/$%02X", e, c, h, h | k)
+      src[#src + 1] = s
     end
   end
   local bodies, n, noHand, noKit = {}, 0, 0, 0
@@ -7699,8 +7714,11 @@ function M.keyLine(tag)
       bodies[#bodies + 1] = string.format("s%d:$%03X:row$%02X:sh%d", s, sp, row, sh)
     end
   end
-  return string.format("[%s] [keys] form=$%03X hands=$%02X kit=$%02X party=%s bodies=%s gauged=%d nohand=%d nokit=%d",
-    tag, M.readWord(0x11E0) & 0x3FF, hands, kit, table.concat(who, ","), table.concat(bodies, ","), n, noHand, noKit)
+  local bagIds = {}
+  for id = 0x41, 0xAD do if bagSaid[id] then bagIds[#bagIds + 1] = string.format("%02X", id) end end
+  return string.format("[%s] [keys] form=$%03X hands=$%02X kit=$%02X party=%s bodies=%s gauged=%d nohand=%d nokit=%d"
+    .. " src=%s bag=%s", tag, M.readWord(0x11E0) & 0x3FF, hands, kit, table.concat(who, ","),
+    table.concat(bodies, ","), n, noHand, noKit, table.concat(src, ","), table.concat(bagIds, "/"))
 end
 
 -- The one monster an untargeted attack lands on: the focus list's first

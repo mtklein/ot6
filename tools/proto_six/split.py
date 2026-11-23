@@ -36,7 +36,9 @@ gen_break_floor.py reads the floor rows from it) and prints the report.
 """
 import collections
 import importlib.util
+import itertools
 import json
+import os
 import re
 import subprocess
 import sys
@@ -77,9 +79,9 @@ PIN = {
     0x014f: ({S: KATANA, B: FIST}, "wob L692 '(Cyan slash + Sabin bludg)'"),
     0x0176: ({S: KATANA, B: FIST}, "wob L693 'Doma defense (same two)'"),
     0x0175: ({P: DAGGER}, "wob L694 'Locke SOLO ... the thief's dagger finds the seam'"),
-    0x0065: ({S: KATANA, P: DAGGER}, "wob L695 'slash for Cyan/Sabin, pierce for Locke/Gau'"),
-    0x003f: ({S: KATANA, P: DAGGER}, "wob L696 'ditto'"),
-    0x009f: ({S: KATANA, P: DAGGER}, "wob L697 'Locke SOLO (pierce)'; row 'slash for a Cyan/Sabin squad'"),
+    0x0065: ({P: DAGGER}, "wob L695 'pierce for Locke/Gau' (the slash half follows the squad the route fights it with)"),
+    0x003f: ({P: DAGGER}, "wob L696 'ditto'"),
+    0x009f: ({P: DAGGER}, "wob L697 'Locke SOLO (pierce)'"),
     0x003a: ({S: KATANA}, "wob L759 'cut by Cyan's blade'"),
     0x005e: ({B: FIST}, "wob L760 'cracked by Sabin's fists'"),
     0x0059: ({B: FIST}, "wob L761 'crushed by a monk's fists'"),
@@ -144,8 +146,8 @@ PIN = {
     0x0060: ({S: SWORD, P: SPEAR}, "row 'the same three; one spirit to each hand'"),
     0x00b6: ({X: ARCANE}, "row 'banon's rod' (Arcane; the bludgeon half goes to Fist)"),
     0x00cf: ({P: SPEAR}, "row 'edgar's pike'"),
-    0x0079: ({S: KATANA, P: DAGGER}, "row 'every raider takes the troopers' keys'"),
-    0x001c: ({S: KATANA, P: DAGGER}, "row 'every raider takes the troopers' keys'"),
+    0x0079: ({P: DAGGER}, "row 'every raider takes the troopers' keys'"),
+    0x001c: ({P: DAGGER}, "row 'every raider takes the troopers' keys'"),
     0x00c2: ({S: SWORD}, "row 'the banquet's sparring troopers: terra and locke's blades'"),
 }
 # the blocks whose comment keys every body to one member
@@ -171,9 +173,34 @@ def _load(path, name):
     return mod
 
 
+BASE = os.environ.get("OT6_SPLIT_BASE", "origin/main")       # the four-class tree
+# the route's fights (route_fights.py over the qualification log main's play
+# made); absent, the ROUTE step is skipped
+FIGHTS = ROOT / "build/attempts/wt/proto-six-classes/route-fights-v050.json"
+# a member's signature kit under six classes, by character id: the weapon
+# family the member is built around and the class-bearing skills that come
+# with them (EDGAR: spear and tools, and a sword, his other family and the
+# Chain Saw's class; SHADOW: ninja blade and Throw; 14 BANON, 15 LEO)
+ROUTE_KIT = {0: SWORD, 1: DAGGER, 2: KATANA, 3: KATANA | DAGGER, 4: SPEAR | SWORD, 5: FIST, 6: SWORD, 7: ARCANE,
+             8: ARCANE, 9: ARCANE, 10: SPEAR, 11: FIST, 12: 0, 13: FIST, 14: ARCANE, 15: SWORD}
+
+
 def v050(path, text=True):
-    return subprocess.run(["git", "show", "v0.50:" + path], cwd=ROOT, check=True, capture_output=True,
+    return subprocess.run(["git", "show", BASE + ":" + path], cwd=ROOT, check=True, capture_output=True,
                           text=text).stdout
+
+
+def route_parties():
+    """species -> [party kit mask, ...], one per route fight against it."""
+    out = collections.defaultdict(list)
+    if FIGHTS.exists():
+        for f in json.loads(FIGHTS.read_text()):
+            kit = 0
+            for c in f["chars"]:
+                kit |= ROUTE_KIT.get(c, 0)
+            for sp in f["species"]:
+                out[sp].append(kit)
+    return out
 
 
 def old_rows():
@@ -195,50 +222,47 @@ def dealt(csr):
     return held
 
 
-def assign(masks, order, count, how):
+def assign(masks, order, count, how, parties=None):
     """Split masks[sp] for each sp in order; count is the running tally the
-    balance reads (updated only when `count` is not None)."""
-    out = {}
+    balance reads (updated only when `count` is not None).  Returns
+    ({sp: new mask}, {sp: {old class: new class}})."""
+    out, kids_of = {}, {}
+    parties = parties or {}
     for sp in order:
         old = masks[sp]
         if sp in FAMILY and FAMILY[sp] in out:
-            out[sp] = out[FAMILY[sp]]
+            out[sp], kids_of[sp] = out[FAMILY[sp]], kids_of[FAMILY[sp]]
             how[sp] = "family of $%04x" % FAMILY[sp]
             for b in NEW_NAME:
                 if count is not None and out[sp] & b:
                     count[b] += 1
             continue
-        pin = PIN.get(sp, ({}, None))[0]
-        taken, notes = 0, []
-        for o in (S, P, B, X):
-            if old & o and o in pin:
-                assert not taken & pin[o], "species $%04x pins one class twice" % sp
-                taken |= pin[o]
-                notes.append("%s->%s pinned" % (OLD_NAME[o], NEW_NAME[pin[o]]))
-        for o in (S, P, B, X):
-            if not old & o or o in pin:
-                continue
-            kids = [k for k in CHILDREN[o] if not taken & k and not any(
-                pin.get(o2) == k for o2 in pin)]
-            # a later class of this species with only one child left must keep it
-            for o2 in (S, P, B, X):
-                if o2 > o and old & o2 and o2 not in pin:
-                    left = [k for k in CHILDREN[o2] if not taken & k]
-                    if len(left) == 1 and left[0] in kids and len(kids) > 1:
-                        kids.remove(left[0])
-            assert kids, "species $%04x: no child left for %s" % (sp, OLD_NAME[o])
-            tally = count if count is not None else collections.Counter()
-            k = min(kids, key=lambda c: (tally[c], CHILDREN[o].index(c)))
-            taken |= k
-            notes.append("%s->%s" % (OLD_NAME[o], NEW_NAME[k]))
-        assert bin(taken).count("1") == bin(old).count("1"), hex(sp)
-        out[sp] = taken
+        pin = {o: k for o, k in PIN.get(sp, ({}, None))[0].items() if old & o}
+        olds = [o for o in (S, P, B, X) if old & o]
+        tally = count if count is not None else collections.Counter()
+        best = None
+        for combo in itertools.product(*[(pin[o],) if o in pin else CHILDREN[o] for o in olds]):
+            if len(set(combo)) != len(combo):
+                continue                                # one class twice
+            mask = sum(combo)
+            nokey = sum(1 for kit in parties.get(sp, ()) if not kit & mask)
+            key = (nokey, sum(tally[k] for k in combo),
+                   tuple(CHILDREN[o].index(k) for o, k in zip(olds, combo)))
+            if best is None or key < best[0]:
+                best = (key, combo)
+        assert best is not None, "species $%04x: no split satisfies its pins" % sp
+        combo = best[1]
+        fights = len(parties.get(sp, ()))
+        notes = ["%s->%s%s" % (OLD_NAME[o], NEW_NAME[k], " pinned" if o in pin else "")
+                 for o, k in zip(olds, combo)]
+        if fights:
+            notes.append("route: %d of %d fights keyless" % (best[0][0], fights))
+        out[sp], kids_of[sp] = sum(combo), dict(zip(olds, combo))
         how[sp] = ", ".join(notes) or "none"
         if count is not None:
-            for b in NEW_NAME:
-                if taken & b:
-                    count[b] += 1
-    return out
+            for k in combo:
+                count[k] += 1
+    return out, kids_of
 
 
 def compute():
@@ -249,17 +273,44 @@ def compute():
     gauged = sorted(sp for sp in held if rows.get(sp, (0, 0))[0] > 0)
     how, count = {}, collections.Counter()
     masks = {sp: m for sp, (sh, m) in rows.items()}
-    new = assign(masks, gauged, count, how)
+    parties = route_parties()
+    new, kids = assign(masks, gauged, count, how, parties)
     final_count = collections.Counter(count)
     rest = sorted(sp for sp in rows if sp not in new)
-    new.update(assign(masks, rest, collections.Counter(count), how))
+    n2, k2 = assign(masks, rest, collections.Counter(count), how, parties)
+    new.update(n2)
+    kids.update(k2)
     # the floor: every species id's generated class (reached only by a species
     # with no Ot6ShieldTbl row), split by the same rule after the rows
     floor_old = {sp: gbf.classify(names[sp] if sp < len(names) else "")[0] for sp in range(gbf.CODEX_WIDTH)}
     fhow = {}
-    floor = assign(floor_old, sorted(floor_old), collections.Counter(count), fhow)
+    floor, fkids = assign(floor_old, sorted(floor_old), collections.Counter(count), fhow)
+    # what a four-class save's revealed bits mean, per species id: bit k set =
+    # the weakness of four-class bit k became its SECOND child (Katana, Spear,
+    # Arcane, Dagger).  A species with a row reads the row's split, any other
+    # the floor's.
+    sel = {}
+    for sp in range(gbf.CODEX_WIDTH):
+        m = kids.get(sp, fkids[sp])
+        sel[sp] = sum(o for o, k in m.items() if CHILDREN[o].index(k) == 1)
     return dict(rows=rows, held=held, gauged=gauged, new=new, how=how, count=final_count, floor=floor,
-                floor_old=floor_old, names=names)
+                floor_old=floor_old, names=names, sel=sel, parties=parties)
+
+
+def write_split_inc(r):
+    lines = ["; ----------------------------------------------------------------------------",
+             "; what a four-class (v0.50 and older) save's revealed class bits mean, per",
+             "; species id (0..383): bit k set = the weakness of four-class bit k (slash $01,",
+             "; pierce $02, bludgeon $04, special $08) became its SECOND child (katana,",
+             "; spear, arcane, dagger); clear = its first (sword, dagger, fist, arcane).",
+             "; Written once, when the six classes replaced the four (#566); it describes",
+             "; the saves of the releases before that, so it does not change when a row does.",
+             "; ----------------------------------------------------------------------------",
+             "", "Ot6ClassSplitTbl:"]
+    for sp in range(len(r["sel"])):
+        nm = r["names"][sp] if sp < len(r["names"]) else ""
+        lines.append("        .byte   $%02x             ; %3d %s" % (r["sel"][sp], sp, nm or "(unused)"))
+    (ROOT / "ff6/src/battle/ot6_class_split.inc").write_text("\n".join(lines) + "\n")
 
 
 def mask_expr(m):
@@ -304,6 +355,11 @@ def report(r):
             k = sum(1 for m in masks.values() if m & b)
             out.append("  %-8s weak species %3d  (%.1f%% of species, %.1f%% of weaknesses)" % (
                 n, k, 100.0 * k / len(g), 100.0 * k / tot))
+    fought = [sp for sp in g if r["parties"].get(sp)]
+    nf = sum(len(r["parties"][sp]) for sp in fought)
+    nk = sum(1 for sp in fought for kit in r["parties"][sp] if not kit & new[sp])
+    out.append("route fights (species x fight) with a signature-kit key under six: %d of %d (%d keyless, over %d "
+               "species the route fought)" % (nf - nk, nf, nk, len(fought)))
     pinned = sum(1 for sp in g if "pinned" in r["how"][sp])
     npin = sum(r["how"][sp].count("pinned") for sp in g)
     nfam = sum(1 for sp in g if r["how"][sp].startswith("family"))
@@ -326,6 +382,7 @@ def main():
     r = compute()
     if "--report-only" not in sys.argv:
         rewrite_hud(r["new"])
+        write_split_inc(r)
         (ROOT / "ff6/tools/six_class_split.json").write_text(json.dumps({
             "rows": {"%04x" % sp: r["new"][sp] for sp in sorted(r["new"])},
             "floor": {"%04x" % sp: r["floor"][sp] for sp in sorted(r["floor"])},
