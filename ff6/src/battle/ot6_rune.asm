@@ -176,7 +176,6 @@ Ot6SwingHitPalTbl:
         lda     #$00
         sta     f:$7e0000+OT6_RUNESWING
         sta     f:$7e0000+OT6_BLADESWING
-        sta     f:$7e0000+OT6_RUNEHIT
         pla
         rts
 .endproc
@@ -215,15 +214,42 @@ Ot6SwingHitPalTbl:
 @out:   rts
 .endproc
 
+; [ which of these elements bite this body? ]
+; The rune's whole rule: an element bites a monster that is weak to it
+; (vanilla's weak byte, Ot6ElemAddTbl's rows merged in at load) and neither
+; absorbs, nulls nor halves it, nor has it nulled by a ForceField.  One leaf
+; for the hit (Ot6TargetPre) and for the swing's colour (Ot6SwingPal_ext).
+; in: A = element bits, Y = the target's entity offset.  out: A = the bits
+; that bite (Z set = none).  a8, either index width, db=$7e.  Preserves X
+; and Y.
+.proc Ot6RuneBites
+        .a8
+        pha
+        tya
+        cmp     #$08
+        bcc     @none           ; a character: never
+        lda     $3bcc,y         ; absorbed
+        ora     $3bcd,y         ; nulled
+        ora     $3be1,y         ; halved
+        ora     $3ec8           ; nulled by a ForceField
+        eor     #$ff
+        and     $3be0,y         ; weak
+        and     $01,s
+        sta     $01,s
+        pla
+        rts
+@none:  pla
+        lda     #$00
+        rts
+.endproc
+
 ; [ CalcTargetDmg, each target: does the rune bite this body? ]
 ; jsl from CalcTargetDmg in place of its jsl Ot6SeraphHeal, which this ends
-; in.  The rune's elements join the hit only on a monster that is weak to
-; them (vanilla's weak byte, Ot6ElemAddTbl's rows merged in at load) and
-; neither absorbs, nulls nor halves them, nor has them nulled by a
-; ForceField: there the hit truly carries the element, and vanilla's weak
-; branch below doubles it and chips (Ot6Chip).  On any other body the rune
-; adds nothing, so it never turns her Fight into something a body drinks.
-; OT6_RUNEHIT keeps the elements that bit, for the swing's colour.
+; in.  The rune's elements join the hit only on a body they bite
+; (Ot6RuneBites): there the hit truly carries the element, and vanilla's
+; weak branch below doubles it and chips (Ot6Chip).  On any other body the
+; rune adds nothing, so it never turns her Fight into something a body
+; drinks.
 ; a8, either index width, db=$7e; x = the attacker, y = the target.
 ; Preserves x and y; clobbers A.
 .proc Ot6TargetPre
@@ -236,18 +262,9 @@ Ot6SwingHitPalTbl:
         eor     #$ff
         and     $11a1           ; the swing's own elements again (an earlier
         sta     $11a1           ;   target's verdict is not this one's)
-        tya
-        cmp     #$08
-        bcc     @out            ; a character: never
-        lda     $3bcc,y         ; absorbed
-        ora     $3bcd,y         ; nulled
-        ora     $3be1,y         ; halved
-        ora     $3ec8           ; nulled by a ForceField
-        eor     #$ff
-        and     $3be0,y         ; weak
-        and     f:$7e0000+OT6_RUNESWING
+        lda     f:$7e0000+OT6_RUNESWING
+        jsr     Ot6RuneBites
         beq     @out
-        sta     f:$7e0000+OT6_RUNEHIT
         ora     $11a1
         sta     $11a1
 @out:   jml     Ot6SeraphHeal
@@ -789,33 +806,58 @@ done:   rts
 ; [ the swing's colour ]
 ; jml from InitWeaponAnim's weapon-palette load (bank C1, through the
 ; Ot6SwingPal_c1 stub), in place of its jsr LoadSpriteAnimPal, which this
-; ends in.  A swing whose hit carried the rune (OT6_RUNEHIT, set by
-; Ot6TargetPre for the pass this animation plays) is drawn in the element's
-; colours, the weapon's sprite and the hit on the target both; a Break Blade
-; swing in its own.  The colour is the hit's, not the blade's standing
-; state: a swing the rune did not bite is the weapon's own, so the colour
-; and the doubled number and the shield lost are one event, and a red swing
-; never lands on a body that shrugs fire off.  The standing sign is the
-; party window's (Ot6RuneSignStage).
-; in: A = the weapon's own palette (w7e626d), a8/i16, db=$7e.
+; ends in.  A character's swing at a monster his rune bites (Ot6RuneBites,
+; on the pass's first monster target, w7e613e) is drawn in the element's
+; colours, the weapon's sprite and the hit on the target both; a Break
+; Blade swing at a monster in its own.  The colour is the bite's, not the
+; blade's standing state: a swing at a body the rune does nothing to is the
+; weapon's own, so the colour comes with the doubled number and the shield
+; lost, and a red swing never lands on a body that shrugs fire off.  The
+; standing sign is the party window's (Ot6RuneSignStage).  The verdict is
+; read here, from the bytes the hit was judged on, and not carried from the
+; hit: an action's passes are all computed before its script plays them.
+; in: A = the weapon's own palette (w7e626d), a8/i16, db=$7e.  The attacker
+; is read as GetAttackerID reads it, from the pass's block at $2c6e ($10 is
+; scratch by this point of InitWeaponAnim).
 .proc Ot6SwingPal_ext
         .a8
         .i16
         pha
-        lda     f:$7e0000+OT6_RUNEHIT
-        bne     @rune
-        lda     f:$7e0000+OT6_BLADESWING
-        bpl     @plain
+        lda     $62d0           ; (GetAttackerID's other source: not a
+        bne     @plain          ;   plain pass)
+        lda     $2c6e           ; the pass's flags: bit 7, a monster attacks
+        bmi     @plain
+        lda     $2c6f           ; the attacker's seat
+        and     #$03
+        asl
+        longa
+        and     #$0006
+        tax                     ; x = the swinging character
+        shorta0
+        lda     $613e           ; the pass's monster targets
+        beq     @plain
+        ldy     #$0008
+:       lsr
+        bcs     :+
+        iny
+        iny
+        bra     :-
+:       lda     OT6_BREAKBLADE,x
+        beq     @rune
         ldx     #$0008          ; Break Blade's pair
         bra     @sub
-@rune:  ldx     #$0000
+@rune:  lda     OT6_RUNE,x
+        beq     @plain
+        jsr     Ot6RuneBites
+        beq     @plain
+        ldx     #$0000
 :       lsr
         bcs     @sub
         inx
         bra     :-
 @sub:   pla
         lda     f:Ot6SwingHitPalTbl,x
-        sta     f:$7e626f       ; the hit palette, read next
+        sta     $626f           ; the hit palette, read next
         lda     f:Ot6SwingPalTbl,x
         jml     f:LoadSpriteAnimPal     ; a C1 rts: back to InitWeaponAnim
 @plain: pla

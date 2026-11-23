@@ -757,11 +757,4 @@ OT6_LIMITBREAK       := $ef1d
 OT6_REFLCASTER       := $ef1e
 .assert OT6_REFLCASTER = OT6_LIMITBREAK + 1, error, "the bounce's caster must follow the limit-break mask"
 .assert OT6_REFLCASTER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
-; (#563) the rune's elements that joined the last weapon hit computed
-; (Ot6TargetPre), for the swing's colour (Ot6SwingPal_ext); zeroed with
-; OT6_RUNESWING at every attack's load.  The shadow tail's last byte.
-OT6_RUNEHIT          := $ef1f
-.assert OT6_RUNEHIT = OT6_REFLCASTER + 1, error, "the rune's hit byte must follow the bounce's caster"
-.assert OT6_RUNEHIT <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
-
 .endif
