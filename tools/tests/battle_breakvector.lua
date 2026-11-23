@@ -102,12 +102,12 @@ check(shieldRows >= 70, string.format(
 -- different byte, and both fail.  The reason for each is in ot6_hud.asm
 -- beside the row.
 local want = {
-  { 0x00cb, 2, SPEAR | RANGED, "garm (magitek quadruped, entrance)" },
+  { 0x00cb, 2, DAGGER | RANGED, "garm (magitek quadruped, entrance)" },
   { 0x00c7, 2, DAGGER,         "commando (imperial line keeps a point)" },
   { 0x0165, 2, RANGED,         "protoarmor (sealed suit, no seam)" },
   { 0x0041, 2, DAGGER,         "pipsqueak (the x5 swarm; AutoCrossbow)" },
   { 0x0047, 2, RANGED,         "flan (you cannot cut an ooze)" },
-  { 0x0066, 2, DAGGER | RANGED, "general (officer in plate)" },
+  { 0x0066, 2, SPEAR | RANGED, "general (officer in plate)" },
   { 0x002d, 2, RANGED,         "trapper (a device; you smash it)" },
   { 0x00a0, 2, DAGGER | BLUNT, "chaser (1202 hp, on the escape map)" },
   { 0x0088, 2, SWORD | DAGGER, "gobbler (the area's deliberate blade target)" },

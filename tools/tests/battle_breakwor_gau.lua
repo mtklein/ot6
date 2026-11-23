@@ -32,10 +32,10 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x08F] = { "Toe Cutter", 3, SPEAR | BLUNT, FIRE | WIND, ICE },
-  [0x07E] = { "Rhyos", 4, RANGED, 0, 0 },
-  [0x0BB] = { "Allo Ver", 3, SWORD | RANGED, FIRE | HOLY, POISON },
-  [0x119] = { "SrBehemoth", 6, SPEAR | BLUNT, FIRE | POISON, ICE },
+  [0x08F] = { "Toe Cutter", 3, DAGGER | BLUNT, FIRE | WIND, ICE },
+  [0x07E] = { "Rhyos", 4, DAGGER, 0, 0 },
+  [0x0BB] = { "Allo Ver", 3, DAGGER | KATANA, FIRE | HOLY, POISON },
+  [0x119] = { "SrBehemoth", 6, DAGGER | BLUNT, FIRE | POISON, ICE },
 }
 
 -- the hands (wor-veldt-cave-v1's kit: build/attempts/wt/v033-wor-gau/data/):
@@ -49,20 +49,20 @@ local GAU = { "GAU", H.handClass(0x0B, 0xFF, true), POISON | BOLT }
 -- the Veldt's fourteen: species -> { name, shields, classes, the floor's class
 -- (OT6_FLOOR_CLASS), vanilla weak, vanilla absorb, element added }
 local VELDT = {
-  [0x013] = { "Were-Rat", 2, SWORD | DAGGER, KATANA, FIRE, POISON, 0 },
+  [0x013] = { "Were-Rat", 2, SWORD | DAGGER, SWORD, FIRE, POISON, 0 },
   [0x017] = { "Leafer", 2, SWORD | RANGED, SWORD, FIRE | WATER, ICE, 0 },
-  [0x01B] = { "Vomammoth", 2, KATANA | RANGED, SWORD, FIRE, 0, 0 },
-  [0x028] = { "Dark Wind", 2, DAGGER | KATANA, SWORD, FIRE, 0, 0 },
+  [0x01B] = { "Vomammoth", 2, KATANA | RANGED, RANGED, FIRE, 0, 0 },
+  [0x028] = { "Dark Wind", 2, SWORD | DAGGER, SWORD, FIRE, 0, 0 },
   [0x042] = { "M-TekArmor", 3, DAGGER | RANGED, DAGGER, BOLT, 0, POISON },
-  [0x04D] = { "Repo Man", 2, DAGGER | KATANA, KATANA, POISON, 0, 0 },
-  [0x05D] = { "Areneid", 2, SWORD | BLUNT, KATANA, ICE | WATER, 0, POISON },
-  [0x018] = { "Stray Cat", 3, DAGGER | KATANA, KATANA, 0, 0, POISON },
-  [0x029] = { "Beakor", 3, DAGGER | KATANA, KATANA, FIRE, 0, 0 },
-  [0x02F] = { "CrassHoppr", 3, DAGGER | BLUNT, SPEAR, FIRE | WIND, 0, 0 },
-  [0x04F] = { "Bomb", 3, KATANA | RANGED, KATANA, ICE | WATER, FIRE, 0 },
-  [0x05A] = { "Ghost", 3, KATANA | BLUNT, SWORD, FIRE | HOLY, POISON, 0 },
-  [0x076] = { "Rhobite", 3, KATANA | BLUNT, SWORD, WATER, 0, 0 },
-  [0x0A2] = { "Poplium", 3, DAGGER | KATANA, KATANA, FIRE | HOLY, POISON, 0 },
+  [0x04D] = { "Repo Man", 2, DAGGER | KATANA, DAGGER, POISON, 0, 0 },
+  [0x05D] = { "Areneid", 2, SWORD | BLUNT, SWORD, ICE | WATER, 0, POISON },
+  [0x018] = { "Stray Cat", 3, DAGGER | KATANA, DAGGER, 0, 0, POISON },
+  [0x029] = { "Beakor", 3, DAGGER | KATANA, DAGGER, FIRE, 0, 0 },
+  [0x02F] = { "CrassHoppr", 3, DAGGER | BLUNT, DAGGER, FIRE | WIND, 0, 0 },
+  [0x04F] = { "Bomb", 3, KATANA | RANGED, RANGED, ICE | WATER, FIRE, 0 },
+  [0x05A] = { "Ghost", 3, KATANA | BLUNT, BLUNT, FIRE | HOLY, POISON, 0 },
+  [0x076] = { "Rhobite", 3, KATANA | BLUNT, BLUNT, WATER, 0, 0 },
+  [0x0A2] = { "Poplium", 3, DAGGER | KATANA, DAGGER, FIRE | HOLY, POISON, 0 },
 }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }

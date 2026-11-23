@@ -21,7 +21,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 local WANT = {
   [0x07B] = { "Ralph", 2, SWORD | DAGGER, 0, 0, POISON },
   [0x081] = { "Wyvern", 3, SWORD | DAGGER, ICE, 0, 0 },
-  [0x08D] = { "WeedFeeder", 2, KATANA | BLUNT, FIRE | WIND, 0, 0 },
+  [0x08D] = { "WeedFeeder", 2, SWORD | BLUNT, FIRE | WIND, 0, 0 },
   [0x06B] = { "Joker", 2, SWORD | BLUNT, BOLT | POISON, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the

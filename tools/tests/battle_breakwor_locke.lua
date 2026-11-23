@@ -31,15 +31,15 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, elements added }
 local WANT = {
   [0x0BC] = { "Phase", 2, RANGED, ICE, FIRE, HOLY },
-  [0x0BF] = { "Parasoul", 2, DAGGER | KATANA, ICE, FIRE, 0 },
-  [0x0F1] = { "Necromancr", 2, KATANA | RANGED, FIRE | HOLY, POISON, 0 },
+  [0x0BF] = { "Parasoul", 2, SPEAR | KATANA, ICE, FIRE, 0 },
+  [0x0F1] = { "Necromancr", 2, SWORD | BLUNT, FIRE | HOLY, POISON, 0 },
   [0x0F7] = { "Trixter", 2, SPEAR | RANGED, HOLY, 0, 0 },
-  [0x0EC] = { "Aquila", 3, DAGGER | KATANA, ICE, FIRE, 0 },
-  [0x0E2] = { "Chaos Drgn", 4, SPEAR | RANGED, ICE, FIRE, 0 },
+  [0x0EC] = { "Aquila", 3, SPEAR | KATANA, ICE, FIRE, 0 },
+  [0x0E2] = { "Chaos Drgn", 4, SPEAR | BLUNT, ICE, FIRE, 0 },
   [0x0E9] = { "Sea Flower", 2, KATANA, ICE | BOLT, FIRE | WATER, 0 },
   [0x093] = { "Uroburos", 1, BLUNT, ICE, FIRE, 0 },
   [0x153] = { "Red Dragon", 6, SPEAR, ICE | WATER, FIRE, 0 },
-  [0x11D] = { "Doom Gaze", 8, DAGGER | RANGED, FIRE | HOLY, ICE | POISON, 0 },
+  [0x11D] = { "Doom Gaze", 8, SPEAR | RANGED, FIRE | HOLY, ICE | POISON, 0 },
 }
 
 -- the hands (route-wor-locke.md 3; wor-phoenix-v1's kit,

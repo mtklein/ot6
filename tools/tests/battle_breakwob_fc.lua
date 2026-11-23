@@ -19,7 +19,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x169] = { "Naughty", 3, DAGGER | KATANA | RANGED, FIRE | BOLT | HOLY, ICE, 0 },
+  [0x169] = { "Naughty", 3, SWORD | DAGGER | RANGED, FIRE | BOLT | HOLY, ICE, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal

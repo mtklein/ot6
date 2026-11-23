@@ -39,21 +39,21 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   -- the Kohlingen continent (world groups 45-47)
-  [0x089] = { "Harpiai",    3, SPEAR | KATANA,   WIND },
+  [0x089] = { "Harpiai",    3, SWORD | SPEAR,    WIND },
   [0x0DB] = { "Muus",       2, SWORD | BLUNT,    0 },
   [0x0A7] = { "Deep Eye",   2, BLUNT | RANGED, FIRE },
   [0x0D3] = { "Bogy",       3, SWORD | RANGED,   0 },
   -- Darill's Tomb (groups 149-151)
-  [0x005] = { "Orog",       3, KATANA | BLUNT | RANGED,  FIRE | HOLY },
+  [0x005] = { "Orog",       3, SWORD | BLUNT | RANGED,   FIRE | HOLY },
   [0x010] = { "Osteosaur",  3, BLUNT | RANGED,           FIRE | HOLY },
-  [0x06F] = { "PowerDemon", 3, SPEAR | KATANA | RANGED, FIRE | HOLY },
-  [0x061] = { "Mad Oscar",  4, KATANA,           FIRE },
-  [0x091] = { "Exoray",     2, KATANA | RANGED,  FIRE | HOLY },
+  [0x06F] = { "PowerDemon", 3, SWORD | BLUNT | RANGED, FIRE | HOLY },
+  [0x061] = { "Mad Oscar",  4, SWORD,            FIRE },
+  [0x091] = { "Exoray",     2, SWORD | RANGED,   FIRE | HOLY },
   -- the grave (event group 85)
-  [0x11C] = { "Dullahan",  10, SPEAR | BLUNT | RANGED, FIRE },
+  [0x11C] = { "Dullahan",  10, DAGGER | BLUNT | RANGED, FIRE },
   -- the monster chest beside the save point (event group 116)
   [0x101] = { "Presenter",  0, 0,                FIRE },
-  [0x135] = { "Whelk Head", 6, DAGGER,           FIRE },
+  [0x135] = { "Whelk Head", 6, RANGED,           FIRE },
 }
 
 -- the hands (route-wor-falcon.md 8.1): CELES's Enhancer $13 and ThunderBlade

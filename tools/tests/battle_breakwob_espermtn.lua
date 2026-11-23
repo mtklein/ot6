@@ -21,7 +21,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 local WANT = {
   [0x0EE] = { "Mandrake", 2, SWORD | BLUNT, FIRE, WATER, 0 },
   [0x0D0] = { "Insecare", 2, DAGGER | BLUNT, FIRE | WIND, 0, 0 },
-  [0x0EB] = { "Abolisher", 2, SWORD | SPEAR, 0, 0, 0 },
+  [0x0EB] = { "Abolisher", 2, SWORD | DAGGER, 0, 0, 0 },
   [0x0D6] = { "Adamanchyt", 5, DAGGER | BLUNT, 0, 0, 0 },
   [0x0B8] = { "Slurm", 2, BLUNT | RANGED, FIRE, 0, 0 },
 }

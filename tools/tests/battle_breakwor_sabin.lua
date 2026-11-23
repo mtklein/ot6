@@ -36,13 +36,13 @@ local WANT = {
   [0x0D5] = { "Black Drgn", 4, SWORD,          FIRE | HOLY },
   -- the plains (world groups 31, 34 on the route; 33, 35, 36 beside it)
   [0x021] = { "Mesosaur",   3, SWORD | SPEAR, ICE },
-  [0x031] = { "Gilomantis", 3, SWORD | RANGED, FIRE },
-  [0x07C] = { "Chitonid",   3, RANGED,         BOLT },
+  [0x031] = { "Gilomantis", 3, SWORD | BLUNT, FIRE },
+  [0x07C] = { "Chitonid",   3, BLUNT,          BOLT },
   [0x098] = { "Gigan Toad", 2, SWORD | SPEAR, ICE },
-  [0x0CA] = { "Lunaris",    2, SWORD | DAGGER, 0 },
+  [0x0CA] = { "Lunaris",    2, SWORD | SPEAR, 0 },
   [0x0E6] = { "Osprey",     2, SWORD | SPEAR, ICE },
   -- Tzen's collapsing house (map 311; its monster box is event group 150)
-  [0x0E1] = { "Scorpion",   2, SWORD | DAGGER, 0 },
+  [0x0E1] = { "Scorpion",   2, SWORD | SPEAR, 0 },
   [0x02C] = { "HermitCrab", 2, SWORD | RANGED, WATER },
   [0x0C0] = { "Pm Stalker", 2, SWORD | RANGED, FIRE | HOLY },  -- a ghost: ¤ (#347)
 }

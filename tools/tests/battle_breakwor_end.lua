@@ -22,15 +22,15 @@ local ALL = 0xFF
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
   [0x157] = { "Short Arm", 6, DAGGER | RANGED, WATER, 0 },
-  [0x158] = { "Long Arm", 6, SWORD | DAGGER, WIND, 0 },
+  [0x158] = { "Long Arm", 6, DAGGER | KATANA, WIND, 0 },
   [0x159] = { "Face", 8, BLUNT | RANGED, FIRE, 0 },
-  [0x15D] = { "Hit", 6, KATANA | BLUNT, POISON, 0 },
-  [0x15A] = { "Tiger", 6, SWORD | SPEAR, ICE, EARTH },
+  [0x15D] = { "Hit", 6, KATANA | RANGED, POISON, 0 },
+  [0x15A] = { "Tiger", 6, SPEAR | KATANA, ICE, EARTH },
   [0x15B] = { "Tools", 6, DAGGER | RANGED, BOLT, 0 },
-  [0x15C] = { "Magic", 8, SWORD | RANGED, EARTH, 0 },
-  [0x15E] = { "Girl", 3, SWORD | SPEAR, ALL, ALL },
+  [0x15C] = { "Magic", 8, KATANA | RANGED, EARTH, 0 },
+  [0x15E] = { "Girl", 3, SPEAR | KATANA, ALL, ALL },
   [0x15F] = { "Sleep", 8, BLUNT | RANGED, 0, 0 },
-  [0x12A] = { "Kefka", 16, SWORD | SPEAR | BLUNT | RANGED, 0, 0 },
+  [0x12A] = { "Kefka", 16, SWORD | DAGGER | SPEAR | KATANA | BLUNT | RANGED, 0, 0 },
 }
 local TIERS = { 0x1D7, 0x200, 0x201, 0x202 }
 

@@ -19,9 +19,9 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x05C] = { "Sand Ray", 2, SWORD | SPEAR, ICE | WATER, 0, POISON },
-  [0x023] = { "FossilFang", 3, DAGGER | BLUNT, FIRE | ICE | HOLY | WATER, POISON, 0 },
-  [0x015] = { "Rhinotaur", 2, DAGGER | BLUNT, 0, BOLT, POISON },
+  [0x05C] = { "Sand Ray", 2, SPEAR | KATANA, ICE | WATER, 0, POISON },
+  [0x023] = { "FossilFang", 3, SPEAR | BLUNT, FIRE | ICE | HOLY | WATER, POISON, 0 },
+  [0x015] = { "Rhinotaur", 2, SPEAR | BLUNT, 0, BOLT, POISON },
   [0x012] = { "Rhodox", 2, SWORD | SPEAR, 0, 0, POISON },
   [0x0A8] = { "GreaseMonk", 2, SPEAR | RANGED, POISON, 0, 0 },
 }

@@ -28,7 +28,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 local WANT = {
   [0x037] = { "Siegfried (the Colosseum's)", 6, SPEAR | KATANA, 0xFF, 0 },
   [0x040] = { "Chupon (the Colosseum's)", 0, 0, ICE | WATER, FIRE },
-  [0x07F] = { "SrBehemoth (the Colosseum's)", 6, SPEAR | BLUNT, FIRE | HOLY, POISON },
+  [0x07F] = { "SrBehemoth (the Colosseum's)", 6, SPEAR | RANGED, FIRE | HOLY, POISON },
 }
 -- the route's wagers (gen_wor_colosseum's STRIKER and WAGERS): item -> { opponent species, prize }.  The
 -- Striker's record names Chupon and the Striker back; with SHADOW waiting ($01EF) the fight is his
