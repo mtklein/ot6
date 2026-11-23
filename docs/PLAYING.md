@@ -35,7 +35,8 @@ Under each enemy is one line:
 - a shield icon and a number: how many shields the enemy has left;
 - then one cell for each weakness. A grey **?** is a weakness you have not
   found. Once you hit it, the cell shows the icon of the element or weapon
-  type.
+  type. The line shows up to four weaknesses, elements first; an enemy with
+  more has them all the same.
 
 While an enemy has shields it takes half damage. Each hit that matches a
 weakness removes one shield. A hit that matches both an element and a weapon
@@ -56,18 +57,46 @@ A few enemies have no shields and show no line.
 
 ### Weapon types
 
-A weapon's icon shows its type. Fight uses the type of the weapon in hand.
+There are six weapon types. A weapon's icon shows its type, and the item
+menu names it. Fight uses the type of the weapon in hand; an empty hand is a
+fist, which is Blunt.
 
-| Type | Weapons |
-|---|---|
-| Slashing | swords, katanas, claws |
-| Piercing | spears, daggers, thrown blades, bolts, darts, fangs |
-| Bludgeoning | fists, staves, rods, flails, boomerangs |
-| Special | dice, cards, brushes |
+| Type | Icon | Weapons | Skills |
+|---|---|---|---|
+| Sword | a broad blade, up and to the left | swords | Edgar's Chain Saw |
+| Dagger | a short blade lying level | daggers, ninja blades; Gau's fangs | Locke's Trickshot and Dismantle |
+| Spear | a spear standing upright | spears and lances | Edgar's Drill |
+| Katana | a thin blade, up and to the right | katanas; the edged claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | Cyan's Dispatch, Slash, Quadra Slam, Stunner and Cleave |
+| Blunt | a mallet | bare fists; MetalKnuckle, Kaiser and Fire Knuckle; rods, brushes; the Flail, Morning Star and Bone Club | Sabin's Pummel, Suplex and Bum Rush; Umaro's Charge and Throw |
+| Ranged | a throwing star | Shuriken and the other thrown stars; Darts; Cards, Trump and Dice; boomerangs, the Hawk Eye and the other thrown rings | Edgar's AutoCrossbow and Air Anchor; TekMissile; Shadow's skeans; Setzer's Coin Toss |
 
-Skills have a type of their own: a Blitz keeps its type whatever Sabin
-wears, and Edgar's Chain Saw is slashing. A weapon with an element hits the
-weapon's type and its element at once.
+Skills have a type of their own: Edgar's AutoCrossbow is Ranged and his
+Chain Saw a Sword hit, whatever he holds. A weapon with an element hits the
+weapon's type and its element at once. The first hit on a weapon weakness you
+had not found says which it was: "Weak against swords", daggers, spears,
+katanas, blunt or ranged.
+
+Each character has a type of their own, and most can equip a second:
+
+| Character | Own type | Can also equip | Skills with a type |
+|---|---|---|---|
+| Terra | Sword | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | TekMissile, in Magitek armor: Ranged |
+| Locke | Dagger | Sword (MithrilBlade, Flame Sabre, Blizzard, ThunderBlade, Drainer, Falchion, Soul Sabre, Excalibur, Illumina, Ragnarok, Atma Weapon); Ranged (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Trickshot, Dismantle: Dagger. Mug uses his weapon's type |
+| Edgar | Spear | Sword (every sword); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Air Anchor: Ranged. Drill: Spear. Chain Saw: Sword |
+| Sabin | Blunt (bare fists; MetalKnuckle, Kaiser, Fire Knuckle) and Katana (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | none | Pummel, Suplex, Bum Rush: Blunt |
+| Cyan | Katana | Sword (the Scimitar) | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
+| Shadow | Dagger (ninja blades, daggers) | none | Throw: stars Ranged, skeans Ranged and their element; a thrown weapon keeps its type |
+| Celes | Sword | Dagger and Blunt, as Terra | none |
+| Setzer | Ranged (Cards, Trump, Dice, Darts, Doom Darts) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | Coin Toss: Ranged. Hired Help: a type the target is weak to |
+| Strago | Blunt (rods; Flail, Morning Star) | Dagger (Dirk, MithrilKnife, Air Lancet, Man Eater, SwordBreaker, Graedus) | none |
+| Relm | Blunt (brushes, rods; Flail, Morning Star) | Dagger, as Strago | none |
+| Mog | Spear | Dagger (Dirk, MithrilKnife, Graedus) | none |
+| Gau | Dagger (his fangs: bare hands, and his Fight in a rage) | none | none |
+| Umaro | Blunt (bare fists, Bone Club) | none | Charge, Throw: Blunt |
+| Gogo | Blunt (rods; Flail, Morning Star) | Dagger, as Strago | those of the command he uses |
+
+The Fixed Dice and the Heal Rod take no shields. With the Genji Glove each
+hand hits with its own weapon's type.
 
 ### Elements
 
@@ -214,19 +243,19 @@ Tools are found or bought, as in FF6, and cost MP each use.
 
 | Tool | MP | Learned |
 |---|---|---|
-| AutoCrossbow | 4 | from the start. Pierces every enemy once. |
+| AutoCrossbow | 4 | from the start. Hits every enemy once. Ranged. |
 | NoiseBlaster | 6 | Figaro shop. Takes no boost. |
 | Bio Blaster | 8 | Figaro shop. Poison. |
 | Flash | 6 | Figaro's tool merchant and South Figaro's shop |
-| Drill | 16 | Figaro Castle, after the sand dive. Two hits, piercing. |
-| Chain Saw | 18 | Zozo chest. Slashing. |
+| Drill | 16 | Figaro Castle, after the sand dive. Two hits, Spear. |
+| Chain Saw | 18 | Zozo chest. Sword. |
 | Debilitator | 10 | Vector's weapon shop, during the banquet. Gives an enemy a new weakness and shows it; a boost adds one more per point. |
 | **Overclock** | up to 99 | Magitek factory, after the Espers' scene. |
 
 Overclock: a Tool boosted with 3 BP fires twice, each time at 8x. It costs
 both firings, up to 99.
 
-### Sabin, Monk (fists)
+### Sabin, Monk (fists and claws)
 
 Blitzes are chosen from a list; there are no button codes. Sabin learns them
 by level, as in FF6.
@@ -242,8 +271,10 @@ by level, as in FF6.
 | Spiraler | 50 | 42 |
 | **Bum Rush** | 99 | 70, or from Duncan |
 
-Fists are bludgeoning. Claws make his Fight slashing; his Blitzes keep their
-own type. **Bum Rush** is offered only at 3 BP. It is four blows, each at
+Bare fists and the knuckles are Blunt, and so are Pummel, Suplex and Bum Rush
+whatever he wears. The edged claws make his Fight Katana, so with a claw on
+he holds two types. Aura Bolt, Fire Dance and Air Blade hit their elements.
+**Bum Rush** is offered only at 3 BP. It is four blows, each at
 8x. Each blow removes a shield whatever the enemy is weak to.
 
 ### Cyan, Samurai (katana)
@@ -258,7 +289,7 @@ which techs sit in the three slots, or return them to automatic.
 | Dispatch | 4 | from the start |
 | Retort | 10 | 6. A counter stance. |
 | Slash | 13 | 12 |
-| Quadra Slam | 16 | 15. Four slashing hits. |
+| Quadra Slam | 16 | 15. Four Katana hits. |
 | Empowerer | 18 | 24. Drains; two hits. |
 | Stunner | 28 | 34. Hits all enemies. |
 | Quadra Slice | 50 | 44. Four wind hits. |
@@ -300,8 +331,8 @@ Slot opens a short list.
 | Hired Help | level x 50 Gil | one hired blow that uses the type the target is weak to. A boost adds a hire per point. |
 | **Jackpot** | 99 MP | throws the Fixed Dice twice at one enemy (3 BP). Each roll lands a triple, and a low roll does little. Learned when Setzer rejoins in the World of Ruin, at Kohlingen. |
 
-Coin Toss and Hired Help take Gil, not MP. Each hire walks in as a different
-figure.
+Coin Toss and Hired Help take Gil, not MP. Coin Toss is Ranged, like his
+cards, dice and darts. Each hire walks in as a different figure.
 
 ### Strago, Scholar (rod)
 
@@ -321,7 +352,7 @@ figure.
 ### Relm, Painter (brush)
 
 Relm supports the party. Her Painter command opens a list, with Sketch as
-the first row. Brushes hit the special type.
+the first row. Brushes are Blunt, like rods.
 
 | Row | MP | What it does | Learned |
 |---|---|---|---|
@@ -367,10 +398,10 @@ slow an enemy and Gogo can stop it.
 
 | Item | Where | Effect |
 |---|---|---|
-| Shuriken | the merchant at the house where Shadow joins, Kohlingen, Albrook, the Phantom Train; Thamasa in the World of Ruin | piercing |
-| Ninja Star | Thamasa weapon shop, World of Ruin | piercing |
-| Tack Star | Colosseum | piercing |
-| Fire Skean, Water Edge, Bolt Edge | Narshe's item shop after Vector, Kohlingen, Jidoor, Albrook; Maranda in the World of Ruin (the Phantom Train sells Fire Skeans) | piercing and the element, to every enemy |
+| Shuriken | the merchant at the house where Shadow joins, Kohlingen, Albrook, the Phantom Train; Thamasa in the World of Ruin | Ranged |
+| Ninja Star | Thamasa weapon shop, World of Ruin | Ranged |
+| Tack Star | Colosseum | Ranged |
+| Fire Skean, Water Edge, Bolt Edge | Narshe's item shop after Vector, Kohlingen, Jidoor, Albrook; Maranda in the World of Ruin (the Phantom Train sells Fire Skeans) | Ranged and the element, to every enemy |
 | Shadow Edge | the merchant at the house where Shadow joins, Jidoor; Maranda in the World of Ruin | casts Image on the thrower |
 | Inviz Edge | the merchant at the house where Shadow joins, Kohlingen; Maranda in the World of Ruin | casts Vanish on the thrower |
 
@@ -409,7 +440,7 @@ has no ultimate.
 
 Umaro takes no orders. Each turn he picks Fight, Charge, Throw (with the Rage
 Ring) or Storm (with the Blizzard Orb). His Fight, Charge and Throw are
-bludgeoning, and Storm is ice on every enemy. Umaro banks a point each turn,
+Blunt, and Storm is ice on every enemy. Umaro banks a point each turn,
 and when he has been hurt, he spends the bank on his next action. With 3
 points he always Storms, with or without the Blizzard Orb, at 8x. He has no
 MP and cannot wear Espers.
@@ -547,8 +578,10 @@ Notes on the ranks:
 ## Saves
 
 Saves from v0.28 and later load in the current release. A save from before
-v0.44 starts with no Esper progress. A save made in a newer release is not
-meant to load in an older one.
+v0.44 starts with no Esper progress. A save from before v0.51, when there
+were four weapon types, keeps the weaknesses it had revealed, each shown as
+the new type that weakness became for that monster. A save made in a newer
+release is not meant to load in an older one.
 
 The release zip has a `saves` folder: saves at points through the story,
 from Narshe to the World of Ruin, in story order. Each is in slot 3. To use

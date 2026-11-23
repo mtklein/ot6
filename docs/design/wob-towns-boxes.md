@@ -8,6 +8,13 @@ first reach it; nothing boots what a branch leaves, so the line from power-on
 (the middle path) does not move for them. Evidence is under
 `build/attempts/wt/v043-wob-towns/`.
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> below are the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in: slash is now Sword or Katana,
+> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+
 | leg | boots | what it plays |
 |---|---|---|
 | `wob_base_guards` | `blackjack` | the base's guard fights, formations 416 and 417 |
@@ -37,11 +44,12 @@ it is clear in both the `blackjack` and `n128_won` states (`probe2_blackjack.log
 sets it is `_caa773`, event_main.asm:25673). The leg walks east
 to the base on foot, as `wob_base_treasure` does from Vector.
 
-**Break rows.** Commando (2, pierce) and ProtoArmor (2, bludg) were already
+**Break rows.** Commando (2, Dagger) and ProtoArmor (2, Fist) were already
 authored for the Magitek Factory. Mega Armor was on the generated floor (4,
-pierce). Its row is **3, pierce|bludg**: the bigger suit beside the
-ProtoArmor, with joints a pike or a dagger finds (EDGAR's Mithril Pike,
-LOCKE's daggers) and a shell SABIN's blitzes dent. Vanilla bolt|water stays.
+pierce). Its row is **3, Spear|Fist** (pierce|bludg when authored): the bigger
+suit beside the ProtoArmor, with joints a pike finds (EDGAR's Mithril Pike)
+and a shell SABIN's claws and blitzes dent. LOCKE's daggers keyed the pierce
+row; they are Dagger and do not key Spear. Vanilla bolt|water stays.
 `battle_breakwobbase.lua` checks the three rows and both formations against
 the shipped ROM.
 
@@ -89,9 +97,10 @@ leaves the castle the way gen_zozo2_arrival does, and walks in.
   Band 1600, Iron Helmet 1000, Silk Robe 600, Iron Armor 700; items Potion
   300, Tincture 1500, Revivify 300, Antidote 50, Green Cherry 150, Fenix Down
   500, Sleeping Bag 500, Tent 1200. The Flail (CELES among its wearers) and
-  the Full Moon (LOCKE's) are the "blunt" weapons the audit named: both bludg,
-  both free of the row penalty, a bludg key for a party whose only one is
-  SABIN's blitzes.
+  the Full Moon (LOCKE's) are the "blunt" weapons the audit named, both free
+  of the row penalty. The Flail is Fist now, which SABIN's claws and blitzes
+  already hold; the Full Moon is Arcane, which none of the four holds
+  otherwise.
 - SHADOW sits at the inn (191 NPC_1, `$0651`, shown until the Opera
   starts). See section 3.1.
 
@@ -141,22 +150,25 @@ line's party already spends its gil at Jidoor's shops on this leg.
 
 | box | species | row | leg |
 |---|---|---|---|
-| Narshe school 107 (54,28) | Lobo `$019` | 3 pierce (authored) | none (below) |
-| Imperial Camp 117 (17,18) | Telstar `$044` | 4 bludg (authored) | `wob_camp_telstar` |
-| Phantom Train 153 (22,24) | Specter `$156` | **3 slash\|special** (new) | `wob_train_specter` |
-| Floating Continent 394 (48,15) | Gigantos `$0AE` | **5 slash\|bludg** (new) | `wob_fc_gigantos` |
+| Narshe school 107 (54,28) | Lobo `$019` | 3 Spear (authored) | none (below) |
+| Imperial Camp 117 (17,18) | Telstar `$044` | 4 Fist (authored) | `wob_camp_telstar` |
+| Phantom Train 153 (22,24) | Specter `$156` | **3 Katana\|Arcane** (new) | `wob_train_specter` |
+| Floating Continent 394 (48,15) | Gigantos `$0AE` | **5 Katana\|Fist** (new) | `wob_fc_gigantos` |
 
 - **Gigantos** (L25, 6000 HP, Throat Jab x5, weak poison) was on the floor
   row 5 bludg, which the landing party (TERRA, LOCKE and EDGAR's blades,
   SHADOW's point) cannot touch: on the old row the box was lost (lab
-  `giga6`). Its row keeps the boss-grade five and keys slash and bludg, a
-  giant's tendons and bones. The box is reached by the floor switch at
-  (44,11) (`_cad62f`), which the line's crossing never steps on; the switch
-  and the bridge at (40,12) lay tiles a menu's map reload takes away, so the
-  leg opens no menu between them and the box.
+  `giga6`). Its row keeps the boss-grade five and keyed slash and bludg, a
+  giant's tendons and bones. It is Katana and Fist now: of the landing party
+  only SHADOW holds a key (a ninja blade is Katana); TERRA, LOCKE and
+  EDGAR's swords are Sword and do not key it. The box is reached by the
+  floor switch at (44,11) (`_cad62f`), which the line's crossing never steps
+  on; the switch and the bridge at (40,12) lay tiles a menu's map reload
+  takes away, so the leg opens no menu between them and the box.
 - **Specter** (L19, 1500 HP, weak fire|holy) is a spirit, so its row is 3
-  slash|special: CYAN's blade, and special for the guidelines' spirit rule
-  (#347). The rooms car (153) hangs off the front strip the train leg walks;
+  Katana|Arcane: CYAN's blade, and Arcane (special when authored) for the
+  guidelines' spirit rule (#347). The rooms car (153) hangs off the front
+  strip the train leg walks;
   `wob_train_specter` boots `train_b68_entry` (the capture inside the train
   that #286's branch added). The car's door 141 (48,8) lands in 153's
   corridor, where no side of the box is on foot; the box's compartment is
@@ -174,7 +186,8 @@ line's party already spends its gil at Jidoor's shops on this leg.
 
 Each fight leg ran once per in-battle seed shift (0, 4, 8, ... ; distinct
 draws counted by battle key, `$be` at the open plus the formation), on the
-replayed line's states (the ROM with these rows), under
+replayed line's states (the ROM with these rows as authored, in the four
+classes), under
 `build/attempts/wt/v043-wob-towns/sweeps/`.
 
 | fight | runs | distinct keys | won | lost |
@@ -193,8 +206,10 @@ replayed line's states (the ROM with these rows), under
   (TERRA, LOCKE, EDGAR, SHADOW), LOCKE dying with 3 BP banked; the reload drew be64 and won. Four keys in five is a box a
   player beats, and a lab candidate: the driver opens with SHADOW's Fight and
   EDGAR's AutoCrossbow (pierce, not a Gigantos key), and every action draws a
-  counter, so fewer, boosted slash Fights are the lever to measure. A first
-  lab turned EDGAR's Tools line off (`tools = false`; sweep `giga-notools`):
+  counter, so fewer, boosted slash Fights are the lever to measure (the row is
+  Katana, Fist now: of those Fights only SHADOW's, with a ninja blade, keys
+  it). A first lab turned EDGAR's Tools line off (`tools = false`; sweep
+  `giga-notools`):
   5 of 6 distinct keys won (beE8 beE4 be60 be74 be2C; be78 lost), the same
   band. A second lab turned LOCKE's Steal off for the box fight alone (it
   spent turns that took 0 off the body, "skill took 0 ... cmd $05"; sweep

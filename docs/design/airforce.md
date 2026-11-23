@@ -7,6 +7,13 @@ its header carries the decoded rows), `tools/tests/lab_airforce_bake.lua` (delet
 run log under `build/attempts/airforce-lab/` (the batch runner keeps every
 attempt; `python3 tools/tests/airforcelab_aggregate.py` (deleted in 8d350a73; last version at 9ed3b849) printed them all).
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> below are the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in: slash is now Sword or Katana,
+> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+
 **The `build/attempts/airforce-lab/` tree is gone** (#222): it lived in the
 agent worktree this work was done in and went with it.  Every path under it
 cited below is a retained run log lost with the agent worktree; see the
@@ -58,10 +65,16 @@ until the body's script restores it.
 
 | part | slot | HP | def / mdef / mpow | speed | shields (Ot6ShieldTbl) | weak (+25) |
 |---|---|---|---|---|---|---|
-| AirForce `$113` | 0 | 8000 | 150 / 120 / 12 | 35 | **8**, PIERCE | `$84` bolt \| water |
-| Laser Gun `$145` | 2 | 3300 | 130 / 140 / 9 | 30 | 3, PIERCE | `$84` |
-| Speck `$146` | 3 | 420 | 230 / 160 / 10 | 15 | 1, any class | `$84` |
-| MissileBay `$147` | 4 | 3000 | 135 / 150 / 8 | 20 | 3, PIERCE | `$84` |
+| AirForce `$113` | 0 | 8000 | 150 / 120 / 12 | 35 | **8**, Spear | `$84` bolt \| water |
+| Laser Gun `$145` | 2 | 3300 | 130 / 140 / 9 | 30 | 3, Dagger | `$84` |
+| Speck `$146` | 3 | 420 | 230 / 160 / 10 | 15 | 1, Dagger\|Spear\|Katana\|Fist | `$84` |
+| MissileBay `$147` | 4 | 3000 | 135 / 150 / 8 | 20 | 3, Dagger | `$84` |
+
+The class cells are today's rows.  When the lab ran the body, the gun and
+the bay were all PIERCE and the Speck took any of the four classes, so
+EDGAR's AutoCrossbow keyed every part.  It is Spear now and keys the body
+and the Speck; LOCKE's Assassin (Dagger) keys the gun, the bay and the
+Speck.
 
 (`monster_prop.dat` rows at id*32; absorb +23 and null +24 are `$00` on
 all four.)  The moves (`magic_prop_en.dat`, 14 bytes at id*14; the AI
