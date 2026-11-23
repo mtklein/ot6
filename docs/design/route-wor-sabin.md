@@ -8,6 +8,14 @@ from the landing to Tzen's door (`wor-tzen-door-v1`), and section 11 what
 `gen_wor_sabin` measured from there through the house to the first save
 with Sabin (`wor-sabin-v1`).
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> keys below are the present ones. Quoted logs, dated measurements and
+> "before" columns keep the words they were recorded in: slash is now Sword
+> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
+> or Dagger.
+
 Line numbers are into `ff6/src/event/event_main.asm` unless a path is given.
 Decodes come from `tools/route_data.py` (added with this doc: entrances,
 triggers, chests, NPCs, encounter pools, species, shops, items, the party in a
@@ -594,10 +602,11 @@ Remedy ×1 and Genji Glove ×2.
 
 Levers, to be measured by the driving:
 
-- **Weapon(s):** every sword she can hold is slash with the runic property
+- **Weapon(s):** every sword she can hold is Sword (`slash` in the dump
+  above; its `pierce` daggers are Dagger) with the runic property
   (`items.txt`, e.g. `$0E Blizzard ... props swdtech,2-hand,runic`), so Runic
   stays lit with any of them. A **Genji Glove** pair of **Blizzard (ice) +
-  ThunderBlade (bolt)** chips slash plus the element on every hit. That
+  ThunderBlade (bolt)** chips Sword plus the element on every hit. That
   answers the plain's ice bodies and the Chitonid's bolt, and it doubles the
   hits of a boosted Fight (`guidelines.md` "Relics matter"). Break Blade
   (117) is the heaviest plain blade. The house's Drainer (121) is better.
@@ -722,13 +731,13 @@ From the same fixture (`party_wor_landing.txt`):
     can equip relic: Jewel Ring; Peace Ring; Genji Glove; Black Belt; Star Pendant; Back Guard
 ```
 
-His keys are bare fists (bludg, `Ot6WeapClassTbl` `$FF`), claws (slash:
-Kaiser, holy; Poison Claw, poison; Fire Knuckle, fire; `items.txt`), and
-blitzes with their own classes and elements: Pummel and Suplex bludg
-(`ot6_class.asm:191-192`), AuraBolt holy, Fire Dance fire (`MagicProp`
-`$5D-$64`). Tzen's shops 52, 53 and 55 dress him (Fire Knuckle 10,000;
-Power Sash 5,000), along with the house's Hyper Wrist. A second Genji
-Glove is in the bag.
+His one key is Fist (`bludg` and `slash` in the dump above): bare fists
+(`Ot6WeapClassTbl` `$FF`), claws (Kaiser, holy; Poison Claw, poison; Fire
+Knuckle, fire; `items.txt`), and Pummel and Suplex
+(`ot6_class.asm:191-192`). His blitzes add elements: AuraBolt holy, Fire
+Dance fire (`MagicProp` `$5D-$64`). Tzen's shops 52, 53 and 55 dress him
+(Fire Knuckle 10,000; Power Sash 5,000), along with the house's Hyper
+Wrist. A second Genji Glove is in the bag.
 
 Tzen's weapon counter also tops CELES's Flame Sabres (the bag and her hands) up to a pair (7,000
 each) for the Narshe arc's fire-weak bosses: it is the one counter on the
@@ -786,8 +795,8 @@ unchanged: it grows only once the driving has played these areas.
 
 | hand | classes | elements |
 |---|---|---|
-| Celes alone (to Tzen) | **slash** (every sword; pierce only on the 26-30-power daggers) | **ice** (own Ice; Blizzard), **bolt** (ThunderBlade, in the bag), **fire** and bolt (Maduin, worn); holy with Unicorn's Pearl (40 MP) |
-| Celes + Sabin | + **bludg** (fists, Pummel, Suplex), slash (claws) | + **holy** (AuraBolt), **fire** (Fire Dance) |
+| Celes alone (to Tzen) | **Sword** (every sword; Dagger only on the 26-30-power daggers) | **ice** (own Ice; Blizzard), **bolt** (ThunderBlade, in the bag), **fire** and bolt (Maduin, worn); holy with Unicorn's Pearl (40 MP) |
+| Celes + Sabin | + **Fist** (fists, claws, Pummel, Suplex) | + **holy** (AuraBolt), **fire** (Fire Dance) |
 
 ### 8.2 The Solitary Island (world groups 29, 30; not met on the way to `wor-start-v1`)
 
@@ -801,9 +810,9 @@ route.
 
 | id | body | L | HP | vanilla weak | absorbs | proposed row |
 |---|---|---|---|---|---|---|
-| `$072` Peepers | tiny pest | 23 | 1 | ice\|water | — | 1 · slash |
-| `$0B2` EarthGuard | tiny pest | 23 | 1 | water | — | 1 · slash |
-| `$0D5` Black Drgn | dragon | 26 | 4000 | fire\|holy | poison | **4 · slash** |
+| `$072` Peepers | tiny pest | 23 | 1 | ice\|water | — | 1 · Sword |
+| `$0B2` EarthGuard | tiny pest | 23 | 1 | water | — | 1 · Sword |
+| `$0D5` Black Drgn | dragon | 26 | 4000 | fire\|holy | poison | **4 · Sword** |
 
 - The 1-HP pests die to any hit, so a row only makes the gauge read right. One
   shield, in Celes's class, follows the Baren Falls piranha "chum wave" precedent
@@ -812,8 +821,8 @@ route.
 - The Black Drgn is a miniboss-grade body (4000 HP) on the beach, and again
   on the desert tiles at Tzen's door (groups 30, 36 and 40). Its vanilla
   fire and holy are Sabin's (Fire Dance, AuraBolt) and Maduin's. A
-  sword-only Celes has no key on today's floor (pierce). Slash gives her
-  one: a blade finds the gaps in the scales.
+  sword-only Celes has no key on today's floor (pierce). Sword gives her
+  one: a sword finds the gaps in the scales.
 - **Teaches:** the sand holds a dragon. The beach warns, and the desert by
   Tzen repeats it.
 
@@ -821,34 +830,36 @@ route.
 
 | id | body | L | HP | vanilla weak | absorbs | proposed row |
 |---|---|---|---|---|---|---|
-| `$021` Mesosaur | saurian (×4 in group 35) | 26 | 1112 | **ice** | — | **3 · slash\|pierce** |
-| `$031` Gilomantis | mantis | 26 | 1412 | **fire** | — | **3 · slash\|bludg** |
-| `$07C` Chitonid | plated shell, starts in Safe | 26 | 1111 | **bolt** | — | **3 · bludg** |
-| `$098` Gigan Toad | toad | 26 | 458 | **ice** | — | 2 · slash\|pierce |
-| `$0CA` Lunaris | — | 26 | 582 | **none** | — | 2 · slash\|pierce |
-| `$0E6` Osprey | flier | 26 | 850 | **ice** | — | 2 · slash\|pierce |
+| `$021` Mesosaur | saurian (×4 in group 35) | 26 | 1112 | **ice** | — | **3 · Sword\|Spear** |
+| `$031` Gilomantis | mantis | 26 | 1412 | **fire** | — | **3 · Sword\|Arcane** |
+| `$07C` Chitonid | plated shell, starts in Safe | 26 | 1111 | **bolt** | — | **3 · Fist** |
+| `$098` Gigan Toad | toad | 26 | 458 | **ice** | — | 2 · Sword\|Dagger |
+| `$0CA` Lunaris | — | 26 | 582 | **none** | — | 2 · Sword\|Dagger |
+| `$0E6` Osprey | flier | 26 | 850 | **ice** | — | 2 · Sword\|Dagger |
 
 - **Shield counts:** the three 1100-1400-HP bodies are this plain's tanks
   (3). The rest are trash (2). Today's 5 shields (`2 + 26/8`) put the break
   on a corpse, as in the Vector note (`break-coverage-vector.md` §8.2).
-- **Mesosaur:** a hide that a blade or a point opens. Vanilla ice is Celes's
+- **Mesosaur:** a hide that a sword or a spear opens. Vanilla ice is Celes's
   own spell and her Blizzard.
-- **Gilomantis:** slash for the limbs and bludg for the carapace (Sabin
-  later). Vanilla fire (Maduin, the Flame Sabre in both towns, Fire Dance)
-  is the better key, because its Sickle counter answers only Fight.
+- **Gilomantis:** Sword for the limbs and Arcane for the carapace (the
+  bludgeon meant for Sabin later became Arcane, which Setzer, Strago and
+  Relm hold and Sabin does not). Vanilla fire (Maduin, the Flame Sabre in
+  both towns, Fire Dance) is the better key, because its Sickle counter
+  answers only Fight.
 - **Chitonid:** a plated shell that is caved in, never cut (Sabin's fists
   later). For a solo Celes the key is its **vanilla bolt**: the ThunderBlade
   in her landing bag, a Genji Blizzard + ThunderBlade pair, or Maduin's
   Bolt. A sword-only Celes cannot chip it. That is deliberate, and it is the
   one place on the stretch where the key has to be picked up. It is still in
   her bag at the landing, and both towns sell the blade. If review prefers a
-  forgiving row, `3 · slash|bludg` keeps it chippable by any sword.
+  forgiving row, `3 · Sword|Fist` keeps it chippable by any sword.
 - **Lunaris** has no weakness, so its class row is its only key. The row
-  also covers pierce, for later parties.
-- **Osprey:** a flier, which is pierce in the WoB convention
-  (`weapon-classes.md` "pierce-weak fliers"), plus slash so a solo blade
-  reaches it. Its vanilla ice breaks it fast, and it has to die first
-  because of its Beak.
+  also covers Dagger, for later parties.
+- **Osprey:** a flier, which was pierce in the WoB convention
+  (`weapon-classes.md` "pierce-weak fliers") and is Dagger here, plus Sword
+  so a solo Celes reaches it. Its vanilla ice breaks it fast, and it has to
+  die first because of its Beak.
 - **Teaches:** *read the element.* Three of the plain's six bodies are
   ice-weak (Celes's own). The mantis wants fire and punishes a blade. The
   plated one wants the bolt blade. The Lunaris answers only to the class.
@@ -859,9 +870,9 @@ route.
 
 | id | body | L | HP | vanilla weak | absorbs | proposed row |
 |---|---|---|---|---|---|---|
-| `$0E1` Scorpion | soft body (def 5 / mdef 215) | 26 | 290 | **none** | — | 2 · slash\|pierce |
-| `$02C` HermitCrab | shelled, starts in Safe | 26 | 305 | water | — | 2 · slash\|bludg |
-| `$0C0` Pm Stalker | ghost, floats | 26 | 265 | **fire\|holy** | poison | 2 · slash\|special ¤ (8.6) |
+| `$0E1` Scorpion | soft body (def 5 / mdef 215) | 26 | 290 | **none** | — | 2 · Sword\|Dagger |
+| `$02C` HermitCrab | shelled, starts in Safe | 26 | 305 | water | — | 2 · Sword\|Fist |
+| `$0C0` Pm Stalker | ghost, floats | 26 | 265 | **fire\|holy** | poison | 2 · Sword\|Dagger (8.6) |
 
 - **Today, formation 209 (Scorpion ×3, 62.5 % of the house's draws) has no
   key for a sword-carrying Celes, who is alone in the house.** The floor is
@@ -878,11 +889,11 @@ route.
 
   `audit_break_coverage.py` passes these vacuously: tier 1's broad-kit model
   counts pierce as held (`audit_break_coverage.txt:275-277`).
-- **Scorpion:** a blade (or a point, for later parties) through a soft body.
+- **Scorpion:** a sword (or a dagger, for later parties) through a soft body.
   With def 5 and mdef 215 the data already says "the blade, not the spell".
-- **HermitCrab:** the blade takes the body outside the shell and a blow
-  cracks the shell (bludg for Sabin later).
-- **Pm Stalker:** slash in Celes's hand, with vanilla fire and holy for
+- **HermitCrab:** the sword takes the body outside the shell and a blow
+  cracks the shell (Fist for Sabin later).
+- **Pm Stalker:** Sword in Celes's hand, with vanilla fire and holy for
   Maduin, Sabin and the Flame Sabre.
 - **Teaches:** *read the counter.* The Scorpion condemns on its first move,
   so kill it with the blade before the count runs out. The last crab
@@ -903,11 +914,11 @@ formation 204: Osprey $0E6, Chitonid $07C, Gigan Toad $098
 ```
 
 **Format:** each row is an `Ot6ShieldTbl` record (`ff6/src/battle/ot6_hud.asm:1541`),
-`.word` species then `.byte shields, OT6_SLASH|…`, with a comment, as in:
+`.word` species then `.byte shields, OT6_SWORD|…`, with a comment, as in:
 
 ```
         .word   $00e1
-        .byte   2, OT6_SLASH|OT6_PIERCE ; scorpion (WoR, Tzen house): def 5 /
+        .byte   2, OT6_SWORD|OT6_DAGGER ; scorpion (WoR, Tzen house): def 5 /
                                         ;   mdef 215 -- the blade, not the spell
 ```
 
@@ -939,15 +950,20 @@ the driving has played these areas.
 
 Guidelines, "Special (¤) is a common key": spirits, magical and cursed
 bodies take ¤ beside their other keys, so Setzer's cards and dice and
-Relm's brushes have plenty to break. Nobody here holds ¤ (Setzer joins at
-Kohlingen), so this is for a later party: Gau's Veldt draws and a return
+Relm's brushes have plenty to break. Nobody here held ¤ (Setzer joins at
+Kohlingen), so this was for a later party: Gau's Veldt draws and a return
 with Setzer or Relm. Of the twelve, the **Pm Stalker** (a floating ghost)
-takes it: `2 · slash, ¤`, shields and its other key unchanged. The rest
+took it: `2 · slash, ¤`, shields and its other key unchanged. The rest
 are flesh, scale, shell or pests; the Lunaris, whose only key is its class
 row, was left as it is. `battle_breakwor_sabin` carries the row in `WANT`
 and logs the count (`special: 1 of 12 designed species take ¤ in this
 ROM`; 0 on a2d49b67); every formation still has a key for Celes alone
 (build/attempts/wt/v026-rom/347/px13/).
+
+Under six classes the Pm Stalker's row is `2 · Sword, Dagger`: its special
+became Dagger, not Arcane. Setzer's cards and dice and Relm's brushes are
+Arcane and do not key it; Locke's and Shadow's daggers do, and Setzer's
+Darts. Of the twelve, only the Gilomantis (8.3) takes Arcane.
 
 ---
 
@@ -1078,7 +1094,7 @@ stays in the BACK row she arrives in. Maduin stays over Ifrit's +6 vigor:
 no faster on this walk, and its +7 magic stands behind her Cure, her
 in-battle heal. The blades: Blizzard (ice: the Mesosaur, the Osprey, the
 Gigan Toad) and ThunderBlade (bolt: the Chitonid, whose authored row is
-bludgeoning only) on the Genji Glove, and the Jewel Ring in the second
+Fist only) on the Genji Glove, and the Jewel Ring in the second
 relic slot. Without it (`lab/lab_grind_noring.log`, the island's Czarina
 Ring kept) the second fight was lost: `[status] f+1864 ... SLOW`, `[status]
 f+2193 entity 0 char 6 is under PETRIFY`, `[outcome] battle $0CC LOST after
@@ -1659,7 +1675,7 @@ Tonic 5; SERAPHIM held; 203,243 GP.
 
 Played 2026-09-29. Until now §2.3 and §10 kept every walk off the desert
 beside Tzen's door (world group 36), so the Black Drgn was designed
-(§8.2: `4 · slash`) but never fought. `tools/tests/probe_black_drgn.lua`
+(§8.2: `4 · Sword`) but never fought. `tools/tests/probe_black_drgn.lua`
 cold-Continues a battery that saves at (131,179) and optionally uses up K
 plains encounters first. It then walks onto the sand, the way someone who
 does not know what is there would, and paces a six-step stretch,

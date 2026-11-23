@@ -519,7 +519,7 @@ band because each is a support turn that buys no damage of its own.
 
 | Row | Where it shines | Why it is not essential | Limit against trivialising |
 |---|---|---|---|
-| Tint | a body weak to an element only a caster holds: the Chadarnook demon (weak fire, holy; slash and pierce, six shields, route-wor-thamasa.md:219) with the blades painted fire | a caster's spell keys the same body | the colour is the player's, so a wrong one backfires (absorb, null); four turns |
+| Tint | a body weak to an element only a caster holds: the Chadarnook demon (weak fire, holy; Sword and Spear, six shields, route-wor-thamasa.md:219) with the blades painted fire | a caster's spell keys the same body | the colour is the player's, so a wrong one backfires (absorb, null); four turns |
 | Portrait | the turn before a divine or a fold: a two-banked ally reaches three | the ally can bank the point themselves a turn later | single target, refuses a boost, one gift a body, a point never a pip |
 | Varnish | a boss's telegraphed big hit, on the healer or the member it would kill | Safe, Shell, Image, Runic, healing and levels answer the same hits | one action a coat, one coat a body |
 | Still Life | long bosses after #542: the window, and every hit in it, doubles | breaks happen and pay without it | once a break; at most twice a break (4318 frames) |
