@@ -70,7 +70,8 @@ Ot6SkillsKitRows:
         ldy_pos BG3A, {2, 21}
         ldx     #BATTLE_CMD::SKETCH * BattleCmdName::ITEM_SIZE
         jsr     Ot6SkillsCmdRow
-        jmp     TfrBG3ScreenAB
+        jmp     Ot6SkillsRuneRow        ; the tenth, Celes's, then
+                                        ;   TfrBG3ScreenAB (ot6_runeknt_page.asm)
 
 ; [ one Skills row: a BattleCmdName record at a BG3 position ]
 ; in: X = the record's offset in BattleCmdName, Y = the text position.
@@ -122,8 +123,9 @@ Ot6SkillsPainterColor:
         bne     @done                   ; Control in battle: stays grey
         lda     #$20                    ; Sketch, and Sketch in battle: white
         sta     zSkillsTextColor::Painter
-@done:  lda     0,y                     ; the instruction the hook replaced
-        rts
+@done:  jmp     Ot6SkillsRuneColor      ; the tenth row's colour, which ends
+                                        ;   in the `lda 0,y` the hook replaced
+                                        ;   (ot6_runeknt_page.asm)
 
 ; [ does a worn piece carry this relic command rewrite? ]
 ; in: A = the $11d6 bit (OT6_RELIC_*), Y = the character's record.  out: Z
@@ -156,7 +158,7 @@ Ot6WornRelicCmd:
         pla                             ; Z from the answer
         rts
 
-; [ the Skills list's cursor positions: vanilla's eight, then Painter ]
+; [ the Skills list's cursor positions: vanilla's eight, Painter, RuneKnt ]
 ; InitSkillsCursor reads this copy (skills.asm); y = 8n - 4 for BG3A row n.
 Ot6SkillsCursorPos:
         cursor_pos {0, 20}
@@ -168,6 +170,7 @@ Ot6SkillsCursorPos:
         cursor_pos {0, 132}
         cursor_pos {0, 148}             ; Treasure Hunter, BG3A row 19
         cursor_pos {0, 164}             ; Painter, BG3A row 21
+        cursor_pos {0, 180}             ; RuneKnt, BG3A row 23 (#563)
 
 ; [ the Skills list's A: SelectSkillsOption jumps through this copy ]
 Ot6SkillsOptionTbl:
@@ -180,6 +183,7 @@ Ot6SkillsOptionTbl:
         .addr   SkillsOption_06
         .addr   SkillsOption_07         ; Treasure Hunter
         .addr   SkillsOption_08         ; Painter
+        .addr   SkillsOption_09         ; RuneKnt (ot6_runeknt_page.asm)
 
 ; ------------------------------------------------------------------------------
 
@@ -281,16 +285,19 @@ Ot6PainterPageDraw:
 
 ; ---- one row's name.  in: $e5 = Ot6PaintName index, $e6 = row, X = col ----
 Ot6PainterDrawName:
+        ldy     #near Ot6PaintName
+; in: Y = a table of ten-tile names in Ot6PaintName's bank (Celes's page
+; draws Ot6RuneName through this), $e5 = the record, $e6 = row, X = col
+Ot6KitDrawName:
+        sty     $ef
         lda     $e6
         jsr     GetBG1TilemapPtr        ; A = row, X = col -> X = tilemap dest
         longa
         txa
         sta     $7e9e89                 ; DrawPosTextBuf position header
         shorta
-        ldy     #10                     ; Ot6PaintName's record
+        ldy     #10                     ; the record
         sty     $eb
-        ldy     #near Ot6PaintName
-        sty     $ef
         lda     #^Ot6PaintName
         sta     $f1
         lda     $e5

@@ -142,6 +142,9 @@
 ; celes: the rune on her blade and the Rune Knight's list behind Runic (#563)
         .include "ot6_rune.asm"
 
+; her field Rune Knight page's row leaf and help lines (#563), after it
+        .include "ot6_runepage.asm"
+
 ; v0.49 appended three modules here (the Painter page's leaf, the numerals,
 ; Leo's reveal); the bank's code is reached by jsl with 16-bit operands
 ; inside it, so all of it must stay in bank $f0.

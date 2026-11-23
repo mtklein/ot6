@@ -353,7 +353,13 @@ MenuStateTbl:
 .else
         .addr   MenuState_31
 .endif
+.if LANG_EN
+        .addr   MenuState_32_RuneKnt    ; Celes's Rune Knight page (#563), $32,
+                                        ;   the last of vanilla's three unused
+                                        ;   (ot6_runeknt_page.asm)
+.else
         .addr   MenuState_32
+.endif
         .addr   MenuState_33
         .addr   MenuState_34
         .addr   MenuState_35

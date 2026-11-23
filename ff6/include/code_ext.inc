@@ -43,6 +43,9 @@ CODE_EXT_INC = 1
 .global Ot6RuneWeakMul           ;   ... and its tier multiplies it
 .global Ot6SwingPal_ext          ;   InitWeaponAnim: the swing's colour
 .global LoadSpriteAnimPal        ;   btlgfx, for that one's tail
+.global Ot6RunePageRows          ;   the field Rune Knight page's rows and prices
+.global Ot6RuneName              ;   the list's 10-letter names
+.global Ot6RunePageDescPtrs, Ot6RunePageDescStr  ;   its help lines (kit_pages.py)
 .global Ot6PaintListOpen         ; #538 relm's kit: sketch -> tools-shell list
 .global Ot6PaintExec             ;   Cmd_0d's execute-side dispatch (the rows)
 .global Ot6KitConfirm            ;   the tools-shell confirm in modes 4-6

@@ -48,7 +48,7 @@ UpdateSkillsCursor:
 
 InitSkillsCursor:
 .if LANG_EN
-@4b59:  ldy     #near Ot6SkillsCursorPos ; nine rows (ot6_painter_page.asm)
+@4b59:  ldy     #near Ot6SkillsCursorPos ; ten rows (ot6_painter_page.asm)
 .else
 @4b59:  ldy     #near SkillsCursorPos
 .endif
@@ -69,13 +69,13 @@ InitSkillsCursor:
 ; NOTE: this is the only cursor that doesn't have an initial position of (0,0)
 SkillsCursorProp:
 .if LANG_EN
-        cursor_prop {0, 1}, {1, 9}, NO_X_WRAP   ; + Thief and Painter
+        cursor_prop {0, 1}, {1, 10}, NO_X_WRAP  ; + Thief, Painter, RuneKnt
 .else
         cursor_prop {0, 1}, {1, 7}, NO_X_WRAP
 .endif
 
 ; skills cursor positions (EN: no longer read; InitSkillsCursor reads the
-; nine-row copy, Ot6SkillsCursorPos, and these bytes stay so nothing moves)
+; ten-row copy, Ot6SkillsCursorPos, and these bytes stay so nothing moves)
 SkillsCursorPos:
 @4b74:  cursor_pos {0, 20}
         cursor_pos {0, 36}
@@ -386,9 +386,10 @@ _c34c80:
         jsr     DrawPosKana
 .if LANG_EN
         jmp     Ot6SkillsKitRows        ; the 8th row (Locke's, his battle
-                                        ;   command's name) and the 9th
-                                        ;   (Relm's), then TfrBG3ScreenAB
-                                        ;   (ot6_painter_page.asm)
+                                        ;   command's name), the 9th (Relm's)
+                                        ;   and the 10th (Celes's), then
+                                        ;   TfrBG3ScreenAB (ot6_painter_page
+                                        ;   .asm, ot6_runeknt_page.asm)
         .res    10, $ea                 ; the bytes the 8th row's draw took
                                         ;   here, kept so nothing moves
 .else
@@ -419,7 +420,7 @@ _c34d3d:
 @4d41:  sta     zSkillsTextColor,x
         inx
 .if LANG_EN
-        cpx     #$0009      ; + zSkillsTextColor::Thief, ::Painter
+        cpx     #$000a      ; + zSkillsTextColor::Thief, ::Painter, ::RuneKnt
 .else
         cpx     #$0007
 .endif
@@ -511,7 +512,11 @@ DrawMagicMenu:
 .if LANG_EN
 
 SkillsOptionsWindow1:                   make_window BG2A, {1, 1}, {7, 4}
-SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {7, 14}
+SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {7, 16}
+                                        ; 14 -> 16 for RuneKnt at BG3A row
+                                        ;   23 (#563); its frame closes at
+                                        ;   row 24, inside the empty spell
+                                        ;   window, whose own closes at 26
                                         ; 12 -> 14 for Painter at BG3A row
                                         ;   21 (#549); its frame closes at
                                         ;   row 22, over the empty spell
