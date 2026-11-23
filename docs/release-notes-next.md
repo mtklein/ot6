@@ -16,7 +16,7 @@ blade works as boosting the spell does: a Fire 2 Blade or Fire 3 Blade, for
 that spell's MP, bites for 3x or 4x where the plain blade bites for 2x. Her
 swing
 takes the element's colour when it bites, and its icon stands beside her
-name. Her ultimate is now Shatter, learned on the Floating Continent: at
+name. Her ultimate is now Break Blade, learned on the Floating Continent: at
 3 BP and 99 MP, every hit of her weapon takes a shield for three of her
 turns. Runic at 3 BP still sends spells back. Gogo's Runic opens the same
 list.

@@ -300,7 +300,7 @@ that can die, dies. A boss loses four shields and takes a very heavy cut.
 - **What you see.** The element's icon stands beside her name while her
   blade holds it, and her swing is drawn in the element's colour when it
   bites.
-- **Ultimate: Shatter**, her Break spell on the blade, learned on the
+- **Ultimate: Break Blade**, her Break spell on the blade, learned on the
   Floating Continent when Celes turns her sword on Kefka. At 3 BP, for 99
   MP: for three of her turns every
   hit of her weapon takes a shield, whatever the enemy's weaknesses. Her
@@ -454,7 +454,7 @@ owner has learned:
 - Slot opens Setzer's list: Coin Toss, Hired Help and Jackpot.
 - Tools: a 3 BP Tool fires twice (Overclock).
 - RuneKnt opens Celes's list: Runic (at 3 BP it sends spells back), a blade
-  row for each element Gogo can cast, and Shatter.
+  row for each element Gogo can cast, and Break Blade.
 - Throw: a 3 BP Throw kills the enemy it breaks (Assassinate).
 - Magic: Fire at 3 BP is Ultima once Terra has rejoined.
 - Lore: Strago's lores. With Magic among his commands too, he also has

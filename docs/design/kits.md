@@ -106,7 +106,7 @@ open the same divines: [kit-gogo.md](kit-gogo.md).
 | Character | Divine | What three points buy | Built |
 |---|---|---|---|
 | Terra | Trance | her Morph (esper form: magic x2, damage taken halved) until the battle ends or she reverts; under 3 BP Morph lasts a shorter span | yes (`ot6_trance.asm`) |
-| Celes | Shatter (the design's "break blade") | the RuneKnt list's last row at three points pending only: for three of her turns every hit of her weapon takes a shield, whatever the body's keys, 99 MP | yes (`ot6_rune.asm`, #563) |
+| Celes | Break Blade | the RuneKnt list's last row at three points pending only: for three of her turns every hit of her weapon takes a shield, whatever the body's keys, 99 MP | yes (`ot6_rune.asm`, #563) |
 | Edgar | Overclock | the Tool fires twice, at the boost's x8 each, priced as the two firings | yes (`ot6_overclock.asm`) |
 | Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: it strikes every enemy; each killable one dies, each death-immune one loses four shields (Break's 3-BP ceiling) and takes a power-255 cut | yes (`ot6_divine.asm`, learned by story since #379; the strip and every body read #388) |
 | Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
@@ -835,7 +835,7 @@ Rulings that fall out of the vanilla math (see `tools/tests/battle_steal.lua`):
 A spellblade, as FF5's Mystic Knight is (owner, 2026-11-23, #563): her
 command is a list, **RuneKnt**, whose rows put magic on her sword.  Runic,
 the stance, is its first row; a blade row arms her weapon with an element
-she can cast; the divine is Shatter (designed as "break blade").  Her natural magic is vanilla's
+she can cast; the divine is Break Blade.  Her natural magic is vanilla's
 table nearly verbatim (sensing, warding, hastening), set against Terra's
 fire/life/transcendence; both share Cure.
 
@@ -845,7 +845,7 @@ The list (`ot6_rune.asm`; the Tools shell, as Locke's and Relm's):
 |---|---|---|---|---|---|
 | 1 | Runic ✦ | the stance: absorbs the next spell as MP and **+1 BP** ✦; arms her blade with the spell's element | 0 | **turns** ✦ (1/2/3 of her own); at 3 BP **RunicBlade**, a fold | join |
 | 2+ | a blade row, drawn as the sword icon and the element (Fire, Ice, Bolt, Poison, Wind, Pearl, Earth, Water) | arms her blade with that element for the rest of the battle | the cheapest spell of it she holds | **the spell line's tier**, as in the Magic list: Fire, Fire 2, Fire 3 at each tier's MP (Poison to Bio); an element with no line refuses | one row per element she can cast now |
-| last | **Shatter** (divine; the design's "break blade") | her Break spell on the blade: for three of her turns every hit of her weapon takes a shield, whatever the body's keys | 99 | three points only | the Floating Continent (switch `$0266`, or `$00A4`) |
+| last | **Break** with the sword icon, Break Blade (divine) | her Break spell on the blade: for three of her turns every hit of her weapon takes a shield, whatever the body's keys | 99 | three points only | the Floating Continent (switch `$0266`, or `$00A4`) |
 
 Her eight slots: the command and her natural magic (vanilla's levels), with
 the divine in the eighth:
@@ -859,7 +859,7 @@ the divine in the eighth:
 | 5 | Scan | 18 (vanilla) |
 | 6 | Safe | 22 (vanilla) |
 | 7 | Haste | 32 (vanilla) |
-| 8 | **Shatter** (divine) | the Floating Continent (story: switch `$0266`, else `$00A4`) |
+| 8 | **Break Blade** (divine) | the Floating Continent (story: switch `$0266`, else `$00A4`) |
 
 - **Break at 13, where vanilla has Imp** (owner, 2026-11-23: "let's get one
   of break/osmose/drain onto her spell list natively. what value does imp
@@ -964,17 +964,15 @@ the divine in the eighth:
   switch `$0266` is set in that scene when she is in the party there, and a
   party that left her on the airship has the row from the World of Ruin's
   first scene (`$00A4`); no save can be made between the two, so a save past
-  the beat has the row whatever version wrote it.  **The player reads
-  "Shatter"** (the lead's pick, 2026-11-23; the owner may rename it):
-  vanilla already has a sword named Break Blade, the one that casts Break,
-  so the list row, the banner, PLAYING.md and the booklet say Shatter, and
-  "break blade" stays the design's description here and in the code's
-  symbols (`OT6_BREAKBLADE`, `Ot6BreakBladeTake`).  No other row's name is
-  an item's, a spell's or an attack's: the blade rows' banners ("Fire
-  Blade", "Bolt 2 Blade", "Bio Blade") match nothing in the item, magic,
-  attack, esper-attack or monster-special name tables (the nearest are the
-  sword ThunderBlade and Sabin's Air Blade), and their list rows are a
-  spell's name behind the sword icon on purpose.
+  the beat has the row whatever version wrote it.  Vanilla has a sword of
+  the same name, the one that casts Break; it keeps it (owner, 2026-11-23:
+  "don't worry about the name clash"; "Shatter" was tried for an hour and
+  dropped), and the two do not interact beyond the sword being a weapon she
+  can swing.  No other row's name is an item's, a spell's or an attack's:
+  the blade rows' banners ("Fire Blade", "Bolt 2 Blade", "Bio Blade") match
+  nothing in the item, magic, attack, esper-attack or monster-special name
+  tables (the nearest are the sword ThunderBlade and Sabin's Air Blade), and
+  their list rows are a spell's name behind the sword icon on purpose.
 - **RunicBlade is a fold now, not the divine** (#563): what a full boost
   buys on the Runic row once she has learned it (switch `$0068`, the Magitek
   factory), as Ultima is what one buys on Terra's Fire.  It is unchanged:
