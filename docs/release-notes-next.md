@@ -46,6 +46,12 @@ spell, or Setzer's Hired Help (which swings a type the target is weak to)
 answers them. The guide (docs/PLAYING.md, "Weapon types") lists every type
 each character can equip.
 
+**Boosted Dances open on their rare step.** Each of Mog's Dances has four
+steps, and the rarest (Cokatrice, Wombat, Kitty, Tapir, Whump, Wild Bear,
+Pois. Frog or Ice Rabbit) comes one turn in 16. A boosted Dance now starts
+on it 1 time in 4 with 1 point, 1 in 2 with 2, and always with 3. Later
+turns of the dance keep the usual odds. Gogo's Dance works the same way.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

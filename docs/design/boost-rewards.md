@@ -90,7 +90,7 @@ proposal below copies:
 | passes | one more pass of the same action, each its own hit and chip | Coin Toss, Hired Help, GP Rain, Umaro's Throw, Jackpot's two rolls |
 | tier | the next spell of the line, at that spell's own price | Fire/Ice/Bolt, Poison→Bio, Cure, Life, Slow→Slow 2, Haste→Haste2 (`Ot6FoldTbl`); SwdTech's window |
 | multiplier | x2/x4/x8 on the number the action produces | everything else with a number: Blitz, Tools, Lore, Dance steps, Throw, Jump, Trickshot, items that heal (`Ot6BoostDmg`) |
-| certainty | a narrower gamble; the full boost removes it | Steal, Slot's rig, Rage's coin, Dance's stumble |
+| certainty | a narrower gamble; the full boost removes it | Steal, Slot's rig, Rage's coin, Dance's stumble and its opening step |
 | duration | more of the user's own turns the effect stands | Runic (1/2/3 of Celes's turns), Morph (596/800/993 ticks, permanent at 3) |
 | reach | one more body, in battle order, wrapping | Shadow's smoke and exit tricks (`Ot6TrickReach`); Scan and Appraise (every enemy at a point) |
 | steps or shields | one more application of the same effect | Dismantle (a corrode a point), Break (a shield a point) |
@@ -153,7 +153,7 @@ guidelines, a bug.
 | Slot | the rig's certainty |
 | Coin Toss, Hired Help | passes |
 | Jackpot | the divine (Setzer) |
-| Dance | the multiplier on every step, and the stumble's certainty |
+| Dance | the multiplier on every step, and the start's certainty: the stumble, and the rare step as the opener |
 | Rage | the coin's certainty |
 | Leap | refused (`Ot6CmdNoBoost`) |
 | Sketch | the multiplier when the sketched attack has a number; dropped when it has none (#469) |
