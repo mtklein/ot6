@@ -15,8 +15,13 @@
 --      Rmove, so his main hand is empty too;
 --   1. a Veldt encounter; GAU Fights and SABIN Fights (H.kitBattle), the
 --      others Defend;
---   2. GAU picks Rage (row 1; the list's entry under the cursor), and the
---      party Defends while he rages, until a plain attack of his has swung;
+--   2. GAU picks Rage, and in its list a rage whose monster's hand code
+--      (MonsterProp+26, what SetRage puts in his hands) is not $FF and is
+--      not a Dagger by the item table -- chosen from the rages he knows
+--      ($1D2C) and the ROM, the d-pad steered to it by the list's cursor
+--      cells -- so the empty-hand rule and the item table would both give
+--      another class; the party Defends while he rages, until a plain attack
+--      of his has swung;
 --   a battle that ends before all three were seen is followed by another.
 -- Read at the ROM's own store: every write of the attack's class byte
 -- (OT6_ATKCLASS) made from inside Ot6WeaponClass, with the swinging entity,
@@ -24,8 +29,8 @@
 --   a. GAU's bare-handed swings (hand $FF, not raging) each load Dagger $02;
 --   b. SABIN's bare-handed swings (hand $FF) each load Blunt $04, which is
 --      Ot6WeapClassTbl[$FF]: the same empty hand, the other class;
---   c. GAU's raging swings each load Dagger $02, whatever code his hand
---      holds (logged with what the item table says for that code);
+--   c. GAU's raging swings each load Dagger $02, with his hand holding the
+--      rage's code, for which the item table says another class;
 --   d. every other swing seen loads its hand's Ot6WeapClassTbl byte.
 --
 -- One declared write (tools/state_write_waivers.txt): on the Veldt GAU's
@@ -94,6 +99,23 @@ local function arm()
   end, emu.callbackType.exec, H.sym("InitCmdList"), H.sym("InitCmdList"))
 end
 
+-- the rage to pick: the first he knows whose monster's hand code is an item
+-- of another class than Dagger.  The list shows the known rages in id order,
+-- two columns.  -> index in the list, species, code
+local function pickRage()
+  local mp, tbl, k = H.sym("MonsterProp") & 0x3FFFFF, H.sym("Ot6WeapClassTbl") & 0x3FFFFF, 0
+  for sp = 0, 255 do
+    if (H.readByte(0x1D2C + (sp >> 3)) >> (sp & 7)) & 1 == 1 then
+      local code = H.readRomByte(mp + sp * 32 + 26)
+      local cls = H.readRomByte(tbl + code)
+      if code ~= 0xFF and cls ~= DAGGER and cls ~= 0 then return k, sp, code end
+      k = k + 1
+    end
+  end
+  return nil
+end
+local RAGE = {}
+
 local function seen() return count("gau bare") >= 1 and count("sabin bare") >= 1 and count("gau raging") >= 1 end
 
 -- one Veldt battle: the two bare Fights, then the rage
@@ -132,6 +154,24 @@ local function battle(i)
     H.cond(function() return H.battleLoadStarted() end, {
       H.kitBattle({ { who = GAU, cmd = CMD_RAGE, boost = 0 } }, { idle = "defend", care = false, maxFrames = 20000,
         giveUp = function() return H.readByte(MSTATE) == ST_RAGE or raging(seatOf(GAU) or 0) end }),
+      -- the list's cursor to the chosen rage (scroll $892B, column $892F, row $8933, by seat)
+      H.driveUntil(function()
+        local g = seatOf(GAU)
+        return H.readByte(MSTATE) ~= ST_RAGE or (H.readByte(0x892B + g) + H.readByte(0x8933 + g) == RAGE.k // 2
+          and H.readByte(0x892F + g) == RAGE.k % 2)
+      end, 3000, {
+        H.call(function()
+          local g = seatOf(GAU)
+          if H.readByte(MSTATE) ~= ST_RAGE then H.setPad({}); return end
+          local absRow, col = H.readByte(0x892B + g) + H.readByte(0x8933 + g), H.readByte(0x892F + g)
+          if col ~= RAGE.k % 2 then H.setPad({ [col < RAGE.k % 2 and "right" or "left"] = true })
+          elseif absRow ~= RAGE.k // 2 then H.setPad({ [absRow < RAGE.k // 2 and "down" or "up"] = true })
+          else H.setPad({}) end
+        end),
+        H.waitFrames(2),
+        H.call(function() H.setPad({}) end),
+        H.waitFrames(8),
+      }, tag .. ": the rage list's cursor on the chosen rage"),
       H.driveUntil(function() return raging(seatOf(GAU) or 0) or not H.battleLoadStarted() end, 4000, {
         H.call(function()
           local g = seatOf(GAU)
@@ -173,6 +213,11 @@ local steps = {
     H.assertEq(H.weaponClass(0xFF), BLUNT, "Ot6WeapClassTbl[$FF], the empty hand, is Blunt")
     H.assertEq(H.kitClass("fang"), DAGGER, "Ot6KitClassTbl's fang byte is Dagger")
     H.log(string.format("[sixgau] SABIN's weapon ($%02X) goes back to the bag through Equip -> Rmove", hand(SABIN)))
+    RAGE.k, RAGE.sp, RAGE.code = pickRage()
+    H.assertEq(RAGE.k ~= nil, true, "GAU knows a rage whose monster's hand code is an item of another class than "
+      .. "Dagger (the rages gen_sabin_gau's Veldt battles left him)")
+    H.log(string.format("[sixgau] the rage: entry %d of his list, species $%03X, hand code $%02X (the item table: "
+      .. "class $%02X)", RAGE.k, RAGE.sp, RAGE.code, H.weaponClass(RAGE.code)))
   end),
   H.removeEquip(SABIN, 0, { tag = "sixgau: SABIN's hand emptied" }),
   H.call(function() H.assertEq(hand(SABIN), 0xFF, "SABIN's main hand is empty") end),
@@ -191,6 +236,7 @@ steps[#steps + 1] = H.call(function()
     if w.kind == "gau bare" then
       H.assertEq(w.class, DAGGER, "GAU's bare-handed Fight carries Dagger, his fangs (" .. what .. ")")
     elseif w.kind == "gau raging" then
+      H.assertEq(w.item, RAGE.code, "raging, GAU's hand holds the chosen rage's code (" .. what .. ")")
       H.assertEq(w.class, DAGGER, "GAU's raging plain attack carries Dagger, whatever his hand holds (" .. what .. ")")
     elseif w.kind == "sabin bare" then
       H.assertEq(w.class, BLUNT, "SABIN's bare hand carries Blunt: the fangs are GAU's alone (" .. what .. ")")
