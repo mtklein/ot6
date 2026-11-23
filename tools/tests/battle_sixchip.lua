@@ -36,6 +36,9 @@
 --   fist    vargas_entry    a member whose weapon went back to the bag
 --                           through Equip -> Rmove (an empty hand is a fist);
 --                           VARGAS weak, an Ipooh not
+--                           (VARGAS cannot be aimed at while an Ipooh stands:
+--                           his side is played from a second snapshot, taken
+--                           once the party has fought the Ipoohs down)
 --   dagger  kolts_cave      a dagger in a hand (or put there from the bag,
 --                           through Equip); the cave's first encounter
 --   spear   ultros1_entry   EDGAR's spear at ULTROS
@@ -256,11 +259,12 @@ end
 local SETTLE, TRIES = 200, 5
 -- one branch: restore the opening, stage what the formation lacks, attack,
 -- and hold the result to `side`'s rule
-local function branch(cls, side)
+local function branch(cls, side, when)
+  when = when or "blob"
   local plan = { { who = 0, cmd = CMD_FIGHT, boost = 0, slot = 0 } }
   local r = nil
   local steps = {
-    H.call(function() B.load = H.requestLoadState(B.blob) end),
+    H.call(function() B.load = H.requestLoadState(B[when]) end),
     H.waitFrames(3),
     H.call(function() H.checkReq(B.load, cls.name .. " " .. side .. ": the opening restored") end),
     H.waitUntil(function() return H.battleActive() end, 900, "the battle is up again", 5),
@@ -443,18 +447,23 @@ local function openBattle(tag)
     H.call(function() H.checkReq(B.req, tag .. ": the opening snapshot"); B.blob = B.req.blob end),
   })
 end
+-- names: a class name (both sides from the opening snapshot), or { name,
+-- weak = "late" } / { name, cold = "late" } for a side played from the
+-- visit's later snapshot (B.late)
+local function nameOf(n) return type(n) == "table" and n[1] or n end
 local function cases(names)
   local t = {}
   for _, n in ipairs(names) do
-    if wanted(n) then
-      t[#t + 1] = branch(BY_NAME[n], "weak")
-      t[#t + 1] = branch(BY_NAME[n], "cold")
+    if wanted(nameOf(n)) then
+      local o = type(n) == "table" and n or {}
+      t[#t + 1] = branch(BY_NAME[nameOf(n)], "weak", o.weak)
+      t[#t + 1] = branch(BY_NAME[nameOf(n)], "cold", o.cold)
     end
   end
   return H.seqStep(t)
 end
 local function any(names)
-  for _, n in ipairs(names) do if wanted(n) then return true end end
+  for _, n in ipairs(names) do if wanted(nameOf(n)) then return true end end
   return false
 end
 local function hand(c) return H.readByte(0x1600 + 37 * c + 0x1F) end
@@ -466,7 +475,20 @@ local function bagHas(id)
 end
 local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) == H.readByte(0x1A6D) and (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 
--- VARGAS's ledge: one A at him, the scene, battle 66 (a fixed formation)
+-- VARGAS's ledge: one A at him, the scene, battle 66 (a fixed formation).
+-- The target select does not reach VARGAS while an Ipooh stands (measured:
+-- "the target select never reached monster 0 (15 presses)", chip2.log; and
+-- battle_vargas's control waits for both Ipoohs down), so the side that
+-- needs him is played from a second snapshot, B.late, taken once the party
+-- has fought both Ipoohs down with plain Fights (H.kitBattle's fight-out).
+local VARGAS = 0x103
+local function vargasAlone()
+  local n, v = 0, false
+  for s = 0, 5 do
+    if standing(s) then n = n + 1; v = v or species(s) == VARGAS end
+  end
+  return n == 1 and v
+end
 local function vargas(tag, prep, names)
   local aPh = 0
   return H.cond(function() return any(names) end, {
@@ -478,6 +500,17 @@ local function vargas(tag, prep, names)
       H.call(function() aPh = (aPh + 1) % 8; H.setPad(aPh < 4 and { "a" } or {}) end),
     }, tag .. ": the VARGAS scene reaches its battle"),
     openBattle(tag),
+    H.kitBattle({}, { care = false, maxFrames = 30000, giveUp = vargasAlone }),
+    H.call(function()
+      H.assertEq(vargasAlone() and H.battleLoadStarted(), true, tag .. ": both Ipoohs are down and VARGAS stands alone")
+    end),
+    H.waitFrames(90),
+    H.call(function()
+      H.log(string.format("[six] %s, the Ipoohs down: %s", tag, formationText()))
+      B.lreq = H.requestSaveState()
+    end),
+    H.waitFrames(5),
+    H.call(function() H.checkReq(B.lreq, tag .. ": the later snapshot"); B.late = B.lreq.blob end),
     cases(names),
   }, {})
 end
@@ -574,7 +607,7 @@ H.run({ maxFrames = 400000 }, {
         string.format("Ot6ClassMsgTbl's entry for %s is the design's message $%02X", c.name, c.msg))
     end
   end),
-  vargas("vargas", H.waitFrames(1), { "sword" }),
+  vargas("vargas", H.waitFrames(1), { { "sword", cold = "late" } }),
   -- the fist: one member's weapon goes back to the bag through Equip -> Rmove
   vargas("vargas, a hand emptied", H.seqStep({
     H.call(function()
@@ -587,7 +620,7 @@ H.run({ maxFrames = 400000 }, {
         return self.inner:tick()
       end, reset = function(self) self.inner = nil end },
     H.call(function() H.assertEq(hand(strip.who), 0xFF, "fist: the main hand is empty") end),
-  }), { "fist" }),
+  }), { { "fist", weak = "late" } }),
   kolts({ "dagger" }),
   ultros({ "spear", "arcane" }),
   doma({ "katana" }),
