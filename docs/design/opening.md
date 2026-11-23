@@ -10,7 +10,9 @@ are" (2026-11-23).
 - The rows are `tools/proto_six/pins.py`'s `OPENING` block, 85 species, each
   with its reason. `python3 tools/proto_six/split.py` writes them into
   `Ot6ShieldTbl` (`ff6/src/battle/ot6_hud.asm`); the masks are never edited
-  by hand.
+  by hand. They were applied with `--keep origin/wt/v051-six-classes`, which
+  leaves every other row as that branch had it: the split's balance step
+  reads a running tally, so without it 45 rows nobody looked at move too.
 - The tables below are `python3 tools/proto_six/opening.py --md`, and the
   numbers `python3 tools/proto_six/opening.py`
   (`build/attempts/wt/v051-six-classes/opening/shares.txt`). The species of

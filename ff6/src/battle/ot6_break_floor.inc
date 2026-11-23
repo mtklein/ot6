@@ -17,7 +17,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_RANGED  ;   6 Mag Roader -> SLASH -> RANGED
         .byte   OT6_BLUNT   ;   7 Retainer -> PIERCE -> BLUNT
         .byte   OT6_BLUNT   ;   8 Hazer -> SLASH -> BLUNT
-        .byte   OT6_RANGED  ;   9 Dahling -> SLASH -> RANGED
+        .byte   OT6_SWORD   ;   9 Dahling -> SLASH -> SWORD
         .byte   OT6_BLUNT   ;  10 Rain Man -> SLASH -> BLUNT
         .byte   OT6_SWORD   ;  11 Brawler -> BLUDGEON -> SWORD
         .byte   OT6_SWORD   ;  12 Apokryphos -> SLASH -> SWORD
@@ -38,14 +38,14 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SWORD   ;  27 Vomammoth -> SLASH -> SWORD
         .byte   OT6_SWORD   ;  28 Fidor -> SLASH -> SWORD
         .byte   OT6_SWORD   ;  29 Baskervor -> SLASH -> SWORD
-        .byte   OT6_RANGED  ;  30 Suriander -> SLASH -> RANGED
+        .byte   OT6_BLUNT   ;  30 Suriander -> SLASH -> BLUNT
         .byte   OT6_SWORD   ;  31 Chimera -> SLASH -> SWORD
         .byte   OT6_SWORD   ;  32 Behemoth -> SLASH -> SWORD
         .byte   OT6_SWORD   ;  33 Mesosaur -> PIERCE -> SWORD
         .byte   OT6_SWORD   ;  34 Pterodon -> PIERCE -> SWORD
         .byte   OT6_BLUNT   ;  35 FossilFang -> PIERCE -> BLUNT
         .byte   OT6_RANGED  ;  36 White Drgn -> PIERCE -> RANGED
-        .byte   OT6_BLUNT   ;  37 Doom Drgn -> PIERCE -> BLUNT
+        .byte   OT6_DAGGER  ;  37 Doom Drgn -> PIERCE -> DAGGER
         .byte   OT6_DAGGER  ;  38 Brachosaur -> PIERCE -> DAGGER
         .byte   OT6_DAGGER  ;  39 Tyranosaur -> PIERCE -> DAGGER
         .byte   OT6_DAGGER  ;  40 Dark Wind -> SLASH -> DAGGER
@@ -67,7 +67,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_BLUNT   ;  56 Nautiloid -> PIERCE -> BLUNT
         .byte   OT6_SWORD   ;  57 Exocite -> PIERCE -> SWORD
         .byte   OT6_KATANA  ;  58 Anguiform -> SLASH -> KATANA
-        .byte   OT6_BLUNT   ;  59 Reach Frog -> SLASH -> BLUNT
+        .byte   OT6_RANGED  ;  59 Reach Frog -> SLASH -> RANGED
         .byte   OT6_SWORD   ;  60 Lizard -> SLASH -> SWORD
         .byte   OT6_SWORD   ;  61 ChickenLip -> SLASH -> SWORD
         .byte   OT6_RANGED  ;  62 Hoover -> SLASH -> RANGED
@@ -92,9 +92,9 @@ OT6_FLOOR_CLASS:
         .byte   OT6_RANGED  ;  81 Boxed Set -> SLASH -> RANGED
         .byte   OT6_SWORD   ;  82 SlamDancer -> BLUDGEON -> SWORD
         .byte   OT6_BLUNT   ;  83 HadesGigas -> BLUDGEON -> BLUNT
-        .byte   OT6_RANGED  ;  84 Pug -> BLUDGEON -> RANGED
+        .byte   OT6_BLUNT   ;  84 Pug -> BLUDGEON -> BLUNT
         .byte   OT6_SWORD   ;  85 Magic Urn -> SLASH -> SWORD
-        .byte   OT6_RANGED  ;  86 Mover -> SLASH -> RANGED
+        .byte   OT6_BLUNT   ;  86 Mover -> SLASH -> BLUNT
         .byte   OT6_RANGED  ;  87 Figaliz -> SLASH -> RANGED
         .byte   OT6_BLUNT   ;  88 Buffalax -> SLASH -> BLUNT
         .byte   OT6_DAGGER  ;  89 Aspik -> BLUDGEON -> DAGGER
@@ -140,14 +140,14 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SWORD   ; 129 Wyvern -> PIERCE -> SWORD
         .byte   OT6_SWORD   ; 130 Zombone -> BLUDGEON -> SWORD
         .byte   OT6_KATANA  ; 131 Dragon -> PIERCE -> KATANA
-        .byte   OT6_RANGED  ; 132 Brontaur -> SLASH -> RANGED
+        .byte   OT6_BLUNT   ; 132 Brontaur -> SLASH -> BLUNT
         .byte   OT6_RANGED  ; 133 Allosaurus -> PIERCE -> RANGED
         .byte   OT6_DAGGER  ; 134 Cirpius -> SLASH -> DAGGER
         .byte   OT6_SWORD   ; 135 Sprinter -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 136 Gobbler -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 137 Harpiai -> SLASH -> SWORD
         .byte   OT6_BLUNT   ; 138 GloomShell -> PIERCE -> BLUNT
-        .byte   OT6_RANGED  ; 139 Drop -> SLASH -> RANGED
+        .byte   OT6_DAGGER  ; 139 Drop -> SLASH -> DAGGER
         .byte   OT6_SWORD   ; 140 Mind Candy -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 141 WeedFeeder -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 142 Luridan -> SLASH -> SWORD
@@ -155,13 +155,13 @@ OT6_FLOOR_CLASS:
         .byte   OT6_BLUNT   ; 144 Over Grunk -> SLASH -> BLUNT
         .byte   OT6_SWORD   ; 145 Exoray -> SLASH -> SWORD
         .byte   OT6_BLUNT   ; 146 Crusher -> SLASH -> BLUNT
-        .byte   OT6_RANGED  ; 147 Uroburos -> SLASH -> RANGED
+        .byte   OT6_BLUNT   ; 147 Uroburos -> SLASH -> BLUNT
         .byte   OT6_SWORD   ; 148 Primordite -> BLUDGEON -> SWORD
         .byte   OT6_RANGED  ; 149 Sky Cap -> SLASH -> RANGED
         .byte   OT6_SWORD   ; 150 Cephaler -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 151 Maliga -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 152 Gigan Toad -> SLASH -> SWORD
-        .byte   OT6_SWORD   ; 153 Geckorex -> SLASH -> SWORD
+        .byte   OT6_KATANA  ; 153 Geckorex -> SLASH -> KATANA
         .byte   OT6_BLUNT   ; 154 Cluck -> SLASH -> BLUNT
         .byte   OT6_DAGGER  ; 155 Land Worm -> SLASH -> DAGGER
         .byte   OT6_SPEAR   ; 156 Test Rider -> PIERCE -> SPEAR
@@ -169,7 +169,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_RANGED  ; 158 Tomb Thumb -> SLASH -> RANGED
         .byte   OT6_DAGGER  ; 159 HeavyArmor -> PIERCE -> DAGGER
         .byte   OT6_DAGGER  ; 160 Chaser -> PIERCE -> DAGGER
-        .byte   OT6_RANGED  ; 161 Scullion -> SLASH -> RANGED
+        .byte   OT6_BLUNT   ; 161 Scullion -> SLASH -> BLUNT
         .byte   OT6_DAGGER  ; 162 Poplium -> SLASH -> DAGGER
         .byte   OT6_SWORD   ; 163 Intangir -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 164 Misfit -> SLASH -> SWORD
@@ -183,13 +183,13 @@ OT6_FLOOR_CLASS:
         .byte   OT6_BLUNT   ; 172 Pan Dora -> SLASH -> BLUNT
         .byte   OT6_RANGED  ; 173 SoulDancer -> SLASH -> RANGED
         .byte   OT6_SWORD   ; 174 Gigantos -> BLUDGEON -> SWORD
-        .byte   OT6_BLUNT   ; 175 Mag Roader -> SLASH -> BLUNT
-        .byte   OT6_SWORD   ; 176 Spek Tor -> SLASH -> SWORD
+        .byte   OT6_RANGED  ; 175 Mag Roader -> SLASH -> RANGED
+        .byte   OT6_BLUNT   ; 176 Spek Tor -> SLASH -> BLUNT
         .byte   OT6_KATANA  ; 177 Parasite -> SLASH -> KATANA
         .byte   OT6_SWORD   ; 178 EarthGuard -> PIERCE -> SWORD
         .byte   OT6_KATANA  ; 179 Coelecite -> BLUDGEON -> KATANA
         .byte   OT6_KATANA  ; 180 Anemone -> SLASH -> KATANA
-        .byte   OT6_BLUNT   ; 181 Hipocampus -> SLASH -> BLUNT
+        .byte   OT6_DAGGER  ; 181 Hipocampus -> SLASH -> DAGGER
         .byte   OT6_BLUNT   ; 182 Spectre -> SLASH -> BLUNT
         .byte   OT6_BLUNT   ; 183 Evil Oscar -> SLASH -> BLUNT
         .byte   OT6_BLUNT   ; 184 Slurm -> BLUDGEON -> BLUNT
@@ -197,7 +197,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_BLUNT   ; 186 StillGoing -> SLASH -> BLUNT
         .byte   OT6_DAGGER  ; 187 Allo Ver -> SLASH -> DAGGER
         .byte   OT6_RANGED  ; 188 Phase -> SLASH -> RANGED
-        .byte   OT6_KATANA  ; 189 Outsider -> SLASH -> KATANA
+        .byte   OT6_DAGGER  ; 189 Outsider -> SLASH -> DAGGER
         .byte   OT6_SWORD   ; 190 Barb-e -> SLASH -> SWORD
         .byte   OT6_KATANA  ; 191 Parasoul -> SLASH -> KATANA
         .byte   OT6_SWORD   ; 192 Pm Stalker -> SLASH -> SWORD
@@ -211,14 +211,14 @@ OT6_FLOOR_CLASS:
         .byte   OT6_BLUNT   ; 200 Opinicus -> SLASH -> BLUNT
         .byte   OT6_KATANA  ; 201 Poppers -> SLASH -> KATANA
         .byte   OT6_SWORD   ; 202 Lunaris -> SLASH -> SWORD
-        .byte   OT6_RANGED  ; 203 Garm -> SLASH -> RANGED
+        .byte   OT6_DAGGER  ; 203 Garm -> SLASH -> DAGGER
         .byte   OT6_DAGGER  ; 204 Vindr -> SLASH -> DAGGER
         .byte   OT6_KATANA  ; 205 Kiwok -> SLASH -> KATANA
-        .byte   OT6_RANGED  ; 206 Nastidon -> PIERCE -> RANGED
+        .byte   OT6_BLUNT   ; 206 Nastidon -> PIERCE -> BLUNT
         .byte   OT6_BLUNT   ; 207 Rinn -> SLASH -> BLUNT
         .byte   OT6_DAGGER  ; 208 Insecare -> PIERCE -> DAGGER
         .byte   OT6_BLUNT   ; 209 Vermin -> SLASH -> BLUNT
-        .byte   OT6_SWORD   ; 210 Mantodea -> PIERCE -> SWORD
+        .byte   OT6_BLUNT   ; 210 Mantodea -> PIERCE -> BLUNT
         .byte   OT6_SWORD   ; 211 Bogy -> SLASH -> SWORD
         .byte   OT6_RANGED  ; 212 Prussian -> PIERCE -> RANGED
         .byte   OT6_SWORD   ; 213 Black Drgn -> PIERCE -> SWORD
@@ -245,7 +245,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_RANGED  ; 234 Fortis -> SLASH -> RANGED
         .byte   OT6_SWORD   ; 235 Abolisher -> SLASH -> SWORD
         .byte   OT6_KATANA  ; 236 Aquila -> SLASH -> KATANA
-        .byte   OT6_BLUNT   ; 237 Junk -> SLASH -> BLUNT
+        .byte   OT6_DAGGER  ; 237 Junk -> SLASH -> DAGGER
         .byte   OT6_SWORD   ; 238 Mandrake -> SLASH -> SWORD
         .byte   OT6_BLUNT   ; 239 1st Class -> PIERCE -> BLUNT
         .byte   OT6_SWORD   ; 240 Tap Dancer -> SLASH -> SWORD
@@ -254,15 +254,15 @@ OT6_FLOOR_CLASS:
         .byte   OT6_RANGED  ; 243 Mag Roader -> SLASH -> RANGED
         .byte   OT6_SWORD   ; 244 Wild Rat -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 245 Gold Bear -> SLASH -> SWORD
-        .byte   OT6_RANGED  ; 246 Innoc -> SLASH -> RANGED
+        .byte   OT6_DAGGER  ; 246 Innoc -> SLASH -> DAGGER
         .byte   OT6_RANGED  ; 247 Trixter -> SLASH -> RANGED
         .byte   OT6_DAGGER  ; 248 Red Wolf -> SLASH -> DAGGER
         .byte   OT6_BLUNT   ; 249 Didalos -> SLASH -> BLUNT
         .byte   OT6_KATANA  ; 250 Woolly -> SLASH -> KATANA
         .byte   OT6_SWORD   ; 251 Veteran -> PIERCE -> SWORD
         .byte   OT6_RANGED  ; 252 Sky Base -> SLASH -> RANGED
-        .byte   OT6_RANGED  ; 253 IronHitman -> PIERCE -> RANGED
-        .byte   OT6_RANGED  ; 254 Io -> SLASH -> RANGED
+        .byte   OT6_BLUNT   ; 253 IronHitman -> PIERCE -> BLUNT
+        .byte   OT6_DAGGER  ; 254 Io -> SLASH -> DAGGER
         .byte   OT6_RANGED  ; 255 Pugs -> BLUDGEON -> RANGED
         .byte   OT6_SWORD   ; 256 Whelk -> SLASH -> SWORD
         .byte   OT6_KATANA  ; 257 Presenter -> SLASH -> KATANA
@@ -311,10 +311,10 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SWORD   ; 300 Ultros -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 301 Ultros -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 302 Ultros -> SLASH -> SWORD
-        .byte   OT6_BLUNT   ; 303 Chupon -> SLASH -> BLUNT
+        .byte   OT6_RANGED  ; 303 Chupon -> SLASH -> RANGED
         .byte   OT6_BLUNT   ; 304 L.20 Magic -> SLASH -> BLUNT
         .byte   OT6_DAGGER  ; 305 Siegfried -> SLASH -> DAGGER
-        .byte   OT6_BLUNT   ; 306 L.10 Magic -> SLASH -> BLUNT
+        .byte   OT6_RANGED  ; 306 L.10 Magic -> SLASH -> RANGED
         .byte   OT6_BLUNT   ; 307 L.50 Magic -> SLASH -> BLUNT
         .byte   OT6_RANGED  ; 308 Head -> SLASH -> RANGED
         .byte   OT6_RANGED  ; 309 Whelk Head -> SLASH -> RANGED
@@ -330,7 +330,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SWORD   ; 319 RightBlade -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 320 Left Blade -> SLASH -> SWORD
         .byte   OT6_RANGED  ; 321 Rough -> SLASH -> RANGED
-        .byte   OT6_KATANA  ; 322 Striker -> SLASH -> KATANA
+        .byte   OT6_DAGGER  ; 322 Striker -> SLASH -> DAGGER
         .byte   OT6_RANGED  ; 323 L.70 Magic -> SLASH -> RANGED
         .byte   OT6_KATANA  ; 324 Tritoch -> SLASH -> KATANA
         .byte   OT6_RANGED  ; 325 Laser Gun -> PIERCE -> RANGED
@@ -340,28 +340,28 @@ OT6_FLOOR_CLASS:
         .byte   OT6_BLUNT   ; 329 Ice Dragon -> PIERCE -> BLUNT
         .byte   OT6_SWORD   ; 330 Kefka -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 331 Storm Drgn -> PIERCE -> SWORD
-        .byte   OT6_BLUNT   ; 332 Dirt Drgn -> PIERCE -> BLUNT
+        .byte   OT6_DAGGER  ; 332 Dirt Drgn -> PIERCE -> DAGGER
         .byte   OT6_SWORD   ; 333 Ipooh -> SLASH -> SWORD
         .byte   OT6_KATANA  ; 334 Leader -> PIERCE -> KATANA
         .byte   OT6_BLUNT   ; 335 Grunt -> SLASH -> BLUNT
-        .byte   OT6_KATANA  ; 336 Gold Drgn -> PIERCE -> KATANA
+        .byte   OT6_DAGGER  ; 336 Gold Drgn -> PIERCE -> DAGGER
         .byte   OT6_BLUNT   ; 337 Skull Drgn -> PIERCE -> BLUNT
-        .byte   OT6_KATANA  ; 338 Blue Drgn -> PIERCE -> KATANA
+        .byte   OT6_DAGGER  ; 338 Blue Drgn -> PIERCE -> DAGGER
         .byte   OT6_SPEAR   ; 339 Red Dragon -> PIERCE -> SPEAR
         .byte   OT6_BLUNT   ; 340 Piranha -> SLASH -> BLUNT
         .byte   OT6_BLUNT   ; 341 Rizopas -> SLASH -> BLUNT
         .byte   OT6_BLUNT   ; 342 Specter -> SLASH -> BLUNT
-        .byte   OT6_RANGED  ; 343 Short Arm -> SLASH -> RANGED
-        .byte   OT6_KATANA  ; 344 Long Arm -> SLASH -> KATANA
+        .byte   OT6_DAGGER  ; 343 Short Arm -> SLASH -> DAGGER
+        .byte   OT6_DAGGER  ; 344 Long Arm -> SLASH -> DAGGER
         .byte   OT6_BLUNT   ; 345 Face -> SLASH -> BLUNT
-        .byte   OT6_DAGGER  ; 346 Tiger -> SLASH -> DAGGER
-        .byte   OT6_RANGED  ; 347 Tools -> SLASH -> RANGED
+        .byte   OT6_KATANA  ; 346 Tiger -> SLASH -> KATANA
+        .byte   OT6_DAGGER  ; 347 Tools -> SLASH -> DAGGER
         .byte   OT6_RANGED  ; 348 Magic -> SLASH -> RANGED
         .byte   OT6_RANGED  ; 349 Hit -> SLASH -> RANGED
-        .byte   OT6_DAGGER  ; 350 Girl -> SLASH -> DAGGER
+        .byte   OT6_KATANA  ; 350 Girl -> SLASH -> KATANA
         .byte   OT6_BLUNT   ; 351 Sleep -> SLASH -> BLUNT
         .byte   OT6_BLUNT   ; 352 Hidonite -> SLASH -> BLUNT
-        .byte   OT6_BLUNT   ; 353 Hidonite -> SLASH -> BLUNT
+        .byte   OT6_DAGGER  ; 353 Hidonite -> SLASH -> DAGGER
         .byte   OT6_BLUNT   ; 354 Hidonite -> SLASH -> BLUNT
         .byte   OT6_RANGED  ; 355 L.80 Magic -> SLASH -> RANGED
         .byte   OT6_KATANA  ; 356 L.90 Magic -> SLASH -> KATANA

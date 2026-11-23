@@ -51,7 +51,14 @@ the floor rows from it) and ff6/src/battle/ot6_class_split.inc
 became -- what a four-class save's revealed bits mean, for the codex
 migration), and prints the report.
 
-    python3 tools/proto_six/split.py [--report-only]
+    python3 tools/proto_six/split.py [--report-only] [--keep REV]
+
+--keep REV: every row but the opening's authored ones (and the rows that
+follow one by pins.FAMILY) is taken as REV's tree has it
+(ff6/tools/six_class_split.json and ot6_class_split.inc there), not
+recomputed.  The balance step reads a running tally in species order, so a
+changed row moves the unpinned rows after it; --keep is how a hand-authored
+change lands without moving rows nobody looked at.
 """
 import collections
 import importlib.util
@@ -319,7 +326,7 @@ def assign(masks, order, count, how, ev=None, stage=None, binds=None, departs=No
     return out, kids_of
 
 
-def compute():
+def compute(keep=None):
     csr, rows = old_rows()
     held = dealt(csr)
     gbf = _load(ROOT / "ff6/tools/gen_break_floor.py", "gbf")
@@ -339,6 +346,22 @@ def compute():
     # with no Ot6ShieldTbl row), split by the same rule after the rows
     floor_old = {sp: gbf.classify(names[sp] if sp < len(names) else "")[0] for sp in range(gbf.CODEX_WIDTH)}
     floor, fkids = assign(floor_old, sorted(floor_old), collections.Counter(count), {})
+    kept = 0
+    if keep:
+        krows, kfloor, ksel = kept_tables(keep)
+        for sp in sorted(new):
+            if sp in pins.OPENING or pins.FAMILY.get(sp) in pins.OPENING or sp not in krows:
+                continue
+            if new[sp] != krows[sp]:
+                kept += 1
+                how[sp] = "kept from %s (recomputed: %s; %s)" % (
+                    keep, "|".join(NEW_NAME[b] for b in ORDER if new[sp] & b) or "-", how[sp])
+            new[sp] = krows[sp]
+            kids[sp] = {o: ksel[sp][i] for i, o in enumerate((S, P, B, X)) if ksel[sp][i] or masks[sp] & o}
+        for sp in floor:
+            if sp not in new and sp in kfloor:
+                floor[sp] = kfloor[sp]
+                fkids[sp] = {o: ksel[sp][i] for i, o in enumerate((S, P, B, X)) if ksel[sp][i]}
     # a species with a row never reads the floor; its floor byte follows the row
     # (the row's first class in bit order) so the two never disagree
     for sp, m in new.items():
@@ -348,7 +371,21 @@ def compute():
     # the four classes, the six-class bits its weakness became (0: it had none)
     sel = {sp: [kids.get(sp, fkids[sp]).get(o, 0) for o in (S, P, B, X)] for sp in range(gbf.CODEX_WIDTH)}
     return dict(rows=rows, held=held, gauged=gauged, new=new, how=how, count=final_count, floor=floor,
-                names=names, sel=sel, ev=ev, binds=binds, stage=stage, departs=departs)
+                names=names, sel=sel, ev=ev, binds=binds, stage=stage, departs=departs, keep=keep, kept=kept)
+
+
+def kept_tables(rev):
+    """REV's rows, floor and Ot6ClassSplitTbl bytes: ({sp: mask}, {sp: floor bit}, {sp: [four bytes]})"""
+    def show(path):
+        return subprocess.run(["git", "show", rev + ":" + path], cwd=ROOT, check=True, capture_output=True,
+                              text=True).stdout
+    j = json.loads(show("ff6/tools/six_class_split.json"))
+    sel = {}
+    for line in show("ff6/src/battle/ot6_class_split.inc").split("\n"):
+        m = re.match(r"\s*\.byte\s+\$(\w\w), \$(\w\w), \$(\w\w), \$(\w\w) ;\s*(\d+) ", line)
+        if m:
+            sel[int(m.group(5))] = [int(m.group(k), 16) for k in range(1, 5)]
+    return ({int(k, 16): v for k, v in j["rows"].items()}, {int(k, 16): v for k, v in j["floor"].items()}, sel)
 
 
 def write_split_inc(r):
@@ -420,6 +457,10 @@ def report(r):
     pinned = sum(1 for sp in g if "pinned" in r["how"][sp])
     out.append("dealt gauged species with a pinned weakness: %d" % pinned)
     out.append("the opening's authored rows (pins.OPENING): %d" % sum(1 for sp in rows if sp in pins.OPENING))
+    if r.get("keep"):
+        out.append("every other row kept as %s has it (--keep): %d of them would have been recomputed otherwise "
+                   "(the tallies above count the kept rows; the holder-rule list below was checked on the recomputed ones)" % (
+                       r["keep"], r["kept"]))
     out.append("")
     out.append("OPENING DEPARTS (an authored row that changes the number of weapon weaknesses, or names a class "
                "that is no child of the old ones): %d rows" % len(r["departs"]))
@@ -451,7 +492,8 @@ def report(r):
 
 
 def main():
-    r = compute()
+    keep = sys.argv[sys.argv.index("--keep") + 1] if "--keep" in sys.argv else None
+    r = compute(keep)
     if "--report-only" not in sys.argv:
         rewrite_hud(r["new"])
         write_split_inc(r)
