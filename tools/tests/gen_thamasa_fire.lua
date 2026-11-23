@@ -549,7 +549,15 @@ local function loreOfferedA(id) return H.readByte(TBL_306A_A + id) == id + 0x8B 
 -- learned {3,7,20} -> Aqua Rake (id 3) renders on row index 3; the old
 -- compacted-count model computed row 0, and the driver A-tapped the empty
 -- first row for ~61k frames -- the stall the owner watched twice).
-local function loreRowForA(targetId) return targetId end
+-- Since #541 the Lore list is packed: one offered lore to a row from the top, in id order (battle_denselists),
+-- so the row is the number of offered ids below the target.  Read positionally, a draw that put STRAGO's Aqua
+-- Rake turn in the ambush held Down past the packed list's end until the no-effect watchdog tripped (the
+-- branch's fire_out sweep, shift 40: "B:01.1B.02 ... l00.00.02", build/attempts/wt/v050-line-deaths/labI/).
+local function loreRowForA(targetId)
+  local row = 0
+  for id = 0, targetId - 1 do if loreOfferedA(id) then row = row + 1 end end
+  return row
+end
 
 local function newAmbushPlan(tag)
   local F = {}

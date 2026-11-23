@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "9fb2a92305dbc542f3259b051c8ee20f9cc99dff1fbd3191f58fec044c76784e",
-  "generator_sig": "db28d2b299bd85b994eec9abccfe703692c7c4b2c4c5f1e3d25c49539be81721 gen_wor_gogo build/checkpoints/wor-belly-v1/manifest.json build/checkpoints/wor-belly-v1/wor-belly.sram",
+  "payload_sha256": "fba187a9f7b617ff66f22a76753c6ce118b8c3b2d861c86055d818205e6bbfd5",
+  "generator_sig": "35dc5895ec194b2ad2f03bf37cc647675d0967b03390c7d53bc8dde80a16a129 gen_wor_gogo build/checkpoints/wor-belly-v1/manifest.json build/checkpoints/wor-belly-v1/wor-belly.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-belly-v1/manifest.json",
-      "sha256": "99fd06eb62615705d7feab67fb8d87c930773539115eab750d6069ba0fe60f1f"
+      "sha256": "1287a042db8d9db981cc837d0224421510c3caea938600edf63f4d9eb5696103"
     }
   ]
 }
