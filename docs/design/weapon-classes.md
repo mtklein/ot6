@@ -4,45 +4,82 @@ Scope: World of Balance. Locked ✦.
 
 ## Six physical classes ✦
 
-Each class is a weapon family the player can see in a hand. 6 physical + 8
+Six classes, after Octopath's six (sword, spear, dagger, axe, bow, staff;
+owner, 2026-11-23: "katana is axe"; Ranged "gathers together all the ranged
+physicals"; "rods and fists could group", as Blunt). 6 physical + 8
 elemental = 14 weakness axes (Octopath has 12). Through v0.50 there were
 four (slash, pierce, bludgeon, special ¤); "How the four became six" below
-says what moved. `ot6_class.asm` is the truth: `Ot6WeapClassTbl` gives every
-weapon one class, `Ot6SkillClassTbl` every class-bearing skill.
+says what moved. `tools/proto_six/classes.py` is the grouping as data, and
+`ot6_class.asm`'s two tables are written from it: `Ot6WeapClassTbl` gives
+every weapon one class, `Ot6SkillClassTbl` every class-bearing skill.
 
-| Class | Weapons | Skills that carry it | Wielders | Icon |
+| Class | Weapons | Skills that carry it | Who really holds it | Icon |
 |---|---|---|---|---|
-| **Sword** | swords | Edgar's Chain Saw | Terra, Celes, Edgar; alt for Locke and Cyan (the Scimitar) | $d9 |
-| **Dagger** | daggers, thrown stars and edges, Hawk Eye, darts | Shadow's skeans; Locke's Trickshot and Dismantle | Locke, Shadow; alt for Terra, Celes, Edgar, Setzer, Mog, Strago, Relm | $d8 |
-| **Spear** | spears and lances | Edgar's Drill, Air Anchor and AutoCrossbow; TekMissile | Edgar, Mog | $da |
-| **Katana** | katanas, ninja blades | every SwdTech that cuts (Dispatch, Slash, Quadra Slam, Stunner, Cleave) | Cyan, Shadow | $db |
-| **Fist** | bare hands, claws, the Flail, Morning Star and Bone Club | Sabin's Pummel, Suplex and Bum Rush; Umaro's Charge and Throw | Sabin, Gau, Umaro; alt for Terra, Celes, Strago, Relm (the Flail, the Morning Star) | $e1 |
-| **Arcane** | rods, brushes, cards, dice, boomerangs | Setzer's Coin Toss | Strago, Relm, Setzer; alt for Locke (boomerangs) | $df |
+| **Sword** | swords | Edgar's Chain Saw | Terra, Celes, Leo (Edgar and Locke when they carry one) | $d9 |
+| **Dagger** | daggers, ninja blades; Gau's fangs (his empty hand, and his Fight while he rages) | Locke's Trickshot and Dismantle | Locke, Shadow, Gau | $d8 |
+| **Spear** | spears and lances | Edgar's Drill | Edgar, Mog | $da |
+| **Katana** | katanas; the edged claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | every SwdTech that cuts (Dispatch, Slash, Quadra Slam, Stunner, Cleave) | Cyan, Sabin (with claws) | $db |
+| **Blunt** | bare fists; the knuckles (MetalKnuckle, Kaiser, Fire Knuckle); rods, brushes; the Flail, Morning Star and Bone Club | Sabin's Pummel, Suplex and Bum Rush; Umaro's Charge and Throw | Sabin, Umaro, Strago, Relm, Banon | $dc |
+| **Ranged** | thrown stars; Darts, Doom Darts; Cards, Trump, Dice; the boomerangs and rings (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Edgar's AutoCrossbow and Air Anchor; TekMissile; Shadow's skeans; Setzer's Coin Toss | Setzer, Shadow (Throw), Edgar (AutoCrossbow) | $de |
+
+Spear is thin on purpose: Edgar and Mog. A plan on another branch (#567)
+would let the Dragoon Boots' wearer equip a spear; it is not built.
 
 - **The weapon sets Fight's class; abilities carry their own ✦.**
-  Edgar with a spear in hand cuts as a Sword with the Chain Saw, and
-  Pummel is Fist whatever Sabin wears. Ability class bytes are
-  immutable; only the basic attack reads the equipped weapon. Locke's
-  Mug is a Fight that steals, so it takes the class of the weapon he
-  holds. (Claws and bare hands are one class, so Sabin holds one weapon
-  class; the Chain Saw buys Edgar Sword.)
-- **A body's look narrows the guess to a pair, and the probe picks.** A
-  thing that is cut takes Sword or Katana, a thing that is stuck Dagger
-  or Spear, a thing that is struck Fist or Arcane; a spirit or a magical
-  body takes Arcane or Dagger.
+  Sabin with a claw equipped cuts as Katana when he Fights, and Pummel
+  is Blunt whatever he wears, so claws are how the monk holds a second
+  class (owner: he "has been very versatile for having slashing and
+  pummel"). Edgar's Chain Saw is Sword with a spear in his hand.
+  Ability class bytes are immutable; only the basic attack reads the
+  equipped weapon. Locke's Mug is a Fight that steals, so it takes the
+  class of the weapon he holds.
+- **A holder is who really wields a class.** Owner, 2026-11-23: "we
+  don't want just one particular character to be required to get
+  through fights", and "it's pretty rare anyone will want to be
+  wielding a dagger". So a class's holders are the characters whose
+  signature weapon or command carries it (the column above), not
+  everyone who could equip into it, and at every story stage a
+  species' weapon keys must be really held by two or more characters
+  the player can field there, or by one the story forces into the
+  party (`split.py`'s holder step, `stages.py`).
 - **Null-break stays, as a property rather than a class ✦**: some
   attacks deal damage and chip nothing, the physical counterpart of
   non-elemental magic. It is a per-weapon/per-skill flag. The Fixed
   Dice roll high numbers and reveal nothing, while the ordinary dice
-  chip Arcane-weak enemies.
+  chip Ranged-weak enemies.
 - Cyan is the Katana *specialist* (Quadra Slam ×4 is the best Katana
-  chip in the game). The only other Katana key is Shadow's ninja blade,
-  so a party without either breaks a Katana-weak body by its other
-  weakness. Class-coverage balance is re-asked every milestone ✦.
+  chip in the game), but he is not the only Katana key: Sabin's edged
+  claws cover the class when he is absent. Class-coverage balance is
+  re-asked every milestone ✦.
 - The 8 elements stay untouched ✦.
 - **Row jank preserved ✦**: weapons that ignore row in vanilla
   (boomerangs, dice, cards, darts…) keep ignoring row. The new
   system does not change it.
+
+Where a weapon sits badly in its class (`classes.py` says each once):
+
+- **Chain Saw**: a saw is no sword; Sword is the nearest edge (not a
+  katana's cut, not a blow), and it is what "buys Edgar slashing" meant.
+- **Air Anchor**: it fires a harpoon: a spear by shape, Ranged by how it
+  is delivered (as the AutoCrossbow's bolts).
+- **The skeans**: the three damaging skeans are thrown, so Ranged with
+  the stars, though they resolve as spells and their elements do most of
+  their chipping.
+- **Umaro's Throw** hurls an ally: literally a thrown thing, kept Blunt
+  as his Charge is (a body's blow).
+- **Trickshot** throws a coin but carries Locke's own class whatever he
+  holds: Dagger.
+- **Brushes**: a brush is no bludgeon; it goes with the rods, the other
+  caster's weapon ("rods and fists could group").
+- **Claws**: the four edged claws cut, so Katana; the three knuckles
+  strike, so Blunt.
+- **Hawk Eye and the returning rings** are thrown: Ranged, though vanilla
+  drew them with the flails.
+- **Dice and cards** are Setzer's thrown things: Ranged (the Fixed Dice
+  stay null-break).
+- **Gau's fangs**: his bare hand and his raging Fight are Dagger (owner:
+  "fangs could be daggers maybe? they're more piercing than blunt");
+  everyone else's empty hand is a fist, Blunt.
 
 ## How the four became six
 
@@ -51,37 +88,40 @@ weapons has been pretty easy because there are few types". Under four
 classes a party holding slash and pierce weapon-keyed 86% of the species
 the game deals; any three classes keyed 91-96%.
 
-What moved between families: claws were slash and are Fist; ninja blades
-were pierce and are Katana; rods and boomerangs were bludgeon and are
-Arcane; flails and clubs stay with fists; cards, dice and brushes were
-special and are Arcane.
-
-Every monster keeps its *number* of weapon weaknesses. Each old weakness
-became one of two:
+Every monster keeps its *number* of weapon weaknesses (the two rows any
+weapon broke, the Intangir's and the Speck's, take all six). Each old
+weakness became one class its own weapons went to:
 
 | Was | Is one of |
 |---|---|
 | slash | Sword or Katana |
-| pierce | Dagger or Spear |
-| bludgeon | Fist or Arcane |
-| special ¤ | Arcane or Dagger |
+| pierce | Dagger, Spear or Ranged |
+| bludgeon | Blunt or Ranged |
+| special ¤ | Ranged or Blunt |
 
 Which one, in order (`tools/proto_six/split.py`, whose `--report-only`
 prints every species' old row, new row and reason):
 
-1. where a break story or the row's own comment names the member whose
-   weapon or skill is the key, that member's new class;
-2. else the split that leaves the party the route met the species with
-   holding a key;
-3. else an even balance across the six.
+1. pinned: the opening's rows are authored by hand, and where a World
+   of Balance break story names the member whose weapon or skill is the
+   key, the weakness becomes the class that weapon carries;
+2. Ultros's four records share one row;
+3. the holder rule above: a split is refused where nobody fieldable at
+   the stage really holds one of the row's classes, or only one
+   character the story does not force in;
+4. the route's own hands: of the splits left, the one under which the
+   parties that met the species (a baseline play's record of what each
+   held) keep a key in hand;
+5. then what the four-class row's own comment suggests;
+6. then an even balance across the six.
 
-Of the 349 species the game deals and gauges, 99 are weak to Sword, 111
-to Dagger, 104 to Fist, 113 to Arcane, 98 to Katana and 109 to Spear.
-One class keys 28-32% of them, two classes 51-62%, three 69-81%, four
-84-94%, five 95-98% (`tools/proto_six/party_share.py`).
+Of the 349 species the game deals and gauges, 99 are weak to Sword, 95
+to Dagger, 94 to Spear, 99 to Katana, 125 to Blunt and 124 to Ranged.
+One class keys 27-36% of them, two classes 47-64%, three 66-81%, four
+82-94%, five 91-98%.
 
-A save from an older release keeps its revealed weaknesses, each shown
-as whichever of the two new classes that monster now has
+A save from an older release keeps its revealed weaknesses, each shown as
+the class that weakness became for that monster
 ([save-layout.md](save-layout.md)).
 
 ## The item icon shows the break class
@@ -90,7 +130,7 @@ Each weapon's item icon is its break class icon, on every surface
 that renders item names: item menu, shops, equip, battle lists. The
 icon byte is the first byte of the item name, so a single data table
 covers every surface, and the item menu's type column reads
-DAGGER / SWORD / SPEAR / KATANA / ARCANE / FIST from the same byte.
+DAGGER / SWORD / SPEAR / KATANA / BLUNT / RANGED from the same byte.
 Classless weapons (Heal Rod) show a small dash. Armor, relic, tool, and
 consumable icons are unchanged from vanilla.
 
@@ -104,11 +144,16 @@ white, side by side, so each blade is on its own axis
 | Katana | $db | vanilla's katana, mirrored: a thin blade up and to the right |
 | Spear | $da | redrawn: upright, a leaf head on a thin shaft |
 | Dagger | $d8 | redrawn: level, the point to the left |
-| Fist | $e1 | vanilla's claw |
-| Arcane | $df | vanilla's sparkle |
+| Blunt | $dc | redrawn: a mallet, a broad head on a short shaft |
+| Ranged | $de | vanilla's thrown star |
 
 The first hit on a hidden weakness names it: "Weak against swords",
-"daggers", "fists", "arcane", "katanas" or "spears".
+"daggers", "spears", "katanas", "blunt" or "ranged".
+
+The line under a monster has four weakness cells, elements first, then
+classes in the order Sword, Dagger, Blunt, Ranged, Katana, Spear. A body
+with more weaknesses than cells has them all the same: the Intangir and
+the Speck take all six classes and show the first four.
 
 Rule: if more visual distinction between weapon types is wanted, add
 another weapon class rather than a second icon set with no mechanical
@@ -122,15 +167,15 @@ scenario split is the stress test:
 
 | Stretch | Physical classes on hand | Elements | Enemies there lean |
 |---|---|---|---|
-| Narshe intro | (magitek: TekMissile is Spear) | fire, bolt | beam-weak, tutorial-obvious |
-| Figaro → Kolts | **Dagger, Dagger, Spear** going up (a Sword if Edgar buys the Mithril Blade); Fist only after Sabin | **fire, poison** (+cure) | authored: poison is the second key ✦ |
+| Narshe intro | (magitek: TekMissile is Ranged) | fire, bolt | beam-weak, tutorial-obvious |
+| Figaro → Kolts | **Dagger, Dagger, Spear** going up, Ranged with Edgar's AutoCrossbow (a Sword if he buys the Mithril Blade); Blunt only after Sabin | **fire, poison** (+cure) | authored: poison is the second key ✦ |
 | **Locke scenario** | Dagger only | none | *everything* in occupied South Figaro takes a Dagger ✦ |
-| **Sabin scenario** | Fist (Sabin, Gau), Katana (Cyan; Shadow's blade), Dagger (Shadow's throws) | holy, fire, wind | Phantom Train: holy + Katana featured |
-| **Terra/Banon scenario** | Sword, Spear, Arcane (Banon's rod) | fire, ice, bolt, poison | mage-check spread |
+| **Sabin scenario** | Blunt and Katana (Sabin), Katana (Cyan), Dagger and Ranged (Shadow), Dagger (Gau) | holy, fire, wind | Phantom Train: holy + Katana featured |
+| **Terra/Banon scenario** | Sword, Spear and Ranged (Edgar), Blunt (Banon's rod) | fire, ice, bolt, poison | mage-check spread |
 | Zozo | reunited | most | first dungeon needing a per-encounter read |
-| Opera → Vector | + Arcane (Setzer) | — | fliers that take a point + the first Arcane-weak enemies |
-| Magitek factory | all | all | armored spread: Fist and Dagger featured |
-| Sealed Gate / Thamasa | + Strago/Relm (Arcane) | + lores | spirits: elements first, Arcane beside them |
+| Opera → Vector | + Setzer (Ranged: cards, dice, darts) | — | fliers that take a point + enemies weak to what is thrown |
+| Magitek factory | all | all | armored spread: Blunt and Dagger featured |
+| Sealed Gate / Thamasa | + Strago/Relm (Blunt: rods, brushes) | + lores | spirits: elements first |
 | Floating Continent | final WoB party | all | final check: every class and element locks once |
 
 - **Elemental weaknesses**: vanilla's bits stay wherever they exist ✦;
@@ -139,50 +184,49 @@ scenario split is the stress test:
   a player can guess and then confirm by probing.
 - Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs.
 
-What a party holds, stage by stage (`tools/proto_six/party_share.py`).
-"Signature" is each member's own weapon family and class-bearing skills,
-with nobody re-armed for a key; "widest" adds every class of every weapon
-the members can equip. The percentages are the share of the 349 gauged
-species the party can weapon-key. Free picks are filled with the members
-named.
+What a party holds, stage by stage. "Really held" is each member's
+signature weapon and commands (`classes.py`), with nobody re-armed for a
+key; "widest" adds every class of every weapon the members can equip.
+The percentages are the share of the 349 gauged species the party can
+weapon-key. Free picks are filled with the members named.
 
-| Stage and party | Signature classes | keys | widest |
+| Stage and party | Really held | keys | widest |
 |---|---|---|---|
-| Whelk (Terra in Magitek armor) | Spear | 31% | 31% |
-| Marshal (Locke, Mog) | Dagger, Spear | 62% | 88% |
-| Mt. Kolts to Vargas (Terra, Locke, Edgar) | Sword, Dagger, Spear | 74% | 98% |
-| Lete River, Ultros 1 (+ Sabin, Banon) | Sword, Dagger, Spear, Fist, Arcane | 98% | 98% |
-| Locke's scenario (Locke alone) | Dagger | 32% | 71% |
-| TunnelArmr (Locke, Celes) | Sword, Dagger | 52% | 86% |
-| Imperial camp (Sabin, Shadow) | Dagger, Katana, Fist | 70% | 70% |
-| Phantom Train (Sabin, Cyan, Shadow) | Dagger, Katana, Fist | 70% | 87% |
-| Baren Falls, the trench, the Veldt (Sabin, Cyan, Gau) | Katana, Fist | 52% | 76% |
-| Terra's scenario (Terra, Edgar, Banon) | Sword, Spear, Arcane | 73% | 98% |
-| Zozo (Locke, Celes, Edgar, Sabin) | Sword, Dagger, Spear, Fist | 87% | 98% |
-| Zozo (Locke, Celes, Cyan, Gau) | Sword, Dagger, Katana, Fist | 87% | 95% |
-| Opera, Ultros 2 (Locke, Edgar, Sabin, Cyan) | Sword, Dagger, Spear, Katana, Fist | 95% | 99% |
-| Magitek factory (Locke, Celes, Edgar, Sabin) | Sword, Dagger, Spear, Fist | 87% | 98% |
-| Magitek factory (Locke, Celes, Setzer, Cyan) | Sword, Dagger, Katana, Arcane | 85% | 95% |
-| Sealed Gate, Ultros 3 (Terra, Locke, Edgar, Sabin) | Sword, Dagger, Spear, Fist | 87% | 98% |
-| Thamasa, FlameEater (Terra, Locke, Strago) | Sword, Dagger, Arcane | 71% | 86% |
-| Airship deck (Terra, Edgar, Sabin) | Sword, Spear, Fist | 71% | 87% |
-| Floating Continent (Terra, Edgar, Sabin, Shadow) | Sword, Dagger, Spear, Katana, Fist | 95% | 95% |
-| Floating Continent (Terra, Setzer, Relm, Shadow) | Sword, Dagger, Katana, Arcane | 85% | 95% |
+| Whelk (Terra in Magitek armor) | Ranged | 36% | 36% |
+| Marshal (Locke, Mog) | Dagger, Spear | 54% | 87% |
+| Mt. Kolts to Vargas (Terra, Locke, Edgar) | Sword, Dagger, Spear, Ranged | 87% | 97% |
+| Lete River, Ultros 1 (Terra, Locke, Edgar, Sabin, Banon) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
+| Locke's scenario (Locke) | Dagger | 27% | 74% |
+| TunnelArmr (Locke, Celes) | Sword, Dagger | 48% | 90% |
+| Imperial camp (Sabin, Shadow) | Dagger, Katana, Blunt, Ranged | 87% | 87% |
+| Phantom Train (Sabin, Cyan, Shadow) | Dagger, Katana, Blunt, Ranged | 87% | 98% |
+| Baren Falls, the trench, the Veldt (Sabin, Cyan, Gau) | Dagger, Katana, Blunt | 69% | 84% |
+| Terra's scenario (Terra, Edgar, Banon) | Sword, Spear, Blunt, Ranged | 87% | 97% |
+| Zozo, Dadaluma (Locke, Celes, Edgar, Sabin) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
+| Zozo, Dadaluma (Locke, Celes, Cyan, Gau) | Sword, Dagger, Katana | 69% | 98% |
+| Opera, Ultros 2 (Locke, Edgar, Sabin, Cyan) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
+| Magitek factory (Locke, Celes, Edgar, Sabin) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
+| Magitek factory (Locke, Celes, Setzer, Cyan) | Sword, Dagger, Katana, Ranged | 88% | 98% |
+| Sealed Gate, Ultros 3 (Terra, Locke, Edgar, Sabin) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
+| Thamasa, FlameEater (Terra, Locke, Strago) | Sword, Dagger, Blunt | 71% | 90% |
+| airship deck (Terra, Edgar, Sabin) | Sword, Spear, Katana, Blunt, Ranged | 96% | 99% |
+| Floating Continent (Terra, Edgar, Sabin, Shadow) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
+| Floating Continent (Terra, Setzer, Relm, Shadow) | Sword, Dagger, Blunt, Ranged | 90% | 90% |
 | WoR: the island to Tzen (Celes) | Sword | 28% | 71% |
-| WoR: Tzen to Edgar (Celes, Sabin) | Sword, Fist | 54% | 71% |
-| WoR: the Falcon (Celes, Sabin, Edgar, Setzer) | Sword, Spear, Fist, Arcane | 88% | 98% |
-| WoR: Mt. Zozo (Celes, Sabin, Edgar, Cyan) | Sword, Spear, Katana, Fist | 84% | 95% |
-| WoR: Narshe (Terra, Celes, Cyan, Mog) | Sword, Spear, Katana | 71% | 95% |
-| WoR: Thamasa arc (Terra, Celes, Relm, Strago) | Sword, Arcane | 54% | 86% |
-| WoR: Phoenix Cave party 1 (Terra, Strago, Sabin, Cyan) | Sword, Katana, Fist, Arcane | 91% | 95% |
-| WoR: Phoenix Cave party 2 (Celes, Relm, Mog, Umaro) | Sword, Spear, Fist, Arcane | 88% | 98% |
-| WoR: Veldt cave (Celes, Terra, Relm, Gau) | Sword, Fist, Arcane | 75% | 86% |
-| WoR: Ebot's Rock, the Zone Eater (Terra, Celes, Strago, Relm) | Sword, Arcane | 54% | 86% |
-| WoR: Ancient Castle (Terra, Celes, Relm, Cyan) | Sword, Katana, Arcane | 76% | 95% |
+| WoR: Tzen to Edgar (Celes, Sabin) | Sword, Katana, Blunt | 78% | 84% |
+| WoR: the Falcon (Celes, Sabin, Edgar, Setzer) | Sword, Spear, Katana, Blunt, Ranged | 96% | 99% |
+| WoR: Mt. Zozo (Celes, Sabin, Edgar, Cyan) | Sword, Spear, Katana, Blunt, Ranged | 96% | 99% |
+| WoR: Narshe (Terra, Celes, Cyan, Mog) | Sword, Spear, Katana | 70% | 91% |
+| WoR: Thamasa arc (Terra, Celes, Relm, Strago) | Sword, Blunt | 58% | 71% |
+| WoR: Phoenix Cave party 1 (Terra, Strago, Sabin, Cyan) | Sword, Katana, Blunt | 78% | 84% |
+| WoR: Phoenix Cave party 2 (Celes, Relm, Mog, Umaro) | Sword, Spear, Blunt | 70% | 83% |
+| WoR: Veldt cave (Celes, Terra, Relm, Gau) | Sword, Dagger, Blunt | 71% | 71% |
+| WoR: Ebot's Rock, the Zone Eater (Terra, Celes, Strago, Relm) | Sword, Blunt | 58% | 71% |
+| WoR: Ancient Castle (Terra, Celes, Relm, Cyan) | Sword, Katana, Blunt | 78% | 84% |
 
 The share is of every species in the game, not of the species the stage
-deals: the rows there were split toward the party that meets them (rule 2
-above), so a stage's own bodies key more often than its line says.
+deals: the rows there were split toward the party that meets them (steps 3
+and 4 above), so a stage's own bodies key more often than its line says.
 
 ## Weapons as chip carriers
 
@@ -213,10 +257,10 @@ byte-identical), and leaves the default cursor where class is irrelevant
 ## Skills carry their own class ✦
 
 The chip check reads the *action's* class byte, never the wielder's:
-Trickshot is Dagger with a sword in Locke's hand, the Chain Saw is
-Sword from a spear machinist, Suplex is Fist bare-handed or clawed.
+Trickshot is Dagger with a sword in Locke's hand, the AutoCrossbow is
+Ranged from a spear machinist, Suplex is Blunt with claws on.
 Shadow's skeans (Fire Skean, Water Edge, Bolt Edge) resolve as their
-spells and carry Dagger through them (#383, kits.md "Shadow"), so a
+spells and carry Ranged through them (#383, kits.md "Shadow"), so a
 thrown edge chips its class and its element.
 (The per-skill class/element byte provides this for free.)
 
@@ -226,38 +270,37 @@ Base rule: one signature class per character. A character reaches
 another class three ways, none needing battle code:
 
 1. **Skills** (above): a kit can reach outside its weapon class.
-   Edgar's tools give him Spear and Sword at once.
+   Edgar's tools give him Ranged (AutoCrossbow, Air Anchor), Spear
+   (Drill) and Sword (Chain Saw); Shadow's Throw is Ranged beside his
+   Dagger; Sabin's Blitzes are Blunt beside a claw's Katana.
 2. **Other weapons**: the equip lists are vanilla's, so most characters
-   can hold a second family (the table below).
+   can hold a second family (the table below). The holder rule does not
+   count these: they are what a player who re-arms for a key can reach.
 3. **Magicite weapon permits**: not built. Kept spare ✦: if six classes
    play too hard, a worn esper could permit one extra weapon type while
    it is worn, rented like its spells, never a kept rank (owner,
    2026-11-23, #566).
 
 Every class each character can equip into, and the skills that bring
-one. The first class listed is the signature.
+one. The first column is the class the character really holds.
 
 | Character | Signature | Can also equip | Skills with a class of their own |
 |---|---|---|---|
-| Terra | **Sword** (every sword) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Fist (Flail, Morning Star) | in Magitek armor, TekMissile: Spear |
-| Locke | **Dagger** (every dagger; Hawk Eye) | Sword (MithrilBlade, Flame Sabre, Blizzard, ThunderBlade, Drainer, Falchion, Soul Sabre, Excalibur, Illumina, Ragnarok, Atma Weapon); Arcane (Boomerang, Full Moon, Rising Sun, Sniper, Wing Edge) | Trickshot, Dismantle: Dagger whatever he holds. Mug swings his weapon |
-| Edgar | **Spear** (every spear) | Sword (every sword); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Drill, Air Anchor: Spear. Chain Saw: Sword |
-| Sabin | **Fist** (bare hands, every claw) | — | Pummel, Suplex, Bum Rush: Fist |
+| Terra | **Sword** (every sword) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | in Magitek armor, TekMissile: Ranged |
+| Locke | **Dagger** (every dagger) | Sword (MithrilBlade, Flame Sabre, Blizzard, ThunderBlade, Drainer, Falchion, Soul Sabre, Excalibur, Illumina, Ragnarok, Atma Weapon); Ranged (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Trickshot, Dismantle: Dagger whatever he holds. Mug swings his weapon |
+| Edgar | **Spear** (every spear) | Sword (every sword); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Air Anchor: Ranged. Drill: Spear. Chain Saw: Sword |
+| Sabin | **Blunt** (bare fists; MetalKnuckle, Kaiser, Fire Knuckle) and **Katana** (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | — | Pummel, Suplex, Bum Rush: Blunt |
 | Cyan | **Katana** (every katana) | Sword (the Scimitar) | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
-| Shadow | **Katana** (the ninja blades) | Dagger (Dirk, MithrilKnife, ThiefKnife, Assassin, Man Eater, SwordBreaker, Graedus) | Throw: the three stars Dagger, the three skeans Dagger and their element; a thrown weapon keeps its class |
-| Celes | **Sword** (every sword) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Fist (Flail, Morning Star) | — |
-| Setzer | **Arcane** (Cards, Trump, Dice; the Fixed Dice chip nothing) | Dagger (Darts, Doom Darts, Dirk, MithrilKnife, Man Eater, Graedus) | Coin Toss: Arcane. Hired Help: a class the target is weak to |
-| Strago | **Arcane** (every rod but the Heal Rod, which has no class) | Dagger (Dirk, MithrilKnife, Air Lancet, Man Eater, SwordBreaker, Graedus); Fist (Flail, Morning Star) | — |
-| Relm | **Arcane** (every brush; the rods, as Strago) | Dagger and Fist, as Strago | — |
+| Shadow | **Dagger** (the ninja blades; Dirk, MithrilKnife, ThiefKnife, Assassin, Man Eater, SwordBreaker, Graedus) | — | Throw: the three stars Ranged, the three skeans Ranged and their element; a thrown weapon keeps its class |
+| Celes | **Sword** (every sword) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | — |
+| Setzer | **Ranged** (Cards, Trump, Dice, Darts, Doom Darts; the Fixed Dice chip nothing) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | Coin Toss: Ranged. Hired Help: a class the target is weak to |
+| Strago | **Blunt** (every rod but the Heal Rod, which has no class; Flail, Morning Star) | Dagger (Dirk, MithrilKnife, Air Lancet, Man Eater, SwordBreaker, Graedus) | — |
+| Relm | **Blunt** (every brush; the rods, Flail and Morning Star, as Strago) | Dagger, as Strago | — |
 | Mog | **Spear** (every spear) | Dagger (Dirk, MithrilKnife, Graedus) | — |
-| Gau | **Fist** (bare hands; he holds no weapon) | — | — |
-| Umaro | **Fist** (bare hands, the Bone Club) | — | Charge, Throw: Fist |
-| Gogo | **Arcane** (the rods, as Strago) | Dagger and Fist, as Strago | the kit he mimics |
+| Gau | **Dagger** (his fangs: his empty hand, and his Fight while he rages) | — | — |
+| Umaro | **Blunt** (bare fists, the Bone Club) | — | Charge, Throw: Blunt |
+| Gogo | **Blunt** (the rods, Flail and Morning Star, as Strago) | Dagger, as Strago | the kit he mimics |
 
-Anyone with an empty hand punches as Fist. The Imp Halberd is a Spear on
-every equip list but Umaro's. With the Genji Glove each hand chips its
-own weapon's class.
-
-Arcane's icon is the vanilla sparkle glyph at $df; every consumer keys on
-the code, so custom art can replace it in place without touching anything
-else.
+An empty hand is a fist, Blunt (Gau's is his fangs, Dagger). The Imp
+Halberd is a Spear on every equip list but Umaro's. With the Genji Glove
+each hand chips its own weapon's class.

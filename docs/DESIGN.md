@@ -39,27 +39,37 @@ touches vanilla behavior where a pillar requires it.
 |---|---|---|---|---|
 | Terra | Mage | Sword | Fire | 8 spells; divine: Trance (Morph at a full boost); Ultima is Fire's fourth fold |
 | Locke | Thief | Dagger | — | Steal, Filch, Bestow, Mug, Trickshot, Dismantle, Appraise; divine: Master's Mark |
-| Edgar | Machinist | Spear (and Sword: swords, the Chain Saw) | — | seven Tools, learned by acquisition; divine: Overclock. Air Anchor is a findable extra |
-| Sabin | Monk | Fist (bare hands, claws) | Fire/Holy/Wind | the 8 Blitzes, selected from a menu |
+| Edgar | Machinist | Spear (Ranged: the AutoCrossbow; Sword: the Chain Saw) | — | seven Tools, learned by acquisition; divine: Overclock. Air Anchor is a findable extra |
+| Sabin | Monk | Blunt (fists, knuckles), Katana (edged claws) | Fire/Holy/Wind | the 8 Blitzes, selected from a menu |
 | Cyan | Samurai | Katana | Wind | the 8 SwdTech, priced in BP (see below) |
 | Celes | Rune Knight | Sword | Ice | Runic from the start (signature) + spells (see below) |
-| Gau | Beast Tamer | Fist (bare hands) | varies by rage | Rage learned without limit on the Veldt, 8 equipped (see below); no divine (a varied set needs none; owner, 2026-11-15) |
-| Setzer | Gambler/Merchant | Arcane (cards, dice) | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
-| Strago | Scholar | Arcane (rod) | varies by lore | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; divine: Study, his Scan at a full boost, which learns every lore the monsters present could cast; Bserk, learned by watching a monster inflict Berserk (kits.md) |
-| Relm | Painter | Arcane (brush) | — | Sketch (signature) with the party's buffs behind it, a list like Locke's: Portrait (a free boost point), Tint (an ally's weapon carries the colour she picks), Varnish (the next enemy hit misses), Still Life (a break lasts twice as long), Underpainting (the next weakness hit takes two shields), Gesture (an ally's turn now); divine: Masterpiece (every other ally's free point). Built ([kit-relm.md](design/kit-relm.md), #538) |
-| Shadow | Assassin | Dagger (thrown), Katana (ninja blade) | Fire/Water/Lightning (the skeans) | Throw (signature) over the eight throwing items, learned by acquisition as Edgar's Tools are: three stars, three skeans (Dagger and an element), the smoke (Image) and the exit (Vanish), whose boost buys reach (kits.md "Shadow"); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken. Every throw hobbles (Slows) an enemy and pins (Stops, 8 ticks) a Slowed one ([kit-shadow-pin.md](design/kit-shadow-pin.md), #546) |
+| Gau | Beast Tamer | Dagger (his fangs) | varies by rage | Rage learned without limit on the Veldt, 8 equipped (see below); no divine (a varied set needs none; owner, 2026-11-15) |
+| Setzer | Gambler/Merchant | Ranged (cards, dice, darts) | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
+| Strago | Scholar | Blunt (rod) | varies by lore | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; divine: Study, his Scan at a full boost, which learns every lore the monsters present could cast; Bserk, learned by watching a monster inflict Berserk (kits.md) |
+| Relm | Painter | Blunt (brush) | — | Sketch (signature) with the party's buffs behind it, a list like Locke's: Portrait (a free boost point), Tint (an ally's weapon carries the colour she picks), Varnish (the next enemy hit misses), Still Life (a break lasts twice as long), Underpainting (the next weakness hit takes two shields), Gesture (an ally's turn now); divine: Masterpiece (every other ally's free point). Built ([kit-relm.md](design/kit-relm.md), #538) |
+| Shadow | Assassin | Dagger (ninja blade), Ranged (Throw) | Fire/Water/Lightning (the skeans) | Throw (signature) over the eight throwing items, learned by acquisition as Edgar's Tools are: three stars, three skeans (Ranged and an element), the smoke (Image) and the exit (Vanish), whose boost buys reach (kits.md "Shadow"); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken. Every throw hobbles (Slows) an enemy and pins (Stops, 8 ticks) a Slowed one ([kit-shadow-pin.md](design/kit-shadow-pin.md), #546) |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim; no divine for now (kits.md "Divines") |
-| Umaro | Berserker | Fist (club, bare hands) | Ice | takes no orders; four arms (Fight, Charge, Throw, Storm); divine: Storm, ice on every enemy, on a dump of all three points (kits.md "Umaro") |
-| Gogo | Mime | Arcane (rod) | — | bonus character; has access to every job and masters none |
+| Umaro | Berserker | Blunt (club, fists) | Ice | takes no orders; four arms (Fight, Charge, Throw, Storm); divine: Storm, ice on every enemy, on a dump of all three points (kits.md "Umaro") |
+| Gogo | Mime | Blunt (rod) | — | bonus character; has access to every job and masters none |
 
-**Break classes (6):** Sword (swords), Dagger (daggers, thrown stars and
-edges, darts), Spear (spears and lances), Katana (katanas, ninja blades),
-Fist (bare hands, claws, flails, clubs) and Arcane (rods, brushes, cards,
-dice, boomerangs), `OT6_SWORD` .. `OT6_SPEAR` in `ot6_class.asm`;
-`Ot6WeapClassTbl` gives every weapon one. The column above is each
-character's own class; [weapon-classes.md](design/weapon-classes.md) has
-every class each can equip into. Through v0.50 there were four (slash,
-pierce, bludgeon, special).
+**Break classes (6),** after Octopath's six: Sword (swords), Dagger
+(daggers, ninja blades, Gau's fangs), Spear (spears and lances), Katana
+(katanas, the edged claws), Blunt (fists, knuckles, rods, brushes, flails,
+clubs) and Ranged (what is thrown or shot: stars, skeans, darts, cards,
+dice, coins, boomerangs, the AutoCrossbow), `OT6_SWORD` .. `OT6_SPEAR` in
+`ot6_class.asm`; `Ot6WeapClassTbl` gives every weapon one. The column
+above is the class each character really holds (signature weapon or
+command); [weapon-classes.md](design/weapon-classes.md) has every class
+each can equip into. Through v0.50 there were four (slash, pierce,
+bludgeon, special).
+
+**The holder rule** (owner, 2026-11-23: "we don't want just one particular
+character to be required to get through fights"): at every story stage a
+species' weapon keys must be really held by two or more characters the
+player can field there, or by one the story forces into the party. A
+holder is who really wields the class, not who could equip into it ("it's
+pretty rare anyone will want to be wielding a dagger"). Letting the
+Dragoon Boots' wearer equip a spear is planned on another branch (#567).
 **Elements (8):** FF6's native fire, ice, lightning, wind, earth, water,
 holy, poison. That is two more than Octopath's six, which makes the weakness
 matrix larger.
@@ -163,7 +173,7 @@ Display only: every rule reads the live state.
 **Sources of chip by character.** This is what makes party composition a
 puzzle: weapon attacks chip by weapon class; spells chip by element; each
 Blitz, Tool, Lore, and Dance carries an assigned class or element (Aura
-Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
+Cannon is holy, Drill is Spear, Fire Dance is fire, ...).
 
 ## BP economy
 

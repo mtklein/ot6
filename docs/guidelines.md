@@ -123,8 +123,9 @@ power, write like a human (owner, 2026-09-30).
   brushes do best with plenty to break: spirits, magical and cursed bodies
   and some bosses can take ¤ beside their other keys, often enough that
   bringing Setzer or Relm is a real choice, without ¤ becoming the answer
-  to every fight (owner, 2026-10-01). Since v0.51 the class is Arcane, and
-  it holds the rods and boomerangs too.
+  to every fight (owner, 2026-10-01). Since v0.51 there is no Special:
+  cards and dice are Ranged and brushes Blunt
+  ([weapon-classes.md](design/weapon-classes.md)).
 - **Every recruit should feel amazing and important on arrival** (owner,
   2026-10-01). The area right after a character joins is a good place to
   show what only they bring: break keys their weapons or skills hold that
