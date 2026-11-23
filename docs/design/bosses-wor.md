@@ -1110,7 +1110,7 @@ hook.
 
 Party: CELES, RELM, GOGO, STRAGO (`wor_opera.log:4671`). Event group 134.
 
-**Built.** 6 shields; ranged, spear (`ot6_hud.asm:3200-3203`); weak
+**Built.** 6 shields; dagger, blunt (`ot6_hud.asm`); weak
 wind and water.
 
 **Script** (`ai_script.asm:6989-7011`). Every turn is earth, and a clock
@@ -1137,9 +1137,8 @@ safe. Stays verbatim: 50 Gs, Honed Tusk, the rotation.
 
 **Shields.** 6; proposed 8.
 
-**Break story.** No member holds a class key (the rods and RELM's brush
-are Blunt, CELES's blade a Sword); STRAGO's Aqua Rake is the wind and
-water.
+**Break story.** The rods and RELM's brush are Blunt and key it (CELES's
+blade, a Sword, does not); STRAGO's Aqua Rake is the wind and water.
 
 **On the line.** Won in 8,339 ticks, no death, **never broken** (lowest
 2): thirteen actions, seven spells, five lores and an item, no Fight
@@ -1995,8 +1994,8 @@ Each can be answered in a sentence.
 6. **Thin break stories:** the Poltrgeist (two class key-holders in its
    party), the Red Dragon (one), Atma and the Gold Drgn (MOG's spear
    alone), the Goddess (two), and the White Drgn (one spell). The Doom
-   Gaze, the Dirt Drgn and the second SrBehemoth take no class their
-   party holds; elements key them. None is unbreakable.
+   Gaze and the second SrBehemoth take no class their party holds;
+   elements key them. The Dirt Drgn takes RELM's and STRAGO's rods. None is unbreakable.
 7. **The second SrBehemoth is a different species under a heading that
    says otherwise.** `$07F` (formation 424) arrives by `change_battle`
    from the first one's death; its row sits with the Colosseum's bodies

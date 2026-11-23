@@ -163,7 +163,7 @@ STRAGO's quest, so every body takes his rod beside a key of its own:
 
 | species | L / HP | vanilla elements | shields | classes | why |
 |---|---|---|---|---|---|
-| Dirt Drgn `$14C` | 53 / 28,500 | weak wind, water | 6 | Ranged, Spear | an earth dragon; no member holds Ranged or Spear, so STRAGO's Aqua Rake (wind, water) is the key |
+| Dirt Drgn `$14C` | 53 / 28,500 | weak wind, water | 6 | Dagger, Blunt | an earth dragon; RELM's and STRAGO's rods (Blunt) key it, and STRAGO's Aqua Rake (wind, water) |
 | Doom Gaze `$11D` | (the Phoenix Cave arc's row, unchanged) | | 8 | Ranged, Spear | no member holds either: fire and holy |
 
 `battle_breakwor_gogo` checks the 21 rows in the built ROM, every formation
