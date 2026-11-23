@@ -43,21 +43,36 @@ ELEMENT_BIT.update(
     }
 )
 
-CLASSES = ["slash", "pierce", "bludg", "special"]
-CLASS_BIT = {"slash": 0x01, "pierce": 0x02, "bludg": 0x04, "special": 0x08}
-CLASS_BIT.update(
-    {
-        "slashing": 0x01,
-        "piercing": 0x02,
-        "bludgeon": 0x04,
-        "bludgeoning": 0x04,
-        "OT6_SLASH": 0x01,
-        "OT6_PIERCE": 0x02,
-        "OT6_BLUDG": 0x04,
-        "OT6_SPECIAL": 0x08,
-    }
-)
-ALL_CLASSES = 0x0F
+# The weapon classes are ot6_class.asm's own (tools/ot6_class.py reads the
+# names and bits from the source): six since v0.51 (#566) -- sword, dagger,
+# blunt, ranged, katana, spear.  The doc names a class by that word, any
+# case; the source by its OT6_ token.  Data() re-reads them from --repo.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ot6_class  # noqa: E402
+
+_C = ot6_class.read(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CLASSES = list(_C.bit)
+CLASS_BIT = dict(_C.bit)
+CLASS_BIT.update(_C.token)
+ALL_CLASSES = _C.mask
+
+# The four classes v0.50 and older named, and the two names the six-class
+# prototype tried and dropped (Fist, Arcane: regrouped into Blunt and Ranged,
+# with other members).  A weakness cell that still names one makes no claim
+# this checker can hold to the table, so it is refused rather than read as
+# silence (the word would otherwise drop out of the cell and leave its
+# element claim looking complete).  A name that is a class again is not
+# retired.
+_RETIRED = ("slashing", "slash", "piercing", "pierce", "bludgeoning", "bludgeon", "bludg",
+            "special", "fist", "arcane")
+
+
+def _retired_re():
+    words = [w for w in _RETIRED if w not in CLASSES]
+    return re.compile(r"\b(%s)\b" % "|".join(words), re.I)
+
+
+RETIRED_CLASS = _retired_re()
 
 
 def elem_str(mask: int) -> str:
@@ -92,13 +107,25 @@ OFF_WEAK = 25
 
 class Data:
     def __init__(self, root: str):
+        global CLASS_TOKEN, ALL_CLASSES, RETIRED_CLASS
         self.root = root
+        self.classes = ot6_class.read(root)
+        CLASSES[:] = list(self.classes.bit)
+        CLASS_BIT.clear()
+        CLASS_BIT.update(self.classes.bit)
+        CLASS_BIT.update(self.classes.token)
+        ALL_CLASSES = self.classes.mask
+        CLASS_TOKEN = _class_token_re()
+        RETIRED_CLASS = _retired_re()
         self.prop = self._read(MONSTER_PROP)
         assert len(self.prop) == REC * 384, len(self.prop)
         self.names = self._monster_names()
         self.shield_tbl = self._parse_shield_tbl()
         self.elem_add = self._parse_elem_add()
         self.floor = self._parse_floor()
+        if ULTROS_ROW_SPECIES not in self.shield_tbl:
+            raise SystemExit("check_boss_rows: no Ot6ShieldTbl row for Ultros $%03x" % ULTROS_ROW_SPECIES)
+        _ULTROS_ROW[0] = self.shield_tbl[ULTROS_ROW_SPECIES]["class"]
 
     # -- io ------------------------------------------------------------
     def _read(self, rel: str) -> bytes:
@@ -236,7 +263,10 @@ class Data:
                     part = part.strip()
                     if part in ("$00", "0"):
                         continue
-                    v |= CLASS_BIT.get(part, 0)
+                    if part not in CLASS_BIT:
+                        raise SystemExit("check_boss_rows: unknown class token %r in %s"
+                                         % (part, FLOOR_INC))
+                    v |= CLASS_BIT[part]
                 vals.append(v)
         return vals
 
@@ -296,7 +326,17 @@ CURVE_ADDS = {
 # say "the row" are claiming that row, so resolve them to it rather than
 # skipping them.
 ULTROS_ROW_ELEMS = ELEMENT_BIT["fire"] | ELEMENT_BIT["bolt"]
-ULTROS_ROW_CLASSES = CLASS_BIT["slash"] | CLASS_BIT["pierce"]
+ULTROS_ROW_SPECIES = 0x12C      # Ultros (1): his prose spells the row in full
+_ULTROS_ROW = [None]            # the classes of that row, set by Data()
+
+
+def ultros_row_classes():
+    """The classes "the row" claims: Ultros (1)'s authored row, which his
+    own prose claims word for word, so a later Ultros that says "the row"
+    is held to the first one's classes whatever the split made them."""
+    if _ULTROS_ROW[0] is None:
+        raise SystemExit("check_boss_rows: \"the row\" read before the data was loaded")
+    return _ULTROS_ROW[0]
 
 
 # --------------------------------------------------------------------------
@@ -316,7 +356,7 @@ WAIVERS = {
 
 class Claim:
     __slots__ = ("line", "where", "label", "species", "shields", "elems",
-                 "classes", "absorbs", "elem_add", "note")
+                 "classes", "absorbs", "elem_add", "note", "retired")
 
     def __init__(self, line, where, label, species):
         self.line = line
@@ -329,6 +369,7 @@ class Claim:
         self.absorbs = None
         self.elem_add = None   # doc claims this element comes from ElemAddTbl
         self.note = ""
+        self.retired = []      # four-class words in the claim's own text
 
     def __repr__(self):
         return "<Claim %s:%d %s sp=%s>" % (self.where, self.line, self.label,
@@ -337,8 +378,11 @@ class Claim:
 
 ELEM_TOKEN = re.compile(
     r"\b(fire|ice|bolt|lightning|thunder|poison|wind|holy|pearl|earth|water)\b", re.I)
-CLASS_TOKEN = re.compile(
-    r"\b(slashing|slash|piercing|pierce|bludgeoning|bludgeon|bludg|special)\b", re.I)
+def _class_token_re():
+    return re.compile(r"\b(%s)\b" % "|".join(re.escape(n) for n in CLASSES), re.I)
+
+
+CLASS_TOKEN = _class_token_re()
 
 
 def parse_masks(text):
@@ -354,6 +398,11 @@ def parse_masks(text):
     for m in CLASS_TOKEN.finditer(text):
         classes |= CLASS_BIT[m.group(1).lower()]
     return elems, classes, bool(elems or classes)
+
+
+def retired_words(text):
+    """The four-class names (v0.50 and older) a weakness phrase still uses."""
+    return sorted({m.group(1).lower() for m in RETIRED_CLASS.finditer(text)})
 
 
 CELL_SPLIT = re.compile(r"(?<!\\)\|")
@@ -471,6 +520,7 @@ def extract_claims(doc_text):
                 head, _, tail = para.partition("(")
                 e, c, ok = parse_masks(head)
                 cl = Claim(i + 1, "prose", m2.group(1), sp)
+                cl.retired = retired_words(head)
                 cl.shields = int(m2.group(2))
                 if ok:
                     cl.elems, cl.classes = e, c
@@ -482,6 +532,7 @@ def extract_claims(doc_text):
                     if sp2 is not None:
                         e2, c2, ok2 = parse_masks(mm.group(3))
                         cl2 = Claim(i + 1, "prose", mm.group(1).strip(), sp2)
+                        cl2.retired = retired_words(mm.group(3))
                         cl2.shields = int(mm.group(2))
                         if ok2:
                             cl2.elems = e2 if e2 else None
@@ -542,15 +593,17 @@ def _prose_claims(para, lineno, section, shapes):
         phrase = w.group(1)
         # cut at the first sentence/aside boundary
         phrase = re.split(r"(?:\.\s|\s—\s|\s·\s|\()", phrase, maxsplit=1)[0]
+        cl.retired = retired_words(phrase)
         if "the row" in phrase:
             cl.elems = ULTROS_ROW_ELEMS
-            cl.classes = ULTROS_ROW_CLASSES
+            cl.classes = ultros_row_classes()
             cl.note = '"the row" (Ultros)'
         elif "rotating" in phrase.lower():
             cf = re.search(r"Classes fixed:\s*([^.]+)", para)
             if cf:
                 _e, c, _ok = parse_masks(cf.group(1))
                 cl.classes = c
+                cl.retired = retired_words(cf.group(1))
             cl.note = "element row rotates (WallChange) — element check skipped"
         else:
             e, c, ok = parse_masks(phrase)
@@ -576,6 +629,7 @@ def _prose_claims(para, lineno, section, shapes):
             c2 = Claim(lineno, "prose", mm.group(1).strip(), one)
             c2.shields = int(mm.group(2))
             e, c, ok = parse_masks(mm.group(3))
+            c2.retired = retired_words(mm.group(3))
             if ok:
                 c2.elems = e if e else None
                 c2.classes = c if c else None
@@ -624,6 +678,7 @@ def _table_row(hdr, cells, lineno, section, claims, shapes):
                     cl.note = "claims element ADD %s" % elem_str(pe)
             _e, c, _ok = parse_masks(body.replace("\\|", "|"))
             cl.classes = c or None
+            cl.retired = retired_words(body)
         claims.append(cl)
         shapes["species"] += 1
         return
@@ -655,17 +710,18 @@ def _table_row(hdr, cells, lineno, section, claims, shapes):
             elif "no gauge" in row["shields"] or row["shields"].startswith("—"):
                 cl.shields = 0
             weak = row["weak"]
+            cl.retired = retired_words(weak)
             if weak in ("—", "-", ""):
                 cl.note = "no gauge"
-            elif "any physical class" in weak:
+            elif "any physical class" in weak or "any weapon class" in weak:
                 cl.classes = ALL_CLASSES
-                cl.note = "any physical class"
+                cl.note = "any weapon class"
                 e, _c, ok = parse_masks(weak)
                 cl.elems = e if ok and e else None
             elif "the row" in weak and not ELEM_TOKEN.search(weak):
                 # bare "the row" with no elements spelled out
                 cl.elems = ULTROS_ROW_ELEMS
-                cl.classes = ULTROS_ROW_CLASSES
+                cl.classes = ultros_row_classes()
                 cl.note = '"the row" (Ultros)'
             else:
                 e, c, ok = parse_masks(weak)
@@ -726,6 +782,14 @@ def check(root, verbose=False):
 
         if c.note.startswith("UNPARSED"):
             problems.append("%s\n    %s" % (tag, c.note))
+
+        # a four-class word in a weakness phrase claims nothing the six-class
+        # table can be held to: it must be renamed, never read as silence
+        if c.retired:
+            problems.append(
+                "%s\n    RETIRED CLASS: the weakness names %s, a key of the four "
+                "classes (v0.50 and older) or of the dropped Fist/Arcane; the classes are %s (%s)"
+                % (tag, ", ".join(c.retired), ", ".join(CLASSES), ot6_class.CLASS_ASM))
 
         # a row that names classes but no element, for a species that has
         # one, is not a contradiction, but it is still worth naming.

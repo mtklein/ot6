@@ -52,12 +52,13 @@ STAGES = [
     ("crescent_landing", {"TERRA", "LOCKE"}, None, False),
     ("thamasa_night", {"TERRA", "LOCKE", "SHADOW"}, None, False),
     ("fire_out", {"TERRA", "LOCKE", "STRAGO"}, None, False),
-    ("thamasa_done", ALL_WOB, set(), False),
+    ("wob_esper_mtn_hunt", {"TERRA", "LOCKE", "STRAGO", "RELM"}, None, False),
+    ("thamasa_done", ALL_WOB | {"LEO"}, set(), False),
     ("fc_landing", ALL_WOB | {"SHADOW"}, {"SHADOW"}, False),
-    ("wor_landing", {"CELES"}, None, False),
+    ("wor_island", {"CELES"}, None, False),      # (the leg wor_landing is the Floating Continent's end)
     ("wor_sabin", {"CELES", "SABIN"}, None, False),
     ("wor_edgar", {"CELES", "SABIN", "EDGAR"}, None, False),
-    ("wor_falcon", {"CELES", "SABIN", "EDGAR", "SETZER"}, None, False),
+    ("wor_tomb", {"CELES", "SABIN", "EDGAR", "SETZER"}, None, False),
     ("wor_terra", None, set(), False),      # from here: everyone recruited so far
 ]
 

@@ -11,7 +11,10 @@ deliver.
 
 "Can field" reads equippability and command ownership from item_prop_en.dat
 and ff6/src/field/char_prop.asm; SwdTech/Blitz/Tools classes go to whoever
-owns those commands.  "Can deliver" mirrors it for elements: weapon elements
+owns those commands.  The classes are ot6_class.asm's six (sword, dagger,
+blunt, ranged, katana, spear; tools/ot6_class.py), and a member holds the
+class of every weapon the equip masks allow, the imp gear excepted, plus the
+empty hand's (fist).  "Can deliver" mirrors it for elements: weapon elements
 (item_prop +$0F), tool attack elements (Tools ownership), and kit-ability
 elements (SwdTech/Blitz ownership).  Spell elements are runtime state and are
 not credited.  Weapons carrying OT6_NULLBRK grant no class or element.
@@ -23,6 +26,15 @@ Usage:  python3 tools/check_break_reach.py [--repo ROOT] [-v]
                 [--area NAME] [--party A,B,C] [--drop-class CLS]
 
 --party and --drop-class exist to demonstrate failure and for what-if probes.
+
+Beside the reach verdict it reports the owner's HOLDER RULE (2026-11-23: "we
+don't want just one particular character to be required to get through
+fights") for every gauged body the declared areas deal: its weapon keys are
+really held (signature weapon or command, tools/proto_six/classes.py) by at
+least two characters the player can field at the step's story stage
+(tools/proto_six/stages.py), or by one the story forces into the party.  A
+HOLDER line names each stage and species it is not met for;
+--strict-holders makes them fail the run.
 """
 
 from __future__ import annotations
@@ -34,18 +46,34 @@ import re
 import sys
 
 # --------------------------------------------------------------------------
-# class bits (ff6/src/battle/ot6_class.asm:10-14)
+# class bits: ot6_class.asm's own (tools/ot6_class.py reads the names, the
+# bits, their union and the null-break property from the source), from the
+# tree this file sits in until Data() re-reads them from --repo.  Six since
+# v0.51 (#566): sword, dagger, blunt, ranged, katana, spear.
 
-CLASS_BIT = {"slash": 0x01, "pierce": 0x02, "bludg": 0x04, "special": 0x08}
-CLASS_TOKEN = {"OT6_SLASH": 0x01, "OT6_PIERCE": 0x02, "OT6_BLUDG": 0x04,
-               "OT6_SPECIAL": 0x08, "OT6_NULLBRK": 0x80}
-NULLBRK = 0x80
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ot6_class  # noqa: E402
+
+C = ot6_class.read(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CLASS_BIT = dict(C.bit)
+CLASS_TOKEN = dict(C.token, OT6_NULLBRK=C.nullbrk)
+CLASS_MASK = C.mask
+NULLBRK = C.nullbrk
+
+
+def _use_classes(root):
+    """Take the class bits from ROOT's ot6_class.asm."""
+    global C, CLASS_MASK, NULLBRK
+    C = ot6_class.read(root)
+    CLASS_BIT.clear()
+    CLASS_BIT.update(C.bit)
+    CLASS_TOKEN.clear()
+    CLASS_TOKEN.update(C.token, OT6_NULLBRK=C.nullbrk)
+    CLASS_MASK, NULLBRK = C.mask, C.nullbrk
 
 
 def class_str(mask):
-    if mask & 0x0F == 0:
-        return "(none)"
-    return "|".join(n for n, b in CLASS_BIT.items() if mask & b)
+    return C.names(mask & CLASS_MASK)
 
 
 # element bits, vanilla's own order.
@@ -66,7 +94,7 @@ ACTORS = ["TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES",
 ACTOR_ID = {n: i for i, n in enumerate(ACTORS)}
 
 # command ownership: which battle command resolves each classed ability id in
-# Ot6SkillClassTbl (ot6_class.asm:185-195).  Who owns that command is read
+# Ot6SkillClassTbl (ot6_class.asm).  Who owns that command is read
 # from char_prop.asm, not written down here.
 # TekMissile $8a is Magitek-armor only.  No walking party owns it, so it
 # appears in no row below and is credited to nobody.
@@ -80,8 +108,16 @@ COMMAND_ABILITIES = {
 # row at all).
 
 # Tools are type-0 items resolved through the Tools command; their class bytes
-# live in Ot6WeapClassTbl at the item id (ot6_class.asm:149-158).
+# live in Ot6WeapClassTbl at the item id (ot6_class.asm, "tools $a3-$aa").
 TOOLS_RANGE = range(0xA3, 0xAB)
+
+# The imp gear's flag in an item's equip word (item_prop +1/+2 bit 14; set
+# on $24 Imp Halberd alone among the weapons, mask $dfff: everyone but
+# Umaro).  The Imp Halberd is a World of Ruin find and every declared area is
+# a World of Balance one, so it is credited to nobody: under four classes it
+# handed twelve of the fourteen "pierce", which most of them held anyway;
+# under six it would hand them Spear, which is Edgar's and Mog's class.
+IMP_GEAR = 0x4000
 
 # the command that swings an equipped weapon (and an empty hand).  JUMP is
 # Fight under Dragoon Boots (RelicCmdTbl1/2, battle_main.asm:14095-14102) and
@@ -104,6 +140,9 @@ MIMIC_ONLY = {"GOGO"}
 # --------------------------------------------------------------------------
 # area declarations.  An area is a list of steps; a step is a party plus the
 # random-encounter maps it walks and the forced battles it must fight.
+# stage: the step's story stage, by its first leg in tools/proto_six/stages.py
+# (who the player can field there, whom the story forces), for the holder
+# rule; the party is the one the route walked in with, for the reach check.
 # events: (event battle id, tuple of EventBattleGroup word slots reached,
 #          human label).  EventBattle rolls word 0 at 75% / word 1 at 25%
 # (field/event.asm @a5a7), TrainCmd_e0/e1 do the same (train_script.asm
@@ -116,6 +155,7 @@ AREAS = {
         "steps": [
             {
                 "name": "facility, four (bosses-wob.md SS13-14)",
+                "stage": "vector_sneak",
                 "party": ["LOCKE", "CELES", "SABIN", "EDGAR"],
                 "maps": [262, 263, 264, 269, 271, 273],
                 "events": [
@@ -126,6 +166,7 @@ AREAS = {
             {
                 "name": "escape, three -- Celes lost in the tube room "
                         "(bosses-wob.md SS15-16)",
+                "stage": "minecart_entry",
                 "party": ["LOCKE", "SABIN", "EDGAR"],
                 "maps": [240],
                 "events": [
@@ -141,12 +182,13 @@ AREAS = {
     # enable bit set and reachable; battle 149 is the map-384 (66,11)
     # trap-switch Ninja ambush.
     "sealed-gate": {
-        "doc": "docs/design/break-coverage-sealed-gate.md SS1-2, SS5",
+        "doc": "docs/design/break-coverage-gate.md",
         "min_formations": 13,   # 3 unique per map x4 maps + the Ninja
         "steps": [
             {
                 "name": "cave, four (issue #31 dispatcher ruling: Terra "
                         "seated, Setzer benched)",
+                "stage": "gate_cave_save",
                 "party": ["TERRA", "LOCKE", "EDGAR", "SABIN"],
                 "maps": [382, 383, 384, 385],
                 "events": [
@@ -167,6 +209,7 @@ AREAS = {
         "steps": [
             {
                 "name": "the climb, four (LOCKE CELES EDGAR SABIN)",
+                "stage": "figaro_submerged",
                 "party": ["LOCKE", "CELES", "EDGAR", "SABIN"],
                 "maps": [221, 225],
                 "events": [],
@@ -218,6 +261,7 @@ def _eval_expr(expr, where):
 class Data:
     def __init__(self, root):
         self.root = root
+        _use_classes(root)
         self.map_prop = self._read(MAP_PROP)
         self.sub = self._read(SUB_GROUP)
         self.rand = self._read(RAND_GROUP)
@@ -309,57 +353,11 @@ class Data:
     # -- table parsers ---------------------------------------------------
     def _parse_weap_tbl(self):
         """Ot6WeapClassTbl: 256 class bytes, item-id indexed (.byte / .res)."""
-        src = self._text(CLASS_ASM).splitlines()
-        start = next(i for i, l in enumerate(src)
-                     if l.strip().startswith("Ot6WeapClassTbl:"))
-        out = []
-        for i in range(start + 1, len(src)):
-            code = src[i].split(";", 1)[0].strip()
-            if not code:
-                continue
-            m = re.match(r"\.byte\s+(.+)$", code)
-            if m:
-                v = 0
-                for tok in m.group(1).split("|"):
-                    tok = tok.strip()
-                    v |= CLASS_TOKEN.get(tok) if tok in CLASS_TOKEN else \
-                        _eval_expr(tok, "%s:%d" % (CLASS_ASM, i + 1))
-                out.append(v)
-            elif code.startswith(".res"):
-                m = re.match(r"\.res\s+(.+?),\s*(\S+)$", code)
-                n = _eval_expr(m.group(1), "%s:%d" % (CLASS_ASM, i + 1))
-                fill = _eval_expr(m.group(2), "%s:%d" % (CLASS_ASM, i + 1))
-                out.extend([fill] * n)
-            else:
-                break  # next label / directive: table ended
-            if len(out) >= 256:
-                break
-        if len(out) != 256:
-            raise SystemExit("check_break_reach: Ot6WeapClassTbl parsed %d "
-                             "bytes, want 256 (%s)" % (len(out), CLASS_ASM))
-        return out
+        return ot6_class.weapon_classes(self._text(CLASS_ASM), C)
 
     def _parse_skill_tbl(self):
         """Ot6SkillClassTbl: (ability id, class) pairs, $ff-terminated."""
-        src = self._text(CLASS_ASM).splitlines()
-        start = next(i for i, l in enumerate(src)
-                     if l.strip().startswith("Ot6SkillClassTbl:"))
-        out = {}
-        for i in range(start + 1, len(src)):
-            code = src[i].split(";", 1)[0].strip()
-            if not code:
-                continue
-            m = re.match(r"\.byte\s+\$([0-9a-fA-F]{2})\s*,\s*(\S+)$", code)
-            if m:
-                out[int(m.group(1), 16)] = CLASS_TOKEN[m.group(2).strip()]
-                continue
-            if re.match(r"\.byte\s+\$ff\s*$", code):
-                break
-            break
-        if len(out) < 9:
-            raise SystemExit("check_break_reach: Ot6SkillClassTbl parsed %d "
-                             "entries, want >= 9 (%s)" % (len(out), CLASS_ASM))
-        return out
+        return ot6_class.skill_classes(self._text(CLASS_ASM), C)
 
     def _parse_shield_tbl(self):
         """Ot6ShieldTbl: .word species / .byte shields, classes ($ffff-term)."""
@@ -405,7 +403,10 @@ class Data:
             m = re.match(r"\s*\.byte\s+(\S+)\s*$", code)
             if m:
                 tok = m.group(1).strip()
-                vals.append(CLASS_TOKEN.get(tok, 0))
+                if tok not in CLASS_TOKEN:
+                    raise SystemExit("check_break_reach: unknown class token %r "
+                                     "in %s" % (tok, FLOOR_INC))
+                vals.append(CLASS_TOKEN[tok])
         if len(vals) != N_SPECIES:
             raise SystemExit("check_break_reach: floor parsed %d species, "
                              "want %d (%s)" % (len(vals), N_SPECIES, FLOOR_INC))
@@ -479,8 +480,8 @@ class Data:
         row = self.shield_tbl.get(sp)
         if row is not None:
             gaugeless = row["class"] == 0 and row["shields"] == 0
-            return row["class"] & 0x0F, "Ot6ShieldTbl:%d" % row["line"], gaugeless
-        return self.floor[sp] & 0x0F, "floor", False
+            return row["class"] & CLASS_MASK, "Ot6ShieldTbl:%d" % row["line"], gaugeless
+        return self.floor[sp] & CLASS_MASK, "floor", False
 
     # -- party -------------------------------------------------------------
     def actor_classes(self, name):
@@ -499,20 +500,24 @@ class Data:
                     continue
                 if not (int.from_bytes(rec[1:3], "little") >> a) & 1:
                     continue
+                if int.from_bytes(rec[1:3], "little") & IMP_GEAR:
+                    continue
                 cls = self.weap_class[it]
                 if cls & NULLBRK:
                     continue
-                mask |= cls & 0x0F
-            mask |= self.weap_class[0xFF] & 0x0F   # bare fists (empty hand $ff)
+                mask |= cls & CLASS_MASK
+            # the empty hand ($ff); GAU's is his fangs (OT6_CLS_FANG, #566)
+            mask |= (C.consts.get("OT6_CLS_FANG", self.weap_class[0xFF]) if name == "GAU"
+                     else self.weap_class[0xFF]) & CLASS_MASK
         for cmd, sids in COMMAND_ABILITIES.items():
             if cmd not in cmds:
                 continue
             for sid in sids:
                 if sid in self.skill_class:
-                    mask |= self.skill_class[sid] & 0x0F
+                    mask |= self.skill_class[sid] & CLASS_MASK
         if "TOOLS" in cmds:
             for it in TOOLS_RANGE:
-                mask |= self.weap_class[it] & 0x0F
+                mask |= self.weap_class[it] & CLASS_MASK
         return mask
 
     def actor_elems(self, name):
@@ -533,6 +538,8 @@ class Data:
                 if rec[0] & 0x07 != 1:          # not a weapon
                     continue
                 if not (int.from_bytes(rec[1:3], "little") >> a) & 1:
+                    continue
+                if int.from_bytes(rec[1:3], "little") & IMP_GEAR:
                     continue
                 if self.weap_class[it] & NULLBRK:
                     continue
@@ -563,11 +570,17 @@ class Data:
 # --------------------------------------------------------------------------
 
 def check_area(data, area_name, area, party_override, drop_mask,
-               drop_elem_mask, verbose):
+               drop_elem_mask, verbose, holders=None):
     problems = []
     checked = 0
+    stage_tbl = ot6_class.stage_table()
 
     for step in area["steps"]:
+        if step["stage"] not in stage_tbl:
+            raise SystemExit("check_break_reach: area %s step %r names stage %r, "
+                             "which tools/proto_six/stages.py does not start"
+                             % (area_name, step["name"], step["stage"]))
+        roster, forced, magitek = stage_tbl[step["stage"]]
         party = party_override or step["party"]
         for who in party:
             if who not in ACTOR_ID:
@@ -629,6 +642,16 @@ def check_area(data, area_name, area, party_override, drop_mask,
                     gaugeless_only = False
                     keys |= cls
                     ekeys |= elems
+                    # the holder rule: this body's weapon keys, really held by
+                    # two the player can field at this stage, or one forced
+                    why = ot6_class.holder_rule(cls, roster, forced, magitek) if cls else None
+                    if why and holders is not None:
+                        holders.setdefault((step["stage"], sp), [
+                            "stage %s (%s; forced: %s) %s($%03x) %s: %s"
+                            % (step["stage"], ", ".join(sorted(roster)),
+                               ", ".join(sorted(forced)) or "nobody",
+                               data.names[sp], sp, class_str(cls), why), set()])[1].add(
+                                   "%s formation $%03x" % (where, f))
                 parts.append("%s($%03x)x%d=%s/%s[%s]"
                              % (data.names[sp], sp, n,
                                 class_str(cls) if not gaugeless else "no gauge",
@@ -669,33 +692,43 @@ def main():
                     help="comma-separated actor names overriding every step's "
                          "declared party (what-if / failure demo)")
     ap.add_argument("--drop-class", action="append", default=[],
-                    choices=sorted(CLASS_BIT),
-                    help="pretend no member can field this class (repeatable)")
+                    metavar="CLS",
+                    help="pretend no member can field this class (repeatable): "
+                         "one of ot6_class.asm's, here %s" % ", ".join(CLASS_BIT))
     ap.add_argument("--drop-elem", action="append", default=[],
                     choices=sorted(ELEM_BIT),
                     help="pretend no member can deliver this element "
                          "(repeatable; failure demo for element-keyed areas)")
+    ap.add_argument("--strict-holders", action="store_true",
+                    help="fail when the holder rule (a species' weapon keys "
+                         "really held by two the player can field at the "
+                         "step's stage, or by one the story forces) is not met")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
     party_override = None
     if args.party:
         party_override = [w.strip().upper() for w in args.party.split(",") if w.strip()]
-    drop_mask = 0
-    for c in args.drop_class:
-        drop_mask |= CLASS_BIT[c]
     drop_elem_mask = 0
     for e in args.drop_elem:
         drop_elem_mask |= ELEM_BIT[e]
 
     data = Data(args.repo)
+    drop_mask = 0
+    for c in args.drop_class:
+        if c not in CLASS_BIT:
+            ap.error("--drop-class %s: not a class of %s (%s)"
+                     % (c, CLASS_ASM, ", ".join(CLASS_BIT)))
+        drop_mask |= CLASS_BIT[c]
     names = [args.area] if args.area else sorted(AREAS)
     all_problems = []
+    holders = {}
     total = 0
     print("break-class encounter/party reachability check")
     for bn in names:
         problems, checked = check_area(data, bn, AREAS[bn], party_override,
-                                       drop_mask, drop_elem_mask, args.verbose)
+                                       drop_mask, drop_elem_mask, args.verbose,
+                                       holders)
         mode = ""
         if party_override:
             mode += " party-override=%s" % ",".join(party_override)
@@ -707,12 +740,21 @@ def main():
         all_problems.extend(problems)
         total += checked
 
+    for (_stage, _sp), (text, where) in sorted(holders.items()):
+        print("  HOLDER %s; dealt by %s%s" % (text, "; ".join(sorted(where)[:3]),
+                                             " ..." if len(where) > 3 else ""))
+    print("  holder rule: %d stage x species pair(s) not met over the declared "
+          "areas%s" % (len(holders), "" if args.strict_holders else
+                       " (reported; --strict-holders fails on them)"))
     if all_problems:
         print("  %d PROBLEM(S):" % len(all_problems))
         print()
         for p in all_problems:
             print("  " + p.replace("\n", "\n  "))
             print()
+        return 1
+    if args.strict_holders and holders:
+        print("  the holder rule is not met (--strict-holders)")
         return 1
     print("  OK -- every checked formation has a chip the step's party can "
           "reach, by class key or by weak element")
