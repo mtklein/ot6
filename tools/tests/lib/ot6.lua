@@ -7640,7 +7640,21 @@ function M.blitzChips(slot, id)
 end
 
 -- #566's instrument: the weapon keys the party holds as a battle opens, one
--- [keys] line a battle (log only; nothing reads it back into play).
+-- [keys] line a battle (log only; nothing reads it back into play), said by
+-- the run loop twelve frames after M.battleActive first holds, so a leg's own
+-- battle loop (the Lete's raft, the falls) is counted as the Driver's are.
+M.keysState = { live = false, since = 0, said = false }
+function M.keysWatch()
+  local k = M.keysState
+  local ok, live = pcall(M.battleActive)
+  if not (ok and live) then k.live, k.said = false, false; return end
+  if not k.live then k.live, k.since = true, M.frame end
+  if not k.said and M.frame - k.since >= 12 then
+    k.said = true
+    local ok2, line = pcall(M.keyLine, "battle")
+    M.log(ok2 and line or ("[battle] [keys] unread: " .. tostring(line)))
+  end
+end
 --   hands  the classes of the weapons in the seated members' hands (an empty
 --          main hand is a fist; a member in Magitek armor swings none)
 --   kit    hands, plus the class-bearing skills they could use now: Pummel
@@ -22179,10 +22193,6 @@ function Driver:frame()
     -- first fights"; the audit reads these lines)
     M.log(string.format("[%s] [open] party HP as the battle opens: %s", self.tag or "fight",
       table.concat(said, ", ")))
-    do
-      local ok, line = pcall(M.keyLine, self.tag or "fight")     -- #566: log only, never a failure
-      M.log(ok and line or string.format("[%s] [keys] unread: %s", self.tag or "fight", tostring(line)))
-    end
   end
   self:watchStatuses()
   self:watchLeavers()
@@ -24551,6 +24561,7 @@ function M.run(opts, steps)
       return
     end
     M.frame = M.frame + 1
+    M.keysWatch()       -- #566: one [keys] line a battle, whoever drives it
     if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
     if M.frame % M.PROG_IVL == 0 then M.progressSample() end
     -- The run's heartbeat (docs/TOOLING.md "The run's heartbeat"): the
