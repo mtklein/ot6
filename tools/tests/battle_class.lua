@@ -3,9 +3,10 @@
 
 --   tools/tests/run.sh tools/tests/battle_class.lua
 
--- The entry-point guards are authored spear-weak (Ot6ShieldTbl carries a
--- class byte; #566: six classes, the guards' pierce became Spear $20, the
--- TekMissile probe's class), so the seed itself is under test before any pokes.  The
+-- The entry-point guards are authored Ranged-weak (Ot6ShieldTbl carries a
+-- class byte; #566: six classes, the guards' v0.50 pierce became Ranged $08,
+-- TekMissile's class, the Magitek party's one key), so the seed itself is
+-- under test before any pokes.  The
 -- magitek party has no Fight command, so this borrows battle_hits's
 -- driver: rewrite the live command lists to Fight-only and berserk the
 -- party (RandCharAction -> Cmd_00 -> FightAttack, with no menus).  The class
@@ -13,19 +14,24 @@
 -- probe class without touching damage stats, and each phase re-arms the
 -- party with a different weapon and watches the shield counter:
 
---   0. seed: shields 2/2, class-weak $20 (authored), revealed-class 0
---      (fresh codex init after self-clean)
+--   0. seed: shields 2/2, class-weak $08 (authored: the ROM's row),
+--      revealed-class 0 (fresh codex init after self-clean)
 --   1. sword phase (MithrilBlade $0a): swings land, nothing chips
 --   1b. dagger phase (Dirk $00, #566): the knife was the guards' key while
---      pierce was one class; under six it is the spear's sibling and
+--      pierce was one class; under six it is another class than theirs and
 --      chips nothing, reveals nothing
---   2. spear phase (Mithril Pike $1d): chip + reveal ($3ea9 bit $20) +
---      class codex byte learned
+--   5. null-break phase (Fixed Dice $52 = class $88, Ranged with the
+--      null-break bit, on the authored row): swings land, nothing chips,
+--      nothing revealed.  (Numbered as before #566, when this phase and the
+--      next ran after the recovery on guards re-poked special-weak: the dice
+--      are Ranged now, the guards' own class, so the null-break negative
+--      has to come before the first Ranged chip reveals the class.)
+--   2. ranged phase (Dice $51 = class $08): chip + reveal ($3ea9 bit $08)
+--      + class codex byte learned
 --   3. keep swinging: shields 0 -> broken timer
 --   4. recovery: shields restore and the revealed class survives
---   5. null-break phase (Fixed Dice $52 = class $88, guards re-poked
---      ¤-weak): swings land, nothing chips, nothing revealed
---   6. ¤ phase (Dice $51 = class $08): the chip fires
+--   6. a second class, staged (guards re-poked spear-weak, Mithril Pike
+--      $1d): the chip fires and reveals $20
 --   7. heal-reversal phase: sword-weak guards absorb fire and swings carry
 --      fire (hand element poked), so every hit resolves as a heal, and a
 --      resolved heal must chip nothing (the $f2 bit-0 gate; the per-frame HP
@@ -33,9 +39,9 @@
 --   8. flagged-skill phase (TekMissile $8a, flags3 $20 "can't dodge"):
 --      terra is un-berserked, her real commands restored, and her menu
 --      driven to TekMissile.  A flags3-nonzero classed skill must chip a
---      spear-weak guard.  The drive traverses terra's magitek list, so
+--      ranged-weak guard.  The drive traverses terra's magitek list, so
 --      its rendered rows also carry the ability-list assert: TekMissile
---      (elementless, Ot6SkillClassTbl spear) wears the spear class icon
+--      (elementless, Ot6SkillClassTbl ranged) wears the ranged class icon
 --      after its name, where elemental abilities wear their element icon
 --   9. tools-list phase (staged, since no fixture reaches a Tools user):
 --      three tool items are poked into the battle inventory ($2686
@@ -46,9 +52,9 @@
 --      (each replacing the name field's trailing blank), NoiseBlaster
 --      (classless, and a full-width 13-char name) keeps its last letter
 
--- The under-enemy HUD is asserted around phases 0-2: an authored-spear
+-- The under-enemy HUD is asserted around phases 0-2: an authored-ranged
 -- guard with no element weakness shows [shield]['?'] before any probe,
--- and the '?' becomes the spear class icon ($da, white like the '?')
+-- and the '?' becomes the ranged class icon ($de, white like the '?')
 -- once the class is revealed, because the class slots use the same
 -- revealed-versus-'?' code the element slots use.
 
@@ -69,10 +75,10 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 
 -- the six classes (ot6_class.asm, #566) this suite names
-local SWORD, DAGGER, ARCANE, SPEAR = 0x01, 0x02, 0x08, 0x20
+local SWORD, DAGGER, RANGED, SPEAR = 0x01, 0x02, 0x08, 0x20
 local NULLBRK = 0x80
 -- a revealed class's HUD/list word: Ot6ClassGlyphTbl's cell in the white row
-local ICON_SWORD, ICON_SPEAR = 0x21D9, 0x21DA
+local ICON_SWORD, ICON_RANGED, ICON_SPEAR = 0x21D9, 0x21DE, 0x21DA
 
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 local function codexBase()
@@ -234,15 +240,21 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(s1, 2, "guard 1 shields seeded")           -- GUESS(seed-2)
     H.assertEq(s2, 2, "guard 2 shields seeded")
     local w1, w2 = classWeak()
-    H.assertEq(w1, SPEAR, "guard 1 authored spear-weak")
-    H.assertEq(w2, SPEAR, "guard 2 authored spear-weak")
-    -- the hands the phases arm, by the ROM's own table: the design this
-    -- suite stands on (a sword and the knife are not the guards' key; the
-    -- pike is)
+    local row = H.speciesClassRow(H.readWord(0x57C4))
+    H.assertEq(w1, row, "guard 1 seeded with its authored class row (Ot6ShieldTbl)")
+    H.assertEq(w2, row, "guard 2 seeded with its authored class row (Ot6ShieldTbl)")
+    -- the premise the phases below are written for: the guards answer to
+    -- Ranged alone (TekMissile's class, the Magitek party's one key), so a
+    -- sword and the knife chip nothing and the dice do
+    H.assertEq(row, RANGED, "the guards' authored row is Ranged alone ($08)")
+    -- the hands the phases arm, by the ROM's own table
     H.assertEq(H.weaponClass(0x0A), SWORD, "MithrilBlade $0a is a sword")
     H.assertEq(H.weaponClass(0x00), DAGGER, "Dirk $00 is a dagger")
     H.assertEq(H.weaponClass(0x1D), SPEAR, "Mithril Pike $1d is a spear")
-    H.assertEq(H.skillClass(0x8A), SPEAR, "TekMissile $8a is a spear skill")
+    H.assertEq(H.weaponClass(0x51), RANGED, "Dice $51 are ranged")
+    H.assertEq(H.readRomByte((H.sym("Ot6WeapClassTbl") & 0x3FFFFF) + 0x52), RANGED | NULLBRK,
+      "Fixed Dice $52 are ranged with the null-break bit ($88)")
+    H.assertEq(H.skillClass(0x8A), RANGED, "TekMissile $8a is a ranged skill")
     local r1, r2 = classRev()
     H.assertEq(r1, 0, "guard 1 opens with no class revealed")
     H.assertEq(r2, 0, "guard 2 opens with no class revealed")
@@ -311,14 +323,14 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq((classWrites[SWORD] or 0) >= 2, true,
       "two sword swings actually resolved during the phase")
     local s1, s2 = shields()
-    H.assertEq(s1, s1c, "sword swings never chip a spear-weak guard")
-    H.assertEq(s2, s2c, "sword swings never chip a spear-weak guard (2)")
+    H.assertEq(s1, s1c, "sword swings never chip a ranged-weak guard")
+    H.assertEq(s2, s2c, "sword swings never chip a ranged-weak guard (2)")
     local r1, r2 = classRev()
     H.assertEq(r1 | r2, 0, "and reveal nothing")
   end),
 
-  -- 1b. dagger phase (#566): the knife, pierce's other child, is no key to
-  -- a spear-weak guard
+  -- 1b. dagger phase (#566): the knife, another of pierce's children, is no
+  -- key to a ranged-weak guard
   armRightHands(0x00),                     -- Dirk: a dagger
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
@@ -330,38 +342,58 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq((classWrites[DAGGER] or 0) >= 2, true,
       "two dagger swings actually resolved during the phase")
     local s1, s2 = shields()
-    H.assertEq(s1, s1c, "dagger swings never chip a spear-weak guard")
-    H.assertEq(s2, s2c, "dagger swings never chip a spear-weak guard (2)")
+    H.assertEq(s1, s1c, "dagger swings never chip a ranged-weak guard")
+    H.assertEq(s2, s2c, "dagger swings never chip a ranged-weak guard (2)")
     local r1, r2 = classRev()
     H.assertEq(r1 | r2, 0, "and reveal nothing")
   end),
 
-  -- 2. spear phase: chip + reveal + codex
-  armRightHands(0x1D),                     -- Mithril Pike: a spear
+  -- 5. null-break phase, on the authored row: Fixed Dice teach nothing
+  armRightHands(0x52),                     -- Fixed Dice: ranged + null-break
+  H.call(function() s1c, s2c = shields() end),
+  watchClasses(true),
+  -- The same guard as the sword phase: require two null-break Fights
+  -- to resolve before accepting "nothing chips", or fail.
+  H.driveUntil(function() return (classWrites[RANGED | NULLBRK] or 0) >= 2 end,
+    2000, driveStep, "two null-break ranged swings to resolve"),
+  watchClasses(false),
+  report("nullbreak-phase"),
+  H.call(function()                        -- GUESS(dice)
+    H.assertEq((classWrites[RANGED | NULLBRK] or 0) >= 2, true,
+      "two null-break ranged swings actually resolved during the phase")
+    local s1, s2 = shields()
+    H.assertEq(s1, s1c, "fixed dice never chip")
+    H.assertEq(s2, s2c, "fixed dice never chip (2)")
+    local r1, r2 = classRev()
+    H.assertEq((r1 | r2) & RANGED, 0, "and never reveal the class")
+  end),
+
+  -- 2. ranged phase: ordinary dice chip the guards' class: chip + reveal + codex
+  armRightHands(0x51),                     -- Dice: ranged, chips
   H.driveUntil(function()
     local r1, r2 = classRev()
-    return ((r1 | r2) & SPEAR) == SPEAR
-  end, 15000, driveStep, "a spear chip to reveal the class"),
-  report("spear-chip"),
+    return ((r1 | r2) & RANGED) == RANGED
+  end, 15000, driveStep, "a ranged chip to reveal the class"),  -- GUESS(dice)
+  report("ranged-chip"),
   H.call(function()
     local s1, s2 = shields()
     H.assertEq(s1 < 2 or s2 < 2, true, "the revealing hit also chipped")
     local species = H.readWord(0x57C4)
     H.log(string.format("guard species=%d", species))
-    H.assertEq(sram(codexBase() + 0x190 + species) & SPEAR, SPEAR,
-      "class codex learned the spear")
+    H.assertEq(sram(codexBase() + 0x190 + species) & RANGED, RANGED,
+      "class codex learned the ranged class")
   end),
 
-  -- hud: the revealed class replaces its '?' with the spear icon ($da,
-  -- white, the same glyph the menus use for spears).  This uses
-  -- waitUntil because the revealing swing's animation can contest bg3 for a
-  -- few dozen frames.
+  -- hud: the revealed class replaces its '?' with the ranged icon ($de,
+  -- white, the same glyph the menus use for thrown and shot weapons).  This
+  -- uses waitUntil because the revealing swing's animation can contest bg3
+  -- for a few dozen frames.
   H.waitUntil(function()
     for _, w in ipairs(hudSlotWords()) do
-      if w == ICON_SPEAR then return true end
+      if w == ICON_RANGED then return true end
     end
     return false
-  end, 600, "revealed spear icon in the hud row", 10),
+  end, 600, "revealed ranged icon in the hud row", 10),
   -- (the tag keeps its v0.50 name: tools/manual/shots.py's "shields" shot reads it)
   H.call(function() H.screenshot("class_hud_pierce") end),
 
@@ -407,44 +439,29 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(max, 2, "the broken guard's max is its authored 2")
     H.assertEq(H.vars.shStores[1], max,
       "shields restored to max (the first store to the broken guard's gauge after the break)")
-    H.assertEq((r1 | r2) & SPEAR, SPEAR, "revealed class survives recovery")
+    H.assertEq((r1 | r2) & RANGED, RANGED, "revealed class survives recovery")
   end),
 
-  -- 5. null-break phase: ¤-weak guards, Fixed Dice teach nothing
+  -- 6. a second class, staged: spear-weak guards, the pike chips and reveals
   H.call(function()
-    H.writeByte(0x3EA8, ARCANE)            -- guards now ¤-weak (arcane) only
-    H.writeByte(0x3EAA, ARCANE)
+    -- guards now spear-weak only, on clean gauges with no timer running (as phase 7 stages them): the
+    -- dice went on chipping after the recovery, and a guard caught Broken here would read 0 below
+    for _, a in ipairs({ 0x3EA8, 0x3EAA }) do H.writeByte(a, SPEAR) end
+    for a, v in pairs({ [0x3E44] = 2, [0x3E46] = 2, [0x3E94] = 0, [0x3E96] = 0 }) do H.writeByte(a, v) end
   end),
-  armRightHands(0x52),                     -- Fixed Dice: ¤ + null-break
+  armRightHands(0x1D),                     -- Mithril Pike: a spear
   H.call(function() s1c, s2c = shields() end),
-  watchClasses(true),
-  -- The same guard as the sword phase: require two null-break ¤ Fights
-  -- to resolve before accepting "nothing chips", or fail.
-  H.driveUntil(function() return (classWrites[ARCANE | NULLBRK] or 0) >= 2 end,
-    2000, driveStep, "two null-break ¤ swings to resolve"),
-  watchClasses(false),
-  report("nullbreak-phase"),
-  H.call(function()                        -- GUESS(dice)
-    H.assertEq((classWrites[ARCANE | NULLBRK] or 0) >= 2, true,
-      "two null-break ¤ swings actually resolved during the phase")
-    local s1, s2 = shields()
-    H.assertEq(s1, s1c, "fixed dice never chip")
-    H.assertEq(s2, s2c, "fixed dice never chip (2)")
-    local r1, r2 = classRev()
-    H.assertEq((r1 | r2) & ARCANE, 0, "and never reveal ¤")
-  end),
-
-  -- 6. ¤ phase: ordinary dice chip the arcane class
-  armRightHands(0x51),                     -- Dice: ¤, chips
   H.driveUntil(function()
     local r1, r2 = classRev()
-    return ((r1 | r2) & ARCANE) == ARCANE
-  end, 15000, driveStep, "a ¤ chip to reveal the class"),  -- GUESS(dice)
-  report("arcane-chip"),
+    return ((r1 | r2) & SPEAR) == SPEAR
+  end, 15000, driveStep, "a spear chip to reveal the staged class"),
+  report("spear-chip"),
   H.call(function()
     local s1, s2 = shields()
-    H.assertEq(s1 < s1c or s2 < s2c, true, "the ¤ reveal also chipped")
-    H.screenshot("class_arcane")
+    local r1, r2 = classRev()
+    H.assertEq(s1 < s1c or s2 < s2c, true, "the spear reveal also chipped")
+    H.assertEq((r1 | r2) & RANGED, RANGED, "and the ranged class stays revealed beside it")
+    H.screenshot("class_spear")
   end),
 
   -- 7. heal-reversal phase: a hit that resolves as a heal must not chip.
@@ -608,7 +625,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   H.call(function()
-    H.writeByte(0x3EA8, SPEAR); H.writeByte(0x3EAA, SPEAR)  -- spear-weak
+    H.writeByte(0x3EA8, RANGED); H.writeByte(0x3EAA, RANGED)  -- ranged-weak (the authored row)
     H.writeByte(0x3BD8, 0); H.writeByte(0x3BDA, 0)        -- absorb off
     H.writeByte(0x3E44, 2); H.writeByte(0x3E46, 2)        -- shields staged
     H.writeByte(0x3E94, 0); H.writeByte(0x3E96, 0)
@@ -663,24 +680,24 @@ H.run({ maxFrames = 90000 }, {
   watchClasses(false),
   report("tek-chip"),
   H.call(function()
-    H.assertEq((classWrites[SPEAR] or 0) >= 1, true,
-      "a spear skill load resolved -- with swords in every hand, " ..
-      "only TekMissile ($8a) stores $20")
+    H.assertEq((classWrites[RANGED] or 0) >= 1, true,
+      "a ranged skill load resolved -- with swords in every hand, " ..
+      "only TekMissile ($8a) stores $08")
     local s1, s2 = shields()
     H.assertEq(s1 < 2 or s2 < 2, true,
-      "the flags3-$20 skill chipped a spear-weak guard")
+      "the flags3-$20 skill chipped a ranged-weak guard")
     local species = H.readWord(0x57C4)
-    H.assertEq(sram(codexBase() + 0x190 + species) & SPEAR, SPEAR,
-      "class codex holds the spear after the skill chip")
+    H.assertEq(sram(codexBase() + 0x190 + species) & RANGED, RANGED,
+      "class codex holds the ranged class after the skill chip")
     -- ability list: the drive rendered Terra's magitek list on the way
     -- to TekMissile, and rendered rows persist in the menu map (the
     -- battle_break precedent).  TekMissile is elementless, so its icon
-    -- column must carry the Ot6SkillClassTbl spear glyph in white,
+    -- column must carry the Ot6SkillClassTbl ranged glyph in white,
     -- where Fire Beam carries its red element icon.
     local tek = findName({0x93,0x9e,0xa4,0x8c,0xa2,0xac,0xac,0xa2,0xa5,0x9e})
     H.assertEq(tek ~= nil, true, "TekMissile row rendered in the menu map")
-    H.assertEq(emu.readWord((tek + 10) * 2, emu.memType.snesVideoRam), ICON_SPEAR,
-      "spear class icon right of TekMissile in the magitek list")
+    H.assertEq(emu.readWord((tek + 10) * 2, emu.memType.snesVideoRam), ICON_RANGED,
+      "ranged class icon right of TekMissile in the magitek list")
     H.screenshot("class_tek")
   end),
 
@@ -761,8 +778,7 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(saw ~= nil, true, "Chain Saw row rendered")
     H.assertEq(emu.readWord((saw + 11) * 2, emu.memType.snesVideoRam), ICON_SWORD,
       "sword class icon after Chain Saw in the tools list")
-    -- Drill (col 1): a spear -> the spear icon $da, as TekMissile
-    -- wears it in the magitek list above.
+    -- Drill (col 1): a spear -> the spear icon $da.
     local drill = findName({0x83,0xab,0xa2,0xa5,0xa5})     -- "Drill"
     H.assertEq(drill ~= nil, true, "Drill row rendered")
     H.assertEq(emu.readWord((drill + 11) * 2, emu.memType.snesVideoRam), ICON_SPEAR,

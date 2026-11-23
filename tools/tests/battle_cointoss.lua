@@ -1,30 +1,25 @@
--- @suite slow savestate=wor_tomb_b1_hunt_b1
+-- @suite slow
 -- battle_cointoss.lua -- SETZER's Coin Toss (#319, kits.md "Setzer"): the
 -- Slot row's table, and its second row thrown twice, unboosted and at 1 BP.
 --
--- Played, not staged: boot wor_tomb_b1_hunt_b1 (gen_wor_tomb_b1_hunt's frame
--- on Darill's Tomb's B1 stairs: CELES, SABIN, EDGAR and SETZER; SETZER back
--- in the World of Ruin, so his Jackpot is learned), walk B1 into random
--- battles (field group 149: an Osteosaur; two Orogs; an Orog and two
--- PowerDemons), and play SETZER's turns through the real menu
--- (H.setzerBattle) in the battles that deal a crowd -- two or more
--- monsters, one arcane-weak -- so a toss splits across bodies and chips
--- the arcane-weak one, asserted (coverage), since a lone body dealt
+-- Played, not staged: Continue the wor-tomb-v1 battery (CELES, SABIN,
+-- EDGAR and SETZER on Darill's Tomb's B3 save point; SETZER back in the
+-- World of Ruin, so his Jackpot is learned), walk the east room into
+-- random battles (field group 151: a Mad Oscar; a Mad Oscar and an Exoray;
+-- a PowerDemon and two Exorays), and play SETZER's turns through the real
+-- menu (H.setzerBattle) in the battles that deal a crowd -- two or more
+-- monsters, one weak to the coins' class by its row in the ROM (Ranged,
+-- #566: the Exorays and the PowerDemon; special, the PowerDemon alone, under
+-- four classes) -- so a toss splits across bodies and chips
+-- the ranged-weak one, asserted (coverage), since a lone Mad Oscar dealt
 -- first had quietly stopped both from running.  Any other battle is fought
 -- out by the route's fight driver and followed by field care
 -- (H.setzerCrowdBattles).  The budget is decoded from the room's pool and
--- the ROM's class rows (H.setzerCrowdBudget, which fails by name when the
--- room deals no crowd): the most encounters any encounter-counter state
--- needs to the next crowd, per crowd the throws need -- at most two, since
--- each crowd battle gives at least one throw.  Every other assertion is
--- derived from the battle's own state.
---
--- Why B1 (#566).  Until six classes this suite Continued wor-tomb-v1 and
--- walked the tomb's east room (map 300, group 151: a Mad Oscar; a Mad Oscar
--- and an Exoray; a PowerDemon and two Exorays), where the PowerDemon was the
--- special-weak body.  The coins are Arcane now and the split left group 151
--- no arcane-weak body (the PowerDemon's special became the dagger), so that
--- room deals no crowd a toss can chip; B1's Orogs hold the arcane.
+-- the ROM's class rows: the most encounters any encounter-counter state
+-- needs to the next crowd (H.setzerCrowdBudget logs it and fails by name
+-- when the room deals none), per crowd the throws need -- at most two, since each crowd
+-- battle gives at least one throw.  Every other assertion is derived from
+-- the battle's own state.
 --
 -- What it holds, per throw (the action's own edges: Ot6SetzerExec's entry
 -- and SETZER's Ot6ActionEnd):
@@ -39,17 +34,18 @@
 --   * every toss replayed from the opening state (H.setzerReplay): twice
 --     its gil over the bodies it hit, each share halved while shields hold,
 --     doubled once Broken (a toss's own chip can break it), capped at 9,999
---     and the HP; the class Arcane ($08: the coins', #566) on every hit, a shield off a
---     arcane-weak body that stood shielded and unbroken -- held against
+--     and the HP; the class Ranged ($08: the coins', #566; special under four classes) on every hit, a shield off a
+--     ranged-weak body that stood shielded and unbroken -- held against
 --     every body's HP and shields at the end.
 -- Negative controls: the mutant ROMs in build/attempts/wt/kit-setzer/
 -- (rate, boost, class) fail the named assertion.
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
--- crept in, and the split across bodies and the arcane chip stopped
+-- crept in, and the split across bodies and the ranged chip stopped
 -- running): at least one toss over two or more bodies, and at least one
--- chip on an arcane-weak body
+-- chip on a ranged-weak body
 local function coverage(all, tag)
   local split, chip = 0, 0
   for _, ps in ipairs(all) do
@@ -58,15 +54,13 @@ local function coverage(all, tag)
       for _, h in ipairs(p.hits) do if h.chip then chip = chip + 1 end end
     end
   end
-  H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d arcane chip(s)", tag, split, chip))
+  H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d ranged chip(s)", tag, split, chip))
   H.assertEq(split > 0, true, tag .. ": a toss split across two or more bodies (the draw deals a crowd)")
-  H.assertEq(chip > 0, true, tag .. ": a toss chipped an arcane-weak body")
+  H.assertEq(chip > 0, true, tag .. ": a toss chipped a ranged-weak body")
 end
 
 local COIN = 0x59
-local STATE, MAP_B1 = "build/states/wor_tomb_b1_hunt_b1.mss.lua", 298
-local B1_LAP = { { 13, 16 }, { 13, 17 } }      -- gen_wor_tomb_b1_hunt's lap, clear of the stairs' tiles
-local ARCANE = 0x08     -- OT6_ARCANE: the coins' class (OT6_CLS_COIN; special until #566)
+local RANGED = 0x08     -- OT6_RANGED: the coins' class (OT6_CLS_COIN; special $08 until #566)
 
 local function checkList(l)
   local want = { [0] = 0x5C, 0xFF, 0x59, 0xFF, 0x5A, 0xFF, 0x5B, 0xFF }
@@ -90,13 +84,13 @@ end
 -- ally with a Revivify before SETZER's next throw; every throw checked
 -- below ran on SETZER's own aim.
 local function checkThrow(r, i)
-  return H.setzerCheckCoins(r, i, 30, function() return ARCANE end, "cointoss")
+  return H.setzerCheckCoins(r, i, 30, function() return RANGED end, "cointoss")
 end
 
 local WANT = { { row = COIN, boost = 1 }, { row = COIN, boost = 0 } }
 local function crowdWalk(tag, want)
   return H.setzerCrowdBattles({
-    tag = tag, want = want, wps = B1_LAP,
+    tag = tag, want = want, wps = { { 124, 26 }, { 120, 11 } },
     setzerOpts = { onList = checkList, shot = "cointoss_table" },
     check = function(rec, i)
       H.assertEq(rec.row, COIN, string.format("record %d is a Coin Toss", i))
@@ -106,8 +100,8 @@ local function crowdWalk(tag, want)
   })
 end
 local walk, S = crowdWalk("cointoss", WANT)
--- A crowd is chosen as it opens (two or more bodies, one arcane-weak and
--- shielded), and the arcane-weak body can be dead before SETZER's first
+-- A crowd is chosen as it opens (two or more bodies, one ranged-weak and
+-- shielded), and the ranged-weak body can be dead before SETZER's first
 -- toss: the v0.33 qualification's wor-tomb-v1 draw Zombied him three times
 -- in crowd battle 1 while the others fought, and both his tosses found it
 -- at 0 HP ("slot 0: HP 0 -> 0, shields 3 -> 3"; build/attempts/wt/
@@ -138,7 +132,7 @@ local extraSteps = {}
 for e = 1, EXTRA do
   extraSteps[#extraSteps + 1] = H.cond(function() return chips(played()) == 0 end, {
     H.call(function()
-      H.log(string.format("[cointoss] no toss so far chipped an arcane-weak body (the crowd's died before SETZER's "
+      H.log(string.format("[cointoss] no toss so far chipped a ranged-weak body (the crowd's died before SETZER's "
         .. "tosses reached it): crowd %d more, one Coin Toss", e))
     end),
     extras[e].walk,
@@ -146,14 +140,9 @@ for e = 1, EXTRA do
 end
 
 H.run({ maxFrames = 1200000 }, {
-  -- #566: the coins' crowd is dealt on B1 (the header), from gen_wor_tomb_b1_hunt's own frame on its stairs
-  H.waitFrames(20), H.loadState(STATE), H.waitFrames(20),
-  H.waitUntil(function() return H.hasControl() and H.tileAligned() and not H.dialogWaiting() end, 3000,
-    "control on B1's stairs", 5),
+  H.bootCheckpoint("wor-tomb-v1"),
   H.call(function()
-    H.assertEq(H.mapId() & 0x1ff, MAP_B1, "booted on Darill's Tomb's B1 (map 298), gen_wor_tomb_b1_hunt's stairs")
-    H.assertEq(H.readByte(0x1850 + 9) & 7, H.readByte(0x1A6D) & 7, "SETZER is in the active party")
-    H.assertEq(H.kitClass("coin"), ARCANE, "the coins' class is Arcane (Ot6KitClassTbl +1)")
+    H.assertEq(H.kitClass("coin"), RANGED, "the coins' class is Ranged (Ot6KitClassTbl +1)")
   end),
   walk,
   H.cond(function() return true end, extraSteps),

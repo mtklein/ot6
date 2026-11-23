@@ -18,7 +18,7 @@
 --     on it); no MP; the bank +1 / -1;
 --   * one target, and the class: every chip call on it carries the first
 --     class its row holds in bit order (#566, six classes: Sword $01, else
---     Dagger $02, Fist $04, Arcane $08, Katana $10, Spear $20; Ot6HireClass's
+--     Dagger $02, Blunt $04, Ranged $08, Katana $10, Spear $20; Ot6HireClass's
 --     lowest set bit), or none when the row holds no class -- the
 --     sellsword's weapon fits the target, whatever SETZER holds;
 --   * each hit: twice the fee, halved while the body's shields hold,
@@ -36,8 +36,8 @@
 -- byte with that figure's ROM sheet; each swap made with the slot hidden
 -- and standing out of sight (its absolute screen position past the edge);
 -- each paid hire one drawn strike with the figure's weapon for the class
--- (its family: a blade for Sword or Katana, a point for Dagger or Spear, a
--- blow for Fist or Arcane, held to the class the hire swung);
+-- (its family: a blade for Sword or Katana, a point for Dagger, Spear or
+-- Ranged, a blow for Blunt, held to the class the hire swung);
 -- and at SETZER's Ot6ActionEnd his sheet, screen position, offsets and
 -- pose ($61c0/$61c1) as at his Ot6SetzerExec.  The 2 and 3 BP hires (the Imp,
 -- the fourth hire) are battle_hirecrew's.  The ROM's identity is logged.
@@ -90,14 +90,14 @@ H.run({ maxFrames = 200000 }, {
     H.hireCrewArm()
     H.assertEq(H.kitClass("hire"), CLASSES, "a hire may swing any of the six classes (Ot6KitClassTbl +3)")
     H.assertEq(sellsword(0x30), 0x10, "the model: a Katana|Spear row is answered with the katana")
-    H.assertEq(sellsword(0x28), 0x08, "the model: an Arcane|Spear row is answered with the arcane")
+    H.assertEq(sellsword(0x28), 0x08, "the model: a Ranged|Spear row is answered with the ranged weapon")
     H.assertEq(sellsword(0x80), 0x00, "the model: no class bit, no class")
     -- H.hireCrewCheck holds each strike's weapon to the family of the class swung (H.hireFamily): the design's
     -- three families, and none for no class
     local fam = {}
     for _, c in ipairs({ 0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20 }) do fam[#fam + 1] = H.hireFamily(c) end
-    H.assertEq(table.concat(fam, ""), "0123312", "the families: none; a blade for Sword and Katana, a point for "
-      .. "Dagger and Spear, a blow for Fist and Arcane")
+    H.assertEq(table.concat(fam, ""), "0123212", "the families: none; a blade for Sword and Katana, a point for "
+      .. "Dagger, Ranged and Spear, a blow for Blunt")
   end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return #done >= #WANT end, 160000, {

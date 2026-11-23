@@ -180,15 +180,15 @@ local function attempt(n)
   -- off on this fight (#235).  Either sibling can take the killing blow,
   -- so the test needs a key on BOTH gauges or the rung is a coin flip.
   -- With the tactical kit on, EDGAR spends his turn on AutoCrossbow
-  -- (a spear; pierce under four classes) and SABIN on Pummel (a fist), and neither
+  -- (Ranged; pierce under four classes) and SABIN on Pummel (Blunt), and neither
   -- reaches SHIVA's six sword shields: only CELES's sword chips her, one a turn, while
   -- four characters pour damage into her 3000 HP -- so SHIVA reliably
   -- died UNBROKEN and the attempt produced nothing (measured: 2 of the 3
   -- rungs at the default shift ended that way both before and after
   -- #235's fix, build/lab/fight-swings/brokendeath/).  With it off,
   -- EDGAR's MithrilBlade is a sword Fight like CELES's (under four classes
-  -- SABIN's MetalKnuckle was slash too, three keys; under six his claw is a
-  -- fist and SHIVA has two keys on her), while IFRIT keeps the keys his
+  -- SABIN's MetalKnuckle was slash too, three keys; under six a knuckle is
+  -- Blunt and SHIVA has two keys on her), while IFRIT keeps the keys his
   -- row gives LOCKE's dagger pair, and CELES's Ice.  The gate under test is untouched; what changes
   -- is that the observation stops depending on which sibling the tag-team
   -- happens to leave standing.
@@ -357,7 +357,7 @@ H.run({ maxFrames = 120000 + 16000 * ATTEMPTS }, {
   --    (H.fieldCare).  The old arm asked this independent run for the
   --    checkpoint run's two ThunderBlades; neither exists in this save,
   --    so that was a fixture fabrication disguised as menu input.  EDGAR's
-  --    MithrilBlade supplies the sword, while the daggers and Tools cover dagger and spear.
+  --    MithrilBlade supplies the sword, while the daggers and Tools cover the dagger, ranged and spear keys.
   -- Best-effort, like the wave-4 kits: each slot conds on the bag
   -- (present -> worn, absent -> keep current gear, logged).  LOCKE wears
   -- the Genji Glove, so his left hand is a DAGGER ladder, never a shield

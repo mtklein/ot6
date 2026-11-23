@@ -19720,8 +19720,8 @@ end
 -- deals (default 2), { weak = false } a crowd that needs no coin-weak body.
 -- The aim and pass suites (battle_setzeraim, battle_passside,
 -- battle_passretarget) read no chip and ask for the room's three-body
--- formation; under six classes group 151 holds no arcane-weak body, so the
--- default crowd is not dealt there and the coin suites walk B1 (group 149).
+-- formation, whatever its rows hold (the split moves which bodies answer to
+-- the coins' class, and with them which formations are the default crowd).
 function M.setzerCrowdBudget(group, tag, o)
   local pool = M.encounterPool(group)
   local ok, parts = {}, {}
@@ -20080,7 +20080,7 @@ M.HIRE_FIG_GFX = { [0] = 0x13, [1] = 0x0E, [2] = 0x0F, [3] = 0x03, [5] = 0x14 }
 M.HIRE_FIG_NAME = { [0] = "merchant", [1] = "soldier", [2] = "Imp", [3] = "Shadow", [4] = "Interceptor", [5] = "ghost" }
 -- the weapon a figure swings by the class's weapon family, the two bits
 -- Ot6CoinPrice puts in the hire's mark (#566: none; a blade, Sword or Katana;
--- a point, Dagger or Spear; a blow, Fist or Arcane -- under four classes
+-- a point, Dagger, Spear or Ranged; a blow, Blunt -- under four classes
 -- none, slashing, piercing, bludgeoning), item ids from kits.md; the Fight
 -- animation's number is id + 1
 M.HIRE_FIG_WEAPON = {
@@ -20090,12 +20090,12 @@ M.HIRE_FIG_WEAPON = {
 }
 -- #566 (wt/v051-six-suites): a class's weapon family as Ot6CoinPrice's @fam
 -- arm counts it (ot6_setzer.asm): 0 none, 1 a blade (Sword $01, Katana $10),
--- 2 a point (Dagger $02, Spear $20), 3 a blow (Fist $04, Arcane $08)
+-- 2 a point (Dagger $02, Spear $20, Ranged $08), 3 a blow (Blunt $04)
 function M.hireFamily(class)
   class = class & 0x3F
   if class == 0 then return 0 end
   if (class & 0x11) ~= 0 then return 1 end
-  if (class & 0x22) ~= 0 then return 2 end
+  if (class & 0x2A) ~= 0 then return 2 end
   return 3
 end
 local function romB(a) return M.readRomByte(a & 0x3FFFFF) end
@@ -20438,7 +20438,7 @@ function M.hireCrewCheck(r, tag)
       M.assertEq(s.weapon, M.HIRE_FIG_WEAPON[fig][cls + 1] + 1, string.format("%s strike %d: the %s's weapon for class %d",
         tag, j, NAME[fig], cls))
       -- #566: and that family is the swung class's (a blade for Sword or
-      -- Katana, a point for Dagger or Spear, a blow for Fist or Arcane)
+      -- Katana, a point for Dagger, Spear or Ranged, a blow for Blunt)
       M.assertEq(swung[j] ~= nil, true, string.format("%s strike %d: paid hire %d's class was read at its chip call",
         tag, j, j))
       M.assertEq(cls, M.hireFamily(swung[j]), string.format("%s strike %d: the mark's class bits (%d) are the weapon "

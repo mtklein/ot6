@@ -249,8 +249,8 @@ H.run({ maxFrames = 600000 }, {
   end),
   H.bootCheckpoint("wor-tomb-v1"),
   H.call(function()
-    -- the room's three-body formation, whatever its rows hold: nothing here reads a chip (#566: under six
-    -- classes group 151 has no body weak to the coins, and the coin suites' crowd is not dealt in this room)
+    -- the room's three-body formation, whatever its rows hold: nothing here reads a chip (#566: which bodies
+    -- answer to the coins' class, and so which formations the coin suites call a crowd, moves with the split)
     W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG, { bodies = 3, weak = false })
   end),
   H.driveUntil(function() return done end, 560000, {

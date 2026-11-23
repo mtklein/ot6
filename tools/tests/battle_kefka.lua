@@ -55,8 +55,8 @@ local KEFKA = 0x014A
 --   tool    AutoCrossbow, from the ROM's data: power 125, ignores defence,
 --           4 MP (Ot6AbilityCostTbl).  Under four classes $AA was OT6_PIERCE
 --           and pierce one of KEFKA's shield classes; under six (#566) it is
---           OT6_SPEAR (Ot6WeapClassTbl) and keys him only if his row holds
---           the spear -- the chips this suite asserts (3) are counted on the
+--           OT6_RANGED (Ot6WeapClassTbl) and keys him only if his row holds
+--           that -- the chips this suite asserts (3) are counted on the
 --           gauge, whatever lands them.  The Bio Blaster ($A4) the old fighter's cursor named
 --           resolves as spell $7D (ThrowToolsItemTbl): power 20 poison, 8 MP.
 --           The driver names the tool by id, and the boost it cannot pay for

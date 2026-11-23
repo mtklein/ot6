@@ -11,7 +11,7 @@
 -- (H.kitBattle; Defends bank the points, the others Defend): SABIN's Bum Rush at 3 BP, then GOGO's Mimic at 2 BP.
 -- Declared unit-test expedient (tools/state_write_waivers.txt): at the battle's open every present monster's HP is
 -- raised to 60,000, so the battle outlasts Bum Rush's four blows (at most 4 x 9,999) and GOGO's copy runs; and
--- each is staged as a body that does not key fist (its OT6_BP_CLASS fist bit cleared) with six shields of
+-- each is staged as a body that does not key blunt (its OT6_BP_CLASS blunt bit cleared) with six shields of
 -- six, unbroken, so the take below is the keyless one whatever the factory's draw fields (#388's second call).  The
 -- copy needs a battle that outlasts the original; Doom (63,000 HP) would host it write-free (a later move); in the factory's random battles
 -- the four blows ended all 12 battles before the copy ran (dev run brm1), and in Inferno's SABIN fell before his
@@ -20,7 +20,7 @@
 -- Asserted, per counted battle:
 --   SABIN's command entered and ran Bum Rush ($64) at 3 BP pending;
 --   each of its landed blows (Ot6HitJoin) took exactly one of the struck body's shields, though it does not key
---     fist (Ot6BumRushTake: four blows, 6 -> 2, not Broken; main's ROM before the take leaves 6, red);
+--     blunt (Ot6BumRushTake: four blows, 6 -> 2, not Broken; main's ROM before the take leaves 6, red);
 --   GOGO's command entered as Bum Rush ($64, the copy) at 2 BP pending, ran Pummel ($5D: Ot6BlitzTake rewrote $b6),
 --   set the multi-attack counter to 1 (Pummel's two blows, not Bum Rush's four), and cost GOGO no MP.
 -- A battle where SABIN or GOGO cannot act is fought out and the next taken; one where GOGO's Mimic copied something
@@ -35,7 +35,7 @@ local CMD_BLITZ, CMD_MIMIC = 0x0A, 0x12
 local BUMRUSH, PUMMEL = 0x64, 0x5D
 local MIMIC_BOOST = 2
 local SH_CUR, SH_MAX, BRK_TICKS, BP_CLASS = 0x3E38, 0x3E39, 0x3E88, 0x3E9C  -- by entity offset (OT6_SHIELD_CUR ...)
-local FIST = 0x04                                                         -- Bum Rush's class (Ot6SkillClassTbl: Fist, #566)
+local BLUNT = 0x04                                                         -- Bum Rush's class (Ot6SkillClassTbl: Blunt, #566)
 local STAGED_SHIELDS = 6
 
 local seats, recs, mode, battles, done = {}, {}, nil, 0, false
@@ -111,7 +111,7 @@ local function arm()
     local e = emu.getState()["cpu.y"] & 0xFF
     if e >= 8 and e < 0x14 then
       r.blows[#r.blows + 1] = { e = e, sh = H.readByte(SH_CUR + e), br = H.readByte(BRK_TICKS + e) ~= 0,
-        keyed = (H.readByte(BP_CLASS + e) & FIST) ~= 0 }
+        keyed = (H.readByte(BP_CLASS + e) & BLUNT) ~= 0 }
     end
   end, emu.callbackType.exec, join, join)
   emu.addMemoryCallback(function()
@@ -186,16 +186,16 @@ local function decide()
   for m = 0, 5 do
     if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) > 0 then
       local e = 8 + m * 2
-      H.log(string.format("[bumrushmimic] m%d as fielded: %d shield(s) of %d, class $%02X (%s fist)", m,
+      H.log(string.format("[bumrushmimic] m%d as fielded: %d shield(s) of %d, class $%02X (%s blunt)", m,
         H.readByte(SH_CUR + e), H.readByte(SH_MAX + e), H.readByte(BP_CLASS + e),
-        (H.readByte(BP_CLASS + e) & FIST) ~= 0 and "keys" or "does not key"))
+        (H.readByte(BP_CLASS + e) & BLUNT) ~= 0 and "keys" or "does not key"))
       H.writeWord(0x3BFC + m * 2, 60000)
-      H.writeByte(BP_CLASS + e, H.readByte(BP_CLASS + e) & ~FIST & 0xFF)
+      H.writeByte(BP_CLASS + e, H.readByte(BP_CLASS + e) & ~BLUNT & 0xFF)
       H.writeByte(SH_CUR + e, STAGED_SHIELDS)
       H.writeByte(SH_MAX + e, STAGED_SHIELDS)
     end
   end
-  H.log(string.format("[bumrushmimic] every present monster's HP := 60000, fist key cleared, shields := %d of "
+  H.log(string.format("[bumrushmimic] every present monster's HP := 60000, blunt key cleared, shields := %d of "
     .. "%d (declared expedient)", STAGED_SHIELDS, STAGED_SHIELDS))
   plan = { { who = SABIN, cmd = CMD_BLITZ, row = BUMRUSH, boost = 3, direct = true },
            { who = GOGO, cmd = CMD_MIMIC, boost = MIMIC_BOOST, self = true } }
@@ -212,12 +212,12 @@ local function judge()
   end
   H.assertEq(s.pend, 3, "SABIN's Bum Rush ran at 3 BP pending")
   H.assertEq(s.ran, BUMRUSH, "and as Bum Rush")
-  -- the keyless take (#388): each landed blow on a body that does not key fist took one shield
+  -- the keyless take (#388): each landed blow on a body that does not key blunt took one shield
   H.assertEq(#s.blows >= 1, true, "Bum Rush's blows landed on a monster (Ot6HitJoin)")
   local want, order = {}, {}
   for _, b in ipairs(s.blows) do
     if want[b.e] == nil then
-      H.assertEq(b.keyed, false, string.format("m%d does not key fist (staged)", (b.e - 8) // 2))
+      H.assertEq(b.keyed, false, string.format("m%d does not key blunt (staged)", (b.e - 8) // 2))
       H.assertEq(b.sh == STAGED_SHIELDS and not b.br, true, string.format("m%d entered the first blow at %d "
         .. "shields, unbroken (staged)", (b.e - 8) // 2, STAGED_SHIELDS))
       want[b.e] = { sh = b.sh, br = b.br, n = 0 }
@@ -232,11 +232,11 @@ local function judge()
   end
   for _, e in ipairs(order) do
     local w, got = want[e], s.after[e]
-    H.log(string.format("[bumrushmimic] m%d (does not key fist): %d blow(s) landed on %d shield(s) -> %d "
+    H.log(string.format("[bumrushmimic] m%d (does not key blunt): %d blow(s) landed on %d shield(s) -> %d "
       .. "shield(s)%s (want %d%s)", (e - 8) // 2, w.n, STAGED_SHIELDS, got.sh, got.br and " Broken" or "", w.sh,
       w.br and " Broken" or ""))
     H.assertEq(got.sh, w.sh, string.format("m%d: each landed Bum Rush blow took one shield, though it does not "
-      .. "key fist (Ot6BumRushTake)", (e - 8) // 2))
+      .. "key blunt (Ot6BumRushTake)", (e - 8) // 2))
     H.assertEq(got.br, w.br, string.format("m%d: Broken exactly when the blows took its last shield", (e - 8) // 2))
   end
   H.assertEq(g.pend < 3, true, "GOGO's copy ran under three points pending")

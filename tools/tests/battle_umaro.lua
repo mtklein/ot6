@@ -1,6 +1,6 @@
 -- @suite savestate=tunnelarmr_entry slow
 -- battle_umaro.lua -- Umaro's kit (#380): a full dump is always Storm, his
--- divine, and Charge and Throw strike as Fist hits (#566: the club's class; bludgeoning under four classes).
+-- divine, and Charge and Throw strike as Blunt hits (#566: the club's class; bludgeoning under four classes).
 --
 -- THIS IS A SYNTHETIC MECHANISM TEST (docs/TESTING.md, "Synthetic mechanism
 -- tests"): Umaro is World of Ruin content (Narshe, v0.29) and no route state
@@ -36,7 +36,7 @@
 -- row 0).  Asserted:
 --   1. every turn with three points pending rolls Storm (arm 1);
 --   2. no turn with fewer rolls Storm (no Blizzard Orb: vanilla never can);
---   3. every Charge and Throw pass carries the Fist class ($04).
+--   3. every Charge and Throw pass carries the Blunt class ($04).
 -- Old-ROM red: build/attempts/wt/v028-kits/px13-lab/old/battle_umaro2.out.  Mutants (the
 -- gate at two points, the club class off):
 -- build/attempts/wt/v028-kits/px13-lab2/mut/{ugate,uclass}/.
@@ -49,7 +49,7 @@ local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_DEF = 0x05, 0x27
 local CMDTBL = 0x202E
 local ATKCLASS = 0x57B8
-local FIST = 0x04       -- OT6_FIST: UMARO's club (OT6_CLS_CLUB)
+local BLUNT = 0x04      -- OT6_BLUNT: UMARO's club (OT6_CLS_CLUB)
 local ARM = { [0] = "Throw", [1] = "Storm", [2] = "Charge", [3] = "Fight" }
 local CYCLE = { 3, 0, 2, 1 }             -- the staged pending, turn by turn
 local MAX_TURNS = 40
@@ -213,8 +213,8 @@ H.run({ maxFrames = 120000 }, {
         end
         for _, c in ipairs(t.classes) do
           struck = struck + 1
-          if c ~= FIST then
-            fails[#fails + 1] = string.format("turn %d: %s carried class %02X, not Fist ($04)", i, ARM[t.arm], c)
+          if c ~= BLUNT then
+            fails[#fails + 1] = string.format("turn %d: %s carried class %02X, not Blunt ($04)", i, ARM[t.arm], c)
           end
         end
       end
@@ -224,8 +224,8 @@ H.run({ maxFrames = 120000 }, {
     for _, m in ipairs(fails) do H.log("[umaro] FAIL " .. m) end
     H.assertEq(full >= 4 and other >= 4, true, "at least four turns at three points and four under")
     H.assertEq(struck >= 2, true, "at least two Charge passes were watched")
-    H.assertEq(H.kitClass("club"), FIST, "the ROM's own class for the club is Fist (Ot6KitClassTbl +2)")
-    H.assertEq(#fails, 0, "a full dump is Storm, and only a full dump; Charge and Throw are Fist hits")
+    H.assertEq(H.kitClass("club"), BLUNT, "the ROM's own class for the club is Blunt (Ot6KitClassTbl +2)")
+    H.assertEq(#fails, 0, "a full dump is Storm, and only a full dump; Charge and Throw are Blunt hits")
     H.log("[umaro] PASS")
   end),
 })

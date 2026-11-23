@@ -19,7 +19,7 @@ local H = dofile("tools/tests/lib/ot6.lua")   -- only for H.sym if needed
 local PRG = emu.memType.snesPrgRom
 -- the six classes (ot6_class.asm, #566): Leo's Crystal is a sword
 local SWORD = 0x01
-local OTHERS = 0x3E      -- dagger, fist, arcane, katana, spear: OT6_CLASSES less the sword
+local OTHERS = 0x3E      -- dagger, blunt, ranged, katana, spear: OT6_CLASSES less the sword
 local KEFKA_VS_LEO = 0x0173
 local fails = 0
 
@@ -79,7 +79,7 @@ check(r ~= nil and r[1] == 4 and r[2] == SWORD, string.format(
   r and tostring(r[1]) or "MISSING",
   r and string.format("$%02X", r[2]) or "-"))
 -- the class byte is exactly the sword: no stray class (a katana, a dagger,
--- a spear, a fist, the arcane) that a solo Leo, who holds only a sword,
+-- a spear, blunt, ranged) that a solo Leo, who holds only a sword,
 -- could not field.
 check(r ~= nil and (r[2] & OTHERS) == 0,
   "the class key is sword-only -- Leo's Crystal is the only tool here")

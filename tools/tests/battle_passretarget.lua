@@ -26,8 +26,8 @@
 -- banked; SABIN's Blitz is Pummel), care after each.  In a crowd (three or
 -- more monsters: the PowerDemon and its two Exorays.  Until #566 "two or
 -- more, one special-weak", the coin suites' crowd, which was that formation
--- and no other; no rule here reads a chip, and under six classes the room
--- holds no body weak to the coins) past the first PASS_SKIP, SETZER first
+-- and no other; no rule here reads a chip, and under six classes which
+-- bodies answer to the coins moves with the split) past the first PASS_SKIP, SETZER first
 -- plays each kind still unmet through the real menu (H.setzerBattle, whose
 -- confirm lands only on the target asked for), each from the battle's
 -- opening snapshot (TESTING.md: branch one legitimately reached state):

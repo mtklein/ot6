@@ -12,7 +12,7 @@
 -- pass's figure, the slot's graphics and its whole buffer against the figure's ROM sheet, the swap hidden and out
 -- of sight, the strike's weapon for the class; the third pass is the Imp (graphics $0F, the Imp status's battle
 -- set, its palette loaded into the slot's by status_pat_tfr) swinging the Imp Halberd or, on a target answered with
--- a blow (#566: a Fist or Arcane hire), the Morning Star; and at SETZER's Ot6ActionEnd his own sheet, position and pose, not the Imp's.
+-- a blow (#566: a Blunt hire), the Morning Star; and at SETZER's Ot6ActionEnd his own sheet, position and pose, not the Imp's.
 -- A mechanism test of the crew's third figure, not a claim about play.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
