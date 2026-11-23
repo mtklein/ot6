@@ -142,6 +142,7 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         ora     OT6_REVEALED_ELEM,y
         sta     OT6_REVEALED_ELEM,y
         lda     f:OT6_CODEX_CLASS,x
+SixMask:                        ; (mutant_rom.py's seam, #566: the row's mask)
         and     OT6_BP_CLASS,y  ; six classes: only what the body answers to
         ora     OT6_BOOST_REVEALED,y
         sta     OT6_BOOST_REVEALED,y
