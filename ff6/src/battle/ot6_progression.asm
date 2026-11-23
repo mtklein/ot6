@@ -297,6 +297,73 @@
 
 ; ------------------------------------------------------------------------------
 
+; [ the field Magic list for Gogo revealed as Leo: his own stone's spells ]
+;
+; #552 piece F.  Gogo's field Magic list (_c350a2's `_50c5`) holds what the
+; other three members know, each through Ot6FieldSpellKnown, as his battle
+; list takes the battle's union.  Revealed as Leo he wears a stone, and in
+; battle its spells (and his worn items' grants) join the union
+; (Ot6UnionEspers), so the field list holds them too: the spell in $e0 is
+; known when his own stone or worn item grants it, and otherwise the
+; others' scan decides as before.
+;
+; jsl from skills.asm `_c350a2`, in place of vanilla's `lda 0,y / cmp
+; #CHAR_PROP::GOGO / beq _50c5` (7 bytes: this jsl, `bcs _50c5` and an
+; rts).  a8/i16, Y = the selected record, the menu's $e0 = the spell id.
+; out: C set = Gogo's scan of the others (`_50c5`); C clear = A is the
+; answer ($ff known, else the learn byte), returned by the rts.  Everyone
+; but Gogo gets Ot6FieldSpellKnown's answer, as `_c350ae` gave it.
+; Preserves Y; X is scratch there already.
+.proc Ot6FieldLeoMagic
+        .a8
+        .i16
+        tyx
+        lda     f:$7e0000,x     ; the record's actor (vanilla's `lda 0,y`)
+        cmp     #CHAR_PROP::GOGO
+        beq     gogo
+        jsl     Ot6FieldSpellKnown      ; (preserves Y)
+        clc
+        rtl
+gogo:  lda     f:OT6_LEO_FLAG
+FieldLeo:                       ; (mutant_rom.py's seam: the and)
+        and     #OT6_LEO_BIT
+        beq     scan           ; unrevealed: vanilla's scan
+        lda     f:$7e001e,x     ; his worn stone ($ff none)
+        bmi     items
+        sta     f:hWRMPYA
+        lda     #11
+        sta     f:hWRMPYB
+        nop                     ; let the hardware product settle
+        nop
+        nop
+        phx
+        longa
+        lda     f:hRDMPYL       ; (26 * 11 = 286 at most)
+        tax                     ; X = GenjuProp row
+        shorta
+        lda     f:$7e00e0
+        cmp     f:GenjuProp+1,x
+        beq     hitx
+        cmp     f:GenjuProp+3,x
+        beq     hitx
+        cmp     f:GenjuProp+5,x
+        beq     hitx
+        cmp     f:GenjuProp+7,x
+        beq     hitx
+        cmp     f:GenjuProp+9,x
+        beq     hitx
+        plx
+items: lda     f:$7e00e0       ; X = the record
+        jsl     Ot6ItemGrants
+        bcs     known
+scan:  sec
+        rtl
+hitx:  plx
+known: lda     #$ff
+        clc
+        rtl
+.endproc
+
 ; [ seed the master spell-list union with equipped espers' granted spells ]
 ;
 ; Called once from InitSpellList (battle_main.asm) right after its actor loop
@@ -334,14 +401,17 @@
         bne     @gnext          ;   unless they did already
         lda     #OT6_BLUE_SPELL
         jsr     @add
-@gnext: jmp     @next
+@gnext: jsr     Ot6UnionLeo     ; #552 piece F: Gogo revealed as Leo wears a
+        bcc     @stone          ;   stone: its spells (and his worn items'
+        jmp     @next           ;   grants) join the union as anyone's do,
+                                ;   and his list takes the union whole
 @own:   cmp     #$0c
         bcs     @next           ; empty/special/umaro: no esper to grant
         cmp     #OT6_CHAR_STRAGO
-        bne     :+
+        bne     @stone
         lda     #OT6_ANALYZE_SPELL      ; Strago's Analyze has a slot too
         jsr     @add            ;   (#381); clobbers A and Y, keeps X
-:       phx
+@stone: phx
         ldy     $3010,x         ; this slot's record pointer
         lda     $161e,y         ; equipped esper (neg = none)
         bmi     @items
@@ -407,6 +477,17 @@
         shorta
         sta     $3034,y         ; A low byte = id -> $3034[id]
 @ret:   rts
+.endproc
+
+; Ot6UnionEspers' test for Gogo's slot: C clear once he is revealed as Leo
+; (Ot6EsperHolder).  Its own proc so mutant_rom.py can return C set (`sec /
+; rts`).  Clobbers nothing but C.
+.proc Ot6UnionLeo
+        pha
+        lda     #$0c
+        jsr     Ot6EsperHolder
+        pla
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------

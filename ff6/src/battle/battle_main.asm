@@ -16088,8 +16088,10 @@ WinBattle:
         beq     @5e59       ; branch if exp. egg not equipped
         jsr     AddExp
 @5e59:  lda     $3ed8,y     ; actor number
-        cmp     #CHAR::GOGO
-        bcs     @5e73       ; branch if >= $0c (gogo)
+        jsl     Ot6EsperVictory ; ot6 #552: vanilla's `cmp #CHAR::GOGO / bcs
+                                ;   @5e73` (4 bytes): returns for 0..11; Gogo
+                                ;   and up resume at Ot6VictoryNext, a
+                                ;   revealed Leo after earning (ot6_esper.asm)
         jsr     GetSpellListPtr
         ldx     $3010,y
         phy
@@ -16097,7 +16099,7 @@ WinBattle:
         jsl     Ot6EsperEarn    ; ot6 #328: Magic Points to the worn esper's
                                 ;   counter (replaces LearnGenjuMagic)
         ply
-@5e73:  dey2                ; next character
+@5e73:  dey2                ; next character (Ot6VictoryNext, below)
         bpl     @5e13
         jsl     Ot6EsperMsg     ; ot6 #328: "got <v0> magic point(s)" whenever a
                                 ;   member wore a stone, then each new rank
@@ -16247,6 +16249,10 @@ WinBattle:
         bpl     @5fab
 @5fc5:  plp
         rts
+
+; ot6 #552: the victory loop's next member, where Ot6EsperVictory resumes
+; (any symbol defined inside the loop would end its @-scope)
+Ot6VictoryNext = @5e73
 
 ; ------------------------------------------------------------------------------
 

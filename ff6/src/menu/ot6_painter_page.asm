@@ -95,7 +95,8 @@ Ot6SkillsCmdRow:
 ; opens no list in battle (ot6_thief.asm's header: command $06 keeps vanilla
 ; Capture), so the Treasure Hunter row greys as the Painter row does under
 ; the Fake Mustache.  out: A = the actor byte, as `lda 0,y` left it (flags
-; too).  a8/i16.  clobbers X.
+; too), but $ff for Gogo revealed as Leo, whose Espers row this makes white
+; (#552 piece F).  a8/i16.  clobbers X.
 Ot6SkillsPainterColor:
         lda     zSkillsTextColor::Thief
         cmp     #$20
@@ -123,6 +124,25 @@ Ot6SkillsPainterColor:
         lda     #$20                    ; Sketch, and Sketch in battle: white
         sta     zSkillsTextColor::Painter
 @done:  lda     0,y                     ; the instruction the hook replaced
+        cmp     #CHAR_PROP::GOGO
+        bne     @out
+        jsr     Ot6LeoGenjuRow          ; #552 piece F
+@out:   rts
+
+; Gogo's Espers row (A = CHAR_PROP::GOGO in).  Revealed as Leo he wears
+; espers: the row is white whatever he carries (he earns and keeps ranks as
+; anyone does, and summons with Magic picked), and A comes back $ff, so the
+; caller's Gogo test greys nothing.  Unrevealed: A stays Gogo's and the
+; caller greys the row, as vanilla.  (mutant_rom.py's seam: an rts first.)
+Ot6LeoGenjuRow:
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     :+
+        lda     #$20
+        sta     zSkillsTextColor::Genju
+        lda     #$ff
+        rts
+:       lda     #CHAR_PROP::GOGO
         rts
 
 ; [ does a worn piece carry this relic command rewrite? ]

@@ -220,14 +220,39 @@ Continue, party changes and the parties of Kefka's Tower (`save_leo`).
   ("LEO as Gogo": the small name the record's, the big name row 12) and his
   scene, with and without the reveal.
 
-## Espers (the next step)
+## Espers
 
-Letting him wear espers is a second step with a save-version bump (#552
-piece F): the esper pages hold Magic Points for actors 0-11 only (624 bytes,
-26 stones each), so actor 12 needs 52 more bytes in each slot's esper page
-reserve, read only when `OT6_SAVEVER` is 2 or more.  What this step learned
-for it: the menus that refuse him an esper key on the actor (`menu_common.asm`
-`$0C`, `skills.asm`, `config.asm`, `battle_main.asm` 14677/14833/16098), so the
-esper step branches there on the switch too; `Ot6EsperFold` already runs for
-every slot in UpdateEquip, so his kept rungs would fold in through the same
-path once the counters exist.
+Piece F (#552; owner, 2026-11-23: "as long as we can keep reading the old
+saves, let's give it a shot").  Once the switch is set he wears a stone as
+actors 0-11 do: the Skills list, the battle, the ladder and the save.
+Before the reveal nothing changes for Gogo.
+
+| What | How | Where |
+|---|---|---|
+| Who holds espers | Actors 0-11, and actor 12 once the switch is set; every esper gate asks this one test (it read `actor < 12` before) | `Ot6EsperHolder` (ot6_esper.asm): `Ot6EsperEarn`, `Ot6EsperFold`, `Ot6EsperCount` (the signatures: Facet, Rebirth, Limit Break, Fenrir, Conductor, Sraphim), `Ot6EsperProgress` and `Ot6RungDescText` (the esper page) |
+| The Skills list | His Espers row is white whatever commands he carries (an unrevealed Gogo's stays grey, vanilla's rule); the list, the page and the one-owner rule are vanilla's and key on the record | `Ot6LeoGenjuRow` (ot6_painter_page.asm, in the hook `_c34d3d` already calls) |
+| Progress | Magic Points in the esper pages' row 12 (52 bytes after the twelve rows, each slot's page and the live one); the save layout's version 2 | `OT6_ESPER_LEO` (ot6_memory.inc); save-layout.md |
+| Earning | The victory loop skipped every actor from Gogo up; he now earns his worn stone's points there (still no LearnItemMagic: he has no spell table) | `Ot6EsperVictory` in place of the loop's `cmp #CHAR::GOGO / bcs` |
+| Summon | Vanilla's: ValidateSpellList puts any record's worn stone at the top of its Magic list, so with Magic picked he summons it, once a battle | - |
+| Spells | Gogo's battle list takes the whole union; his stone's spells and his worn items' grants now join the union as anyone's do | `Ot6UnionLeo` (Ot6UnionEspers) |
+| The field Magic list | His stone's and worn items' grants, beside what the others know (Gogo's vanilla scan) | `Ot6FieldLeoMagic` (in place of `_c350a2`'s Gogo test) |
+| Limit Break and Mimic | A Mimic runs as the mimic's own action, so a revealed Leo holding Bahamut's signature passes 9999 with his copies too; an unrevealed Gogo stays at 9999 | `Ot6DmgCap` (unchanged; it reads the attacker's bit) |
+
+Every Gogo rule keyed on actor `$0C` (Mimic, the command picker, the final
+battle's order, the kits of #547) is untouched: the slot's actor never
+changes.  Umaro (`$0D`) still wears nothing.
+
+Old saves: a block of layout version 1 or older reads row 12 as no progress
+(`Ot6EsperLeoRow` clears the live row at every load unless the block says
+version 2), and Gogo's worn-esper byte is `$FF` in every golden save and
+tracked checkpoint (`build/attempts/wt/v051-leo-espers/row12_saves.txt`),
+so a revealed Leo from a v0.49 or v0.50 save starts with no stone and no
+progress; its next save writes his row and raises the block to version 2.
+
+Tests: `battle_leoespers` (before the reveal his Espers row grey and closed;
+after it, Magic picked, a stone put on him in the Skills list, random
+battles fought until his first rung is held: the summon, the union spell,
+the earn, the rank line, the kept stat points; the save, a Reset and the
+Continue), and the golden saves (every release's save loads with row 12
+empty, the junk saves' `$FF` rows included; the mutants `leorowall` and
+`noraise`).
