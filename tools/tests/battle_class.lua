@@ -378,6 +378,15 @@ H.run({ maxFrames = 90000 }, {
     local broke = (t1 > 0) and 1 or 2
     H.assertEq(broke == 1 and s1 or s2, 0, "broken guard shields at 0")
     H.screenshot("class_broken")
+    -- every store to the broken guard's shield cell from here on, in order:
+    -- the recovery (Ot6Tick: OT6_SHIELD_MAX -> OT6_SHIELD_CUR) is the first,
+    -- and the berserk party's next spear chip can follow it within frames
+    -- (#566: a 30-frame poll read 1 after the restore to 2 and a chip)
+    local cell = broke == 1 and 0x3E44 or 0x3E46
+    H.vars.brokeCell, H.vars.shStores = cell, {}
+    H.vars.shRef = emu.addMemoryCallback(function(_, value)
+      H.vars.shStores[#H.vars.shStores + 1] = value
+    end, emu.callbackType.write, 0x7E0000 + cell, 0x7E0000 + cell)
   end),
 
   -- 4. recovery: shields restore, the revealed class survives.
@@ -386,15 +395,18 @@ H.run({ maxFrames = 90000 }, {
   -- monsters never chip again, which is what the first live run showed.)
   H.driveUntil(function()
     local t1, t2 = timers()
-    local s1, s2 = shields()
-    return t1 == 0 and t2 == 0 and (s1 == 2 or s2 == 2)
+    return t1 == 0 and t2 == 0 and #H.vars.shStores > 0
   end, 15000, driveStep, "broken guard to recover"),
   H.waitFrames(30),
   report("recovered"),
   H.call(function()
-    local s1, s2 = shields()
+    emu.removeMemoryCallback(H.vars.shRef, emu.callbackType.write,
+      0x7E0000 + H.vars.brokeCell, 0x7E0000 + H.vars.brokeCell)
     local r1, r2 = classRev()
-    H.assertEq(s1 == 2 or s2 == 2, true, "shields restored to max")
+    local max = H.readByte(H.vars.brokeCell + 1)       -- OT6_SHIELD_MAX
+    H.assertEq(max, 2, "the broken guard's max is its authored 2")
+    H.assertEq(H.vars.shStores[1], max,
+      "shields restored to max (the first store to the broken guard's gauge after the break)")
     H.assertEq((r1 | r2) & SPEAR, SPEAR, "revealed class survives recovery")
   end),
 
