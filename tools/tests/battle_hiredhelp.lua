@@ -92,6 +92,12 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sellsword(0x30), 0x10, "the model: a Katana|Spear row is answered with the katana")
     H.assertEq(sellsword(0x28), 0x08, "the model: an Arcane|Spear row is answered with the arcane")
     H.assertEq(sellsword(0x80), 0x00, "the model: no class bit, no class")
+    -- H.hireCrewCheck holds each strike's weapon to the family of the class swung (H.hireFamily): the design's
+    -- three families, and none for no class
+    local fam = {}
+    for _, c in ipairs({ 0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20 }) do fam[#fam + 1] = H.hireFamily(c) end
+    H.assertEq(table.concat(fam, ""), "0123312", "the families: none; a blade for Sword and Katana, a point for "
+      .. "Dagger and Spear, a blow for Fist and Arcane")
   end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return #done >= #WANT end, 160000, {
