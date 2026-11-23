@@ -1,28 +1,25 @@
 ; ------------------------------------------------------------------------------
 ; OT6: weapon/ability class data (M3)
 ;
-; six physical classes, one bit each, sharing a byte with the null-break
-; property. with the 8 elements these are 14 probe axes (octopath has 12).
+; four physical classes, one bit each, sharing a byte with the null-break
+; property. together with the 8 elements these are octopath's 12 probe axes.
 ; the weapon sets Fight's class; abilities keep their own class byte
-; (the chain saw is a sword whatever edgar holds; pummel is always fist).
+; (sabin with claws equipped slashes on Fight, and Pummel stays bludgeoning).
 ; ------------------------------------------------------------------------------
 
-; the six classes (#566, v0.51): v0.50's four classes each
-; split in two.  bits $01..$08 keep their v0.50 parent (slash, pierce,
-; bludgeon, special), so a v0.50 save's revealed class bits read as the
-; first child of what they were.
-OT6_SWORD   := $01              ; swords, the chain saw (was slash)
-OT6_DAGGER  := $02              ; daggers, thrown stars and edges, darts,
-                                ;   a thief's hit (was pierce)
-OT6_FIST    := $04              ; fists, claws, fangs, clubs, flails (was
-                                ;   bludgeon; the claws were slash)
-OT6_ARCANE  := $08              ; rods, brushes, cards, dice, coins, the
-                                ;   returning arcs (was special; the rods
-                                ;   and arcs were bludgeon)
-OT6_KATANA  := $10              ; katanas, ninja blades, swdtech (was
-                                ;   slash; the ninja blades were pierce)
-OT6_SPEAR   := $20              ; spears, bolts, the drill, the air anchor,
-                                ;   tekmissile (was pierce)
+; six weapon classes (#566), after Octopath's six: the four of v0.50 and
+; before (slash $01, pierce $02, bludgeon $04, special $08) regrouped by the
+; weapon in hand.  tools/proto_six/classes.py is the grouping as data, and
+; this file's two tables are written from it.
+OT6_SWORD   := $01              ; swords; the chain saw
+OT6_DAGGER  := $02              ; daggers and ninja blades; a thief's hit
+OT6_BLUNT   := $04              ; fists and knuckles, rods and brushes, flails
+                                ;   and clubs; the blitzes' blows; umaro's arms
+OT6_RANGED  := $08              ; what is thrown or shot: stars, skeans, darts,
+                                ;   cards, dice, coins, boomerangs, the
+                                ;   autocrossbow, the air anchor, tekmissile
+OT6_KATANA  := $10              ; katanas and the edged claws; swdtech
+OT6_SPEAR   := $20              ; spears; the drill
 OT6_CLASSES := $3f              ; every class bit
 OT6_NCLASS  = 6
 OT6_NULLBRK := $80              ; property, not a class: high damage that
@@ -31,9 +28,10 @@ OT6_NULLBRK := $80              ; property, not a class: high damage that
                                 ;   for future consumers (equip permits, hud).
 
 ; the classes the kits load by hand (no weapon, no table row)
-OT6_CLS_THIEF = OT6_DAGGER      ; Trickshot, Dismantle (Mug swings his weapon)
-OT6_CLS_COIN  = OT6_ARCANE      ; Coin Toss and a character's GP Rain
-OT6_CLS_CLUB  = OT6_FIST        ; Umaro's Charge and Throw
+OT6_CLS_THIEF = OT6_DAGGER      ; Mug, Trickshot and the rest of Locke's hits
+OT6_CLS_COIN  = OT6_RANGED      ; Coin Toss and a character's GP Rain
+OT6_CLS_CLUB  = OT6_BLUNT      ; Umaro's Charge and Throw
+OT6_CLS_FANG  = OT6_DAGGER      ; Gau's own body: his bare hand, and his raging Fight
 
 .segment "ot6_code"
 
@@ -48,119 +46,119 @@ OT6_CLS_CLUB  = OT6_FIST        ; Umaro's Charge and Throw
 ;   - heal rod $33: no class. a healing rod teaches nothing, and leaving it
 ;     classless avoids the undead/heal-reversal ambiguity until it is needed.
 ;   - the returning-arc family (full moon, boomerang, rising sun, sniper,
-;     wing edge) is all arcane (v0.50: "boomerangs (ranged bludgeon)"),
+;     wing edge) is all bludgeoning per "boomerangs (ranged bludgeon)",
 ;     even the edgy-looking discs; one-way thrown points (shuriken, stars,
-;     darts, hawk eye) are daggers (v0.50: pierce, "thrown edges, darts").
-;   - hawk eye $49: dagger (a thrown blade, not a returning arc).
-;   - air anchor $a9: spear (it fires a harpoon).
-;   - atma weapon $1c: a plain sword, not null-break.
-;   - empty hand $ff: fist. claws, the flail, the morning star and the
-;     bone club are fist too, so sabin's claws buy him no second class
+;     darts, hawk eye) are piercing per "thrown edges, darts".
+;   - hawk eye $49: piercing (a thrown blade, not a returning arc).
+;   - air anchor $a9: piercing (it fires a harpoon).
+;   - atma weapon $1c: plain slashing, not null-break.
+;   - empty hand $ff: bludgeoning. fists are a real class ("claws are how
+;     the monk buys into a second class"), so bare knuckles stay bludgeon
 ;     and umaro is classified correctly with no special case.
 ;   - dried meat is $fe and "empty" is $ff in equipment slots; only $ff
 ;     ever appears in a hand.
 
 Ot6WeapClassTbl:
         ; daggers $00-$09
-        .byte   OT6_DAGGER      ; $00 dirk
-        .byte   OT6_DAGGER      ; $01 mithrilknife
-        .byte   OT6_DAGGER      ; $02 guardian
-        .byte   OT6_DAGGER      ; $03 air lancet
-        .byte   OT6_DAGGER      ; $04 thiefknife
-        .byte   OT6_DAGGER      ; $05 assassin
-        .byte   OT6_DAGGER      ; $06 man eater
-        .byte   OT6_DAGGER      ; $07 swordbreaker
-        .byte   OT6_DAGGER      ; $08 graedus
-        .byte   OT6_DAGGER      ; $09 valiantknife
+        .byte   OT6_DAGGER      ; $00 dirk [dagger]
+        .byte   OT6_DAGGER      ; $01 mithrilknife [dagger]
+        .byte   OT6_DAGGER      ; $02 guardian [dagger]
+        .byte   OT6_DAGGER      ; $03 air lancet [dagger]
+        .byte   OT6_DAGGER      ; $04 thiefknife [dagger]
+        .byte   OT6_DAGGER      ; $05 assassin [dagger]
+        .byte   OT6_DAGGER      ; $06 man eater [dagger]
+        .byte   OT6_DAGGER      ; $07 swordbreaker [dagger]
+        .byte   OT6_DAGGER      ; $08 graedus [dagger]
+        .byte   OT6_DAGGER      ; $09 valiantknife [dagger]
         ; swords $0a-$1c
-        .byte   OT6_SWORD       ; $0a mithrilblade
-        .byte   OT6_SWORD       ; $0b regalcutlass
-        .byte   OT6_SWORD       ; $0c rune edge
-        .byte   OT6_SWORD       ; $0d flame sabre
-        .byte   OT6_SWORD       ; $0e blizzard
-        .byte   OT6_SWORD       ; $0f thunderblade
-        .byte   OT6_SWORD       ; $10 epee
-        .byte   OT6_SWORD       ; $11 break blade
-        .byte   OT6_SWORD       ; $12 drainer
-        .byte   OT6_SWORD       ; $13 enhancer
-        .byte   OT6_SWORD       ; $14 crystal
-        .byte   OT6_SWORD       ; $15 falchion
-        .byte   OT6_SWORD       ; $16 soul sabre
-        .byte   OT6_SWORD       ; $17 ogre nix
-        .byte   OT6_SWORD       ; $18 excalibur
-        .byte   OT6_SWORD       ; $19 scimitar
-        .byte   OT6_SWORD       ; $1a illumina
-        .byte   OT6_SWORD       ; $1b ragnarok
-        .byte   OT6_SWORD       ; $1c atma weapon
+        .byte   OT6_SWORD       ; $0a mithrilblade [sword]
+        .byte   OT6_SWORD       ; $0b regalcutlass [sword]
+        .byte   OT6_SWORD       ; $0c rune edge [sword]
+        .byte   OT6_SWORD       ; $0d flame sabre [sword]
+        .byte   OT6_SWORD       ; $0e blizzard [sword]
+        .byte   OT6_SWORD       ; $0f thunderblade [sword]
+        .byte   OT6_SWORD       ; $10 epee [sword]
+        .byte   OT6_SWORD       ; $11 break blade [sword]
+        .byte   OT6_SWORD       ; $12 drainer [sword]
+        .byte   OT6_SWORD       ; $13 enhancer [sword]
+        .byte   OT6_SWORD       ; $14 crystal [sword]
+        .byte   OT6_SWORD       ; $15 falchion [sword]
+        .byte   OT6_SWORD       ; $16 soul sabre [sword]
+        .byte   OT6_SWORD       ; $17 ogre nix [sword]
+        .byte   OT6_SWORD       ; $18 excalibur [sword]
+        .byte   OT6_SWORD       ; $19 scimitar [sword]
+        .byte   OT6_SWORD       ; $1a illumina [sword]
+        .byte   OT6_SWORD       ; $1b ragnarok [sword]
+        .byte   OT6_SWORD       ; $1c atma weapon [sword]
         ; spears $1d-$24
-        .byte   OT6_SPEAR       ; $1d mithril pike
-        .byte   OT6_SPEAR       ; $1e trident
-        .byte   OT6_SPEAR       ; $1f stout spear
-        .byte   OT6_SPEAR       ; $20 partisan
-        .byte   OT6_SPEAR       ; $21 pearl lance
-        .byte   OT6_SPEAR       ; $22 gold lance
-        .byte   OT6_SPEAR       ; $23 aura lance
-        .byte   OT6_SPEAR       ; $24 imp halberd
+        .byte   OT6_SPEAR       ; $1d mithril pike [spear]
+        .byte   OT6_SPEAR       ; $1e trident [spear]
+        .byte   OT6_SPEAR       ; $1f stout spear [spear]
+        .byte   OT6_SPEAR       ; $20 partisan [spear]
+        .byte   OT6_SPEAR       ; $21 pearl lance [spear]
+        .byte   OT6_SPEAR       ; $22 gold lance [spear]
+        .byte   OT6_SPEAR       ; $23 aura lance [spear]
+        .byte   OT6_SPEAR       ; $24 imp halberd [spear]
         ; ninja knives $25-$2a
-        .byte   OT6_KATANA      ; $25 imperial
-        .byte   OT6_KATANA      ; $26 kodachi
-        .byte   OT6_KATANA      ; $27 blossom
-        .byte   OT6_KATANA      ; $28 hardened
-        .byte   OT6_KATANA      ; $29 striker
-        .byte   OT6_KATANA      ; $2a stunner
+        .byte   OT6_DAGGER      ; $25 imperial [ninja blade]
+        .byte   OT6_DAGGER      ; $26 kodachi [ninja blade]
+        .byte   OT6_DAGGER      ; $27 blossom [ninja blade]
+        .byte   OT6_DAGGER      ; $28 hardened [ninja blade]
+        .byte   OT6_DAGGER      ; $29 striker [ninja blade]
+        .byte   OT6_DAGGER      ; $2a stunner [ninja blade]
         ; katanas $2b-$32
-        .byte   OT6_KATANA      ; $2b ashura
-        .byte   OT6_KATANA      ; $2c kotetsu
-        .byte   OT6_KATANA      ; $2d forged
-        .byte   OT6_KATANA      ; $2e tempest
-        .byte   OT6_KATANA      ; $2f murasame
-        .byte   OT6_KATANA      ; $30 aura
-        .byte   OT6_KATANA      ; $31 strato
-        .byte   OT6_KATANA      ; $32 sky render
+        .byte   OT6_KATANA      ; $2b ashura [katana]
+        .byte   OT6_KATANA      ; $2c kotetsu [katana]
+        .byte   OT6_KATANA      ; $2d forged [katana]
+        .byte   OT6_KATANA      ; $2e tempest [katana]
+        .byte   OT6_KATANA      ; $2f murasame [katana]
+        .byte   OT6_KATANA      ; $30 aura [katana]
+        .byte   OT6_KATANA      ; $31 strato [katana]
+        .byte   OT6_KATANA      ; $32 sky render [katana]
         ; rods $33-$3c
         .byte   $00             ; $33 heal rod (teaches nothing; see block)
-        .byte   OT6_ARCANE      ; $34 mithril rod
-        .byte   OT6_ARCANE      ; $35 fire rod
-        .byte   OT6_ARCANE      ; $36 ice rod
-        .byte   OT6_ARCANE      ; $37 thunder rod
-        .byte   OT6_ARCANE      ; $38 poison rod
-        .byte   OT6_ARCANE      ; $39 pearl rod
-        .byte   OT6_ARCANE      ; $3a gravity rod
-        .byte   OT6_ARCANE      ; $3b punisher
-        .byte   OT6_ARCANE      ; $3c magus rod
+        .byte   OT6_BLUNT       ; $34 mithril rod [rod]
+        .byte   OT6_BLUNT       ; $35 fire rod [rod]
+        .byte   OT6_BLUNT       ; $36 ice rod [rod]
+        .byte   OT6_BLUNT       ; $37 thunder rod [rod]
+        .byte   OT6_BLUNT       ; $38 poison rod [rod]
+        .byte   OT6_BLUNT       ; $39 pearl rod [rod]
+        .byte   OT6_BLUNT       ; $3a gravity rod [rod]
+        .byte   OT6_BLUNT       ; $3b punisher [rod]
+        .byte   OT6_BLUNT       ; $3c magus rod [rod]
         ; brushes $3d-$40
-        .byte   OT6_ARCANE      ; $3d chocobo brush
-        .byte   OT6_ARCANE      ; $3e davinci brush
-        .byte   OT6_ARCANE      ; $3f magical brush
-        .byte   OT6_ARCANE      ; $40 rainbow brush
+        .byte   OT6_BLUNT       ; $3d chocobo brush [brush]
+        .byte   OT6_BLUNT       ; $3e davinci brush [brush]
+        .byte   OT6_BLUNT       ; $3f magical brush [brush]
+        .byte   OT6_BLUNT       ; $40 rainbow brush [brush]
         ; thrown stars $41-$43
-        .byte   OT6_DAGGER      ; $41 shuriken
-        .byte   OT6_DAGGER      ; $42 ninja star
-        .byte   OT6_DAGGER      ; $43 tack star
+        .byte   OT6_RANGED      ; $41 shuriken [star]
+        .byte   OT6_RANGED      ; $42 ninja star [star]
+        .byte   OT6_RANGED      ; $43 tack star [star]
         ; the "special"-icon grab bag $44-$52
-        .byte   OT6_FIST        ; $44 flail
-        .byte   OT6_ARCANE      ; $45 full moon (returning arc)
-        .byte   OT6_FIST        ; $46 morning star
-        .byte   OT6_ARCANE      ; $47 boomerang
-        .byte   OT6_ARCANE      ; $48 rising sun (returning arc)
-        .byte   OT6_DAGGER      ; $49 hawk eye (thrown blade)
-        .byte   OT6_FIST        ; $4a bone club
-        .byte   OT6_ARCANE      ; $4b sniper (returning arc)
-        .byte   OT6_ARCANE      ; $4c wing edge (returning arc)
-        .byte   OT6_ARCANE      ; $4d cards
-        .byte   OT6_DAGGER      ; $4e darts
-        .byte   OT6_DAGGER      ; $4f doom darts
-        .byte   OT6_ARCANE      ; $50 trump
-        .byte   OT6_ARCANE      ; $51 dice (ordinary: chips)
-        .byte   OT6_ARCANE|OT6_NULLBRK; $52 fixed dice: high damage, teaches nothing
+        .byte   OT6_BLUNT       ; $44 flail [flail]
+        .byte   OT6_RANGED      ; $45 full moon (returning arc) [boomerang]
+        .byte   OT6_BLUNT       ; $46 morning star [flail]
+        .byte   OT6_RANGED      ; $47 boomerang [boomerang]
+        .byte   OT6_RANGED      ; $48 rising sun (returning arc) [boomerang]
+        .byte   OT6_RANGED      ; $49 hawk eye (thrown blade) [boomerang]
+        .byte   OT6_BLUNT       ; $4a bone club [club]
+        .byte   OT6_RANGED      ; $4b sniper (returning arc) [boomerang]
+        .byte   OT6_RANGED      ; $4c wing edge (returning arc) [boomerang]
+        .byte   OT6_RANGED      ; $4d cards [card]
+        .byte   OT6_RANGED      ; $4e darts [dart]
+        .byte   OT6_RANGED      ; $4f doom darts [dart]
+        .byte   OT6_RANGED      ; $50 trump [card]
+        .byte   OT6_RANGED      ; $51 dice (ordinary ¤: chips) [dice]
+        .byte   OT6_RANGED|OT6_NULLBRK; $52 fixed dice: high damage, teaches nothing [dice]
         ; claws $53-$59
-        .byte   OT6_FIST        ; $53 metalknuckle
-        .byte   OT6_FIST        ; $54 mithril claw
-        .byte   OT6_FIST        ; $55 kaiser
-        .byte   OT6_FIST        ; $56 poison claw
-        .byte   OT6_FIST        ; $57 fire knuckle
-        .byte   OT6_FIST        ; $58 dragon claw
-        .byte   OT6_FIST        ; $59 tiger fangs
+        .byte   OT6_BLUNT       ; $53 metalknuckle [knuckle]
+        .byte   OT6_KATANA      ; $54 mithril claw [claw]
+        .byte   OT6_BLUNT       ; $55 kaiser [knuckle]
+        .byte   OT6_KATANA      ; $56 poison claw [claw]
+        .byte   OT6_BLUNT       ; $57 fire knuckle [knuckle]
+        .byte   OT6_KATANA      ; $58 dragon claw [claw]
+        .byte   OT6_KATANA      ; $59 tiger fangs [claw]
         ; shields/helms/armor $5a-$a2: no class
         .res    $a3 - $5a, $00
         ; tools $a3-$aa (the Tools command resolves through item data,
@@ -168,18 +166,18 @@ Ot6WeapClassTbl:
         .byte   $00             ; $a3 noiseblaster
         .byte   $00             ; $a4 bio blaster (resolves as its spell)
         .byte   $00             ; $a5 flash (resolves as its spell)
-        .byte   OT6_SWORD       ; $a6 chain saw (edgar's sword key)
+        .byte   OT6_SWORD       ; $a6 chain saw ("buys edgar slashing") [chainsaw]
         .byte   $00             ; $a7 debilitator
-        .byte   OT6_SPEAR       ; $a8 drill
-        .byte   OT6_SPEAR       ; $a9 air anchor (harpoon)
-        .byte   OT6_SPEAR       ; $aa autocrossbow
+        .byte   OT6_SPEAR       ; $a8 drill [drill]
+        .byte   OT6_RANGED      ; $a9 air anchor (harpoon) [air anchor]
+        .byte   OT6_RANGED      ; $aa autocrossbow [crossbow]
         ; skeans/edges $ab-$ad resolve as their spells $51-$53, whose class
-        ; is Ot6SkillClassTbl's (dagger, #383); the Inviz and Shadow Edges
+        ; is Ot6SkillClassTbl's (pierce, #383); the Inviz and Shadow Edges
         ; deal no damage (ot6_shadow.asm): no class here
         .res    $b0 - $ab, $00
         ; relics $b0-$e6, consumables $e7-$fe: no class
         .res    $ff - $b0, $00
-        .byte   OT6_FIST        ; $ff empty hand: bare fists
+        .byte   OT6_BLUNT       ; $ff empty hand: bare fists bludgeon [fist]
 
 ; ------------------------------------------------------------------------------
 
@@ -191,32 +189,32 @@ Ot6WeapClassTbl:
 ; (aurabolt is a holy chip, not a punch). WoB physical skills only;
 ; slots attacks, dances, and rage specials stay unclassified.
 ;
-;   - swdtechs are katana: cyan is its specialist, and quadra slam is
-;     the strongest katana chip in the game.  three are not cuts (#379,
+;   - swdtechs slash: cyan is the slashing specialist, and quadra slam is
+;     the strongest slash chip in the game.  three are not slashes (#379,
 ;     kits.md's chip column): retort ($56) is a counter stance and
 ;     empowerer ($59) a drain, so both are classless and chip nothing; quadra
 ;     slice ($5b) is wind, its element byte (battle_main.asm's MagicProp
 ;     override), so it is absent here and chips wind shields four times.
 ;   - $55 dispatch doubles as slots' "joker doom" (vanilla reuses the
 ;     record, and renamed its attack-name slot), so a failed joker doom
-;     is a katana probe. that is vanilla behaviour, kept as it is.
-;   - pummel/suplex/bum rush are fist whatever sabin wears ✦.
-;   - tekmissile is spear: the whelk tutorial's fourth chip
+;     is a slashing probe. that is vanilla behaviour, kept as it is.
+;   - pummel/suplex/bum rush bludgeon regardless of claws ✦.
+;   - tekmissile is piercing: the whelk tutorial's fourth chip
 ;     ("three beams and a tekmissile").
 
 Ot6SkillClassTbl:
-        .byte   $55, OT6_KATANA ; dispatch
-        .byte   $57, OT6_KATANA ; slash
-        .byte   $58, OT6_KATANA ; quadra slam (chips per hit)
-        .byte   $5a, OT6_KATANA ; stunner
-        .byte   $5c, OT6_KATANA ; cleave
-        .byte   $5d, OT6_FIST   ; pummel
-        .byte   $5f, OT6_FIST   ; suplex (the train is fist-weak)
-        .byte   $64, OT6_FIST   ; bum rush
-        .byte   $8a, OT6_SPEAR  ; tekmissile
-        .byte   $51, OT6_DAGGER ; fire skean  (thrown edges, #383: each
-        .byte   $52, OT6_DAGGER ; water edge   chips dagger and its
-        .byte   $53, OT6_DAGGER ; bolt edge    element)
+        .byte   $55, OT6_KATANA ; dispatch [swdtech]
+        .byte   $57, OT6_KATANA ; slash [swdtech]
+        .byte   $58, OT6_KATANA ; quadra slam (chips per hit) [swdtech]
+        .byte   $5a, OT6_KATANA ; stunner [swdtech]
+        .byte   $5c, OT6_KATANA ; cleave [swdtech]
+        .byte   $5d, OT6_BLUNT  ; pummel [blitz]
+        .byte   $5f, OT6_BLUNT  ; suplex (the train is bludgeon-weak) [blitz]
+        .byte   $64, OT6_BLUNT  ; bum rush [blitz]
+        .byte   $8a, OT6_RANGED ; tekmissile [tekmissile]
+        .byte   $51, OT6_RANGED ; fire skean  (thrown edges pierce, #383: [skean]
+        .byte   $52, OT6_RANGED ; water edge   each chips pierce and its [skean]
+        .byte   $53, OT6_RANGED ; bolt edge    element) [skean]
         .byte   $ff
 
 ; ------------------------------------------------------------------------------
@@ -226,7 +224,7 @@ Ot6SkillClassTbl:
 ; the harness reads these (tools/tests/lib/ot6.lua M.kitClass) so its key
 ; model follows the ROM: +0 a thief's hit, +1 the coins, +2 Umaro's club,
 ; +3 the classes a hire may swing (Ot6HireClass: the first the target is
-; weak to, in bit order)
+; weak to, in bit order), +4 Gau's fangs
 Ot6KitClassTbl:
-        .byte   OT6_CLS_THIEF, OT6_CLS_COIN, OT6_CLS_CLUB, OT6_CLASSES
+        .byte   OT6_CLS_THIEF, OT6_CLS_COIN, OT6_CLS_CLUB, OT6_CLASSES, OT6_CLS_FANG
 

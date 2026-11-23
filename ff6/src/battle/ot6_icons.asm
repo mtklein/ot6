@@ -418,8 +418,8 @@ Ot6ElemPalTbl:
         .byte   3 << 2          ; water: blue (wave shape vs ice crystal)
         .byte   0 << 2          ; sword: white
         .byte   0 << 2          ; dagger: white
-        .byte   0 << 2          ; fist: white
-        .byte   0 << 2          ; arcane: white
+        .byte   0 << 2          ; blunt: white
+        .byte   0 << 2          ; ranged: white
         .byte   0 << 2          ; katana: white
         .byte   0 << 2          ; spear: white
 
@@ -663,8 +663,8 @@ Ot6ElemPalTbl:
 Ot6ClassGlyphTbl:
         .byte   $d9             ; sword: the sword icon
         .byte   $d8             ; dagger: the dirk icon
-        .byte   $e1             ; fist: the claw icon
-        .byte   $df             ; arcane: the sparkle icon
+        .byte   $dc             ; blunt: the staff cell, redrawn a mallet
+        .byte   $de             ; ranged: the thrown star
         .byte   $db             ; katana: the katana icon, mirrored in
                                 ;   the font so it reads apart from the
                                 ;   sword (tools/proto_six/font.py)
