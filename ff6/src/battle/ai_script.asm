@@ -9,17 +9,28 @@
         Start := AIScript
 .endscope
 
-; cf/8400
+; OT6 (#561): the "ai_script" segment loads in bank $f1 (ff6-en.cfg), with a
+; larger block, so that boss scripts can grow: vanilla's block at cf/8700 was
+; $3950 bytes with under ten free.  Every read of the table and of the block
+; is long-addressed (`lda f:AIScriptPtrs,x`, `lda f:AIScript,x`) and the
+; table holds offsets from AIScript, so nothing else changes; cf/8400-cf/c04f
+; is fill, and the segment after it (monster_text) is pinned where it was.
+; The block must end below $8000: an offset's high bit is the "no counter
+; script" test (`lda $3269,x / bmi`, CheckRetal and Ot6RetalStory).
+OT6_AI_BLOCK = $6000
+.assert OT6_AI_BLOCK <= $8000, error, "an AI script offset must stay below $8000 (the no-counter-script test)"
+
+; cf/8400 (vanilla); f1/0000 (OT6)
 AIScriptPtrs:
         ptr_tbl AIScript
 
 ; ------------------------------------------------------------------------------
 
-; cf/8700
+; cf/8700 (vanilla); f1/0300 (OT6)
 AIScript:
 
 .if LANG_EN
-        fixed_block $3950
+        fixed_block OT6_AI_BLOCK
 .else
         fixed_block $4100
 .endif
