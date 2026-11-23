@@ -331,7 +331,7 @@ H.run({ maxFrames = 250000, allowGameOver = true }, {
     H.assertEq(rizo.shields, 4,
       "RIZOPAS seeds 4 shields (Ot6ShieldTbl; #139 took the fifth pip -- "
       .. "the 1W/8L real-attempt ledger at the routed curve)")
-    H.assertEq(rizo.wkc, 0x05, "RIZOPAS class row SLASH|BLUDG ($05)")
+    H.assertEq(rizo.wkc, H.speciesClassRow(RIZOPAS), "RIZOPAS class row: the ROM's (Ot6ShieldTbl)")
     H.assertEq(inParty(5), true, "SABIN in the party")
     H.assertEq(inParty(2), true, "CYAN in the party")
     H.assertEq(inParty(3), false, "SHADOW gone")

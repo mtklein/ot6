@@ -416,10 +416,12 @@ Ot6ElemPalTbl:
         .byte   2 << 2          ; holy: yellow (star shape vs bolt zigzag)
         .byte   1 << 2          ; earth: gray
         .byte   3 << 2          ; water: blue (wave shape vs ice crystal)
-        .byte   0 << 2          ; slash: white
-        .byte   0 << 2          ; pierce: white
-        .byte   0 << 2          ; bludgeon: white
-        .byte   0 << 2          ; special ¤: white
+        .byte   0 << 2          ; sword: white
+        .byte   0 << 2          ; dagger: white
+        .byte   0 << 2          ; fist: white
+        .byte   0 << 2          ; arcane ¤: white
+        .byte   0 << 2          ; katana: white
+        .byte   0 << 2          ; spear: white
 
 ; generic battle lists ($2c already holds a global ability id)
 .proc Ot6ListIcon_ext
@@ -659,10 +661,14 @@ Ot6ElemPalTbl:
 ; upload: every battle text system and the bg3 field map index the same
 ; $5800 font tiles.
 Ot6ClassGlyphTbl:
-        .byte   $d9             ; slash: the sword icon
-        .byte   $da             ; pierce: the spear icon
-        .byte   $dc             ; bludgeon: the staff icon
-        .byte   $df             ; special ¤: the sparkle icon
+        .byte   $d9             ; sword: the sword icon
+        .byte   $d8             ; dagger: the dirk icon
+        .byte   $e1             ; fist: the claw icon
+        .byte   $df             ; arcane ¤: the sparkle icon
+        .byte   $db             ; katana: the katana icon, mirrored in
+                                ;   the font so it reads apart from the
+                                ;   sword (tools/proto_six/font.py)
+        .byte   $da             ; spear: the spear icon
 
 ; 8x8 2bpp element icons, element-bit order (fire $01 ... water $80)
 Ot6FontIcons:

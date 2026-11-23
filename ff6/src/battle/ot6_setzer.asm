@@ -575,16 +575,23 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         lda     f:$7e0000+OT6_SETZERROW
         cmp     #OT6_SETZER_HIRE
         beq     @hire
-@rain:  lda     #OT6_SPECIAL
+@rain:  lda     #OT6_CLS_COIN
         sta     f:$7e0000+OT6_ATKCLASS
         lda     #OT6_COIN_RATE
         bra     @price
 @hire:  jsr     Ot6HireClass
         lda     f:$7e0000+OT6_ATKCLASS  ; the sellsword's weapon fits it: the
-        cmp     #OT6_BLUDG              ;   class as two bits into $b7's cc
-        bne     :+                      ;   ($01/$02/$04 -> 1/2/3, none 0)
-        lda     #$03
-:       asl
+        beq     @fam                    ;   class's weapon family as two bits
+        bit     #OT6_SWORD|OT6_KATANA   ;   into $b7's cc (none 0, a blade 1,
+        beq     :+                      ;   a point 2, a blow 3)
+        lda     #$01
+        bra     @fam
+:       bit     #OT6_DAGGER|OT6_SPEAR
+        beq     :+
+        lda     #$02
+        bra     @fam
+:       lda     #$03
+@fam:   asl
         asl
         tsb     $b7
         lda     #OT6_HIRE_RATE
@@ -641,20 +648,15 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         bcc     @mon
 @none:  lda     #$00
         bra     @sto
-@have:  lda     OT6_BP_CLASS,x  ; the monster's class weaknesses
-        lsr
-        bcs     @slash
-        lsr
-        bcs     @pierce
-        lsr
-        bcs     @bludg
-        bra     @none
-@slash: lda     #OT6_SLASH
-        bra     @sto
-@pierce:
-        lda     #OT6_PIERCE
-        bra     @sto
-@bludg: lda     #OT6_BLUDG
+@have:  lda     OT6_BP_CLASS,x  ; the monster's class weaknesses: the
+        and     #OT6_CLASSES    ;   lowest bit of them (a & -a)
+        beq     @none
+        pha
+        eor     #$ff
+        inc
+        and     $01,s
+        sta     $01,s
+        pla
 @sto:   sta     f:$7e0000+OT6_ATKCLASS
         plp
         plx
@@ -1511,7 +1513,7 @@ Ot6JackpotCubeTbl:
         stz     $3414           ; damage modification off (the effect's own)
         lda     #$20
         tsb     $11a4           ; can't dodge (the effect's own)
-        lda     #OT6_SPECIAL|OT6_NULLBRK
+        lda     #OT6_ARCANE|OT6_NULLBRK
         sta     f:$7e0000+OT6_ATKCLASS  ; no chip: the Fixed Dice teach nothing
         lda     #$26
         sta     $b5             ; the dice-roll animation (last: a watcher

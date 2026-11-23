@@ -294,7 +294,7 @@ local function kefkaFight()
           end
           H.assertEq(ks >= 0, true, "KEFKA_NARSHE $014A on the field")
           H.assertEq(H.readByte(0x3E38 + 8 + ks * 2), 6, "gauge 6/6 seeded")
-          H.assertEq(H.readByte(0x3E9C + 8 + ks * 2), 0x03, "class row $03")
+          H.assertEq(H.readByte(0x3E9C + 8 + ks * 2), H.speciesClassRow(KEFKA), "class row: the ROM's (Ot6ShieldTbl)")
           H.assertEq(H.readByte(0x3BE0 + 8 + ks * 2), 0x09,
             "weak byte exactly $09")
           H.log(string.format("[kefka] seed verified: hp=%d sh=%d -- " ..

@@ -34,8 +34,8 @@ HUD_ASM = "ff6/src/battle/ot6_hud.asm"
 BREAK_ASM = "ff6/src/battle/ot6_break.asm"
 ROM = "build/ot6.sfc"
 
-CLASS_BIT = {"OT6_SLASH": 0x01, "OT6_PIERCE": 0x02, "OT6_BLUDG": 0x04,
-             "OT6_SPECIAL": 0x08}
+CLASS_BIT = {"OT6_SWORD": 0x01, "OT6_DAGGER": 0x02, "OT6_FIST": 0x04,
+             "OT6_ARCANE": 0x08, "OT6_KATANA": 0x10, "OT6_SPEAR": 0x20}
 
 
 def _num(tok: str) -> int:

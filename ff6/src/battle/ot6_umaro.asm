@@ -78,7 +78,7 @@
 .proc Ot6UmaroClub
         .a8
         sta     $b5             ; the command it draws as (vanilla's write)
-        lda     #OT6_BLUDG
+        lda     #OT6_CLS_CLUB
         sta     f:$7e0000+OT6_ATKCLASS
         rtl
 .endproc

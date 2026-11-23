@@ -30,6 +30,12 @@ OT6_BLUDG = 0x04   # fists, staves, rods, flails, boomerangs
 
 CLASS_NAME = {OT6_SLASH: "SLASH", OT6_PIERCE: "PIERCE", OT6_BLUDG: "BLUDGEON"}
 CLASS_CONST = {OT6_SLASH: "OT6_SLASH", OT6_PIERCE: "OT6_PIERCE", OT6_BLUDG: "OT6_BLUDG"}
+# six-class prototype (#566): the keyword rule below still picks one of
+# v0.50's three classes; tools/proto_six/split.py splits it in two and writes
+# six_class_split.json ("floor": species id -> one of these bits) before this
+# runs.
+SIX_CONST = {0x01: "OT6_SWORD", 0x02: "OT6_DAGGER", 0x04: "OT6_FIST", 0x08: "OT6_ARCANE",
+             0x10: "OT6_KATANA", 0x20: "OT6_SPEAR"}
 
 # ------------------------------------------------------------------------------
 # Keyword palette (designer-authored). Each bucket is a list of lowercase
@@ -214,10 +220,13 @@ def emit_inc(rows, out_path):
     lines.append("; ----------------------------------------------------------------------------")
     lines.append("")
     lines.append("OT6_FLOOR_CLASS:")
+    split = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "six_class_split.json")))["floor"]
     for sid, name, cls, _label in rows:
         shown = name if name != "" else "(unused)"
+        six = SIX_CONST[split["%04x" % sid]]
         lines.append(
-            f"        .byte   {CLASS_CONST[cls]:<12}; {sid:>3} {shown} -> {CLASS_NAME[cls]}"
+            f"        .byte   {six:<12}; {sid:>3} {shown} -> {CLASS_NAME[cls]} -> {six[4:]}"
         )
     lines.append("")
     lines.append(f"        ; {CODEX_WIDTH} bytes total (codex width)")

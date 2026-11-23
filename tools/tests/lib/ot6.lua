@@ -4333,7 +4333,32 @@ function M.weaponClass(item)
   if item == nil or item > 0xFF then return 0 end
   local c = M.readRomByte((M.sym("Ot6WeapClassTbl") & 0x3FFFFF) + item)
   if (c & 0x80) ~= 0 then return 0 end
-  return c & 0x0F
+  return c & 0x7F
+end
+
+-- The class a skill carries by its own table row: Ot6SkillClassTbl
+-- (ot6_class.asm: (ability id, class) pairs, $FF ends), 0 for an ability
+-- with no row or a null-break one.  Read from the ROM, so the chip model
+-- follows the classes the build has (#566: six in the prototype).
+function M.skillClass(id)
+  local t = M.sym("Ot6SkillClassTbl") & 0x3FFFFF
+  for i = 0, 255 do
+    local a = M.readRomByte(t + i * 2)
+    if a == 0xFF then return 0 end
+    if a == id then
+      local c = M.readRomByte(t + i * 2 + 1)
+      return (c & 0x80) ~= 0 and 0 or (c & 0x7F)
+    end
+  end
+  return 0
+end
+
+-- The classes the kits load by hand, from Ot6KitClassTbl (ot6_class.asm):
+-- "thief" LOCKE's hits (Mug, Trickshot), "coin" Coin Toss and GP Rain,
+-- "club" UMARO's Charge and Throw, "hire" every class a hire may swing.
+function M.kitClass(which)
+  local k = ({ thief = 0, coin = 1, club = 2, hire = 3 })[which]
+  return M.readRomByte((M.sym("Ot6KitClassTbl") & 0x3FFFFF) + k) & 0x7F
 end
 
 -- ---- a boosted Fight: passes attempted, and hits that land (#235) --------
@@ -4807,7 +4832,7 @@ M.HUD_QMARK_ATTR = 0x25
 -- with each icon's palette taken from Ot6ElemPalTbl and its cell from
 -- Ot6ElemGlyphTbl / Ot6ClassGlyphTbl.
 M.HUD_ICON_NAMES = { "fire", "ice", "lightning", "poison", "wind", "holy", "earth", "water",
-  "slash", "pierce", "bludgeon", "special" }
+  "sword", "dagger", "fist", "arcane", "katana", "spear" }
 function M.hudColours(drawn)
   local vr, rom, cg = emu.memType.snesVideoRam, emu.memType.snesPrgRom, emu.memType.snesCgRam
   local function stroke(cell, pal)
@@ -4829,7 +4854,7 @@ function M.hudColours(drawn)
   local pals = M.sym("Ot6ElemPalTbl") & 0x3FFFFF
   local ecells = M.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
   local ccells = M.sym("Ot6ClassGlyphTbl") & 0x3FFFFF
-  for k = 0, 11 do
+  for k = 0, #M.HUD_ICON_NAMES - 1 do
     local cell = k < 8 and emu.read(ecells + k, rom) or emu.read(ccells + k - 8, rom)
     out.icons[#out.icons + 1] = { M.HUD_ICON_NAMES[k + 1],
       stroke(cell, palOf(emu.read(pals + k, rom))) }
@@ -7594,16 +7619,21 @@ end
 -- here is not offered to the chip model's lines (bestLine) or the race.
 -- (Table fields, not locals: the main chunk is at Lua's 200-local limit.)
 BATTLE.BLITZ_SHAPE = {
-  [0x5D] = { class = 0x04, elem = 0, hits = 2 },   -- Pummel
+  [0x5D] = { class = true, elem = 0, hits = 2 },   -- Pummel
   [0x5E] = {},                                     -- Aura Bolt
-  [0x5F] = { class = 0x04 },                       -- Suplex
+  [0x5F] = { class = true },                       -- Suplex
   [0x62] = { aoe = true },                         -- Air Blade
-  [0x64] = { class = 0x04, elem = 0, hits = 4 },   -- Bum Rush (#388: bludgeon x4, Ot6HitCountTbl's +3)
+  [0x64] = { class = true, elem = 0, hits = 4 },   -- Bum Rush (#388: x4, Ot6HitCountTbl's +3)
 }
+-- a shaped Blitz's class: its Ot6SkillClassTbl row's (class = true), else none
+function M.blitzClass(id)
+  local b = BATTLE.BLITZ_SHAPE[id]
+  return b and b.class and M.skillClass(id) or 0
+end
 M.BUMRUSH, M.CLEAVE = 0x64, 0x5C      -- the two divines Driver:divineLine plays (#388)
 function M.blitzChips(slot, id)
   local b = BATTLE.BLITZ_SHAPE[id]
-  return (b.hits or 1) * hitChips(slot, b.class or 0, b.elem or M.spellElement(id))
+  return (b.hits or 1) * hitChips(slot, M.blitzClass(id), b.elem or M.spellElement(id))
 end
 
 -- The one monster an untargeted attack lands on: the focus list's first
@@ -9844,7 +9874,7 @@ function Driver:setzerLine(actor, have)
     local n, most = 0, 0
     for s = 0, 5 do
       if monAlive(s) and M.readByte(BATTLE.SH_CUR + s * 2) > 0
-         and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 and hitChips(s, 0x08, 0) > 0 then
+         and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 and hitChips(s, M.kitClass("coin"), 0) > 0 then
         n = n + 1
         most = math.max(most, M.readByte(BATTLE.SH_CUR + s * 2))
       end
@@ -9864,7 +9894,7 @@ function Driver:setzerLine(actor, have)
   -- still want (and the bank and the purse allow)
   local fee = M.setzerGil(level, 50, 0)
   if o.hire ~= false and gilRows and gil - fee >= floorGil and sh > 0 and not broken
-     and hitChips(slot, 0x07, 0) > 0 and fightChips(actor, slot, have) == 0 then
+     and hitChips(slot, M.kitClass("hire"), 0) > 0 and fightChips(actor, slot, have) == 0 then
     local b = math.max(0, math.min(have, 3, sh - 1))
     while b > 0 and gil - fee * (1 + b) < floorGil do b = b - 1 end
     M.log(string.format("[%s] actor=%d SETZER Hired Help on slot %d at %d BP: %d hire(s) at %d gil of %d; his "
@@ -9981,7 +10011,7 @@ function Driver:lockeLine(actor, have)
   end
   if o.trickshot ~= false and M.lockeKnows(L.TRICK) and mp - L.PRICE[L.TRICK] >= floor
      and M.readByte(BATTLE.SH_CUR + slot * 2) > 0 and M.readByte(BATTLE.BRK_TICKS + slot * 2) == 0
-     and hitChips(slot, 0x02, 0) > 0 and fightChips(actor, slot, 0) == 0 then
+     and hitChips(slot, M.kitClass("thief"), 0) > 0 and fightChips(actor, slot, 0) == 0 then
     return plan(L.TRICK, 0, slot, "pierce-weak, and his Fight keys nothing there")
   end
   return nil
@@ -10379,7 +10409,7 @@ function Driver:rageLine(actor, have)
             v = power
             if elem ~= 0 and (weak & elem) ~= 0 then v = v * 2
             elseif elem ~= 0 and (half & elem) ~= 0 then v = v // 2 end
-            v = v + 1000 * hitChips(s, phys and 0x04 or 0, elem)
+            v = v + 1000 * hitChips(s, phys and M.weaponClass(0xFF) or 0, elem)
             if all then score = score + v elseif v > top then top = v end
           end
         end
@@ -13100,7 +13130,7 @@ function Driver:dodgePlan(actor, plan)
     or string.format("slot %d is under %s and the re-aim filter refuses every body a swing can hit (slot %s)",
       aim, why, table.concat(refused, ", "))
   if plan.kind == "skill" then
-    local cls = plan.cmd == BATTLE.CMD_TOOLS and M.weaponClass(plan.skill) or BATTLE.BLITZ_SHAPE[plan.skill].class
+    local cls = plan.cmd == BATTLE.CMD_TOOLS and M.weaponClass(plan.skill) or M.blitzClass(plan.skill)
     if (cls or 0) == 0 then return plan end
   end
   if cmdRow(actor, BATTLE.CMD_MAGIC) then
@@ -19571,7 +19601,7 @@ function M.setzerCrowdBudget(group, tag)
     for _, f in ipairs(pool[slot].formations) do
       local weak = 0
       for _, sp in ipairs(f.species) do
-        if (M.speciesClassRow(sp) & 0x08) ~= 0 then weak = weak + 1 end
+        if (M.speciesClassRow(sp) & M.kitClass("coin")) ~= 0 then weak = weak + 1 end
       end
       ok[slot] = ok[slot] and #f.species >= 2 and weak >= 1
       names[#names + 1] = string.format("%d (%d bodies, %d special-weak)", f.id, #f.species, weak)
@@ -19637,7 +19667,9 @@ function M.setzerCrowdBattles(o)
     for b = 0, 5 do
       if (mask >> b) & 1 == 1 then
         alive = alive + 1
-        if (M.readByte(0x3EA4 + b * 2) & 0x08) ~= 0 and M.readByte(0x3E40 + b * 2) > 0 then weak = weak + 1 end
+        if (M.readByte(0x3EA4 + b * 2) & M.kitClass("coin")) ~= 0 and M.readByte(0x3E40 + b * 2) > 0 then
+          weak = weak + 1
+        end
       end
     end
     local yes = alive >= 2 and weak >= 1

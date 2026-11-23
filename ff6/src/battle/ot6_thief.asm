@@ -859,7 +859,7 @@ done:   plp
         sta     $11ae
         lda     $3b18,x         ; level, as InitAttackerLevel loads it
         sta     $11af
-        lda     #OT6_PIERCE
+        lda     #OT6_CLS_THIEF
         sta     f:$7e0000+OT6_ATKCLASS
         lda     $b6
         cmp     #OT6_THIEF_TRICK
