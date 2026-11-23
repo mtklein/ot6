@@ -274,8 +274,8 @@ H.run({ maxFrames = 3000 }, {
     -- the six classes (ot6_class.asm, #566)
     H.assertEq(H.weaponClass(0x0F), 0x01, "ThunderBlade $0F is a sword")
     H.assertEq(H.weaponClass(0x05), 0x02, "Assassin $05 is a dagger")
-    H.assertEq(H.weaponClass(H.AUTOCROSSBOW), 0x20, "AutoCrossbow $AA is a spear (its bolts)")
-    H.assertEq(H.weaponClass(0xFF), 0x04, "an empty hand is a fist")
+    H.assertEq(H.weaponClass(H.AUTOCROSSBOW), 0x08, "AutoCrossbow $AA is Ranged (its bolts)")
+    H.assertEq(H.weaponClass(0xFF), 0x04, "an empty hand is a blunt fist")
     -- ...but it is not a WEAPON, and this ROM will say it is if asked
     -- naively (#235).  $FF is the empty-slot sentinel, not an item id;
     -- ItemProp has thirty bytes at that index all the same, and the type
@@ -1120,15 +1120,15 @@ H.run({ maxFrames = 3000 }, {
   end),
 
   -- 13. the keyed line's boost (#174, H.keyBoost) on the map-269 trio
-  -- (Trapper: 2 shields, the fist its key) and Nerapa (5 shields, sword and
-  -- dagger):
+  -- (Trapper: 2 shields, one class its key) and Nerapa (5 shields, two
+  -- classes):
   -- chips per boost are the chip model's for each member's hands.
   H.call(function()
     -- LOCKE's Genji pair on a Trapper: ThunderBlade (bolt) chips, Guardian
     -- does not; swings alternate, so 0 BP = 1 chip, 1 BP = 2, 2 BP = 3
     local b, why = H.keyBoost({ need = 2, chipsAt = { [0] = 1, [1] = 2, [2] = 3, [3] = 4 }, bank = 3 })
     H.assertEq(b, 1, "LOCKE on a Trapper: one pip breaks this turn -- not the bank's three (" .. why .. ")")
-    -- SABIN's Pummel: two fist hits whatever the boost
+    -- SABIN's Pummel: two blunt hits whatever the boost
     b, why = H.keyBoost({ need = 2, chipsAt = { [0] = 2, [1] = 2, [2] = 2, [3] = 2 }, bank = 3 })
     H.assertEq(b, 0, "SABIN's Pummel on a Trapper breaks unboosted: the pip banks (" .. why .. ")")
     -- LOCKE on Nerapa: both hands chip, 2/4/6 chips at 0/1/2 BP

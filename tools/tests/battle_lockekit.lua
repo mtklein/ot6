@@ -25,14 +25,14 @@
 --      the boost bought the swings and pays once); 4 MP, the bank pays the
 --      point;
 --   3. Trickshot at 0 BP, then 4. at 1 BP: at the damage calc the props are
---      the coin's (power 40, physical, ignore defense, class pierce) under
+--      the coin's (power 40, physical, ignore defense, class Dagger: a thief's hit, #566) under
 --      command $18, which Ot6BoostDmg multiplies; the body loses HP; 4 MP,
 --      then 10 at 1 BP (x2.5, the price escalates with the multiplier), and
 --      the multiplier made the base damage x1, then x2 ($11B0 at
 --      Ot6BoostDmg's return);
 --   5. Dismantle at 2 BP: the body's defense ($3BB8) drops by three quarter
 --      steps (each a quarter, at least one point), the stab goes in under
---      Steal's command $05 (not multiplied), class pierce; 8 MP flat;
+--      Steal's command $05 (not multiplied), class Dagger; 8 MP flat;
 --   6. Appraise at 0 BP: Ot6AnalyzeOne read the target alone, its weak
 --      elements and classes; 7. at 1 BP with two or more bodies standing:
 --      it read every one; 3 MP flat at either boost;
@@ -56,7 +56,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local LOCKE, CMD = 0x01, 0x05
 local STEAL, FILCH, BESTOW, MUG, TRICK, DIS, APP, MARK = 0x56, 0x57, 0x58, 0xE0, 0xE1, 0xE2, 0xE3, 0xE4
-local PIERCE = 0x02
+local DAGGER = 0x02      -- OT6_DAGGER: a thief's hit (OT6_CLS_THIEF; pierce until #566)
 local CAPTURE = 0x06
 
 local function ent(s) return 8 + s * 2 end
@@ -318,7 +318,8 @@ local function judge()
     H.assertEq(c.b5, 0x18, "the coin runs under command $18, which Ot6BoostDmg multiplies (not Steal's gated $05)")
     H.assertEq(c.power, 40, "the coin's battle power is 40")
     H.assertEq(c.flags & 0x21, 0x21, "the coin is physical and ignores defense")
-    H.assertEq(c.cls, PIERCE, "the coin pierces")
+    H.assertEq(c.cls, DAGGER, "the coin is a dagger hit")
+    H.assertEq(H.kitClass("thief"), DAGGER, "and that is the ROM's own class for a thief's hit (Ot6KitClassTbl +0)")
     H.assertEq(c.out, math.min(c.dmg * (1 << b), 0xFFFF), string.format("the boost multiplied the coin x%d "
       .. "(%d -> %s)", 1 << b, c.dmg, tostring(c.out)))
     H.assertEq(r.hp1 < r.hp0, true, "the body lost HP to the coin")
@@ -332,7 +333,7 @@ local function judge()
     H.assertEq(#r.calc, 1, "Dismantle's stab is one damage calc")
     H.assertEq(r.calc[1].b5, 0x05, "the stab runs under Steal's command $05: the boost bought the corrode, not a "
       .. "multiplier")
-    H.assertEq(r.calc[1].cls, PIERCE, "the stab pierces")
+    H.assertEq(r.calc[1].cls, DAGGER, "the stab is a dagger hit")
     H.assertEq(r.mp0 - r.mp1, 8, "Dismantle cost 8 MP flat at 2 BP")
     bankPaid(r, 2, "Dismantle")
   elseif stage == 6 or stage == 7 then

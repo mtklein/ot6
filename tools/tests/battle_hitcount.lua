@@ -47,7 +47,7 @@
 -- the carry-clear exit with no roll, so neither can whiff.
 --
 -- Not asserted here: that the two hits chip two shields.  That needs a
--- fist-weak target (Pummel is a Fist skill), and which formation the ledge draws is random.
+-- blunt-weak target (Pummel is a Blunt skill), and which formation the ledge draws is random.
 -- Chips seen are logged, not required.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
@@ -491,7 +491,7 @@ H.run({ maxFrames = 120000 }, {
 
     H.log(string.format("%d Pummel(s) cast; chips seen: AuraBolt %d, best "
       .. "Pummel %d (chips are not asserted -- the ledge draw decides whether "
-      .. "the target is fist-weak)", #pummels, ab.chips, pu.chips))
+      .. "the target is blunt-weak)", #pummels, ab.chips, pu.chips))
     H.log("PASSED: Pummel strikes twice, AuraBolt once, the hook fires once "
       .. "per action, the power split is in the shipped tables, and the "
       .. "Pummel animation plays once for its two hits")

@@ -35,13 +35,16 @@
 --   2. Fight executes and carries a real weapon class (battle B, where row
 --      0 is Fight): picked through the live $7BC2 menu, with the target
 --      steered onto the monster side and the bench deferred with X, so every
---      monster HP drop is Gau's.  OT6_ATKCLASS ($57b8) reads OT6_BLUDG and
---      only OT6_BLUDG for the window: Gau equips nothing at join and
---      Ot6WeapClassTbl[$ff] is OT6_BLUDG, so bare fists are a bludgeoning
---      probe, through the same per-swing $3ca8 hand lookup as everyone else.
+--      monster HP drop is Gau's.  OT6_ATKCLASS ($57b8) reads Gau's own
+--      class and only that for the window: Gau equips nothing at join, and
+--      under six classes (#566) his body is his weapon -- his fangs, Dagger
+--      $02 (OT6_CLS_FANG, loaded by Ot6WeaponClass for his empty hand; under
+--      four classes Ot6WeapClassTbl[$ff], OT6_BLUDG $04, as for any bare
+--      fist) -- so his bare hand is a Dagger probe, through the same
+--      per-swing hand lookup as everyone else.
 --   3. the shield ledger agrees with the class: the body he hit is measured
 --      (whoever lost HP), and its shield counter moves iff its class-
---      weakness byte carries bludgeoning, checked both ways.
+--      weakness byte carries his class, checked both ways.
 --   4. rage possession is unaffected (battle A): rage is started from row 1 of
 --      the real menu, the window's cursor is steered to entry 0 by d-pad
 --      against the live cursor cells with no pokes, the RAGE status is set,
@@ -59,7 +62,13 @@ local CMD_MAGIC = 0x02
 local CMD_LEAP = 0x11
 local VELDT = 0x11E4                  -- bit 1 = the flag InitCmd_01 reads
 local ATKCLASS = 0x57B8               -- OT6_ATKCLASS (ot6_memory.inc:85)
-local OT6_BLUDG = 0x04                -- ot6_class.asm:12
+local OT6_FANG = 0x02                -- OT6_CLS_FANG = OT6_DAGGER (ot6_class.asm): GAU's bare hand
+local OTHER_CLASSES = { 0x01, 0x04, 0x08, 0x10, 0x20 }   -- sword, blunt, ranged, katana, spear
+local function onlyFang(seen)         -- his fangs' class was loaded, and no other class was
+  if not seen[OT6_FANG] then return false end
+  for _, c in ipairs(OTHER_CLASSES) do if seen[c] then return false end end
+  return true
+end
 local ST_RAGE = 0x1E                  -- the rage window's battle menu state
 
 local function CMDROW(slot, row) return 0x202E + slot * 12 + row * 3 end
@@ -72,7 +81,7 @@ local function CURMP(s) return 0x3C08 + s * 2 end
 local gauSlot, msPresent = nil, {}
 local classWrites, cmd10Hits, gauDispatches, gauMenus = {}, 0, 0, 0
 -- the swinging entity (+1 for a left hand) Ot6WeaponClass was entered with, and Gau's own swings' class writes:
--- a bench member's turn can come before the X defers it (#524's replay: CYAN's slash, class $01, landed first on
+-- a bench member's turn can come before the X defers it (#524's replay: CYAN's blade (class $01 on the four-class ROM) landed first on
 -- the regenerated gau_joined's key be04-g0035, and the arm read his damage as Gau's), so the class arm reads the
 -- writes Gau's own swings made
 local swingEntity, gauClassWrites = nil, {}
@@ -672,24 +681,24 @@ add({
     end
     classWrites, gauClassWrites, swings, gauBase = {}, {}, {}, nil
     -- battle B is a single natural draw with no formation criterion, so
-    -- nothing guarantees a bludgeon-weak body, and Gau's swing goes where
+    -- nothing guarantees a dagger-weak body, and Gau's swing goes where
     -- the target cursor's own default lands.  So every present body that
-    -- is not already bludgeon-weak gains OT6_BLUDG in its class-weak mask
+    -- is not already dagger-weak gains OT6_FANG in its class-weak mask
     -- here, before the swing, so whatever body the swing hits is a positive
     -- case for the chip arm.  (Until #252 this pinned only when NO body was
     -- weak: on a mixed draw the default could land on an unpinned body and
-    -- "at least one hit body is bludgeon-weak" failed on the cursor's pick.)
+    -- "at least one hit body is dagger-weak" failed on the cursor's pick.)
     -- The poke never touches shields, HP or the class window under test.
     local pinned = {}
     for _, m in ipairs(msPresent) do
       local e = 8 + m * 2
-      if (H.readByte(CLSWEAK(e)) & OT6_BLUDG) == 0 then
-        H.writeByte(CLSWEAK(e), H.readByte(CLSWEAK(e)) | OT6_BLUDG)
+      if (H.readByte(CLSWEAK(e)) & OT6_FANG) == 0 then
+        H.writeByte(CLSWEAK(e), H.readByte(CLSWEAK(e)) | OT6_FANG)
         pinned[#pinned + 1] = tostring(m)
       end
     end
-    H.log(string.format("[pre-fight] bodies not bludgeon-weak by the draw, pinned |= "
-      .. "OT6_BLUDG (labeled positive-arm poke): {%s}", table.concat(pinned, ",")))
+    H.log(string.format("[pre-fight] bodies not dagger-weak by the draw, pinned |= "
+      .. "OT6_FANG (labeled positive-arm poke): {%s}", table.concat(pinned, ",")))
     H.log(string.format("[pre-fight] bodies=%d gau slot %d fights from the "
       .. "real menu", #msPresent, gauSlot))
   end),
@@ -742,13 +751,14 @@ add({
     H.assertEq(#hit > 0, true,
       "Gau's Fight actually dealt damage -- an out-of-MP Gau now has a turn, "
       .. "and the HP read from his own swing's class write on")
-    H.assertEq(seen[OT6_BLUDG] or false, true,
-      "the swing resolved a REAL weapon class: OT6_ATKCLASS took OT6_BLUDG "
-      .. "($04) off the empty-hand row of Ot6WeapClassTbl -- bare fists are "
+    H.assertEq(H.kitClass("fang"), OT6_FANG, "GAU's fangs are Dagger in the ROM's own table (Ot6KitClassTbl +4)")
+    H.assertEq(H.handClass(0x0B, 0xFF), OT6_FANG, "and the harness's hand model agrees for his empty hand")
+    H.assertEq(seen[OT6_FANG] or false, true,
+      "the swing resolved a REAL weapon class: OT6_ATKCLASS took OT6_CLS_FANG "
+      .. "($02, Dagger: Ot6WeaponClass's answer for GAU's empty hand) -- his fangs are "
       .. "his probe")
-    H.assertEq(#gauClassWrites > 0 and seen[OT6_BLUDG]
-               and not seen[0x01] and not seen[0x02] and not seen[0x08], true,
-      "and it resolved ONLY bludgeoning: with the bench deferred, nothing "
+    H.assertEq(#gauClassWrites > 0 and onlyFang(seen), true,
+      "and it resolved ONLY his fangs' class (none of the other five classes): with the bench deferred, nothing "
       .. "else was loading an attack class into the window")
     -- the mutant: the swing filter switched to any entity but Gau's reads the bench's swings (or none), and the
     -- arm must not pass on them
@@ -757,32 +767,32 @@ add({
       for _, w in ipairs(swings) do
         if (w.e >> 1) ~= gauSlot then mseen[w.v] = true; mn = mn + 1 end
       end
-      local mutantPasses = mn > 0 and mseen[OT6_BLUDG] and not mseen[0x01] and not mseen[0x02] and not mseen[0x08]
+      local mutantPasses = mn > 0 and onlyFang(mseen)
       H.assertEq(mutantPasses and true or false, false, string.format("the mutant (the swing filter on every entity "
         .. "but Gau's: %d write(s)) does not pass the class arm", mn))
       H.assertEq(isGauSwing(gauSlot * 2) and isGauSwing(gauSlot * 2 + 1) and not isGauSwing(((gauSlot + 1) % 4) * 2),
         true, "the swing filter takes both of Gau's hands and no other entity")
     end
 
-    -- Require the draw to have produced at least one bludgeon-weak hit
+    -- Require the draw to have produced at least one dagger-weak hit
     -- body, so the positive arm of the agreement below is always exercised.
     local anyWeak = false
     for _, m in ipairs(hit) do
-      if (H.readByte(CLSWEAK(8 + m * 2)) & OT6_BLUDG) ~= 0 then
+      if (H.readByte(CLSWEAK(8 + m * 2)) & OT6_FANG) ~= 0 then
         anyWeak = true
       end
     end
     H.assertEq(anyWeak, true,
-      "at least one hit body is bludgeon-weak -- the chip arm below has " ..
+      "at least one hit body is dagger-weak -- the chip arm below has " ..
       "a positive case to prove, not just absences to agree with")
     -- the ledger and the class must agree, both ways, on the body he hit
     for _, m in ipairs(hit) do
       local e = 8 + m * 2
       local weak = H.readByte(CLSWEAK(e))
       local chipped = H.readByte(SHIELD(e)) < gauBase.sh[m]
-      H.assertEq(chipped, (weak & OT6_BLUDG) ~= 0, string.format(
+      H.assertEq(chipped, (weak & OT6_FANG) ~= 0, string.format(
         "body %d's shield ledger agrees with the class: class-weakness $%02X, "
-        .. "shield %d -> %d.  A bludgeoning probe chips a bludgeon-weak body "
+        .. "shield %d -> %d.  A dagger probe chips a dagger-weak body "
         .. "and nothing else (Ot6ClassChip, ot6_break.asm)",
         m, weak, gauBase.sh[m], H.readByte(SHIELD(e))))
     end

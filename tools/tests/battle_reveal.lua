@@ -12,11 +12,11 @@
 -- state a Cmd_20 reload or uninitialized RAM would hand the seed, then
 -- boots the Whelk head fight and asserts every mask reads hidden despite
 -- the garbage, and that a real fire chip reveals only the fire axis while
--- the head's class-weak SPEAR axis stays hidden.
+-- the head's class-weak axis stays hidden.
 --
 -- Fixture: whelk_entry. The head ($0134) is authored fire-weak with 4
--- shields and class-weak SPEAR ($20; #566: the six classes' child of its
--- v0.50 pierce, the TekMissile probe's class); the shell ($0100) is class-weak
+-- shields and a class row (#566: one of the six classes, read from the
+-- ROM's Ot6ShieldTbl; pierce $02 under four); the shell ($0100) is class-weak
 -- $00.  Addresses, all +slot*2 off the monster slot the body lands in:
 -- revealed elements $3E91, revealed classes $3EA5, broken timer $3E90,
 -- class-weak mask $3EA4, weak elements $3BE8, shields $3E40, HP $3BFC,
@@ -31,7 +31,7 @@ local WEAK, SHLD = 0x3BE8, 0x3E40
 local ALIVE, MSTAT, SPEC = 0x3AA8, 0x3EEC, 0x57C0
 local MENU, ACTOR, CHID = 0x7BCA, 0x62CA, 0x3ED8
 local HEAD_SP, SHELL_SP = 0x0134, 0x0100
-local SPEAR = 0x20                   -- OT6_SPEAR (ot6_class.asm)
+local CLASSES = 0x3F                 -- OT6_CLASSES (ot6_class.asm)
 local CHAR_TERRA = 0x00
 
 local hs, ss, terra                  -- head slot, shell slot, Terra's slot
@@ -192,8 +192,10 @@ H.run({ maxFrames = 60000 }, {
         -- seed's authoritative value.
         H.assertEq(clsW ~= 0xFF, true, "slot "..slot.." class-weak mask replaced, not OR'd (got FF)")
         if sp == HEAD_SP then
-          H.assertEq(clsW, SPEAR, "head's authored class-weak overwritten to SPEAR $20")
-          H.assertEq(clsW, H.speciesClassRow(HEAD_SP), "which is its Ot6ShieldTbl row's class byte")
+          local row = H.speciesClassRow(HEAD_SP)
+          H.assertEq(row & CLASSES ~= 0 and row ~= 0xFF, true,
+            string.format("the head's Ot6ShieldTbl row holds a weapon class, and not every bit ($%02X)", row))
+          H.assertEq(clsW, row, "head's authored class-weak overwritten to its Ot6ShieldTbl row")
           sawAuthored = true
         end
         if sp == SHELL_SP then
@@ -247,12 +249,12 @@ H.run({ maxFrames = 60000 }, {
     -- And only that axis: the head's second authored axis is its class
     -- weakness, asserted as a pair (there, and still hidden).
     local clsW = H.readByte(CWEAK + hs * 2)
-    H.assertEq(clsW, SPEAR,
+    H.assertEq(clsW == H.speciesClassRow(HEAD_SP) and clsW & CLASSES ~= 0, true,
       "control: the head really has a SECOND authored axis to keep hidden -- "
-      .. "class-weak SPEAR (without this the next assertion tests nothing)")
+      .. "its class row (without this the next assertion tests nothing)")
     H.assertEq(H.readByte(RCLASS + hs * 2), 0,
       "one fire chip reveals the ELEMENT axis only -- the head's authored "
-      .. "SPEAR weakness is still hidden, not disclosed by the same hit")
+      .. "class weakness is still hidden, not disclosed by the same hit")
     -- and the shell, which took no hit at all, disclosed nothing
     H.assertEq(H.readByte(REVEAL + ss * 2), 0,
       "the untouched shell revealed nothing -- the disclosure is per body")

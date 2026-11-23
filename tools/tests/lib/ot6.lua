@@ -19744,9 +19744,16 @@ end
 -- 151 (Mad Oscar; Mad Oscar + Exoray; PowerDemon + 2 Exorays twice), only
 -- the PowerDemon slots qualify, and the worst state needs 19 (kit-setzer
 -- round 5 review: 8 covered 95.7%).  Logs the decode.
-function M.setzerCrowdBudget(group, tag)
+-- o (#566, wt/v051-six-suites): { bodies = N } the fewest bodies a crowd
+-- deals (default 2), { weak = false } a crowd that needs no coin-weak body.
+-- The aim and pass suites (battle_setzeraim, battle_passside,
+-- battle_passretarget) read no chip and ask for the room's three-body
+-- formation, whatever its rows hold (the split moves which bodies answer to
+-- the coins' class, and with them which formations are the default crowd).
+function M.setzerCrowdBudget(group, tag, o)
   local pool = M.encounterPool(group)
   local ok, parts = {}, {}
+  local bodies, needWeak = o and o.bodies or 2, not (o and o.weak == false)
   for slot = 1, 4 do
     ok[slot] = true
     local names = {}
@@ -19755,8 +19762,8 @@ function M.setzerCrowdBudget(group, tag)
       for _, sp in ipairs(f.species) do
         if (M.speciesClassRow(sp) & M.kitClass("coin")) ~= 0 then weak = weak + 1 end
       end
-      ok[slot] = ok[slot] and #f.species >= 2 and weak >= 1
-      names[#names + 1] = string.format("%d (%d bodies, %d special-weak)", f.id, #f.species, weak)
+      ok[slot] = ok[slot] and #f.species >= bodies and (weak >= 1 or not needWeak)
+      names[#names + 1] = string.format("%d (%d bodies, %d coin-weak)", f.id, #f.species, weak)
     end
     parts[#parts + 1] = string.format("slot %d (%d/256) %s%s", slot, pool[slot].odds, table.concat(names, ", "),
       ok[slot] and " a crowd" or "")
@@ -19767,7 +19774,8 @@ function M.setzerCrowdBudget(group, tag)
   M.log(string.format("[%s] budget: group %d: %s -- the worst of the 65536 encounter-counter states needs %d "
     .. "encounter(s) to the next crowd; %.1f%% need no more than 8", tag, group, table.concat(parts, "; "), worst,
     100 * M.encounterShare(hist, 8)))
-  M.assertEq(worst < 1024, true, string.format("group %d deals a crowd at all", group))
+  M.assertEq(worst < 1024, true, string.format("group %d deals a crowd at all (%d or more bodies%s)", group, bodies,
+    needWeak and string.format(", one weak to the coins' class $%02X", M.kitClass("coin")) or ""))
   return worst
 end
 
@@ -20098,13 +20106,26 @@ end
 local HC = nil
 M.HIRE_FIG_GFX = { [0] = 0x13, [1] = 0x0E, [2] = 0x0F, [3] = 0x03, [5] = 0x14 }
 M.HIRE_FIG_NAME = { [0] = "merchant", [1] = "soldier", [2] = "Imp", [3] = "Shadow", [4] = "Interceptor", [5] = "ghost" }
--- the weapon a figure swings by class (none, slashing, piercing, bludgeoning),
--- item ids from kits.md; the Fight animation's number is id + 1
+-- the weapon a figure swings by the class's weapon family, the two bits
+-- Ot6CoinPrice puts in the hire's mark (#566: none; a blade, Sword or Katana;
+-- a point, Dagger, Spear or Ranged; a blow, Blunt -- under four classes
+-- none, slashing, piercing, bludgeoning), item ids from kits.md; the Fight
+-- animation's number is id + 1
 M.HIRE_FIG_WEAPON = {
   [0] = { 0x00, 0x0B, 0x00, 0x34 }, [1] = { 0x0A, 0x0A, 0x1D, 0x46 },
   [2] = { 0x24, 0x24, 0x24, 0x46 }, [3] = { 0x26, 0x2B, 0x26, 0x44 },
   [5] = { 0x00, 0x0A, 0x1D, 0x4A },
 }
+-- #566 (wt/v051-six-suites): a class's weapon family as Ot6CoinPrice's @fam
+-- arm counts it (ot6_setzer.asm): 0 none, 1 a blade (Sword $01, Katana $10),
+-- 2 a point (Dagger $02, Spear $20, Ranged $08), 3 a blow (Blunt $04)
+function M.hireFamily(class)
+  class = class & 0x3F
+  if class == 0 then return 0 end
+  if (class & 0x11) ~= 0 then return 1 end
+  if (class & 0x2A) ~= 0 then return 2 end
+  return 3
+end
 local function romB(a) return M.readRomByte(a & 0x3FFFFF) end
 local hcSheets = {}
 local function hcSheet(g)
@@ -20423,6 +20444,13 @@ function M.hireCrewCheck(r, tag)
   end
   M.assertEq(#strikes, #r.costs, string.format("%s: every paid hire was drawn as its figure's strike (%d strikes, %d paid)",
     tag, #strikes, #r.costs))
+  -- #566 (wt/v051-six-suites): the class each paying pass swung, read where
+  -- the coin checks read it (r.seq: a pass's TakeGil, then its chip calls)
+  local swung, paidN = {}, 0
+  for _, ev in ipairs(r.seq or {}) do
+    if ev.t == "pay" then paidN = paidN + 1
+    elseif ev.t == "hit" and ev.y >= 8 and paidN > 0 and swung[paidN] == nil then swung[paidN] = ev.class end
+  end
   for j, s in ipairs(strikes) do
     local fig = (s.pass.mark >> 4) & 7
     local cls = (s.pass.mark >> 2) & 3
@@ -20437,6 +20465,12 @@ function M.hireCrewCheck(r, tag)
       M.assertEq(s.off, 0, string.format("%s strike %d: the slot's graphics buffer is the %s's sheet", tag, j, NAME[fig]))
       M.assertEq(s.weapon, M.HIRE_FIG_WEAPON[fig][cls + 1] + 1, string.format("%s strike %d: the %s's weapon for class %d",
         tag, j, NAME[fig], cls))
+      -- #566: and that family is the swung class's (a blade for Sword or
+      -- Katana, a point for Dagger, Spear or Ranged, a blow for Blunt)
+      M.assertEq(swung[j] ~= nil, true, string.format("%s strike %d: paid hire %d's class was read at its chip call",
+        tag, j, j))
+      M.assertEq(cls, M.hireFamily(swung[j]), string.format("%s strike %d: the mark's class bits (%d) are the weapon "
+        .. "family of the class the hire swung ($%02X)", tag, j, cls, swung[j]))
     end
   end
   M.assertEq(done ~= nil, true, tag .. ": SETZER's slot read at Ot6ActionEnd")

@@ -39,7 +39,7 @@
 --     (vanilla's Fixed Dice arithmetic, saturating at 65,535), and what it
 --     landed: that, halved while the body's shields hold, doubled once
 --     Broken, capped at 9,999 and at the HP the roll found;
---   * null-break: every roll's class is special | null-break ($88) and no
+--   * null-break: every roll's class is ranged | null-break ($88) and no
 --     monster's shields move;
 --   * 99 MP, no gil, and the bank less the three points.
 -- A pass with no body left: Dullahan's 23,450 HP outlast one throw (two
@@ -156,7 +156,7 @@ local function checkJackpot(r, i)
     local dmg = math.min(65535, f * f * f * r.level * 2 * f)
     H.assertEq(d.dmg, dmg, string.format("Jackpot %d, roll %d: the triple's damage, face %d^4 x level %d x 2", i, k,
       f, r.level))
-    H.assertEq(d.class, 0x88, string.format("Jackpot %d, roll %d: special | null-break", i, k))
+    H.assertEq(d.class, 0x88, string.format("Jackpot %d, roll %d: ranged | null-break (OT6_RANGED|OT6_NULLBRK)", i, k))
     -- what it landed: the HP the roll found against the next roll's (or the end's)
     local post = r.dice[k + 1] and r.dice[k + 1].hp or (function()
       local t = {} for b = 0, 5 do t[b] = r.mon1[b].hp end return t end)()

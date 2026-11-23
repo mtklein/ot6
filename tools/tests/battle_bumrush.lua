@@ -3,7 +3,7 @@
 --
 -- kits.md ("Divines", "Sabin"): the Blitz list's eighth row, taught by Duncan in the World of Ruin.  Its one gate
 -- is three points pending (Ot6BushidoRowGrey's blitz arm greys it under three and the A button refuses it, the
--- grey Master's Mark and Jackpot take); at three it is the row at the full boost: four bludgeon blows
+-- grey Master's Mark and Jackpot take); at three it is the row at the full boost: four blunt blows
 -- (Ot6HitCountTbl: the multi-attack counter $3a70 set to 3), each at Ot6BoostDmg's x8, for 99 MP.  Blitz commits
 -- from the list (no target select), so a pick is never taken back; the command's own check (Ot6BlitzTake) turns
 -- a copy read under three points (a Gogo's Mimic) into Pummel, and a random Blitz (Muddle, Charm, the
@@ -18,11 +18,11 @@
 --   2. a second Bum Rush in the next battle SABIN can afford one: the same (a divine is not once a battle, and the
 --      bank, not a flag, paces it).
 -- In each, every landed blow (Ot6HitJoin) on an unbroken body with a shield left took exactly one, whatever its
--- keys (#388's second call: Ot6BumRushTake, keyless; a body that keys bludgeon loses it to the class chip
+-- keys (#388's second call: Ot6BumRushTake, keyless; a body that keys blunt loses it to the class chip
 -- instead), and the body is Broken exactly when the blows took its last.  The monsters by Duncan's house all key
--- bludgeon, so main's ROM passes here (the class chip takes the same one); the bumrush_double mutant (two a blow)
+-- blunt, so main's ROM passes here (the class chip takes the same one); the bumrush_double mutant (two a blow)
 -- is red: build/attempts/wt/v041-divines-2/mx/mx3/.  The keyless take's behavioural red, a body that does not
--- key bludgeon losing one shield a landed blow, is battle_bumrushmimic's (a staged body in the factory's battles).
+-- key blunt losing one shield a landed blow, is battle_bumrushmimic's (a staged body in the factory's battles).
 -- (#554) The script plays the Bum Rush animation once: each blow after the first is a folded strike (command $04,
 -- Ot6GfxCmdFold: no animation, a beat), and each landed blow has its numeral; v0.49's ROM plays it once a blow.
 -- MP is a soft precondition, topped up the way a player would (field care between battles), and asserted at each
@@ -37,7 +37,7 @@ local SABIN, CMD_BLITZ = 0x05, 0x0A
 local BUMRUSH, PUMMEL = 0x64, 0x5D
 local BUMRUSH_MP = 99
 local SH_CUR, BRK_TICKS, BP_CLASS = 0x3E38, 0x3E88, 0x3E9C   -- OT6_SHIELD_CUR, OT6_BROKEN_TICKS, OT6_BP_CLASS
-local BLUDGEON = 0x04                                         -- Bum Rush's class (Ot6SkillClass)
+local BLUNT = 0x04                                             -- Bum Rush's class (Ot6SkillClassTbl: Blunt, #566; bludgeon until then)
 
 local seat, rec, recs, stage, battles, mode = nil, nil, {}, 1, 0, nil
 local plan = {}
@@ -72,7 +72,7 @@ local function arm()
     if v ~= 0xFF then rec.sets[#rec.sets + 1] = v end
   end, emu.callbackType.write, 0x7E3A70, 0x7E3A70)
   -- each landed blow (Ot6HitJoin, y = the body it lands on): the body's shields, Broken timer and whether it keys
-  -- bludgeon, read as the blow enters the join (before any take)
+  -- blunt, read as the blow enters the join (before any take)
   local join = H.sym("Ot6HitJoin")
   emu.addMemoryCallback(function()
     if rec == nil or rec.ran == nil or rec.ended then return end
@@ -80,7 +80,7 @@ local function arm()
     local e = emu.getState()["cpu.y"] & 0xFF
     if e >= 8 and e < 0x14 then
       rec.blows[#rec.blows + 1] = { e = e, sh = H.readByte(SH_CUR + e), br = H.readByte(BRK_TICKS + e) ~= 0,
-        keyed = (H.readByte(BP_CLASS + e) & BLUDGEON) ~= 0 }
+        keyed = (H.readByte(BP_CLASS + e) & BLUNT) ~= 0 }
     end
   end, emu.callbackType.exec, join, join)
   -- #554: the battle script the action queued, read as BtlGfx_04 starts to play it (the first after the
@@ -153,11 +153,11 @@ local function judge()
   for _, e in ipairs(first) do
     local w, b0, got = want[e], nil, r.after[e]
     for _, b in ipairs(r.blows) do if b.e == e then b0 = b; break end end
-    H.log(string.format("[bumrush] stage %d: slot %d (%s bludgeon): %d blow(s) landed on %d shield(s)%s -> %d "
+    H.log(string.format("[bumrush] stage %d: slot %d (%s blunt): %d blow(s) landed on %d shield(s)%s -> %d "
       .. "shield(s)%s (want %d%s)", stage, (e - 8) // 2, w.keyed and "keys" or "does not key", w.n, b0.sh,
       b0.br and " Broken" or "", got.sh, got.br and " Broken" or "", w.sh, w.br and " Broken" or ""))
     H.assertEq(got.sh, w.sh, string.format("slot %d: each landed blow took one shield, whatever its keys (%s)",
-      (e - 8) // 2, w.keyed and "it keys bludgeon" or "it does not key bludgeon"))
+      (e - 8) // 2, w.keyed and "it keys blunt" or "it does not key blunt"))
     H.assertEq(got.br, w.br, string.format("slot %d: Broken exactly when the blows took its last shield", (e - 8) // 2))
   end
   -- #554: one animation per use.  Every blow stays a pass (the takes above); the script plays the Bum Rush

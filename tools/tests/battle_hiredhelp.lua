@@ -17,9 +17,10 @@
 --     every fee; fewer only once its body has fallen (#545: the hires stay
 --     on it); no MP; the bank +1 / -1;
 --   * one target, and the class: every chip call on it carries the first
---     physical class its row holds (slashing $01, else piercing $02, else
---     bludgeoning $04), or none when the row holds no physical class --
---     the sellsword's weapon fits the target, whatever SETZER holds;
+--     class its row holds in bit order (#566, six classes: Sword $01, else
+--     Dagger $02, Blunt $04, Ranged $08, Katana $10, Spear $20; Ot6HireClass's
+--     lowest set bit), or none when the row holds no class -- the
+--     sellsword's weapon fits the target, whatever SETZER holds;
 --   * each hit: twice the fee, halved while the body's shields hold,
 --     doubled once Broken (a hire's own chip can break it), never more than
 --     the HP; one shield off exactly when that class exists and the body
@@ -34,7 +35,9 @@
 -- each walked-in figure's graphics id and its $7F buffer compared byte for
 -- byte with that figure's ROM sheet; each swap made with the slot hidden
 -- and standing out of sight (its absolute screen position past the edge);
--- each paid hire one drawn strike with the figure's weapon for the class;
+-- each paid hire one drawn strike with the figure's weapon for the class
+-- (its family: a blade for Sword or Katana, a point for Dagger, Spear or
+-- Ranged, a blow for Blunt, held to the class the hire swung);
 -- and at SETZER's Ot6ActionEnd his sheet, screen position, offsets and
 -- pose ($61c0/$61c1) as at his Ot6SetzerExec.  The 2 and 3 BP hires (the Imp,
 -- the fourth hire) are battle_hirecrew's.  The ROM's identity is logged.
@@ -59,10 +62,13 @@ local function walkToBattle()
   }, "a random battle in the east room")
 end
 
+-- the class a hire swings at a body: the lowest class bit its row holds
+-- (the design; the suite's own model of Ot6HireClass, not the ROM's code)
+local CLASSES = 0x3F
 local function sellsword(row)
-  if row & 0x01 ~= 0 then return 0x01 end
-  if row & 0x02 ~= 0 then return 0x02 end
-  if row & 0x04 ~= 0 then return 0x04 end
+  for bit = 0, 5 do
+    if row & CLASSES & (1 << bit) ~= 0 then return 1 << bit end
+  end
   return 0x00
 end
 
@@ -80,7 +86,19 @@ end
 
 H.run({ maxFrames = 200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
-  H.call(function() H.hireCrewArm() end),
+  H.call(function()
+    H.hireCrewArm()
+    H.assertEq(H.kitClass("hire"), CLASSES, "a hire may swing any of the six classes (Ot6KitClassTbl +3)")
+    H.assertEq(sellsword(0x30), 0x10, "the model: a Katana|Spear row is answered with the katana")
+    H.assertEq(sellsword(0x28), 0x08, "the model: a Ranged|Spear row is answered with the ranged weapon")
+    H.assertEq(sellsword(0x80), 0x00, "the model: no class bit, no class")
+    -- H.hireCrewCheck holds each strike's weapon to the family of the class swung (H.hireFamily): the design's
+    -- three families, and none for no class
+    local fam = {}
+    for _, c in ipairs({ 0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20 }) do fam[#fam + 1] = H.hireFamily(c) end
+    H.assertEq(table.concat(fam, ""), "0123212", "the families: none; a blade for Sword and Katana, a point for "
+      .. "Dagger, Ranged and Spear, a blow for Blunt")
+  end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return #done >= #WANT end, 160000, {
     H.call(function()

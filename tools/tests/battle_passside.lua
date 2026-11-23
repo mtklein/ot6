@@ -464,7 +464,9 @@ H.run({ maxFrames = 900000 }, {
   H.call(function()
     PW = H.passWatch()
     armExec()
-    W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG)
+    -- the room's three-body formation, whatever its rows hold: nothing here reads a chip (#566: which bodies
+    -- answer to the coins' class, and so which formations the coin suites call a crowd, moves with the split)
+    W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG, { bodies = 3, weak = false })
   end),
   H.driveUntil(function() return done end, 860000, {
     H.call(function()

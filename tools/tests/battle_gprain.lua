@@ -1,7 +1,7 @@
 -- @suite slow
 -- battle_gprain.lua -- the Coin Toss relic's GP Rain since #319: Slot gives
--- way to GP Rain (no table), and its coins are now special (one chip on a
--- special-weak body) and boostable (the boost buys another toss a point, as
+-- way to GP Rain (no table), and its coins are Ranged (special until #566; one chip on a
+-- ranged-weak body) and boostable (the boost buys another toss a point, as
 -- Coin Toss's does; before, GP Rain's boost bought nothing, because
 -- Ot6BoostDmg's multiplier runs in CalcDmg and GP Rain's effect overwrites
 -- the damage).
@@ -11,8 +11,8 @@
 -- hand SETZER the party's widest guard (H.guardOn: the room Zombies), walk Darill's
 -- Tomb's east room into random battles, and throw GP Rain from the command
 -- row (H.setzerBattle's `cmd` entries) at 1 BP and unboosted in the
--- battles that deal a crowd (two or more monsters, one special-weak), so a
--- toss splits across bodies and chips the special-weak one (asserted:
+-- battles that deal a crowd (two or more monsters, one ranged-weak), so a
+-- toss splits across bodies and chips the ranged-weak one (asserted:
 -- coverage); any other battle is fought out by the route's fight driver
 -- and followed by field care, within the budget decoded from the room's
 -- pool (H.setzerCrowdBattles: the worst encounter-counter state's
@@ -20,16 +20,16 @@
 -- SETZER's Ot6ActionEnd): the command list holds GP Rain and no Slot; 1 +
 -- boost tosses, each that finds a body paying level x 30; every toss
 -- replayed (H.setzerCheckCoins: twice its gil over the bodies it hit, the
--- shields' halving, the Broken double, the cap, special on every hit, a
--- shield off a special-weak body).
+-- shields' halving, the Broken double, the cap, Ranged on every hit, a
+-- shield off a ranged-weak body).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
--- crept in, and the split across bodies and the special chip stopped
+-- crept in, and the split across bodies and the ranged chip stopped
 -- running): at least one toss over two or more bodies, and at least one
--- chip on a special-weak body (up to two more crowds, one GP Rain each, when
--- the crowd's special-weak body is broken or dead by the time the coins land)
+-- chip on a ranged-weak body (up to two more crowds, one GP Rain each, when
+-- the crowd's ranged-weak body is broken or dead by the time the coins land)
 local function coverage(alls, tag)
   local split, chip = 0, 0
   for _, all in ipairs(alls) do
@@ -40,15 +40,16 @@ local function coverage(alls, tag)
       end
     end
   end
-  H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d special chip(s)", tag, split, chip))
+  H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d ranged chip(s)", tag, split, chip))
   H.assertEq(split > 0, true, tag .. ": a toss split across two or more bodies (the draw deals a crowd)")
-  H.assertEq(chip > 0, true, tag .. ": a toss chipped a special-weak body")
+  H.assertEq(chip > 0, true, tag .. ": a toss chipped a ranged-weak body")
 end
 
 local SETZER, COIN_TOSS_RELIC = 9, 0xD6
+local RANGED = 0x08     -- OT6_RANGED: the coins' class (OT6_CLS_COIN; special $08 until #566)
 
 local function checkRain(r, i)
-  return H.setzerCheckCoins(r, i, 30, function() return 0x08 end, "gprain")
+  return H.setzerCheckCoins(r, i, 30, function() return RANGED end, "gprain")
 end
 
 local WANT = { { cmd = 0x18, boost = 1 }, { cmd = 0x18, boost = 0 } }
@@ -75,8 +76,8 @@ local function crowdWalk(tag, want)
   })
 end
 local walk, S = crowdWalk("gprain", WANT)
--- A crowd is chosen as it opens (two or more bodies, one special-weak and
--- shielded), and the special-weak body can be Broken or dead by the time
+-- A crowd is chosen as it opens (two or more bodies, one ranged-weak and
+-- shielded), and the ranged-weak body can be Broken or dead by the time
 -- SETZER's coins land: v0.50's replay, his GP Rain confirmed at f4384 and
 -- run at f5632 on a body broken in between ('slot 0: HP 1385 -> 0, shields
 -- 0 -> 0, broken 14 -> 11, row 0B', build/attempts/wt/v050-multihit-anim/
@@ -107,7 +108,7 @@ local extraSteps = {}
 for e = 1, EXTRA do
   extraSteps[#extraSteps + 1] = H.cond(function() return chips(played()) == 0 end, {
     H.call(function()
-      H.log(string.format("[gprain] no toss so far chipped a special-weak body (it was broken or dead when the "
+      H.log(string.format("[gprain] no toss so far chipped a ranged-weak body (it was broken or dead when the "
         .. "coins landed): crowd %d more, one GP Rain", e))
     end),
     extras[e].walk,
@@ -117,6 +118,7 @@ end
 H.run({ maxFrames = 1200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   H.call(function()
+    H.assertEq(H.kitClass("coin"), RANGED, "the coins' class is Ranged (Ot6KitClassTbl +1)")
     H.assertEq(H.invCountOf(COIN_TOSS_RELIC) > 0, true, "the bag holds the Coin Toss relic")
   end),
   H.equipKit(SETZER, { { 4, COIN_TOSS_RELIC } }, { tag = "the Coin Toss relic on SETZER" }),
