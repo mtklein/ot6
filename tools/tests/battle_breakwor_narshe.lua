@@ -17,7 +17,13 @@
 --      one declared lesson: the Test Rider in town before MOG joins;
 --   3. the lessons: MOG's spear is the Test Rider's only key and
 --      the Ice Dragon's class key (its keys are the spear and TERRA's fire,
---      not the blades); each of the four holds a key on Tritoch and Umaro;
+--      not the blades); each of the four holds a key on Tritoch; on Umaro
+--      MOG (whom the story forces in), TERRA and CELES hold one and CYAN does
+--      not (#566: Umaro's two weapon weaknesses, slash|pierce through v0.50,
+--      were the blades, CYAN's katana and MOG's spear at once; six classes
+--      give two of those three hands, and the split kept the forced MOG's
+--      spear and the swords, since a third class would push the spear, MOG's
+--      key, past the HUD's four cells: tools/proto_six/pins_suite.py ADD);
 --      every boss absorbs ice and is weak to fire; the Psychot absorbs fire; Tritoch's record $144 carries a real
 --      row while the World of Balance's $114/$115 stay shieldless.
 -- All mismatches are logged before the verdict.
@@ -217,15 +223,20 @@ H.run({ maxFrames = 600 }, {
     for _, sp in ipairs({ DRAGON, TRITOCH, UMAROSP }) do
       if (absorb(sp) & ICE) == 0 then problem("$%03X no longer absorbs ice", sp) end
       if (weakOf(sp) & FIRE) == 0 then problem("$%03X is not weak to fire", sp) end
-      -- Tritoch and Umaro: each of the four holds a key; the Ice Dragon's
-      -- keys are MOG's spear and fire (TERRA's), not the blades (the design:
-      -- who the party brings decides how it breaks)
+      -- Tritoch: each of the four holds a key; Umaro: each but CYAN (the
+      -- header); the Ice Dragon's keys are MOG's spear and fire (TERRA's), not
+      -- the blades (the design: who the party brings decides how it breaks)
       for _, m in ipairs({ CYAN, TERRA, CELES, MOG }) do
         local ok = keys(sp, m[2], m[3])
         H.log(string.format("$%03X: %s %s", sp, m[1], ok and "holds a key" or "holds NO key"))
-        local want = sp ~= DRAGON or m == MOG or m == TERRA
+        local want
+        if sp == DRAGON then want = m == MOG or m == TERRA
+        elseif sp == UMAROSP then want = m ~= CYAN
+        else want = true end
         if ok ~= want then
-          problem("$%03X: %s %s", sp, m[1], want and "holds no key" or "holds a key the design keeps from the blades")
+          problem("$%03X: %s %s", sp, m[1], want and "holds no key" or
+            (sp == DRAGON and "holds a key the design keeps from the blades" or
+             "holds a key: Umaro's two classes were to leave CYAN's katana out"))
         end
       end
     end

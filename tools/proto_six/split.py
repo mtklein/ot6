@@ -51,14 +51,16 @@ the floor rows from it) and ff6/src/battle/ot6_class_split.inc
 became -- what a four-class save's revealed bits mean, for the codex
 migration), and prints the report.
 
-    python3 tools/proto_six/split.py [--report-only] [--keep REV]
+    python3 tools/proto_six/split.py [--report-only] [--keep REV [--redo SP,SP...]]
 
 --keep REV: every row but the opening's authored ones (and the rows that
 follow one by pins.FAMILY) is taken as REV's tree has it
 (ff6/tools/six_class_split.json and ot6_class_split.inc there), not
 recomputed.  The balance step reads a running tally in species order, so a
 changed row moves the unpinned rows after it; --keep is how a hand-authored
-change lands without moving rows nobody looked at.
+change lands without moving rows nobody looked at.  --redo SP,... (hex
+species ids) recomputes those rows too: how a new pin outside the opening
+(pins.PIN, pins_suite.SUITE) lands.
 """
 import collections
 import importlib.util
@@ -332,7 +334,7 @@ def assign(masks, order, count, how, ev=None, stage=None, binds=None, departs=No
     return out, kids_of
 
 
-def compute(keep=None):
+def compute(keep=None, redo=()):
     csr, rows = old_rows()
     held = dealt(csr)
     gbf = _load(ROOT / "ff6/tools/gen_break_floor.py", "gbf")
@@ -356,7 +358,7 @@ def compute(keep=None):
     if keep:
         krows, kfloor, ksel = kept_tables(keep)
         for sp in sorted(new):
-            if sp in pins.OPENING or pins.FAMILY.get(sp) in pins.OPENING or sp not in krows:
+            if sp in pins.OPENING or pins.FAMILY.get(sp) in pins.OPENING or sp not in krows or sp in redo:
                 continue
             if new[sp] != krows[sp]:
                 kept += 1
@@ -525,7 +527,8 @@ def report(r):
 
 def main():
     keep = sys.argv[sys.argv.index("--keep") + 1] if "--keep" in sys.argv else None
-    r = compute(keep)
+    redo = {int(x, 16) for x in sys.argv[sys.argv.index("--redo") + 1].split(",")} if "--redo" in sys.argv else set()
+    r = compute(keep, redo)
     if "--report-only" not in sys.argv:
         rewrite_hud(r["new"])
         write_split_inc(r)

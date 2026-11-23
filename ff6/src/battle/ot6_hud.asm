@@ -3270,7 +3270,7 @@ Ot6ShieldTbl:
         ; ---- the world of ruin: the opera house (the dirt dragon;
         ; route-wor-gogo.md section 3) --------------------------------------
         .word   $014c
-        .byte   6, OT6_SPEAR|OT6_RANGED ; dirt drgn: an earth dragon; the
+        .byte   6, OT6_DAGGER|OT6_BLUNT ; dirt drgn: an earth dragon; the
                                 ;   floor's pierce (dagger) and a rod's blow.
                                 ;   wind|water vanilla (strago's aqua rake)
         ; ---- the world of ruin: the plain west of doma castle (world group

@@ -48,7 +48,7 @@ local WANT = {
   [0x160] = { "Hidonite (confuclaw)", 2, SWORD | BLUNT, 0, FIRE | ICE | BOLT | POISON | WIND | HOLY | WATER },
   [0x161] = { "Hidonite (zombi claw)", 2, DAGGER | BLUNT, FIRE | HOLY, POISON },
   [0x162] = { "Hidonite (mega claw)", 2, BLUNT, FIRE | ICE | BOLT | POISON | WIND | HOLY | EARTH | WATER, 0 },
-  [0x14C] = { "Dirt Drgn", 6, SPEAR | RANGED, WIND | WATER, 0 },
+  [0x14C] = { "Dirt Drgn", 6, DAGGER | BLUNT, WIND | WATER, 0 },
   [0x11D] = { "Doom Gaze", 8, SPEAR | RANGED, FIRE | HOLY, ICE | POISON },
 }
 

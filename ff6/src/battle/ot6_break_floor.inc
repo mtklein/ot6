@@ -341,7 +341,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_RANGED  ; 329 Ice Dragon -> row -> RANGED
         .byte   OT6_SWORD   ; 330 Kefka -> row -> SWORD
         .byte   OT6_SWORD   ; 331 Storm Drgn -> row -> SWORD
-        .byte   OT6_RANGED  ; 332 Dirt Drgn -> row -> RANGED
+        .byte   OT6_DAGGER  ; 332 Dirt Drgn -> row -> DAGGER
         .byte   OT6_SWORD   ; 333 Ipooh -> row -> SWORD
         .byte   OT6_KATANA  ; 334 Leader -> row -> KATANA
         .byte   OT6_BLUNT   ; 335 Grunt -> row -> BLUNT

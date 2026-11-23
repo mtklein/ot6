@@ -32,9 +32,13 @@ local POOLS = {
 -- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
   -- terra_clifftop: EDGAR the Mithril Pike $1D, BANON the Punisher $3B; water-rondo-v1: LOCKE the MithrilKnife
-  -- $01, EDGAR the Blizzard $0E, SABIN the Poison Claw $56, MOG the Mithril Pike $1D
+  -- $01, EDGAR the Blizzard $0E, SABIN the Poison Claw $56, MOG the Mithril Pike $1D.  EDGAR's tools are his in
+  -- both: the Bio Blaster's poison (the first party's model always had it) and, from #566, the AutoCrossbow $AA
+  -- (Ranged), which battle_breakwob_events's banquet party already counts; under six classes they are the
+  -- second party's keys on the guard in plate (Blunt|Ranged, weak poison: opening.md 10a, "the bolt or
+  -- BANON's rod"), where through v0.50 the knife and the pikes were (pierce)
   { "TERRA, EDGAR, BANON", { { "TERRA", 0, FIRE }, { "EDGAR", W(0x1D), POISON }, { "BANON", W(0x3B), 0 } }, nil },
-  { "LOCKE, EDGAR, SABIN, MOG", { { "LOCKE", W(0x01), 0 }, { "EDGAR", W(0x0E), ICE }, { "SABIN", W(0x56), 0 }, { "MOG", W(0x1D), 0 } }, nil },
+  { "LOCKE, EDGAR, SABIN, MOG", { { "LOCKE", W(0x01), 0 }, { "EDGAR", W(0x0E) | W(0xAA), ICE | POISON }, { "SABIN", W(0x56), 0 }, { "MOG", W(0x1D), 0 } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {

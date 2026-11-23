@@ -137,6 +137,7 @@ SUITE = {
     0x0149: ({P: 'spear'}, "suite battle_breakwor_narshe: were its pierce Dagger, not Spear: $149: MOG's spear does not key the Ice Dragon"),
     0x0152: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $152 Blue Drgn: CYAN alone (the Ancient Castle) holds no key'),
     0x0160: ({B: 'rod'}, "suite battle_breakwor_gogo: were its bludgeon Ranged, not Blunt: formation 464 (event group 94): species $160 (class $18, weak $00) has no key for Ebot's four (STRAGO, RELM, GOGO, TERRA)"),
+    0x014c: ({P: 'dagger', B: 'rod'}, "suite battle_breakwor_gogo: Ebot's four (STRAGO, RELM, GOGO, TERRA) hold a key on the Dirt Drgn: TERRA's dagger (the Man Eater) and the rods (pierce and bludgeon were those hands; the balance step's Spear|Ranged left none of the four a key)"),
     0x0167: ({X: 'brush'}, 'suite battle_breakwor_dreams: were its special Ranged, not Blunt: $167 SoulSaver: class $08, want the brush alone ($04)'),
     0x016d: ({S: 'sword'}, 'suite battle_breakwor_terra: were its slash Katana, not Sword: formation 423 (event group 131): species $16D (class $1C, weak $08) has no key for TERRA alone'),
     0x017d: ({P: 'spear'}, 'suite battle_breakwor_tower: were its pierce Dagger, not Spear: formation 482 (event battle 112): species $17D (class $12, weak $00) has no key for party 2'),
