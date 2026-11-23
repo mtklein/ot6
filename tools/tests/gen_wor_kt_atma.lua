@@ -56,6 +56,8 @@ H.run({ maxFrames = 1200000 }, {
   H.absorbSafeArms(nil, { ATMA }, { tag = "arms for Atma" }),
   H.fieldCare({ threshold = 1.0, tag = "before Atma" }),
   H.call(function() say("boss", "party 2 before Atma") end),
+  -- atma_entry (also= in the graph): party 2 two tiles below Atma, armed and cared for -- battle_atma's fixture
+  H.saveState("atma_entry.mss"),
   T.touchBoss(76, 51, MAP_331, function() return sw(0x06BE) == 1 end, "Atma (331 NPC_1)", BOSS_FIGHT),
   H.call(function()
     H.assertEq(sw(0x06BE), 1, "Atma beaten: the save point behind him shown ($06BE, _cc18b4)")

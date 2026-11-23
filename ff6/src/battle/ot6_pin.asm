@@ -192,8 +192,10 @@ OT6_MARK_STATUS = STATUS3::SLOW | STATUS3::STOP | STATUS3::HASTE
 ; (Ot6ShownGauge: $40 for a dead or petrified body, whose line draws empty
 ; and so shows no mark).  Writes OT6_MARKCELL for the slot: the held mark
 ; while the slot is held (#539: OT6_SHOWN's odd byte, which Ot6Hold
-; snapshots and each event's hit sets), else the live status 3.  a8/i16,
-; db=$7e.  Preserves a/x/y.
+; snapshots and each event's hit sets), else the live status 3; and, for a
+; body whose fuse is lit (#561: OT6_FUSE bit 0, ot6_fuse.asm), the fuse's
+; mark, by turns with the trap's when it has one.  a8/i16, db=$7e.
+; Preserves a/x/y (b too).
 .proc Ot6MarkStage
         .a8
         .i16
@@ -214,9 +216,15 @@ OT6_MARK_STATUS = STATUS3::SLOW | STATUS3::STOP | STATUS3::HASTE
         bra     @put
 @live:  lda     $3f00,y         ; status 3 (+8: the monster half)
         jsr     Ot6MarkOf
-        bra     @put
+@put:   pha                     ; #561: a lit fuse shows its mark here too
+        lda     OT6_FUSE,y      ;   (bit 0, the hud's poll; ot6_fuse.asm)
+        lsr
+        pla
+        bcc     @store
+        jsr     Ot6FuseMark     ;   by turns with the trap's, if both
+        bra     @store
 @none:  lda     #$00
-@put:   sta     OT6_MARKCELL,x
+@store: sta     OT6_MARKCELL,x
         plx
         pla
         rts

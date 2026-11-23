@@ -5,6 +5,14 @@ and its effect. Cite evidence in the commit message.
 
 ## What's changed
 
+A boss that announces a big move loses it if you break the boss first. While
+the move is pending a yellow **!** stands in front of the boss's shield icon;
+a break while it is up cancels the move, and the boss has to build up to it
+again after it recovers. Before, a break only delayed the move. This applies
+to AtmaWeapon's Flare Star, Atma's Ultima, the Gold Dragon's Bolt 3 and
+Kefka's Goner. Hitting the Gold Dragon with Fight while it is broken no
+longer counts toward its stored Bolt 3.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

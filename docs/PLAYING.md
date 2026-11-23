@@ -54,6 +54,16 @@ battles and in your save. Scan reveals all of a kind's weaknesses at once.
 
 A few enemies have no shields and show no line.
 
+### A boss's big move
+
+Some bosses announce their biggest move before they use it: a line of text,
+and a glow. From then until the move a yellow **!** stands in front of the
+boss's shield icon. Break the boss while the **!** is up and the move is
+cancelled. When the boss recovers it does not pick the move up where it left
+off; it has to build up to it again. A move that has been announced always
+comes unless you break the boss first. AtmaWeapon's Flare Star, Atma's
+Ultima, the Gold Dragon's Bolt 3 and Kefka's Goner work this way.
+
 ### Weapon types
 
 A weapon's icon shows its type. Fight uses the type of the weapon in hand.

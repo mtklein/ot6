@@ -195,6 +195,18 @@ OT6_SHADOW           := $ecf1
 ; InitBP's shadow clear and per-slot by Ot6SeedShields (Cmd_20 reloads).
 OT6_RVPEND_ELEM      := $ed45   ; 12 bytes
 OT6_RVPEND_CLS       := $ed51   ; 12 bytes
+; A boss's fuse (#561, ot6_fuse.asm), in odd bytes of the two strides above,
+; so InitBP's shadow clear zeroes them.  OT6_FUSE: one byte per monster slot,
+; stride 2 by the slot offset: bit 7, this body's species has a row in
+; Ot6FuseTbl (Ot6FuseSeed, at every seed); bit 0, its fuse is lit, as the HUD
+; last polled it (Ot6FusePoll: display state, behind a held gauge like the
+; trap's mark; the cancel reads the script itself).  OT6_FUSEPOLL: 0 while no
+; body with a row has been seeded this battle; else $80 | the slot offset
+; polled last.
+OT6_FUSE             := OT6_RVPEND_ELEM + 1     ; 6 bytes, stride 2
+OT6_FUSEPOLL         := OT6_RVPEND_CLS + 1
+.assert OT6_FUSE + 10 < OT6_RVPEND_CLS, error, "the fuse bytes must sit in the element stride's odd bytes"
+.assert OT6_FUSEPOLL < OT6_SHADOW + $70, error, "the fuse poll byte must sit inside InitBP's shadow clear"
 ; wallet pseudo-line: current-MP display painted into the open costed
 ; list window every nmi.  CUR/PREV are the first cell's vram word address
 ; (0 = off; prev != cur blanks the old cells one-shot), CELLS the staged
@@ -709,7 +721,8 @@ OT6_UNDERPAINT       := $ef14
 ; vanilla's 18); also cleared per slot by Ot6SeedShields and whole at every
 ; script's and action's end (Ot6ShowFlush), so a pin never outlives its
 ; action.  OT6_MARKCELL: per slot, the mark the shield line should show
-; before its emblem (0 free, 1 hobbled: Slow, 2 pinned: Stop), written by
+; before its emblem (0 free, 1 hobbled: Slow, 2 pinned: Stop, 3 a lit fuse:
+; #561, ot6_fuse.asm), written by
 ; Ot6BgHudLine every frame a line is live (the held mark while the slot is
 ; held, #539, else the live status).  OT6_MARKSHOWN: the slots whose mark
 ; cell the nmi flush last wrote with a mark, so a mark that ends is blanked

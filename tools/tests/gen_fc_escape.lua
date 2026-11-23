@@ -556,6 +556,9 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
     H.assertEq(atmaUp(), true, "$035F set -- AtmaWeapon stands at (60,15)")
     H.screenshot("atma_doorstep")
   end),
+  -- atmaweapon_entry (also= in the graph): the party on AtmaWeapon's doorstep, cared for, before the talk --
+  -- battle_atmaweapon's fixture (the fuse and its cancel, bosses-wob.md "The boss contract")
+  H.saveState("atmaweapon_entry.mss"),
 
   -- ---- 2. AtmaWeapon --------------------------------------------------------
   (function()
