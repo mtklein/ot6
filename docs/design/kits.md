@@ -894,7 +894,10 @@ the divine in the eighth:
   battle.  It is separate from the stance's bit (`$3e4c.2`), which comes and
   goes with her turns.  A spell with two elements would be kept whole and
   each element judged on its own at the swing; none of the 20 elemental
-  spells Runic can absorb, and no player spell, carries two.
+  spells Runic can absorb carries two.  One player spell does: Merton is
+  fire and wind (and is the only wind a player casts: W Wind carries no
+  element), so a caster whose only fire spell is Merton has a fire row and
+  a wind row, each at Merton's price and each arming its own element.
 - **What it does: weak-only** (owner, 2026-11-23: "hurting more than helping
   is no good").  Her weapon's swings — Fight and each of its boosted swings,
   either hand of a Genji Glove, a counter, Mug and Capture, Jump; every pass
@@ -923,7 +926,7 @@ the divine in the eighth:
   point her MP cannot pay for (#555), a third point adds nothing, and the
   boost is spent as any boosted action's is (no point earned that turn).
   Whether she "knows" the tier is the Magic list's rule: boost reaches up
-  from the line's head.  Pearl, Quake, W Wind and the other spells that head
+  from the line's head.  Pearl, Quake, Merton and the other spells that head
   no line take no boost (R is refused, `Ot6RuneNoBoost`, and a boost raised
   on the command window first is dropped before it costs anything,
   `Ot6KeepBoost`).  An absorb takes the tier of the spell absorbed: Fire 3
@@ -1093,6 +1096,40 @@ the divine in the eighth:
   with one weapon from a full bank (2 BP, 0, 1), 12 with two; 4 and 8 from a
   bank of exactly three.  Bum Rush takes four in one turn for the same 99
   MP, and Cleave four from every death-immune body at once.
+- **The field page** (#563, the owner 2026-11-23: "the full treatment"):
+  Skills > RuneKnt, the list's tenth row, under Painter.  The row reads
+  BattleCmdName's record, as the TresHnt and Painter rows do; the Status
+  screen's command box and Gogo's picker already read the same record
+  (`menu_runeknt`), which is all the Status screen shows of Locke's and
+  Relm's kits too.  The page lists the rows the battle list would offer
+  now, in its order: Runic (free, no price drawn); a blade row for each
+  element of which the field Magic list has a spell for the character,
+  priced at the cheapest such spell as that list prices it (Gold Hairpin
+  and Economizer included); and Break Blade last, its name and 99 once
+  learned and the other pages' locked marker until then.  The battle list
+  reads the caster's battle Magic list; the field has none, so the page
+  asks the field Magic list's own test of each spell (`_c350a2`:
+  `Ot6FieldSpellKnown`'s learned spells, Break by her level, the worn
+  esper's spells and worn items' grants), and the two follow an esper put
+  on or taken off together.  For a Gogo carrying the command that test is
+  the seated party's union, as his field Magic list has it (and his own
+  stone's spells once he is revealed as Leo with Summon picked), which is
+  what his battle list holds.  Six blades at most, the battle shell's eight
+  cells less Runic and Break Blade; the cursor walks only the rows there
+  are.  The help window shows a line a row (`tools/kit_pages.py`'s RUNE
+  table, eleven lines by row id: a blade's line names its element and
+  says "Boost it like Fire" on the four elements with a spell line, "Takes
+  no boost" on the rest; Break Blade not learned says where it is learned).
+  The row is white for whoever carries the command **and holds a weapon
+  that allows Runic**, and grey otherwise: no relic rewrites command `$0B`,
+  but battle still greys it when neither hand's weapon carries the runic
+  property (vanilla's `UpdateCmd_01`; for Celes a Flail, a Morning Star,
+  the Atma Weapon or bare hands), and the field menu offers no page where
+  the battle offers no list, as under a Thief Glove or a Fake Mustache
+  (`ot6_runeknt_page.asm`; `Ot6RunePageRows` and `Ot6RunePageOpens` in
+  `ot6_runepage.asm`; `menu_runekntpage`, `menu_runekntpage_wob`).  In the
+  built ROM Merton carries fire and wind and W Wind no element, so Merton
+  alone gives a Fire row and a Wind row at its 85 MP.
 - Suites: `battle_spellblade` (the list, arming from an ally's spell,
   replacement, persistence, the weak-only rule with absorbing, nulling and
   halving bodies, each hit of a boosted Fight, the tiers' prices and
@@ -1102,8 +1139,12 @@ the divine in the eighth:
   `battle_gogomimic` (Gogo's list and copies, the rows with no line),
   `save_celesbreak` (an old save's Celes has Break by her level, nothing
   written), `menu_runeknt` (the command's name in the three windows that
-  draw it), `battle_runic`, `battle_runicblade`.  Mutants, one an arm:
-  `build/attempts/wt/v051-spellblade/mutants/mutants.py`.
+  draw it), `menu_runekntpage` and `menu_runekntpage_wob` (the field page:
+  its rows against a model, following her esper, Gogo's, the weapon rule,
+  Break Blade learned and locked), `battle_runic`, `battle_runicblade`.
+  Mutants, one an arm:
+  `build/attempts/wt/v051-spellblade/mutants/mutants.py`, and the page's in
+  `build/attempts/wt/v051-spellblade/sb4/mutants.py`.
 
 ### Setzer — Gambler/Merchant (special ¤: cards, dice; darts = piercing)
 

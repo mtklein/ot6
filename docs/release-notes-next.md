@@ -19,7 +19,8 @@ takes the element's colour when it bites, and its icon stands beside her
 name. Her ultimate is now Break Blade, learned on the Floating Continent: at
 3 BP and 99 MP, every hit of her weapon takes a shield for three of her
 turns. Runic at 3 BP still sends spells back. Gogo's Runic opens the same
-list.
+list. In the field menu, Skills has a RuneKnt page that lists her rows with
+their MP and a line of help for each.
 
 Celes learns Break at level 13 where she used to learn Imp. A save in which
 she is already past 13 has Break when it loads, and keeps the Imp she

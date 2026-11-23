@@ -754,6 +754,16 @@ TEST_ENV = {
     # GOGO seated); menus and one random battle
     "menu_runeknt": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-opera-v1",
+    # #563: CELES's Rune Knight page in the field Skills menu, on the same
+    # battery (Break Blade learned): her rows against a model, the rows
+    # following her esper, GOGO's page with the command, and the row grey with
+    # no runic weapon in hand; menus only
+    "menu_runekntpage": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-opera-v1",
+    # #563: the page before the Floating Continent, Break Blade's row locked,
+    # in the Magitek Research Facility's save room; menus only
+    "menu_runekntpage_wob":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/mrf-save-room-v1",
     # #563: a v0.50 release save (CELES L36, Imp learned, Break not) has
     # Break by her level, in the field and in battle, with nothing written;
     # a tracked golden save, not a capture (the suite edge below)
@@ -1179,9 +1189,12 @@ check("esper_ladder",
 # esper page's font rule; a second line clear of the page's title box), a
 # locked line naming the level Ot6PaintRowTbl teaches at, and the ROM's lines
 # the table's; the selftest's mutants move a ROM line and break the table.
+# #563: and the Rune Knight page's eleven (Celes's rows by id, in
+# Ot6RuneName's order; a boost promised on OT6_RUNE_LINES elements).
 check("kit_pages",
       "python3 tools/kit_pages.py --selftest",
       ["tools/kit_pages.py", "tools/esper_ladder.py", "ff6/src/battle/ot6_paint.asm",
+       "ff6/src/battle/ot6_rune.asm",
        "ff6/src/gfx/font_gfx.asm", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
 # #547: item descriptions fit the help window in pixels (FontWidth, the
 # esper page's rule) and battle command names fit their windows' seven

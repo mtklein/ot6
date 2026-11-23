@@ -1,8 +1,9 @@
 ; ------------------------------------------------------------------------------
-; Celes's field Rune Knight page (#563): the one bank-F0 leaf it needs beyond
-; the list's own (Ot6RuneName, Ot6RuneBitTbl, Ot6BreakLearned), appended
-; after everything so no symbol already in bank $f0 moves.  The page itself
-; is menu code (menu/ot6_runeknt_page.asm).
+; Celes's field Rune Knight page (#563): the two bank-F0 leaves it needs
+; beyond the list's own (Ot6RuneName, Ot6RuneBitTbl, Ot6BreakLearned): the
+; page's rows (Ot6RunePageRows) and the Skills row's colour
+; (Ot6RunePageOpens).  Appended after everything so no symbol already in
+; bank $f0 moves.  The page itself is menu code (menu/ot6_runeknt_page.asm).
 ; ------------------------------------------------------------------------------
 
 ; the page's help lines (tools/kit_pages.py --write)
@@ -26,8 +27,9 @@ OT6_RPAGE_BLADES = 6            ; the battle shell's eight cells: Runic, six
 ; battle Magic list ($302c) which elements she can cast; the field has no
 ; such list, so the menu asks its own Magic list's test of each spell
 ; (skills.asm _c350a2: Ot6FieldSpellKnown, and for a GOGO the seated
-; party's union, as his field Magic list shows) and stages the answers at
-; OT6_RPAGE_KNOWN.  From them, as the battle list packs its cells:
+; party's union, with his own stone's spells once he is revealed as Leo and
+; has picked Summon, as his field Magic list shows) and stages the answers
+; at OT6_RPAGE_KNOWN.  From them, as the battle list packs its cells:
 ;   Runic, free;
 ;   a blade row for each element, in bit order, of which one of those
 ;     spells carries the bit (MagicProp+1), priced at the cheapest such
@@ -167,5 +169,63 @@ OT6_RPAGE_BLADES = 6            ; the battle shell's eight cells: Runic, six
         lda     #$01
         rts
 @plain: pla
+        rts
+.endproc
+
+; [ the Skills list's RuneKnt row: would battle offer this character the list? ]
+; The record carries the Runic command, and a hand holds a weapon that
+; allows Runic: battle greys the command otherwise (UpdateCmd_01: bit 7 of
+; $3ba4 | $3ba5, the special-effects byte ItemProp+19 that UpdateEquip keeps
+; for a weapon in a hand, and for nothing else there).  No relic rewrites
+; command $0b.  The record is read, not UpdateEquip's $11da: the Skills menu
+; asks this of characters it has not loaded (CheckSkillValid's scan).
+; in: Y = the character's record.  out: carry set = yes.  a8/i16, any db.
+; Preserves Y; clobbers A and X; no direct-page scratch.  rtl.
+.proc Ot6RunePageOpens
+        .a8
+        .i16
+        tyx
+        lda     f:$7e0016,x     ; the four battle commands
+        cmp     #BATTLE_CMD::RUNIC
+        beq     @runic
+        lda     f:$7e0017,x
+        cmp     #BATTLE_CMD::RUNIC
+        beq     @runic
+        lda     f:$7e0018,x
+        cmp     #BATTLE_CMD::RUNIC
+        beq     @runic
+        lda     f:$7e0019,x
+        cmp     #BATTLE_CMD::RUNIC
+        beq     @runic
+        clc
+        rtl
+@runic: lda     f:$7e001f,x     ; the right hand
+        jsr     @hand
+        bcs     @out
+        tyx
+        lda     f:$7e0020,x     ; the left
+        jsr     @hand
+@out:   rtl
+
+; in: A = a hand's piece.  out: carry set = a weapon that allows Runic (an
+; empty hand's record, $ff, has no such bit).  clobbers A and X.
+@hand:  sta     f:hWRMPYA
+        lda     #30             ; ItemProp's record
+        sta     f:hWRMPYB
+        nop                     ; let the hardware product settle
+        nop
+        nop
+        longa
+        lda     f:hRDMPYL
+        tax
+        shorta
+        lda     f:ItemProp,x
+        and     #$07
+        cmp     #$01            ; a weapon
+        bne     @no
+        lda     f:ItemProp+19,x ; its special effects
+        asl                     ; bit 7: Runic
+        rts
+@no:    clc
         rts
 .endproc

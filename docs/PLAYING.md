@@ -306,6 +306,12 @@ that can die, dies. A boss loses four shields and takes a very heavy cut.
   hit of her weapon takes a shield, whatever the enemy's weaknesses. Her
   rune comes back when it ends.
 
+In the field menu, Skills > RuneKnt lists the rows she has now, with their
+MP and a line of help for each: Runic, a blade for each element she can
+cast, and Break Blade, shown locked until she learns it. RuneKnt is greyed
+out while she holds no weapon that allows Runic (a Flail, a Morning Star,
+the Atma Weapon or bare hands), as her command is in battle.
+
 ### Gau, Beast Tamer (fangs)
 
 - **Rage.** Gau learns rages on the Veldt, without limit. Under Skills > Rage

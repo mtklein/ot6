@@ -22,10 +22,12 @@
 ;                the Magic list's own (_c350a2, skills.asm: learned spells,
 ;                CELES's Break by her level, the worn esper's spells and worn
 ;                items' grants through Ot6FieldSpellKnown; for a GOGO the
-;                seated party's union, as his Magic list has it), so the
-;                page and the Magic list cannot disagree, and it follows an
-;                esper put on or taken off.  Six at most, the battle shell's
-;                eight cells less Runic and Break Blade.
+;                seated party's union, as his Magic list has it, with his
+;                own stone's spells once he is revealed as Leo and has
+;                picked Summon, Ot6FieldLeoMagic), so the page and the Magic
+;                list cannot disagree, and it follows an esper put on or
+;                taken off.  Six at most, the battle shell's eight cells
+;                less Runic and Break Blade.
 ;   Break Blade  last: its name and 99 once it is learned (Ot6BreakLearned),
 ;                and until then the locked marker of the other pages, with
 ;                the help window saying where it is learned.
@@ -39,20 +41,23 @@
 ;
 ; The row is white for whoever carries the Runic command in their four
 ; commands and holds a weapon that allows Runic, and grey otherwise.  No
-; relic rewrites command $0b (RelicCmdTbl has no Runic entry), but battle
+; relic rewrites command $0b (RelicCmdTbl1 has no Runic entry), but battle
 ; greys the command when neither hand's weapon carries the runic property
 ; (UpdateCmd_01: $3ba4/$3ba5 bit 7, the ItemProp+19 byte UpdateEquip stores
-; for a weapon in a hand): a Flail, a Morning Star, the Atma Weapon, bare
-; hands, and most of what a GOGO holds.  There the list cannot be opened, so
-; the field menu offers no page either, as it offers none under a Thief
-; Glove or a Fake Mustache.
+; for a weapon in a hand): for CELES a Flail, a Morning Star, the Atma
+; Weapon or bare hands; for a GOGO a Flail, a Morning Star, bare hands and
+; every rod but the Magus Rod.
+; There the list cannot be opened, so the field menu offers no page either,
+; as it offers none under a Thief Glove or a Fake Mustache
+; (Ot6RunePageOpens, bank F0).
 ;
 ; This code sits in its own segment after the Painter page's
 ; (ot6_menu_runeknt, cfg/ff6-en.cfg).  The hooks: the Painter page's two
-; Skills-list routines end in this file's (Ot6SkillsKitRows,
-; Ot6SkillsPainterColor), its cursor table and jump table grew a tenth
-; entry, and menu_code's same-size operands count ten rows (skills.asm,
-; field_menu.asm, menu_common.asm's state table).
+; Skills-list routines come through this file's (Ot6SkillsKitRows ends in
+; Ot6SkillsRuneRow; Ot6SkillsPainterColor calls Ot6SkillsRuneColor for the
+; `lda 0,y` it owes its caller), its cursor table and jump table grew a
+; tenth entry, and menu_code's same-size operands count ten rows
+; (skills.asm, field_menu.asm, menu_common.asm's state table).
 ; ------------------------------------------------------------------------------
 
 .if LANG_EN
@@ -61,8 +66,6 @@
 
 MENU_STATE_RUNEKNT = $32                ; the last of vanilla's unused $30-$32
                                         ;   (menu_misc.asm)
-OT6_WEAPON_RUNIC   = $80                ; ItemProp+19, a weapon's special
-                                        ;   effects: it allows Runic
 ; the page's rows in the menu's list buffer (battle/ot6_runepage.asm)
 OT6_RPAGE_ROW      = $7e9d89            ; eight rows: the help line's index
                                         ;   (LoadBigText reads it), $ff none
@@ -87,50 +90,21 @@ Ot6SkillsRuneRow:
         jmp     TfrBG3ScreenAB
 
 ; [ the Skills list: the tenth row's colour, as battle has the command ]
-; Ot6SkillsPainterColor's tail comes here, with Y the character's record and
-; the init loop having greyed the row.  White when the record carries the
-; Runic command and a hand holds a weapon that allows it (the header).
+; Ot6SkillsPainterColor calls this where it had its `lda 0,y`, with Y the
+; character's record and the init loop having greyed the row.  White when
+; the record carries the Runic command and a hand holds a weapon that allows
+; it (the header): Ot6RunePageOpens reads the record, in bank F0, where
+; there is room for it.
 ; out: A = the actor byte, as the `lda 0,y` _c34d3d's hook replaced left it
-; (flags too).  a8/i16.  preserves Y; clobbers X; no direct-page scratch
-; (CheckShoulderBtns holds its next state in $e0 across CheckSkillValid).
+; (flags too), for Ot6SkillsPainterColor's Gogo test.  a8/i16.  preserves Y;
+; clobbers X; no direct-page scratch (CheckShoulderBtns holds its next state
+; in $e0 across CheckSkillValid).
 Ot6SkillsRuneColor:
-        phy
-        ldx     #$0004
-@cmd:   lda     $0016,y                 ; battle commands
-        cmp     #BATTLE_CMD::RUNIC
-        beq     @runic
-        iny
-        dex
-        bne     @cmd
-        ply
-        bra     @done                   ; no Runic: grey
-@runic: ply
-        lda     $001f,y                 ; the right hand
-        jsr     @hand
-        bmi     @white
-        lda     $0020,y                 ; the left
-        jsr     @hand
-        bpl     @done                   ; neither allows Runic: grey in battle
-@white: lda     #$20
+        jsl     Ot6RunePageOpens        ; F0: carry set = battle offers the list
+        bcc     @done                   ; no Runic, or no weapon for it: grey
+        lda     #$20
         sta     zSkillsTextColor::RuneKnt
 @done:  lda     0,y                     ; the instruction the hook replaced
-        rts
-
-; a hand's piece: N set when it is a weapon that allows Runic, as UpdateEquip
-; reads it (a shield's byte is not a weapon's; an empty hand's record has
-; none).  in: A = the item.  clobbers X.
-@hand:  sta     hWRMPYA
-        lda     #30
-        sta     hWRMPYB
-        nop3
-        ldx     hRDMPYL
-        lda     f:ItemProp,x
-        and     #$07
-        cmp     #$01                    ; a weapon
-        bne     @none
-        lda     f:ItemProp+19,x         ; its special effects
-        rts
-@none:  lda     #$00
         rts
 
 ; ------------------------------------------------------------------------------

@@ -610,7 +610,7 @@ done:   rts
 ; It does when the element has a line (fire, ice, bolt, poison) and the
 ; cheapest spell of it she can cast is the line's head: boost then reaches
 ; up from the head as it does in the Magic list, whether or not she knows
-; the tiers.  Pearl, Quake, W Wind and the rest head no line.
+; the tiers.  Pearl, Quake, Merton and the rest head no line.
 ; in: A = the element's bit index, X = the caster.  out: carry set = yes.
 ; a8/i16, db=$7e.  Preserves X and Y; clobbers A.
 .proc Ot6BladeClimbs
@@ -859,7 +859,7 @@ done:   rts
 ; [ R on the Rune Knight's list: a blade with no line to climb buys nothing ]
 ; Runic buys turns, Break Blade is its own gate, and a blade row whose
 ; element has a line (Ot6BladeClimbs) buys its tiers; a row that climbs
-; nothing (Pearl's, Quake's, W Wind's) refuses R, as every row a boost buys
+; nothing (Pearl's, Quake's, Merton's) refuses R, as every row a boost buys
 ; nothing on does.  in: A = the row's id.  out: carry set = refuse.
 ; a8/i16, db=$7e.  Preserves A, X and Y.
 .proc Ot6RuneNoBoost

@@ -44,6 +44,7 @@ CODE_EXT_INC = 1
 .global Ot6SwingPal_ext          ;   InitWeaponAnim: the swing's colour
 .global LoadSpriteAnimPal        ;   btlgfx, for that one's tail
 .global Ot6RunePageRows          ;   the field Rune Knight page's rows and prices
+.global Ot6RunePageOpens         ;   the Skills list's RuneKnt row: white or grey
 .global Ot6RuneName              ;   the list's 10-letter names
 .global Ot6RunePageDescPtrs, Ot6RunePageDescStr  ;   its help lines (kit_pages.py)
 .global Ot6PaintListOpen         ; #538 relm's kit: sketch -> tools-shell list
