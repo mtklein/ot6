@@ -252,6 +252,63 @@ def floor_classes(text: str, C: Classes):
     return vals
 
 
+# ------------------------------------------------- the grouping and the holders --
+# tools/proto_six/classes.py is the grouping as data (which class every weapon
+# family, tool and skill carries; SIGNATURE: who really holds each) and
+# tools/proto_six/stages.py the story's stages (who the player can field,
+# whom the story forces).  rewrite_class.py writes ot6_class.asm from the
+# first, so the two agree by construction; selftest() holds them to it, so a
+# tool may read the bits from the source and the holders from the grouping.
+
+PROTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "proto_six")
+
+
+def grouping():
+    """(classes, stages): the two modules of tools/proto_six."""
+    if PROTO not in sys.path:
+        sys.path.insert(0, PROTO)
+    import classes
+    import stages
+    return classes, stages
+
+
+def really_held(name, magitek=False, K=None):
+    """The classes a character really holds (signature weapon or command, not
+    "could equip"); in Magitek armor, TERRA's TekMissile and nobody else's."""
+    K = K or grouping()[0]
+    if magitek:
+        return K.KIND_CLASS["tekmissile"] if name == "TERRA" else 0
+    return K.signature_mask(name)
+
+
+def holder_rule(mask, roster, forced, magitek=False, K=None):
+    """The owner's holder rule (2026-11-23: "we don't want just one particular
+    character to be required to get through fights") for one species' weapon
+    keys at one stage: None when met, else why not.  Met when at least two
+    characters the player can field there really hold one of the row's
+    classes, or one whom the story forces into the party does.  forced None:
+    the story fixes the whole roster.  The same rule as split.py's
+    holder_check."""
+    K = K or grouping()[0]
+    forced = set(roster) if forced is None else set(forced)
+    if magitek and not any(really_held(n, True, K) for n in roster):
+        return None                     # in armor with no TekMissile: no weapon key to hold
+    real = sorted(n for n in roster if really_held(n, magitek, K) & mask)
+    if not real:
+        return "nobody fieldable there really holds it"
+    if len(real) == 1 and real[0] not in forced:
+        return "only %s really holds it, and the story does not force them in" % real[0]
+    return None
+
+
+def stage_table(S=None):
+    """{first leg: (roster, forced, magitek)} of stages.STAGES; the open World
+    of Ruin stage (roster None) is left out: its roster is the play's."""
+    S = S or grouping()[1]
+    return {first: (set(roster), set(roster) if forced is None else set(forced), magitek)
+            for first, roster, forced, magitek in S.STAGES if roster is not None}
+
+
 # ---------------------------------------------------------------- selftest --
 
 def selftest(root: str) -> int:
@@ -302,6 +359,39 @@ def selftest(root: str) -> int:
         floor = floor_classes(f.read(), C)
     assert len(rows) >= 300 and all(r[2] & ~C.mask == 0 for r in rows), "an Ot6ShieldTbl class byte leaves OT6_CLASSES"
     assert all(v and v & (v - 1) == 0 and v & C.mask for v in floor), "a floor byte is not one class"
+    # the grouping (tools/proto_six/classes.py) restates the source's tables:
+    # held to them, name by name and item by item
+    K, S = grouping()
+    assert {K.CONST[b]: b for b in K.CONST} == C.token, "classes.py CONST is not ot6_class.asm's class bits"
+    with open(os.path.join(root, CLASS_ASM), encoding="utf-8") as f:
+        asm = f.read()
+    weapon, skill = weapon_classes(asm, C), skill_classes(asm, C)
+    bad = [i for i in range(256) if K.item_class(i) != weapon[i] & C.mask]
+    assert not bad, "classes.py ITEM_KIND disagrees with Ot6WeapClassTbl at item(s) " + ", ".join("$%02x" % i for i in bad)
+    bad = [a for a in set(skill) | set(K.SKILL_KIND) if K.skill_class(a) != skill.get(a, 0) & C.mask]
+    assert not bad, "classes.py SKILL_KIND disagrees with Ot6SkillClassTbl at " + ", ".join("$%02x" % a for a in bad)
+    for kit, const in (("thief", "OT6_CLS_THIEF"), ("coin", "OT6_CLS_COIN"), ("club", "OT6_CLS_CLUB"),
+                       ("fang", "OT6_CLS_FANG")):
+        assert K.KIND_CLASS[K.KIT_KIND[kit]] == C.consts[const], "classes.py KIT_KIND %s is not %s" % (kit, const)
+    for name in K.SIGNATURE:
+        assert name in K.CHARS, name
+    stage = stage_table(S)
+    assert len(stage) >= 30 and all(f <= r for r, f, _m in stage.values()), "a stage forces someone it cannot field"
+    # the holder rule: two real holders, or one the story forces
+    two = next(b for b in C.token.values() if len(K.holders(b)) >= 2)
+    a, b = sorted(K.holders(two))[:2]
+    other = next(n for n in K.CHARS if n != "TERRA" and K.signature_mask(n) and not K.signature_mask(n) & two)
+    assert holder_rule(two, {a, b, other}, set(), False, K) is None
+    assert holder_rule(two, {a, other}, {a}, False, K) is None
+    assert holder_rule(two, {a, other}, None, False, K) is None
+    for tag, why in (("one holder the story does not force", holder_rule(two, {a, other}, set(), False, K)),
+                     ("one holder, another forced", holder_rule(two, {a, other}, {other}, False, K)),
+                     ("no holder", holder_rule(two, {other}, None, False, K)),
+                     ("armor: TERRA's TekMissile is not that key",
+                      holder_rule(C.mask & ~K.KIND_CLASS["tekmissile"], {"TERRA", a}, None, True, K))):
+        assert why, "holder rule: %s was accepted" % tag
+        print("ot6_class selftest: holder rule refuses %s: %s" % (tag, why))
+    assert holder_rule(two, {a, other}, set(), True, K) is None, "armor without TERRA holds no key to ask for"
     print("ot6_class selftest OK: %d classes (%s), mask $%02x; %d Ot6ShieldTbl rows, %d floor bytes"
           % (len(C.bit), ", ".join(C.bit), C.mask, len(rows), len(floor)))
     return 0

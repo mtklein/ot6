@@ -26,6 +26,15 @@ Usage:  python3 tools/check_break_reach.py [--repo ROOT] [-v]
                 [--area NAME] [--party A,B,C] [--drop-class CLS]
 
 --party and --drop-class exist to demonstrate failure and for what-if probes.
+
+Beside the reach verdict it reports the owner's HOLDER RULE (2026-11-23: "we
+don't want just one particular character to be required to get through
+fights") for every gauged body the declared areas deal: its weapon keys are
+really held (signature weapon or command, tools/proto_six/classes.py) by at
+least two characters the player can field at the step's story stage
+(tools/proto_six/stages.py), or by one the story forces into the party.  A
+HOLDER line names each stage and species it is not met for;
+--strict-holders makes them fail the run.
 """
 
 from __future__ import annotations
@@ -131,6 +140,9 @@ MIMIC_ONLY = {"GOGO"}
 # --------------------------------------------------------------------------
 # area declarations.  An area is a list of steps; a step is a party plus the
 # random-encounter maps it walks and the forced battles it must fight.
+# stage: the step's story stage, by its first leg in tools/proto_six/stages.py
+# (who the player can field there, whom the story forces), for the holder
+# rule; the party is the one the route walked in with, for the reach check.
 # events: (event battle id, tuple of EventBattleGroup word slots reached,
 #          human label).  EventBattle rolls word 0 at 75% / word 1 at 25%
 # (field/event.asm @a5a7), TrainCmd_e0/e1 do the same (train_script.asm
@@ -143,6 +155,7 @@ AREAS = {
         "steps": [
             {
                 "name": "facility, four (bosses-wob.md SS13-14)",
+                "stage": "vector_sneak",
                 "party": ["LOCKE", "CELES", "SABIN", "EDGAR"],
                 "maps": [262, 263, 264, 269, 271, 273],
                 "events": [
@@ -153,6 +166,7 @@ AREAS = {
             {
                 "name": "escape, three -- Celes lost in the tube room "
                         "(bosses-wob.md SS15-16)",
+                "stage": "minecart_entry",
                 "party": ["LOCKE", "SABIN", "EDGAR"],
                 "maps": [240],
                 "events": [
@@ -174,6 +188,7 @@ AREAS = {
             {
                 "name": "cave, four (issue #31 dispatcher ruling: Terra "
                         "seated, Setzer benched)",
+                "stage": "gate_cave_save",
                 "party": ["TERRA", "LOCKE", "EDGAR", "SABIN"],
                 "maps": [382, 383, 384, 385],
                 "events": [
@@ -194,6 +209,7 @@ AREAS = {
         "steps": [
             {
                 "name": "the climb, four (LOCKE CELES EDGAR SABIN)",
+                "stage": "figaro_submerged",
                 "party": ["LOCKE", "CELES", "EDGAR", "SABIN"],
                 "maps": [221, 225],
                 "events": [],
@@ -490,7 +506,9 @@ class Data:
                 if cls & NULLBRK:
                     continue
                 mask |= cls & CLASS_MASK
-            mask |= self.weap_class[0xFF] & CLASS_MASK   # bare fists (empty hand $ff)
+            # the empty hand ($ff); GAU's is his fangs (OT6_CLS_FANG, #566)
+            mask |= (C.consts.get("OT6_CLS_FANG", self.weap_class[0xFF]) if name == "GAU"
+                     else self.weap_class[0xFF]) & CLASS_MASK
         for cmd, sids in COMMAND_ABILITIES.items():
             if cmd not in cmds:
                 continue
@@ -552,11 +570,17 @@ class Data:
 # --------------------------------------------------------------------------
 
 def check_area(data, area_name, area, party_override, drop_mask,
-               drop_elem_mask, verbose):
+               drop_elem_mask, verbose, holders=None):
     problems = []
     checked = 0
+    stage_tbl = ot6_class.stage_table()
 
     for step in area["steps"]:
+        if step["stage"] not in stage_tbl:
+            raise SystemExit("check_break_reach: area %s step %r names stage %r, "
+                             "which tools/proto_six/stages.py does not start"
+                             % (area_name, step["name"], step["stage"]))
+        roster, forced, magitek = stage_tbl[step["stage"]]
         party = party_override or step["party"]
         for who in party:
             if who not in ACTOR_ID:
@@ -618,6 +642,16 @@ def check_area(data, area_name, area, party_override, drop_mask,
                     gaugeless_only = False
                     keys |= cls
                     ekeys |= elems
+                    # the holder rule: this body's weapon keys, really held by
+                    # two the player can field at this stage, or one forced
+                    why = ot6_class.holder_rule(cls, roster, forced, magitek) if cls else None
+                    if why and holders is not None:
+                        holders.setdefault((step["stage"], sp), [
+                            "stage %s (%s; forced: %s) %s($%03x) %s: %s"
+                            % (step["stage"], ", ".join(sorted(roster)),
+                               ", ".join(sorted(forced)) or "nobody",
+                               data.names[sp], sp, class_str(cls), why), set()])[1].add(
+                                   "%s formation $%03x" % (where, f))
                 parts.append("%s($%03x)x%d=%s/%s[%s]"
                              % (data.names[sp], sp, n,
                                 class_str(cls) if not gaugeless else "no gauge",
@@ -665,6 +699,10 @@ def main():
                     choices=sorted(ELEM_BIT),
                     help="pretend no member can deliver this element "
                          "(repeatable; failure demo for element-keyed areas)")
+    ap.add_argument("--strict-holders", action="store_true",
+                    help="fail when the holder rule (a species' weapon keys "
+                         "really held by two the player can field at the "
+                         "step's stage, or by one the story forces) is not met")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -684,11 +722,13 @@ def main():
         drop_mask |= CLASS_BIT[c]
     names = [args.area] if args.area else sorted(AREAS)
     all_problems = []
+    holders = {}
     total = 0
     print("break-class encounter/party reachability check")
     for bn in names:
         problems, checked = check_area(data, bn, AREAS[bn], party_override,
-                                       drop_mask, drop_elem_mask, args.verbose)
+                                       drop_mask, drop_elem_mask, args.verbose,
+                                       holders)
         mode = ""
         if party_override:
             mode += " party-override=%s" % ",".join(party_override)
@@ -700,12 +740,21 @@ def main():
         all_problems.extend(problems)
         total += checked
 
+    for (_stage, _sp), (text, where) in sorted(holders.items()):
+        print("  HOLDER %s; dealt by %s%s" % (text, "; ".join(sorted(where)[:3]),
+                                             " ..." if len(where) > 3 else ""))
+    print("  holder rule: %d stage x species pair(s) not met over the declared "
+          "areas%s" % (len(holders), "" if args.strict_holders else
+                       " (reported; --strict-holders fails on them)"))
     if all_problems:
         print("  %d PROBLEM(S):" % len(all_problems))
         print()
         for p in all_problems:
             print("  " + p.replace("\n", "\n  "))
             print()
+        return 1
+    if args.strict_holders and holders:
+        print("  the holder rule is not met (--strict-holders)")
         return 1
     print("  OK -- every checked formation has a chip the step's party can "
           "reach, by class key or by weak element")

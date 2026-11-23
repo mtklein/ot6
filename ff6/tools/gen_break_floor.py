@@ -47,27 +47,30 @@ CLASS_NAME = {OT6_SLASH: "SLASH", OT6_PIERCE: "PIERCE", OT6_BLUDG: "BLUDGEON"}
 # ------------------------------------------------------------------------------
 # The child rule (six classes).  The three constants above are the keyword
 # rule's PARENTS, v0.50's classes; they are no longer class bits of the ROM.
-# Each parent has two children among ot6_class.asm's six, named here by their
-# source tokens (main() refuses a token the source does not define):
+# Each parent's children are the classes its own weapons went to when the six
+# were grouped (tools/proto_six/classes.py CHILDREN: slash's swords and
+# katanas; pierce's daggers, spears and bolts; bludgeon's fists and rods, and
+# the returning arcs that went to Ranged), named here by their source tokens
+# (main() refuses a token ot6_class.asm does not define):
 #
-#   every family of a parent deals its species to the parent's two children
-#   IN TURN, in species-id order: a species takes whichever child fewer
-#   species of its parent hold so far, the first-named child on a tie.
+#   every family of a parent deals its species to the parent's children IN
+#   TURN, in species-id order: a species takes whichever child of its parent
+#   the fewest species hold so far, the first-named child on a tie.
 #
-# So a parent's bodies split evenly between the two weapon families that
-# inherited it, with no keyword deciding the half (a name says "armor", not
-# "dagger or spear").  Two frozen inputs make the dealing reproduce the table
-# the six-class split shipped, byte for byte, so the ROM did not move when
-# this generator stopped reading the split's json:
+# So a parent's bodies spread evenly over the weapon families that inherited
+# it, with no keyword deciding which (a name says "armor", not "dagger, spear
+# or bolt").  Ranged is a child of two parents and has one tally.  Two frozen
+# inputs make the dealing reproduce the table the six-class split shipped,
+# byte for byte, so the ROM did not move when this generator stopped reading
+# the split's json:
 #
-#   FLOOR_LEAD  the head start the first-named child has when the dealing
-#               begins (negative: the second-named child's): the difference
-#               in the authored rows' tallies on the day of the split, which
-#               the floor was dealt after.
-#   FLOOR_KEPT  the species the dealing would hand the other child, which
-#               keep the child their own Ot6ShieldTbl row was pinned to on
-#               that day (the floor was written row-first).  Every one of
-#               them has an authored row, so its floor byte is never read
+#   FLOOR_LEAD  each class's head start when the dealing begins: the authored
+#               rows' tallies on the day of the split, which the floor was
+#               dealt after, less the smallest of them.
+#   FLOOR_KEPT  the species the dealing would hand another child, which keep
+#               the child their own Ot6ShieldTbl row was pinned to on that
+#               day (the floor was written row-first).  Every one of them has
+#               an authored row, so its floor byte is never read
 #               (Ot6SeedShields takes the row); a kept species still counts
 #               toward its child's tally.
 #
@@ -76,20 +79,20 @@ CLASS_NAME = {OT6_SLASH: "SLASH", OT6_PIERCE: "PIERCE", OT6_BLUDG: "BLUDGEON"}
 # the shipped table.)
 FLOOR_CHILDREN = {
     OT6_SLASH:  ("OT6_SWORD", "OT6_KATANA"),
-    OT6_PIERCE: ("OT6_DAGGER", "OT6_SPEAR"),
-    OT6_BLUDG:  ("OT6_FIST", "OT6_ARCANE"),
+    OT6_PIERCE: ("OT6_DAGGER", "OT6_SPEAR", "OT6_RANGED"),
+    OT6_BLUDG:  ("OT6_BLUNT", "OT6_RANGED"),
 }
-FLOOR_LEAD = {OT6_SLASH: 1, OT6_PIERCE: 2, OT6_BLUDG: -9}
+FLOOR_LEAD = {"OT6_SWORD": 5, "OT6_DAGGER": 1, "OT6_BLUNT": 31, "OT6_RANGED": 30, "OT6_KATANA": 5, "OT6_SPEAR": 0}
 FLOOR_KEPT = {
-    # slash: the rows pinned to a blade's owner
-    0x008: "OT6_KATANA", 0x045: "OT6_KATANA", 0x051: "OT6_KATANA", 0x060: "OT6_SWORD",
-    0x06d: "OT6_KATANA", 0x072: "OT6_SWORD", 0x0a6: "OT6_KATANA", 0x0c0: "OT6_SWORD",
-    0x0db: "OT6_SWORD", 0x118: "OT6_SWORD", 0x12c: "OT6_SWORD", 0x12d: "OT6_SWORD",
-    0x12e: "OT6_SWORD", 0x154: "OT6_KATANA", 0x155: "OT6_KATANA", 0x156: "OT6_KATANA",
-    0x168: "OT6_SWORD",
-    # pierce: the rows pinned to a dagger or a spear
-    0x001: "OT6_DAGGER", 0x002: "OT6_DAGGER", 0x011: "OT6_DAGGER", 0x039: "OT6_SPEAR",
-    0x09c: "OT6_SPEAR", 0x09d: "OT6_SPEAR", 0x104: "OT6_DAGGER", 0x153: "OT6_SPEAR",
+    0x000: "OT6_RANGED", 0x001: "OT6_RANGED", 0x002: "OT6_RANGED", 0x00e: "OT6_KATANA",
+    0x011: "OT6_DAGGER", 0x039: "OT6_SPEAR", 0x03a: "OT6_KATANA", 0x057: "OT6_KATANA",
+    0x071: "OT6_SWORD", 0x072: "OT6_SWORD", 0x098: "OT6_SWORD", 0x09c: "OT6_SPEAR",
+    0x09d: "OT6_RANGED", 0x0ba: "OT6_KATANA", 0x0ca: "OT6_SWORD", 0x0d3: "OT6_SWORD",
+    0x0e6: "OT6_SWORD", 0x0f5: "OT6_SWORD", 0x102: "OT6_DAGGER", 0x104: "OT6_DAGGER",
+    0x108: "OT6_SWORD", 0x10a: "OT6_SWORD", 0x113: "OT6_RANGED", 0x124: "OT6_KATANA",
+    0x12d: "OT6_SWORD", 0x12e: "OT6_SWORD", 0x140: "OT6_SWORD", 0x145: "OT6_RANGED",
+    0x147: "OT6_RANGED", 0x14d: "OT6_SWORD", 0x153: "OT6_SPEAR", 0x155: "OT6_KATANA",
+    0x156: "OT6_KATANA", 0x16d: "OT6_SWORD", 0x173: "OT6_SWORD",
 }
 
 # ------------------------------------------------------------------------------
@@ -265,19 +268,20 @@ def build_rows(names):
 
 def floor_children(rows):
     """[child token] per row of build_rows(): the child rule above."""
-    tally = {}
-    for parent, (first, second) in FLOOR_CHILDREN.items():
-        lead = FLOOR_LEAD[parent]
-        tally[first], tally[second] = max(lead, 0), max(-lead, 0)
+    tally = {t: 0 for kids in FLOOR_CHILDREN.values() for t in kids}
+    for t, lead in FLOOR_LEAD.items():
+        if t not in tally or lead < 0:
+            raise SystemExit(f"gen_break_floor: FLOOR_LEAD {t} = {lead}: not a child's head start")
+        tally[t] = lead
     out = []
     for sid, _name, parent, _label in rows:
-        first, second = FLOOR_CHILDREN[parent]
-        child = first if tally[first] <= tally[second] else second
+        kids = FLOOR_CHILDREN[parent]
+        child = min(kids, key=lambda t: (tally[t], kids.index(t)))
         if sid in FLOOR_KEPT:
             child = FLOOR_KEPT[sid]
-            if child not in (first, second):
+            if child not in kids:
                 raise SystemExit(f"gen_break_floor: FLOOR_KEPT ${sid:03x} is {child}, not a child of "
-                                 f"{CLASS_NAME[parent]} ({first}, {second})")
+                                 f"{CLASS_NAME[parent]} ({', '.join(kids)})")
         tally[child] += 1
         out.append(child)
     return out

@@ -84,6 +84,23 @@ So the model is split the way the two tiers always were:
     element (an esper, Terra's Fire, a rod) is the reader's to check.
     v0.50's model called both "keyed" on fire/ice/bolt alone, everywhere.
 
+  THE HOLDER RULE (owner, 2026-11-23: "we don't want just one particular
+  character to be required to get through fights").  Tier 2 also holds
+  every stage of the line to it: for every gauged species with a class row
+  that a stage can be dealt, the row's classes are REALLY held (signature
+  weapon or command, not "could equip": tools/proto_six/classes.py
+  SIGNATURE) by at least two characters the player can field there, or by
+  one the story forces into the party (tools/proto_six/stages.py STAGES:
+  roster and forced, by leg of the line; tools/ot6_class.py holder_rule,
+  the rule split.py's HOLDERS step applies to the species the route met).
+  A stage's legs are the generator logs' own names; what it can be dealt
+  is every formation of the pool of each map and world group a leg fought
+  on, and every formation it fought (the event battles), not only the
+  bodies the route happened to meet.  Each (stage, species) the rule is
+  not met for is a HOLDER line; --strict-holders makes them fail the run.
+  The Veldt's legs are no stage (it re-deals formations from everywhere),
+  and the magic-only tower swings no weapon.
+
   "May only tighten" (configure.py, at the gate's edge).  Tier 2 refuses
   what v0.50's model accepted: a formation keyed only by a class the party
   there did not hold (v0.50 counted slash, pierce and bludgeon as held by
@@ -100,10 +117,12 @@ Usage:
   python3 tools/audit_break_coverage.py --gate       the build gate (tier 1)
   python3 tools/audit_break_coverage.py              tier 1 and the claim,
         [--logs DIR] [--stages] [--strict]           from build/states/*.log
-                                                     (or DIR/*.log); --stages
+        [--strict-holders]                           (or DIR/*.log); --stages
                                                      prints each stage's hands;
                                                      --strict fails on a
-                                                     STAGE NO-KEY
+                                                     STAGE NO-KEY,
+                                                     --strict-holders on a
+                                                     HOLDER line
   python3 tools/audit_break_coverage.py --selftest
 """
 
@@ -169,6 +188,7 @@ floor = dict(enumerate(ot6_class.floor_classes(rt(ot6_class.FLOOR_INC), C)))
 # ---- THE TUNING CLAIM, from the route's own battles (#287) --------------
 SEED_BATTLE = re.compile(r'^\[ot6\] \[seed\] (?:first )?battle: .*?key be[0-9A-F]{2}-g([0-9A-F]{4})')
 OUTCOME = re.compile(r'^\[ot6\] .*\[outcome\] battle \$([0-9A-F]{3}) ')
+OUTCOME_CHAR = re.compile(r'char (\d+) ')       # the seated members an [outcome] line's reward names
 TILES = re.compile(r'^\[ot6\] \[tiles\] map=(\d+) ')
 # #566's instrument (tools/tests/lib/ot6.lua M.keyLine): what the seated
 # members held as a battle opened, and the bodies that stood
@@ -188,7 +208,8 @@ def kit_of(src, bag):
     hand) or `:r<item>` and `:l<item>` (the hands, $FF empty), `:B` Blitz
     (Pummel), `:S` SwdTech (Dispatch), `:tools` and `:throw` (the bag's
     Tools $A3-$AA; its stars $41-$43 and skeans $AB-$AD), `:T` a thief's
-    hit.  A null-break weapon chips nothing and holds nothing."""
+    hit.  GAU's empty hand is his fangs.  A null-break weapon chips nothing
+    and holds nothing."""
     def weapon(i):
         b = WEAPON_CLASS[i]
         return 0 if b & C.nullbrk else b & C.mask
@@ -207,7 +228,12 @@ def kit_of(src, bag):
         members.append(int(m.group(1)))
         for p in parts[1:]:
             if re.fullmatch(r'[rl][0-9A-F]{2}', p):
-                hands |= weapon(int(p[1:], 16))
+                # GAU's empty hand is his fangs (Ot6WeaponClass, OT6_CLS_FANG;
+                # ot6.lua M.handClass), not the empty hand's class
+                if members[-1] == ACTORS.index('GAU') and p[1:] == 'FF' and 'OT6_CLS_FANG' in C.consts:
+                    hands |= C.consts['OT6_CLS_FANG'] & C.mask
+                else:
+                    hands |= weapon(int(p[1:], 16))
             elif p == 'M':
                 kit |= skill(0x8A)
             elif p == 'B':
@@ -230,25 +256,32 @@ def kit_of(src, bag):
 
 
 def fought_by_map(paths):
-    """({map: {formation}}, {map: [key record]}): each battle a log names,
-    on the map whose [tiles] line comes next (the trace flushes a map as the
-    party leaves it, and a battle leaves $1F64 on its field map).  A key
-    record is (formation, members, kit, [species standing]).  Also fills
-    WALKED with each world's walked sector bases."""
-    out, keys = {}, {}
+    """({map: {formation}}, {map: [key record]}, {leg: {map: {formation}}},
+    {leg: {member names seen fighting}}): each battle a log names, on the map
+    whose [tiles] line comes next (the trace flushes a map as the party
+    leaves it, and a battle leaves $1F64 on its field map).  A key record is
+    (formation, members, kit, [species standing]); a leg is a log's own name
+    (build/states/<leg>.log).  Also fills WALKED with each world's walked
+    sector bases."""
+    out, keys, legs, seen = {}, {}, {}, {}
     for path in paths:
+        leg = os.path.basename(path)[:-4]
         pending, pkeys = set(), []
         with open(path, errors='replace') as f:
             for line in f:
                 m = SEED_BATTLE.match(line) or OUTCOME.match(line)
                 if m:
                     pending.add(int(m.group(1), 16))
+                    for c in OUTCOME_CHAR.findall(line) if '[outcome]' in line else ():
+                        if int(c) < len(ACTORS):
+                            seen.setdefault(leg, set()).add(ACTORS[int(c)])
                     continue
                 k = KEYS.match(line)
                 if k:
                     members, _hands, kit = kit_of(k.group(3), k.group(4))
                     sps = [int(b.split(':')[1][1:], 16) for b in k.group(2).split(',') if b]
                     pkeys.append((int(k.group(1), 16), members, kit, sps))
+                    seen.setdefault(leg, set()).update(ACTORS[c] for c in members if c < len(ACTORS))
                     continue
                 t = TILES.match(line)
                 if t and int(t.group(1)) in (0, 1):
@@ -261,11 +294,12 @@ def fought_by_map(paths):
                                 w * 256 + (int(y) & 0xE0) + ((int(x) >> 3) & 0x1C))
                 if t and pending:
                     out.setdefault(int(t.group(1)), set()).update(pending)
+                    legs.setdefault(leg, {}).setdefault(int(t.group(1)), set()).update(pending)
                     pending = set()
                 if t and pkeys:
                     keys.setdefault(int(t.group(1)), []).extend(pkeys)
                     pkeys = []
-    return out, keys
+    return out, keys, legs, seen
 
 
 # {world: {sector base byte}} walked, from [tiles] lines with world
@@ -483,6 +517,77 @@ def print_stage(tree, findings, stages, nlogs, show_stages):
     return n['NO-KEY']
 
 
+def holder_findings(tree, legs, seen, order=None):
+    """THE HOLDER RULE, stage by stage.  Returns (findings, checked, stages
+    met): findings is {(stage's first leg, species): [why, roster, forced,
+    {(where, formation)}]} for every gauged species with a class row that a
+    stage can be dealt -- every formation of the pool of each map (and world
+    group) a leg of the stage fought on, and every formation it fought --
+    whose row the rule is not met for there.  The Veldt's legs deal
+    formations from everywhere the party has been and are no stage of their
+    own; the magic-only tower swings no weapon."""
+    K, S = ot6_class.grouping()
+    order = order if order is not None else S.line_order(os.path.join(ROOT, 'build.ninja'))
+    stage = S.stage_of(order, seen)
+    found, checked, met = {}, set(), []
+    for leg in order:
+        st = stage.get(leg)
+        if leg not in legs or st is None or leg in S.VELDT:
+            continue
+        first, roster, forced, magitek = st
+        if first not in met:
+            met.append(first)
+        # the stage table against the play: a member the leg's battles seated
+        # whom the stage says the player cannot field there (a guest aside)
+        extra = sorted(seen.get(leg, set()) - roster)
+        if extra:
+            STAGE_DRIFT.append(f'  STAGE ROSTER leg {leg} (stage {first}: {", ".join(sorted(roster))}): the play '
+                               f'seated {", ".join(extra)} there, whom the stage does not field')
+        forms = {}
+        for m, fs in sorted(legs[leg].items()):
+            if m in MAGIC_ONLY_MAPS:
+                continue
+            if m in (0, 1):
+                for g in sorted({wbg[sec] for sec in range(m * 256, m * 256 + 256)
+                                 if wbg[sec] != 0xFF and group_forms(wbg[sec]) & fs}):
+                    for f in group_forms(g):
+                        forms.setdefault(f, f'world {m} group {g}')
+            elif props[m*33+5] & 0x80 and group_forms(sbg[m]) & fs:
+                for f in group_forms(sbg[m]):
+                    forms.setdefault(f, f'map {m}')
+            for f in fs:
+                forms.setdefault(f, f'map {m}, fought' if m > 1 else f'world {m}, fought')
+        for f, where in sorted(forms.items()):
+            for sp in sorted(set(formation_species(f))):
+                sh, mask = tree.authored.get(sp, (1, tree.floor.get(sp, 0)))
+                if sh == 0 or not mask:
+                    continue                # no gauge, or no weapon key to hold
+                checked.add((first, sp))
+                why = ot6_class.holder_rule(mask, roster, forced, magitek, K)
+                if why:
+                    found.setdefault((first, sp), [why, roster, forced, set()])[3].add((where, f))
+    return found, checked, met
+
+
+STAGE_DRIFT = []
+
+
+def print_holders(tree, found, checked, met):
+    for l in STAGE_DRIFT:
+        print(l)
+    for (first, sp), (why, roster, forced, where) in sorted(found.items(), key=lambda kv: (met.index(kv[0][0]), kv[0][1])):
+        forced_txt = 'all forced' if forced == roster else ('forced: ' + (', '.join(sorted(forced)) or 'nobody'))
+        places = sorted({w for w, _f in where})
+        print(f'  HOLDER stage {first} ({", ".join(sorted(roster))}; {forced_txt}) ${sp:03X} {tree.row_text(sp)}: '
+              f'{why}; dealt by {"; ".join(places[:4])}{" ..." if len(places) > 4 else ""} '
+              f'({len({f for _w, f in where})} formation(s))')
+    print(f'holder rule (owner, 2026-11-23: a species\' weapon keys are really held by two the player can field '
+          f'there, or by one the story forces): {len(checked)} stage x species pair(s) over {len(met)} stage(s) '
+          f'of the line, {len(found)} not met ({len({sp for _s, sp in found})} species, '
+          f'{len({s for s, _sp in found})} stage(s))')
+    return len(found)
+
+
 def unresolved():
     """Every formation a walked pool can deal must resolve to bodies: a word
     read raw (a "+Rand" flag left on) indexes past the formation table and its
@@ -578,6 +683,31 @@ def selftest():
     found, _ = stage_findings(TREE, {m: [(f, (6,), C.mask & ~AUTHORED[eweak][1], [eweak])]}, set())
     assert [x[0] for x in found] == ['ELEMENT-ONLY'], found
     print(f'audit_break_coverage selftest: tier 2, {mname(eweak)} against a kit without its class: ELEMENT-ONLY')
+    # the holder rule over a staged leg: a species whose only key one
+    # unforced member holds is found; with a second holder fieldable, or
+    # that member forced, it is not
+    K, S = ot6_class.grouping()
+    cls = AUTHORED[sps[0]][1]
+    cls &= -cls                                         # one class of form f's first body
+    hold = sorted(K.holders(cls))
+    rest = sorted(n for n in K.CHARS if K.signature_mask(n) and not K.signature_mask(n) & cls)
+    assert hold and rest, (hold, rest)
+    one = Tree({s: ((2, cls) if s in sps else (0, 0)) for s in AUTHORED}, {s: 0 for s in floor})
+    saved = S.STAGES[:]
+    try:
+        for tag, roster, forced, want in (
+                ('one real holder the story does not force', {hold[0], rest[0]}, set(), 1),
+                ('nobody who holds it', {rest[0]}, None, 1),
+                ('that holder forced into the party', {hold[0], rest[0]}, {hold[0]}, 0),
+                ('a second real holder fieldable', set(hold[:2]) | {rest[0]}, set(), 0 if len(hold) > 1 else 1)):
+            S.STAGES[:] = [('selftest_leg', roster, forced, False)]
+            found, checked, _met = holder_findings(one, {'selftest_leg': {m: {f}}}, {}, ['selftest_leg'])
+            got = len({sp for _st, sp in found})
+            assert (got > 0) == (want > 0), f'holder rule, {tag}: {got} species found, wanted {"some" if want else "none"}'
+            print(f'audit_break_coverage selftest: holder rule, map {m} form {f} keyed by {C.names(cls)} alone, '
+                  f'{tag} ({", ".join(sorted(roster))}): {got} species not met of {len(checked)}')
+    finally:
+        S.STAGES[:] = saved
     print('audit_break_coverage selftest OK')
     return 0
 
@@ -595,6 +725,7 @@ def main():
                     help='the directory of generator logs the claim is read from')
     ap.add_argument('--stages', action='store_true', help="print each stage's party and hands")
     ap.add_argument('--strict', action='store_true', help='a STAGE NO-KEY fails the run')
+    ap.add_argument('--strict-holders', action='store_true', help='a HOLDER finding fails the run')
     ap.add_argument('--selftest', action='store_true')
     args = ap.parse_args()
     if args.selftest:
@@ -605,7 +736,7 @@ def main():
     logs = [] if args.gate else sorted(
         p for p in glob.glob(os.path.join(args.logs, '*.log'))
         if not os.path.basename(p).startswith(('quick_', 'suite_quick_')))
-    fought, keys = fought_by_map(logs)
+    fought, keys, legs, seen = fought_by_map(logs)
     # a world's walked sectors count once its logs record the world trace
     # (#288): the blind trace wrote only the field coordinates of map-change
     # frames under map=0/1, 56 distinct tiles across the 217 logs of
@@ -621,7 +752,7 @@ def main():
                             or sec & ~3 in WALKED[sec // 256])}
 
     nokey, unclaimed = tier1(TREE, None if args.gate else claimed_field, claimed_sectors)
-    stage_nokey = 0
+    stage_nokey = holders = 0
     if args.gate:
         print('tuning claim: not read (--gate); run without --gate for it')
     else:
@@ -638,6 +769,7 @@ def main():
         else:
             findings, stages = stage_findings(TREE, keys, claimed_field)
             stage_nokey = print_stage(TREE, findings, stages, len(logs), args.stages)
+            holders = print_holders(TREE, *holder_findings(TREE, legs, seen))
 
     bad = unresolved()
     if bad:
@@ -652,6 +784,9 @@ def main():
     print('tier-1 floor invariant holds: zero completely keyless formations game-wide')
     if args.strict and stage_nokey:
         print(f'RATCHET (--strict): {stage_nokey} STAGE NO-KEY formation(s) within the claim')
+        return 1
+    if args.strict_holders and holders:
+        print(f'RATCHET (--strict-holders): the holder rule is not met for {holders} stage x species pair(s)')
         return 1
     return 0
 
