@@ -430,6 +430,7 @@ local function branch(cls, side, when)
     end
     H.log(string.format("[six] %s OK", name))
   end)
+  steps[#steps + 1] = H.waitFrames(4)     -- (a screenshot is of the next frame drawn: before the next restore)
   return H.seqStep(steps)
 end
 

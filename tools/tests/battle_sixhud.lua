@@ -178,9 +178,10 @@ local steps = {
     for i = 1, 2 do H.assertEq(b[i], QMARK, string.format("hidden: B's weakness cell %d is the grey '?'", i)) end
     for i = 3, 4 do H.assertEq(b[i], BLANK, string.format("hidden: B's weakness cell %d is blank", i)) end
     H.screenshot("sixhud_hidden")
-    -- 2. revealed
-    stage(A, 0x0F, 0x0F); stage(Bd, 0x30, 0x30)
   end),
+  H.waitFrames(4),                     -- (a screenshot is of the next frame drawn)
+  -- 2. revealed
+  H.call(function() stage(A, 0x0F, 0x0F); stage(Bd, 0x30, 0x30) end),
   settle(),
   H.call(function()
     local a, b = cells(A), cells(Bd)
@@ -223,6 +224,7 @@ local steps = {
     end
     H.screenshot("sixhud_six")
   end),
+  H.waitFrames(4),
 }
 
 -- 3. each class in each cell its rank can give it
@@ -265,7 +267,8 @@ steps[#steps + 1] = H.call(function()
     H.assertEq(a[k], want[k], string.format("all six: weakness cell %d is the class of rank %d, in bit order", k, k))
   end
   H.screenshot("sixhud_allsix")
-  H.log("[sixhud] PASS")
 end)
+steps[#steps + 1] = H.waitFrames(4)
+steps[#steps + 1] = H.call(function() H.log("[sixhud] PASS") end)
 
 H.run({ maxFrames = 20000 }, steps)
