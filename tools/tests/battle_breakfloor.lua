@@ -17,7 +17,7 @@
 -- species classes, so it survives future data shifts.
 
 local PRG = emu.memType.snesPrgRom
-local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local fails = 0
 
 local function rb(off) return emu.read(off, PRG) end
@@ -36,19 +36,26 @@ end
 
 local function check(cond, msg)
   if not cond then fails = fails + 1 end
-  emu.log(string.format("breakfloor: %s %s", cond and "OK  " or "FAIL", msg))
+  -- print() reaches the run log; emu.log goes to Mesen's script log, which nothing reads headless
+  -- (battle_breaktbl.lua's check has the same note), so a failure here names itself
+  local line = string.format("breakfloor: %s %s", cond and "OK  " or "FAIL", msg)
+  emu.log(line)
+  print(line)
 end
 
--- anchor: species 0..15 classes (guard/soldier/templar pierce, ninja and
--- samurai slash, orog bludgeon, and so on), a distinctive 16-byte run
--- (verified unique in [300000,310000) at authoring time).
+-- anchor: species 0..15 classes (the classifier's slash, pierce and bludgeon
+-- for the guard, the soldier, the templar and so on, each become one of the
+-- six classes by six_class_split.json), a distinctive 16-byte run (unique in
+-- [300000,310000) on the six-class ROM, #566).  The run and the sample rows
+-- below are re-derived from the shipped table when the split moves.
 local base = find(
-  { PIERCE, PIERCE, PIERCE, SLASH, SLASH, BLUDG, SLASH, PIERCE,
-    SLASH, SLASH, SLASH, BLUDG, SLASH, SLASH, SLASH, SLASH },
+  { RANGED, RANGED, RANGED, SWORD, SWORD, SWORD, RANGED, BLUNT,
+    BLUNT, SWORD, BLUNT, SWORD, SWORD, BLUNT, BLUNT, RANGED },
   0x300000, 0x310000)
 
 if not base then
   emu.log("breakfloor: FAIL OT6_FLOOR_CLASS not located")
+  print("breakfloor: FAIL OT6_FLOOR_CLASS not located")
   emu.stop(1)
   return
 end
@@ -57,10 +64,10 @@ emu.log(string.format("breakfloor: OT6_FLOOR_CLASS @%06X", base))
 -- floor[species] the classifier chose: one per class bit, plus a beast
 -- default.  These are the bytes the @formula seed reads as the fallback mask.
 local want = {
-  [0]  = { PIERCE, "guard (armored -> pierce)" },
-  [36] = { PIERCE, "white drgn (pierce)" },
-  [71] = { BLUDG,  "flan (soft body -> bludgeon)" },
-  [19] = { SLASH,  "were-rat (beast default -> slash)" },
+  [0]  = { RANGED, "guard (armored -> the classifier's pierce)" },
+  [36] = { RANGED, "white drgn (the classifier's pierce)" },
+  [71] = { RANGED, "flan (soft body -> the classifier's bludgeon)" },
+  [19] = { SWORD, "were-rat (beast default -> the classifier's slash)" },
 }
 for species, w in pairs(want) do
   local got = rb(base + species)
@@ -71,7 +78,7 @@ end
 -- every floor byte must name at least one breakable class; that is what the
 -- floor is for, so that no un-authored species is left with a zero class
 -- mask, which would make it unbreakable.  Sweep all 384 species.
-local ANY = SLASH | PIERCE | BLUDG
+local ANY = SWORD | DAGGER | BLUNT | RANGED | KATANA | SPEAR
 local zeros = 0
 for species = 0, 383 do
   local got = rb(base + species)
@@ -82,8 +89,10 @@ check(zeros == 0,
 
 if fails == 0 then
   emu.log("breakfloor: break-floor table present and complete - PASS")
+  print("breakfloor: break-floor table present and complete - PASS")
   emu.stop(0)
 else
   emu.log(string.format("breakfloor: %d assertion(s) FAILED", fails))
+  print(string.format("breakfloor: %d assertion(s) FAILED", fails))
   emu.stop(1)
 end

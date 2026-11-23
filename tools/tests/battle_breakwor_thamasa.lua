@@ -18,54 +18,59 @@
 --      (CYAN, TERRA, CELES), the four on the plains (TERRA, CELES, RELM,
 --      STRAGO), and inside the tower the same four's spells only (no
 --      class: the tower is magic-only);
---   3. the lessons: the Mantodea takes RELM's brush (special); L.20 and
+--   3. the lessons: the Mantodea takes RELM's brush; L.20 and
 --      L.70 Magic start with Reflect and their key is earth (Quake, which
 --      Reflect does not bounce); the Holy Dragon has no weakness and no
 --      Reflect (OT6's Break is its key); the goddess carries no gauge.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, elements added }
 local WANT = {
-  [0x0CC] = { "Vindr", 1, SLASH | PIERCE, FIRE, 0, 0 },
-  [0x0AD] = { "SoulDancer", 2, SLASH | SPECIAL, POISON, 0, 0 },
-  [0x092] = { "Crusher", 3, PIERCE | BLUDG, FIRE, 0, 0 },
-  [0x077] = { "Wild Cat", 1, SLASH | PIERCE, FIRE | WATER, 0, 0 },
-  [0x009] = { "Dahling", 2, SLASH | SPECIAL, POISON, 0, 0 },
-  [0x033] = { "Nightshade", 2, SLASH, FIRE, WATER, 0 },
-  [0x050] = { "Still Life", 4, SLASH | SPECIAL, FIRE, 0, 0 },
+  [0x0CC] = { "Vindr", 1, DAGGER | KATANA, FIRE, 0, 0 },
+  [0x0AD] = { "SoulDancer", 2, KATANA | RANGED, POISON, 0, 0 },
+  [0x092] = { "Crusher", 3, SPEAR | BLUNT, FIRE, 0, 0 },
+  [0x077] = { "Wild Cat", 1, DAGGER | KATANA, FIRE | WATER, 0, 0 },
+  [0x009] = { "Dahling", 2, SWORD | BLUNT, POISON, 0, 0 },
+  [0x033] = { "Nightshade", 2, KATANA, FIRE, WATER, 0 },
+  [0x050] = { "Still Life", 4, KATANA | RANGED, FIRE, 0, 0 },
   [0x11E] = { "Chadarnook (goddess)", 0, 0, FIRE, HOLY | WATER, 0 },
-  [0x148] = { "Chadarnook (demon)", 6, SLASH | PIERCE, FIRE | HOLY, BOLT, 0 },
-  [0x0D2] = { "Mantodea", 3, SLASH | BLUDG | SPECIAL, FIRE, 0, 0 },
-  [0x02B] = { "Harpy", 2, PIERCE | SPECIAL, 0, 0, 0 },
-  [0x08A] = { "GloomShell", 3, PIERCE | BLUDG, ICE, 0, 0 },
-  [0x0D4] = { "Prussian", 3, SLASH | BLUDG, 0, 0, 0 },
-  [0x132] = { "L.10 Magic", 1, SPECIAL, FIRE | HOLY, POISON, 0 },
-  [0x130] = { "L.20 Magic", 2, SPECIAL, 0, POISON, EARTH },
-  [0x125] = { "L.30 Magic", 2, SPECIAL, POISON, HOLY, 0 },
-  [0x12B] = { "L.40 Magic", 2, SPECIAL, BOLT, POISON, 0 },
-  [0x133] = { "L.50 Magic", 2, SPECIAL, FIRE | HOLY, POISON, 0 },
-  [0x139] = { "L.60 Magic", 3, SPECIAL, FIRE, ICE, 0 },
-  [0x143] = { "L.70 Magic", 3, SPECIAL, ICE | WATER, FIRE, EARTH },
-  [0x163] = { "L.80 Magic", 3, SPECIAL, POISON, 0, 0 },
+  [0x148] = { "Chadarnook (demon)", 6, SPEAR | KATANA, FIRE | HOLY, BOLT, 0 },
+  [0x0D2] = { "Mantodea", 3, KATANA | BLUNT | RANGED, FIRE, 0, 0 },
+  [0x02B] = { "Harpy", 2, SPEAR | BLUNT, 0, 0, 0 },
+  [0x08A] = { "GloomShell", 3, SPEAR | BLUNT, ICE, 0, 0 },
+  [0x0D4] = { "Prussian", 3, KATANA | RANGED, 0, 0, 0 },
+  [0x132] = { "L.10 Magic", 1, RANGED, FIRE | HOLY, POISON, 0 },
+  [0x130] = { "L.20 Magic", 2, BLUNT, 0, POISON, EARTH },
+  [0x125] = { "L.30 Magic", 2, RANGED, POISON, HOLY, 0 },
+  [0x12B] = { "L.40 Magic", 2, RANGED, BOLT, POISON, 0 },
+  [0x133] = { "L.50 Magic", 2, BLUNT, FIRE | HOLY, POISON, 0 },
+  [0x139] = { "L.60 Magic", 3, BLUNT, FIRE, ICE, 0 },
+  [0x143] = { "L.70 Magic", 3, RANGED, ICE | WATER, FIRE, EARTH },
+  [0x163] = { "L.80 Magic", 3, RANGED, POISON, 0, 0 },
   [0x164] = { "L.90 Magic", 0, 0, 0, WIND, 0 },
   [0x055] = { "Magic Urn", 0, 0, 0, 0xFF, 0 },
-  [0x024] = { "White Drgn", 6, SPECIAL, 0, HOLY, 0 },
-  [0x166] = { "MagiMaster", 8, SPECIAL, nil, nil, 0 },   -- WallChange rewrites his bytes in battle
+  [0x024] = { "White Drgn", 6, RANGED, 0, HOLY, 0 },
+  [0x166] = { "MagiMaster", 8, RANGED, nil, nil, 0 },   -- WallChange rewrites his bytes in battle
 }
 
 -- the hands (route-wor-thamasa.md 4, 5.5, 6): Owzer's three (wor-narshe-v1's
 -- kit: TERRA's natural Fire and Pearl, CELES's Ice and Tritoch's Ice, Bolt
--- and Poison, CYAN's Ifrit), the four on the plains with RELM's brush and
--- STRAGO's rod, and the same four's spells in the tower (TERRA's Quake too)
-local TERRA  = { "TERRA", SLASH, FIRE | HOLY | EARTH }
-local CELES  = { "CELES", SLASH, ICE | BOLT | POISON }
-local CYAN   = { "CYAN", SLASH, FIRE }
-local RELM   = { "RELM", SPECIAL, 0 }
-local STRAGO = { "STRAGO", BLUDG, WIND | WATER }
+-- and Poison, CYAN's Ifrit; TERRA's and CELES's blades, the Falchion $15, and
+-- CYAN's Tempest $2E), the four on the plains with RELM's brush (the Magical
+-- Brush $3F) and STRAGO's rod (the Gravity Rod $3A), and the same four's
+-- spells in the tower (TERRA's Quake too)
+local TERRA  = { "TERRA", W(0x15), FIRE | HOLY | EARTH }
+local CELES  = { "CELES", W(0x15), ICE | BOLT | POISON }
+local CYAN   = { "CYAN", W(0x2E), FIRE }
+local RELM   = { "RELM", W(0x3F), 0 }
+local STRAGO = { "STRAGO", W(0x3A), WIND | WATER }
 local function union(what, list, magicOnly)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do
@@ -205,7 +210,7 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(0x0D2) & SPECIAL) == 0 then problem("$0D2: RELM's brush (special) does not key the Mantodea") end
+    if (classOf(0x0D2) & RELM[2]) == 0 then problem("$0D2: RELM's brush does not key the Mantodea") end
     for _, sp in ipairs({ 0x130, 0x143 }) do
       local mstat = H.readRomByte(prop + sp * 32 + 29)   -- MonsterProp +29: status 3 at start (bit 7 Reflect)
       if (mstat & 0x80) == 0 then problem("$%03X no longer starts with Reflect (MonsterProp+29 $%02X)", sp, mstat) end

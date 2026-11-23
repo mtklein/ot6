@@ -7,16 +7,19 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the flower takes the blades (slash) and Fire, and still drinks water.
+--   3. the lessons: the flower takes the Mithril Blades and Fire, and still drinks water.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x032] = { "Trilium", 2, SLASH | PIERCE, FIRE, WATER, 0 },
+  [0x032] = { "Trilium", 2, SWORD | SPEAR, FIRE, WATER, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -25,9 +28,10 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 4); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "TERRA, LOCKE, EDGAR", { { "TERRA", SLASH, FIRE }, { "LOCKE", SLASH, 0 }, { "EDGAR", PIERCE, POISON } }, nil },
+  -- kolts-summit-v1: TERRA and LOCKE the MithrilBlade $0A, EDGAR the Mithril Pike $1D
+  { "TERRA, LOCKE, EDGAR", { { "TERRA", W(0x0A), FIRE }, { "LOCKE", W(0x0A), 0 }, { "EDGAR", W(0x1D), POISON } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -137,7 +141,7 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(0x032) & SLASH) == 0 then problem("$032 Trilium: the Mithril Blades (slash) hold no key") end
+    if (classOf(0x032) & W(0x0A)) == 0 then problem("$032 Trilium: the Mithril Blades hold no key") end
     if (weakOf(0x032) & FIRE) == 0 then problem("$032 Trilium: TERRA's Fire holds no key") end
     if (absorb(0x032) & WATER) == 0 then problem("$032 Trilium no longer absorbs water") end
     H.log("the lessons: the flower takes the blades and Fire, and drinks water")

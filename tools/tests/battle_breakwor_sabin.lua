@@ -11,35 +11,40 @@
 --   2. every species the stretch can draw has an authored row, and every
 --      formation it can draw holds a key for Celes alone with a sword and
 --      her own Ice (the weakest hand section 8 designs for): a species
---      whose break class (authored, else the floor) includes slash, or
+--      whose break class (authored, else the floor) includes her sword's class, or
 --      whose weakness (vanilla or added) includes ice.
---   3. special (¤) is a common key (guidelines, #347): the designed rows
---      that take it are the spirits, and the count is logged.
+--   3. special (¤) was a common key (guidelines, #347); under the six
+--      classes its holders' hands are the cards (ranged) and the brushes
+--      (blunt): the designed rows that take the cards' class are counted
+--      and the count is logged.
 --
 -- All mismatches are logged before the verdict, so a red run names every
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, HOLY, WATER = 0x01, 0x02, 0x04, 0x20, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   -- the Solitary Island (world groups 29, 30)
-  [0x072] = { "Peepers",    1, SLASH,          ICE | WATER },
-  [0x0B2] = { "EarthGuard", 1, SLASH,          WATER },
-  [0x0D5] = { "Black Drgn", 4, SLASH,          FIRE | HOLY },
+  [0x072] = { "Peepers",    1, SWORD,          ICE | WATER },
+  [0x0B2] = { "EarthGuard", 1, SWORD,          WATER },
+  [0x0D5] = { "Black Drgn", 4, SWORD,          FIRE | HOLY },
   -- the plains (world groups 31, 34 on the route; 33, 35, 36 beside it)
-  [0x021] = { "Mesosaur",   3, SLASH | PIERCE, ICE },
-  [0x031] = { "Gilomantis", 3, SLASH | BLUDG,  FIRE },
-  [0x07C] = { "Chitonid",   3, BLUDG,          BOLT },
-  [0x098] = { "Gigan Toad", 2, SLASH | PIERCE, ICE },
-  [0x0CA] = { "Lunaris",    2, SLASH | PIERCE, 0 },
-  [0x0E6] = { "Osprey",     2, SLASH | PIERCE, ICE },
+  [0x021] = { "Mesosaur",   3, SWORD | SPEAR, ICE },
+  [0x031] = { "Gilomantis", 3, SWORD | BLUNT, FIRE },
+  [0x07C] = { "Chitonid",   3, BLUNT,          BOLT },
+  [0x098] = { "Gigan Toad", 2, SWORD | SPEAR, ICE },
+  [0x0CA] = { "Lunaris",    2, SWORD | SPEAR, 0 },
+  [0x0E6] = { "Osprey",     2, SWORD | SPEAR, ICE },
   -- Tzen's collapsing house (map 311; its monster box is event group 150)
-  [0x0E1] = { "Scorpion",   2, SLASH | PIERCE, 0 },
-  [0x02C] = { "HermitCrab", 2, SLASH | BLUDG,  WATER },
-  [0x0C0] = { "Pm Stalker", 2, SLASH | SPECIAL, FIRE | HOLY },  -- a ghost: ¤ (#347)
+  [0x0E1] = { "Scorpion",   2, SWORD | SPEAR, 0 },
+  [0x02C] = { "HermitCrab", 2, SWORD | RANGED, WATER },
+  [0x0C0] = { "Pm Stalker", 2, SWORD | RANGED, FIRE | HOLY },  -- a ghost: ¤ (#347)
 }
 
 -- where the stretch draws from (section 4): world groups (40 is the other
@@ -49,7 +54,7 @@ local FIELD_MAPS   = { 311 }
 local EVENT_GROUPS = { 150 }
 
 -- the weakest hand section 8 designs for: Celes alone, a sword, her Ice
-local HAND_CLASSES, HAND_ELEMS = SLASH, ICE
+local HAND_CLASSES, HAND_ELEMS = W(0x11), ICE     -- wor-island-v1: the Break Blade $11
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),
@@ -179,9 +184,9 @@ H.run({ maxFrames = 600 }, {
     local nspecial, nids = 0, 0
     for sp in pairs(WANT) do
       nids = nids + 1
-      if shield[sp] and (shield[sp][2] & SPECIAL) ~= 0 then nspecial = nspecial + 1 end
+      if shield[sp] and (shield[sp][2] & W(0x4D)) ~= 0 then nspecial = nspecial + 1 end
     end
-    H.log(string.format("special: %d of %d designed species take ¤ in this ROM", nspecial, nids))
+    H.log(string.format("the cards: %d of %d designed species take SETZER's cards' class in this ROM", nspecial, nids))
 
     H.assertEq(#problems, 0, "WoR island-to-Tzen break row mismatches")
     H.log("WoR island-to-Tzen break rows verified against the built ROM")

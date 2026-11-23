@@ -8,53 +8,60 @@
 --      no Ot6ElemAddTbl row;
 --   2. every species of every formation the tower's twenty pool groups and eight event battles deal has an authored
 --      row, and a key for each party whose lane meets it (LANES);
---   3. the lessons: the factory's machines turn the blades (no slash) and take the point and the blow (pierce and
---      bludgeon) and bolt; the three statues each take the brush and the cards (special), and between them every
---      other hand (slash, pierce, bludgeon); the Guardian the tower fights ($112) has a gauge, and the World of
---      Balance's ($111) still has none.
+--   3. the lessons: the factory's machines turn the blades (no sword, no katana) and take a point and a blow
+--      (what the four classes' pierce and bludgeon became: a dagger, a spear or a ranged hit, and a blunt or a
+--      ranged one; two different classes) and bolt; the three statues each take the cards or the brush (what
+--      special became), and between them a blade, a point and a blow, four classes or more; the Guardian the
+--      tower fights ($112) has a gauge, and the World of Balance's ($111) still has none.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
-local PB = PIERCE | BLUDG
+-- what each of the four classes became (tools/proto_six/classes.py CHILDREN): slash a sword or a katana, pierce a
+-- dagger, a spear or a ranged hit, bludgeon a blunt or a ranged one
+local EDGE, POINT, BLOW = SWORD | KATANA, DAGGER | SPEAR | RANGED, BLUNT | RANGED
+local function nbits(m) local n = 0; while m ~= 0 do n = n + (m & 1); m = m >> 1 end; return n end
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x084] = { "Brontaur", 3, PB, ICE, 0 },
-  [0x0B7] = { "Evil Oscar", 3, SLASH | SPECIAL, FIRE, 0xFE },
-  [0x080] = { "Vectaur", 2, SLASH | PIERCE, ICE | WATER, 0 },
-  [0x0E0] = { "GtBehemoth", 3, PB, 0, 0 },
-  [0x00D] = { "Dark Force", 3, BLUDG | SPECIAL, HOLY, 0 },
-  [0x0BD] = { "Outsider", 3, SLASH | PIERCE, HOLY, POISON },
-  [0x06A] = { "Madam", 3, SLASH | SPECIAL, POISON, 0 },
-  [0x007] = { "Retainer", 3, SLASH | BLUDG, POISON, 0 },
-  [0x0C1] = { "Hemophyte", 2, SLASH | SPECIAL, 0, 0 },
-  [0x0FB] = { "Veteran", 3, SLASH | PIERCE, 0, 0 },
-  [0x0F9] = { "Didalos", 3, BLUDG | SPECIAL, FIRE | HOLY, POISON },
-  [0x016] = { "Steroidite", 4, PB, HOLY, 0 },
-  [0x056] = { "Mover", 1, SLASH | BLUDG, 0, POISON },
-  [0x025] = { "Doom Drgn", 4, PIERCE | SPECIAL, 0, 0 },
-  [0x0E4] = { "Vectagoyle", 3, BLUDG | SPECIAL, 0, 0 },
-  [0x09B] = { "Land Worm", 3, SLASH | PIERCE, ICE, EARTH },
-  [0x0FD] = { "IronHitman", 2, PB, BOLT | WATER, 0 },
-  [0x0D9] = { "Dueller", 3, PB, BOLT | WATER, 0 },
-  [0x0EA] = { "Fortis", 4, PB, BOLT | WATER, 0 },
-  [0x0ED] = { "Junk", 2, PB, BOLT | WATER, 0 },
-  [0x0F6] = { "Innoc", 3, PB, BOLT | WATER, 0 },
-  [0x105] = { "Prometheus", 4, PB, BOLT | WATER, 0 },
-  [0x0FC] = { "Sky Base", 2, PB, BOLT | WATER, 0 },
-  [0x0A1] = { "Scullion", 4, PB, BOLT | WATER, 0 },
-  [0x10C] = { "Inferno", 6, PB, BOLT, FIRE },
-  [0x142] = { "Striker", 3, SLASH | PIERCE, FIRE, ICE },
-  [0x141] = { "Rough", 3, SLASH | BLUDG, ICE, BOLT },
-  [0x112] = { "Guardian", 10, PB, BOLT | WATER, 0 },
-  [0x127] = { "Doom", 10, SLASH | SPECIAL, HOLY, ICE | POISON },
-  [0x128] = { "Goddess", 8, PIERCE | SPECIAL, 0, BOLT | HOLY },
-  [0x129] = { "Poltrgeist", 8, BLUDG | SPECIAL, POISON, FIRE | WIND },
-  [0x17D] = { "Atma", 10, SLASH | PIERCE, 0, POISON | WIND | HOLY | EARTH | WATER },
-  [0x150] = { "Gold Drgn", 6, SLASH | PIERCE, WATER, BOLT },
-  [0x151] = { "Skull Drgn", 6, BLUDG | SPECIAL, FIRE | HOLY, POISON },
+  [0x084] = { "Brontaur", 3, SPEAR | BLUNT, ICE, 0 },
+  [0x0B7] = { "Evil Oscar", 3, KATANA | BLUNT, FIRE, 0xFE },
+  [0x080] = { "Vectaur", 2, SPEAR | KATANA, ICE | WATER, 0 },
+  [0x0E0] = { "GtBehemoth", 3, DAGGER | BLUNT, 0, 0 },
+  [0x00D] = { "Dark Force", 3, BLUNT | RANGED, HOLY, 0 },
+  [0x0BD] = { "Outsider", 3, DAGGER | KATANA, HOLY, POISON },
+  [0x06A] = { "Madam", 3, KATANA | RANGED, POISON, 0 },
+  [0x007] = { "Retainer", 3, KATANA | BLUNT, POISON, 0 },
+  [0x0C1] = { "Hemophyte", 2, KATANA | RANGED, 0, 0 },
+  [0x0FB] = { "Veteran", 3, SWORD | DAGGER, 0, 0 },
+  [0x0F9] = { "Didalos", 3, BLUNT | RANGED, FIRE | HOLY, POISON },
+  [0x016] = { "Steroidite", 4, SPEAR | RANGED, HOLY, 0 },
+  [0x056] = { "Mover", 1, KATANA | BLUNT, 0, POISON },
+  [0x025] = { "Doom Drgn", 4, DAGGER | BLUNT, 0, 0 },
+  [0x0E4] = { "Vectagoyle", 3, BLUNT | RANGED, 0, 0 },
+  [0x09B] = { "Land Worm", 3, DAGGER | KATANA, ICE, EARTH },
+  [0x0FD] = { "IronHitman", 2, SPEAR | BLUNT, BOLT | WATER, 0 },
+  [0x0D9] = { "Dueller", 3, SPEAR | RANGED, BOLT | WATER, 0 },
+  [0x0EA] = { "Fortis", 4, SPEAR | RANGED, BOLT | WATER, 0 },
+  [0x0ED] = { "Junk", 2, DAGGER | RANGED, BOLT | WATER, 0 },
+  [0x0F6] = { "Innoc", 3, DAGGER | RANGED, BOLT | WATER, 0 },
+  [0x105] = { "Prometheus", 4, SPEAR | RANGED, BOLT | WATER, 0 },
+  [0x0FC] = { "Sky Base", 2, SPEAR | RANGED, BOLT | WATER, 0 },
+  [0x0A1] = { "Scullion", 4, SPEAR | BLUNT, BOLT | WATER, 0 },
+  [0x10C] = { "Inferno", 6, SPEAR | RANGED, BOLT, FIRE },
+  [0x142] = { "Striker", 3, DAGGER | KATANA, FIRE, ICE },
+  [0x141] = { "Rough", 3, KATANA | RANGED, ICE, BOLT },
+  [0x112] = { "Guardian", 10, SPEAR | RANGED, BOLT | WATER, 0 },
+  [0x127] = { "Doom", 10, KATANA | RANGED, HOLY, ICE | POISON },
+  [0x128] = { "Goddess", 8, SPEAR | RANGED, 0, BOLT | HOLY },
+  [0x129] = { "Poltrgeist", 8, BLUNT | RANGED, POISON, FIRE | WIND },
+  [0x17D] = { "Atma", 10, SPEAR | KATANA, 0, POISON | WIND | HOLY | EARTH | WATER },
+  [0x150] = { "Gold Drgn", 6, DAGGER | KATANA, WATER, BOLT },
+  [0x151] = { "Skull Drgn", 6, BLUNT | RANGED, FIRE | HOLY, POISON },
 }
 local MACHINES = { 0x0FD, 0x0D9, 0x0EA, 0x0ED, 0x0F6, 0x105, 0x0FC, 0x0A1, 0x10C, 0x112 }
 local STATUES = { 0x127, 0x128, 0x129 }
@@ -62,22 +69,24 @@ local EVENTS = { 98, 99, 100, 112, 114, 135, 136, 140 }
 -- the three parties the route seats (route-wor-kefka-tower.md section 4) and the lanes they walk (section 2): the
 -- pool groups and event battles each meets, the class keys its weapons hold and the elements its spells, skeans
 -- and lores reach at wor-desert-v1.  A species keys a party when either meets it.
---   party 1: TERRA (a blade; Fire, Ice, Bolt), RELM (a rod), EDGAR (a knife), SETZER (cards): the north-west,
+--   party 1: TERRA (a blade, the Falchion $15; Fire, Ice, Bolt), RELM (a rod, the Magus Rod $3C), EDGAR (a knife,
+--            the Man Eater $06), SETZER (cards, the Trump $50): the north-west,
 --            303, 304, 292, the machines' hall 352, 295; the chamber's east column, the Goddess (354)
---   party 2: CELES (a blade; Ice), STRAGO (a rod; Aqua Rake), LOCKE (the Wing Edge), MOG (a spear): 338, 331
+--   party 2: CELES (a blade, the Falchion; Ice), STRAGO (a rod, the Pearl Rod $39; Aqua Rake), LOCKE (the Wing
+--            Edge $4C), MOG (a spear, the Partisan $20): 338, 331
 --            (Atma), 329, 409, 292, 294, 335 (the Gold Dragon), 354; the chamber's middle, Guardian (291), 287,
 --            the Poltergeist (334)
---   party 3: CYAN (katanas), SHADOW (the Striker; his skeans fire, water, bolt), SABIN (claws; fire, holy), GOGO (a
---            knife): 339, the factory 410 (Inferno), 296, 293, 354 (the Skull Dragon); the chamber's west
+--   party 3: CYAN (katanas, the Strato $31), SHADOW (the Striker $29; the skeans he throws, $51-$53: fire,
+--            water, bolt), SABIN (claws, the Dragon Claw $58; fire, holy), GOGO (a knife, the Man Eater): 339, the factory 410 (Inferno), 296, 293, 354 (the Skull Dragon); the chamber's west
 --            column, Doom (355)
 -- The chamber's gate switches shut each column behind the party that enters it, so the order the weights fall
 -- in sets the lanes (route-wor-kefka-tower.md section 2): party 1 east, party 3 west, party 2 the middle.
 local LANES = TOWER_LANES or {
-  { "party 1", SLASH | BLUDG | PIERCE | SPECIAL, FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
+  { "party 1", W(0x15) | W(0x3C) | W(0x06) | W(0x50), FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
     226 }, { 99 } },
-  { "party 2", SLASH | BLUDG | PIERCE, ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
+  { "party 2", W(0x15) | W(0x39) | W(0x4C) | W(0x20), ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
     { 112, 135, 140, 100 } },
-  { "party 3", SLASH | PIERCE, FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
+  { "party 3", W(0x31) | W(0x29) | SK(0x51) | W(0x58) | W(0x06), FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
     { 114, 136, 98 } },
 }
 
@@ -192,18 +201,20 @@ H.run({ maxFrames = 600 }, {
     -- 3. the lessons
     for _, sp in ipairs(MACHINES) do
       local nm = WANT[sp][1]
-      if (classOf(sp) & SLASH) ~= 0 then problem("$%03X %s: a machine the blades (slash) key", sp, nm) end
-      if (classOf(sp) & PB) ~= PB then problem("$%03X %s: a machine not keyed by the point and the blow", sp, nm) end
+      if (classOf(sp) & EDGE) ~= 0 then problem("$%03X %s: a machine the blades (a sword, a katana) key", sp, nm) end
+      if (classOf(sp) & POINT) == 0 or (classOf(sp) & BLOW) == 0 or nbits(classOf(sp) & (POINT | BLOW)) < 2 then
+        problem("$%03X %s: a machine not keyed by a point and a blow, two classes (class $%02X)", sp, nm, classOf(sp))
+      end
       if (weakOf(sp) & BOLT) == 0 then problem("$%03X %s: a machine Bolt does not key", sp, nm) end
     end
     local hands = 0
     for _, sp in ipairs(STATUES) do
-      if (classOf(sp) & SPECIAL) == 0 then problem("$%03X %s: a statue the brush and cards (special) do not key", sp,
+      if (classOf(sp) & (W(0x50) | W(0x3F))) == 0 then problem("$%03X %s: a statue neither the cards nor the brush keys", sp,
         WANT[sp][1]) end
       hands = hands | classOf(sp)
     end
-    if (hands & (SLASH | PIERCE | BLUDG)) ~= (SLASH | PIERCE | BLUDG) then
-      problem("the three statues together key class mask $%02X, want every hand", hands)
+    if (hands & EDGE) == 0 or (hands & POINT) == 0 or (hands & BLOW) == 0 or nbits(hands) < 4 then
+      problem("the three statues together key class mask $%02X, want a blade, a point and a blow, four classes or more", hands)
     end
     if shield[0x111] == nil or shield[0x111][1] ~= 0 then problem("$111 Guardian (the WoB's): not shieldless") end
     H.log("the lessons: the machines turn the blades and take the point, the blow and bolt; each statue takes the "

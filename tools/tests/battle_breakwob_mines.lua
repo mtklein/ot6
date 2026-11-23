@@ -7,16 +7,19 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the wisp's one shield, keyed by TERRA's knife (pierce) and by her Fire.
+--   3. the lessons: the wisp's one shield, keyed by TERRA's knife and by her Fire.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x046] = { "Vaporite", 1, PIERCE | BLUDG, FIRE | HOLY, BOLT, 0 },
+  [0x046] = { "Vaporite", 1, DAGGER | BLUNT, FIRE | HOLY, BOLT, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -25,9 +28,9 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 1); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "TERRA alone", { { "TERRA", PIERCE, FIRE } }, nil },
+  { "TERRA alone", { { "TERRA", W(0x01), FIRE } }, nil },                -- her MithrilKnife $01
 }
 
 H.run({ maxFrames = 600 }, {
@@ -138,7 +141,7 @@ H.run({ maxFrames = 600 }, {
 
     -- 3. the lessons
     if shield[0x046] == nil or shield[0x046][1] ~= 1 then problem("$046 Vaporite: not one shield, so the hit that breaks it is not the kill") end
-    if (classOf(0x046) & PIERCE) == 0 then problem("$046 Vaporite: TERRA's knife (pierce) holds no key") end
+    if (classOf(0x046) & W(0x01)) == 0 then problem("$046 Vaporite: TERRA's knife holds no key") end
     if (weakOf(0x046) & FIRE) == 0 then problem("$046 Vaporite: TERRA's Fire holds no key") end
     H.log("the lessons: the wisp's one shield; TERRA's knife and her Fire both key it")
     H.assertEq(#problems, 0, "WoB mines break row mismatches")

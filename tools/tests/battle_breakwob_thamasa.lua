@@ -7,18 +7,21 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: LOCKE's ThunderBlade keys the Cephaler twice (slash and bolt); the Chimera is the four-shield miniboss-grade beast.
+--   3. the lessons: LOCKE's ThunderBlade keys the Cephaler twice (its blade and its bolt); the Chimera is the four-shield miniboss-grade beast.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x096] = { "Cephaler", 2, SLASH | PIERCE, BOLT, 0, 0 },
-  [0x01F] = { "Chimera", 4, SLASH | PIERCE, 0, 0, POISON },
-  [0x01D] = { "Baskervor", 2, SLASH | PIERCE, 0, 0, POISON },
+  [0x096] = { "Cephaler", 2, SWORD | DAGGER, BOLT, 0, 0 },
+  [0x01F] = { "Chimera", 4, SWORD | DAGGER, 0, 0, POISON },
+  [0x01D] = { "Baskervor", 2, SWORD | DAGGER, 0, 0, POISON },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -29,9 +32,10 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 10); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "TERRA, LOCKE, STRAGO", { { "TERRA", SLASH, ICE }, { "LOCKE", SLASH, BOLT }, { "STRAGO", BLUDG, FIRE } }, nil },
+  -- esper-mtn-save-v1: TERRA the Blizzard $0E, LOCKE the ThunderBlade $0F, STRAGO the Fire Rod $35
+  { "TERRA, LOCKE, STRAGO", { { "TERRA", W(0x0E), ICE }, { "LOCKE", W(0x0F), BOLT }, { "STRAGO", W(0x35), FIRE } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {

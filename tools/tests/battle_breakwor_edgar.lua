@@ -14,54 +14,62 @@
 --      groups, field maps and event group -- has an authored row, and a
 --      key for the party that meets it there: a break class (authored,
 --      else the floor) the party holds, or a weakness (vanilla or added)
---      one of its elements carries.  CELES + SABIN hold slash and bludg,
---      ice, bolt, fire and holy; at the Tentacles EDGAR adds pierce and
---      poison;
+--      one of its elements carries.  CELES + SABIN hold her swords and his knuckles and blitzes,
+--      ice, bolt, fire and holy; at the Tentacles EDGAR adds his pike, his
+--      AutoCrossbow (and his own sword) and poison;
 --   3. at the Tentacles the classes carry the fight: three of the four
 --      absorb one of the party's fire, ice or bolt, so every Tentacle has
 --      a class key for the three members together, and each member holds
---      a class key on at least three of the four (CELES's slash misses
+--      a class key on at least three of the four (CELES's swords miss
 --      `$13D`, the design's one).
---   4. special (¤) is a common key (guidelines, #347): the designed rows
---      that take it are the cave's reaper and demon; the count is logged.
+--   4. special (¤) was a common key (guidelines, #347); under the six
+--      classes the designed rows that take the cards' class are counted
+--      and the count is logged.
 --
 -- All mismatches are logged before the verdict, so a red run names every
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, HOLY, WATER = 0x01, 0x02, 0x04, 0x08, 0x20, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   -- north of Tzen to Nikeah (world groups 37-39)
-  [0x035] = { "Bloompire",  1, SLASH,          FIRE },
-  [0x058] = { "Buffalax",   3, BLUDG,          FIRE | WATER },
-  [0x03C] = { "Lizard",     3, SLASH | PIERCE, ICE },
-  [0x030] = { "Delta Bug",  2, BLUDG | PIERCE, FIRE },
+  [0x035] = { "Bloompire",  1, SWORD,          FIRE },
+  [0x058] = { "Buffalax",   3, BLUNT,          FIRE | WATER },
+  [0x03C] = { "Lizard",     3, SWORD | SPEAR, ICE },
+  [0x030] = { "Delta Bug",  2, SPEAR | BLUNT, FIRE },
   -- the South Figaro continent (world groups 41-44)
-  [0x0C3] = { "Nohrabbit",  1, SLASH,          WATER },
-  [0x0B9] = { "Latimeria",  3, SLASH | PIERCE, BOLT },
-  [0x097] = { "Maliga",     2, SLASH | BLUDG,  ICE | BOLT | WATER },
-  [0x05F] = { "Sand Horse", 2, SLASH | PIERCE, ICE | WATER },
+  [0x0C3] = { "Nohrabbit",  1, SWORD,          WATER },
+  [0x0B9] = { "Latimeria",  3, SWORD | SPEAR, BOLT },
+  [0x097] = { "Maliga",     2, SWORD | BLUNT, ICE | BOLT | WATER },
+  [0x05F] = { "Sand Horse", 2, SWORD | SPEAR, ICE | WATER },
   -- the Figaro cave and the castle's basements (groups 137-140)
-  [0x049] = { "Humpty",     2, BLUDG,          FIRE | HOLY },
-  [0x04B] = { "Cruller",    3, BLUDG,          FIRE | HOLY },
-  [0x0A9] = { "NeckHunter", 3, SLASH | PIERCE | SPECIAL, POISON },  -- a reaper: ¤ (#347)
-  [0x0D7] = { "Dante",      4, SLASH | BLUDG | SPECIAL,  POISON },  -- a demon: ¤ (#347)
-  [0x08B] = { "Drop",       2, BLUDG | PIERCE, BOLT | WATER },
+  [0x049] = { "Humpty",     2, BLUNT,          FIRE | HOLY },
+  [0x04B] = { "Cruller",    3, BLUNT,          FIRE | HOLY },
+  [0x0A9] = { "NeckHunter", 3, SWORD | DAGGER | BLUNT, POISON },  -- a reaper: ¤ (#347)
+  [0x0D7] = { "Dante",      4, SWORD | BLUNT | RANGED,   POISON },  -- a demon: ¤ (#347)
+  [0x08B] = { "Drop",       2, DAGGER | RANGED, BOLT | WATER },
   -- the engine room's Tentacles (event group 84)
-  [0x11B] = { "Tentacle",   5, SLASH | PIERCE, ICE | WATER },
-  [0x13C] = { "Tentacle",   5, SLASH | BLUDG,  FIRE },
-  [0x13D] = { "Tentacle",   5, BLUDG | PIERCE, 0 },
-  [0x13E] = { "Tentacle",   5, SLASH | PIERCE, 0 },
+  [0x11B] = { "Tentacle",   5, SWORD | SPEAR, ICE | WATER },
+  [0x13C] = { "Tentacle",   5, SWORD | BLUNT, FIRE },
+  [0x13D] = { "Tentacle",   5, SPEAR | BLUNT, 0 },
+  [0x13E] = { "Tentacle",   5, SWORD | BLUNT, 0 },
 }
 
--- the hands (route-wor-edgar.md 8.1)
-local DUO = { cls = SLASH | BLUDG, el = ICE | BOLT | FIRE | HOLY,
-              what = "CELES + SABIN (slash, bludg; ice, bolt, fire, holy)" }
-local TRIO = { cls = SLASH | BLUDG | PIERCE, el = ICE | BOLT | FIRE | HOLY | POISON,
-               what = "CELES + SABIN + EDGAR (+ pierce, poison)" }
+-- the hands (route-wor-edgar.md 8.1; wor-sabin-v1): CELES's Blizzard $0E and
+-- ThunderBlade $0F; SABIN's Fire Knuckles $57, Pummel $5D, Suplex $5F and bare
+-- fists $FF; EDGAR's AutoCrossbow $AA, Mithril Pike $1D and Break Blade $11
+local CELES_HAND, SABIN_HAND = W(0x0E) | W(0x0F), W(0x57) | SK(0x5D) | SK(0x5F) | W(0xFF)
+local EDGAR_HAND = W(0xAA) | W(0x1D) | W(0x11)
+local DUO = { cls = CELES_HAND | SABIN_HAND, el = ICE | BOLT | FIRE | HOLY,
+              what = "CELES + SABIN (her swords, his knuckles and blitzes; ice, bolt, fire, holy)" }
+local TRIO = { cls = CELES_HAND | SABIN_HAND | EDGAR_HAND, el = ICE | BOLT | FIRE | HOLY | POISON,
+               what = "CELES + SABIN + EDGAR (+ his pike, AutoCrossbow and blade; poison)" }
 -- where the stretch draws from (section 3), and who meets it there.  The
 -- Black Drgn's desert (group 40) is on the walk to Nikeah; the cave's maps
 -- are walked out again with EDGAR, but the duo's key is the stricter one.
@@ -202,7 +210,7 @@ H.run({ maxFrames = 600 }, {
       end
     end
     H.log(string.format("the Tentacles: %d of 4 absorb one of the party's fire, ice or bolt", absorbing))
-    local members = { { "CELES", SLASH }, { "SABIN", SLASH | BLUDG }, { "EDGAR", SLASH | PIERCE } }
+    local members = { { "CELES", CELES_HAND }, { "SABIN", SABIN_HAND }, { "EDGAR", EDGAR_HAND } }
     for _, m in ipairs(members) do
       local n = 0
       for _, sp in ipairs(TENTACLES) do
@@ -215,9 +223,9 @@ H.run({ maxFrames = 600 }, {
     local nspecial, nids = 0, 0
     for sp in pairs(WANT) do
       nids = nids + 1
-      if shield[sp] and (shield[sp][2] & SPECIAL) ~= 0 then nspecial = nspecial + 1 end
+      if shield[sp] and (shield[sp][2] & W(0x4D)) ~= 0 then nspecial = nspecial + 1 end
     end
-    H.log(string.format("special: %d of %d designed species take ¤ in this ROM", nspecial, nids))
+    H.log(string.format("the cards: %d of %d designed species take SETZER's cards' class in this ROM", nspecial, nids))
 
     H.assertEq(#problems, 0, "WoR Tzen-to-Edgar break row mismatches")
     H.log("WoR Tzen-to-Edgar break rows verified against the built ROM")

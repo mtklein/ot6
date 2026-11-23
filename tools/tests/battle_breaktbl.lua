@@ -15,7 +15,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")   -- only for H.sym address lookups
 
 local PRG = emu.memType.snesPrgRom
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
 local fails = 0
 
@@ -67,7 +67,7 @@ end
 -- anchors: ShieldTbl opens guard/lobo/whelk(shell); ElemAddTbl opens
 -- whelk-head(fire)/vargas(holy). both are distinctive multi-record runs.
 local shieldBase = find(
-  { 0x00, 0x00, 0x02, 0x02, 0x19, 0x00, 0x03, 0x02, 0x00, 0x01, 0x00, 0x00 },
+  { 0x00, 0x00, 0x02, 0x08, 0x19, 0x00, 0x03, 0x20, 0x00, 0x01, 0x00, 0x00 },
   0x300000, 0x310000)
 local elemBase = find(
   { 0x34, 0x01, 0x01, 0x00, 0x03, 0x01, 0x20, 0x00 },
@@ -87,33 +87,33 @@ local E = walk(elemBase)
 
 -- the v0.6 class rows: id -> {shields, class, name}
 local want = {
-  [0x0001] = { 2, SLASH | PIERCE, "soldier" },
-  [0x0002] = { 3, PIERCE,         "templar" },
-  [0x014e] = { 3, SLASH,          "leader (Cyan duel)" },
-  [0x014f] = { 2, SLASH | BLUDG,  "grunt" },
-  [0x0176] = { 3, SLASH | BLUDG,  "cadet" },
-  [0x0175] = { 2, PIERCE,         "officer" },
-  [0x0065] = { 2, SLASH | PIERCE, "trooper" },
-  [0x003f] = { 3, SLASH | PIERCE, "rider" },
-  [0x009f] = { 3, SLASH | PIERCE, "heavyarmor" },
-  [0x013a] = { 2, PIERCE,         "merchant" },
-  [0x003a] = { 2, SLASH,          "anguiform (trench)" },
-  [0x005e] = { 2, BLUDG,          "actaneon (trench)" },
+  [0x0001] = { 2, KATANA | RANGED, "soldier" },
+  [0x0002] = { 3, RANGED,         "templar" },
+  [0x014e] = { 3, KATANA,         "leader (Cyan duel)" },
+  [0x014f] = { 2, KATANA | BLUNT, "grunt" },
+  [0x0176] = { 3, KATANA | BLUNT, "cadet" },
+  [0x0175] = { 2, DAGGER,         "officer" },
+  [0x0065] = { 2, SWORD | DAGGER, "trooper" },
+  [0x003f] = { 3, SWORD | DAGGER, "rider" },
+  [0x009f] = { 3, SWORD | DAGGER, "heavyarmor" },
+  [0x013a] = { 2, DAGGER,         "merchant" },
+  [0x003a] = { 2, KATANA,         "anguiform (trench)" },
+  [0x005e] = { 2, BLUNT,          "actaneon (trench)" },
   -- the trench trio is Sabin + Cyan + Gau and none of them pierces: Gau's
   -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
-  -- hands read $ff -> OT6_BLUDG.
-  [0x0059] = { 2, BLUDG,          "aspik (trench) -- #23, was a dead PIERCE" },
+  -- hands read $ff -> OT6_BLUNT (Gau's own are his fangs, OT6_DAGGER, #566).
+  [0x0059] = { 2, BLUNT,          "aspik (trench) -- #23, was a dead PIERCE" },
   -- the floating continent's random pool (map 394): the FC party carries
-  -- RELM, whose brushes are special (weapon-classes.md), and special is a
-  -- common key (guidelines, #347): the three magic bodies take it; the
-  -- beasts, the dragons and the ninja do not
-  [0x0020] = { 3, SLASH | PIERCE,           "behemoth (FC)" },
-  [0x0083] = { 3, SLASH | PIERCE,           "dragon (FC)" },
-  [0x000c] = { 2, SLASH | PIERCE | SPECIAL, "apokryphos (FC): a demon, special" },
-  [0x00a4] = { 2, SLASH | PIERCE | SPECIAL, "misfit (FC): conjured, special" },
-  [0x0003] = { 2, SLASH | PIERCE,           "ninja (FC)" },
-  [0x00d8] = { 2, SLASH | PIERCE,           "wirey drgn (FC)" },
-  [0x004a] = { 2, SLASH | PIERCE | SPECIAL, "brainpan (FC): a mind, special" },
+  -- RELM, whose brushes were special (weapon-classes.md), and special was a
+  -- common key (guidelines, #347): the three magic bodies took it; the
+  -- beasts, the dragons and the ninja did not
+  [0x0020] = { 3, SWORD | SPEAR,            "behemoth (FC)" },
+  [0x0083] = { 3, SPEAR | KATANA,           "dragon (FC)" },
+  [0x000c] = { 2, SWORD | DAGGER | BLUNT, "apokryphos (FC): a demon (it took special)" },
+  [0x00a4] = { 2, SWORD | DAGGER | BLUNT, "misfit (FC): conjured (it took special)" },
+  [0x0003] = { 2, SWORD | DAGGER,           "ninja (FC)" },
+  [0x00d8] = { 2, SWORD | DAGGER,           "wirey drgn (FC)" },
+  [0x004a] = { 2, SWORD | DAGGER | BLUNT, "brainpan (FC): a mind (it took special)" },
 }
 for id, w in pairs(want) do
   local r = S[id]
@@ -135,8 +135,12 @@ check(E[0x0042] ~= nil and E[0x0042][1] == POISON, "m-tekarmor $0042 keeps poiso
 check(E[0x009f] ~= nil and E[0x009f][1] == POISON, "heavyarmor $009F keeps poison")
 
 -- the rows both tables opened with
-check(S[0x0000] ~= nil and S[0x0000][2] == PIERCE, "regression: guard $0000 pierce")
-check(S[0x0134] ~= nil and S[0x0134][2] == PIERCE, "regression: whelk head $0134 pierce")
+-- the Magitek party's one class key is TERRA's TekMissile ($8A): its class is read from the ROM
+local TEK = H.skillClass(0x8A)
+check(TEK ~= 0 and S[0x0000] ~= nil and S[0x0000][2] == TEK, string.format(
+  "regression: guard $0000 takes the TekMissile's class alone ($%02X)", TEK))
+check(TEK ~= 0 and S[0x0134] ~= nil and S[0x0134][2] == TEK, string.format(
+  "regression: whelk head $0134 takes the TekMissile's class alone ($%02X)", TEK))
 check(E[0x0134] ~= nil and E[0x0134][1] == FIRE, "regression: whelk head fire add")
 
 -- ------------------------------------------------------------------------
@@ -221,8 +225,8 @@ check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,
 --   row)?
 --
 -- The Shurikens the merchant already sold are not a key: item $41 is
--- OT6_PIERCE (ot6_class.asm:120), the shield row is OT6_BLUDG, and a
--- Shuriken throw has no element, so it is damage without a chip.
+-- OT6_RANGED (ot6_class.asm, Ot6WeapClassTbl), the shield row is OT6_BLUNT,
+-- and a Shuriken throw has no element, so it is damage without a chip.
 --
 -- ShopProp is `.incbin shop_prop.dat` spliced at shop.asm.  PRG offsets
 -- come from the dbg symbols (& 0x3FFFFF maps HiROM CPU -> file) so bank-C4
@@ -275,11 +279,12 @@ do
   local weak = rb(MPROP + GHOSTTRAIN * MREC + OFF_WEAK)
   local add = E[GHOSTTRAIN] and E[GHOSTTRAIN][1] or 0
   local chippable = weak | add
-  -- the premise, pinned: 4 shields (6 until #400) behind bludgeoning, which is what makes
+  -- the premise, pinned: 4 shields (6 until #400) behind the class of SABIN's Suplex ($5F, read from the ROM), which is what makes
   -- Sabin the only chipper in a party of Sabin, Cyan and Shadow.
   local row = S[GHOSTTRAIN]
-  check(row ~= nil and row[1] == 4 and row[2] == BLUDG, string.format(
-    "GhostTrain $%04X row is 4 shields / OT6_BLUDG (got %s) -- the premise of "
+  local SUPLEX = H.skillClass(0x5F)
+  check(SUPLEX ~= 0 and row ~= nil and row[1] == 4 and row[2] == SUPLEX, string.format(
+    "GhostTrain $%04X row is 4 shields / the Suplex's class alone (got %s) -- the premise of "
     .. "#74", GHOSTTRAIN,
     row and string.format("%d/%02X", row[1], row[2]) or "MISSING"))
   check(chippable ~= 0, string.format(
@@ -312,8 +317,10 @@ end
 
 if fails == 0 then
   emu.log("breaktbl: all v0.6 break-coverage rows present - PASS")
+  print("breaktbl: all v0.6 break-coverage rows present - PASS")
   emu.stop(0)
 else
   emu.log(string.format("breaktbl: %d assertion(s) FAILED", fails))
+  print(string.format("breaktbl: %d assertion(s) FAILED", fails))
   emu.stop(1)
 end

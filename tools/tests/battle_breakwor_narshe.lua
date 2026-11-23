@@ -15,7 +15,7 @@
 --      132 (the Ice Dragon) and 152 (the Pugs' chest) -- has an authored
 --      row, and every gauged one a key for the hands that meet it, but the
 --      one declared lesson: the Test Rider in town before MOG joins;
---   3. the lessons: MOG's spear (pierce) is the Test Rider's only key and
+--   3. the lessons: MOG's spear is the Test Rider's only key and
 --      the Ice Dragon's class key (its keys are the spear and TERRA's fire,
 --      not the blades); each of the four holds a key on Tritoch and Umaro;
 --      every boss absorbs ice and is weak to fire; the Psychot absorbs fire; Tritoch's record $144 carries a real
@@ -23,39 +23,43 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x0F8] = { "Red Wolf", 2, SLASH | PIERCE, 0, 0 },
-  [0x0CE] = { "Nastidon", 2, SLASH | BLUDG, FIRE, 0 },
-  [0x09C] = { "Test Rider", 3, PIERCE, POISON, 0 },
-  [0x0C4] = { "Wizard", 2, SLASH | PIERCE | SPECIAL, BOLT | POISON, 0 },
-  [0x0DA] = { "Psychot", 1, PIERCE | SPECIAL, ICE, FIRE },
-  [0x0E7] = { "Mag Roader (ice)", 2, PIERCE | BLUDG, 0, 0 },
-  [0x0F3] = { "Mag Roader (fire)", 2, PIERCE | BLUDG, 0, 0 },
-  [0x0C9] = { "Poppers", 1, SLASH | PIERCE, FIRE, 0 },
-  [0x0CD] = { "Kiwok", 2, SLASH | PIERCE, ICE, 0 },
-  [0x0C6] = { "Ceritops", 3, PIERCE | BLUDG, FIRE, BOLT },
-  [0x0B4] = { "Anemone", 2, SLASH, FIRE | BOLT, BOLT | WATER },
-  [0x09E] = { "Tomb Thumb", 2, PIERCE | SPECIAL, BOLT | WATER, 0 },
-  [0x054] = { "Pug", 4, SLASH | SPECIAL, FIRE | BOLT, WATER },
-  [0x0FF] = { "Pugs", 4, SLASH | SPECIAL, FIRE, WATER },
-  [0x110] = { "Umaro", 6, SLASH | PIERCE, FIRE | POISON, ICE },
-  [0x144] = { "Tritoch", 10, SLASH | PIERCE, FIRE, ICE },
-  [0x149] = { "Ice Dragon", 6, PIERCE | BLUDG, FIRE, ICE },
+  [0x0F8] = { "Red Wolf", 2, DAGGER | KATANA, 0, 0 },
+  [0x0CE] = { "Nastidon", 2, KATANA | BLUNT, FIRE, 0 },
+  [0x09C] = { "Test Rider", 3, SPEAR, POISON, 0 },
+  [0x0C4] = { "Wizard", 2, DAGGER | KATANA | RANGED, BOLT | POISON, 0 },
+  [0x0DA] = { "Psychot", 1, DAGGER | RANGED, ICE, FIRE },
+  [0x0E7] = { "Mag Roader (ice)", 2, SPEAR | RANGED, 0, 0 },
+  [0x0F3] = { "Mag Roader (fire)", 2, SPEAR | RANGED, 0, 0 },
+  [0x0C9] = { "Poppers", 1, SPEAR | KATANA, FIRE, 0 },
+  [0x0CD] = { "Kiwok", 2, SPEAR | KATANA, ICE, 0 },
+  [0x0C6] = { "Ceritops", 3, SPEAR | RANGED, FIRE, BOLT },
+  [0x0B4] = { "Anemone", 2, KATANA, FIRE | BOLT, BOLT | WATER },
+  [0x09E] = { "Tomb Thumb", 2, SPEAR | RANGED, BOLT | WATER, 0 },
+  [0x054] = { "Pug", 4, KATANA | BLUNT, FIRE | BOLT, WATER },
+  [0x0FF] = { "Pugs", 4, KATANA | RANGED, FIRE, WATER },
+  [0x110] = { "Umaro", 6, SPEAR | KATANA, FIRE | POISON, ICE },
+  [0x144] = { "Tritoch", 10, SPEAR | KATANA, FIRE, ICE },
+  [0x149] = { "Ice Dragon", 6, SPEAR | BLUNT, FIRE, ICE },
 }
 
 -- the hands (route-wor-narshe.md 5.4, 6): the three who walk into Narshe
 -- (wor-cyan-v1's kit: TERRA knows Fire and Quake, CELES Ice, CYAN's
--- Tempest is wind), MOG's spear with them once he joins, and UMARO's club
--- and Storm on the plain at the end with MOG, TERRA and CELES
-local TERRA = { "TERRA", SLASH, FIRE | EARTH }
-local CELES = { "CELES", SLASH, ICE }
-local CYAN  = { "CYAN", SLASH, WIND }
-local MOG   = { "MOG", PIERCE, 0 }
-local UMARO = { "UMARO", BLUDG, ICE }
+-- Tempest $2E is wind; TERRA's and CELES's blades, the Falchion $15),
+-- MOG's spear (the Partisan $20) with them once he joins, and UMARO's Bone
+-- Club $4A and Storm on the plain at the end with MOG, TERRA and CELES
+local TERRA = { "TERRA", W(0x15), FIRE | EARTH }
+local CELES = { "CELES", W(0x15), ICE }
+local CYAN  = { "CYAN", W(0x2E), WIND }
+local MOG   = { "MOG", W(0x20), 0 }
+local UMARO = { "UMARO", W(0x4A), ICE }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
@@ -208,8 +212,8 @@ H.run({ maxFrames = 600 }, {
 
     -- 3. the lessons
     local RIDER, DRAGON, TRITOCH, UMAROSP = 0x09C, 0x149, 0x144, 0x110
-    if classOf(RIDER) ~= PIERCE then problem("$09C: the Test Rider's only class key is not pierce") end
-    if (classOf(DRAGON) & PIERCE) == 0 then problem("$149: MOG's spear (pierce) does not key the Ice Dragon") end
+    if classOf(RIDER) ~= MOG[2] then problem("$09C: the Test Rider's only class key is not MOG's spear") end
+    if (classOf(DRAGON) & MOG[2]) == 0 then problem("$149: MOG's spear does not key the Ice Dragon") end
     for _, sp in ipairs({ DRAGON, TRITOCH, UMAROSP }) do
       if (absorb(sp) & ICE) == 0 then problem("$%03X no longer absorbs ice", sp) end
       if (weakOf(sp) & FIRE) == 0 then problem("$%03X is not weak to fire", sp) end
