@@ -180,7 +180,7 @@ local awaiting = nil   -- the arm whose owner's action has run, its copy still t
 local round = nil
 local function closeAct()
   if cur == nil or not cur.ended or H.frame <= cur.ended + 1 then return false end
-  cur.mp1 = mpOf(gseat())
+  cur.mp1 = mpOf(cur.seat)
   acts[#acts + 1] = cur
   local c = cur.copy
   H.log(string.format("[gogomimic] GOGO's action %d (f%d): %s; ran cmd $%02X atk $%02X at %d BP: MP %d -> %d, "
@@ -229,7 +229,7 @@ local function install()
     local want = 0
     for m = 0, 5 do if present(m) then want = want | studyRow(species(m)) end end
     cur = { copy = copyAt, cmd = H.readByte(0xB5), atk = H.readByte(0xB6), pend = H.readByte(0x3E9D + x),
-      mp0 = mpOf(s), passes = 0, marks = 0, studied = 0, want = want & ~lores() & 0xFFFFFF, f = H.frame,
+      seat = s, mp0 = mpOf(s), passes = 0, marks = 0, studied = 0, want = want & ~lores() & 0xFFFFFF, f = H.frame,
       planned = copyAt and inflight }
     copyAt = nil
     if cur.copy ~= nil and cur.cmd == CMD.THROW and cur.pend >= 3 then
@@ -261,7 +261,7 @@ local function install()
   end, emu.callbackType.exec, sm, sm)
   local pt = H.sym("Ot6PassTargeted")
   emu.addMemoryCallback(function()
-    if cur and not cur.ended and (cpu()["cpu.x"] & 0xFF) == gseat() * 2 then cur.passes = cur.passes + 1 end
+    if cur and not cur.ended and (cpu()["cpu.x"] & 0xFF) == cur.seat * 2 then cur.passes = cur.passes + 1 end
   end, emu.callbackType.exec, pt, pt)
   local ag = H.sym("Ot6AssassinateGate")
   emu.addMemoryCallback(function(_, v)
@@ -278,8 +278,8 @@ local function install()
   emu.addEventCallback(function() if cur ~= nil then closeAct() end end, emu.eventType.endFrame)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
-    local s = gseat()
-    if cur == nil or cur.ended or s == nil or (cpu()["cpu.x"] & 0xFF) ~= s * 2 then return end
+    if cur == nil or cur.ended or (cpu()["cpu.x"] & 0xFF) ~= cur.seat * 2 then return end
+    local s = cur.seat
     cur.ended = H.frame
     cur.blade = (emu.read(RUNICBLADE, emu.memType.snesMemory) & H.readByte(0x3018 + s * 2)) ~= 0
   end, emu.callbackType.exec, ae, ae)
