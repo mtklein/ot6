@@ -597,8 +597,8 @@ Every species a table above names, with the row `ot6_hud.asm` ships today.
 | Mag Roader | `$006` | 2 · ranged |
 | Mag Roader | `$0af` | 2 · ranged |
 | Number 128 | `$10b` | 7 · dagger |
-| Left Blade | `$140` | 3 · sword |
-| RightBlade | `$13f` | 3 · sword |
+| Left Blade | `$140` | 3 · katana |
+| RightBlade | `$13f` | 3 · katana |
 | Ifrit | `$109` | 6 · dagger |
 | Shiva | `$108` | 6 · sword |
 | Number 024 | `$10a` | 7 · sword\|dagger |
@@ -606,7 +606,7 @@ Every species a table above names, with the row `ot6_hud.asm` ships today.
 | Crane | `$10e` | 6 · dagger |
 | Guardian | `$111` | 0 · — |
 | Guardian | `$112` | 10 · ranged\|spear |
-| Garm | `$0cb` | 2 · dagger\|ranged |
+| Garm | `$0cb` | 2 · ranged\|spear |
 | Commando | `$0c7` | 2 · dagger |
 | ProtoArmor | `$165` | 2 · ranged |
 | Pipsqueak | `$041` | 2 · dagger |
