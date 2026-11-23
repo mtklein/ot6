@@ -680,6 +680,9 @@ Element adds, shield counts, shops and events are outside this change.
   `build/attempts/wt/v051-six-classes/opening/split-report.txt`.
 - `python3 tools/proto_six/dlg_fit.py`: the school's pages wrapped as the
   field does it; none runs past four lines.
-- `ninja build/ot6.sfc` assembles; `tools/check_shield_rows.py`'s source
-  checks pass (its ROM signature still names the four-class Guard and Lobo
-  bytes).
+- `ninja build/ot6.sfc` assembles, and on the built ROM
+  `tools/check_shield_rows.py`, `tools/check_break_reach.py`,
+  `tools/audit_break_coverage.py --gate` and `tools/check_save_layout.py`
+  pass. `tools/check_boss_rows.py` names 13 lines of bosses-wob.md that
+  still state the rows this change replaces
+  (`build/attempts/wt/v051-six-classes/opening/boss-rows-disagreements.txt`).
