@@ -107,7 +107,7 @@ never.
 | $3000-$3001 | 2 | slot1 | Esper page, slot 1: magic `$3145` ('E1') | OT6_ESPER_ROOT | save | Any other value: the slot has no esper progress |
 | $3002-$300F | 14 | slot1 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $3010-$327F | 624 | slot1 | Magic Points per character (actors 0-11) per esper slot (26, GenjuProp order, Odin and Raiden share one), little-endian words, actor-major, capped at 9999 | OT6_ESPER_ROOT+OT6_ESPER_CTR | save | Read only when signed |
-| $3280-$32B3 | 52 | slot1 | Row 12: Magic Points for actor 12 (Gogo's slot, a holder once revealed as Leo), 26 words as the rows above (v0.51, layout version 2) | OT6_ESPER_ROOT+OT6_ESPER_LEO | save | Read only when the page is signed and the slot's block is signed with `OT6_SAVEVER` 2 or more; otherwise no progress (reserve before v0.51: zero from v0.45 on, junk possible in a v0.44 page) |
+| $3280-$32B3 | 52 | slot1 | Row 12: Magic Points for actor 12 (Gogo's slot: a holder once revealed as Leo, while Summon is one of his picks), 26 words as the rows above (v0.51, layout version 2) | OT6_ESPER_ROOT+OT6_ESPER_LEO | save | Read only when the page is signed and the slot's block is signed with `OT6_SAVEVER` 2 or more; otherwise no progress (reserve before v0.51: zero from v0.45 on, junk possible in a v0.44 page) |
 | $32B4-$33FF | 332 | slot1 | Reserved; a save into the slot zeroes it | OT6_ESPER_ROOT+OT6_ESPER_COPY | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $3400-$3401 | 2 | slot2 | Esper page, slot 2: magic | OT6_ESPER_ROOT+OT6_ESPER_STRIDE | save | as slot 1 |
 | $3402-$340F | 14 | slot2 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
@@ -337,7 +337,7 @@ the destination slot's codex and esper page pads and tails at every save
 Version 2 (v0.51, #552 piece F) is the first raise. Its field is the
 esper pages' row 12 (`$x280-$x2B3` of each slot's page, `$3E80-$3EB3` live):
 Magic Points for actor 12, Gogo's slot, who wears espers once revealed as
-General Leo ([leo-reveal.md](leo-reveal.md)). It sits in what was the
+General Leo, while Summon is one of his picks ([leo-reveal.md](leo-reveal.md)). It sits in what was the
 pages' tail reserve: zero in every slot a signing build (v0.45-v0.50) saved,
 but a v0.44 page never had its tail zeroed, so the row is read only from a
 block that says version 2 (`Ot6EsperLeoRow`, at every load: the slot's row

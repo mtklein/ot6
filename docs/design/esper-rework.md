@@ -414,8 +414,9 @@ What this says:
   and the World of Ruin is where a character masters a few.
 - Umaro and Gogo never wear espers (vanilla; Gau can), and the bench earns
   nothing (vanilla pays only the battle's party).  Since v0.51 Gogo revealed
-  as Leo does (#552 piece F, [leo-reveal.md](leo-reveal.md) "Espers"): his
-  counters are the esper pages' row 12.
+  as Leo does while Summon is one of his picks (#552 piece F,
+  [leo-reveal.md](leo-reveal.md) "Espers"): his counters are the esper
+  pages' row 12.
 
 ## Plan A — spells while worn, a ladder for keeps (recommended)
 

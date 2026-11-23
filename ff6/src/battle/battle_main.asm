@@ -13207,6 +13207,9 @@ FixPlayerAttack:
 @4d9f:  xba
         lda     $3018,y
         tsb     $3f2e
+        lda     #$08        ; ot6 #552: and re-grade his commands after this
+        ora     $3204,y     ;   action (AfterAction2 -> UpdateCmdList), so
+        sta     $3204,y     ;   the Summon command greys once spent
         pla
 @4da7:  cmp     #$01
         beq     @4daf       ; branch if item
@@ -14119,7 +14122,7 @@ UpdateCmdList:
         sec
 @52c3:  pla
         bcs     @52db
-        ldx     #7
+        ldx     #8          ; ot6 #552: and Summon (was 7)
 @52c9:  cmp     f:UpdateCmdIDTbl,x
         bne     @52d7
         txa
@@ -14143,6 +14146,7 @@ UpdateCmdList:
 
 UpdateCmdIDTbl:
 @52e9:  .byte   $03,$0b,$07,$0c,$17,$02,$06,$00
+        .byte   $19         ; ot6 #552: summon (UpdateCmd_08)
 
 UpdateCmdTbl:
 @52f1:  .addr   UpdateCmd_00
@@ -14153,6 +14157,26 @@ UpdateCmdTbl:
         .addr   UpdateCmd_05
         .addr   UpdateCmd_06
         .addr   UpdateCmd_07
+        .addr   UpdateCmd_08
+
+; ------------------------------------------------------------------------------
+
+; [ ot6 #552 piece F: summon ]
+
+; The Summon command (Gogo's pick; after the reveal Leo's esper pick) is the
+; once-a-battle summon the Magic list's esper row is: grey once the
+; character's bit is in $3f2e (set when a summon is queued), and grey with
+; no stone ($3344 = $ff).  Vanilla left it white, so it summoned every turn.
+; y = the entity.  out: carry set = greyed.
+UpdateCmd_08:
+        lda     $3018,y
+        bit     $3f2e
+        bne     @grey       ; spent this battle
+        lda     $3344,y
+        cmp     #$ff        ; no stone: carry set
+        rts
+@grey:  sec
+        rts
 
 ; ------------------------------------------------------------------------------
 

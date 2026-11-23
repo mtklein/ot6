@@ -103,9 +103,12 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
 ; A (its low byte, either m width) = actor -> C clear when that actor wears
 ; stones and keeps esper counters: actors 0..11, and actor 12, Gogo's slot,
 ; once he has been revealed as General Leo (switch $00E0, OT6_LEO_FLAG; #552
-; piece F, docs/design/leo-reveal.md "Espers").  Before the reveal, Umaro,
-; guests and an empty slot: C set, as every gate here read it before
-; (`cmp #OT6_ESPER_CHARS / bcs`).  Preserves A, X, Y and every flag but C.
+; piece F, docs/design/leo-reveal.md "Espers") and only while Summon is one
+; of his picks (Ot6LeoPicked: the owner, 2026-11-23, the esper is one of his
+; picked abilities, swapped like the others; unpicked, a stone he wore stays
+; in his record but does nothing).  Before the reveal, Umaro, guests and an
+; empty slot: C set, as every gate here read it before (`cmp
+; #OT6_ESPER_CHARS / bcs`).  Preserves A, X, Y and every flag but C.
 .proc Ot6EsperHolder
         php
         longa
@@ -119,6 +122,9 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
 LeoGate:                        ; (mutant_rom.py's seam: the reveal's test)
         and     #OT6_LEO_BIT
         beq     no
+        jsr     Ot6LeoPicked
+PickGate:                       ; (mutant_rom.py's seam: the pick's test)
+        bcc     no
 yes:   pla
         plp
         clc
@@ -126,6 +132,77 @@ yes:   pla
 no:    pla
         plp
         sec
+        rts
+.endproc
+
+; C set when Summon ($19) is one of the four commands in Gogo's record
+; ($7e1616 + 12 * $25: Mimic, then his three picks from the Status screen;
+; no symbol, as it is a vanilla record field).  The
+; record, not the battle's list, so a field menu and a battle agree.
+; Preserves A, X, Y and every flag but C.
+.proc Ot6LeoPicked
+        php
+        sep     #$20
+        .a8
+        pha
+        lda     f:$7e1616+OT6_ESPER_LEOACTOR*$25
+        cmp     #BATTLE_CMD::SUMMON
+        beq     yes
+        lda     f:$7e1616+OT6_ESPER_LEOACTOR*$25+1
+        cmp     #BATTLE_CMD::SUMMON
+        beq     yes
+        lda     f:$7e1616+OT6_ESPER_LEOACTOR*$25+2
+        cmp     #BATTLE_CMD::SUMMON
+        beq     yes
+        lda     f:$7e1616+OT6_ESPER_LEOACTOR*$25+3
+        cmp     #BATTLE_CMD::SUMMON
+        beq     yes
+        pla
+        plp
+        clc
+        rts
+yes:    pla
+        plp
+        sec
+        rts
+.endproc
+
+; [ an unpicked stone is inert in battle ]
+;
+; From Ot6PackSpellList, at the end of ValidateSpellList, once per caster:
+; vanilla put the record's worn stone ($161e) at the top of the caster's
+; Magic list (row 0) and in $3344, whoever the caster is.  Gogo's slot
+; revealed as Leo keeps the stone he wore when he unpicks Summon (the owner,
+; 2026-11-23: re-picking brings it back), but it does nothing then: no
+; summon from the Magic list or anywhere, so row 0 and $3344 go back to
+; "none" ($ff; btlgfx CheckHasGenju reads row 0's second byte).  Only when a
+; stone was loaded, so an unrevealed Gogo (who wears none) is untouched.
+; in: X = the caster's entity offset (i16), db=$7e, either m width.
+; Preserves A, X, Y and P.
+.proc Ot6LeoInertStone
+        php
+        sep     #$20
+        .a8
+        pha
+        lda     $3ed8,x
+        cmp     #OT6_ESPER_LEOACTOR
+        bne     out
+        lda     $3344,x
+        cmp     #$ff
+        beq     out             ; no stone: nothing to hide
+        lda     #OT6_ESPER_LEOACTOR
+        jsr     Ot6EsperHolder
+InertGate:                      ; (mutant_rom.py's seam: 2 bytes)
+        bcc     out             ; Summon picked: the stone is his
+        lda     #$ff
+        sta     $3344,x
+        phy
+        ldy     $302c,x         ; his list's row 0
+        sta     a:$0000,y
+        sta     a:$0001,y
+        ply
+out:    pla
+        plp
         rts
 .endproc
 

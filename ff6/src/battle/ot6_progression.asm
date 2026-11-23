@@ -324,10 +324,10 @@
         jsl     Ot6FieldSpellKnown      ; (preserves Y)
         clc
         rtl
-gogo:  lda     f:OT6_LEO_FLAG
-FieldLeo:                       ; (mutant_rom.py's seam: the and)
-        and     #OT6_LEO_BIT
-        beq     scan           ; unrevealed: vanilla's scan
+gogo:                           ; A = $0c
+FieldLeo:                       ; (mutant_rom.py's seam: 3 bytes)
+        jsr     Ot6EsperHolder  ; revealed, with Summon picked
+        bcs     scan            ; else vanilla's scan of the others
         lda     f:$7e001e,x     ; his worn stone ($ff none)
         bmi     items
         sta     f:hWRMPYA
