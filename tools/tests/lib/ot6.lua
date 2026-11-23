@@ -17908,7 +17908,7 @@ end
 -- hand since, and battle_jackpot its own).  A caller reads these after the
 -- battle; nothing it asked for (who, cmd, boost, row, slot...) is touched.
 M.KIT_ENTRY_STATE = { "opened", "seat", "presses", "lPresses", "tookBack", "allyPresses", "greyed",
-  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen", "raised", "rPresses" }
+  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen", "raised", "rPresses", "tapSnd", "tapMiss" }
 function M.freshKitEntries(plan)
   for _, q in ipairs(plan) do
     for _, f in ipairs(M.KIT_ENTRY_STATE) do q[f] = nil end
@@ -18610,6 +18610,21 @@ function M.battleKeyWait()
   return M.dlgKeyFrame ~= nil and M.frame - M.dlgKeyFrame <= 2
 end
 
+-- Ot6Boost's answers so far, counted from the first call: the ching of a
+-- point taken ($6281 written non-zero) and the buzz of one refused ($95,
+-- the menu's error sound, written non-zero).  Armed once.
+function M.kitBoostSounds()
+  if not M.boostSndArmed then
+    M.boostSndArmed, M.boostSnd = true, 0
+    local function hit(_, v) if v ~= 0 then M.boostSnd = M.boostSnd + 1 end end
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x7E6281, 0x7E6281)
+    -- (`inc $95` is a direct-page store: it lands in bank $00, so both views are watched)
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x000095, 0x000095)
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x7E0095, 0x7E0095)
+  end
+  return M.boostSnd
+end
+
 function M.kitBattle(plan, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -18938,9 +18953,24 @@ function M.kitBattle(plan, opts)
       -- p.listR = n: R pressed n times with the cursor on the spell (#555:
       -- a point the MP cannot pay for is refused); the pending boost before
       -- and after is kept on the entry (p.listR0, p.listR1)
+      -- An R tap the game never read does not count (#563's gate:
+      -- battle_spellboost_mp's second tap, pressed while the list was still
+      -- redrawing the first one's fold, was lost on one draw in three, on
+      -- the ROM before the change too: build/attempts/wt/v051-spellblade/
+      -- sbmp/).  Ot6Boost answers every R it reads with its ching or its
+      -- buzz (M.kitBoostSounds), so a tap that ends with neither is pressed
+      -- again, up to six times an entry.
+      if p.listR ~= nil and p.listKey == nil and tapT == 0 and p.tapSnd ~= nil then
+        if M.kitBoostSounds() == p.tapSnd and (p.tapMiss or 0) < 6 then
+          p.listRn, p.tapMiss = p.listRn - 1, (p.tapMiss or 0) + 1
+          M.log(string.format("[kit] f%d an R tap on the list's row was not read (no ching, no buzz): pressed again "
+            .. "(%d)", M.frame, p.tapMiss))
+        end
+        p.tapSnd = nil
+      end
       if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
         if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
-        if tapT == 0 then p.listRn = (p.listRn or 0) + 1 end
+        if tapT == 0 then p.listRn = (p.listRn or 0) + 1; p.tapSnd = M.kitBoostSounds() end
         tap(p.listKey or "r")
         return
       end
