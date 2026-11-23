@@ -1293,6 +1293,66 @@ there).
   each level and the thresholds as odds over RNGTbl; `battle_dancestumble`
   the settlement; `battle_dancestep` MOG's locked-in steps on GOGO's
   background, each predicted from the tier MOG's start bought.
+
+  **The opener (owner, 2026-11-23: "definitely have boosted dances
+  guarantee the 1/16th move as a starter. that feels like a powerful
+  reward").** Each dance has four steps (`DanceProp`), and vanilla's
+  `RandDance` picks one a turn from one draw against `DanceRateTbl` (`$10,
+  $30, $90`, C2/05CE in the retail ROM): the fourth step below `$10`, the
+  third below `$30`, the second below `$90`, else the first.  Over RNGTbl
+  that is exactly 16, 32, 96 and 112 draws in 256: 1/16, 1/8, 3/8, 7/16.
+  The fourth is the rare step:
+
+  | Dance | first (7/16) | second (3/8) | third (1/8) | rare (1/16) |
+  |---|---|---|---|---|
+  | Wind Song | Wind Slash | Sun Bath | Plasma | Cokatrice |
+  | Forest Suite | Rage | Harvester | Elf Fire | Wombat |
+  | Desert Aria | Sand Storm | Antlion | Wind Slash | Kitty |
+  | Love Sonata | Elf Fire | Specter | Snare | Tapir |
+  | Earth Blues | Land Slide | Sonic Boom | Sun Bath | Whump |
+  | Water Rondo | El Nino | Plasma | Specter | Wild Bear |
+  | Dusk Requium | Cave In | Snare | Elf Fire | Pois. Frog |
+  | Snowman Jazz | Snowball | Surge | Snare | Ice Rabbit |
+
+  The boost a start is bought with loads that roll for the turn the dance
+  starts, and only that turn (`Ot6DanceOpener`, called where the menu's
+  start picks its first step, FixPlayerAttack's cmd-$13 arm):
+
+  | BP | the opener's row | rare | third | second | first |
+  |---|---|---|---|---|---|
+  | 0 | vanilla's `RandDance`, untouched | 16/256 | 32 | 96 | 112 |
+  | 1 | `$40, $59, $A6` | 64/256 (1/4) | 25 | 77 | 90 |
+  | 2 | `$80, $91, $C4` | 128/256 (1/2) | 17 | 51 | 60 |
+  | 3 | no row: the rare step, whatever the draw | 256/256 | 0 | 0 | 0 |
+
+  The rows are `Ot6DanceOpenerOdds`.  *Why this ladder:* it is the Chance
+  family's shape (the third point removes the gamble), and the lower points
+  each at least double the rare step's odds (x4, then x2, then x2) while
+  leaving a real gamble for the third point to remove: a coin at 2 BP, where
+  Rage's ladder (the miss quartered each point) would have made 2 BP 15 in
+  16 and left the 99 MP start almost nothing to buy.  Steal's rare pick
+  climbs the same way (1/8, 3/8, 3/4, then certain).  At 1 and 2 BP the
+  three common steps share what is left in vanilla's own proportions
+  (7 : 6 : 2), to the nearest 256th.  Every level takes the one draw
+  `RandDance` takes (at 3 BP it is taken and not read), so a boosted start
+  changes which step opens and leaves the battle RNG where vanilla's would.
+
+  The opener is the step the menu queues, so it is danced only if the start
+  lands: off its terrain the stumble ladder above still applies at 1 and 2
+  BP (a rare opener 3/16 and 15/32 of the time there), and at 3 BP neither
+  roll can miss.  The boost's multiplier covers the opener as it covers
+  every step, as it did before (`Ot6BoostLevel`; `battle_danceboost`).
+  Every later step is `RandDance`'s at vanilla's odds, and so is a dance
+  the engine starts on its own (Muddle, the Colosseum: `RandCharAction`
+  calls `RandDance` directly and never reaches the hook).  This is a boost
+  reward, not a divine: Mog's divine stays open.  GOGO's Dance takes the
+  same ladder from his own pending boost.  His Mimic of a Dance start
+  copies the action, as every Mimic does: the step the dancer opened with,
+  whatever his own boost (which buys him the multiplier and the stumble
+  ladder, as before).  `battle_danceopener` predicts every start's opener
+  from its draw at 0-3 BP for MOG and GOGO, a 3-BP start on every dance MOG
+  knows, the stumble, the later steps and an engine start, and reads the
+  rows and their odds from the ROM.
 - **Umaro — Berserker (bludgeoning: club, fists)**: see "Umaro" below
   (#380).
 
