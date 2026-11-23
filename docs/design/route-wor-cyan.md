@@ -14,11 +14,9 @@ log there. Nothing was measured by writing game state.
 
 > Weapon classes: v0.51 replaced the four classes this document was written
 > under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
 > keys below are the present ones. Quoted logs, dated measurements and
-> "before" columns keep the words they were recorded in: slash is now Sword
-> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
-> or Dagger.
+> "before" columns keep the words they were recorded in.
 
 ---
 
@@ -244,18 +242,18 @@ Slam and Stunner (`[advanceStory] actor=0 SwdTech row 2: tech $5A at 3 BP`).
 
 | record | shields | classes | vanilla | why |
 |---|---|---|---|---|
-| Crawler `$05B` | 3 | Dagger, Arcane | weak ice | a shelled crawler: a rod's blow cracks it, a dagger's point finds the joints |
-| Geckorex `$099` | 3 | Sword, Spear | weak ice | lizard hide |
-| Reach Frog `$03B` | 2 | Arcane | weak ice | soft, crushed |
-| Mantodea `$0D2` | 3 | Katana, Fist, Arcane | weak fire | cut or crush the scythes; three, so it breaks before its Battle lands (route-wor-terra.md 8) |
-| Sprinter `$087` | 3 | Sword, Spear | weak bolt | a running bird |
-| Spek Tor `$0B0` | 1 | Sword, Spear, Fist | weak water | 250 HP |
-| Luridan `$08E` | 2 | Spear, Katana | weak fire, wind | horned, in herds of three and six: CYAN's Stunner cuts them all; his Tempest finds the wind |
-| Borras `$0F2` | 4 | Katana, Fist | weak poison | the brute: break it before the Uppercut |
-| Punisher `$0DD` | 3 | Spear, Katana | weak poison | |
-| Scrapper `$0C5` | 2 | Katana, Fist | absorbs poison | beside the Punishers, the Bio Blaster heals it |
-| Ursus `$014` | 2 | Sword, Fist | weak fire | two, so it breaks before it runs |
-| Storm Drgn `$14B` | 14 | Spear, Katana | weak bolt, absorbs wind | CYAN's katana cuts the hide, his Quadra Slam four a turn; the bolt finds it; the Tempest heals it |
+| Crawler `$05B` | 3 | Dagger, Blunt | weak ice | a shelled crawler: a rod's blow cracks it, a dagger's point finds the joints |
+| Geckorex `$099` | 3 | Sword, Dagger | weak ice | lizard hide |
+| Reach Frog `$03B` | 2 | Blunt | weak ice | soft, crushed |
+| Mantodea `$0D2` | 3 | Sword, Blunt, Ranged | weak fire | cut or crush the scythes; three, so it breaks before its Battle lands (route-wor-terra.md 8) |
+| Sprinter `$087` | 3 | Sword, Dagger | weak bolt | a running bird |
+| Spek Tor `$0B0` | 1 | Sword, Dagger, Blunt | weak water | 250 HP |
+| Luridan `$08E` | 2 | Dagger, Katana | weak fire, wind | horned, in herds of three and six: CYAN's Stunner cuts them all; his Tempest finds the wind |
+| Borras `$0F2` | 4 | Sword, Blunt | weak poison | the brute: break it before the Uppercut |
+| Punisher `$0DD` | 3 | Sword, Dagger | weak poison | |
+| Scrapper `$0C5` | 2 | Sword, Blunt | absorbs poison | beside the Punishers, the Bio Blaster heals it |
+| Ursus `$014` | 2 | Sword, Blunt | weak fire | two, so it breaks before it runs |
+| Storm Drgn `$14B` | 14 | Sword, Katana | weak bolt, absorbs wind | CYAN's katana cuts the hide, his Quadra Slam four a turn; the bolt finds it; the Tempest heals it |
 
 `tools/tests/battle_breakwor_cyan.lua` (`@suite`) reads the rows back from
 the ROM, the vanilla weak and absorb bytes, the formations of world groups
@@ -263,10 +261,9 @@ the ROM, the vanilla weak and absorb bytes, the formations of world groups
 for the two parties that meet them (`suite/suite1.log`: `checked 12
 designed rows`, `checked 13 formations, 35 formation-species-hands
 triples`, `$14B: CYAN's katana (slash) is a key`, `PASS`; Katana today).
-Under the six classes the Crawler's classes are Dagger and Arcane and the
-Reach Frog's is Arcane, which no member of either party holds by signature
-weapon (both stay weak to ice), and of this leg's four only CYAN holds a
-class of the dragon's row.
+Under the six classes SABIN's fists key the Crawler and the Reach Frog
+(both Blunt, both still weak to ice), and the dragon's row (Sword, Katana)
+takes TERRA's and CELES's swords and CYAN's katana.
 
 The first draft of the dragon's row was the floor's `6 * pierce`, which no
 member of either party holds; it broke only through the ThunderBlade's
@@ -320,8 +317,8 @@ storm leg on Mt. Zozo's east face, group 160), each at shifts 0 and 12
   CYAN's Quadra Slam 5, his Fight 2 and Empowerer 1, CELES 1. CYAN lands
   a quarter of them in the fight he joins for. (Measured under the four
   classes: SABIN's claw and CELES's sword were slash keys. The row is
-  Spear, Katana now, SABIN's claw is Fist and the swords are Sword; the
-  ThunderBlade still chips by its bolt.)
+  Sword, Katana now: the swords and SABIN's claw (Katana) still key it,
+  and the ThunderBlade chips by its blade and its bolt.)
 
 The first variation set (`varA/`, the generator before b429308e) stalled in
 9 of 12 seeds on Zozo's outside stair, a battle under the pressed walk

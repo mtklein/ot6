@@ -8,11 +8,9 @@ attempt; `tools/tests/m269lab_aggregate.py` (deleted in 8d350a73; last version a
 
 > Weapon classes: v0.51 replaced the four classes this document was written
 > under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
 > keys below are the present ones. Quoted logs, dated measurements and
-> "before" columns keep the words they were recorded in: slash is now Sword
-> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
-> or Dagger.
+> "before" columns keep the words they were recorded in.
 
 ## What happened in the regeneration
 
@@ -66,7 +64,7 @@ map's pool** (`audit_encounters.py` over maps 0..420: only 269).
 |---|---|---|
 | Trapper $02d | L19, HP 555, MP 80, speed 35, atk 13, def 180, mdef 135, **mpow 10**, XP 235, GP 200 | `monster_prop.dat` +$05A0; all 32 bytes identical to the vanilla ROM record (`Final Fantasy III (USA).sfc` $0F05A0) |
 | weakness | **bolt \| water** ($84); no absorb/null | `monster_prop.dat` +25 |
-| shields | **2, class key OT6_BLUDG** (OT6_FIST today) | `Ot6ShieldTbl`, `ot6_hud.asm:1748` ("a fixed trap mechanism, smashed rather than stabbed"); no `Ot6ElemAddTbl` row |
+| shields | **2, class key OT6_BLUDG** (OT6_RANGED today) | `Ot6ShieldTbl`, `ot6_hud.asm:1748` ("a fixed trap mechanism, smashed rather than stabbed"); no `Ot6ElemAddTbl` row |
 | special "Program 18" | $57: bit $40 = **no damage** (`battle_main.asm:8447` clears the attack power), effect $17 = status bit 23 = **Reflect** on the target | `monster_prop.dat` +31 |
 | AI | `attack SPECIAL, L5_DOOM, NOTHING` / wait / `attack SPECIAL, L4_FLARE, NOTHING` / wait / `attack SPECIAL, L3_MUDDLE, NOTHING` / end (loop) | `ai_script.asm:1262` "trapper" |
 | L4 Flare $95 | power **66**, magic, flags +2 = $60 = **ignore defence \| no split**, +8 = **4** (the level divisor) | `magic_prop_en.dat`; byte-identical to vanilla, as are L5 Doom ($94, divisor 5) and L3 Muddle ($96, divisor 3) |
@@ -87,10 +85,10 @@ The routed party at the save (`audit_levels`, `savestate_party`):
 | SABIN | 17 | **0/511 dead** | 108 | back | MetalKnuckle (slash on Fight); **Pummel is OT6_BLUDG** | class key |
 | CELES | **16** | 443 | **6** | back | MithrilBlade (slash); Ramuh (bolt, 25 MP) unaffordable | none at 6 MP |
 
-The keys are as recorded, under four classes.  Today the Trapper's key is
-Fist and MetalKnuckle is Fist, so SABIN's Fight holds the class key as
-Pummel does; RegalCutlass and MithrilBlade are Sword and AutoCrossbow is
-Spear, still not keys.
+The keys are as recorded, under four classes.  Today the Trapper's class
+is Ranged: EDGAR's AutoCrossbow keys it, and SABIN's MetalKnuckle and
+Pummel (Blunt) and the RegalCutlass and MithrilBlade (Sword) do not.  The
+measurements below, which rest on Pummel as the class key, are v0.50's.
 
 Bag: 84 Tonics, 13 Fenix Downs, 2 Tinctures, 3 Elixirs.  XP: LOCKE 13097
 (L17 at 14152, **1055 short**), CELES 13033 (**1119 short**).
@@ -305,8 +303,8 @@ What the numbers say:
    kept the bolt key down too; 27 Fenix Downs were spent in battle across
    the 15 fights, 16 more at the care stops.
 4. **`boostfight` is the wrong default here.**  Dropping Pummel for a
-   boosted slash Fight drops the class key (it did then; SABIN's claws are
-   Fist today, the Trapper's key): mean 8515 frames, 7/15 double
+   boosted slash Fight drops the class key (it did then; today neither is a
+   key, and the AutoCrossbow is): mean 8515 frames, 7/15 double
    kills, 23 Flares, 5 in-battle Fenix.  The keyed tactical driver
    (`cared`, 3355 frames) beats the boost-Fight line by 2.5x on this
    formation; `breakfirst` (bank 0 on the keyed lines) buys nothing over

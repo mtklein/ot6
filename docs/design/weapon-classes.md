@@ -88,7 +88,8 @@ weapons has been pretty easy because there are few types". Under four
 classes a party holding slash and pierce weapon-keyed 86% of the species
 the game deals; any three classes keyed 91-96%.
 
-Every monster keeps its *number* of weapon weaknesses (the two rows any
+Outside the opening's hand-authored rows ([opening.md](opening.md), 22 of
+which depart), every monster keeps its *number* of weapon weaknesses (the two rows any
 weapon broke, the Intangir's and the Speck's, take all six). Each old
 weakness became one class its own weapons went to:
 
@@ -115,10 +116,10 @@ prints every species' old row, new row and reason):
 5. then what the four-class row's own comment suggests;
 6. then an even balance across the six.
 
-Of the 349 species the game deals and gauges, 99 are weak to Sword, 95
-to Dagger, 94 to Spear, 99 to Katana, 125 to Blunt and 124 to Ranged.
-One class keys 27-36% of them, two classes 47-64%, three 66-80%, four
-82-94%, five 91-98% (`tools/proto_six/party_share.py`).
+Of the 349 species the game deals and gauges, 120 are weak to Sword, 102
+to Dagger, 79 to Spear, 83 to Katana, 141 to Blunt and 128 to Ranged.
+One class keys 23-40% of them, two classes 42-67%, three 62-85%, four
+81-94%, five 93-99% (`tools/proto_six/party_share.py`).
 
 A save from an older release keeps its revealed weaknesses, each shown as
 the class that weakness became for that monster

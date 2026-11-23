@@ -8,11 +8,11 @@ next arc's boot.
 
 > Weapon classes: v0.51 replaced the four classes this document was written
 > under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
 > keys below are the present ones. Quoted logs, dated measurements and
 > "before" columns keep the words they were recorded in: slash is now Sword
-> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
-> or Dagger.
+> or Katana, pierce Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged
+> or Blunt.
 
 Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v033-wor-gau/lab/` (the run logs, and
@@ -81,7 +81,7 @@ launchers `lab.sh`, `sweep.sh`, `sweep1.sh`, `hd.sh`, `boss.sh`, `cave.sh`,
    Whisper, Were-Rat, Rhinotaur, Lobo, Hornet, Trilobiter, Exocite,
    M-TekArmor) and an empty loadout, which AUTO reads as the first eight by
    id (kit-gau.md 8.0): M-TekArmor is left out.  No weapon (his Fight is his
-   fists, Fist); the gear care dresses him from the bag (Mithril Shld,
+   fangs, Dagger); the gear care dresses him from the bag (Mithril Shld,
    Tiger Mask, Power Sash) and the relic care adds a Star Pendant and a
    Jewel Ring.
 
@@ -114,19 +114,19 @@ aboard.
 
 The cave's bodies (vanilla stats, `route_data.py species`).  Before this arc
 all four rode the floor (slash).  The four who walk the cave hold Sword
-(CELES), Dagger (TERRA's dagger), Arcane (RELM's rod), Fist (GAU's fists)
-and fire, ice, bolt and poison; the cave drinks CELES's ice (Toe Cutter,
-the SrBehemoth) and Allo Ver drinks poison.  The rows key Fist on every
-body, so GAU's fists and his beasts' physical turns break what CELES's ice
-heals.  RELM's rod keyed every row as a bludgeon; it is Arcane now, which
-no cave row takes.  Vanilla elements stay.
+(CELES), Dagger (TERRA's dagger, GAU's fangs), Blunt (RELM's rod) and fire,
+ice, bolt and poison; the cave drinks CELES's ice (Toe Cutter, the
+SrBehemoth) and Allo Ver drinks poison.  The rows key Dagger on every body,
+so GAU's fangs, TERRA's dagger and his beasts' physical turns break what
+CELES's ice heals.  RELM's rod keys the Toe Cutter and the SrBehemoth.
+Vanilla elements stay.
 
 | species | where | L / HP | vanilla elements; notes | shields | classes | why |
 |---|---|---|---|---|---|---|
-| Toe Cutter `$08F` | 353 (80+80+80/256) | 36 / 2,500 | weak fire, wind; absorbs ice; Doomsickle | 3 | Dagger, Fist | a scythed shell: crack or puncture it |
-| Rhyos `$07E` | 353 (16/256) | 36 / 7,191 | none; Giga Volt, Magnitude8, Rage (x2) | 4 | Fist | an armoured horn (defence 150), the rare body |
-| Allo Ver `$0BB` | the monster chest (6,8) | 19 / 8,000 | weak fire, holy; absorbs poison; Doom, Condemned | 3 | Katana, Fist | bones |
-| SrBehemoth `$119` | event 82 | 43 / 19,000 | weak fire, poison; absorbs ice; Ice 3, Meteo, Pearl | 6 | Spear, Fist | the dead beast: horn and bone; Were-Rat's poison |
+| Toe Cutter `$08F` | 353 (80+80+80/256) | 36 / 2,500 | weak fire, wind; absorbs ice; Doomsickle | 3 | Dagger, Blunt | a scythed shell: crack or puncture it |
+| Rhyos `$07E` | 353 (16/256) | 36 / 7,191 | none; Giga Volt, Magnitude8, Rage (x2) | 4 | Dagger | an armoured horn (defence 150), the rare body |
+| Allo Ver `$0BB` | the monster chest (6,8) | 19 / 8,000 | weak fire, holy; absorbs poison; Doom, Condemned | 3 | Sword, Dagger | bones |
+| SrBehemoth `$119` | event 82 | 43 / 19,000 | weak fire, poison; absorbs ice; Ice 3, Meteo, Pearl | 6 | Dagger, Blunt | the dead beast: horn and bone; Were-Rat's poison |
 
 `battle_breakwor_gau` checks the rows in the built ROM, every formation of
 the cave's pool (group 132), the chest (event group 153) and the
@@ -147,20 +147,20 @@ the rows are for the areas they come from as much as for the Veldt.
 
 | species | L | floor | row | body |
 |---|---|---|---|---|
-| Were-Rat `$013` | 4 | 2 slash | 2 Spear, Katana | a rat |
-| Leafer `$017` | 5 | 2 slash | 2 Sword, Arcane | a rabbit |
-| Vomammoth `$01B` | 1 | 2 slash | 2 Katana, Fist | a mammoth's hide |
-| Dark Wind `$028` | 5 | 2 slash | 2 Sword, Spear | a bird |
-| M-TekArmor `$042` | 8 | 3 pierce | 3 Spear, Fist | armour |
-| Repo Man `$04D` | 5 | 2 slash | 2 Sword, Spear | a thief |
-| Areneid `$05D` | 6 | 2 slash | 2 Sword, Arcane | a shelled crawler |
-| Stray Cat `$018` | 10 | 3 slash | 3 Dagger, Katana | claws and teeth |
-| Beakor `$029` | 11 | 3 slash | 3 Dagger, Katana | a bird |
-| CrassHoppr `$02F` | 11 | 3 pierce | 3 Dagger, Arcane | an insect's shell |
-| Bomb `$04F` | 8 | 3 slash | 3 Katana, Arcane | burst it |
-| Ghost `$05A` | 10 | 3 slash | 3 Sword, Dagger | a spirit (guidelines: special on spirits; it became Dagger here) |
-| Rhobite `$076` | 10 | 3 slash | 3 Katana, Fist | a beetle |
-| Poplium `$0A2` | 11 | 3 slash | 3 Spear, Katana | a puffball |
+| Were-Rat `$013` | 4 | 2 slash | 2 Sword, Dagger | a rat |
+| Leafer `$017` | 5 | 2 slash | 2 Sword, Dagger | a rabbit |
+| Vomammoth `$01B` | 1 | 2 slash | 2 Sword, Blunt | a mammoth's hide |
+| Dark Wind `$028` | 5 | 2 slash | 2 Dagger, Ranged | a bird |
+| M-TekArmor `$042` | 8 | 3 pierce | 3 Dagger, Ranged | armour |
+| Repo Man `$04D` | 5 | 2 slash | 2 Sword, Dagger | a thief |
+| Areneid `$05D` | 6 | 2 slash | 2 Dagger | a shelled crawler |
+| Stray Cat `$018` | 10 | 3 slash | 3 Dagger, Blunt | claws and teeth |
+| Beakor `$029` | 11 | 3 slash | 3 Ranged, Katana | a bird |
+| CrassHoppr `$02F` | 11 | 3 pierce | 3 Dagger, Blunt | an insect's shell |
+| Bomb `$04F` | 8 | 3 slash | 3 Ranged, Katana | burst it |
+| Ghost `$05A` | 10 | 3 slash | 3 Blunt, Katana | a spirit (guidelines: special on spirits) |
+| Rhobite `$076` | 10 | 3 slash | 3 Blunt, Katana | a beetle |
+| Poplium `$0A2` | 11 | 3 slash | 3 Dagger, Katana | a puffball |
 
 The other thirty the Veldt can deal from this save stay on the floor: no
 run met them (section 8).  `battle_breakwor_gau` checks the fourteen
@@ -171,8 +171,10 @@ ROM without this arc's rows (`bwbase`, on the final suite at cc895b8c:
 "mismatches: got 26") and on two ROM mutants (`rowmuts.sh`):
 Toe Cutter without bludgeon (`bwmut1`: "$08F Toe Cutter: GAU alone holds no
 key"), Leafer without the floor's slash (`bwmut2`: "$017 Leafer lost the
-floor's class $01").  Of the present rows the Rhobite's (Katana, Fist; weak
-water) holds no key for TERRA (Dagger), CELES (Sword) and RELM (Arcane).
+floor's class $01").  Of the present rows the Beakor's and the Bomb's
+(Ranged, Katana) hold no class key for TERRA (Dagger), CELES (Sword), RELM
+(Blunt) or GAU (his fangs, Dagger); their keys are the Beakor's fire and
+the Bomb's ice and water.
 
 ## 4. The bosses
 
@@ -192,14 +194,14 @@ formation, read with full power: the special is MonsterRage's second
 attack, its element, power and targeting MagicProp's; a special something
 standing absorbs or nulls is out, a weakness doubles it, a revealed key it
 chips counts a thousand (the MagiTek line's rule), and the physical
-specials (Battle, Special) are scored as his fists (Fist) at a nominal
+specials (Battle, Special) are scored as his fangs (Dagger) at a nominal
 power.  The boost: an event battle spends up to three pips (the special
 every turn), a random battle one (three in four).  The steer reads the rage
 window's cursor cells (`$892B`/`$892F`/`$8933`) and the live list, and a
 refused confirm takes the verb off for the battle.
 
-Off, which is how this arc plays, GAU Fights: his bare hands are Fist, the
-key every body in the Veldt cave carries (section 3).  The line was on for
+Off, which is how this arc plays, GAU Fights: his bare hands are his fangs,
+Dagger, the key every body in the Veldt cave carries (section 3).  The line was on for
 the first sweeps; the paired A/B in section 7 found the possession slower
 than his fists on every SrBehemoth key (and costlier: two deaths) and on the
 cave's randoms by the mean (1559 against 1363 ticks; Rage was the faster on

@@ -311,8 +311,8 @@ By the body's role in its fight, not its level:
 6. **The Face's 8 was never chipped on the line** (8 at the open, 8 at
    its death, `raw_lines.md` "final tier 1"): the front four at the plate
    are two blades and two rods, and the rods' hits went elsewhere. Its
-   keys are bludgeon, special and fire (`ot6_hud.asm:3480-3482`).
-7. **The White Dragon's row is one key** (special; `ot6_hud.asm:3006-3009`)
+   keys are blunt, ranged and fire (`ot6_hud.asm:3480-3482`).
+7. **The White Dragon's row is one key** (blunt; `ot6_hud.asm:3006-3009`)
    with no vanilla weakness. In its own fight weapons are off and only the
    Break spell chips it: 21,014 ticks, never broken, lowest 3
    (`wor_tower.log:29339-34519`). The Veldt deals the same formation to a
@@ -378,10 +378,10 @@ counters, the absorbs, 0 XP.
 **Shields.** 5 each, 20 across four gauges: the WoR's opening multi-body
 fight, on the band.
 
-**Break story.** SABIN (claws, fists) and EDGAR (the Break Blade, the
-AutoCrossbow's pierce on all four) hold a class key on every body; CELES
-(slash) on three; `$13D` answers only fists and the crossbow
-(route-wor-edgar.md 8.5). Elements are a trap: each body drinks one of the
+**Break story.** SABIN's fists and Blitzes (Blunt) key three bodies, and
+EDGAR's Break Blade and CELES's blade (Sword) three; `$13D` answers only
+fists and a spear (EDGAR's Drill). The AutoCrossbow (Ranged) and SABIN's
+claws (Katana) key none. Elements are a trap: each body drinks one of the
 party's three.
 
 **On the line.** Won in 7,060 ticks with no death, and **no body was
@@ -398,7 +398,7 @@ today; the hostage rule would make it one.
 Party: CELES 33, SABIN, EDGAR, SETZER 32 (`wor_falcon.log:5098`, :5171).
 Formation 455, event group 85. A loss is a game over.
 
-**Built.** 10 shields; pierce, bludgeon, special (`ot6_hud.asm:2775-2780`);
+**Built.** 10 shields; dagger, blunt, ranged (`ot6_hud.asm:2775-2780`);
 weak fire, absorbs ice (vanilla). The count is owner-approved
 (route-wor-falcon.md section 14, :2472-2475). The telegraph is "proposed"
 and open: Absolute 0 (:786-788, :2483-2488).
@@ -447,8 +447,8 @@ gathers in the wound", a `wait`, then the cure; a break denies the heal.
 
 **Shields.** 10, the capstone band.
 
-**Break story.** EDGAR pierces and SETZER holds pierce (Darts) or special
-(Cards, Dice); SABIN's Blitz is the blow and his claws carry fire; CELES
+**Break story.** EDGAR's AutoCrossbow and SETZER's darts, cards and dice
+are Ranged; SABIN's Blitz is the blow and his claws carry fire; CELES
 holds fire by Maduin and stands on Runic, which five of his spells feed
 (route-wor-falcon.md section 5). Every member has a key.
 
@@ -465,7 +465,7 @@ and a party that plays to the hook rather than racing, would see it more.
 Party: the same four (`wor_falcon.log:2095`). Formation 433, event group
 116.
 
-**Built.** The shell `$101` has no gauge; the head `$135` has 6, pierce,
+**Built.** The shell `$101` has no gauge; the head `$135` has 6, ranged,
 with vanilla fire (`ot6_hud.asm:2781-2788`): "the narshe whelk's rows
 grown for the WoR".
 
@@ -490,7 +490,7 @@ note, not a defect (guidelines: a win is a win).
 Party: CELES 33, SABIN, EDGAR, SETZER 32 (`wor_terra.log:2869`, :4703).
 Battles 129 and 130, records `$16B` and `$16C`.
 
-**Built.** 4 and 5 shields, bludgeon and special
+**Built.** 4 and 5 shields, blunt and ranged
 (`ot6_hud.asm:2800-2810`); weak poison, absorbs bolt. Six and eight "never
 broke in 18 fights" each (route-wor-terra.md section 6). The first record
 `$16A`, TERRA alone against an invincible body, has no gauge (:2796-2799).
@@ -523,8 +523,8 @@ monster switch), nothing else. Stays verbatim: the rotation, the line at
 
 **Shields.** 4 and 5, set by measurement.
 
-**Break story.** SABIN's Blitz and SETZER's cards are the class keys,
-EDGAR's Bio Blaster the vanilla poison; CELES holds none and stands on
+**Break story.** SABIN's Blitz, SETZER's cards and EDGAR's AutoCrossbow
+are the class keys, EDGAR's Bio Blaster the vanilla poison; CELES holds none and stands on
 Runic against Bolt 2 and Bolt 3 (route-wor-terra.md section 6).
 
 **On the line.** The second visit crossed the line Broken: at f+2700 he
@@ -540,7 +540,7 @@ ticks, broken at 2,439; no deaths.
 Party: CELES, SABIN, TERRA 32 (morphed), SETZER (`wor_terra.log:6422`,
 :6537). Battle 131, record `$16D`.
 
-**Built.** 12 shields; slash, bludgeon, special
+**Built.** 12 shields; sword, blunt, ranged
 (`ot6_hud.asm:2811-2814`).
 
 **Script** (`ai_script.asm:7855-7868`): the same rotation; a Bolt 2 in
@@ -565,7 +565,7 @@ board step and he broke at tick 2,858 with 19,492 of 26,000 HP
 Party: CYAN 35, TERRA 37, SABIN, CELES 36 (`wor_storm.log:5153`, :5185).
 Event group 133.
 
-**Built.** 14 shields; slash, pierce (`ot6_hud.asm:2860-2864`); weak
+**Built.** 14 shields; sword, katana (`ot6_hud.asm:2860-2864`); weak
 bolt, absorbs wind. "Cyan's quadra slam chips four a turn".
 
 **Script** (`ai_script.asm:6966-6984`). No counter, no timer, no line.
@@ -595,7 +595,8 @@ Wind Slash, Rage, the counter's Battle.
 
 **Shields.** 14 today (section 3.2, 5).
 
-**Break story.** Four blades: every member holds slash; bolt is the
+**Break story.** Four blades: TERRA's and CELES's swords, CYAN's katana and
+SABIN's claws all key it; bolt is the
 ThunderBlade's; CYAN's Tempest heals it (route-wor-cyan.md section 6).
 
 **On the line.** Won in 14,383 ticks, no death; broken once, at tick
@@ -609,7 +610,7 @@ half the fight passed before the first break. Over draws at level 38-40:
 Party: CYAN, TERRA, CELES, MOG (`wor_narshe.log:22250`). Event group 132;
 it walks the cliff and fights on touch.
 
-**Built.** 6 shields; pierce, bludgeon (`ot6_hud.asm:2926-2933`); weak
+**Built.** 6 shields; ranged, spear (`ot6_hud.asm:2926-2933`); weak
 fire, absorbs ice. Six "not the plan's ten".
 
 **Script** (`ai_script.asm:6922-6940`): a three-turn rotation with no
@@ -649,7 +650,7 @@ of 112 fights with the blades (13.4).
 Party: CYAN 38, TERRA 39, CELES 38, MOG 36 (`wor_tritoch.log:3808`,
 :3852). Battle 119, record `$144`; the two WoB records keep no gauge.
 
-**Built.** 10 shields; slash, pierce (`ot6_hud.asm:2919-2925`); weak
+**Built.** 10 shields; sword, katana, spear (`ot6_hud.asm:2919-2925`); weak
 fire, absorbs ice, nulls six elements; defence 254.
 
 **Script** (`ai_script.asm:6794-6819`): a rotation of Rasp, Ice 3 and Cold
@@ -692,7 +693,7 @@ Party: the same four, 39/39/39/37 (`wor_tritoch.log:9382`). Battle 117,
 record `$110` (`$10F` is a duplicate no battle deals,
 `ot6_hud.asm:3602-3603`).
 
-**Built.** 6 shields; slash, pierce (`ot6_hud.asm:2915-2918`); weak fire
+**Built.** 6 shields; sword, spear (`ot6_hud.asm:2915-2918`); weak fire
 and poison, absorbs ice. "break him before his green cherry".
 
 **Script** (`ai_script.asm:4914-4976`). The wind-up is an HP line with
@@ -726,7 +727,8 @@ verbatim: the Jump, the counters, the cherry's four statuses.
 
 **Shields.** 6, a guard's count for the fight that ends in a recruit.
 
-**Break story.** Every member holds slash or pierce, and three cast fire.
+**Break story.** TERRA's and CELES's swords and MOG's spear key him;
+CYAN's katana does not. Three cast fire.
 
 **On the line.** Won in 6,151 ticks, no death; broken at 3,533 with
 12,002 of 17,200 HP, above the cherry's line
@@ -738,7 +740,7 @@ Party: CYAN, TERRA, CELES, MOG (`wor_umaro_box.log:2510`), on a branch leg
 nothing boots (wor-coverage.md section 12). Formation 235, three Pugs,
 level 99.
 
-**Built.** 4 shields each; slash, special (`ot6_hud.asm:2912-2914`).
+**Built.** 4 shields each; ranged, katana (`ot6_hud.asm:2912-2914`).
 
 **Script** (`ai_script.asm:4217-4292`). Each Pug steps forward on its
 turn and strikes with Knife when it has stepped eight times; three Fights
@@ -766,7 +768,7 @@ Party: CYAN 40, TERRA 40, CELES 39, SABIN 37 (`wor_relm.log:3982`,
 :4105). Formation 456: the goddess `$11E` and, hidden behind her, the
 demon `$148`.
 
-**Built.** The goddess has no gauge, the demon 6 with slash and pierce
+**Built.** The goddess has no gauge, the demon 6 with katana and spear
 (`ot6_hud.asm:2963-2969`); the demon is weak to fire and holy and absorbs
 bolt. So this is not a no-gauge fight: only its wrong body is. Why the
 goddess has none: hitting her draws Phantasm and she returns from her own
@@ -810,7 +812,8 @@ counter, Flash Rain under 15,360.
 
 **Shields.** 6 on the demon.
 
-**Break story.** Four blades; fire from TERRA and the Ifrit wearer, Pearl
+**Break story.** CYAN's katana and SABIN's claws key the demon; TERRA's
+and CELES's swords do not. Fire from TERRA and the Ifrit wearer, Pearl
 from TERRA; CELES on Runic for Bolt 2 and 3. The demon absorbs bolt.
 
 **On the line.** Won in 12,576 ticks, no death, and broken once, late: at
@@ -825,7 +828,7 @@ fight with the most to gain from a designed window.
 Party: TERRA 49, CELES 48, RELM, STRAGO 46 (`wor_tower.log:34519`,
 :34766). Formation 481, event group 139; magic only (battle switch `$38`).
 
-**Built.** 6 shields; special (`ot6_hud.asm:3006-3009`); no weakness,
+**Built.** 6 shields; blunt (`ot6_hud.asm:3006-3009`); no weakness,
 absorbs holy. "no weakness and no reflect: ot6's break is its key".
 
 **Script** (`ai_script.asm:3253-3266`): Pearl twice a turn, and any Magic
@@ -862,7 +865,7 @@ An earlier lab broke it "twice a fight by TERRA's Break"
 Party: the same four (`wor_tower.log:57199`, :57455). Formation 354,
 event group 145; magic only.
 
-**Built.** 8 shields; special (`ot6_hud.asm:3010-3012`); no weakness of
+**Built.** 8 shields; blunt (`ot6_hud.asm:3010-3012`); no weakness of
 his own: "his wall's one weakness (wallchange), or ot6's break".
 
 **Script** (`ai_script.asm:3551-3578`). Two things, both in the counter:
@@ -917,10 +920,10 @@ with the break line and a second Break (12.3).
 Party: CELES, RELM, MOG, UMARO, the cave's second party
 (`wor_locke.log:2666`). Event group 138.
 
-**Built.** 6 shields; pierce (`ot6_hud.asm:3049-3052`); weak ice and
+**Built.** 6 shields; spear (`ot6_hud.asm:3049-3052`); weak ice and
 water, absorbs fire. "The floor had already given it 6 shields and
 pierce, so the row changes no number of its fight"
-(route-wor-locke.md section 4).
+(route-wor-locke.md section 4; pierce through v0.50, Spear today).
 
 **Script** (`ai_script.asm:7223-7280`). A clock, ahead of everything else
 in the script:
@@ -962,7 +965,7 @@ one class key and one caster's element: thin, and it shows.
 Party: CELES, RELM, GOGO, STRAGO (`wor_opera.log:7469`). Formation 463;
 met from the Falcon's deck, and its HP carries between meetings.
 
-**Built.** 8 shields; pierce, special (`ot6_hud.asm:3053-3057`); weak
+**Built.** 8 shields; ranged, spear (`ot6_hud.asm:3053-3057`); weak
 fire and holy, absorbs ice and poison.
 
 **Script** (`ai_script.asm:5480-5500`). It opens with L5 Doom, and its
@@ -990,8 +993,9 @@ between meetings.
 
 **Shields.** 8, the boss band.
 
-**Break story.** RELM's brush is the class key; fire and holy from the
-casters. Two members of four hold no key.
+**Break story.** No member holds a class key: RELM's brush and the rods
+are Blunt, CELES's blade a Sword. Fire and holy from the casters are the
+keys.
 
 **On the line.** Three meetings: 7,919 ticks and he escaped (broken once,
 at 3,162), 5,214 ticks and he escaped (never broken), 6,141 ticks and he
@@ -1008,7 +1012,8 @@ three to five meetings (route-wor-gogo.md section 4).
 Party: TERRA 51, CELES 50, RELM 47, GAU 33 (`wor_gau.log:1817`, :2003).
 Event battle 82: formation 452, then formation 424.
 
-**Built.** Two rows, 6 shields each, pierce and bludgeon:
+**Built.** Two rows, 6 shields each, dagger and blunt for the first,
+ranged and spear for the second:
 `ot6_hud.asm:3076-3081` for the first (`$119`, weak fire and poison,
 absorbs ice) and :3314-3317 for the second (`$07F`, weak fire and holy,
 absorbs poison). The second row sits under the Colosseum's heading, which
@@ -1044,9 +1049,10 @@ line is a fuse and not a caption. The first body gets none.
 
 **Shields.** 6 and 6, guards' counts for a two-stage fight.
 
-**Break story.** TERRA's dagger pierces, RELM's rod and GAU's fists are
-blows; fire is TERRA's. GAU's Were-Rat poison, the first body's vanilla
-key (:3079), heals the second.
+**Break story.** On the first body TERRA's dagger and GAU's fangs are
+Daggers and RELM's brush is Blunt; no member holds the second body's
+Ranged or Spear, so its keys are fire (TERRA's) and holy. GAU's Were-Rat
+poison, the first body's vanilla key (:3079), heals the second.
 
 **On the line.** Won in 6,737 ticks, no death; the first broken at 1,720
 and the second at 5,008 (`wor_gau.log:602`, :1394, :1817). The outcome
@@ -1059,8 +1065,8 @@ route-wor-gau.md finding 6 left that "not explained here"; it is the
 Party: STRAGO 53, RELM 53, GOGO 45, TERRA 54 (`wor_ebot.log:12774`,
 :13088). Formation 464: Hidon and four Hidonites.
 
-**Built.** Hidon 6, pierce and bludgeon; the Hidonites 2 each, a
-different pair on each (`ot6_hud.asm:3183-3197`). Hidon is weak to fire,
+**Built.** Hidon 6, dagger and blunt; the Hidonites 2 each, every one
+Blunt, three with a second class (`ot6_hud.asm:3183-3197`). Hidon is weak to fire,
 holy and earth and absorbs poison.
 
 **Script** (`ai_script.asm:5731-5789`). Vanilla's own fuse, and its
@@ -1104,7 +1110,7 @@ hook.
 
 Party: CELES, RELM, GOGO, STRAGO (`wor_opera.log:4671`). Event group 134.
 
-**Built.** 6 shields; pierce, bludgeon (`ot6_hud.asm:3200-3203`); weak
+**Built.** 6 shields; ranged, spear (`ot6_hud.asm:3200-3203`); weak
 wind and water.
 
 **Script** (`ai_script.asm:6989-7011`). Every turn is earth, and a clock
@@ -1131,8 +1137,9 @@ safe. Stays verbatim: 50 Gs, Honed Tusk, the rotation.
 
 **Shields.** 6; proposed 8.
 
-**Break story.** STRAGO's rod is the blow and his Aqua Rake the wind and
-water; the other three hold no class key.
+**Break story.** No member holds a class key (the rods and RELM's brush
+are Blunt, CELES's blade a Sword); STRAGO's Aqua Rake is the wind and
+water.
 
 **On the line.** Won in 8,339 ticks, no death, **never broken** (lowest
 2): thirteen actions, seven spells, five lores and an item, no Fight
@@ -1144,8 +1151,8 @@ water; the other three hold no class key.
 Party: CELES 53, RELM 53, TERRA 54; three, since CYAN is the dream's
 (`wor_dream.log:9145`, :9233). Formation 460, event battle 90.
 
-**Built.** 4 shields each, three class pairs that between them take every
-hand (`ot6_hud.asm:3252-3261`). Curley weak to ice and water, Larry to
+**Built.** 4 shields each: Curley ranged and katana, Larry ranged and
+spear, Moe sword and blunt (`ot6_hud.asm:3252-3261`). Curley weak to ice and water, Larry to
 fire, Moe to nothing; each absorbs another's element.
 
 **Script** (`ai_script.asm:5543-5692`). Three scripts with one shared
@@ -1176,8 +1183,8 @@ answer to Magic.
 
 **Shields.** 4 each, 12 across three gauges.
 
-**Break story.** Two blades and a rod or brush: between the three bodies
-every member holds a key somewhere (:3252-3253).
+**Break story.** The two blades and RELM's brush key Moe only. Curley
+takes ice and water, Larry fire: the casters' keys.
 
 **On the line.** Won in 11,616 ticks, no death, three breaks, the first
 at 534 (`wor_dream.log:6493`, :9145). Over draws: 10 of 10, low point 97%
@@ -1188,7 +1195,7 @@ at 534 (`wor_dream.log:6493`, :9145). Over draws: 10 of 10, low point 97%
 Party: CELES 54, RELM 54, TERRA 55 (`wor_doma.log:6114`, :6398).
 Formation 462: Wrexsoul and two SoulSavers. Event battle 92.
 
-**Built.** Wrexsoul 6, slash and special; the SoulSavers 2, special
+**Built.** Wrexsoul 6, blunt and katana; the SoulSavers 2, blunt
 (`ot6_hud.asm:3262-3268`). All three weak to ice, absorbing fire and
 holy.
 
@@ -1221,8 +1228,8 @@ SoulSavers.
 
 **Shields.** 6; SoulSavers 2.
 
-**Break story.** Two blades for Wrexsoul and RELM's brush for all three;
-ice from CELES.
+**Break story.** RELM's brush keys all three; the two blades key none.
+Ice from CELES.
 
 **On the line.** Won in 11,162 ticks. One death, the host's, by the
 party's own hand (`wor_doma.log:4925`: "entity 3 char 0 from 41/4383 by
@@ -1235,7 +1242,7 @@ tick 9,302 with 3,535 of 23,066 HP (`:5686`). Over draws: 11 of 11
 Party: CELES 55, RELM 55, CYAN 44, TERRA 56 (`wor_ancient.log:11511`,
 :11552). Event group 137; it walks the queen's east room.
 
-**Built.** 6 shields; slash, pierce (`ot6_hud.asm:3286-3288`); weak bolt,
+**Built.** 6 shields; katana, spear (`ot6_hud.asm:3286-3288`); weak bolt,
 absorbs water.
 
 **Script** (`ai_script.asm:7147-7218`). CleanSweep at the open and every
@@ -1266,8 +1273,8 @@ traded. Stays verbatim: CleanSweep's clock, the Aqua Rake phase under
 
 **Shields.** 6; proposed 8.
 
-**Break story.** Three blades key it; bolt from the Maduin or Tritoch
-wearer. CYAN returns from his dream with every SwdTech.
+**Break story.** CYAN's katana keys it; the two swords do not. Bolt from
+the Maduin or Tritoch wearer. CYAN returns from his dream with every SwdTech.
 
 **On the line.** Won in 3,429 ticks, no death; broken at 1,760 with
 18,953 of 26,900 HP (`wor_ancient.log:11047`, :11511). The shortest boss
@@ -1279,7 +1286,7 @@ fight of the line: six actions. "Not a coin flip; no lab"
 Party: the same four (`wor_ancient_boxes.log:1379`), on a branch leg.
 Formation 465, event group 95.
 
-**Built.** 6 shields; slash, pierce (`ot6_hud.asm:3296-3300`); weak
+**Built.** 6 shields; katana, spear (`ot6_hud.asm:3296-3300`); weak
 poison.
 
 **Script** (`ai_script.asm:5794-5838`). A clock with vanilla's own line,
@@ -1314,7 +1321,7 @@ before the statuses land.
 Party: the same four (`wor_ancient_boxes.log:4751`). Formation 483, event
 group 113.
 
-**Built.** 6 shields; slash, special (`ot6_hud.asm:3291-3295`); no
+**Built.** 6 shields; ranged, katana (`ot6_hud.asm:3291-3295`); no
 weakness of its own, absorbs water.
 
 **Script** (`ai_script.asm:6488-6542`). WallChange on a clock, and then
@@ -1356,8 +1363,8 @@ Levels at Guardian's save: TERRA 63, CELES 58, CYAN 55, SHADOW 56, RELM
 
 Party 3 (`wor_kt_inferno.log:2607`). Formation 484, event battle 114.
 
-**Built.** Inferno 6, pierce and bludgeon; Striker 3, slash and pierce;
-Rough 3, slash and bludgeon (`ot6_hud.asm:3429-3438`). A triangle of
+**Built.** Inferno 6, ranged and spear; Striker 3, katana and spear;
+Rough 3, ranged and katana (`ot6_hud.asm:3429-3438`). A triangle of
 elements: Inferno weak to bolt and drinking fire, Striker weak to fire
 and drinking ice, Rough weak to ice and drinking bolt.
 
@@ -1389,8 +1396,8 @@ verbatim: the arms' clocks, Delta Hit, Meteor, TekBarrier.
 
 **Shields.** 6 and 3, 3: a guard and its parts.
 
-**Break story.** SHADOW's point and SABIN's Blitz key Inferno; CYAN's
-katana keys both arms; bolt is SHADOW's Bolt Edge. "SABIN's Fire Knuckle
+**Break story.** SHADOW's throws (Ranged) key Inferno and Rough; CYAN's
+katana and SABIN's claws key both arms; bolt is SHADOW's Bolt Edge. "SABIN's Fire Knuckle
 healed Inferno"
 (route-wor-kefka-tower.md section 6): the absorb triangle bites.
 
@@ -1404,7 +1411,7 @@ with 11,113 of 30,800 HP; the arms' gauges never reached 0
 Party 2 (`wor_kt_atma.log:5252`). Formation 482, event battle 112;
 optional, with a save point behind him.
 
-**Built.** 10 shields; slash, pierce (`ot6_hud.asm:3455-3458`); no
+**Built.** 10 shields; katana, spear (`ot6_hud.asm:3455-3458`); no
 weakness, absorbs five elements. "the atmaweapon's row, the rematch".
 
 **Script** (`ai_script.asm:8103-8154`). Vanilla's longest fuse, armed by
@@ -1442,8 +1449,8 @@ must be earned again. Nothing in the script changes.
 
 **Shields.** 10, one under the AtmaWeapon's 11; proposed 12.
 
-**Break story.** CELES's blade, LOCKE's knife and MOG's spear: three of
-four hold a key. No element helps.
+**Break story.** MOG's spear is party 2's one class key; CELES's blade,
+LOCKE's Wing Edge and STRAGO's rod do not key it. No element helps.
 
 **On the line.** Won in 6,611 ticks, no death; broken at 3,183 with
 44,055 of 55,000 HP (`wor_kt_atma.log:4415`, :5252). Fifteen party
@@ -1454,7 +1461,7 @@ monster action. Over draws: 12 of 12, 0 deaths (section 6).
 
 Party 2 (`wor_kt_guardian.log:10446`). Event battle 135.
 
-**Built.** 6 shields; slash, pierce (`ot6_hud.asm:3459-3462`); weak
+**Built.** 6 shields; katana, spear (`ot6_hud.asm:3459-3462`); weak
 water, absorbs bolt.
 
 **Script** (`ai_script.asm:7047-7118`). **The telegraph already exists in
@@ -1489,8 +1496,8 @@ question 1. With the species table clearing battle switch 0 and variable
 **Shields.** 6, the floor's number; proposed 8. "It may be too easy for an
 eighth dragon" (route-wor-kefka-tower.md section 6).
 
-**Break story.** CELES's blade and the bench's knife and spear; STRAGO's
-Aqua Rake is its water.
+**Break story.** MOG's spear; CELES's blade and LOCKE's Wing Edge do not key
+it. STRAGO's Aqua Rake is its water.
 
 **On the line.** Won in 4,019 ticks, no death; broken at 1,934 with
 22,733 of 32,400 HP; nine of the ten actions were Fights
@@ -1501,7 +1508,7 @@ Bolt 3 fired is not measured: the log names no monster action.
 
 Party 3 (`wor_kt_guardian.log:3979`). Event battle 136.
 
-**Built.** 6 shields; bludgeon, special (`ot6_hud.asm:3463-3466`); weak
+**Built.** 6 shields; blunt, ranged (`ot6_hud.asm:3463-3466`); weak
 fire and holy, absorbs poison.
 
 **Script** (`ai_script.asm:7123-7142`). A fixed bar of four beats, no
@@ -1532,10 +1539,8 @@ World of Ruin.
 
 **Shields.** 6, the floor's number; proposed 8.
 
-**Break story.** Thin on class: "Party 3's keys are slash and pierce
-only" (route-wor-kefka-tower.md section 4), so SABIN's Blitz is the only
-blow and nobody holds special. Fire is SHADOW's skean and SABIN's; holy
-is Aura Bolt.
+**Break story.** SABIN's Blitz and fists (Blunt) and SHADOW's throws
+(Ranged) key it. Fire is SHADOW's skean and SABIN's; holy is Aura Bolt.
 
 **On the line.** Won in 5,420 ticks, no death; broken at 3,847 with
 15,162 of 32,800 HP (`wor_kt_guardian.log:3529`, :3979).
@@ -1545,7 +1550,7 @@ is Aura Bolt.
 Party 2 (`wor_kt_guardian.log:61064`). Battle 140, record `$112`; the
 WoB's `$111` keeps no gauge.
 
-**Built.** 10 shields; pierce, bludgeon (`ot6_hud.asm:3439-3443`); weak
+**Built.** 10 shields; ranged, spear (`ot6_hud.asm:3439-3443`); weak
 bolt and water.
 
 **Script** (`ai_script.asm:3674-3788`). Four programs, each announced and
@@ -1585,7 +1590,7 @@ clears monster switches 1-4 and he falls back to the basic program.
 
 **Shields.** 10, the capstone band.
 
-**Break story.** LOCKE's knife, MOG's spear and STRAGO's rod; CELES wants
+**Break story.** MOG's spear and LOCKE's Wing Edge (Ranged); CELES wants
 Bolt. STRAGO's Aqua Rake is its water.
 
 **On the line.** Won in 7,496 ticks; broken at 4,252 with 46,711 of
@@ -1597,7 +1602,7 @@ Bolt. STRAGO's Aqua Rake is its water.
 
 Party 3 (`wor_kt_doom.log:23003`). Formation 468, event battle 98.
 
-**Built.** 10 shields; slash, special (`ot6_hud.asm:3444-3447`); weak
+**Built.** 10 shields; ranged, katana (`ot6_hud.asm:3444-3447`); weak
 holy, absorbs ice and poison.
 
 **Script** (`ai_script.asm:5861-5913`). At half his HP, in the counter,
@@ -1636,8 +1641,8 @@ statuses, ForceField, R.Polarity at eight hits, the ice rotation.
 
 **Shields.** 10.
 
-**Break story.** CYAN's katana and SABIN's claws are slash; nobody in
-party 3 holds special; holy is SABIN's Aura Bolt. His phase change runs
+**Break story.** CYAN's katana and SABIN's claws are Katana, SHADOW's
+throws Ranged; holy is SABIN's Aura Bolt. His phase change runs
 even while he is Broken (its block holds a `dlg`), and its Haste shortens
 his breaks (bosses-wob.md:77-80).
 
@@ -1651,7 +1656,7 @@ save: 9 of 9 once the bench is levelled and dressed against ice
 
 Party 1 (`wor_kt_goddess.log:2124`). Formation 469, event battle 99.
 
-**Built.** 8 shields; pierce, special (`ot6_hud.asm:3448-3450`); no
+**Built.** 8 shields; ranged, spear (`ot6_hud.asm:3448-3450`); no
 weakness, absorbs bolt and holy.
 
 **Script** (`ai_script.asm:5918-5956`). Every Fight is answered with Love
@@ -1675,8 +1680,8 @@ Love Token, Charm, Lullaby, Overcast.
 
 **Shields.** 8; proposed 10.
 
-**Break story.** EDGAR's spear, SETZER's cards or darts, RELM's brush:
-three of four hold a key. No element helps.
+**Break story.** EDGAR's AutoCrossbow and Drill and SETZER's cards or
+darts: two of four hold a key; TERRA's sword and RELM's brush do not. No element helps.
 
 **On the line.** Won in 6,242 ticks, no death; broken once, at tick
 4,635 with 19,159 of 44,000 HP (`wor_kt_goddess.log:1686`, :2124). Over
@@ -1687,7 +1692,7 @@ draws: about 7 or 8 of 9 (route-wor-kefka-tower.md finding 6).
 Party 2 (`wor_kt_poltergeist.log:61829`). Formation 470, event battle
 100.
 
-**Built.** 8 shields; bludgeon, special (`ot6_hud.asm:3451-3454`); weak
+**Built.** 8 shields; blunt, ranged (`ot6_hud.asm:3451-3454`); weak
 poison, absorbs fire and wind.
 
 **Script** (`ai_script.asm:5961-6000`). A two-step kill ahead of the
@@ -1719,12 +1724,10 @@ move, one turn apart. A break, or a cure for Stop, cancels it.
 
 **Shields.** 8; proposed 10 with care (section 3.2, 3).
 
-**Break story.** The thinnest in the tower. STRAGO's rod is the party's
-only class key (the leg hands him the Pearl Rod for it,
-route-wor-kefka-tower.md section 5); CELES, LOCKE and MOG hold none.
-Poison is its vanilla weakness, the Tritoch wearer's spell. One
-key-holder in four is a flag: a party 2 without STRAGO could chip it
-only by poison.
+**Break story.** The thinnest in the tower. STRAGO's rod (Blunt; the leg
+hands him the Pearl Rod for it, route-wor-kefka-tower.md section 5) and
+LOCKE's Wing Edge (Ranged) are the party's class keys; CELES and MOG hold
+none. Poison is its vanilla weakness, the Tritoch wearer's spell.
 
 **On the line.** Won in 18,367 ticks, no death; broken twice, at 6,922
 and 16,611 (`wor_kt_poltergeist.log:58951`, :61313, :61829). It is the
@@ -1989,10 +1992,11 @@ Each can be answered in a sentence.
    the Dirt Drgn, the White Drgn, MagiMaster, the Whelk head, and the
    Face, whose gauge never moved. None is unbreakable by its party; each
    is killed first, or waited out.
-6. **Thin break stories:** the Poltrgeist (one class key-holder in its
-   party), the Red Dragon (one), the Skull Drgn (one blow, no special in
-   party 3), Doom (no special in party 3), and the White Drgn (one
-   spell). None is unbreakable.
+6. **Thin break stories:** the Poltrgeist (two class key-holders in its
+   party), the Red Dragon (one), Atma and the Gold Drgn (MOG's spear
+   alone), the Goddess (two), and the White Drgn (one spell). The Doom
+   Gaze, the Dirt Drgn and the second SrBehemoth take no class their
+   party holds; elements key them. None is unbreakable.
 7. **The second SrBehemoth is a different species under a heading that
    says otherwise.** `$07F` (formation 424) arrives by `change_battle`
    from the first one's death; its row sits with the Colosseum's bodies

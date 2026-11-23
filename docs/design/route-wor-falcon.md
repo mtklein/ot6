@@ -23,10 +23,10 @@ emulator run was made for this plan.
 
 > Weapon classes: v0.51 replaced the four classes this document was written
 > under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and keys
 > below are the present ones. Quoted logs, dated measurements and "before"
 > columns keep the words they were recorded in: slash is now Sword or Katana,
-> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+> pierce Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged or Blunt.
 
 ---
 
@@ -123,7 +123,7 @@ MP. The first thing the arc does is field care.
 | member | level | kit | commands |
 |---|---|---|---|
 | CELES | L31, xp 90,373 (L32 at 91,384) | MADUIN; Enhancer (Sword, runic) + ThunderBlade (Sword, bolt) on the Genji Glove, Crystal Helm, Gold Armor, Jewel Ring | Fight, Runic, Magic (Ice, Scan, Safe, Imp, Cure, Antdot; Fire/Ice/Bolt from Maduin; Haste at L32), Item |
-| SABIN | L31 | IFRIT; Fire Knuckle x2 (Fist, fire) on the Genji Glove, Tiger Mask, Power Sash, Black Belt | Fight, Blitz (Pummel, AuraBolt, Suplex, Fire Dance, Mantra, Air Blade), Magic (Fire, Drain), Item |
+| SABIN | L31 | IFRIT; Fire Knuckle x2 (Blunt, fire) on the Genji Glove, Tiger Mask, Power Sash, Black Belt | Fight, Blitz (Pummel, AuraBolt, Suplex, Fire Dance, Mantra, Air Blade), Magic (Fire, Drain), Item |
 | EDGAR | L31 | RAMUH; Break Blade (Sword), Mithril Shld, Gold Helmet, Mithril Vest, Jewel Ring, Star Pendant | Fight, Tools (AutoCrossbow, NoiseBlaster, Bio Blaster), Magic (Bolt, Rasp), Item |
 | SETZER (not yet in the party) | L25 | nothing | Fight, Slot, Magic, Item |
 
@@ -197,8 +197,9 @@ either route into map 89.
 **#321 fits here, with EDGAR.** The pair that walls CELES and SABIN (route-
 wor-edgar 12.1: formation 222 won 6 and lost 2, both losses `class=died
 with 3 BP banked` with both horses untouched, the driver heal-locked, #312)
-now meets three, and the authored row (`2 · Spear|Katana`) gives EDGAR's
-AutoCrossbow both horses at once. Leg 1 plays the desert on the way to
+now meets three. The authored row (`2 · Sword|Spear`) is keyed by CELES's
+and EDGAR's blades and by CELES's Ice; EDGAR's AutoCrossbow (Ranged) no
+longer sweeps both horses at once, as it did through v0.50. Leg 1 plays the desert on the way to
 South Figaro and back, and a lab measures formation 222's first-attempt rate
 over distinct battle keys with the trio (section 9). The arc meets the
 desert again at Kohlingen (5 steps) and on every later castle ride.
@@ -433,8 +434,8 @@ authored since), and the two authored rows are the present ones.
 
 | id | name | L | HP | def/mdef | weak | absorb / null | the script | today |
 |---|---|---|---|---|---|---|---|---|
-| `$05F` | Sand Horse | 27 | 1025 | 135/155 | ice, water | — | Sand Storm; Clamp (x5); **alone: B/B/Clamp** `:2020` | authored 2 Spear\|Katana |
-| `$097` | Maliga | 26 | 952 | 110/145 | ice, bolt, water | — | B; B/B/Scissors; **alone: Scissors x2** `:2005` | authored 2 Sword\|Fist |
+| `$05F` | Sand Horse | 27 | 1025 | 135/155 | ice, water | — | Sand Storm; Clamp (x5); **alone: B/B/Clamp** `:2020` | authored 2 Sword\|Spear |
+| `$097` | Maliga | 26 | 952 | 110/145 | ice, bolt, water | — | B; B/B/Scissors; **alone: Scissors x2** `:2005` | authored 2 Sword\|Blunt |
 | `$089` | Harpiai | 29 | 1418 | 102/153 | wind | — | B/B; B/B/**Aero (wind 125)**; B/B/Pearl Wind; B/B/Nail `:2103`; starts Float | floor 5 slash |
 | `$0DB` | Muus | 28 | 900 | 110/105 | — | null poison, wind, holy, earth, water | B/Gunk (Slow)/Pep Up; **counter to Magic: Pep Up** `:2118`; starts Shell | floor 5 slash |
 | `$0A7` | Deep Eye | 28 | 1334 | 100/150 | fire | — | B/B/**Dreamland (Sleep)**; Escape `:2149` | floor 5 slash |
@@ -519,8 +520,8 @@ member's experience.
   absorb guard knows absorbs (route-wor-edgar 12.1).
 - **Weapons in reach**: the Gold Lance (EDGAR, Spear 139, 12,000 GP,
   Kohlingen 65), the **Man Eater** (Dagger 146; EDGAR, CELES or SETZER; the
-  east-room chest), Darts (SETZER, Dagger 115, 10,000) or Trump (SETZER,
-  Arcane 133, 13,000), the Soul Sabre in the bag (Sword 125). `items.txt`.
+  east-room chest), Darts (SETZER, Ranged 115, 10,000) or Trump (SETZER,
+  Ranged 133, 13,000), the Soul Sabre in the bag (Sword 125). `items.txt`.
 - **Armor**: Kohlingen's 66 (Diamond Shld/Helm/Vest/Armor, Bard's Hat,
   Green Beret); the tomb's Genji Helmet and Crystal Mail (EDGAR, CELES,
   SETZER).
@@ -540,7 +541,7 @@ member's experience.
 | character | planned (kits.md) | what this arc has | where it bites |
 |---|---|---|---|
 | SETZER | Slot ✦; Coin Toss, Hired Help (gil-priced); divine Jackpot | built since #319 (kits.md "Setzer"): his table behind Slot, Jackpot learned at Kohlingen's rejoin | his first arc; the route's driver plays the table (`Driver:setzerLine`, #353; section 13.10) |
-| EDGAR | 8 Tools (AutoCrossbow, NoiseBlaster, Bio Blaster, Flash, Drill, Chain Saw, Debilitator, Overclock) | 3: AutoCrossbow, NoiseBlaster, Bio Blaster | Drill (Spear x2, "answers armored bosses") and Debilitator are in Figaro's World of Ruin shop 84, which refuses a party with EDGAR or SABIN (`_ca67c0`): both are in every party this arc fields; Chain Saw is a Zozo chest (after the Falcon); Overclock (built in v0.27: a 3-BP Tool fires twice) needs no item. Dullahan is the armored boss Drill was planned for (Drill is Spear, and Dullahan's row is Dagger, Fist, Arcane now) |
+| EDGAR | 8 Tools (AutoCrossbow, NoiseBlaster, Bio Blaster, Flash, Drill, Chain Saw, Debilitator, Overclock) | 3: AutoCrossbow, NoiseBlaster, Bio Blaster | Drill (Spear x2, "answers armored bosses") and Debilitator are in Figaro's World of Ruin shop 84, which refuses a party with EDGAR or SABIN (`_ca67c0`): both are in every party this arc fields; Chain Saw is a Zozo chest (after the Falcon); Overclock (built in v0.27: a 3-BP Tool fires twice) needs no item. Dullahan is the armored boss Drill was planned for (Drill is Spear, and Dullahan's row is Dagger, Blunt, Ranged now) |
 | CELES | RunicBlade (divine, built in v0.27): a 3-BP Runic that also sends back what it absorbs | Runic | Dullahan is a caster boss: Runic takes his Ice 2, Ice 3, Pearl, N. Cross and his own Cure 2 (section 5) |
 | SABIN | through Air Blade (L30) | Air Blade held; Spiraler L42 | — |
 | all | #328 (Esper stat packages, growth) | the WoB stones' packages | — |
@@ -720,43 +721,42 @@ designed rows`, `checked 20 formations, 27 formation-species pairs`, `PASS
 != designed on 0`). `audit_break_coverage.py` no longer lists the twelve as
 unauthored (`px13/audit.before.txt`, `px13/audit.after.txt`); the tuning
 claim is unchanged and grows only by play. The suite's hands are the
-four-class ones: under the six classes SABIN holds no key on the Bogy (8.2),
-and EDGAR's key on Dullahan is the Man Eater (8.4).
+four-class ones: under the six all four still key the Bogy (8.2), and on
+Dullahan SABIN, EDGAR and SETZER do; CELES's key on him is fire (8.4).
 
 ### 8.1 Who holds what
 
 | hand | classes | elements |
 |---|---|---|
 | CELES | Sword (Enhancer, ThunderBlade; the Soul Sabre in the bag) | fire, ice, bolt (MADUIN), bolt (the blade) |
-| SABIN | Fist (claws, bare hands, Pummel, Suplex) | fire (Knuckles, Fire Dance, IFRIT), holy (AuraBolt), wind (Air Blade) |
-| EDGAR | Sword (Break Blade), Spear (Mithril Pike, Gold Lance) or Dagger (Man Eater); Spear on every body (AutoCrossbow) | bolt (RAMUH), poison (Bio Blaster) |
-| SETZER (from Kohlingen) | Arcane (Cards, Trump, Dice) or Dagger (Darts) | his Esper's (Unicorn holy, Shiva ice) |
+| SABIN | Blunt (Fire Knuckles, bare hands, Pummel, Suplex) | fire (Knuckles, Fire Dance, IFRIT), holy (AuraBolt), wind (Air Blade) |
+| EDGAR | Sword (Break Blade), Spear (Mithril Pike, Gold Lance) or Dagger (Man Eater); Ranged on every body (AutoCrossbow) | bolt (RAMUH), poison (Bio Blaster) |
+| SETZER (from Kohlingen) | Ranged (Cards, Trump, Dice, Darts) or Dagger (Man Eater) | his Esper's (Unicorn holy, Shiva ice) |
 
 ### 8.2 The Kohlingen continent (world groups 45-47)
 
 | id | body | HP | weak | row |
 |---|---|---|---|---|
-| `$089` Harpiai | a winged woman, floating | 1418 | wind | **3 · Sword, Spear** |
-| `$0DB` Muus | a small shelled beast; nulls five elements | 900 | — | **2 · Sword, Fist** |
-| `$0A7` Deep Eye | a floating eye, in crowds of up to six | 1334 | fire | **2 · Spear, Arcane** |
-| `$0D3` Bogy | a ghost behind Safe, no weakness | 1318 | — | **3 · Sword, Arcane** |
+| `$089` Harpiai | a winged woman, floating | 1418 | wind | **3 · Sword, Ranged** |
+| `$0DB` Muus | a small shelled beast; nulls five elements | 900 | — | **2 · Sword, Blunt** |
+| `$0A7` Deep Eye | a floating eye, in crowds of up to six | 1334 | fire | **2 · Blunt, Ranged** |
+| `$0D3` Bogy | a ghost behind Safe, no weakness | 1318 | — | **3 · Sword, Blunt, Ranged** |
 
-- **Harpiai**: a flier (Spear here; fliers took pierce by the WoB
-  convention) and Sword for CELES's blades and EDGAR's Break Blade. SABIN's
-  claws are Fist now and do not key it; vanilla wind is SABIN's Air Blade,
-  the one wind key the party has. Its Aero (wind 125) is the plain's
+- **Harpiai**: a flier (Ranged: the AutoCrossbow and SETZER's throws) and
+  Sword for CELES's blades and EDGAR's Break Blade. SABIN's knuckles do not
+  key it; vanilla wind is SABIN's Air Blade, the one wind key the party has. Its Aero (wind 125) is the plain's
   hardest hit.
 - **Muus**: a Fight body (its nulls and its Pep Up counter turn spells
-  away); Sword and Fist, not Spear, so the AutoCrossbow does
+  away); Sword and Blunt, not Ranged, so the AutoCrossbow does
   not sweep the Muus x3.
-- **Deep Eye**: Spear, a point in the eye. Two shields so the AutoCrossbow's
-  one chip a body cracks six of them in two sweeps: the crossbow's crowd.
-  Vanilla fire is CELES's and SABIN's. A magic eye (its Dreamland sleeps
-  whoever meets its gaze), so Arcane too (section 8.7).
+- **Deep Eye**: Ranged and Blunt. Two shields so the AutoCrossbow's one
+  chip a body cracks six of them in two sweeps: the crossbow's crowd.
+  Vanilla fire is CELES's and SABIN's, and SABIN's knuckles key it. A magic
+  eye (its Dreamland sleeps whoever meets its gaze; section 8.7).
 - **Bogy**: no vanilla weakness, so the row is its only key: Sword for
-  CELES and EDGAR's Break Blade (the trio meet it before Kohlingen; SABIN's
-  claws are Fist now and hold no key on it) and **Arcane for SETZER's
-  cards**: a ghost. An owner decision.
+  CELES and EDGAR's Break Blade, Blunt for SABIN's knuckles, and **Ranged
+  for the AutoCrossbow and SETZER's cards**: a ghost. Every hand keys it.
+  An owner decision.
 - **Teaches:** *the crossbow sweeps the crowd* (Deep Eye x6) and *wind for
   the harpy*.
 
@@ -764,25 +764,23 @@ and EDGAR's key on Dullahan is the Man Eater (8.4).
 
 | id | body | HP | weak | row |
 |---|---|---|---|---|
-| `$005` Orog | a zombie mass | 1584 | fire, holy | **3 · Katana, Fist, Arcane** |
-| `$010` Osteosaur | a skeleton | 1584 | fire, holy | **3 · Fist, Arcane** |
-| `$06F` PowerDemon | a demon, the tomb's tank | 2058 | fire, holy | **3 · Dagger, Spear, Katana** |
+| `$005` Orog | a zombie mass | 1584 | fire, holy | **3 · Sword, Blunt, Ranged** |
+| `$010` Osteosaur | a skeleton | 1584 | fire, holy | **3 · Blunt, Ranged** |
+| `$06F` PowerDemon | a demon, the tomb's tank | 2058 | fire, holy | **3 · Sword, Blunt, Ranged** |
 | `$061` Mad Oscar | a man-eating plant | 2900 | fire | **4 · Sword** |
-| `$091` Exoray | a spore plant behind Shell | 1200 | fire, holy | **2 · Spear, Katana** |
+| `$091` Exoray | a spore plant behind Shell | 1200 | fire, holy | **2 · Sword, Ranged** |
 
-- **Orog**: Katana, Fist and Arcane: SABIN's fists and SETZER's cards open
-  it; the four's swords do not (Katana is CYAN's and SHADOW's). Broken, it
-  neither Zombies nor counters. Cursed flesh: Arcane (8.7).
-- **Osteosaur**: bones are broken, not cut or stuck: SABIN's fists (the
-  floor's pierce was the wrong class). EDGAR's key is the vanilla fire
-  someone else holds; the Bio Blaster heals it. Risen bones: Arcane (8.7).
-- **PowerDemon**: the tomb's tank: Dagger, Spear and Katana. EDGAR's pike
-  and AutoCrossbow key it, and a dagger (the Man Eater, SETZER's Darts);
-  the four's swords and SETZER's cards do not. It appears in all three
-  basements. A demon: its special key (8.7) became Dagger.
+- **Orog**: Sword, Blunt and Ranged: every hand of the four opens it.
+  Broken, it neither Zombies nor counters. Cursed flesh (8.7).
+- **Osteosaur**: bones are broken, not cut: SABIN's knuckles, the
+  AutoCrossbow and SETZER's throws; the swords do not key it (the floor's
+  pierce was the wrong class). The Bio Blaster heals it. Risen bones (8.7).
+- **PowerDemon**: the tomb's tank: Sword, Blunt and Ranged, so every hand
+  of the four keys it. It appears in all three basements. A demon (8.7).
 - **Mad Oscar**: the plant is cut (Sword); four shields (miniboss-grade,
   2,900 HP) so the break lands before Sour Mouth's second turn.
-- **Exoray**: trash at two; the AutoCrossbow sweeps the Exoray x3.
+- **Exoray**: trash at two; the AutoCrossbow sweeps the Exoray x3, and the
+  swords key it.
 - **Teaches:** *the dead burn*: fire on all five and holy on four, Zombie
   on four, poison absorbed by four. Break the Zombie-caster before it acts;
   keep the Bio Blaster in the bag.
@@ -792,20 +790,19 @@ and EDGAR's key on Dullahan is the Man Eater (8.4).
 Party: CELES, SABIN, EDGAR, SETZER. Formation 455.
 
 **Shields:** 10 (8-12 the range considered) · **Weak:** fire (vanilla) +
-Dagger, Fist, Arcane · **Absorbs:** ice.
+Dagger, Blunt, Ranged · **Absorbs:** ice.
 
-- **Keys:** an armored knight: a dagger through the joints, a fist on
-  the plate, and Arcane for the headless spirit inside (the third key, 8.7).
-  CELES holds fire (MADUIN), SABIN Fist and fire, EDGAR Dagger with the Man
-  Eater (his pike and the AutoCrossbow are Spear and do not chip him),
-  SETZER Dagger with Darts or the Man Eater and Arcane with Cards, Trump or
-  Dice (before the re-cut, `design_keys.txt`:
+- **Keys:** an armored knight: a dagger through the joints, a blow on
+  the plate, and Ranged for the headless spirit inside (the third key, 8.7).
+  CELES holds fire (MADUIN; her swords do not chip him), SABIN Blunt and
+  fire, EDGAR Ranged (the AutoCrossbow) and Dagger with the Man Eater,
+  SETZER Ranged with every weapon he has (before the re-cut, `design_keys.txt`:
   `SETZER (Cards): today Dullahan:n | designed Dullahan:n`).
 - **Telegraph (proposed):** Absolute 0. Vanilla's own fuse is the hit
   counter (nine hits, then the ice combo); the contract's one telegraph
   would make Absolute 0 a charged move a break cancels.
 - **Break story:** CELES on Runic through the ice rotation (BP from his
-  own spells), the rest chipping on fire, Dagger and Fist; spend the break
+  own spells), the rest chipping on fire, Blunt and Ranged; spend the break
   on the fuse; Shell on the party for L? Pearl and Absolute 0.
 - **Jank ✦:** L? Pearl's gil digit stays as vanilla has it; the hit-counted
   combo stays.
@@ -815,14 +812,13 @@ Dagger, Fist, Arcane · **Absorbs:** ice.
 | id | body | HP | row |
 |---|---|---|---|
 | `$101` Presenter | the shell | 9230 | **0** (no gauge: hitting the shell is the mistake) |
-| `$135` Whelk Head | the head | 9845 | **6 · Dagger** |
+| `$135` Whelk Head | the head | 9845 | **6 · Ranged** |
 
-The Narshe Whelk's rows (`$0100` 0 shields, `$0134` 4 · Spear,
+The Narshe Whelk's rows (`$0100` 0 shields, `$0134` 4 · Ranged,
 `ot6_hud.asm` `Ot6ShieldTbl`) grown for the World of Ruin, the way Ultros
-keeps one row and grows its count. Both heads took pierce; it is Spear on
-the Narshe Head and Dagger on this one, so of the four the Man Eater
-(EDGAR, CELES or SETZER) and SETZER's Darts key this head and the
-AutoCrossbow (Spear) does not. Formation 433 is also the 16/256 slot of
+keeps one row and grows its count. Both heads took pierce; both are
+Ranged today, so of the four the AutoCrossbow and SETZER's throws key this
+head and the Man Eater does not. Formation 433 is also the 16/256 slot of
 **World of Balance world group 13** (`pools.txt`: `slot 3: 16/256 word
 $01B1 formation 433: Presenter $101 x1, Whelk Head $135 x1`), beside Red
 Fangs and Mind Candies (L14-L15); these rows would change that encounter
@@ -847,10 +843,10 @@ draft every formation is keyed for the trio and for the four; SETZER alone
 keys only the Bogy with Cards, and the Sand Horse, Harpiai, Deep Eye,
 PowerDemon, Exoray, Dullahan and Whelk Head with Darts. Since the re-cut
 (8.7) his Cards key the Bogy, the Deep Eye, the Orog, the Osteosaur, the
-PowerDemon and Dullahan. Under the six classes his Cards (Arcane) key the
-Bogy, the Deep Eye, the Orog, the Osteosaur and Dullahan, and his Darts
-(Dagger) the PowerDemon, Dullahan and the Whelk Head; the Sand Horse, the
-Harpiai, the Deep Eye and the Exoray take Spear where they took pierce.
+PowerDemon and Dullahan. Under the six classes all his weapons are Ranged
+and key the Harpiai, the Deep Eye, the Bogy, the Orog, the Osteosaur, the
+PowerDemon, the Exoray, Dullahan and the Whelk Head; the Sand Horse
+(Sword, Spear), the Muus and the Mad Oscar are not his.
 
 ### 8.7 Special as a common key (re-cut, owner 2026-10-01)
 
@@ -861,17 +857,17 @@ Bogy took ¤ here. Six of the twelve species did after it, chosen by body:
 spirits, magical things and cursed things took ¤ beside their keys; the
 plants, the beasts, the harpy and the chest pair did not. Every row kept
 its shield count and its existing classes, so nothing the trio relied on
-moved. Under the six classes the ¤ of five of the six is Arcane and the
-PowerDemon's is Dagger ("row now" below).
+moved. Under the six classes each ¤ became Ranged or Blunt ("row now"
+below).
 
 | id | body | row before | row now | why ¤ |
 |---|---|---|---|---|
-| `$0D3` Bogy | a ghost | 3 · slash, ¤ | **3 · Sword, Arcane** | a spirit (the row it had) |
-| `$0A7` Deep Eye | a floating eye whose Dreamland sleeps | 2 · pierce | **2 · Spear, Arcane** | a magic eye |
-| `$005` Orog | a zombie mass | 3 · slash, bludg | **3 · Katana, Fist, Arcane** | cursed flesh |
-| `$010` Osteosaur | a skeleton | 3 · bludg | **3 · Fist, Arcane** | risen bones |
-| `$06F` PowerDemon | a demon | 3 · slash, pierce | **3 · Dagger, Spear, Katana** | a demon (its ¤ became Dagger) |
-| `$11C` Dullahan | a headless knight | 10 · pierce, bludg | **10 · Dagger, Fist, Arcane** | the headless spirit in the armor (its third key) |
+| `$0D3` Bogy | a ghost | 3 · slash, ¤ | **3 · Sword, Blunt, Ranged** | a spirit (the row it had) |
+| `$0A7` Deep Eye | a floating eye whose Dreamland sleeps | 2 · pierce | **2 · Blunt, Ranged** | a magic eye |
+| `$005` Orog | a zombie mass | 3 · slash, bludg | **3 · Sword, Blunt, Ranged** | cursed flesh |
+| `$010` Osteosaur | a skeleton | 3 · bludg | **3 · Blunt, Ranged** | risen bones |
+| `$06F` PowerDemon | a demon | 3 · slash, pierce | **3 · Sword, Blunt, Ranged** | a demon |
+| `$11C` Dullahan | a headless knight | 10 · pierce, bludg | **10 · Dagger, Blunt, Ranged** | the headless spirit in the armor (its third key) |
 
 (Since #347 the earlier arcs and the WoB took ¤ on their own spirits too:
 the Pm Stalker, the NeckHunter and Dante in the WoR, the Sealed Gate's
@@ -896,9 +892,9 @@ fire. Darts are unchanged (`SETZER (Darts): every body 8, some body 5, none
 + SABIN + EDGAR: every body 10, some body 0, none 0`; `the four: every body
 20, some body 0, none 0`), and the ROM's rows equal the re-cut on every
 hand line (`px13/design_keys.compare.txt`: `hand lines 130, today !=
-designed on 0`). (Counted on the four-class ROM. Today his Cards are Arcane
-and do not key the PowerDemon; the plants are Sword (the Mad Oscar) and
-Spear, Katana (the Exoray); 8.6 has what his Cards and Darts key now.)
+designed on 0`). (Counted on the four-class ROM. Today his Cards are Ranged
+and key the PowerDemon; the plants are Sword (the Mad Oscar) and Sword,
+Ranged (the Exoray); 8.6 has what his weapons key now.)
 
 **A ripple into the Kohlingen leg.** `gen_wor_kohlingen` dresses SETZER
 with the weapon whose class keys the most of its ten arc species, then by
@@ -911,14 +907,13 @@ power (section 11.1). Read statically from the re-cut ROM with the same rule
 score 1133`). So a regenerated wor-kohlingen chain should dress SETZER
 with the Trump where the purse allows it (a reading of the rule, not a
 run; the cut checkpoint `wor-kohlingen-v1` keeps its Darts until it is
-re-cut). (The Trump is Arcane and the Darts Dagger today; the scores are the
+re-cut). (The Trump and the Darts are both Ranged today; the scores are the
 four-class ROM's.)
 
 **The check.** `battle_breakwor_falcon.lua` carries the re-cut rows in
 WANT and checks that SETZER's Cards hold a key on each of the six and on
 Dullahan, with the Bogy and Dullahan checks of 8.6 kept (written for the
-four classes: under the six his Cards key five of the six, not the
-PowerDemon). Evidence in
+four classes: under the six his Cards, Ranged, key all six). Evidence in
 `build/attempts/wt/special-weak/px13/` (`commands.txt` one level up):
 green on the re-cut ROM (`suite_battle_breakwor_falcon.log`: `special:
 SETZER (Cards) holds a key on 6 of 12 designed species`, `Dullahan: SETZER
@@ -1126,7 +1121,7 @@ build/attempts/wt/wor-figaro-sweep-review/var1_keys_rerun.txt). The losses #321 
 (both `class=died with 3 BP banked`, the horses untouched) and the trio's
 deaths here have one cause: a driver policy problem (#312), the
 "covering an ally" heal that does not lift the ally clear. The Sand Horse
-row (`2 · slash|pierce`; Spear, Katana today) and its vanilla script need no
+row (`2 · slash|pierce`; Sword, Spear today) and its vanilla script need no
 change; the fix
 belongs in `M.healDecision` (#312, v0.26) and is measured above. Not
 measured: CELES and SABIN alone against 222 (the leg never fields the
@@ -2064,8 +2059,8 @@ Not a coin flip and not attrition at this level: every key won. The fight
 ends on the first boss_death, the shell's or the head's, **40 and 40**
 (`killed s0:$101` / `killed s1:$135`). The head was never broken: its six
 pierce shields took 82 chips, all EDGAR's (the AutoCrossbow), and the fight
-ended first in every run. (The head's row is Dagger now and the AutoCrossbow
-is Spear, so it no longer chips the head.) The shell's
+ended first in every run. (The head's row is Ranged now, and the
+AutoCrossbow still chips it.) The shell's
 counter is Giga Volt one hit in three,
 as its script says (`attack NOTHING, NOTHING, GIGA_VOLT`), not on every
 hit: **73 Giga Volts over 213 counters weighed** on the shell
@@ -2122,8 +2117,8 @@ by: {'SETZER': 68, 'SABIN': 11, 'EDGAR': 5}`), the ¤ key of 8.7 at work,
 and the break is where SABIN's Blitzes land their damage. He lands one
 kill in eleven. In the chest neither part keys ¤ (the shell has no gauge,
 the head is pierce), and he is a fifth of the damage. Not a passenger; his
-share is the break, not the damage. (Today the Trump is Arcane, which
-Dullahan still takes; the head takes Dagger.)
+share is the break, not the damage. (Today the Trump is Ranged, which
+Dullahan and the head both take.)
 
 ### 13.8 Flying and landing (`H.flyTo`, `field_flyto`)
 
@@ -2205,7 +2200,7 @@ control's 40 and no Fenix Down to its 2. Slot and Coin Toss were not chosen
 on this arc then: Slot waited for 3 BP, which the tomb's random fights end
 before his bank reaches (since #353 it spins from 2, its reels timed; 13.9),
 and Coin Toss waits for two revealed ¤ bodies. (Today the Trump and Coin
-Toss are Arcane, and the Whelk Head's key is Dagger.)
+Toss are Ranged, which the Whelk Head takes.)
 
 The table above measured the first Jackpot and Hired Help (a floor the
 boost raised to certain sixes; one hire whose fee the boost doubled), on ROM
@@ -2510,8 +2505,8 @@ Pendant $B1`, both legs passing on their first attempt
   (8.5).
 - **SETZER's class on the arc**: decided (owner, 2026-10-01): ¤ is a
   common key. His ¤ weapons keyed six of the twelve species after the
-  re-cut (8.7) and Darts (pierce) seven. Under the six classes his Arcane
-  weapons key five and his Darts (Dagger) three (8.6).
+  re-cut (8.7) and Darts (pierce) seven. Under the six classes every weapon
+  of his is Ranged and keys nine (8.6).
 - **#319 before or after this arc**: SETZER joins with Slot alone; EDGAR's
   Drill and Debilitator sit in a shop that refuses this party (vanilla's
   "I can't take money from the King!"). Keep the refusal (vanilla) or let
@@ -2529,7 +2524,7 @@ Pendant $B1`, both legs passing on their first attempt
   the route does not wear it; ranking them for a fight whose damage is
   spells is a rule change for the owner.
 - **SETZER on arrival** (13.7): in Dullahan he lands four breaks in five
-  and a fifth of the damage; in the chest, where ¤ keys nothing, a fifth of
+  and a fifth of the damage; in the chest, where ¤ keyed nothing, a fifth of
   the damage and no breaks. His Slot is not played (#319's verbs); whether
   the driver should spin it at bosses is open.
 - **The side items' place**: decided (owner, 2026-10-01: "you gotta use a

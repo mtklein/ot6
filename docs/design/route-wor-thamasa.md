@@ -10,11 +10,9 @@ magic-only). Sections 0-10 are the plan as written before play.
 
 > Weapon classes: v0.51 replaced the four classes this document was written
 > under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
 > keys below are the present ones. Quoted logs, dated measurements and
-> "before" columns keep the words they were recorded in: slash is now Sword
-> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
-> or Dagger.
+> "before" columns keep the words they were recorded in.
 
 Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v030-plan-kits/`, read from
@@ -206,7 +204,7 @@ x2 + Wild Cat + Crusher x2 (285) (`maps_jidoor.txt`).
 Vanilla stats (`species.txt`). Shields follow ot6_hud.asm's tiers. The party
 holds Sword (TERRA, CELES), Katana (CYAN), fire (TERRA, CYAN's Ifrit), holy
 (TERRA's Pearl) and bolt/ice (CELES's Tritoch) going into Owzer's; RELM and
-STRAGO both add Arcane (the brush, the rod). Inside the tower only spells chip:
+STRAGO both add Blunt (the brush, the rod). Inside the tower only spells chip:
 an element on a weakness, or OT6's Break (one shield, one more a boost
 point; `ot6_breakspell.asm`), so the tower's rows are designed around
 elements and around which spells reach each body (finding 4). **Counts and
@@ -217,14 +215,14 @@ keys are a proposal**; the route's play sets them.
 | species | where | L / HP | vanilla elements; notes | shields | classes | why |
 |---|---|---|---|---|---|---|
 | Vindr `$0CC` | 207 | 36 / 885 | weak fire; Float, evade 90; Beak (Petrify) | 1 | Dagger, Katana | a bird that dodges blades: fire is the key that lands |
-| SoulDancer `$0AD` | 207, event 151 | 22 / 2,539 | weak poison; Red Dance (drain) | 2 | Katana, Arcane | a dancing spirit (guidelines.md: ¤ for spirits; Arcane now) |
-| Crusher `$092` | 207 | 36 / 2,095 | weak fire; Blow (x5); counter Lifeshaver | 3 | Dagger, Fist | the house's tank; break it before Blow |
-| Wild Cat `$077` | 207, event 151 | 36 / 1,115 | weak fire, water; Fire Ball | 1 | Spear, Katana | in fours |
-| Dahling `$009` | event 146 | 37 / 3,580 | weak poison; Mute, Ice 2, Bolt 2 (Runic-able); counter Cure 2 | 2 | Sword, Arcane | a painting; CELES's Runic eats its list |
+| SoulDancer `$0AD` | 207, event 151 | 22 / 2,539 | weak poison; Red Dance (drain) | 2 | Katana, Ranged | a dancing spirit (guidelines.md: ¤ for spirits; Ranged now) |
+| Crusher `$092` | 207 | 36 / 2,095 | weak fire; Blow (x5); counter Lifeshaver | 3 | Spear, Blunt | the house's tank; break it before Blow |
+| Wild Cat `$077` | 207, event 151 | 36 / 1,115 | weak fire, water; Fire Ball | 1 | Dagger, Katana | in fours |
+| Dahling `$009` | event 146 | 37 / 3,580 | weak poison; Mute, Ice 2, Bolt 2 (Runic-able); counter Cure 2 | 2 | Katana, Ranged | a painting; CELES's Runic eats its list |
 | Nightshade `$033` | event 147 | 37 / 2,200 | weak fire; absorbs water; Charm | 2 | Katana | a painted flower |
-| Still Life `$050` | event 148 | 37 / 4,889 | weak fire; Lullaby; counter Condemned | 4 | Sword, Arcane | the basement's miniboss painting |
+| Still Life `$050` | event 148 | 37 / 4,889 | weak fire; Lullaby; counter Condemned | 4 | Katana, Ranged | the basement's miniboss painting |
 | Chadarnook (painting) `$11E` | event 86 | 37 / 56,000 | weak fire; absorbs holy, water; counter Phantasm | 0 | -- | the goddess: hitting her is the fight's mistake, so she carries no shields to chip |
-| Chadarnook (demon) `$148` | event 86 | 41 / 30,000 | weak fire, holy; absorbs bolt; Bolt 2/3 (Runic-able), Flash Rain | 6 | Sword, Spear | the boss: TERRA's and CELES's swords (or MOG's spear), with fire and Pearl; CYAN's katana no longer keys it |
+| Chadarnook (demon) `$148` | event 86 | 41 / 30,000 | weak fire, holy; absorbs bolt; Bolt 2/3 (Runic-able), Flash Rain | 6 | Katana, Spear | the boss: CYAN's katana (or MOG's spear, SABIN's claw), with fire and Pearl; TERRA's and CELES's swords do not key it |
 
 ### 4.2 The Fanatics' Tower
 
@@ -245,8 +243,8 @@ keys are a proposal**; the route's play sets them.
 
 The tower species' classes do not matter inside (no Fight). Outside the
 tower they appear only in random groups 84 and 85 and event groups 58, 96,
-102, 108 and 110 (`sharing.txt`), none of them on this arc; each takes
-Arcane (`special`, the ¤ of a magical body, when this was written) for those. The element adds are `Ot6ElemAddTbl` rows (`ot6_break.asm:206`),
+102, 108 and 110 (`sharing.txt`), none of them on this arc; L.10-L.80
+take Blunt (`special`, the ¤ of a magical body, when this was written) for those. The element adds are `Ot6ElemAddTbl` rows (`ot6_break.asm:206`),
 the tool earlier arcs used (Whelk Head + fire, Vargas + holy).
 
 ### 4.3 The plains and Thamasa
@@ -254,11 +252,11 @@ the tool earlier arcs used (Whelk Head + fire, Vargas + holy).
 | species | where | L / HP | vanilla elements | row today | proposal |
 |---|---|---|---|---|---|
 | Crawler `$05B`, Sprinter `$087`, Spek Tor `$0B0`, Geckorex `$099`, Reach Frog `$03B` | groups 48-52 | 50-54 | (`species.txt`) | authored (3/3/1/3/2) | as built |
-| Mantodea `$0D2` | groups 49-52 | 54 / 4,500 | weak fire; atk 180 | authored 3, slash, bludg | **+Arcane** (`special` then; the row is 3, Katana, Fist, Arcane now): RELM's brush becomes a key on the arc's one killer, the day she joins |
+| Mantodea `$0D2` | groups 49-52 | 54 / 4,500 | weak fire; atk 180 | authored 3, slash, bludg | **+special** (then; the row is 3, Sword, Blunt, Ranged now): RELM's brush is a key on the arc's one killer, the day she joins |
 | Bloompire `$035`, Buffalax `$058`, Lizard `$03C` | group 37 (the tower's plain) | 26 | | authored | as built |
-| Harpy `$02B` | group 55 (Thamasa's plain) | 42 / 3,615 | none; Aero (a lore) | floor | 2, Dagger, Arcane |
-| GloomShell `$08A` | group 56 (Thamasa's gate) | 41 / 2,905 | weak ice; Net (Stop) | floor | 3, Dagger, Arcane (a shell: STRAGO's rod) |
-| Prussian `$0D4` | groups 55, 56 | 41 / 3,300 | none; Bear Hug (x3) | floor | 3, Sword, Fist |
+| Harpy `$02B` | group 55 (Thamasa's plain) | 42 / 3,615 | none; Aero (a lore) | floor | 2, Dagger, Blunt |
+| GloomShell `$08A` | group 56 (Thamasa's gate) | 41 / 2,905 | weak ice; Net (Stop) | floor | 3, Dagger, Blunt (a shell: STRAGO's rod) |
+| Prussian `$0D4` | groups 55, 56 | 41 / 3,300 | none; Bear Hug (x3) | floor | 3, Sword, Blunt |
 
 ## 5. The bosses and the levels
 
@@ -286,9 +284,9 @@ against 2,400-2,900 HP here. So:
   Walking in and out of the gate still crosses group 49, so every draw there
   can deal formation 323, and the rows and the kill order have to take it.
 - **The kill order puts the Mantodea first, and breaks it.** Its row is 3,
-  Katana, Fist and Arcane (section 4.3): CYAN's katana, UMARO's club, RELM's
-  brush and STRAGO's rod. TERRA's and CELES's swords, which keyed its slash
-  when this was written, do not. Fire is its weakness. The back row and Safe
+  Sword, Blunt and Ranged (section 4.3): TERRA's and CELES's swords,
+  UMARO's club, RELM's brush and STRAGO's rod; CYAN's katana does not key
+  it. Fire is its weakness. The back row and Safe
   (CELES's natural Safe, Carbunkl, Golem) for the casters.
 - **Measure before the grind.** The lab Continues `wor-owzer-v1` and walks
   group 49 (as `lab_ruinwaste.lua` did), counting formation 323 by battle key
@@ -419,10 +417,9 @@ STRAGO Palidor.
 
 ### 6.2 RELM on arrival
 
-- **Her key:** the brush is the party's only Arcane until STRAGO's rod
-  (CYAN's katana is Katana, TERRA's and CELES's swords Sword). The proposed
-  rows make Arcane a key on the Mantodea (the plain's killer) and the Harpy
-  (Thamasa's plain).
+- **Her key:** the brush is Blunt, as are STRAGO's rod and UMARO's club
+  (CYAN's katana is Katana, TERRA's and CELES's swords Sword). Blunt keys
+  the Mantodea (the plain's killer) and the Harpy (Thamasa's plain).
 - **Gear:** the Moogle Suit from map 207 (92,58) (STRAGO or RELM; nulls
   poison); Thamasa's DaVinci Brsh (7,000), Mystery Veil (5,500) or Circlet,
   Light Robe (11,000; mdef 43, `items.txt`).
@@ -430,10 +427,8 @@ STRAGO Palidor.
 
 ### 6.3 STRAGO on arrival
 
-- **His key:** the rod (Arcane): the GloomShell (proposed) and the
-  Mantodea and Crawlers on the plains. The Prussian's bludgeon, proposed
-  for the rod, became Fist (its row is Sword, Fist), which the rod does not
-  key.
+- **His key:** the rod (Blunt): the GloomShell, the Prussian, and the
+  Mantodea and Crawlers on the plains.
 - **His kit:** the lores (below), Aqua Rake as the free row and Analyze
   (Scan, always his; #381, kits.md "Strago"). Lore is off in the tower;
   his Magic row, Scan with it, is not: he reads MagiMaster's wall.

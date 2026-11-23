@@ -15,10 +15,9 @@ arm; `build/lab/fight-vs-ability/aggregate.txt`,
 
 > Weapon classes: v0.51 replaced the four classes this document was written
 > under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and keys
 > below are the present ones. Quoted logs, dated measurements and "before"
-> columns keep the words they were recorded in: slash is now Sword or Katana,
-> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+> columns keep the words they were recorded in.
 
 **Nothing here changes the ROM.** The 2.5x rate, the 99 cap and the Fight
 exemption are the owner's design, and he has settled them for this
@@ -221,17 +220,18 @@ and LOCKE, EDGAR, CELES and TERRA carry swords, spears and daggers.
 whatever was equipped, so for that whole span the class existed in the party
 only as an ability.
 
-Under six classes this no longer holds as measured. Claws are Fist, the class
-Pummel, Suplex and Bum Rush carry, and the seven bodies below are all
-Fist-keyed, so SABIN's Fight chips them. The numbers below are the four-class
-ROM's.
+Under six classes this no longer holds as measured. The MetalKnuckle is
+Blunt, the class Pummel, Suplex and Bum Rush carry, but six of the seven
+bodies below are Ranged today (the HadesGigas Blunt and Ranged): EDGAR's
+AutoCrossbow keys them, and SABIN's Fight and Blitzes key only the
+HadesGigas. The numbers below are the four-class ROM's.
 
 (The first bludgeoning weapon the route actually carried was STRAGO's Ice
 Rod, at `esper_mtn_save` — a stretch `check_break_reach.py`'s areas do not
 cover, so it is outside this arm. Whoever extends the areas to Esper
 Mountain should expect section 2.1 to get smaller there: map 375's Slurm
 and Adamanchyt were both bludgeon-keyed, and his rod was the key. Rods are
-Arcane today, Slurm is Fist, Arcane and Adamanchyt Spear, Arcane, so his rod
+Blunt today, Slurm is Blunt, Ranged and Adamanchyt Dagger, Blunt, so his rod
 still keys both.)
 
 Cross-referencing each stretch's own fixture gear and bag against the
@@ -260,8 +260,8 @@ The seven, with the key that opens them:
 | Mag Roader `$0AF` | 2 | bludg | ice | Pummel; Suplex |
 | HadesGigas `$053` | 2 | bludg | poison | EDGAR Bio Blaster 8 MP; Pummel; Suplex |
 
-Every one was bludgeon-keyed (Fist today), and **SABIN's Pummel at 4 MP is
-on every row**. Measured against Flan, on the whole `ifrit_entry` spread
+Every one was bludgeon-keyed (Ranged today, the HadesGigas Blunt and
+Ranged), and **SABIN's Pummel at 4 MP was on every row**. Measured against Flan, on the whole `ifrit_entry` spread
 (`build/lab/fight-vs-ability/ifrit_entry/`, 28 logs, tabulated in
 `build/lab/fight-vs-ability/mechanic-ifrit_entry.txt`):
 
@@ -280,7 +280,7 @@ any boost, with or without the Genji pair. An unboosted Pummel takes two
 shields for four MP. That is the role, and it costs base price.
 
 The same thing measured on a body with real HP — Rhinox, 800 HP, bludgeon
-key (Fist today), **absorbs bolt** (`n024_won`, party LOCKE / EDGAR / SABIN /
+key (Ranged today), **absorbs bolt** (`n024_won`, party LOCKE / EDGAR / SABIN /
 CELES):
 
 ```
@@ -465,7 +465,7 @@ claim either way would be invented.
 
 ### 3.1 Breaking a class the weapon already reaches
 
-Dadaluma is six shields, class Dagger, Arcane (`pierce|bludg` when measured),
+Dadaluma is six shields, class Dagger, Blunt (`pierce|bludg` when measured),
 and LOCKE arrives at Zozo with a Genji pair of Guardian and MithrilKnife —
 **two Dagger weapons**.
 His Fight at one pip is four hits and four chips. Over eight Dadaluma
