@@ -117,8 +117,8 @@ prints every species' old row, new row and reason):
 
 Of the 349 species the game deals and gauges, 99 are weak to Sword, 95
 to Dagger, 94 to Spear, 99 to Katana, 125 to Blunt and 124 to Ranged.
-One class keys 27-36% of them, two classes 47-64%, three 66-81%, four
-82-94%, five 91-98%.
+One class keys 27-36% of them, two classes 47-64%, three 66-80%, four
+82-94%, five 91-98% (`tools/proto_six/party_share.py`).
 
 A save from an older release keeps its revealed weaknesses, each shown as
 the class that weakness became for that monster
@@ -184,45 +184,52 @@ scenario split is the stress test:
   a player can guess and then confirm by probing.
 - Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs.
 
-What a party holds, stage by stage. "Really held" is each member's
-signature weapon and commands (`classes.py`), with nobody re-armed for a
-key; "widest" adds every class of every weapon the members can equip.
-The percentages are the share of the 349 gauged species the party can
-weapon-key. Free picks are filled with the members named.
+What a party holds, stage by stage (`tools/proto_six/party_share.py`; the
+stages are `stages.py`'s, named by the first leg of the line). "Really
+held" is each member's signature weapon and commands (`classes.py`), with
+nobody re-armed for a key; "widest" adds every class of every weapon the
+members can equip; "four classes" is what the same signature kits keyed
+through v0.50. The percentages are the share of the gauged species the
+party can weapon-key. Where the player can field more than four, the range
+is over the parties of four.
 
-| Stage and party | Really held | keys | widest |
-|---|---|---|---|
-| Whelk (Terra in Magitek armor) | Ranged | 36% | 36% |
-| Marshal (Locke, Mog) | Dagger, Spear | 54% | 87% |
-| Mt. Kolts to Vargas (Terra, Locke, Edgar) | Sword, Dagger, Spear, Ranged | 87% | 97% |
-| Lete River, Ultros 1 (Terra, Locke, Edgar, Sabin, Banon) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
-| Locke's scenario (Locke) | Dagger | 27% | 74% |
-| TunnelArmr (Locke, Celes) | Sword, Dagger | 48% | 90% |
-| Imperial camp (Sabin, Shadow) | Dagger, Katana, Blunt, Ranged | 87% | 87% |
-| Phantom Train (Sabin, Cyan, Shadow) | Dagger, Katana, Blunt, Ranged | 87% | 98% |
-| Baren Falls, the trench, the Veldt (Sabin, Cyan, Gau) | Dagger, Katana, Blunt | 69% | 84% |
-| Terra's scenario (Terra, Edgar, Banon) | Sword, Spear, Blunt, Ranged | 87% | 97% |
-| Zozo, Dadaluma (Locke, Celes, Edgar, Sabin) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
-| Zozo, Dadaluma (Locke, Celes, Cyan, Gau) | Sword, Dagger, Katana | 69% | 98% |
-| Opera, Ultros 2 (Locke, Edgar, Sabin, Cyan) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
-| Magitek factory (Locke, Celes, Edgar, Sabin) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
-| Magitek factory (Locke, Celes, Setzer, Cyan) | Sword, Dagger, Katana, Ranged | 88% | 98% |
-| Sealed Gate, Ultros 3 (Terra, Locke, Edgar, Sabin) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
-| Thamasa, FlameEater (Terra, Locke, Strago) | Sword, Dagger, Blunt | 71% | 90% |
-| airship deck (Terra, Edgar, Sabin) | Sword, Spear, Katana, Blunt, Ranged | 96% | 99% |
-| Floating Continent (Terra, Edgar, Sabin, Shadow) | Sword, Dagger, Spear, Katana, Blunt, Ranged | 99% | 99% |
-| Floating Continent (Terra, Setzer, Relm, Shadow) | Sword, Dagger, Blunt, Ranged | 90% | 90% |
-| WoR: the island to Tzen (Celes) | Sword | 28% | 71% |
-| WoR: Tzen to Edgar (Celes, Sabin) | Sword, Katana, Blunt | 78% | 84% |
-| WoR: the Falcon (Celes, Sabin, Edgar, Setzer) | Sword, Spear, Katana, Blunt, Ranged | 96% | 99% |
-| WoR: Mt. Zozo (Celes, Sabin, Edgar, Cyan) | Sword, Spear, Katana, Blunt, Ranged | 96% | 99% |
-| WoR: Narshe (Terra, Celes, Cyan, Mog) | Sword, Spear, Katana | 70% | 91% |
-| WoR: Thamasa arc (Terra, Celes, Relm, Strago) | Sword, Blunt | 58% | 71% |
-| WoR: Phoenix Cave party 1 (Terra, Strago, Sabin, Cyan) | Sword, Katana, Blunt | 78% | 84% |
-| WoR: Phoenix Cave party 2 (Celes, Relm, Mog, Umaro) | Sword, Spear, Blunt | 70% | 83% |
-| WoR: Veldt cave (Celes, Terra, Relm, Gau) | Sword, Dagger, Blunt | 71% | 71% |
-| WoR: Ebot's Rock, the Zone Eater (Terra, Celes, Strago, Relm) | Sword, Blunt | 58% | 71% |
-| WoR: Ancient Castle (Terra, Celes, Relm, Cyan) | Sword, Katana, Blunt | 78% | 84% |
+| Stage (its first leg) | The player can field | four classes | six: really held | six: widest |
+|---|---|---|---|---|
+| `battle_entry`, in Magitek armor | Terra | 58% | 36% | 36% |
+| `narshe_streets` | Terra | 56% | 28% | 71% |
+| `moogle_cleared` | Locke, Mog | 58% | 54% | 87% |
+| `worldmap_narshe` | Locke, Terra | 86% | 48% | 90% |
+| `figaro_intro` | Edgar, Locke, Terra | 86% | 87% | 97% |
+| `vargas_entry` | Edgar, Locke, Sabin, Terra | 96% | 99% | 99% |
+| `scenario_hub` | Banon, Edgar, Sabin, Terra | 96% | 96% | 99% |
+| `locke_scenario` | Locke | 58% | 27% | 74% |
+| `sfigaro_escape` | Celes, Locke | 86% | 48% | 90% |
+| `sabin_world` | Sabin, Shadow | 96% | 87% | 87% |
+| `cyan_defence` | Cyan, Sabin, Shadow | 96% | 87% | 98% |
+| `camp_escaped`, in Magitek armor | Cyan, Sabin, Shadow | 0% | 0% | 0% |
+| `forest_done` | Cyan, Sabin, Shadow | 96% | 87% | 98% |
+| `falls_done` | Cyan, Sabin | 85% | 56% | 78% |
+| `gau_joined` | Cyan, Gau, Sabin | 85% | 69% | 84% |
+| `rapids_start` | Banon, Edgar, Terra | 96% | 87% | 97% |
+| `narshe_battle` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Terra | 85-96% (mean 93%) | 48-99% (mean 86%) | 84-99% (mean 96%) |
+| `figaro_submerged` | Celes, Cyan, Edgar, Gau, Locke, Sabin | 85-96% (mean 95%) | 69-99% (mean 90%) | 84-99% (mean 98%) |
+| `ultros2_entry` | Cyan, Edgar, Gau, Locke, Sabin | 96-96% (mean 96%) | 69-97% (mean 90%) | 96-99% (mean 98%) |
+| `vector_entry` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Setzer | 85-99% (mean 97%) | 69-99% (mean 89%) | 84-99% (mean 97%) |
+| `vector_sneak` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Setzer | 85-99% (mean 97%) | 69-99% (mean 89%) | 84-99% (mean 97%) |
+| `minecart_entry` | Cyan, Edgar, Gau, Locke, Sabin, Setzer | 94-99% (mean 98%) | 69-97% (mean 88%) | 87-99% (mean 97%) |
+| `narshe_mission` | Cyan, Edgar, Gau, Locke, Sabin, Setzer | 94-99% (mean 98%) | 69-97% (mean 88%) | 87-99% (mean 97%) |
+| `wob_airship_hunt` | Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer | 74-99% (mean 96%) | 69-97% (mean 87%) | 87-99% (mean 96%) |
+| `gate_cave_save` | Celes, Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer, Terra | 74-99% (mean 95%) | 48-99% (mean 86%) | 83-99% (mean 96%) |
+| `vector_crash` | Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer, Terra | 74-99% (mean 95%) | 66-99% (mean 87%) | 84-99% (mean 96%) |
+| `crescent_landing` | Locke, Terra | 86% | 48% | 90% |
+| `thamasa_night` | Locke, Shadow, Terra | 86% | 74% | 90% |
+| `fire_out` | Locke, Strago, Terra | 96% | 71% | 90% |
+| `thamasa_done` | Celes, Cyan, Edgar, Gau, Locke, Mog, Relm, Sabin, Setzer, Strago, Terra | 68-99% (mean 95%) | 48-99% (mean 84%) | 69-99% (mean 94%) |
+| `wor_landing` | Celes | 56% | 28% | 71% |
+| `wor_sabin` | Celes, Sabin | 85% | 78% | 84% |
+| `wor_edgar` | Celes, Edgar, Sabin | 96% | 96% | 99% |
+| `wor_falcon` | Celes, Edgar, Sabin, Setzer | 99% | 96% | 99% |
+| `wor_terra` | Celes, Edgar, Sabin, Setzer | 99% | 96% | 99% |
 
 The share is of every species in the game, not of the species the stage
 deals: the rows there were split toward the party that meets them (steps 3
