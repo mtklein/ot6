@@ -24,7 +24,9 @@ local H = dofile("tools/tests/lib/ot6.lua")   -- only for the ROM's weapon, skil
 
 local PRG = emu.memType.snesPrgRom
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
-local EDGE = SWORD | KATANA             -- a blade of either kind (the four classes' slash)
+-- what each of the four classes became (tools/proto_six/classes.py CHILDREN): slash a sword or a katana, pierce a
+-- dagger, a spear or a ranged hit, bludgeon a blunt or a ranged one
+local EDGE, POINT, BLOW = SWORD | KATANA, DAGGER | SPEAR | RANGED, BLUNT | RANGED
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
 
 local MPROP, MREC = 0x0F0000, 32
@@ -277,16 +279,15 @@ end
 
 -- --------------------------------------------------- the one deliberate cost
 -- Formation $168 (Rhinox x2) is the section's single hard demand: one class,
--- the blow's (SABIN's Pummel's class, read from the ROM; the four classes'
--- bludgeon), or nothing.  Asserted from both sides so it stays intentional:
---   * it is keyed by that class alone, and
+-- one of the two the four classes' bludgeon became (blunt, or ranged), or
+-- nothing.  Asserted from both sides so it stays intentional:
+--   * it is keyed by that one class alone, and
 --   * no element substitutes, because Rhinox has no vanilla weakness at all
 --     and absorbs bolt, the element the rest of the facility teaches.
 do
   local keys = formationKeys(0x168)
-  local BLOW = SK(0x5D)
-  check(BLOW ~= 0 and keys == BLOW, string.format(
-    "formation $168 (Rhinox x2) is keyed by the Pummel's class alone (keys=%s)",
+  check(keys == BLUNT or keys == RANGED, string.format(
+    "formation $168 (Rhinox x2) is keyed by one class alone, blunt or ranged (keys=%s)",
     classStr(keys)))
   check(rb(MPROP + 0x0075 * MREC + OFF_WEAK) == 0x00,
     "rhinox $075 has NO vanilla element weakness -- the class row is its "
@@ -306,28 +307,27 @@ do
 end
 
 do
-  -- the shares, like for like with the four classes: a blade of either kind
-  -- (sword or katana) for slash, a point (dagger or spear) for pierce, and the
-  -- blow (blunt) for bludgeon; ranged, which all of pierce, bludgeon and
-  -- special may have become, counts toward none of them
+  -- the shares, like for like with the four classes: what slash became (a sword
+  -- or a katana), what pierce became (a dagger, a spear or a ranged hit) and what
+  -- bludgeon became (a blunt or a ranged one)
   local slashW, bludgW, pierceW, total = 0, 0, 0, 0
   for _, e in ipairs(randForms) do
     local keys = formationKeys(e.f)
     total = total + e.w
     if keys & EDGE ~= 0 then slashW = slashW + e.w end
-    if keys & (DAGGER | SPEAR) ~= 0 then pierceW = pierceW + e.w end
-    if keys & BLUNT ~= 0 then bludgW = bludgW + e.w end
+    if keys & POINT ~= 0 then pierceW = pierceW + e.w end
+    if keys & BLOW ~= 0 then bludgW = bludgW + e.w end
   end
   emu.log(string.format(
-    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% blunt %.2f%%",
+    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% blows %.2f%%",
     100 * slashW, 100 * pierceW, 100 * bludgW))
   print(string.format(
-    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% blunt %.2f%%",
+    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% blows %.2f%%",
     100 * slashW, 100 * pierceW, 100 * bludgW))
   check(math.abs(total - 1.0) < 1e-6, string.format(
     "draw weights sum to 1.0 (got %.6f)", total))
   check(bludgW > slashW, string.format(
-    "blunt (%.2f%%) outranks the blades (%.2f%%) as an area key -- a blade is no "
+    "the blow (blunt or ranged, %.2f%%) outranks the blades (%.2f%%) as an area key -- a blade is no "
     .. "longer the automatic answer", 100 * bludgW, 100 * slashW))
   check(slashW < 0.35, string.format(
     "a blade (sword or katana) keys only %.2f%% of draws (slash was 67.86%% under the generated floor)",
