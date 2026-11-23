@@ -36,12 +36,12 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local FIXTURES = {
-  { state = "build/states/worldmap_narshe.mss.lua", tag = "early" },
-  { state = "build/states/fc_landing.mss.lua", tag = "stones" },
-  { state = "build/states/wor_ancient_hunt.mss.lua", tag = "late" },
-  { state = "build/states/wob_esper_mtn_hunt.mss.lua", tag = "lore" },
-  { state = "build/states/wor_gogo.mss.lua", tag = "gogo" },
-  { state = "build/states/wor_gau.mss.lua", tag = "rage" },
+  { state = "build/states/worldmap_narshe.mss.lua", tag = "early", kind = "magic" },
+  { state = "build/states/fc_landing.mss.lua", tag = "stones", kind = "magic" },
+  { state = "build/states/wor_ancient_hunt.mss.lua", tag = "late", kind = "magic" },
+  { state = "build/states/wob_esper_mtn_hunt.mss.lua", tag = "lore", kind = "lore" },
+  { state = "build/states/wor_gogo.mss.lua", tag = "gogo", kind = "magic" },
+  { state = "build/states/wor_gau.mss.lua", tag = "rage", kind = "rage" },
 }
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -121,6 +121,20 @@ local function cmdRow(slot, cmd)
   for r = 0, 3 do if H.readByte(0x202E + slot * 12 + r * 3) == cmd then return r end end
   return nil
 end
+-- why a member's command row cannot be opened now, or nil: the row greyed (bit 7 of its second byte, the bit
+-- battle_doom's hasRow reads; the cursor skips such a row), or, for Magic, the member Muted ($3EE5 bit 3, which
+-- UpdateCmd_05 greys it for)
+local ST2_MUTE = 0x08
+local function rowBlocked(slot, cmd)
+  local r = cmdRow(slot, cmd)
+  if r == nil then return "no row" end
+  local flags = H.readByte(0x202E + slot * 12 + r * 3 + 1)
+  if (flags & 0x80) ~= 0 then return string.format("its row %d is greyed (flags $%02X)", r, flags) end
+  if (cmd == CMD_MAGIC or cmd == CMD_XMAGIC) and (H.readByte(0x3EE5 + slot * 2) & ST2_MUTE) ~= 0 then
+    return "it is Muted"
+  end
+  return nil
+end
 
 -- the rows check: a segment's cells are `want`, then empty
 local function checkRows(slot, first, count, want, what)
@@ -186,7 +200,7 @@ end
 
 -- bring up `slot`'s window for `k`; false if the member never gets a turn
 local function openWindow(k, slot, tag)
-  local row = cmdRow(slot, k.cmd)
+  local row, moves = cmdRow(slot, k.cmd), 0
   for _ = 1, 12000 do
     local s = st()
     if H.readByte(MENU) ~= 0 and s ~= ST_TRANS then
@@ -197,8 +211,21 @@ local function openWindow(k, slot, tag)
         idle(30)
         return true
       elseif s == ST_CMD then
+        -- a row that went grey with the window open (a status landed) is one the cursor skips: say so and stop,
+        -- rather than walk Up and Down past it until the battle's clock has worn the party down (the v0.50
+        -- line's fc_landing draw: EDGAR's Magic row greyed, 914 Downs and 912 Ups, one monster wiping the party
+        -- over some 33,000 frames; suites/battle_denselists_gate2_red.log.gz)
+        local why = rowBlocked(slot, k.cmd)
+        if why ~= nil then return false, why end
         local cur = H.readByte(0x890F + slot) & 3
-        if cur == row then press("a") else press(cur < row and "down" or "up") end
+        if cur == row then press("a") else
+          moves = moves + 1
+          if moves > 16 then
+            error(string.format("%s: slot %d's cursor took %d presses and has not reached row %d (on row %d)", tag,
+              slot, moves, row, cur), 0)
+          end
+          press(cur < row and "down" or "up")
+        end
       else
         press("b")
       end
@@ -208,6 +235,10 @@ local function openWindow(k, slot, tag)
   end
   error(tag .. ": the member's " .. k.st .. " window never came up", 0)
 end
+-- per fixture: a worn stone seen on a member's magic walk, the Up checks made, the walks a lost control ended
+local stoneSeen, upChecked, lostMid = {}, {}, {}
+-- per fixture: walks opened, by list ("tag:kind"), and walks skipped (a lost control, a greyed or Muted row)
+local walked, skipped = {}, {}
 local function closeWindow(k, slot)
   for _ = 1, 40 do
     if st() ~= k.st and st() ~= ST_ESPER then return end
@@ -218,7 +249,14 @@ end
 local function walk(kindName, slot, want, tag)
   local k = KIND[kindName]
   local n = #want
-  openWindow(k, slot, tag)
+  local opened, why = openWindow(k, slot, tag)
+  if opened == false then
+    H.log(string.format("[dense] %s slot %d: its %s window cannot be opened (%s): the walk is skipped", tag, slot,
+      kindName, why))
+    skipped[tag] = (skipped[tag] or 0) + 1
+    return nil
+  end
+  walked[tag .. ":" .. kindName] = (walked[tag .. ":" .. kindName] or 0) + 1
   H.screenshot(string.format("battle_denselists_%s_%s_slot%d", tag, kindName, slot))
   -- every cell in order, from the first
   for _ = 1, 64 do
@@ -256,7 +294,22 @@ local function walk(kindName, slot, want, tag)
     if j == 0 and sc == 0 then break end
     press(k.cols == 2 and "left" or "up")
   end
+  -- a member who lost control during the walk (Petrify, Zombie or Death: the same mask the walks test at a
+  -- member's start) keeps a window the engine closes at the next press (v0.50 line's wob_esper_mtn_hunt capture:
+  -- STRAGO petrified while his list was walked, "st 0E ... s1 40", and Up took the menu to $14, $01, $0F;
+  -- build/attempts/wt/v050-line-deaths/suites/): its walk ends there, said, and the fixture's other members
+  -- carry the summon check (asserted per fixture below)
+  if (H.readByte(0x3EE4 + slot * 2) & 0xC2) ~= 0 then
+    H.log(string.format("[dense] %s slot %d lost control during its %s walk (status1 $%02X): the rest of its walk "
+      .. "is the engine's window, not the list's; ended here", tag, slot, kindName, H.readByte(0x3EE4 + slot * 2)))
+    lostMid[tag] = (lostMid[tag] or 0) + 1
+    if kindName == "magic" and H.readByte(LISTPTR[slot]) ~= 0xFF then stoneSeen[tag] = true end
+    closeWindow(k, slot)
+    return 0
+  end
   if kindName == "magic" and H.readByte(LISTPTR[slot]) ~= 0xFF then
+    stoneSeen[tag] = true
+    upChecked[tag] = (upChecked[tag] or 0) + 1
     press("up")
     idle(10)
     H.assertEq(st(), ST_ESPER, tag .. ": Up from the first cell opens the worn stone's summon")
@@ -334,26 +387,46 @@ local function checkBattle(tag)
 end
 
 local function walks(tag)
+  -- a member out of control (Death, Petrify, Zombie) or whose row cannot be opened is skipped, said and counted;
+  -- the fixture's own list must still be walked by someone (asserted per fixture)
+  local function ready(slot, kindName, cmd)
+    if cmdRow(slot, cmd) == nil then return false end
+    local s1 = H.readByte(0x3EE4 + slot * 2)
+    local why = (s1 & 0xC2) ~= 0 and string.format("out of control, status1 $%02X", s1) or rowBlocked(slot, cmd)
+    if why ~= nil then
+      H.log(string.format("[dense] %s slot %d: its %s walk is skipped (%s)", tag, slot, kindName, why))
+      skipped[tag] = (skipped[tag] or 0) + 1
+      return false
+    end
+    return true
+  end
   for slot = 0, 3 do
     local actor = H.readByte(0x3ED8 + slot * 2)
-    if actor < 0x10 and (H.readByte(0x3EE4 + slot * 2) & 0xC2) == 0 then
-      if cmdRow(slot, CMD_MAGIC) then
+    if actor < 0x10 then
+      if ready(slot, "magic", CMD_MAGIC) then
         local want = expectedMagic(slot)
         if #want > 0 then
           local c = walk("magic", slot, want, tag)
-          H.log(string.format("[dense] %s slot %d magic: %d cells walked, %d confirmed", tag, slot, #want, c))
+          if c ~= nil then
+            H.log(string.format("[dense] %s slot %d magic: %d cells walked, %d confirmed", tag, slot, #want, c))
+          end
         end
       end
-      if cmdRow(slot, CMD_LORE) then
+      -- (read again after the magic walk: a member petrified during it has no lore window)
+      if ready(slot, "lore", CMD_LORE) then
         local want = expectedLores()
         local c = walk("lore", slot, want, tag)
-        H.log(string.format("[dense] %s slot %d lore: %d rows walked, %d confirmed", tag, slot, #want, c))
+        if c ~= nil then
+          H.log(string.format("[dense] %s slot %d lore: %d rows walked, %d confirmed", tag, slot, #want, c))
+        end
       end
-      if cmdRow(slot, CMD_RAGE) then
+      if ready(slot, "rage", CMD_RAGE) then
         local want = expectedRages()
         H.assertEq(H.readByte(0x3A9A), #want, tag .. ": the rage count is the packed list's length")
         local c = walk("rage", slot, want, tag)
-        H.log(string.format("[dense] %s slot %d rage: %d cells walked, %d confirmed", tag, slot, #want, c))
+        if c ~= nil then
+          H.log(string.format("[dense] %s slot %d rage: %d cells walked, %d confirmed", tag, slot, #want, c))
+        end
       end
     end
   end
@@ -405,6 +478,15 @@ for _, f in ipairs(FIXTURES) do
       H.setPad(pad or {})
     end),
   }, f.tag .. ": the windows walked")
+  steps[#steps + 1] = H.call(function()
+    H.assertEq((walked[f.tag .. ":" .. f.kind] or 0) >= 1, true, string.format("%s: the %s list this fixture is "
+      .. "for was walked at least once (%d walk(s) skipped)", f.tag, f.kind, skipped[f.tag] or 0))
+    if stoneSeen[f.tag] then
+      H.assertEq((upChecked[f.tag] or 0) >= 1, true, string.format("%s: the summon's Up was checked on a member "
+        .. "wearing a stone (%d check(s); %d walk(s) ended by a lost control)", f.tag, upChecked[f.tag] or 0,
+        lostMid[f.tag] or 0))
+    end
+  end)
   steps[#steps + 1] = H.release()
 end
 

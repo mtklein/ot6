@@ -42,17 +42,18 @@ local function mutant(from, to)
   return chunk(H)
 end
 
--- a snapshot: an event battle, SHADOW's Throw row there, two monsters that take Slow and Stop, nothing Slowed,
--- Stopped or Broken; the bag holds a Dirk (150 gil), a Shuriken (30) and a Fire Skean (500), all spare
+-- a snapshot: an event battle, SHADOW's Throw row there, two bosses that take Slow and Stop, nothing Slowed,
+-- Stopped or Broken; the bag holds two Dirks (150 gil, a weapon), a Shuriken (30) and a Fire Skean (500), all
+-- spare
 local function snap(f)
   local s = { event = true, row = true, mons = {}, bag = {
-    { id = 0x00, price = 150, sold = true, throw = true, spare = true },
-    { id = 0x41, price = 30, sold = true, throw = true, spare = true },
+    { id = 0x00, price = 150, sold = true, throw = true, spare = true, weapon = true, count = 2 },
+    { id = 0x41, price = 30, sold = true, throw = true, spare = true, count = 5 },
     { id = 0xAB, price = 10, sold = true, throw = true, spare = true },
     { id = 0xE9, price = 5, sold = true, throw = false, spare = true },
   } }
-  s.mons[0] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 3000, species = 0x044 }
-  s.mons[1] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 5000, species = 0x001 }
+  s.mons[0] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 3000, species = 0x044, boss = true }
+  s.mons[1] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 5000, species = 0x001, boss = true }
   if f then f(s) end
   return s
 end
@@ -111,10 +112,40 @@ check("the line names the aimed body's species", "species = s.mons[aim.slot].spe
   function()
   local d = pick(snap(function(s)
     s.mons[0].up = false
-    s.mons[3] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 100, species = 0x001 }
+    s.mons[3] = { up = true, st3 = 0, broken = 0, allowed = 0xFF, hp = 100, species = 0x001, boss = true }
     s.mons[1].up = false
   end))
   return d.kind == "hobble" and d.slot == 3 and d.species == 0x001
+end)
+-- #553: the hobble is a boss's (section 6, rule 3), so the Telstar battle's Soldiers called in (100 HP, no
+-- death guard) take the Fight, not a Dirk; a pin still goes at any Slowed body
+check("never hobble a monster that is no boss", "and m.allowed & 0x04 ~= 0 and m.boss then",
+  "and m.allowed & 0x04 ~= 0 then", function()
+  local d = pick(snap(function(s) s.mons[1].boss = false end))
+  return d.kind == "hobble" and d.slot == 0
+end)
+check("no boss to hobble and nothing Slowed: no line", "and m.allowed & 0x04 ~= 0 and m.boss then",
+  "and m.allowed & 0x04 ~= 0 then", function()
+  return pick(snap(function(s) s.mons[0].boss = false; s.mons[1].boss = false end)) == nil
+end)
+check("a Slowed monster that is no boss is still pinned", "local aim, kind = pin, \"pin\"",
+  "local aim, kind = nil, \"pin\"", function()
+  local d = pick(snap(function(s) s.mons[0].boss = false; s.mons[0].st3 = 0x04 end))
+  return d.kind == "pin" and d.slot == 0
+end)
+check("never aim at a slot whose live species is $FFFF", "m.up and m.species ~= 0xFFFF and", "m.up and",
+  function()
+  local d = pick(snap(function(s) s.mons[1].species = 0xFFFF end))
+  return d.kind == "hobble" and d.slot == 0
+end)
+-- #553: a weapon is thrown only with a second one above the reserve; the last is kept
+check("never throw the last spare weapon", "(not it.weapon or (it.count or 0) >= 2)", "true", function()
+  local d = pick(snap(function(s) s.bag[2].spare = false; s.bag[1].count = 1 end))
+  return d.kind == "none"
+end)
+check("a second spare weapon may go", "(not it.weapon or (it.count or 0) >= 2)", "(not it.weapon)", function()
+  local d = pick(snap(function(s) s.bag[2].spare = false end))
+  return d.kind == "hobble" and d.item == 0x00
 end)
 check("the cheapest throwable, never a skean", "(it.id < 0xAB or it.id > 0xAF)", "true", function()
   local d = pick(snap())

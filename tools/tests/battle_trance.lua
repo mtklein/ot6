@@ -95,6 +95,17 @@ local function arm()
       cur.m0, cur.t0m, cur.turns0 = H.frame, ticks(), turns
       H.log(string.format("[trance] f%d tick %d: TERRA morphed (%d BP)", H.frame, ticks(), cur.b))
     end
+    -- her gauge byte on every battle frame she is morphed (#558: read once at the step's end, it could be a
+    -- frame after the battle closed, where $3B04 is no longer hers -- the v0.50 line's fc-alcove capture read
+    -- $FF there, after she had stayed morphed to the battle's end)
+    if m and cur ~= nil and cur.m0 ~= nil then
+      local g = H.readByte(0x3B04 + e())
+      if g ~= 0 and cur.gauge == nil then
+        cur.gauge = g
+        H.log(string.format("[trance] f%d tick %d: her gauge byte $3B04 reads $%02X while morphed", H.frame, ticks(), g))
+      end
+      cur.gaugeFrames = (cur.gaugeFrames or 0) + 1
+    end
     if c and not lastC and cur ~= nil then
       cur.clocked, cur.t0 = true, ticks()
       H.log(string.format("[trance] f%d tick %d: her clock starts, speed $3F32 = %d", H.frame, cur.t0,
@@ -220,7 +231,9 @@ local function step(b)
         H.assertEq(cur.t1 - cur.t0, SPAN[b], string.format("Morph at %d BP lasts its span, in battle ticks", b))
       else
         H.assertEq(cur.clocked == true, false, "Morph at 3 BP is not clocked ($3EE2 stays $FF)")
-        H.assertEq(H.readByte(0x3B04 + e()), 0, "and shows no gauge")
+        H.assertEq((cur.gaugeFrames or 0) > 0, true, "her gauge was read on the battle frames she was morphed")
+        H.assertEq(cur.gauge or 0, 0, string.format("and shows no gauge ($3B04 read on %d morphed battle frames)",
+          cur.gaugeFrames or 0))
         local held = ticks() - cur.t0m
         if not morphed() then
           H.assertEq(inBattle(), false, string.format("Morph at 3 BP: she is morphed until the battle ends (reverted after %d ticks)", held))

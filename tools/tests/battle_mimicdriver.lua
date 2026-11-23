@@ -73,10 +73,22 @@ local function theFight(what)
         -- GOGO's command windows: the command menu ($7BC2 state $05) open on his seat ($62CA)
         local s = gogoSlot()
         local open = s ~= nil and H.readByte(0x7BC2) == 0x05 and H.readByte(0x62CA) == s
-        if open and not cur.inWindow then cur.windows = cur.windows + 1 end
-        cur.inWindow = open
+        if open and not cur.inWindow then cur.windows = cur.windows + 1; cur.inWindow = "new"
+        else cur.inWindow = open end
         ph = (ph + 1) % 8
         bn = H.battleLoadStarted() and bn + 1 or 0
+        -- staged (declared, state_write_waivers.txt): GOGO's bank at 3 as each of his command windows opens,
+        -- before the driver decides there, so the plans his line makes have pips to boost with (the driver's
+        -- boost is the bank's, Driver:makePlanRules).  Which plans run as copies is the fight's draw; on the
+        -- v0.50 line's wor_opera_switch capture all 13 fights' copies came from 0-BP plans ("copy 1: ...
+        -- pending 0; plan read cmd $00 atk $FF at 0 BP (bank 0)"), and with the bank staged once at the open
+        -- he had spent it on other lines before his Mimics (7 of 8 plans at 0 BP; build/attempts/wt/
+        -- v050-line-deaths/suites/), so check 3 had no boosted copy to read.  The property is a copy's pending
+        -- pips against its plan's, which the bank feeds and does not decide.
+        if open and cur.inWindow == "new" and H.readByte(0x3E9C + s * 2) < 3 then
+          H.log(string.format("[mimic] %s: GOGO's window: bank staged %d -> 3", what, H.readByte(0x3E9C + s * 2)))
+          H.writeByte(0x3E9C + s * 2, 3)
+        end
         if bn >= 3 then drv.frame(); return end
         if bn == 0 then drv.idle() end
         H.setPad((H.dialogWaiting() and ph < 4) and { "a" } or {})

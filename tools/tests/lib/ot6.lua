@@ -1455,14 +1455,77 @@ end
 -- Re-plan if the bank can no longer buy it; never settle at a different
 -- effect/cost. Repeated unacknowledged presses use the driver's existing
 -- parked-window and plan-pulse watchdogs.
-function M.exactBoostStep(pending, want, bank)
+-- `gift` (0 or 1): a Portrait gift the member holds (Ot6BankGift, #538).  R's room is the bank plus the gift, as
+-- the command window's other boost step reads it (#558: an exact plan was dropped as unbuyable with one point
+-- banked and the gift held).
+function M.exactBoostStep(pending, want, bank, gift)
+  gift = gift or 0
   if type(want) ~= "number" or want % 1 ~= 0 or want < 0 or want > 3
     or type(pending) ~= "number" or pending % 1 ~= 0 or pending < 0 or pending > 3
     or type(bank) ~= "number" or bank % 1 ~= 0 or bank < 0 or bank > 5
-    or bank < want then return "drop" end
+    or (gift ~= 0 and gift ~= 1)
+    or bank + gift < want then return "drop" end
   if pending > want then return "l" end
   if pending < want then return "r" end
   return "go"
+end
+
+-- The party cure's boost (#558).  Until v0.49 the plan picked 1 point (2 when deep) and the R that spreads the
+-- cure at its target select raised the pending boost one more whenever the bank held it (#555 took that out of
+-- the ROM): 7 of the v0.48 line's 37 party cures cast a tier above their plan's (the action trace's submit
+-- events, "boost":1 / "accepted_boost":2), none in v0.49's.  Now the plan sizes the boost on purpose: the least
+-- tier (from the old floor, 1 or 2 when deep) whose spread share -- half the folded tier's least restore,
+-- vanilla's split over several targets -- lifts each hurt member by what it needs: to two of its rounds or the
+-- heal threshold, whichever is higher, and never past its max HP.  The bank caps it; castBoost then steps it
+-- down for MP as before.
+--   restoreAt(b) -> the folded tier's least single-target restore at boost b (nil: unknown)
+--   cands = { { e, hp, maxhp }, ... }; price[e] a round's cost; threshold the heal percentage
+-- Returns the boost and a note for the log.
+function M.partyCureBoost(bank, deep, cands, restoreAt, price, threshold)
+  local floor = math.min(bank, deep and 2 or 1)
+  local need = 0
+  for _, c in ipairs(cands) do
+    local want = math.max(2 * ((price and price[c.e]) or 0), ((threshold or 0) * c.maxhp + 99) // 100) - c.hp
+    need = math.max(need, math.min(c.maxhp - c.hp, want))
+  end
+  local top = math.min(bank, 3)
+  local share
+  for b = floor, top do
+    local least = restoreAt(b)
+    share = least and least // 2 or nil
+    if share == nil then
+      return floor, string.format("boost %d (the share is unknown)", floor)
+    end
+    if share >= need then
+      return b, string.format("boost %d: a share of %d covers the %d the worst-off needs", b, share, need)
+    end
+  end
+  return top, string.format("boost %d (the bank's most): a share of %d against %d needed", top, share or 0, need)
+end
+
+-- The Muddle rule's second cure-hit (#558): a cure-hit already in flight on a muddled member stops blocking a
+-- second one when that member's own Fight can kill a standing ally outright -- one miss, or one Freeze on the
+-- hitter, and the ally is dead (the v0.49 line's wor_kt_doom wipe: CYAN muddled, SABIN's hit missed, SHADOW's held
+-- by Frozen, SHADOW and GOGO killed from full HP).  The ally is any standing member but the muddled one and the
+-- actor deciding (who is the one to hit).  o = { inFlight = { [e] = true }, status2 = { [e] = byte },
+-- hp = { [e] = HP }, actor, estimate = f(e, a) -> nil or { top, lethal } (Driver:allyFightEstimate) }.
+-- Clears the freed entries of o.inFlight and returns { { e, a, est }, ... }, one per muddled member freed.
+function M.muddleLethalFree(o)
+  local freed = {}
+  for e = 0, 3 do
+    if o.inFlight[e] and ((o.status2[e] or 0) & M.ST2_MUDDLE) ~= 0 then
+      for a = 0, 3 do
+        if a ~= e and a ~= o.actor and (o.hp[a] or 0) > 0 and o.inFlight[e] then
+          local est = o.estimate(e, a)
+          if est and (est.lethal or (est.top or 0) >= o.hp[a]) then
+            o.inFlight[e] = nil
+            freed[#freed + 1] = { e = e, a = a, est = est }
+          end
+        end
+      end
+    end
+  end
+  return freed
 end
 
 function M.liftFilterHeals(heals, hp, maxhp, cost)
@@ -1980,6 +2043,33 @@ function M.brokenForDrop(t, s, who, brkNow, dropped)
   t.pend[s] = nil
   if pend ~= nil and pend ~= false and pend == who then return false end
   return brkNow
+end
+-- The same question asked per pass (#548 item 1).  The watch samples HP once a frame, and the passes of one
+-- action can land on one frame (a multi-hit volley's ApplyDmg calls run back to back): the frame rule above then
+-- prices the whole drop as one hit, shielded when the breaking pass is among them, so the broken passes that
+-- follow it in the same frame read x4 too cheap and the hit count is one where it was several.  The passes
+-- themselves come from ApplyDmg (execActivate's observers: the target's HP at the call and at its common return,
+-- and whether the body was Broken before the pass, i.e. at the end of the pass before it -- #542's rule that a
+-- hit is judged on the body before it).  passes = { { drop, broken }, ... } for one slot this frame; drop the
+-- frame's HP fall there; fallback the frame rule's verdict for any of it no pass accounts for.
+-- Returns the shielded-equivalent sum, the race's base sum (M.raceDamageBase), the hit count and the HP the
+-- passes account for.
+function M.dropFromPasses(passes, drop, shMax, fallback)
+  local sum, norm, race, n = 0, 0, 0, 0
+  for _, q in ipairs(passes) do
+    if q.drop > 0 then
+      sum, n = sum + q.drop, n + 1
+      norm = norm + (q.broken and q.drop // 4 or q.drop)
+      race = race + M.raceDamageBase(q.drop, shMax, q.broken)
+    end
+  end
+  local rest = drop - sum
+  if rest > 0 then
+    n = n + 1
+    norm = norm + (fallback and rest // 4 or rest)
+    race = race + M.raceDamageBase(rest, shMax, fallback)
+  end
+  return norm, race, n, sum
 end
 
 -- one line's hits on enemy e (mutated), times the line's hit chance
@@ -6947,6 +7037,37 @@ local function execActivate()
   if execHooks then return end
   execHooks = true
   local a = M.sym("ExecCmd@battle_code")
+  -- the passes of a party action on the monsters, one record per ApplyDmg (#548; M.dropFromPasses): the
+  -- target's HP at the call and at its common return (+$27, the return the action trace's effect observer
+  -- verified), and whether the body was Broken before the pass.  M.passBrk[slot] is the gauge as the last pass
+  -- on it left it, re-read for every slot as a party command enters ExecCmd.  Drained by the damage watch.
+  M.passes, M.passStack, M.passBrk = {}, {}, {}
+  local apply = M.sym("ApplyDmg")
+  emu.addMemoryCallback(function()
+    local st = emu.getState()
+    local x, y = st["cpu.x"] & 0xffff, st["cpu.y"] & 0xffff
+    if #M.passStack >= 8 then table.remove(M.passStack, 1) end
+    M.passStack[#M.passStack + 1] = { x = x, y = y, hp = M.readWord(0x3BF4 + y) }
+  end, emu.callbackType.exec, apply, apply)
+  emu.addMemoryCallback(function()
+    local e = table.remove(M.passStack)
+    if e == nil or e.x >= 8 or e.x % 2 ~= 0 or e.y < 8 or e.y >= 20 or e.y % 2 ~= 0 then return end
+    local slot = (e.y - 8) // 2
+    local brk = M.readByte(0x3E90 + slot * 2) ~= 0     -- BATTLE.BRK_TICKS (declared below this)
+    local before = M.passBrk[slot]
+    if before == nil then before = brk end
+    if #M.passes >= 64 then table.remove(M.passes, 1) end
+    M.passes[#M.passes + 1] = { actor = e.x // 2, slot = slot, drop = e.hp - M.readWord(0x3BF4 + e.y),
+      broken = before, frame = M.frame }
+    M.passBrk[slot] = brk
+  end, emu.callbackType.exec, apply + 0x27, apply + 0x27)
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xffff
+    if x < 8 and x % 2 == 0 then
+      M.passStack = {}
+      for slot = 0, 5 do M.passBrk[slot] = M.readByte(0x3E90 + slot * 2) ~= 0 end
+    end
+  end, emu.callbackType.exec, a, a)
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
     if x < 8 and x % 2 == 0 then
@@ -12816,7 +12937,7 @@ function Driver:racePlan(actor, c)
       or M.readByte(0x2F47) ~= 0 then return nil end
     local spell, boost = c.spell or attackPlan.spell, c.boost or 0
     if type(boost) ~= "number" or boost % 1 ~= 0 or boost < 0 or boost > 3
-      or M.readByte(BATTLE.BP + actor*2) < boost then return nil end
+      or M.readByte(BATTLE.BP + actor*2) + ((M.readByte(BATTLE.RELM.GIFT) >> actor) & 1) < boost then return nil end
     local row = cmdRow(actor, BATTLE.CMD_MAGIC)
     if row == nil or spellCell(actor, spell, true) == nil then return nil end
     local price, resolved = M.battleSpellPrice(actor, spell, boost)
@@ -14157,6 +14278,21 @@ function Driver:makePlanRules(actor)
       inFlight[self.unmuddlePending.e] = true
       flightBy[self.unmuddlePending.e] = flightBy[self.unmuddlePending.e] or self.unmuddlePending.by
     end
+    -- ...unless the muddled member's own Fight can kill a standing ally outright (#558): then one cure-hit in
+    -- flight is one miss or one Freeze away from a dead ally, and a second goes in behind it.  The v0.49 line's
+    -- wor_kt_doom wipe and two of six seeds of its sweep (build/attempts/wt/v050-line-deaths/labA/): CYAN muddled
+    -- by $0F6, SABIN's cure-hit missed ("took 0"), SHADOW's was queued and then held by Frozen, and CYAN's Fights
+    -- killed SHADOW from 4956/4956 and GOGO from 4483/4483 while the rule waited on the one in flight.  The second
+    -- hit is still held to the muddled member's unmuddle floor (M.muddleRule), so it never kills him.
+    if M.MUDDLE_ONEHIT_OFF ~= true then
+      for _, f in ipairs(M.muddleLethalFree({ inFlight = inFlight, status2 = s2, hp = hpNow, actor = actor,
+          estimate = function(e, a) return self:allyFightEstimate(e, a) end })) do
+        local said = string.format("[%s] actor=%d: entity %d is MUDDLED and its Fight can kill entity %d "
+          .. "outright (%s, %d HP): a second cure-hit goes in behind actor %d's (#558)", self.tag or "fight",
+          actor, f.e, f.a, f.est.lethal or string.format("priced to %d", f.est.top or 0), hpNow[f.a], flightBy[f.e] or -1)
+        if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+      end
+    end
     for e, _ in pairs(inFlight) do
       if ((s2[e] or 0) & M.ST2_MUDDLE) ~= 0 then
         local said = string.format("[%s] actor=%d: entity %d is MUDDLED but actor %d's "
@@ -15359,7 +15495,11 @@ function Driver:makePlanRules(actor)
       local bank = M.readByte(BATTLE.BP + actor * 2)
       if cell ~= nil and bank >= 1 then
         local deep = cands[1].pct < 35 or #cands >= 3
-        local want = math.min(bank, deep and 2 or 1)
+        local want, sized = M.partyCureBoost(bank, deep, cands, function(b)
+          local _, folded = M.spellPrice(spell, cellMp, b)
+          local least = self:castRestoreOf(folded, actor, cands[1].e)
+          return least
+        end, price, threshold)
         -- The fold and its price both come from M.spellPrice, which
         -- reads Ot6FoldTbl and MagicProp: the tier a boost buys and the
         -- MP it charges are the engine's own numbers rather than a
@@ -15372,8 +15512,8 @@ function Driver:makePlanRules(actor)
           local _, folded = M.spellPrice(spell, cellMp, boost)
           M.log(string.format("[%s] actor=%d party cure: %d hurt "
             .. "(worst %d%%), boost %d folds $%02X -> $%02X (%d MP), "
-            .. "all allies -- %s", self.tag or "fight", actor, #cands,
-            cands[1].pct, boost, spell, folded, mpc, why))
+            .. "all allies -- %s; %s", self.tag or "fight", actor, #cands,
+            cands[1].pct, boost, spell, folded, mpc, why, sized))
           return orSpend({ kind = "heal", spell = spell, target = cands[1].e,
                    row = cureRow, all = true, boostLeft = boost, reason = "party_hurt" }, "a party cure")
         end
@@ -16151,15 +16291,21 @@ end
 -- battles (OT6_RANDBTL, $57BD, clear), after the skean line, in priority order:
 --   1. pin: a standing, unbroken, Slowed monster that may be Stopped ($3330, the allowed statuses vanilla
 --      builds from MonsterProp +22) and is not Stopped, the one with the most HP left;
---   2. hobble: a standing monster that takes Slow and is neither Slowed nor Stopped, the most HP left, at the
---      open and again after each pin ends (one that blocks Stop is hobbled once and stays so);
+--   2. hobble a boss: a standing boss (death-immune, $3AA1 bit 2, the test Ot6AssassinateGate reads) that takes
+--      Slow and is neither Slowed nor Stopped, the most HP left, at the open and again after each pin ends (one
+--      that blocks Stop is hobbled once and stays so).  Section 6's rule 3: a monster called into the fight is
+--      not hobbled (#553: the v0.48 and v0.49 lines' Telstar battle threw a Dirk at a 100-HP Soldier called in
+--      once the boss was low, "hobble slot 2 $001: free, $00 (150 gil)");
 --   3. a Broken monster that is hobbled already is left to the Fight (the x2 is the Fight's), and nothing else
 --      is thrown at.
 -- What it throws: the cheapest throwable in the bag by its price (ItemProp, M.itemPrice; the battle bag's Throw
 -- flag $20, as MakeThrowList reads it), never a skean or a trick ($AB-$AF), from above the bag's reserve, and
 -- only what some shop sells (M.itemSold, ShopProp): an item no shop sells (the Imp Halberd, Excalibur, the Atma
 -- Weapon and their kind, whose price word reads 2) has no price to be cheap by, and "cheapest" would otherwise
--- pick it first (measured, the Inferno lab threw an Imp Halberd).  The route's supply: SHADOW's house merchant
+-- pick it first (measured, the Inferno lab threw an Imp Halberd).  A weapon (ItemProp type 1) is thrown only
+-- while the bag holds two above its reserve, so one is always kept (#553: a Dirk thrown once the Shuriken ran
+-- out; the Cranes fight leans on a kept Mithril Knife); stars and other throw-only items have no such floor.
+-- A slot whose live species reads $FFFF holds no body to aim at, whatever its HP cells say (#553).  The route's supply: SHADOW's house merchant
 -- in SABIN's scenario (shop 39: Shuriken, the Inviz and Shadow Edges; gen_sabin_world buys the Shuriken there,
 -- where SHADOW first joins), the Phantom Train's merchant (shop 85, gen_sabin_train's Shuriken), and Narshe's
 -- item shop (shop 44: Fire Skean, Water Edge, Bolt Edge, the skean line's, never thrown here).  No throwable,
@@ -16168,10 +16314,11 @@ end
 M.shadowLines = {}       -- every trap line this run, oldest first
 -- The policy itself, a pure function of a snapshot (shadowpin_policy_selftest holds it to the rules above):
 --   s.event   the battle is an event battle; s.row SHADOW's Throw row is there
---   s.mons[slot] = { up, st3 (status 3), broken (break ticks), allowed ($3330's status-3 byte), hp,
+--   s.mons[slot] = { up, st3 (status 3), broken (break ticks), allowed ($3330's status-3 byte), hp, boss,
 --                    species (OT6_SPECIES, $57C0: the body standing in the slot, one called in mid-battle
 --                    too, where the formation's opening line-up, M.monsterIds, reads $FFFF) }
---   s.bag     { { id, price, sold (M.itemSold), throw (the bag's Throw flag), spare (count above the reserve) }, ... }
+--   s.bag     { { id, price, sold (M.itemSold), throw (the bag's Throw flag), spare (any above the reserve),
+--               weapon (ItemProp type 1), count (how many above the reserve) }, ... }
 -- -> nil, or { kind = "pin" | "hobble", slot, species, why, item, price }, or { kind = "none" } with nothing to
 -- throw
 function M.shadowPolicy(s)
@@ -16179,10 +16326,10 @@ function M.shadowPolicy(s)
   local pin, hobble
   for slot = 0, 5 do
     local m = s.mons[slot]
-    if m and m.up and m.st3 & 0x10 == 0 then
+    if m and m.up and m.species ~= 0xFFFF and m.st3 & 0x10 == 0 then
       if m.st3 & 0x04 ~= 0 and m.broken == 0 and m.allowed & 0x10 ~= 0 then
         if pin == nil or m.hp > pin.hp then pin = { slot = slot, hp = m.hp, why = "Slowed, stop ok" } end
-      elseif m.st3 & 0x04 == 0 and m.allowed & 0x04 ~= 0 then
+      elseif m.st3 & 0x04 == 0 and m.allowed & 0x04 ~= 0 and m.boss then
         if hobble == nil or m.hp > hobble.hp then
           hobble = { slot = slot, hp = m.hp, why = (m.allowed & 0x10 ~= 0) and "free" or "stop-immune" }
         end
@@ -16194,7 +16341,8 @@ function M.shadowPolicy(s)
   if aim == nil then return nil end
   local item, price
   for _, it in ipairs(s.bag) do
-    if it.throw and it.spare and it.sold and (it.id < 0xAB or it.id > 0xAF) and (price == nil or it.price < price) then
+    if it.throw and it.spare and it.sold and (it.id < 0xAB or it.id > 0xAF) and (not it.weapon or (it.count or 0) >= 2)
+       and (price == nil or it.price < price) then
       item, price = it.id, it.price
     end
   end
@@ -16210,13 +16358,17 @@ function Driver:shadowLine(actor, boost)
   for slot = 0, 5 do
     local e = 8 + 2 * slot
     s.mons[slot] = { up = monAlive(slot), st3 = M.readByte(0x3EF8 + e), broken = M.readByte(0x3E88 + e),
-      allowed = M.readByte(0x3330 + e), hp = M.readWord(0x3BF4 + e), species = M.readWord(0x57C0 + 2 * slot) }
+      allowed = M.readByte(0x3330 + e), hp = M.readWord(0x3BF4 + e), species = M.readWord(0x57C0 + 2 * slot),
+      boss = (M.readByte(0x3AA1 + e) & 0x04) ~= 0 }
   end
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
     if id ~= 0xFF and M.readByte(BATTLE.BATTINV + i * 5 + 3) > 0 then
+      local floor = (self.opts.reserve or {})[id] or 0
       s.bag[#s.bag + 1] = { id = id, price = M.itemPrice(id), sold = M.itemSold(id),
-        throw = (M.readByte(BATTLE.BATTINV + i * 5 + 1) & 0x20) ~= 0, spare = self:battInvIdx(id) ~= nil }
+        throw = (M.readByte(BATTLE.BATTINV + i * 5 + 1) & 0x20) ~= 0, spare = self:battInvIdx(id) ~= nil,
+        weapon = (M.readRomByte(itemRec(id) + ITEM_TYPE) & 0x07) == 1,
+        count = M.readByte(BATTLE.BATTINV + i * 5 + 3) - floor }
     end
   end
   local d = M.shadowPolicy(s)
@@ -16888,7 +17040,7 @@ function Driver:button(actor)
     -- what the plan wants (M.boostStep), not a count of R pulses sent
     if self.plan.exactBoost then
       local step = M.exactBoostStep(M.readByte(BATTLE.PEND_BP + actor * 2),
-        self.plan.boostWant, M.readByte(BATTLE.BP + actor * 2))
+        self.plan.boostWant, M.readByte(BATTLE.BP + actor * 2), (M.readByte(BATTLE.RELM.GIFT) >> actor) & 1)
       if step == "drop" then self:dropPlan("race_boost_unavailable"); return nil end
       if step == "r" or step == "l" then return { step } end
     elseif self.plan.boostLeft and self.plan.boostLeft > 0 and M.BOOST_PULSES then
@@ -20951,6 +21103,18 @@ function Driver:watchDamage()
     who = execDone[#execDone].actor
   end
   self.brkDrop = self.brkDrop or { brk = {}, pend = {} }
+  -- this frame's passes by slot (#548), drained here
+  local passesOn = {}
+  -- only passes of this frame or the one before it: the observers record whenever ApplyDmg runs, and a pass left
+  -- from a stretch when no driver drained the list (between battles, or a suite's own scripted turns) must not
+  -- fold into the drop a later frame sees
+  for _, q in ipairs(M.passes or {}) do
+    if q.frame >= M.frame - 1 then
+      passesOn[q.slot] = passesOn[q.slot] or {}
+      table.insert(passesOn[q.slot], q)
+    end
+  end
+  if M.passes then M.passes = {} end
   for s = 0, 5 do
     local hp = M.readWord(BATTLE.MON_HP + s * 2)
     local last = self.monHpLast[s]
@@ -20971,9 +21135,29 @@ function Driver:watchDamage()
         -- broken (x4 shielded), the breaking hit itself shielded (#542,
         -- M.brokenForDrop), and the per-hit figure (#165) must not
         -- average the two
-        w.norm = w.norm + (brkHit and (drop // 4) or drop)
-        w.raceNorm = (w.raceNorm or 0) + M.raceDamageBase(drop,
-          M.readByte(BATTLE.SH_MAX + s * 2), brkHit)
+        local shMax = M.readByte(BATTLE.SH_MAX + s * 2)
+        local fnorm, frace = (brkHit and (drop // 4) or drop), M.raceDamageBase(drop, shMax, brkHit)
+        local norm, race, n = fnorm, frace, 1
+        local qs = passesOn[s]
+        if qs and not M.BREAKPASS_OFF then
+          local sum
+          norm, race, n, sum = M.dropFromPasses(qs, drop, shMax, brkHit)
+          if norm ~= fnorm or n ~= 1 then
+            local t = {}
+            for _, q in ipairs(qs) do t[#t + 1] = string.format("%d%s", q.drop, q.broken and "b" or "s") end
+            M.log(string.format("[%s] [brkpass] actor=%d slot %d: the frame's drop %d is %d pass(es) (%s; b broken, "
+              .. "s shielded, %d accounted for): %d shielded-equivalent over %d hit(s), where the frame rule read "
+              .. "%d over 1 (%s)", self.tag or "fight", who, s, drop, #qs, table.concat(t, " "), sum, norm, n,
+              fnorm, brkHit and "broken" or "shielded"))
+          end
+        end
+        w.norm = w.norm + norm
+        w.raceNorm = (w.raceNorm or 0) + race
+        -- still one hit a frame: the per-hit figure (dmgHit.per, the race's median) stays what its consumers
+        -- were tuned on.  Counting the passes as hits (n) halved it on Genji frames, and wor_kefka's deaths over
+        -- six shifts went 8 -> 16 (main against the branch, build/attempts/wt/v050-line-deaths/labI/); with one
+        -- hit a frame and the per-pass shield reading kept, 10 (labJ/tally_j4.txt), the same play as the frame
+        -- rule's (labJ/tally_j1.txt).  The pass count is in the [brkpass] line.
         w.n = w.n + 1
       end
     end

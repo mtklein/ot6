@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "3a150e5b012e371c0f594ae705361e946ec88f7ec06f2b110951dc360e967fd2",
-  "generator_sig": "68c849930333581fda0b05bd8e3a30c2bcc9bd7b7158315e73b259b1fbe6dd30 gen_massacre build/checkpoints/ultros-won-v1/manifest.json build/checkpoints/ultros-won-v1/ultros-won.sram",
+  "payload_sha256": "1e806726e87c2fadb8568043a023768921d42d635ee89a43740c66920f94dc3d",
+  "generator_sig": "4af56d6ad55abb68733c381a81163a792e4bed664eec3dc0bf584cdce6cf15b4 gen_massacre build/checkpoints/ultros-won-v1/manifest.json build/checkpoints/ultros-won-v1/ultros-won.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/ultros-won-v1/manifest.json",
-      "sha256": "ed42b8697554b94d2300761872e76017d4312280e25362a571401a146633c5d2"
+      "sha256": "f81bae66135ed7c8a9302f4b35ac11328e9410209f97429784293c945d124627"
     }
   ]
 }

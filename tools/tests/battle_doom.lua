@@ -123,6 +123,8 @@ local deathFrame, deathLine = nil, nil
 -- B's staging: "stage" (no decision has qualified yet), "wait" (staged, the Doom pending), "A" (B done)
 local phase = "stage"
 local TRIES_B = 4
+-- A's battles: B's, then the cave's next encounters while one ends with no decision qualified for A
+local TRIES_A, battlesA = 3, 0
 local skipB, qualifiedB, triesB, whyNotB = 0, 0, {}, {}
 local snapReq, loadReq, snap0, lines0 = nil, nil, nil, nil
 
@@ -166,6 +168,12 @@ local function resetModel()
   notVisits, notVisitSaid = 0, 0
 end
 resetModel()
+-- a new battle (A's next encounter): the counts, accumulators and visits of the last one mean nothing in it; the
+-- periods and visit gaps already measured stand
+local function newBattleModel()
+  lastCount, lastCountFrame, decremented = {}, {}, {}
+  accLast, visits, sim, visitFrame = {}, {}, {}, {}
+end
 
 local function watchCounts()
   for e = 0, 3 do
@@ -373,6 +381,33 @@ local function holdFor(_, x)
   return false
 end
 
+-- pace the auto-detected lane until a natural encounter fires (a step; called again for A's next battle)
+local function paceEncounter()
+  local battN, waited, lane = 0, 0, nil
+  local BACK = { left = "right", right = "left", up = "down", down = "up" }
+  -- each pace starts its own count and finds its own lane (A's later battles start wherever the last one left
+  -- the party)
+  return H.seqStep({ H.call(function() battN, waited, lane = 0, 0, nil end), H.driveUntil(function()
+    waited = waited + 1
+    battN = H.battleLoadStarted() and battN + 1 or 0
+    if battN >= 1 then H.setPad({}) return true end
+    if map() ~= 96 then error("paced off map 96 (now " .. map() .. ")", 0) end
+    return waited >= 8000
+  end, 8600, {
+    H.call(function()
+      if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
+      local x, y = H.fieldX(), H.fieldY()
+      if lane == nil then
+        for _, d in ipairs({ "right", "left", "up", "down" }) do
+          if H.canStep(x, y, d) then lane = { ax = x, ay = y, out = d, back = BACK[d] } break end
+        end
+      end
+      H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
+    end),
+    H.waitFrames(1),
+  }, "a cave encounter fires") })
+end
+
 local function newDriver()
   -- freeRound = "care": a Mt. Kolts encounter can open as a preemptive
   -- strike, whose free round otherwise defers every top-up one turn for an
@@ -391,30 +426,7 @@ H.run({ maxFrames = 120000 }, {
     "field control in cave 96"),
   H.call(function() H.assertEq(map(), 96, "kolts_cave on map 96") end),
 
-  -- pace the auto-detected lane until a natural encounter fires
-  (function()
-    local battN, waited, lane = 0, 0, nil
-    local BACK = { left = "right", right = "left", up = "down", down = "up" }
-    return H.driveUntil(function()
-      waited = waited + 1
-      battN = H.battleLoadStarted() and battN + 1 or 0
-      if battN >= 1 then H.setPad({}) return true end
-      if map() ~= 96 then error("paced off map 96 (now " .. map() .. ")", 0) end
-      return waited >= 8000
-    end, 8600, {
-      H.call(function()
-        if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
-        local x, y = H.fieldX(), H.fieldY()
-        if lane == nil then
-          for _, d in ipairs({ "right", "left", "up", "down" }) do
-            if H.canStep(x, y, d) then lane = { ax = x, ay = y, out = d, back = BACK[d] } break end
-          end
-        end
-        H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
-      end),
-      H.waitFrames(1),
-    }, "a cave encounter fires")
-  end)(),
+  paceEncounter(),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle armed", 5),
   -- the battle's open, kept: a lost B try goes back to it
@@ -483,14 +495,35 @@ H.run({ maxFrames = 120000 }, {
   -- A. the next decision of a member with a Fight row, a living ally, and a
   -- full gauge longer than two counts is condemned at 2 as it opens (qualifyA);
   -- the others Defend until A's Doom lands
-  H.driveUntil(function()
-    watchCounts()
-    if not H.battleLoadStarted() then return true end
-    return doomedA ~= nil and hp(doomedA) == 0
-  end, 12000, {
-    H.call(function() F.frame() end),
-    H.waitFrames(1),
-  }, "A staged in a decision, and its Doom lands"),
+  -- A battle the party wins before any decision qualifies for A (the v0.50 line's kolts_cave capture: EDGAR's
+  -- AutoCrossbow, the plan of B's own staged decision, took all three monsters' 402 HP in one action, and battle_doom
+  -- went red on "a decision qualified for A ()") is not A's: the party paces to the cave's next encounter and A
+  -- is staged there, at most TRIES_A battles.  A asks only for a decision of a member with a Fight row, a living
+  -- ally and a long gauge; nothing in it reads B's battle.
+  H.repeatN(TRIES_A, {
+    H.cond(function() return doomedA == nil end, {
+      H.cond(function() return not H.battleLoadStarted() end, {
+        H.call(function()
+          battlesA = battlesA + 1
+          rawLog(string.format("[test] f%d the battle ended with no decision qualified for A: to the cave's next "
+            .. "encounter (A's battle %d)", H.frame, battlesA + 1))
+        end),
+        H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 6000, "field control after the battle"),
+        paceEncounter(),
+        H.release(),
+        H.waitUntil(function() return H.battleActive() end, 900, "battle armed", 5),
+        H.call(function() newBattleModel(); newDriver() end),
+      }, {}),
+      H.driveUntil(function()
+        watchCounts()
+        if not H.battleLoadStarted() then return true end
+        return doomedA ~= nil and hp(doomedA) == 0
+      end, 12000, {
+        H.call(function() F.frame() end),
+        H.waitFrames(1),
+      }, "A staged in a decision, and its Doom lands"),
+    }, {}),
+  }),
   H.call(function()
     local said = {}
     for e, w in pairs(whyNotA) do said[#said + 1] = string.format("actor %d: %s", e, w) end
