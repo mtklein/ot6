@@ -206,9 +206,10 @@ no single price; its cost is the **sum (Σ)** of the two it fires.
 The 8 Blitzes, verbatim ✦, with the vanilla level table preserved ✦,
 selected from a menu. Fists are
 the core of the **Fist** class (bare hands, claws, flails, clubs). Claws
-were slashing through v0.50 and are Fist now, so equipping them no
-longer buys him a second class: his Fight and his physical Blitzes are
-all Fist, and he holds no other weapon class.
+and bare hands are one class (#566), as are Pummel, Suplex and Bum Rush,
+so Sabin holds one weapon class. His other axes are his Blitzes' elements
+(Aura Bolt holy, Fire Dance fire, Air Blade wind) and Bum Rush's four
+strips, which need no key.
 
 Levels below are `BlitzLevelTbl` (`field/event.asm:1240`).
 

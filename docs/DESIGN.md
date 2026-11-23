@@ -39,24 +39,27 @@ touches vanilla behavior where a pillar requires it.
 |---|---|---|---|---|
 | Terra | Mage | Sword | Fire | 8 spells; divine: Trance (Morph at a full boost); Ultima is Fire's fourth fold |
 | Locke | Thief | Dagger | — | Steal, Filch, Bestow, Mug, Trickshot, Dismantle, Appraise; divine: Master's Mark |
-| Edgar | Machinist | Spear | — | seven Tools, learned by acquisition; divine: Overclock. Air Anchor is a findable extra |
-| Sabin | Monk | Claw | Fire/Holy/Wind | the 8 Blitzes, selected from a menu |
+| Edgar | Machinist | Spear (and Sword: swords, the Chain Saw) | — | seven Tools, learned by acquisition; divine: Overclock. Air Anchor is a findable extra |
+| Sabin | Monk | Fist (bare hands, claws) | Fire/Holy/Wind | the 8 Blitzes, selected from a menu |
 | Cyan | Samurai | Katana | Wind | the 8 SwdTech, priced in BP (see below) |
 | Celes | Rune Knight | Sword | Ice | Runic from the start (signature) + spells (see below) |
-| Gau | Beast Tamer | Fangs (innate) | varies by rage | Rage learned without limit on the Veldt, 8 equipped (see below); no divine (a varied set needs none; owner, 2026-11-15) |
-| Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
-| Strago | Scholar | Rod | varies by lore | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; divine: Study, his Scan at a full boost, which learns every lore the monsters present could cast; Bserk, learned by watching a monster inflict Berserk (kits.md) |
-| Relm | Painter | Brush | — | Sketch (signature) with the party's buffs behind it, a list like Locke's: Portrait (a free boost point), Tint (an ally's weapon carries the colour she picks), Varnish (the next enemy hit misses), Still Life (a break lasts twice as long), Underpainting (the next weakness hit takes two shields), Gesture (an ally's turn now); divine: Masterpiece (every other ally's free point). Built ([kit-relm.md](design/kit-relm.md), #538) |
-| Shadow | Assassin | Dagger (thrown) | Fire/Water/Lightning (the skeans) | Throw (signature) over the eight throwing items, learned by acquisition as Edgar's Tools are: three stars, three skeans (pierce and an element), the smoke (Image) and the exit (Vanish), whose boost buys reach (kits.md "Shadow"); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken. Every throw hobbles (Slows) an enemy and pins (Stops, 8 ticks) a Slowed one ([kit-shadow-pin.md](design/kit-shadow-pin.md), #546) |
+| Gau | Beast Tamer | Fist (bare hands) | varies by rage | Rage learned without limit on the Veldt, 8 equipped (see below); no divine (a varied set needs none; owner, 2026-11-15) |
+| Setzer | Gambler/Merchant | Arcane (cards, dice) | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
+| Strago | Scholar | Arcane (rod) | varies by lore | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; divine: Study, his Scan at a full boost, which learns every lore the monsters present could cast; Bserk, learned by watching a monster inflict Berserk (kits.md) |
+| Relm | Painter | Arcane (brush) | — | Sketch (signature) with the party's buffs behind it, a list like Locke's: Portrait (a free boost point), Tint (an ally's weapon carries the colour she picks), Varnish (the next enemy hit misses), Still Life (a break lasts twice as long), Underpainting (the next weakness hit takes two shields), Gesture (an ally's turn now); divine: Masterpiece (every other ally's free point). Built ([kit-relm.md](design/kit-relm.md), #538) |
+| Shadow | Assassin | Dagger (thrown), Katana (ninja blade) | Fire/Water/Lightning (the skeans) | Throw (signature) over the eight throwing items, learned by acquisition as Edgar's Tools are: three stars, three skeans (Dagger and an element), the smoke (Image) and the exit (Vanish), whose boost buys reach (kits.md "Shadow"); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken. Every throw hobbles (Slows) an enemy and pins (Stops, 8 ticks) a Slowed one ([kit-shadow-pin.md](design/kit-shadow-pin.md), #546) |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim; no divine for now (kits.md "Divines") |
-| Umaro | Berserker | Club, fists | Ice | takes no orders; four arms (Fight, Charge, Throw, Storm); divine: Storm, ice on every enemy, on a dump of all three points (kits.md "Umaro") |
-| Gogo | Mime | — | — | bonus character; has access to every job and masters none |
+| Umaro | Berserker | Fist (club, bare hands) | Ice | takes no orders; four arms (Fight, Charge, Throw, Storm); divine: Storm, ice on every enemy, on a dump of all three points (kits.md "Umaro") |
+| Gogo | Mime | Arcane (rod) | — | bonus character; has access to every job and masters none |
 
-**Break classes (4):** Slash (swords, katanas, claws), Pierce (spears,
-daggers, thrown edges, bolts, darts), Bludgeon (fists, staves, rods, flails,
-boomerangs) and Special ¤ (dice, cards, brushes), `OT6_SLASH` ..
-`OT6_SPECIAL` in `ot6_class.asm`; `Ot6WeapClassTbl` gives every weapon
-one.
+**Break classes (6):** Sword (swords), Dagger (daggers, thrown stars and
+edges, darts), Spear (spears and lances), Katana (katanas, ninja blades),
+Fist (bare hands, claws, flails, clubs) and Arcane (rods, brushes, cards,
+dice, boomerangs), `OT6_SWORD` .. `OT6_SPEAR` in `ot6_class.asm`;
+`Ot6WeapClassTbl` gives every weapon one. The column above is each
+character's own class; [weapon-classes.md](design/weapon-classes.md) has
+every class each can equip into. Through v0.50 there were four (slash,
+pierce, bludgeon, special).
 **Elements (8):** FF6's native fire, ice, lightning, wind, earth, water,
 holy, poison. That is two more than Octopath's six, which makes the weakness
 matrix larger.

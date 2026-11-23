@@ -24,8 +24,8 @@ weapon one class, `Ot6SkillClassTbl` every class-bearing skill.
   Pummel is Fist whatever Sabin wears. Ability class bytes are
   immutable; only the basic attack reads the equipped weapon. Locke's
   Mug is a Fight that steals, so it takes the class of the weapon he
-  holds. (Claws and fists are one class now, so claws no longer buy the
-  monk a second one; the Chain Saw still buys Edgar Sword.)
+  holds. (Claws and bare hands are one class, so Sabin holds one weapon
+  class; the Chain Saw buys Edgar Sword.)
 - **A body's look narrows the guess to a pair, and the probe picks.** A
   thing that is cut takes Sword or Katana, a thing that is stuck Dagger
   or Spear, a thing that is struck Fist or Arcane; a spirit or a magical
@@ -244,7 +244,7 @@ one. The first class listed is the signature.
 | Edgar | **Spear** (every spear) | Sword (every sword); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Drill, Air Anchor: Spear. Chain Saw: Sword |
 | Sabin | **Fist** (bare hands, every claw) | — | Pummel, Suplex, Bum Rush: Fist |
 | Cyan | **Katana** (every katana) | Sword (the Scimitar) | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
-| Shadow | **Katana** (the ninja blades) | Dagger (Dirk, MithrilKnife, ThiefKnife, Assassin, Man Eater, SwordBreaker, Graedus) | Throw: the three stars Dagger, the three skeans Dagger and their element |
+| Shadow | **Katana** (the ninja blades) | Dagger (Dirk, MithrilKnife, ThiefKnife, Assassin, Man Eater, SwordBreaker, Graedus) | Throw: the three stars Dagger, the three skeans Dagger and their element; a thrown weapon keeps its class |
 | Celes | **Sword** (every sword) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Fist (Flail, Morning Star) | — |
 | Setzer | **Arcane** (Cards, Trump, Dice; the Fixed Dice chip nothing) | Dagger (Darts, Doom Darts, Dirk, MithrilKnife, Man Eater, Graedus) | Coin Toss: Arcane. Hired Help: a class the target is weak to |
 | Strago | **Arcane** (every rod but the Heal Rod, which has no class) | Dagger (Dirk, MithrilKnife, Air Lancet, Man Eater, SwordBreaker, Graedus); Fist (Flail, Morning Star) | — |
