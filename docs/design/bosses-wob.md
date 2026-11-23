@@ -128,7 +128,7 @@ and from fighting several bodies at once (the Cranes are 12 shields of
 monster across two gauges) rather than from a larger single count.
 After that come one 8, an 11 at the peak, and a deliberate 5 at the
 end under a timer. No single WoB gauge exceeds 11; 12 and above is
-reserved for the WoR.
+reserved for the WoR ([bosses-wor.md](bosses-wor.md)).
 
 ---
 

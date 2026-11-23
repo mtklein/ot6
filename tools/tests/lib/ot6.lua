@@ -7640,7 +7640,21 @@ function M.blitzChips(slot, id)
 end
 
 -- #566's instrument: the weapon keys the party holds as a battle opens, one
--- [keys] line a battle (log only; nothing reads it back into play).
+-- [keys] line a battle (log only; nothing reads it back into play), said by
+-- the run loop twelve frames after M.battleActive first holds, so a leg's own
+-- battle loop (the Lete's raft, the falls) is counted as the Driver's are.
+M.keysState = { live = false, since = 0, said = false }
+function M.keysWatch()
+  local k = M.keysState
+  local ok, live = pcall(M.battleActive)
+  if not (ok and live) then k.live, k.said = false, false; return end
+  if not k.live then k.live, k.since = true, M.frame end
+  if not k.said and M.frame - k.since >= 12 then
+    k.said = true
+    local ok2, line = pcall(M.keyLine, "battle")
+    M.log(ok2 and line or ("[battle] [keys] unread: " .. tostring(line)))
+  end
+end
 --   hands  the classes of the weapons in the seated members' hands (an empty
 --          main hand is a fist; a member in Magitek armor swings none)
 --   kit    hands, plus the class-bearing skills they could use now: Pummel
@@ -18636,6 +18650,9 @@ end
 -- M.setzerBattle has for SETZER's table, for any character and command:
 --   { who = character id, cmd = command id, boost = 0..3,
 --     spell = id       the Magic list's cell holding this spell id (state $0E)
+--     summon = true    (with cmd = Magic) the worn esper's row above the Magic
+--                      grid: Up from the grid's top opens it (state $16), A
+--                      takes it to the target select
 --     row = id         a Tools-shell list's cell holding this id (state $30),
 --                      or the Throw list's (state $2D, the same shell)
 --     direct = true    the list's A commits the action itself, with no target
@@ -19012,6 +19029,11 @@ function M.kitBattle(plan, opts)
       pulse("a")
     elseif (st == 0x0E or st == 0x30 or st == 0x2D) and not p.opened then
       pulse("b")   -- a window this entry did not open (an earlier entry's, closing)
+    elseif st == 0x0E and p.summon then
+      pulse("up")      -- up off the grid's top row opens the esper window ($16, CheckHasGenju)
+    elseif st == 0x16 and p.summon then
+      if opts.onList and cool == 0 then opts.onList(p, a) end
+      pulse("a")
     elseif st == 0x0E and p.spell ~= nil then
       local i = spellIdx(a, p.spell)
       if i == nil then
@@ -22179,10 +22201,6 @@ function Driver:frame()
     -- first fights"; the audit reads these lines)
     M.log(string.format("[%s] [open] party HP as the battle opens: %s", self.tag or "fight",
       table.concat(said, ", ")))
-    do
-      local ok, line = pcall(M.keyLine, self.tag or "fight")     -- #566: log only, never a failure
-      M.log(ok and line or string.format("[%s] [keys] unread: %s", self.tag or "fight", tostring(line)))
-    end
   end
   self:watchStatuses()
   self:watchLeavers()
@@ -24551,6 +24569,7 @@ function M.run(opts, steps)
       return
     end
     M.frame = M.frame + 1
+    M.keysWatch()       -- #566: one [keys] line a battle, whoever drives it
     if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
     if M.frame % M.PROG_IVL == 0 then M.progressSample() end
     -- The run's heartbeat (docs/TOOLING.md "The run's heartbeat"): the
