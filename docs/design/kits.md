@@ -1022,6 +1022,22 @@ the divine in the eighth:
   row's id, so it is the bare stance (no blade, no Break Blade; a boost is
   never spent by the engine).  Berserk only Fights, with whatever her blade
   holds.
+- **Balance, measured and not tuned** (#563).  With a rune that suits the
+  body, each swing chips, so a 3-BP Fight is four chips and doubled hits
+  (eight with a Genji Glove's two weapons: a 1-BP Fight by a two-weapon
+  CELES chipped four, `build/attempts/wt/v051-spellblade/suite/`).  That is
+  what Tint already gives any fighter for four turns at 10 MP and Relm's
+  turn; the rune costs Celes's own turn and 4-6 MP (or nothing, from an
+  absorb), lasts the battle, is hers alone, and cannot backfire.  Break
+  Blade, from a bank of five and through the real menu in Darill's Tomb's
+  random battles (a two-weapon CELES, nothing staged, six uses over two
+  seeds, `build/attempts/wt/v051-spellblade/balance/`): 41 weapon hits
+  landed under it and 26 shields were taken, 4, 4, 4, 4, 6 and 4 a use,
+  every use ending with nothing standing unbroken (those formations hold
+  four to seven shields).  Its ceiling a use is the hits of three turns: 6
+  with one weapon from a full bank (2 BP, 0, 1), 12 with two; 4 and 8 from a
+  bank of exactly three.  Bum Rush takes four in one turn for the same 99
+  MP, and Cleave four from every death-immune body at once.
 - Suites: `battle_spellblade` (the list, arming from an ally's spell,
   replacement, persistence, the weak-only rule with absorbing, nulling and
   halving bodies, each hit of a boosted Fight, the colours and the sign,
