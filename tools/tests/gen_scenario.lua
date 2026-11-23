@@ -107,8 +107,9 @@
 -- Ultros: `battle 103, RIVER` at _cb08db (:39301), won with real input, the
 -- first real Ultros in this chain's history.  He has an authored shield
 -- row: Ot6ShieldTbl carries $012c (MONSTER::ULTROS_RIVER) at 5 shields,
--- OT6_SLASH|OT6_PIERCE, "ultros 1: the row he keeps all game"
--- (ff6/src/battle/ot6.asm:3008-3009) -- and the design brief for the fight
+-- Sword|Ranged since #566 (docs/design/opening.md "The Lete River and
+-- Ultros": TERRA's sword and EDGAR's AutoCrossbow; slash|pierce through
+-- v0.50) -- and the design brief for the fight
 -- (bosses-wob.md #4) names the loss condition this generator now actually
 -- risks:  Tentacle slams Banon.  The winning line here is the same tap-A
 -- policy as
@@ -254,6 +255,34 @@ local u1Cand, u1CandF = nil, nil
 --   tier 3  + SABIN Blitz->AuraBolt (OT6 blitzes are MENU-picked -- the
 --            tools-shell list, battle_vargas.lua:263 -- AuraBolt is cell 1
 --            of the 2-column grid: right of Pummel)
+-- EDGAR's Tools turn names the AutoCrossbow by steering to its cell (#566).  Until then this fighter confirmed
+-- whatever cell the Tools cursor rested on, which on this river was the Bio Blaster ($A4, 8 MP) every time
+-- (H.namedTool's note); under six classes the crossbow's Ranged is the raft's and ULTROS's key that the swords
+-- and fists may not hold (bosses-wob.md 4), and the Bio Blaster keys none of them.  It is spent where it brings
+-- a key: an event battle (ULTROS) with a standing body weak to it, or a random one with a standing body weak to
+-- it that no living hand keys; else EDGAR Fights and keeps his MP for the boss.  Reads only: the live Tools
+-- list and cursor, the bodies' class rows ($3EA4) and shields, and the hands (H.partyHandMask).
+local function crossbowPlan(slot)
+  local cell = H.toolCell(H.AUTOCROSSBOW)
+  if cell == nil then return nil end
+  local ranged = H.weaponClass(H.AUTOCROSSBOW)
+  local hands = H.partyHandMask()
+  local event = H.readByte(H.RANDBTL) == 0
+  local pays = false
+  for s = 0, 5 do
+    if H.monStanding(s) and H.readByte(0x3E41 + s * 2) > 0 then
+      local row = H.readByte(0x3EA4 + s * 2) & 0x7F
+      if (row & ranged) ~= 0 and (event or (row & hands) == 0) then pays = true end
+    end
+  end
+  if not pays then return nil end
+  local cc, cr = H.readByte(0x8963 + slot), H.readByte(0x8967 + slot)
+  local tr, tc = cell // 2, cell % 2
+  local moves = {}
+  for _ = 1, math.abs(tr - cr) do moves[#moves + 1] = tr > cr and "down" or "up" end
+  for _ = 1, math.abs(tc - cc) do moves[#moves + 1] = tc > cc and "right" or "left" end
+  return H.AUTOCROSSBOW, moves
+end
 local function seqFor(id, tier, slot)
   local bp = H.readByte(BP + slot * 2)
   local boost = bp >= 2 and math.min(bp, 3) or 0
@@ -281,10 +310,10 @@ local function seqFor(id, tier, slot)
   -- ($A4, 8 MP) on all 21 of its Tools turns over a six-seed spread, not the
   -- AutoCrossbow the comment used to claim.  SABIN's sequence DOES steer
   -- (right, to cell 1), so his id is named outright.
-  local costed = nil
+  local costed, toolMoves = nil, nil
   if id == 4 and tier >= 2 then
-    costed = H.namedTool(slot)
-    if costed == nil then tier = 0 end   -- no tool in the bag: Fight
+    costed, toolMoves = crossbowPlan(slot)
+    if costed == nil then tier = 0 end   -- no crossbow, or it brings no key: Fight
   elseif id == 5 and tier >= 3 then costed = 0x5E           -- AuraBolt
   end
   local ok
@@ -298,8 +327,10 @@ local function seqFor(id, tier, slot)
     return seq
   end
   if id == 14 then return push("down", "a", "a") end          -- Health
-  if id == 4 and tier >= 2 then
-    return push("down", "a", "a", "a")                        -- AutoCrossbow
+  if id == 4 and tier >= 2 then                               -- AutoCrossbow
+    push("down", "a")
+    for _, m in ipairs(toolMoves) do push(m) end
+    return push("a", "a")
   end
   if id == 5 and tier >= 3 then
     return push("down", "a", "right", "a", "a")               -- AuraBolt
@@ -440,9 +471,9 @@ local function rideUntil(pred, what, budget, idle, tier)
               if monSpecies(i) == 0x012C then
                 bt.ultros = true
                 H.log(string.format("river: *** ULTROS ($012C) slot %d -- " ..
-                  "hp %d, shields %d (Ot6ShieldTbl authors 5, " ..
-                  "OT6_SLASH|OT6_PIERCE) -- fighting him for real", i,
-                  monHp(i), monShields(i)))
+                  "hp %d, shields %d, class row $%02X -- fighting him for " ..
+                  "real", i, monHp(i), monShields(i),
+                  H.readByte(0x3EA4 + i * 2) & 0x7F))
                 H.screenshot("scenario_ultros")
                 -- ultros1_entry (battle_ultros1 boots it): the last dialog
                 -- wait before his battle (u1Cand, above), emitted after the

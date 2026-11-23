@@ -3681,6 +3681,12 @@ function M.namedTool(slot)
   end
   return id, M.abilityCost(id)
 end
+-- The 0-based cell of tool `id` in the Tools grid (row = cell // 2, column = cell % 2, the cursor bytes namedTool
+-- reads), or nil when the bag holds none: for a fighter that steers to a named tool (gen_scenario's EDGAR, #566).
+function M.toolCell(id)
+  for i, t in ipairs(toolList()) do if t == id then return i - 1 end end
+  return nil
+end
 
 -- ------------------------------------------------- pressing R is a claim --
 -- The ONE place a fighter decides how deep a boost it may press (#230).
@@ -7777,6 +7783,21 @@ function M.keyLine(tag)
   return string.format("[%s] [keys] form=$%03X hands=$%02X kit=$%02X party=%s bodies=%s gauged=%d nohand=%d nokit=%d"
     .. " src=%s bag=%s", tag, M.readWord(0x11E0) & 0x3FF, hands, kit, table.concat(who, ","),
     table.concat(bodies, ","), n, noHand, noKit, table.concat(src, ","), table.concat(bagIds, "/"))
+end
+
+-- The classes the hands of the seated members still standing hold now (keyLine's `hands`, the living only), for a
+-- leg's own fighter that asks whether a costed skill brings a key no hand holds (gen_scenario's EDGAR, #566).
+function M.partyHandMask()
+  local hands = 0
+  for e = 0, 3 do
+    local c = M.readByte(BATTLE.BCHID + e * 2)
+    local hp = M.readWord(0x3BF4 + e * 2)
+    if c < 16 and hp > 0 and hp ~= 0xFFFF and not cmdRow(e, BATTLE.CMD_MAGITEK) then
+      local r, l = handsOf(e)
+      hands = hands | M.handClass(c, r, false) | (l and M.handClass(c, l, false) or 0)
+    end
+  end
+  return hands
 end
 
 -- The one monster an untargeted attack lands on: the focus list's first

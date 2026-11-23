@@ -114,6 +114,36 @@ H.run({ maxFrames = 40000 }, {
 
   -- The last stop before the river, which is long, forced and full of
   -- battles.  Anything not repaired here is carried into it.
+  --
+  -- First the hands (#566).  LOCKE left for South Figaro at the hideout with
+  -- the Mithril Blade, and BANON joined: the four the river forces re-arm
+  -- from the bag by the route's gear rule (H.gearDress: a weapon is worth
+  -- GEAR_KEY more for each key no other hand holds).  On Mt. Kolts TERRA's
+  -- knife was the party's one Dagger and LOCKE held the Sword, so the rule
+  -- kept the knife; here the Sword is nobody's, and EDGAR's spare Mithril
+  -- Blade brings it.  ULTROS is Sword|Ranged (docs/design/opening.md 9:
+  -- TERRA's sword and EDGAR's AutoCrossbow), and the six-class line's first
+  -- replay lost BANON to him three times with no Sword in hand
+  -- (build/attempts/wt/v051-six-classes/line/six/scenario_hub.log).
+  H.gearDress({ tag = "lete: re-arm after the regroup" }),
+  H.call(function()
+    local row, hands, said = H.speciesClassRow(0x12C), 0, {}
+    for _, c in ipairs(H.seatedMembers()) do
+      for slot = 0, 1 do
+        local id = H.readByte(0x1600 + 37 * c + 0x1F + slot)
+        if id ~= 0xFF then
+          hands = hands | H.handClass(c, id, false)
+          said[#said + 1] = string.format("c%d:%d:$%02X", c, slot, id)
+        end
+      end
+    end
+    H.log(string.format("[lete_river] hands $%02X (%s); ULTROS's row $%02X",
+      hands, table.concat(said, " "), row))
+    H.assertEq((hands & row) ~= 0, true, string.format("a hand the river " ..
+      "forces keys ULTROS (row $%02X, hands $%02X): the bag held no weapon " ..
+      "of his classes for TERRA, EDGAR, SABIN or BANON -- gen_kolts's gear " ..
+      "trip and the moogle defense's spare blade supply one", row, hands))
+  end),
   H.fieldCare({ tag = "care before the river", threshold = 0.85 }),
   H.call(function()
     -- The exit contract: nobody dead, petrified, zombie, poisoned, or at
