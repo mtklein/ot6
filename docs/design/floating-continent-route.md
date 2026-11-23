@@ -183,8 +183,8 @@ see `gen_massacre.lua` on the same handler).
 
 | enemy | L | shields | weak | class |
 |---|---|---|---|---|
-| Sky Armor `$043` | 24 | 5 | **bolt**\|wind | Dagger\|Katana |
-| Spit Fire `$0e3` | 25 | 5 | **bolt**\|wind | Spear\|Katana |
+| Sky Armor `$043` | 24 | 2 | **bolt**\|wind | Dagger\|Katana |
+| Spit Fire `$0e3` | 25 | 2 | **bolt**\|wind | Spear\|Katana |
 | Ultros④ `$168` | 26 | 7 | fire\|**bolt**\|poison (absorbs water) | Sword\|Spear |
 | Chupon `$12f` | 26 | 4 | ice\|water (absorbs fire) | Fist |
 | AirForce `$113` | 25 | 8 | **bolt**\|water | Spear |
