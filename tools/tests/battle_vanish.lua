@@ -220,7 +220,7 @@ H.run({ maxFrames = 90000 }, {
   --      body is under Reflect (STATUS3 $80, $3EF8): the bounce would land on the party every turn (the control and
   --      the negative, on one actor);
   --   b. a classless skill (Bio Blaster: Ot6WeapClassTbl $00, magic that lands on a Vanished body) is left as
-  --      planned, and a classed one (AutoCrossbow: pierce, a steel blow that misses) is answered as a Fight is;
+  --      planned, and a classed one (AutoCrossbow: a spear hit, a steel blow that misses) is answered as a Fight is;
   --   c. Driver:absorbWeaponPlan: a Fight with a weapon whose element the aimed body absorbs is not a Fight (the
   --      element and the live absorb byte stubbed through M.weaponElement and M.readByte, since no Kolts body
   --      absorbs the party's weapons); the same Fight is left alone with the stubs off (inert where nothing is

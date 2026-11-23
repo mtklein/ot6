@@ -17,7 +17,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")   -- only for H.sym if needed
 
 local PRG = emu.memType.snesPrgRom
-local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
+-- the six classes (ot6_class.asm, #566): Leo's Crystal is a sword
+local SWORD = 0x01
+local OTHERS = 0x3E      -- dagger, fist, arcane, katana, spear: OT6_CLASSES less the sword
 local KEFKA_VS_LEO = 0x0173
 local fails = 0
 
@@ -81,17 +83,18 @@ emu.log(string.format("leo: Ot6ShieldTbl @%06X  Ot6ElemAddTbl @%06X",
 local S = walk(shieldBase)
 local E = walk(elemBase)
 
--- 1. the authored shield row: 4 shields, slash class.
+-- 1. the authored shield row: 4 shields, sword class.
 local r = S[KEFKA_VS_LEO]
-check(r ~= nil and r[1] == 4 and r[2] == SLASH, string.format(
-  "Ot6ShieldTbl $0173 = shields 4, class OT6_SLASH (got %s/%s) -- the gauge "
+check(r ~= nil and r[1] == 4 and r[2] == SWORD, string.format(
+  "Ot6ShieldTbl $0173 = shields 4, class OT6_SWORD (got %s/%s) -- the gauge "
   .. "renders 4, not the formula floor 2",
   r and tostring(r[1]) or "MISSING",
   r and string.format("$%02X", r[2]) or "-"))
--- the class byte is exactly slash: no stray pierce/bludg that a solo Leo,
--- who holds only a slashing sword, could not field.
-check(r ~= nil and (r[2] & (PIERCE | BLUDG)) == 0,
-  "the class key is slash-only -- Leo's Crystal is the only tool here")
+-- the class byte is exactly the sword: no stray class (a katana, a dagger,
+-- a spear, a fist, the arcane) that a solo Leo, who holds only a sword,
+-- could not field.
+check(r ~= nil and (r[2] & OTHERS) == 0,
+  "the class key is sword-only -- Leo's Crystal is the only tool here")
 
 check(E[KEFKA_VS_LEO] == nil, string.format(
   "Ot6ElemAddTbl has NO $0173 row (got %s) -- Leo's kit is non-elemental, so "
@@ -104,7 +107,7 @@ local nu = rb(MPROP + KEFKA_VS_LEO * MREC + 24)
 local wk = rb(MPROP + KEFKA_VS_LEO * MREC + 25)
 check(ab == 0 and nu == 0 and wk == 0, string.format(
   "$0173 monster_prop absorb/null/weak all $00 (got $%02X/$%02X/$%02X) -- "
-  .. "slash stands alone", ab, nu, wk))
+  .. "the sword stands alone", ab, nu, wk))
 
 -- 4. formation 388 fields a solo $173.
 local frec = BMON + 388 * BREC
