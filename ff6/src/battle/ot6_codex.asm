@@ -73,28 +73,28 @@ OT6_CODEX_SPECIES = 384         ; species a table holds, one byte each
         ; when slot 1 finally triggered the clone.
         lda     f:OT6_CODEX_MAGIC
         cmp     #OT6_CODEX_GLOBAL
-        beq     @legacy
+        beq     Legacy
         lda     f:OT6_CODEX_MAGIC,x
         cmp     #OT6_CODEX_V3
         bne     :+
-        jmp     @done
+        jmp     Done
 :       cmp     #OT6_CODEX_V2
-        bne     @fresh
+        bne     Fresh
         jsr     Ot6CodexSix     ; #566: a four-class page, on its first touch
-        jmp     @done
+        jmp     Done
 
-@legacy:
+Legacy:
         ; O7's two tables already occupy page 1.  Clone their contiguous
         ; $300-byte payload to pages 2/3 before replacing all three magics.
         shorta0
         ldx     #$0000
-@migrate:
+Migrate:
         lda     f:OT6_CODEX,x
         sta     f:OT6_CODEX+$0400,x
         sta     f:OT6_CODEX+$0800,x
         inx
         cpx     #$0300
-        bcc     @migrate
+        bcc     Migrate
         ; #566: O7's classes are the four, so each clone becomes a six-class
         ; page and takes its magic.  Page 1 goes last: its O7 magic is what
         ; starts this over, from a payload still whole, if the console loses
@@ -110,16 +110,16 @@ OT6_CODEX_SPECIES = 384         ; species a table holds, one byte each
         shorta0
         lda     #$00
         ldx     #$0000
-@wipet: sta     f:OT6_CODEX+$0c00,x
+WipeNew: sta     f:OT6_CODEX+$0c00,x
         inx
         cpx     #$0300
-        bcc     @wipet
+        bcc     WipeNew
         longa
         lda     #OT6_CODEX_V3
         sta     f:OT6_CODEX_MAGIC+$0c00
-        bra     @done
+        bra     Done
 
-@fresh:
+Fresh:
         ; An unsigned page: zero both tables, then sign it.  One loop for
         ; whichever page, long through X, so no scratch RAM is needed while
         ; battle initialization is live.  (Through v0.50 this was a fixed
@@ -130,16 +130,17 @@ OT6_CODEX_SPECIES = 384         ; species a table holds, one byte each
         shorta0
         lda     #$00
         ldy     #$0300
-@wipe:  sta     f:OT6_CODEX,x
+FreshWipe:                      ; (mutant_rom.py's seam: the wipe's store)
+        sta     f:OT6_CODEX,x
         inx
         dey
-        bne     @wipe
+        bne     FreshWipe
         longa
         lda     3,s             ; the page offset (under the phy)
         tax
         lda     #OT6_CODEX_V3
         sta     f:OT6_CODEX_MAGIC,x
-@done:  ply
+Done:  ply
         plx
         plp
         rts
@@ -183,6 +184,7 @@ OT6_CODEX_SPECIES = 384         ; species a table holds, one byte each
         ldy     #$0000          ; y = the species' row in the split table
                                 ;   (species * 4); x = page offset + species
 SixNext: lda    f:OT6_CODEX_CLASS,x
+SixFour:                        ; (mutant_rom.py's seam: the four bits kept)
         and     #OT6_CODEX_FOUR
         phx                     ; [1,s] x
         pha                     ; [1,s] the four-class bits still to place
@@ -195,7 +197,7 @@ SixBit: lda     2,s
         lsr
         sta     2,s
         bcc     SixSkip         ; this four-class bit was not revealed
-SixFirst:                       ; (mutant_rom.py's seam: the table read)
+SixRead:                        ; (mutant_rom.py's seam: the table read)
         lda     f:Ot6ClassSplitTbl,x
         ora     1,s
         sta     1,s
@@ -213,7 +215,8 @@ SixPut: pla                     ; the six-class byte ...
         iny
         cpy     #OT6_CODEX_SPECIES * 4
         bcc     SixNext
-        ply
+SixTail:                        ; (mutant_rom.py's seam jumps here from
+        ply                     ;   SixNext: signed, nothing rewritten)
         plx
         longa
 SixSign:                        ; (mutant_rom.py's seam: the page's new magic)
@@ -485,6 +488,7 @@ SlotAt: lda     5,s             ; the destination slot (under the phx/phy)
 @ensure:
         jsr     Ot6EsperLoaded  ; #328: the slot's esper progress goes live
                                 ;   (A = the slot; Ot6CodexEnsure clobbers A)
+LoadEnsure:                     ; (mutant_rom.py's seam: a load's ensure)
         jsr     Ot6CodexEnsure
         plp
         rtl

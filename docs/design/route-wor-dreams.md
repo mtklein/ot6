@@ -10,6 +10,13 @@ Castle, Odin and the queen's statue (Raiden), and the Blue Dragon; a save
 beside the Falcon by Figaro Castle (`wor-ancient-v1`) is the next arc's
 boot.  The Cursed Shield is not uncursed here (section 9).
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> below are the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in: slash is now Sword or Katana,
+> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+
 Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v035-wor-dreams/lab/` (the run logs, and
 the scripts beside them: the explore and probe bodies `x1`-`x20` and `y1`-`y4`;
@@ -136,7 +143,7 @@ Castle (49,58).
 The party is the dream's: the dream takes CYAN and leaves three, and the four
 the cabin seats are the three at the top of the roster (TERRA and CELES L50,
 RELM L48 in `wor-opera-v1`; STRAGO L47 and GOGO L42 sit out) with CYAN.  RELM
-brings Ultima (Ragnarok), Sketch and the party's only bludgeon; TERRA the
+brings Ultima (Ragnarok), Sketch and the party's only Arcane key; TERRA the
 dreamscape's solo walk; CELES the Genji Glove pair and ice for Wrexsoul.
 After the dream the same four, CYAN back, walk the Ancient Castle, whose
 Reflecting bodies want steel: CYAN's katanas (Strato and Aura, the Genji
@@ -151,54 +158,60 @@ off this arc's maps (`where.py`: field groups 181-183 and 143-145 are the
 dream's and the Ancient Castle's only, event groups 90, 92 and 137 theirs).
 
 **The dream** (field groups 183, the dreamscape; 181, the train and the
-dream's Doma; 182, the cave).  TERRA, CELES and RELM hold slash (the two
-blades), bludgeon (RELM's rod), fire, ice, bolt and holy (TERRA's and CELES's
+dream's Doma; 182, the cave).  TERRA, CELES and RELM hold Sword (the two
+blades), Arcane (RELM's rod), fire, ice, bolt and holy (TERRA's and CELES's
 spells, the Pearl Rod).  TERRA walks the dreamscape alone until the stooges
-run, so every body there takes her blade or her fire.  In the cave the
-three ride Magitek armor, whose rows are the beams (fire, bolt, ice), Bio
-Blast (poison) and TERRA's Tek Missile (pierce), with no Fight; every body
-there is weak to bolt vanilla, so the bolt beam breaks them all.
+run.  Every body there takes her Sword or her fire but the Barb-e, whose
+row is Katana, Arcane now (weak poison): TERRA alone holds no key for it.
+In the cave the three ride Magitek armor, whose rows are the beams (fire,
+bolt, ice), Bio Blast (poison) and TERRA's Tek Missile (Spear), with no
+Fight; every body there is weak to bolt vanilla, so the bolt beam breaks
+them all.
 
 | species | where | L / HP | vanilla elements | shields | classes | why |
 |---|---|---|---|---|---|---|
-| Barb-e `$0BE` | 183, 181 | 39 / 3,062 | weak poison | 3 | slash, special | a dream's siren: steel or a brush |
-| Critic `$0AB` | 183 | 40 / 1,200 | none | 2 | slash, bludgeon | a shrieking bird |
-| Allosaurus `$085` | 183 | 38 / 3,000 | weak fire, holy | 3 | pierce, bludgeon | a dinosaur's hide; TERRA's fire |
-| Parasite `$0B1` | 183, 181 | 39 / 1,000 | weak fire | 2 | slash | a soft crawler |
-| Pan Dora `$0AC` | 183, 181 | 39 / 1,522 | weak fire, holy; absorbs poison | 3 | bludgeon, special | a jar: break it |
-| Rain Man `$00A` | 181 | 39 / 2,722 | weak ice, holy, water | 2 | bludgeon, special | a storm spirit; CELES's ice |
-| Samurai `$004` | 181 | 40 / 3,000 | weak poison | 3 | slash, pierce | a swordsman of the dream's war: steel answers steel |
-| Suriander `$01E` | 181 | 40 / 2,912 | weak holy | 3 | slash, bludgeon | a ghostly beast |
-| PlutoArmor `$09D` | 182 | 39 / 2,850 | weak bolt, water | 3 | pierce | an armored rider: the missile pierces |
-| Sky Cap `$095` | 182 | 40 / 3,262 | weak bolt, wind, water | 2 | pierce, special | a flying cap |
-| Io `$0FE` | 182 | 39 / 7,862 | weak bolt, holy, water; nulls poison, wind, earth | 4 | pierce, bludgeon | a war machine |
-| Curley `$11F` | event 90 | 47 / 15,000 | weak ice, water; absorbs fire | 4 | slash, special | a stooge |
-| Larry `$120` | event 90 | 47 / 10,000 | weak fire; absorbs ice, wind | 4 | pierce, bludgeon | a stooge |
-| Moe `$121` | event 90 | 47 / 12,500 | absorbs bolt | 4 | slash, bludgeon | a stooge |
-| Wrexsoul `$122` | event 92 | 53 / 23,066 | weak ice; absorbs fire, holy | 6 | slash, special | a composite of the war's spirits: steel or a brush |
-| SoulSaver `$167` | event 92 | 41 / 3,066 | weak ice; absorbs fire, holy | 2 | special | a soul: the brush, or CELES's ice |
+| Barb-e `$0BE` | 183, 181 | 39 / 3,062 | weak poison | 3 | Katana, Arcane | a dream's siren: steel or a brush |
+| Critic `$0AB` | 183 | 40 / 1,200 | none | 2 | Sword, Fist | a shrieking bird |
+| Allosaurus `$085` | 183 | 38 / 3,000 | weak fire, holy | 3 | Spear, Arcane | a dinosaur's hide; TERRA's fire |
+| Parasite `$0B1` | 183, 181 | 39 / 1,000 | weak fire | 2 | Sword | a soft crawler |
+| Pan Dora `$0AC` | 183, 181 | 39 / 1,522 | weak fire, holy; absorbs poison | 3 | Fist, Arcane | a jar: break it |
+| Rain Man `$00A` | 181 | 39 / 2,722 | weak ice, holy, water | 2 | Fist, Arcane | a storm spirit; CELES's ice |
+| Samurai `$004` | 181 | 40 / 3,000 | weak poison | 3 | Sword, Dagger | a swordsman of the dream's war: steel answers steel |
+| Suriander `$01E` | 181 | 40 / 2,912 | weak holy | 3 | Katana, Arcane | a ghostly beast |
+| PlutoArmor `$09D` | 182 | 39 / 2,850 | weak bolt, water | 3 | Spear | an armored rider: the missile pierces |
+| Sky Cap `$095` | 182 | 40 / 3,262 | weak bolt, wind, water | 2 | Dagger, Arcane | a flying cap |
+| Io `$0FE` | 182 | 39 / 7,862 | weak bolt, holy, water; nulls poison, wind, earth | 4 | Spear, Arcane | a war machine |
+| Curley `$11F` | event 90 | 47 / 15,000 | weak ice, water; absorbs fire | 4 | Katana, Arcane | a stooge |
+| Larry `$120` | event 90 | 47 / 10,000 | weak fire; absorbs ice, wind | 4 | Spear, Arcane | a stooge |
+| Moe `$121` | event 90 | 47 / 12,500 | absorbs bolt | 4 | Sword, Fist | a stooge |
+| Wrexsoul `$122` | event 92 | 53 / 23,066 | weak ice; absorbs fire, holy | 6 | Katana, Arcane | a composite of the war's spirits: steel or a brush |
+| SoulSaver `$167` | event 92 | 41 / 3,066 | weak ice; absorbs fire, holy | 2 | Arcane | a soul: the brush, or CELES's ice |
 
-The three stooges take three different class pairs and together hold a key
-for every hand; Larry's fire and Curley's ice are the elemental answers.
+The three stooges take three different class pairs, five of the six classes
+between them (no Dagger); Larry's fire and Curley's ice are the elemental
+answers.
 
 **The Ancient Castle** (field groups 143, the cave; 144, the castle; 145, the
 courtyard; event 137, the Blue Dragon).  Every body wears Reflect and most
 have mdef 250: spells bounce and steel decides.  CYAN comes back from his
-dream with every SwdTech, and his katana keys every body here.
+dream with every SwdTech, and his katana keys every body here but the
+courtyard's Samurai (below).
 
 | species | where | L / HP | vanilla elements | shields | classes | why |
 |---|---|---|---|---|---|---|
-| Enuo `$0A6` | 143 | 46 / 4,635 | weak holy | 2 | slash, bludgeon | a slime |
-| Goblin `$06D` | 143, 145 | 46 / 5,555 | weak holy | 3 | slash, pierce | L.5 Doom, L.4 Flare, L.3 Muddle |
-| Figaliz `$057` | 143, 144, 145 | 45 / 4,220 | weak ice | 3 | slash, bludgeon | a lizard |
-| Lethal Wpn `$045` | 144 | 47 / 9,200 | weak bolt, water | 4 | slash, bludgeon | a machine: cut its cables or crush it |
-| Boxed Set `$051` | 144 | 45 / 4,020 | weak holy | 3 | slash, bludgeon | an empty armor |
-| Blue Drgn `$152` | event 137 | 65 / 26,900 | weak bolt; absorbs water | 6 | slash, pierce | a water dragon's scales |
-| Master Pug `$138` | event 113 (the cave's box) | 73 / 22,000 | none (WallChange moves the one it takes); absorbs water | 6 | slash, special | the Pugs' row |
-| KatanaSoul `$124` | event 95 (the castle's box) | 61 / 37,620 | weak poison | 6 | slash, pierce | a swordsman's ghost: steel answers steel, as the Samurai |
+| Enuo `$0A6` | 143 | 46 / 4,635 | weak holy | 2 | Katana, Fist | a slime |
+| Goblin `$06D` | 143, 145 | 46 / 5,555 | weak holy | 3 | Dagger, Katana | L.5 Doom, L.4 Flare, L.3 Muddle |
+| Figaliz `$057` | 143, 144, 145 | 45 / 4,220 | weak ice | 3 | Katana, Arcane | a lizard |
+| Lethal Wpn `$045` | 144 | 47 / 9,200 | weak bolt, water | 4 | Katana, Arcane | a machine: cut its cables or crush it |
+| Boxed Set `$051` | 144 | 45 / 4,020 | weak holy | 3 | Katana, Arcane | an empty armor |
+| Blue Drgn `$152` | event 137 | 65 / 26,900 | weak bolt; absorbs water | 6 | Dagger, Katana | a water dragon's scales |
+| Master Pug `$138` | event 113 (the cave's box) | 73 / 22,000 | none (WallChange moves the one it takes); absorbs water | 6 | Dagger, Katana | the Pugs' row |
+| KatanaSoul `$124` | event 95 (the castle's box) | 61 / 37,620 | weak poison | 6 | Spear, Katana | a swordsman's ghost: steel answers steel, as the Samurai |
 
 The courtyard's pool (145) also deals the train's Barb-e, Samurai and
-Suriander, each of them keyed by slash.
+Suriander.  The Barb-e and the Suriander take Katana; the Samurai's row is
+Sword, Dagger now, so TERRA's and CELES's swords key it and CYAN's katana
+does not.
 
 `battle_breakwor_dreams` checks the 23 rows in the built ROM, every
 formation of the pools (field groups 183, 181, 182, 143, 144 and 145, events
@@ -225,7 +238,9 @@ formation-species-hands triples", "CYAN alone (the Ancient Castle) keys 14
 of 14"; red on the ROM without them, "$124 KatanaSoul has no Ot6ShieldTbl
 row", "$138 Master Pug: CYAN alone (the Ancient Castle) holds no key",
 "mismatches: got 5"; `build/attempts/wt/v038-monster-boxes/ancient/bd1`,
-`bd_neg`).
+`bd_neg`).  Two of those lessons were checked under the four classes and
+do not hold for the present rows: the Barb-e (Katana, Arcane) is not keyed
+by TERRA alone, nor the Samurai (Sword, Dagger) by CYAN alone.
 
 ## 4. The bosses
 

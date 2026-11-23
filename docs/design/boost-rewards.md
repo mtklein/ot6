@@ -6,6 +6,13 @@ something (owner, 2026-10-22). An action with no reward for boosting
 doesn't take a boost ... Each such action is a design opportunity: what
 would a boost naturally buy, and which boost family does it join."
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> below are the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in: slash is now Sword or Katana,
+> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+
 ## What is built
 
 The first tranche (#469, `wt/boost-rewards`): the four holes are closed and
@@ -18,7 +25,7 @@ proposals 1, 3, 4 and 5 are built; proposal 2 is declined.
   a tool's hit rate is ItemProp +21, `$FF`, and CheckHit takes `$FF` as a
   certain hit, so its Confuse already lands wherever an immunity does not
   stop it. Air Anchor was never a hole: its ItemProp +20 power is 128, a
-  piercing hit the multiplier doubles (measured, `lab_anchor`, in the
+  Spear hit the multiplier doubles (measured, `lab_anchor`, in the
   commit that dropped it from the refusal), so it keeps the multiplier and
   its escalating price. Debilitator has its reward (proposal 4). MagiTek
   Confuser and X-fer refuse it (`Ot6RowNoBoost`'s MagiTek arm, R on the cell;
@@ -139,7 +146,7 @@ guidelines, a bug.
 | Blitz: Mantra, whose special effect writes the heal (SABIN's HP over the bodies) after the multiplier (`Ot6SpellNoNumber` reads its +9, $15; until v0.45 a boost on it cost the points and 2.5x the MP per point and healed what an unboosted one heals) | refused (R on the Blitz list's row, `Ot6RowNoBoost`; a boost raised on the command window before it was picked is dropped when the action is queued, `Ot6QueueFold`; its price is flat, `Ot6BlitzPrice`; battle_mantrarefuse) |
 | Tools with a number: AutoCrossbow, Bio Blaster, Flash, Drill, Chain Saw | the multiplier; Overclock at 3 (Edgar) |
 | Tools without one: NoiseBlaster | refused (#469) |
-| Air Anchor (power 128, pierce) | the multiplier |
+| Air Anchor (power 128, Spear) | the multiplier |
 | Debilitator | a weakness a point (#469) |
 | Throw, a damaging item | the multiplier |
 | Throw, the smoke and the exit | reach |

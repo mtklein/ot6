@@ -142,6 +142,7 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         ora     OT6_REVEALED_ELEM,y
         sta     OT6_REVEALED_ELEM,y
         lda     f:OT6_CODEX_CLASS,x
+SixMask:                        ; (mutant_rom.py's seam, #566: the row's mask)
         and     OT6_BP_CLASS,y  ; six classes: only what the body answers to
         ora     OT6_BOOST_REVEALED,y
         sta     OT6_BOOST_REVEALED,y
@@ -916,8 +917,8 @@ done:   rts
 
 ; ------------------------------------------------------------------------------
 
-; class bit index -> attack message (attack_msg_en.json): sword, dagger, fist,
-; arcane ($45-$48, the four v0.50 lines' slots), katana, spear ($4a, $4b;
+; class bit index -> attack message (attack_msg_en.json): sword, dagger, blunt,
+; ranged ($45-$48, the four v0.50 lines' slots), katana, spear ($4a, $4b;
 ; $49 is the esper rank line)
 Ot6ClassMsgTbl:
         .byte   $45, $46, $47, $48, $4a, $4b

@@ -404,7 +404,7 @@ Ot6MenuIconArt:
         rts
 .endproc
 
-; element index -> tilemap palette bits (palette << 2); indices 8-11 are
+; element index -> tilemap palette bits (palette << 2); indices 8-13 are
 ; the six weapon classes (Ot6ElemGlyphFor's class fallback): menu-white,
 ; the same way these icons render as item-name leading glyphs
 Ot6ElemPalTbl:
@@ -540,7 +540,7 @@ Ot6ElemPalTbl:
 ; a = ability id (0-255) -> a = element icon glyph, or the ability's
 ; class icon glyph when it has no element (Ot6SkillClassTbl: physical
 ; skills show their class where spells show their element, so
-; TekMissile shows spear in the magitek list, Pummel fist, and quadra
+; TekMissile shows ranged in the magitek list, Pummel blunt, and quadra
 ; slam katana), or $ff when it has neither. first set
 ; bit wins on both axes; an element takes priority over the class (the design:
 ; "consult the class when the ability has no element"). null-break rows
@@ -662,13 +662,13 @@ Ot6ElemPalTbl:
 ; $5800 font tiles.  each blade is on its own axis (font.py's header).
 Ot6ClassGlyphTbl:
         .byte   $d9             ; sword: the sword icon
-        .byte   $d8             ; dagger: the dirk icon
+        .byte   $d8             ; dagger: the dirk cell, redrawn level
         .byte   $dc             ; blunt: the staff cell, redrawn a mallet
         .byte   $de             ; ranged: the thrown star
         .byte   $db             ; katana: the katana icon, mirrored in
                                 ;   the font so it reads apart from the
                                 ;   sword (tools/proto_six/font.py)
-        .byte   $da             ; spear: the spear icon
+        .byte   $da             ; spear: the spear cell, redrawn upright
 
 ; 8x8 2bpp element icons, element-bit order (fire $01 ... water $80)
 Ot6FontIcons:

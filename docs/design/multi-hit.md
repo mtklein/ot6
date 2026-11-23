@@ -6,6 +6,13 @@ over the break loop, and it multiplies directly against MP costs. Pummel
 strikes twice, Bum Rush four times and Drill twice, each at power divided by
 its hit count (§5, where the hook lives).
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> below are the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in: slash is now Sword or Katana,
+> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+
 Three instruments support the shipped rule:
 `tools/tests/probe_multihit.lua` (deleted in b18643d7; the live rule and the break-window cap),
 `tools/tests/battle_hitcount.lua` (a suite test: a real Pummel, driven by
@@ -176,18 +183,18 @@ So a multi-hit can open an axis the weapon cannot.
 
 The static tooling answers a wider question than the design needs.
 `check_break_reach.py` models "can field" as game-wide equippability, meaning
-every weapon the actor could ever wear. Under that model every walking
-character reaches slash, pierce and bludgeoning, and the "ability-only" column
-is empty for all fourteen (`audit_multihit.py`'s per-character section prints
-that). The design needs the narrower question: can they reach a second axis
-without re-equipping, with the weapon they are holding. That is runtime
-state, and no static tool answers it.
+every weapon the actor could ever wear. Under that model, with four classes,
+every walking character reached slash, pierce and bludgeoning, and the
+"ability-only" column was empty for all fourteen (`audit_multihit.py`'s
+per-character section printed that). The design needs the narrower question:
+can they reach a second axis without re-equipping, with the weapon they are
+holding. That is runtime state, and no static tool answers it.
 
-One reach fact is solid: Sabin's fists are bludgeoning and so is
+One reach fact is solid: Sabin's fists are Fist and so is
 Pummel (`ot6_class.asm:163`, `:193`), so a bare-fisted Sabin's Blitz opens no
-axis his Fight does not. With claws equipped (slashing,
-`ot6_class.asm:139-147`), Pummel becomes his second axis at no extra cost.
-That asymmetry is part of his design.
+axis his Fight does not. Claws are Fist too (`ot6_class.asm:139-147`); under
+four classes they were slashing and made Pummel his second axis. Sabin now
+holds one class whatever he wears.
 
 ### 2.4 Duration — hits per turn thereafter, paid once
 A poison status tick chips, measured. Cmd_22
@@ -278,29 +285,29 @@ transcription of that output and go stale if nobody re-runs it.
 
 **SwdTech** (magic ids `$55-$5c`, names from `BushidoName`)
 
-| tech | id | hits | tgt | class | pow | MP | mp/chip |
+| tech | id | hits | tgt | class/elem | pow | MP | mp/chip |
 |---|---|---|---|---|---|---|---|
-| Dispatch | `$55` | 1 | `$53` single | slash | 120 | 4 | 4.0 |
-| Retort | `$56` | 1 | `$53` single | slash | 56 | 10 | — (counter) |
-| Slash | `$57` | 1 | `$53` single | slash | 8 | 13 | 13.0 |
-| **Quadra Slam** | `$58` | **4** | `$53` single | slash | 72 | 16 | **4.0** |
-| Empowerer | `$59` | 2 | `$53` single | slash | 49 | 18 | 9.0 |
-| Stunner | `$5a` | 1 | `$7a` one-side | slash | 97 | 28 | 28.0 |
-| **Quadra Slice** | `$5b` | **4** | `$53` single | slash | 70 | 50 | **12.5** |
-| Cleave | `$5c` | 1 | `$7a` one-side | slash | 0 | 99 | — (execute) |
+| Dispatch | `$55` | 1 | `$53` single | katana | 120 | 4 | 4.0 |
+| Retort | `$56` | 1 | `$53` single | — (classless, #379) | 56 | 10 | — (counter) |
+| Slash | `$57` | 1 | `$53` single | katana | 8 | 13 | 13.0 |
+| **Quadra Slam** | `$58` | **4** | `$53` single | katana | 72 | 16 | **4.0** |
+| Empowerer | `$59` | 2 | `$53` single | — (classless, #379) | 49 | 18 | 9.0 |
+| Stunner | `$5a` | 1 | `$7a` one-side | katana | 97 | 28 | 28.0 |
+| **Quadra Slice** | `$5b` | **4** | `$53` single | wind (no class, #379) | 70 | 50 | **12.5** |
+| Cleave | `$5c` | 1 | `$7a` one-side | katana | 0 | 99 | — (execute) |
 
 **Blitz** (magic ids `$5d-$64`)
 
 | blitz | id | hits | tgt | class/elem | pow | MP | mp/chip |
 |---|---|---|---|---|---|---|---|
-| **Pummel** | `$5d` | **2** | `$53` single | bludg | 55 | 4 | **2.0** |
+| **Pummel** | `$5d` | **2** | `$53` single | blunt | 55 | 4 | **2.0** |
 | AuraBolt | `$5e` | 1 | `$53` single | holy | 68 | 10 | 10.0 |
-| Suplex | `$5f` | 1 | `$7e` one-half | bludg | 180 | 13 | 13.0 |
+| Suplex | `$5f` | 1 | `$7e` one-half | blunt | 180 | 13 | 13.0 |
 | Fire Dance | `$60` | 1 | `$7a` one-side | fire | 42 | 17 | 17.0 |
 | Mantra | `$61` | 1 | `$3e` allies | — | 1 | 16 | — |
 | Air Blade | `$62` | 1 | `$7a` one-side | wind | 78 | 28 | 28.0 |
 | Spiraler | `$63` | 1 | `$3e` | — | 200 | 50 | — |
-| **Bum Rush** | `$64` | **4** | `$53` single | bludg | 32 | 99 | **24.8** |
+| **Bum Rush** | `$64` | **4** | `$53` single | blunt | 32 | 99 | **24.8** |
 
 **Tools** (item ids `$a3-$aa`, `ItemProp`)
 
@@ -309,11 +316,11 @@ transcription of that output and go stale if nobody re-runs it.
 | NoiseBlaster | `$a3` | 1 | `$6a` one-side | — | 0 | 6 | — (confuse) |
 | Bio Blaster | `$a4` | 1 | `$6a` one-side | **poison + status** | 20 | 8 | 8.0 + duration |
 | Flash | `$a5` | 1 | `$6a` one-side | — | 42 | 6 | — (blind) |
-| Chain Saw | `$a6` | 1 | `$43` single | slash | 252 | 18 | 18.0 |
+| Chain Saw | `$a6` | 1 | `$43` single | sword | 252 | 18 | 18.0 |
 | Debilitator | `$a7` | 1 | `$43` single | — | 0 | 10 | — (adds a weakness) |
-| **Drill** | `$a8` | **2** | `$43` single | pierce | 96 | 16 | **8.0** |
-| Air Anchor | `$a9` | 1 | `$43` single | pierce | 128 | 14 | 14.0 |
-| AutoCrossbow | `$aa` | **1/body** | `$6a` one-side | pierce | 125 | 4 | 4.0 (boss) |
+| **Drill** | `$a8` | **2** | `$43` single | spear | 96 | 16 | **8.0** |
+| Air Anchor | `$a9` | 1 | `$43` single | ranged | 128 | 14 | 14.0 |
+| AutoCrossbow | `$aa` | **1/body** | `$6a` one-side | ranged | 125 | 4 | 4.0 (boss) |
 
 **Targeting-byte caveat.** The `INIT` decode above is read from
 `const.inc:1298-1302` plus `ChooseTarget` (`battle_main.asm:14959-14978`), not
@@ -328,7 +335,7 @@ Read straight off §3.1, and printed per character by `audit_multihit.py`:
 
 | character | multi-hit | probe without spending BP |
 |---|---|---|
-| **Cyan** | Quadra Slam ×4, Quadra Slice ×4, Empowerer ×2 | yes, three of them |
+| **Cyan** | Quadra Slam ×4, Quadra Slice ×4, Empowerer ×2 | yes, two of them: Quadra Slam chips Katana, Quadra Slice wind; Empowerer has no class and chips nothing (#379) |
 | **Sabin** | Pummel ×2, Bum Rush ×4 | yes, from level 1 at 4 MP |
 | **Edgar** | Drill ×2 | yes, once Figaro's sand dive is done |
 | everyone else | **none** | one chip per action |
@@ -361,14 +368,14 @@ Principles, stated so they can be reviewed:
 
 | ability | count | reason |
 |---|---|---|
-| **Pummel** | **×2** bludgeoning | Fits P1: 4 MP at level 1, the earliest multi-hit in the game and his signature. Two chips per action against the 31 authored 2-shield species means Sabin breaks trash without help. Power 110 → **55** per hit (P4, straight halving). |
+| **Pummel** | **×2** Fist | Fits P1: 4 MP at level 1, the earliest multi-hit in the game and his signature. Two chips per action against the 31 authored 2-shield species means Sabin breaks trash without help. Power 110 → **55** per hit (P4, straight halving). |
 | **Suplex** | **×1** | P3: this is the single-hit committer. 180 power is the highest in the Blitz list and it stays one number. |
-| **Bum Rush** | **×4** bludgeoning, not ×8 | ×8 breaks every authored gauge but one in a single action (shield tally: 31 species at 2, 10 at 3, 4 at 4, 5 at 5, 8 at 6, 5 at 7, one at 8, one at 11), which fails both P5 and P1, because the ultimate would become the opener. ×4 empties trash and the low bosses outright and is still a capstone moment, while bosses with 5 or more shields need Sabin's own Pummel or a partner to finish. Power 128 → **32** per hit (P4): 99 MP already buys the worst damage-per-MP in the Blitz list, and dividing it makes an expensive capstone weaker still against defended targets, applied anyway because leaving it at 128 across four hits would make the ultimate both the best opener and the best nuke. |
+| **Bum Rush** | **×4** Fist, not ×8 | ×8 breaks every authored gauge but one in a single action (shield tally: 31 species at 2, 10 at 3, 4 at 4, 5 at 5, 8 at 6, 5 at 7, one at 8, one at 11), which fails both P5 and P1, because the ultimate would become the opener. ×4 empties trash and the low bosses outright and is still a capstone moment, while bosses with 5 or more shields need Sabin's own Pummel or a partner to finish. Power 128 → **32** per hit (P4): 99 MP already buys the worst damage-per-MP in the Blitz list, and dividing it makes an expensive capstone weaker still against defended targets, applied anyway because leaving it at 128 across four hits would make the ultimate both the best opener and the best nuke. |
 | AuraBolt / Fire Dance / Air Blade | ×1 | Element probes, and Fire Dance/Air Blade are already breadth. Adding rate on top would make Sabin the answer to every fight, and P2 allows him one rate ability, which Pummel is. |
 | Mantra / Spiraler | ×1, and the question does not arise | Neither strikes an enemy. Mantra heals the party and Spiraler is a sacrifice; a hit count on either has nothing to chip. |
 
-Identity: the cheapest chips in the game, on one axis (two if he wears claws).
-His three bludgeoning Blitzes are one of each shape — Pummel is the rate probe,
+Identity: the cheapest chips in the game, on one axis (claws are Fist too).
+His three Fist Blitzes are one of each shape — Pummel is the rate probe,
 Suplex the single-hit committer, Bum Rush the capstone — so the class stays
 constant while the job changes, which is P3 applied inside one axis.
 
@@ -377,14 +384,14 @@ constant while the job changes, which is P3 applied inside one axis.
 | ability | count | reason |
 |---|---|---|
 | **AutoCrossbow** | **×1 per body**, unchanged | It is breadth (§2.2) and it is already the designed swarm answer in two of the break-coverage docs. Making it ×4 per body would be 16 chips against a four-stack. `kits.md` says "whole side, one hit per body", which is the correct reading. |
-| **Drill** | **×2** piercing | The armoured-boss answer, since it ignores defence (`ToolsEffect_05`, `battle_main.asm:7384-7386`), so two chips into one gauge complements AutoCrossbow's breadth against swarms. 16 MP → 8.0 MP/chip, which prices rate above breadth. Power 191 → **96** per hit (P4; 191 halves to 95.5 and the extra point goes to the player). Drill's `$20` ignore-defence flag comes from `ToolsEffect_05` at runtime rather than from its record, which is why the audit's ItemProp columns do not show it. |
+| **Drill** | **×2** Spear | The armoured-boss answer, since it ignores defence (`ToolsEffect_05`, `battle_main.asm:7384-7386`), so two chips into one gauge complements AutoCrossbow's breadth against swarms. 16 MP → 8.0 MP/chip, which prices rate above breadth. Power 191 → **96** per hit (P4; 191 halves to 95.5 and the extra point goes to the player). Drill's `$20` ignore-defence flag comes from `ToolsEffect_05` at runtime rather than from its record, which is why the audit's ItemProp columns do not show it. |
 | **Bio Blaster** | ×1 per body **+ the DOT** | Duration (§2.4); the tick chip stays as it is. No hit count. |
-| **Chain Saw** | ×1 | The slash committer, 252 power. P3. |
+| **Chain Saw** | ×1 | The Sword committer, 252 power. P3. |
 | Air Anchor / NoiseBlaster / Flash / Debilitator | ×1 | Gag, and three non-damaging utilities. |
 
 Identity: the only character who fields all three cost curves, breadth
 (AutoCrossbow), rate (Drill) and duration (Bio Blaster), and two classes
-(pierce + slash) without changing weapons.
+(Spear + Sword) without changing weapons.
 
 ### 4.3 Cyan — the burst prober, unchanged
 
@@ -394,13 +401,13 @@ everywhere else. Stated per tech:
 
 | tech | count | reason |
 |---|---|---|
-| Dispatch `$55` | ×1 | The cheapest row of any kit at 4 MP. Its job is one reliable slash chip a turn, which is what a tier-1 signature should be. Rate here would make the rest of the ladder pointless. |
+| Dispatch `$55` | ×1 | The cheapest row of any kit at 4 MP. Its job is one reliable Katana chip a turn, which is what a tier-1 signature should be. Rate here would make the rest of the ladder pointless. |
 | Retort `$56` | ×1 | A counter stance rather than an action. Hit count belongs to what it counters with, and multiplying a counter's hits would pay Cyan for being attacked. |
 | Slash `$57` | ×1 | Power 8; it is a status verb wearing a damage record. Nothing to divide. |
-| **Quadra Slam** `$58` | **×4** | Vanilla's. 16 MP for four slash chips into one body is the best rate-per-MP in the game after Pummel, and it arrives at LV15, which is where a party first meets 4-and-5-shield bosses. |
+| **Quadra Slam** `$58` | **×4** | Vanilla's. 16 MP for four Katana chips into one body is the best rate-per-MP in the game after Pummel, and it arrives at LV15, which is where a party first meets 4-and-5-shield bosses. |
 | Empowerer `$59` | ×2 | Vanilla's, at quarter power, and it is a drain. Left as it is: the two hits are a consequence of the drain effect rather than a probing choice, and repricing a drain belongs to the MP economy. |
-| Stunner `$5a` | ×1 | Already breadth: one slash chip on every body. P3 says breadth and rate should be different abilities, and Quadra Slam is the rate one. |
-| **Quadra Slice** `$5b` | **×4** | Vanilla's. The late-ladder repeat of Quadra Slam at 50 MP, which prices it as burst rather than as a probe: 12.5 MP per chip against Quadra Slam's 4.0. |
+| Stunner `$5a` | ×1 | Already breadth: one Katana chip on every body. P3 says breadth and rate should be different abilities, and Quadra Slam is the rate one. |
+| **Quadra Slice** `$5b` | **×4** | Vanilla's. The late-ladder repeat of Quadra Slam at 50 MP, which prices it as burst rather than as a probe: 12.5 MP per chip (wind shields; it carries no class, #379) against Quadra Slam's 4.0. |
 | Cleave `$5c` | ×1 | It refuses a target that is not already Broken, so it never chips at all. It is the rule P1 is named after. |
 
 Two behaviours are worth recording rather than changing:
@@ -415,7 +422,7 @@ Two behaviours are worth recording rather than changing:
   four-hit records: 72 and 70 against Dispatch's 120 and Stunner's 97. P4 is
   satisfied without moving a byte.
 
-Identity: four chips into one gauge, on a slash axis, at burst prices.
+Identity: four chips into one gauge, on the Katana axis, at burst prices.
 
 ### 4.4 Everyone else
 
@@ -660,11 +667,11 @@ what `mp-economy.md` already tunes and it should not be tuned twice.
 
 By the turn, the shipped kit reads:
 
-- Sabin, one turn, 4 MP: **2 chips** on bludgeoning.
+- Sabin, one turn, 4 MP: **2 chips** on Fist.
 - Sabin, one turn, 0 MP + 1 BP: 2 chips on his weapon's class.
-- Cyan, one turn, 16 MP + 2 BP: **4 chips** on slashing.
+- Cyan, one turn, 16 MP + 2 BP: **4 chips** on Katana.
 - Edgar, one turn, 4 MP: 1 chip per body, up to 4 bodies.
-- Edgar, one turn, 16 MP: **2 chips** on piercing, through armour.
+- Edgar, one turn, 16 MP: **2 chips** on Spear, through armour.
 
 Those five lines are different jobs at clearly different prices. Pummel ×2
 costs the same as one BP and buys the same thing, so it is priced at parity

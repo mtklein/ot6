@@ -10,6 +10,14 @@ Line numbers are into `ff6/src/event/event_main.asm`. Evidence is under
 `build/attempts/wt/v027-terra-route/`; every number below is quoted from a
 log there. Nothing was measured by writing game state.
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> keys below are the present ones. Quoted logs, dated measurements and
+> "before" columns keep the words they were recorded in: slash is now Sword
+> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
+> or Dagger.
+
 ---
 
 ## 0. Findings
@@ -133,7 +141,7 @@ The supply band (level-curve.md) at L34: Potion 51 (held 76-79), Tincture
 nothing; the arc spends 3 Potions in the first visit's fight and 2 in the
 second's (`potion=79` -> `76` -> `74`, `dev/dev17_first_pass.log`).
 
-TERRA joins with the Break Blade (slash), Gold Shld, Gold Helmet and
+TERRA joins with the Break Blade (Sword), Gold Shld, Gold Helmet and
 Mithril Vest; the relic rule puts the Ribbon and the Earrings on her and
 moves CELES to the Genji Glove and Hyper Wrist (`[relics with TERRA] TERRA
 wears Ribbon $CA, Earrings $C3`, `CELES wears Genji Glove $D1, Hyper Wrist
@@ -157,9 +165,9 @@ Special. Played results are in section 9.
 | record | shields | classes | why |
 |---|---|---|---|
 | `$16A` | 0 | -- | TERRA's solo loss: no gauge, as the scripted set-pieces |
-| `$16B` | 4 | bludg, special | the hide gives to blows (SABIN) and to ¤ (SETZER: a demon); EDGAR keys him with the Bio Blaster (vanilla poison); the fight lasts 7520 HP, a miniboss's budget |
-| `$16C` | 5 | bludg, special | the same body, the longer fight (10640 HP) |
-| `$16D` | 12 | slash, bludg, special | TERRA's blade keys him, whoever the BabaBreaths left beside her |
+| `$16B` | 4 | Dagger, Fist | the hide gives to Fist (SABIN) and to Dagger; SETZER's cards and dice are Arcane and do not key him, his Darts do; EDGAR keys him with the Bio Blaster (vanilla poison); the fight lasts 7520 HP, a miniboss's budget |
+| `$16C` | 5 | Dagger, Fist | the same body, the longer fight (10640 HP) |
+| `$16D` | 12 | Sword, Dagger, Fist | TERRA's blade keys him, whoever the BabaBreaths left beside her |
 
 CELES holds no key on `$16B`/`$16C`: her turn is Runic against his Bolt 2
 and Bolt 3. `tools/tests/battle_breakwor_terra.lua` (`@suite`) reads the
@@ -167,7 +175,7 @@ rows back from the ROM, the vanilla weak and absorb bytes, the formations
 of event groups 128-131 and world groups 29/30/37/38, and the keys
 (`dev/suite_breakwor_terra_green.log`: `checked 4 designed rows`, `checked
 13 formations, 16 formation-species pairs`, `$16D: TERRA's blade (slash)
-is a key`, `PASS`).
+is a key`, `PASS`; Sword today).
 
 The first draft gave `$16B` 6 and `$16C` 8. Neither broke in 18 fights each
 (`var4/analysis.txt`: `$1A5 (129 first visit): 18 fights, 11 distinct keys,
@@ -221,7 +229,8 @@ these runs, 52 were `by slot 0 cmd $00 atk $EE`, a slot-0 monster's plain
 Battle (the Mantodea in `$143`); 17 of the 58 were `ONE ACTION from >= 80%`. Wins
 came at L33-38; the losses at L33-36. The Mantodea's attack 180 is
 vanilla's (`Mantodea vanilla atk 180 lvl 54 | ot6 atk 180`), and its row is
-the floor (`6 * pierce`); the `$143` XP is 9617 (x2 as a random).
+the floor (`6 * pierce`; designed since, Katana, Fist, Arcane today); the
+`$143` XP is 9617 (x2 as a random).
 
 What it says: the landing's pool is vanilla's late-game pool meeting a
 L33 party; the Mantodea first in the kill order did not change the rate in
@@ -325,7 +334,8 @@ first turn, and every party fight breaks: the 4 and 5 shields of 129 and
 Battle 131's attrition is gone: no party death in 18 fights (9 before the
 merge), and the arc spends 0-7 Potions (`potions 73 -> 66` the most) and
 one Fenix Down in one run of eighteen. The rows stay as they are; nothing
-here is a lab candidate now.
+here is a lab candidate now. (Measured on the four-class rows, where 129
+and 130 took special, SETZER's class; those rows are Dagger, Fist now.)
 
 **A battle on the step onto the Falcon.** None of these draws put one
 there, so `lab_board_battle.lua` (`board/`) boards and lands beside Mobliz
