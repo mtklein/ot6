@@ -2,7 +2,8 @@
 -- battle_ultros4.lua -- the story on a counter plays while its monster is
 -- Broken (#329), on the airship deck.  Boots ultros4_entry (the Blackjack's
 -- deck at the Ultros teaser; gen_fc_landing), walks to the deck's right edge
--- to arm Ultros IV ($168, 7 shields, slash|pierce), and fights him the way
+-- to arm Ultros IV ($168, 7 shields, two weapon classes: the ROM's row,
+-- slash|pierce under four classes), and fights him the way
 -- that lets the party break him before his story line: every member Fights
 -- unboosted while he is unbroken (one chip a weapon hand, the least damage a
 -- chip costs), then boosted with every pip once he is Broken.  His counter

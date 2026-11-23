@@ -1,13 +1,16 @@
 -- @suite savestate=ultros2_entry slow
 -- battle_ultros2.lua -- the Opera's Ultros 2 break gauge. Boots
 -- ultros2_entry, rides into battle 104, and asserts:
---   1. Ultros 2 ($012d) seeds 6/6 shields, class-weak OT6_SLASH|OT6_PIERCE.
+--   1. Ultros 2 ($012d) seeds 6/6 shields and his Ot6ShieldTbl class row: two
+--      of the six classes (#566; v0.50's slash|pierce $03), the sword one of
+--      them (his slash is the party's swords).
 --   2. Nothing is revealed on the fixture's codex at seed.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/ultros2_entry.mss.lua"
 
 local ULTROS2 = 0x012d
-local OT6_SLASH, OT6_PIERCE = 0x01, 0x02
+local OT6_SWORD = 0x01
+local ULTROS2 = 0x012D
 
 -- monster slot s -> entity offset 8 + 2s
 local function SH(s)  return 0x3E38 + (8 + s * 2) end   -- current shields
@@ -55,8 +58,13 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.readByte(SH(uSlot)), 6, "ULTROS 2 seeds 6 shields (Ot6ShieldTbl)")
     H.assertEq(H.readByte(SMX(uSlot)), 6, "ULTROS 2 max shields 6")
     local wc = H.readByte(WKC(uSlot))
-    H.log(string.format("ULTROS 2 weak class = $%02X (want slash|pierce $03)", wc))
-    H.assertEq(wc, OT6_SLASH | OT6_PIERCE, "ULTROS 2 class row is slash|pierce ($03)")
+    local row = H.speciesClassRow(ULTROS2)
+    H.log(string.format("ULTROS 2 weak class = $%02X (the ROM's row $%02X)", wc, row))
+    H.assertEq(wc, row, "ULTROS 2 class row is the ROM's (Ot6ShieldTbl $012D)")
+    local bits = 0
+    for b = 0, 5 do if row & (1 << b) ~= 0 then bits = bits + 1 end end
+    H.assertEq(bits, 2, "and holds two weapon classes (v0.50's slash|pierce, split)")
+    H.assertEq(row & OT6_SWORD, OT6_SWORD, "the sword one of them")
     H.assertEq(H.readByte(RVC(uSlot)), 0, "nothing revealed yet (classes) -- virgin codex")
     H.assertEq(H.readByte(RVE(uSlot)), 0, "nothing revealed yet (elements)")
     H.log(string.format("ULTROS 2 seed: %d/%d shields, class $%02X",

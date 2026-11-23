@@ -7,9 +7,10 @@
 --
 -- What it asserts:
 --   1. battle 57 seeds formation 505: KEFKA_NARSHE $014A alone, gauge
---      6/6 and class row $03 = OT6_SLASH|OT6_PIERCE straight off
---      Ot6ShieldTbl (ot6.asm), which is the authored row rather than the
---      formula.
+--      6/6 and his class row straight off Ot6ShieldTbl (H.speciesClassRow:
+--      the authored row rather than the formula; #566: two of the six
+--      classes, the children of v0.50's slash|pierce $03, and one of them a
+--      class the party's own hands hold).
 --   2. the element add is live.  His weak byte reads exactly $09 =
 --      fire|poison.  Vanilla KEFKA_NARSHE has no weakness, so the whole
 --      byte comes from Ot6ElemAddTbl's row.
@@ -51,10 +52,12 @@ local KEFKA = 0x014A
 --           EDGAR, the harder hitter, keeps swinging.  The top-up fraction is
 --           the driver's healPercent; 85 bought no margin over 70 and spent
 --           2-7 Potions a fight.
---   tool    AutoCrossbow, from the ROM's data: $AA is OT6_PIERCE
---           (Ot6WeapClassTbl), power 125, ignores defence, 4 MP
---           (Ot6AbilityCostTbl), and pierce is one of KEFKA's shield classes
---           (row $03).  The Bio Blaster ($A4) the old fighter's cursor named
+--   tool    AutoCrossbow, from the ROM's data: power 125, ignores defence,
+--           4 MP (Ot6AbilityCostTbl).  Under four classes $AA was OT6_PIERCE
+--           and pierce one of KEFKA's shield classes; under six (#566) it is
+--           OT6_SPEAR (Ot6WeapClassTbl) and keys him only if his row holds
+--           the spear -- the chips this suite asserts (3) are counted on the
+--           gauge, whatever lands them.  The Bio Blaster ($A4) the old fighter's cursor named
 --           resolves as spell $7D (ThrowToolsItemTbl): power 20 poison, 8 MP.
 --           The driver names the tool by id, and the boost it cannot pay for
 --           stays on the Fight it falls back to.
@@ -142,8 +145,25 @@ H.run({ maxFrames = 120000 }, {
               "KEFKA_NARSHE $014A on the field (formation 505)")
             H.assertEq(H.readByte(SH(ks)), 6, "gauge seeds 6 (Ot6ShieldTbl $014A)")
             H.assertEq(H.readByte(SMX(ks)), 6, "gauge max 6")
-            H.assertEq(H.readByte(WKC(ks)), 0x03,
-              "class row $03 = OT6_SLASH|OT6_PIERCE")
+            local row = H.speciesClassRow(KEFKA)
+            H.assertEq(H.readByte(WKC(ks)), row, "class row: the ROM's (Ot6ShieldTbl $014A)")
+            -- what the v0.50 row $03 gave this fight and the six-class row must still: two classes, and a
+            -- key in the hands that meet him (TERRA's, EDGAR's or CELES's weapon; EDGAR's AutoCrossbow)
+            local bits, held = 0, 0
+            for b = 0, 5 do if row & (1 << b) ~= 0 then bits = bits + 1 end end
+            for e = 0, 3 do
+              local ch = H.readByte(0x3ED8 + e * 2)
+              if ch < 16 then
+                held = held | H.weaponClass(H.readByte(0x1600 + 37 * ch + 0x1F))
+                local l = H.readByte(0x1600 + 37 * ch + 0x20)
+                if H.isWeapon(l) then held = held | H.weaponClass(l) end
+              end
+            end
+            held = held | H.weaponClass(H.AUTOCROSSBOW)
+            H.log(string.format("[kefka] class row $%02X (%d classes); the party's hands and the AutoCrossbow hold $%02X",
+              row, bits, held))
+            H.assertEq(bits, 2, "KEFKA's row holds two weapon classes (v0.50's slash|pierce, split)")
+            H.assertEq(row & held ~= 0, true, "and the party that meets him holds one of them")
             H.assertEq(H.readByte(WKE(ks)), 0x09,
               "weak byte EXACTLY $09 -- vanilla has none; the byte IS the ElemAdd row")
             H.assertEq(H.readByte(RVC(ks)), 0, "nothing revealed yet (classes)")

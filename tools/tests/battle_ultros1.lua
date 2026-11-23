@@ -5,9 +5,9 @@
 -- it into the battle, so the battle seeds its RNG from the clock after the
 -- boot and a seed shift is a different fight.  (The first cut booted three
 -- frames into the load, after InitBattle had seeded $be: every shift was
--- the same fight.)  Ultros ($12C, 5 shields,
--- slash|pierce, fire-weak) answers fire with a story block that carries an
--- attack:
+-- the same fight.)  Ultros ($12C, 5 shields, two weapon classes -- the
+-- ROM's row; slash|pierce under four classes --, fire-weak) answers fire with
+-- a story block that carries an attack:
 --
 --     if_element FIRE / dlg $0b ("Yaaooouch!  Seafood soup!") /
 --     attack SPECIAL
