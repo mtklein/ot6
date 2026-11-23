@@ -24,13 +24,13 @@
 -- boost tosses, each that finds a body paying level x 30; every toss
 -- replayed (H.setzerCheckCoins: twice its gil over the bodies it hit, the
 -- shields' halving, the Broken double, the cap, Arcane on every hit, a
--- shield off a arcane-weak body).
+-- shield off an arcane-weak body).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
 -- crept in, and the split across bodies and the arcane chip stopped
 -- running): at least one toss over two or more bodies, and at least one
--- chip on a arcane-weak body (up to two more crowds, one GP Rain each, when
+-- chip on an arcane-weak body (up to two more crowds, one GP Rain each, when
 -- the crowd's arcane-weak body is broken or dead by the time the coins land)
 local function coverage(alls, tag)
   local split, chip = 0, 0
@@ -44,7 +44,7 @@ local function coverage(alls, tag)
   end
   H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d arcane chip(s)", tag, split, chip))
   H.assertEq(split > 0, true, tag .. ": a toss split across two or more bodies (the draw deals a crowd)")
-  H.assertEq(chip > 0, true, tag .. ": a toss chipped a arcane-weak body")
+  H.assertEq(chip > 0, true, tag .. ": a toss chipped an arcane-weak body")
 end
 
 local SETZER, COIN_TOSS_RELIC = 9, 0xD6
@@ -112,7 +112,7 @@ local extraSteps = {}
 for e = 1, EXTRA do
   extraSteps[#extraSteps + 1] = H.cond(function() return chips(played()) == 0 end, {
     H.call(function()
-      H.log(string.format("[gprain] no toss so far chipped a arcane-weak body (it was broken or dead when the "
+      H.log(string.format("[gprain] no toss so far chipped an arcane-weak body (it was broken or dead when the "
         .. "coins landed): crowd %d more, one GP Rain", e))
     end),
     extras[e].walk,

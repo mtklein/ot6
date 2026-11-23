@@ -49,7 +49,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
 -- crept in, and the split across bodies and the arcane chip stopped
 -- running): at least one toss over two or more bodies, and at least one
--- chip on a arcane-weak body
+-- chip on an arcane-weak body
 local function coverage(all, tag)
   local split, chip = 0, 0
   for _, ps in ipairs(all) do
@@ -60,7 +60,7 @@ local function coverage(all, tag)
   end
   H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d arcane chip(s)", tag, split, chip))
   H.assertEq(split > 0, true, tag .. ": a toss split across two or more bodies (the draw deals a crowd)")
-  H.assertEq(chip > 0, true, tag .. ": a toss chipped a arcane-weak body")
+  H.assertEq(chip > 0, true, tag .. ": a toss chipped an arcane-weak body")
 end
 
 local COIN = 0x59
@@ -138,7 +138,7 @@ local extraSteps = {}
 for e = 1, EXTRA do
   extraSteps[#extraSteps + 1] = H.cond(function() return chips(played()) == 0 end, {
     H.call(function()
-      H.log(string.format("[cointoss] no toss so far chipped a arcane-weak body (the crowd's died before SETZER's "
+      H.log(string.format("[cointoss] no toss so far chipped an arcane-weak body (the crowd's died before SETZER's "
         .. "tosses reached it): crowd %d more, one Coin Toss", e))
     end),
     extras[e].walk,
