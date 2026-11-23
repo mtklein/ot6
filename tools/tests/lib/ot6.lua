@@ -18521,6 +18521,9 @@ end
 -- M.setzerBattle has for SETZER's table, for any character and command:
 --   { who = character id, cmd = command id, boost = 0..3,
 --     spell = id       the Magic list's cell holding this spell id (state $0E)
+--     summon = true    (with cmd = Magic) the worn esper's row above the Magic
+--                      grid: Up from the grid's top opens it (state $16), A
+--                      takes it to the target select
 --     row = id         a Tools-shell list's cell holding this id (state $30),
 --                      or the Throw list's (state $2D, the same shell)
 --     direct = true    the list's A commits the action itself, with no target
@@ -18897,6 +18900,11 @@ function M.kitBattle(plan, opts)
       pulse("a")
     elseif (st == 0x0E or st == 0x30 or st == 0x2D) and not p.opened then
       pulse("b")   -- a window this entry did not open (an earlier entry's, closing)
+    elseif st == 0x0E and p.summon then
+      pulse("up")      -- up off the grid's top row opens the esper window ($16, CheckHasGenju)
+    elseif st == 0x16 and p.summon then
+      if opts.onList and cool == 0 then opts.onList(p, a) end
+      pulse("a")
     elseif st == 0x0E and p.spell ~= nil then
       local i = spellIdx(a, p.spell)
       if i == nil then

@@ -890,8 +890,14 @@ for fx in golden_fixtures:
 MUTANTS = {
     # no signing: the junk save's first save is unsigned
     "nosign": ("Ot6SaveSign", "junk/v0.44-wor-cyan", "the saved block is signed"),
-    # the signature alone counts as signed: version 0 is kept, and its junk reserve
-    "sigonly": ("VerCheck=eaeaeaeaeaea", "junk/v0.44-sig-ver0", "with layout version 1"),
+    # the signature alone counts as signed: version 0 is raised in place, and
+    # its junk reserve kept
+    "sigonly": ("VerCheck=eaeaeaeaeaea", "junk/v0.44-sig-ver0", "and the tail"),
+    # #552 piece F: row 12 read without its version test (Ot6EsperLeoRow an
+    # rts): the junk save's $FF row 12 loads as progress
+    "leorowall": ("Ot6EsperLeoRow", "junk/v0.44-wor-cyan", "the live row 12 is no progress"),
+    # no raise: a v0.50 save's first save keeps layout version 1
+    "noraise": ("Raise=eaeaeaeaeaea", "v0.50/wor-cyan-v1", "with layout version 2"),
     # the page reserves zeroed for the slot loaded, not the slot saved into
     "srcpages": ("SlotAt=ad1f02", "junk/v0.44-wor-cyan", "saveas: slot 1's codex and esper page pads"),
     # no New Game clear (battle_newgameloadouts, below)
@@ -959,7 +965,7 @@ check("golden_saves",
       + [f"{fx}/{n}" for fx in golden_fixtures for n in ("manifest.json", "battery.sram")])
 # A New Game's first save (#389): the play from power-on saves for the first
 # time at world-narshe-v1 (gen_worldmap); that capture's slot is signed,
-# version 1, with its reserves zero and its loadouts AUTO.
+# version 2, with its reserves zero and its loadouts AUTO.
 fs_key = "world-narshe-v1"
 check("first_save_signed",
       f"python3 tools/golden_saves.py firstsave {sn.CAPTURE_DIR}/{fs_key}",

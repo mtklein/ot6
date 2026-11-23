@@ -40,7 +40,7 @@ Continue again.  This script holds that run to the fixture file:
         WANT (default "esper")
     golden_saves.py firstsave CAPTURE_DIR
         a New Game's first save (the play from power-on's world-narshe-v1
-        capture): its slot is signed $5653 version 1, its reserve, tail
+        capture): its slot is signed $5653 version 2, its reserve, tail
         and page reserves are zero, and its loadouts are AUTO
     golden_saves.py notes NOTES.md
         the release notes' save line: "Saves from vX.Y and later load in
@@ -78,11 +78,13 @@ SLOT_PTR = sc.SLOT_PTR
 BLOCK = 0x0A00
 CODEX, ESPER, LIVE = 0x2000, 0x3000, 0x3C00
 ESPER_MAGIC = 0x3145
-CTR, CTR_END = 0x0010, 0x0280
+CTR, CTR_END = 0x0010, 0x02B4      # 13 rows of 26 words
+LEO = 0x0280                        # row 12 (actor 12): read from a version-2 block only (#552)
 # what a Continue of slot 3 and a save into it may touch (the battery map's
 # Written tokens; newgame and clear rows are not exercised)
 RUN_WRITES = {"save", "load", "title", "play", "zero"}
-SIG, SIGWORD, SIGVER = 0x1E2C, 0x5653, 1
+SIG, SIGWORD, SIGVER = 0x1E2C, 0x5653, 2
+LEOVER = 2                          # the layout version whose pages hold row 12
 DUMP = re.compile(r"^\[golden\] dump (\S+) (\S+) ([0-9A-F]{4}) ([0-9A-F]+)\s*$")
 
 
@@ -119,6 +121,14 @@ def parse_log(text):
 def block_of(battery, slot):
     p = SLOT_PTR[slot]
     return battery[p:p + BLOCK]
+
+
+def block_version(block):
+    """The block's layout version as Ot6SaveSign reads it: 0 when unsigned."""
+    v = block[SIG + 2 - 0x1600]
+    if w16(block, SIG - 0x1600) != SIGWORD or not 1 <= v <= SIGVER:
+        return 0
+    return v
 
 
 def roster_of_block(block):
@@ -222,16 +232,24 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows, also=()):
     if d1["codex"] != f[cpage:cpage + 0x400]:
         p.append(f"load1: slot {slot}'s codex page is not the file's")
 
-    # 3. esper progress: the slot's signed page, or none
+    # 3. esper progress: the slot's signed page, or none; its row 12 only from
+    # a block of layout version 2 or more (an older page held reserve there)
     epage = ESPER + (slot - 1) * 0x400
     signed = w16(f, epage) == ESPER_MAGIC
     live = d1["live"][CTR:CTR_END]
+    fver = block_version(fblock)
+    leo_held = signed and fver >= LEOVER
+    if any(d1["live"][LEO:CTR_END]) and not leo_held:
+        p.append(f"esper: row 12 loaded {sum(d1['live'][LEO:CTR_END])} from a layout-version-{fver} block "
+                 f"(the slot's page holds {sum(f[epage + LEO:epage + CTR_END])} there): it must read as no progress")
     if esper == "signed":
         if not signed:
             p.append(f"esper: this release signs its esper pages, but the fixture's slot {slot} page "
                      f"is unsigned (${w16(f, epage):04X}); the run read {sum(live)} in the live page")
-        elif live != f[epage + CTR:epage + CTR_END]:
+        elif live[:LEO - CTR] != f[epage + CTR:epage + LEO]:
             p.append("esper: the live page after the load is not the slot's esper page")
+        elif leo_held and d1["live"][LEO:CTR_END] != f[epage + LEO:epage + CTR_END]:
+            p.append("esper: the live row 12 after the load is not the slot's (a version-2 block)")
     elif esper == "none":
         if signed:
             p.append(f"esper: a save from before esper progress has a signed page at ${epage:04X}")
@@ -259,7 +277,7 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows, also=()):
     ablock = block_of(after, slot)
     for name, blk in (("the first save", s1), ("the second save", ablock)):
         if w16(blk, SIG - 0x1600) != SIGWORD or blk[SIG + 2 - 0x1600] != SIGVER:
-            p.append(f"{name}: the block is not signed $5653 version 1")
+            p.append(f"{name}: the block is not signed $5653 version {SIGVER}")
         if any(blk[0x1E2F - 0x1600:0x1E40 - 0x1600]) or any(blk[0x1FF7 - 0x1600:0x1FFE - 0x1600]):
             p.append(f"{name}: the reserve $1E2F-$1E3F or the tail $1FF7-$1FFD is not zero")
     for r in rows:
@@ -426,7 +444,7 @@ def firstsave_problems(b, rows):
         return [f"the battery names slot {slot} ($1FF0), not 1..3"]
     blk = block_of(b, slot)
     if w16(blk, SIG - 0x1600) != SIGWORD or blk[SIG + 2 - 0x1600] != SIGVER:
-        p.append(f"slot {slot} is not signed $5653 version 1 "
+        p.append(f"slot {slot} is not signed $5653 version {SIGVER} "
                  f"(${w16(blk, SIG - 0x1600):04X}, version {blk[SIG + 2 - 0x1600]})")
     if any(blk[0x1E2F - 0x1600:0x1E40 - 0x1600]) or any(blk[0x1FF7 - 0x1600:0x1FFE - 0x1600]):
         p.append(f"slot {slot}'s reserve $1E2F-$1E3F or tail $1FF7-$1FFD is not zero")
@@ -470,7 +488,7 @@ def _synthetic():
     after[b + 0x1863 - 0x1600] = 1  # play time moved (slot3, save)
     after[b + SIG - 0x1600] = 0x53  # signed $5653, version 1
     after[b + SIG + 1 - 0x1600] = 0x56
-    after[b + SIG + 2 - 0x1600] = 1
+    after[b + SIG + 2 - 0x1600] = SIGVER
     def dumps(blk_after):
         return {"load1": {"wram": bytes(block_of(f, 3)), "codex": bytes(f[cp:cp + 0x400]),
                           "live": bytes(f[LIVE:LIVE + 0x400])},
@@ -503,7 +521,7 @@ def selftest():
     for o in (0x0005, CODEX + 0x310, 0x4000, 0x1E00, LIVE + 0x380):
         bad(mut_after=lambda a, o=o: a.__setitem__(o, 0xAA), want="outside the documented writes")
     # the saved slot's own page reserves left non-zero
-    for o in (CODEX + 0x800 + 0x310, CODEX + 0x800 + 0x5, ESPER + 0x800 + 0x280, ESPER + 0x800 + 0x3FF):
+    for o in (CODEX + 0x800 + 0x310, CODEX + 0x800 + 0x5, ESPER + 0x800 + 0x2B4, ESPER + 0x800 + 0x3FF):
         bad(mut_after=lambda a, o=o: a.__setitem__(o, 0xAA), want="reserve $")
     # the save did not sign the block
     bad(mut_after=lambda a: a.__setitem__(SLOT_PTR[3] + SIG - 0x1600, 0), want="not signed $5653")
@@ -536,6 +554,39 @@ def selftest():
     # a pre-v0.44 save that loads with progress
     h = bytearray(f); h[ESPER + 0x800] = 0
     bad(fx=h, esper="none", want="loaded with esper progress")
+    # row 12 (#552): a version-1 (or unsigned) block's page tail loaded as progress
+    def leo(d):
+        w = bytearray(d["load1"]["live"]); w[LEO + 4] = 9; d["load1"]["live"] = bytes(w)
+    bad(mut_dumps=leo, want="row 12 loaded")
+    # junk in an unsigned block's page row 12 is no progress: the run that reads zeros passes
+    j = bytearray(f); j[ESPER + 0x800 + LEO + 4] = 0xFF
+    assert check_run(bytes(j), rr, "signed", dumps(block_of(after, 3)), bytes(after), rows) == [], \
+        check_run(bytes(j), rr, "signed", dumps(block_of(after, 3)), bytes(after), rows)
+    # a version-2 block's row 12 is the slot's: carried, and refused when lost
+    cp = CODEX + 0x800
+    v2 = bytearray(f)
+    v2[SLOT_PTR[3] + SIG - 0x1600:SLOT_PTR[3] + SIG + 3 - 0x1600] = bytes([0x53, 0x56, 2])
+    v2[ESPER + 0x800 + LEO + 6] = 3
+    v2[LIVE + LEO + 6] = 3
+    a2 = bytearray(after)
+    a2[ESPER + 0x800 + LEO + 6] = 3
+    a2[LIVE + LEO + 6] = 3
+
+    def dv2(blk, live=None):
+        lv = bytes(live if live is not None else v2[LIVE:LIVE + 0x400])
+        return {"load1": {"wram": bytes(block_of(v2, 3)), "codex": bytes(v2[cp:cp + 0x400]), "live": lv},
+                "save1": {"slot": bytes(blk)},
+                "load2": {"wram": bytes(blk), "codex": bytes(v2[cp:cp + 0x400]),
+                          "live": bytes(v2[LIVE:LIVE + 0x400])}}
+    rr2 = roster_of_block(block_of(v2, 3))
+    ok2 = check_run(bytes(v2), rr2, "signed", dv2(block_of(a2, 3)), bytes(a2), rows)
+    assert ok2 == [], ok2
+    lost = bytearray(v2[LIVE:LIVE + 0x400]); lost[LEO + 6] = 0
+    probs = check_run(bytes(v2), rr2, "signed", dv2(block_of(a2, 3), lost), bytes(a2), rows)
+    assert any("live row 12 after the load" in x for x in probs), probs
+    m = bytearray(a2); m[ESPER + 0x800 + LEO + 6] = 0
+    probs = check_run(bytes(v2), rr2, "signed", dv2(block_of(m, 3)), bytes(m), rows)
+    assert any("esper page is not the live page" in x for x in probs), probs
     # the save left the esper page unsigned
     bad(mut_after=lambda a: a.__setitem__(ESPER + 0x800, 0), want="esper page is unsigned")
     # a truncated log
@@ -601,7 +652,7 @@ def main(argv):
                 print(f"golden firstsave: FAIL {srams[0]}: {x}")
             if probs:
                 return 1
-            print(f"golden firstsave: {srams[0]}: the New Game's first save is signed $5653 version 1, its "
+            print(f"golden firstsave: {srams[0]}: the New Game's first save is signed $5653 version {SIGVER}, its "
                   f"reserves zero and its loadouts AUTO")
             return 0
         if argv[:1] == ["list"]:

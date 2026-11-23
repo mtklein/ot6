@@ -17,8 +17,9 @@
 -- alone could, and from Leo's set when that set holds the stronger.
 -- The items are chosen from the bag and the ROM's ItemProp at run time (a weapon with Leo's bit 15 and not
 -- GOGO's bit 12; a weapon with GOGO's bit 12), so the suite copes with whatever the play left in the bag.
--- With a full roster the list is 16 rows, one past vanilla's 15: the 16th is drawn on BG3 screen D's row 0, where
--- the status menu's HDMA shows the cursor's 16th position (the cells there change from before the reveal).
+-- With a full roster the list is 17 rows, two past vanilla's 15 (Summon, #552 piece F, then Shock): the 16th is
+-- drawn on BG3 screen D's row 0, where the status menu's HDMA shows the cursor's 16th position (the cells there
+-- change from before the reveal), and the 17th below it.
 -- Screenshots (build/states/shots/menu_leo_*): the main menu, the Status screen, the command list, the
 -- weapon list.  Nothing is written.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -347,12 +348,14 @@ H.run({ maxFrames = 120000 }, {
     local n = 0
     for _, c in ipairs(postList) do if c == SHOCK then n = n + 1 end end
     H.assertEq(n, 1, "after: Shock listed once")
-    H.assertEq(#postList, #preList + 1, "after: the list is the one before plus Shock")
+    -- (#552 piece F: and Summon, his esper pick, before Shock: battle_leoespers covers it)
+    H.assertEq(#postList, #preList + 2, "after: the list is the one before plus Summon and Shock")
+    H.assertEq(postList[#postList - 1], 0x19, "after: Summon just before Shock")
     H.assertEq(cmdByte(1), SHOCK, "after: Shock picked into his second command row ($1617)")
     H.log(string.format("[menu_leo] the 16th row's cells (BG3 screen D, row 0): before %s, after %s", preList.row16,
       postList.row16))
-    if #postList == 16 then
-      H.assertEq(postList.row16 ~= preList.row16, true, "after: the 16th row (Shock) is drawn where the HDMA shows "
+    if #postList >= 16 then
+      H.assertEq(postList.row16 ~= preList.row16, true, "after: the 16th row is drawn where the HDMA shows "
         .. "the cursor's 16th position (BG3 screen D's row 0)")
     end
   end),
