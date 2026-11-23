@@ -34,18 +34,34 @@ import re
 import sys
 
 # --------------------------------------------------------------------------
-# class bits (ff6/src/battle/ot6_class.asm:10-14)
+# class bits: ot6_class.asm's own (tools/ot6_class.py reads the names, the
+# bits, their union and the null-break property from the source), from the
+# tree this file sits in until Data() re-reads them from --repo.  Six since
+# v0.51 (#566): sword, dagger, fist, arcane, katana, spear.
 
-CLASS_BIT = {"slash": 0x01, "pierce": 0x02, "bludg": 0x04, "special": 0x08}
-CLASS_TOKEN = {"OT6_SLASH": 0x01, "OT6_PIERCE": 0x02, "OT6_BLUDG": 0x04,
-               "OT6_SPECIAL": 0x08, "OT6_NULLBRK": 0x80}
-NULLBRK = 0x80
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ot6_class  # noqa: E402
+
+C = ot6_class.read(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CLASS_BIT = dict(C.bit)
+CLASS_TOKEN = dict(C.token, OT6_NULLBRK=C.nullbrk)
+CLASS_MASK = C.mask
+NULLBRK = C.nullbrk
+
+
+def _use_classes(root):
+    """Take the class bits from ROOT's ot6_class.asm."""
+    global C, CLASS_MASK, NULLBRK
+    C = ot6_class.read(root)
+    CLASS_BIT.clear()
+    CLASS_BIT.update(C.bit)
+    CLASS_TOKEN.clear()
+    CLASS_TOKEN.update(C.token, OT6_NULLBRK=C.nullbrk)
+    CLASS_MASK, NULLBRK = C.mask, C.nullbrk
 
 
 def class_str(mask):
-    if mask & 0x0F == 0:
-        return "(none)"
-    return "|".join(n for n, b in CLASS_BIT.items() if mask & b)
+    return C.names(mask & CLASS_MASK)
 
 
 # element bits, vanilla's own order.
@@ -66,7 +82,7 @@ ACTORS = ["TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES",
 ACTOR_ID = {n: i for i, n in enumerate(ACTORS)}
 
 # command ownership: which battle command resolves each classed ability id in
-# Ot6SkillClassTbl (ot6_class.asm:185-195).  Who owns that command is read
+# Ot6SkillClassTbl (ot6_class.asm).  Who owns that command is read
 # from char_prop.asm, not written down here.
 # TekMissile $8a is Magitek-armor only.  No walking party owns it, so it
 # appears in no row below and is credited to nobody.
@@ -80,7 +96,7 @@ COMMAND_ABILITIES = {
 # row at all).
 
 # Tools are type-0 items resolved through the Tools command; their class bytes
-# live in Ot6WeapClassTbl at the item id (ot6_class.asm:149-158).
+# live in Ot6WeapClassTbl at the item id (ot6_class.asm, "tools $a3-$aa").
 TOOLS_RANGE = range(0xA3, 0xAB)
 
 # the command that swings an equipped weapon (and an empty hand).  JUMP is
@@ -218,6 +234,7 @@ def _eval_expr(expr, where):
 class Data:
     def __init__(self, root):
         self.root = root
+        _use_classes(root)
         self.map_prop = self._read(MAP_PROP)
         self.sub = self._read(SUB_GROUP)
         self.rand = self._read(RAND_GROUP)
@@ -324,6 +341,10 @@ class Data:
                     tok = tok.strip()
                     v |= CLASS_TOKEN.get(tok) if tok in CLASS_TOKEN else \
                         _eval_expr(tok, "%s:%d" % (CLASS_ASM, i + 1))
+                if v & ~(CLASS_MASK | NULLBRK):
+                    raise SystemExit("check_break_reach: Ot6WeapClassTbl byte $%02x at "
+                                     "%s:%d leaves OT6_CLASSES|OT6_NULLBRK"
+                                     % (v, CLASS_ASM, i + 1))
                 out.append(v)
             elif code.startswith(".res"):
                 m = re.match(r"\.res\s+(.+?),\s*(\S+)$", code)
@@ -405,7 +426,10 @@ class Data:
             m = re.match(r"\s*\.byte\s+(\S+)\s*$", code)
             if m:
                 tok = m.group(1).strip()
-                vals.append(CLASS_TOKEN.get(tok, 0))
+                if tok not in CLASS_TOKEN:
+                    raise SystemExit("check_break_reach: unknown class token %r "
+                                     "in %s" % (tok, FLOOR_INC))
+                vals.append(CLASS_TOKEN[tok])
         if len(vals) != N_SPECIES:
             raise SystemExit("check_break_reach: floor parsed %d species, "
                              "want %d (%s)" % (len(vals), N_SPECIES, FLOOR_INC))
@@ -479,8 +503,8 @@ class Data:
         row = self.shield_tbl.get(sp)
         if row is not None:
             gaugeless = row["class"] == 0 and row["shields"] == 0
-            return row["class"] & 0x0F, "Ot6ShieldTbl:%d" % row["line"], gaugeless
-        return self.floor[sp] & 0x0F, "floor", False
+            return row["class"] & CLASS_MASK, "Ot6ShieldTbl:%d" % row["line"], gaugeless
+        return self.floor[sp] & CLASS_MASK, "floor", False
 
     # -- party -------------------------------------------------------------
     def actor_classes(self, name):
@@ -502,17 +526,17 @@ class Data:
                 cls = self.weap_class[it]
                 if cls & NULLBRK:
                     continue
-                mask |= cls & 0x0F
-            mask |= self.weap_class[0xFF] & 0x0F   # bare fists (empty hand $ff)
+                mask |= cls & CLASS_MASK
+            mask |= self.weap_class[0xFF] & CLASS_MASK   # bare fists (empty hand $ff)
         for cmd, sids in COMMAND_ABILITIES.items():
             if cmd not in cmds:
                 continue
             for sid in sids:
                 if sid in self.skill_class:
-                    mask |= self.skill_class[sid] & 0x0F
+                    mask |= self.skill_class[sid] & CLASS_MASK
         if "TOOLS" in cmds:
             for it in TOOLS_RANGE:
-                mask |= self.weap_class[it] & 0x0F
+                mask |= self.weap_class[it] & CLASS_MASK
         return mask
 
     def actor_elems(self, name):
@@ -669,8 +693,9 @@ def main():
                     help="comma-separated actor names overriding every step's "
                          "declared party (what-if / failure demo)")
     ap.add_argument("--drop-class", action="append", default=[],
-                    choices=sorted(CLASS_BIT),
-                    help="pretend no member can field this class (repeatable)")
+                    metavar="CLS",
+                    help="pretend no member can field this class (repeatable): "
+                         "one of ot6_class.asm's, here %s" % ", ".join(CLASS_BIT))
     ap.add_argument("--drop-elem", action="append", default=[],
                     choices=sorted(ELEM_BIT),
                     help="pretend no member can deliver this element "
@@ -681,14 +706,17 @@ def main():
     party_override = None
     if args.party:
         party_override = [w.strip().upper() for w in args.party.split(",") if w.strip()]
-    drop_mask = 0
-    for c in args.drop_class:
-        drop_mask |= CLASS_BIT[c]
     drop_elem_mask = 0
     for e in args.drop_elem:
         drop_elem_mask |= ELEM_BIT[e]
 
     data = Data(args.repo)
+    drop_mask = 0
+    for c in args.drop_class:
+        if c not in CLASS_BIT:
+            ap.error("--drop-class %s: not a class of %s (%s)"
+                     % (c, CLASS_ASM, ", ".join(CLASS_BIT)))
+        drop_mask |= CLASS_BIT[c]
     names = [args.area] if args.area else sorted(AREAS)
     all_problems = []
     total = 0

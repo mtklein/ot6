@@ -16,8 +16,12 @@ Three checks, any failure exits 1:
   2. the Ot6ElemAddTbl source (ff6/src/battle/ot6_break.asm) lists each
      species once;
   3. the Ot6ShieldTbl the ROM ships (build/ot6.sfc, located the way
-     tools/audit_break_coverage.py locates it) is row-for-row the parsed
-     source: same species order, shields and class bytes, no duplicates.
+     tools/audit_break_coverage.py locates it: by the source table's own
+     opening rows, tools/ot6_class.py) is row-for-row the parsed source:
+     same species order, shields and class bytes, no duplicates.
+
+The class names are ot6_class.asm's own (tools/ot6_class.py reads them), so
+a row naming a class the source does not define is refused here.
 
 Usage:  python3 tools/check_shield_rows.py [--repo ROOT] [--rom PATH] [--selftest]
 """
@@ -34,8 +38,12 @@ HUD_ASM = "ff6/src/battle/ot6_hud.asm"
 BREAK_ASM = "ff6/src/battle/ot6_break.asm"
 ROM = "build/ot6.sfc"
 
-CLASS_BIT = {"OT6_SWORD": 0x01, "OT6_DAGGER": 0x02, "OT6_FIST": 0x04,
-             "OT6_ARCANE": 0x08, "OT6_KATANA": 0x10, "OT6_SPEAR": 0x20}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ot6_class  # noqa: E402
+
+# the class tokens a row may name: ot6_class.asm's, read from the tree this
+# file sits in (main() re-reads them from --repo)
+CLASS_BIT = dict(ot6_class.read(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))).token)
 
 
 def _num(tok: str) -> int:
@@ -70,6 +78,9 @@ def parse_rows(text: str, label: str, byte2_is_mask: bool):
                 tok = tok.strip()
                 if byte2_is_mask and tok in CLASS_BIT:
                     b |= CLASS_BIT[tok]
+                elif byte2_is_mask and not re.fullmatch(r"\$[0-9a-fA-F]+|[0-9]+", tok):
+                    raise ValueError("%s row at line %d names %r, which ot6_class.asm does not define"
+                                     % (label, i + 1, tok))
                 else:
                     b |= _num(tok)
             rows.append((pending, a, b, pending_line))
@@ -87,23 +98,14 @@ def duplicates(rows):
     return dups
 
 
-def rom_shield_rows(rom: bytes):
-    """The shipped Ot6ShieldTbl, found by its opening rows the way
-    audit_break_coverage.py finds it (guard $0000/2/PIERCE, lobo $0019/3/PIERCE)."""
-    key = bytes([0x00, 0x00, 2, 0x02, 0x19, 0x00, 3, 0x02])
-    i = rom.find(key)
-    if i < 0:
-        raise SystemExit("check_shield_rows: Ot6ShieldTbl signature not found in the ROM")
-    if rom.find(key, i + 1) >= 0:
-        raise SystemExit("check_shield_rows: Ot6ShieldTbl signature is not unique in the ROM")
-    rows, a = [], i
-    while True:
-        sp = rom[a] | (rom[a + 1] << 8)
-        if sp == 0xFFFF:
-            break
-        rows.append((sp, rom[a + 2], rom[a + 3], a))
-        a += 4
-    return rows
+def rom_shield_rows(rom: bytes, source_rows):
+    """The shipped Ot6ShieldTbl, found the way audit_break_coverage.py finds
+    it: by the source table's own opening rows (ot6_class.rom_table_at), which
+    must occur exactly once.  Through v0.50 the search key was spelled here
+    as bytes (guard $0000/2/$02, lobo $0019/3/$02), and the six-class split
+    (#566) moved both rows' class and left the gate unable to find the
+    table; the source's rows cannot drift from the source."""
+    return ot6_class.rom_rows(rom, ot6_class.rom_table_at(rom, source_rows))
 
 
 # ------------------------------------------------- the reachable formations --
@@ -347,7 +349,7 @@ def check(root: str, rom_path: str | None) -> list[str]:
         return problems
     with open(rom_path, "rb") as f:
         rom = f.read()
-    shipped = rom_shield_rows(rom)
+    shipped = rom_shield_rows(rom, shield)
     for sp, first, again in duplicates(shipped):
         problems.append("the ROM's Ot6ShieldTbl lists species $%04X twice (rom+$%06X and rom+$%06X)"
                         % (sp, first, again))
@@ -364,18 +366,40 @@ def check(root: str, rom_path: str | None) -> list[str]:
 
 
 def selftest(root: str) -> int:
-    good = "Tbl:\n .word $0001\n .byte 2, OT6_PIERCE\n .word $0002\n .byte 3, $00\n .word $ffff\n"
-    bad = "Tbl:\n .word $0001\n .byte 2, $00 ; old\n .word $0002\n .byte 3, $00\n .word $0001\n .byte 2, OT6_PIERCE|OT6_SLASH\n .word $ffff\n"
+    (n1, b1), (n2, b2) = list(CLASS_BIT.items())[:2]     # two of the source's own classes
+    good = "Tbl:\n .word $0001\n .byte 2, %s\n .word $0002\n .byte 3, $00\n .word $ffff\n" % n2
+    bad = ("Tbl:\n .word $0001\n .byte 2, $00 ; old\n .word $0002\n .byte 3, $00\n .word $0001\n"
+           " .byte 2, %s|%s\n .word $ffff\n" % (n2, n1))
     rows = parse_rows(good, "Tbl", True)
-    assert rows == [(1, 2, 2, 2), (2, 3, 0, 4)], rows
+    assert rows == [(1, 2, b2, 2), (2, 3, 0, 4)], rows
     assert duplicates(rows) == []
     rows = parse_rows(bad, "Tbl", True)
-    assert rows[2] == (1, 2, 3, 6), rows
+    assert rows[2] == (1, 2, b1 | b2, 6), rows
     assert duplicates(rows) == [(1, 2, 6)], duplicates(rows)
-    rom = bytes([0xEE] * 16 + [0, 0, 2, 2, 0x19, 0, 3, 2, 0x34, 0x01, 4, 2, 0x34, 0x01, 4, 0, 0xFF, 0xFF])
-    got = rom_shield_rows(rom)
-    assert [r[:3] for r in got] == [(0, 2, 2), (0x19, 3, 2), (0x134, 4, 2), (0x134, 4, 0)], got
+    # a class name the source does not define is not a number either
+    try:
+        parse_rows(good.replace(n2, "OT6_NOSUCHCLASS"), "Tbl", True)
+    except ValueError as e:
+        print("check_shield_rows selftest: mutant refused, an undefined class token: %s" % e)
+    else:
+        raise AssertionError("a row naming an undefined class was parsed")
+    # the ROM search follows the source's opening rows, whatever their class
+    # bytes; a ROM that opens differently is refused, not read from elsewhere
+    src = [(0, 2, b2, 0), (0x19, 3, b2, 0), (0x134, 4, b2, 0), (0x134, 4, 0, 0)]
+    blob = b"".join(bytes([sp & 255, sp >> 8, sh, cl]) for sp, sh, cl, _ in src)
+    rom = bytes([0xEE] * 16) + blob + bytes([0xFF, 0xFF])
+    got = rom_shield_rows(rom, src)
+    assert [r[:3] for r in got] == [r[:3] for r in src], got
     assert len(duplicates(got)) == 1
+    moved = [(sp, sh, cl ^ b1, l) for sp, sh, cl, l in src]            # the same rows re-classed
+    for tag, mrom, msrc in (("the ROM's rows are another split's", rom, moved),
+                            ("the opening rows occur twice", rom + blob, src)):
+        try:
+            rom_shield_rows(mrom, msrc)
+        except SystemExit as e:
+            print("check_shield_rows selftest: mutant refused, %s: %s" % (tag, str(e)[:110]))
+        else:
+            raise AssertionError("mutant accepted: " + tag)
     print("check_shield_rows selftest: duplicate rows OK")
     return coverage_selftest(root)
 
@@ -464,6 +488,8 @@ def main() -> int:
     ap.add_argument("--rom", default=None)
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
+    CLASS_BIT.clear()
+    CLASS_BIT.update(ot6_class.read(args.repo).token)
     if args.selftest:
         return selftest(args.repo)
     problems = check(args.repo, args.rom)
