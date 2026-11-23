@@ -12,7 +12,7 @@ deliver.
 "Can field" reads equippability and command ownership from item_prop_en.dat
 and ff6/src/field/char_prop.asm; SwdTech/Blitz/Tools classes go to whoever
 owns those commands.  The classes are ot6_class.asm's six (sword, dagger,
-fist, arcane, katana, spear; tools/ot6_class.py), and a member holds the
+blunt, ranged, katana, spear; tools/ot6_class.py), and a member holds the
 class of every weapon the equip masks allow, the imp gear excepted, plus the
 empty hand's (fist).  "Can deliver" mirrors it for elements: weapon elements
 (item_prop +$0F), tool attack elements (Tools ownership), and kit-ability
@@ -49,7 +49,7 @@ import sys
 # class bits: ot6_class.asm's own (tools/ot6_class.py reads the names, the
 # bits, their union and the null-break property from the source), from the
 # tree this file sits in until Data() re-reads them from --repo.  Six since
-# v0.51 (#566): sword, dagger, fist, arcane, katana, spear.
+# v0.51 (#566): sword, dagger, blunt, ranged, katana, spear.
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ot6_class  # noqa: E402

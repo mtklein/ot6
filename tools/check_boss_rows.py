@@ -45,7 +45,7 @@ ELEMENT_BIT.update(
 
 # The weapon classes are ot6_class.asm's own (tools/ot6_class.py reads the
 # names and bits from the source): six since v0.51 (#566) -- sword, dagger,
-# fist, arcane, katana, spear.  The doc names a class by that word, any
+# blunt, ranged, katana, spear.  The doc names a class by that word, any
 # case; the source by its OT6_ token.  Data() re-reads them from --repo.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ot6_class  # noqa: E402

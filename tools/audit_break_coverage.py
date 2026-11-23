@@ -53,8 +53,8 @@ THE PARTY-HANDS MODEL (six classes, v0.51, #566).  Through v0.50 one mask
 stood for every party everywhere: PARTY_CLASSES = slash|pierce|bludgeon,
 "broadly held", with special left out because only Setzer's and Relm's
 oddball weapons carried it.  Under six classes no such mask exists: each
-class is a few recruits' own weapon family (sword, dagger, fist, arcane,
-katana, spear; ot6_class.asm), a species keeps as many weapon weaknesses as
+class is a few recruits' own weapon family (sword, dagger, spear, katana,
+blunt, ranged; ot6_class.asm), a species keeps as many weapon weaknesses as
 it had, and whether an encounter has a key depends on WHO walks into it.
 So the model is split the way the two tiers always were:
 
@@ -62,9 +62,10 @@ So the model is split the way the two tiers always were:
     class, or fire/ice/bolt, chip a gauged body of the formation.  Every
     class is in some recruit's hands, so "nobody can chip it" now means
     "no body in it takes any class".  This is the one place the model is
-    wider in form than v0.50's: it counts Arcane and Dagger, the classes
-    that inherited special's species (and the rods', arcs' and daggers').
-    It cannot be narrower without knowing who is there, and tier 2 knows.
+    wider in form than v0.50's: it counts Ranged and Blunt, the classes
+    special's species went to (with the bolts', arcs', rods' and fists'),
+    whichever weakness a bit came from.  It cannot be narrower without
+    knowing who is there, and tier 2 knows.
 
   tier 2 (the claim, from the play's logs) asks the question the coverage
     rule asks: did the story party at that point hold a key.  The play
@@ -108,7 +109,9 @@ So the model is split the way the two tiers always were:
   whose only key is a class that came from special.  On the shipped rows
   that set is empty (every formation v0.50 accepted held a slash, pierce,
   bludgeon or fire/ice/bolt key, and the split gave each of those one
-  child class), and --selftest holds the gate to the mutants that matter:
+  child class; build/attempts/wt/v051-six-classes/tools/lineage.py counts
+  it from Ot6ClassSplitTbl: 0 of 513 pool formations), and --selftest
+  holds the gate to the mutants that matter:
   a formation with no class and no fire/ice/bolt weakness is refused, a
   gauged body's row emptied is refused, a party stripped of its kit is
   refused.
