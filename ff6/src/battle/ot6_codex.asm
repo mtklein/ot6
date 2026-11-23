@@ -148,31 +148,24 @@ Done:  ply
 
 ; [ a four-class codex page becomes a six-class one ] (#566)
 ;
-; v0.51 split each of the four weapon classes in two.  A page written by
+; v0.51 regrouped the four weapon classes into six.  A page written by
 ; v0.50 or earlier (magic O8, or an O7 clone) holds, per species, the
 ; revealed bits of the four: slash $01, pierce $02, bludgeon $04, special
-; $08.  Each of a species' four-class weaknesses became exactly one of two
-; children, and Ot6ClassSplitTbl records which (one byte a species: bit k
-; set = the weakness of four-class bit k became its second child).  So each
-; class byte becomes, for every four-class bit k set in it:
-;
-;       bit k   split bit k clear (first)   split bit k set (second)
-;       $01     Sword  $01                  Katana $10
-;       $02     Dagger $02                  Spear  $20
-;       $04     Fist   $04                  Arcane $08
-;       $08     Arcane $08                  Dagger $02
-;
-; and every other bit is dropped.  A first child keeps its parent's bit, so
-; those bits stay where they are; Ot6ClassSecondTbl maps the rest.  The
-; element table is untouched.  The page then takes the six-class magic, so
-; this runs once a page: run again it would not give the same bytes (a
-; Katana bit read as four-class is dropped), and the magic is the only
-; record that it has been done.  The magic is written last, and only its
-; high byte differs from O8's, so the signing is one byte's write.  A
-; console that loses power inside the 384-byte rewrite keeps O8 over a
-; part-rewritten table, and the next touch rewrites all of it: a reveal
-; already moved to Katana or Spear can be lost and has to be found again.
-; Nothing false is drawn either way (below).
+; $08.  Each of a species' four-class weaknesses became one six-class
+; weakness (all six, for the two rows any weapon breaks), and
+; Ot6ClassSplitTbl records which: four bytes a species, byte k the six-class
+; bits its weakness of four-class bit k became (ot6_class_split.inc).  So
+; each class byte becomes the OR of the table's bytes for the four-class
+; bits set in it, and every other bit is dropped.  The element table is
+; untouched.  The page then takes the six-class magic, so this runs once a
+; page: run again it would not give the same bytes (a Katana bit read as
+; four-class is dropped), and the magic is the only record that it has been
+; done.  The magic is written last, and only its high byte differs from
+; O8's, so the signing is one byte's write.  A console that loses power
+; inside the 384-byte rewrite keeps O8 over a part-rewritten table, and the
+; next touch rewrites all of it: a reveal already moved to a bit the four
+; did not have can be lost and has to be found again.  Nothing false is
+; drawn either way (below).
 ;
 ; A revealed bit the species' six-class row does not answer to (a row that
 ; changed since the save was written) is kept here and never drawn:
@@ -180,42 +173,50 @@ Done:  ply
 ;
 ; No scratch RAM (battle initialization may be live, as in Ot6CodexEnsure)
 ; and no data-bank change: the page is read and written long through X, and
-; X is lent to the two table reads.  X (i16) = the page offset.  x/y and
-; widths preserved; A clobbered.
+; X is lent to the table reads.  X (i16) = the page offset.  x/y and widths
+; preserved; A clobbered.
 .proc Ot6CodexSix
         php
         longi
         phx
         phy
         shorta
-        ldy     #$0000          ; y = species; x = page offset + species
+        ldy     #$0000          ; y = the species' row in the split table
+                                ;   (species * 4); x = page offset + species
 SixNext: lda    f:OT6_CODEX_CLASS,x
 SixFour:                        ; (mutant_rom.py's seam: the four bits kept)
         and     #OT6_CODEX_FOUR
-        pha                     ; [1,s] the revealed four-class bits
-        phx                     ; [1,s] x, [3,s] the bits
-        tyx
-        and     f:Ot6ClassSplitTbl,x    ; those whose weakness took its
-        pha                     ;   second child: [1,s], x [2,s], bits [4,s]
-SixFirst:                       ; (mutant_rom.py's seam: the first children)
-        eor     4,s             ; the rest keep their bit: a first child
-        sta     4,s             ;   sits where its parent did
-        pla                     ; the second-takers (0..15)
-        longa
-        and     #$00ff
-        tax
-        shorta
-SixSecond:                      ; (mutant_rom.py's seam: the second children)
-        lda     f:Ot6ClassSecondTbl,x
-        ora     3,s             ; first and second children together
+        phx                     ; [1,s] x
+        pha                     ; [1,s] the four-class bits still to place
+        lda     #$00
+        pha                     ; [1,s] the six-class byte so far, the bits
+                                ;   [2,s], x [3,s]
+        tyx                     ; x walks the species' four table bytes
+SixBit: lda     2,s
+        beq     SixPut          ; none left to place
+        lsr
+        sta     2,s
+        bcc     SixSkip         ; this four-class bit was not revealed
+SixRead:                        ; (mutant_rom.py's seam: the table read)
+        lda     f:Ot6ClassSplitTbl,x
+        ora     1,s
+        sta     1,s
+SixSkip: inx
+        bra     SixBit
+SixPut: pla                     ; the six-class byte ...
+        sta     1,s             ;   ... over the spent bits,
+        pla                     ;   and off the stack with them
         plx
         sta     f:OT6_CODEX_CLASS,x
-        pla                     ; drop the bits
         inx
         iny
-        cpy     #OT6_CODEX_SPECIES
+        iny
+        iny
+        iny
+        cpy     #OT6_CODEX_SPECIES * 4
         bcc     SixNext
-        ply
+SixTail:                        ; (mutant_rom.py's seam jumps here from
+        ply                     ;   SixNext: signed, nothing rewritten)
         plx
         longa
 SixSign:                        ; (mutant_rom.py's seam: the page's new magic)
@@ -225,15 +226,8 @@ SixSign:                        ; (mutant_rom.py's seam: the page's new magic)
         rts
 .endproc
 
-; the second children of a set of four-class bits (index 0..15): slash's is
-; Katana, pierce's Spear, bludgeon's Arcane, special's Dagger
-Ot6ClassSecondTbl:
-.repeat 16, i
-        .byte   ((i & $01) * OT6_KATANA) | (((i >> 1) & $01) * OT6_SPEAR) | (((i >> 2) & $01) * OT6_ARCANE) | (((i >> 3) & $01) * OT6_DAGGER)
-.endrepeat
-
         .include "ot6_class_split.inc"  ; Ot6ClassSplitTbl
-.assert * - Ot6ClassSplitTbl = OT6_CODEX_SPECIES, error, "Ot6ClassSplitTbl is one byte a codex species"
+.assert * - Ot6ClassSplitTbl = OT6_CODEX_SPECIES * 4, error, "Ot6ClassSplitTbl is four bytes a codex species"
 
 ; Begin an unsaved New Game with a freshly blank transient codex page.
 .proc Ot6CodexNewGame

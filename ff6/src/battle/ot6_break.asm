@@ -1909,9 +1909,9 @@ done:   rts
 ; called right after _magicpunch banks the hand's weapon element, so
 ; $3ca8,x is the swinging hand's item id. monsters keep a graphics code
 ; there (MonsterProp+26) rather than an item, so their swings carry no class.
-; (raged gau inherits the rage monster's graphics code into both hands
-; through SetRage, so his raged fights can read a junk class: a known
-; defect until rage is retired for capture. plain gau punches fist, $ff.)
+; (a raging gau's hands hold the rage monster's graphics code, SetRage, which
+; through v0.50 read here as whatever item that code numbered; since #566
+; his own body is his fangs, OT6_CLS_FANG, raging or bare-handed.)
 
 .proc Ot6WeaponClass
         .a8
@@ -1923,6 +1923,26 @@ done:   rts
         bcs     @none
         lda     $3ca8,x         ; the swinging hand's item id
         phx
+        pha                     ; [1,s] the item, [2,s] x
+        longa
+        txa
+        and     #$0006
+        tax                     ; the character, either hand
+        shorta0
+        lda     $3ed8,x
+        cmp     #CHAR::GAU
+        bne     @item
+        lda     $3ef9,x         ; #566: Gau's own body is his fangs -- a
+        lsr                     ;   raging Gau (status 4 bit 0: his hands
+        bcs     @fang           ;   hold the rage's graphics code, SetRage),
+        lda     $01,s           ;   or his empty hand
+        cmp     #$ff
+        bne     @item
+@fang:  pla
+        plx
+        lda     #OT6_CLS_FANG
+        bra     @store
+@item:  pla
         longa
         and     #$00ff
         tax

@@ -586,7 +586,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         beq     :+                      ;   a point 2, a blow 3)
         lda     #$01
         bra     @fam
-:       bit     #OT6_DAGGER|OT6_SPEAR
+:       bit     #OT6_DAGGER|OT6_SPEAR|OT6_RANGED
         beq     :+
         lda     #$02
         bra     @fam
@@ -1513,7 +1513,7 @@ Ot6JackpotCubeTbl:
         stz     $3414           ; damage modification off (the effect's own)
         lda     #$20
         tsb     $11a4           ; can't dodge (the effect's own)
-        lda     #OT6_ARCANE|OT6_NULLBRK
+        lda     #OT6_RANGED|OT6_NULLBRK
         sta     f:$7e0000+OT6_ATKCLASS  ; no chip: the Fixed Dice teach nothing
         lda     #$26
         sta     $b5             ; the dice-roll animation (last: a watcher
