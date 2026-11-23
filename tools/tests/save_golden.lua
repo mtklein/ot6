@@ -24,7 +24,8 @@
 --      codex page is the one the battery held, migrated (#566: a page from
 --      v0.50 or earlier holds the four weapon classes' revealed bits, and
 --      the load rewrites them for the six by the ROM's Ot6ClassSplitTbl and
---      signs the page O9; that rewrite, Ot6CodexSix, ran once), and the live
+--      signs the page O9; that rewrite, Ot6CodexSix, ran once; an O9 page
+--      is left as it is and a page with no magic zeroed), and the live
 --      esper page is
 --      the slot's (a signed page) or empty (an unsigned one: a save from
 --      before v0.44), its row 12 (actor 12) the slot's only for a block of
@@ -220,19 +221,18 @@ local function assertLive(tag, B)
 end
 
 -- A four-class revealed byte as the six classes hold it (#566,
--- ot6_codex.asm Ot6CodexSix): each of bits 0-3 becomes its second child
--- (Katana, Spear, Arcane, Dagger) where the species' Ot6ClassSplitTbl byte
--- has that bit, its first (Sword, Dagger, Fist, Arcane: the same bit)
--- otherwise; every other bit is dropped.  The table is the built ROM's.
-local SECOND = { [0] = 0x10, 0x20, 0x08, 0x02 }
-local function sixClass(b, sel)
+-- ot6_codex.asm Ot6CodexSix): the OR of the species' Ot6ClassSplitTbl bytes
+-- (four a species: byte k the six-class bits its weakness of four-class bit
+-- k became, $00 where it had none) for each of bits 0-3 set in it; every
+-- other bit is dropped.  The table is the built ROM's.
+local function became(sp, k) return H.readRomByte((H.sym("Ot6ClassSplitTbl") & 0x3FFFFF) + sp * 4 + k) end
+local function sixClass(b, sp)
   local n = 0
   for k = 0, 3 do
-    if (b >> k) & 1 == 1 then n = n | (((sel >> k) & 1 == 1) and SECOND[k] or (1 << k)) end
+    if (b >> k) & 1 == 1 then n = n | became(sp, k) end
   end
   return n
 end
-local function splitOf(sp) return H.readRomByte((H.sym("Ot6ClassSplitTbl") & 0x3FFFFF) + sp) end
 
 -- The slot's codex page as the load must leave it, from battery B (the
 -- file's, before the game touched it): an O9 page as it is; an O8 page with
@@ -248,7 +248,7 @@ local function codexLoaded(B)
   local kind = "six"
   if magic == CODEX_FOUR then
     kind = "four"
-    for sp = 0, SPECIES - 1 do t[CLASSES + sp] = sixClass(B[page + CLASSES + sp], splitOf(sp)) end
+    for sp = 0, SPECIES - 1 do t[CLASSES + sp] = sixClass(B[page + CLASSES + sp], sp) end
   elseif magic ~= CODEX_MAGIC then
     kind = "unsigned"
     for o = ELEMS, TABLES_END - 1 do t[o] = 0 end
@@ -265,7 +265,7 @@ local function assertCodexLoaded(tag, B)
   local page = CODEX + (slot - 1) * 0x400
   local want, kind = codexLoaded(B)
   wantSix = (kind == "four") and 1 or 0
-  local n, first, second, lost, kept = 0, 0, 0, 0, 0
+  local n, kept, moved, none = 0, 0, 0, 0
   for o = ELEMS, TABLES_END - 1 do if sram(page + o) ~= 0 then n = n + 1 end end
   local what = { four = "a four-class page", six = "a six-class page", unsigned = "an unsigned page" }
   H.log(string.format("[golden] %s: slot %d's codex page was %s ($%04X in the file); it holds %d "
@@ -280,20 +280,26 @@ local function assertCodexLoaded(tag, B)
       if o >= CLASSES and o < TABLES_END then
         classes = classes + 1
         if classes <= 6 then
-          H.log(string.format("[golden] %s: species %d's classes: the file holds %02X (split %02X), expected %02X, "
-            .. "the page holds %02X", tag, o - CLASSES, B[page + o], splitOf(o - CLASSES), want[o], got))
+          local sp = o - CLASSES
+          H.log(string.format("[golden] %s: species %d's classes: the file holds %02X (table %02X %02X %02X %02X), "
+            .. "expected %02X, the page holds %02X", tag, sp, B[page + o], became(sp, 0), became(sp, 1),
+            became(sp, 2), became(sp, 3), want[o], got))
         end
       elseif o >= ELEMS and o < CLASSES then elems = elems + 1
       else rest = rest + 1 end
     end
     if o >= CLASSES and o < TABLES_END and kind == "four" then
-      local old, sel = B[page + o] & 0x0F, splitOf(o - CLASSES)
-      if old & ~sel & 0x0F ~= 0 then first = first + 1 end
-      if old & sel ~= 0 then second = second + 1 end
+      for k = 0, 3 do
+        if (B[page + o] >> k) & 1 == 1 then
+          local t = became(o - CLASSES, k)
+          if t == 0 then none = none + 1 elseif t == (1 << k) then kept = kept + 1 else moved = moved + 1 end
+        end
+      end
     end
   end
-  H.log(string.format("[golden] %s: of the file's revealed classes, %d species hold a first child and %d a second",
-    tag, first, second))
+  H.log(string.format("[golden] %s: of the file's revealed four-class bits, %d kept their bit, %d became another "
+    .. "class (or several), %d were of a weakness the species does not have and are dropped", tag, kept, moved,
+    none))
   H.assertEq(classes, 0, tag .. ": the slot's revealed classes are the file's, migrated to the six classes"
     .. (kind == "unsigned" and " (an unsigned page's: none)" or ""))
   H.assertEq(elems, 0, tag .. ": the slot's revealed elements are the file's"

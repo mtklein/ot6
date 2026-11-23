@@ -15,17 +15,17 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 -- a four-class revealed byte as the six classes hold it (ot6_codex.asm
--- Ot6CodexSix): each of bits 0-3 becomes its second child where the species'
--- Ot6ClassSplitTbl byte has that bit, its first (the same bit) otherwise
-local SECOND = { [0] = 0x10, 0x20, 0x08, 0x02 }
-local function sixClass(b, sel)
+-- Ot6CodexSix): the OR of the species' Ot6ClassSplitTbl bytes (four a
+-- species: the six-class bits its weakness of each four-class bit became)
+-- for each of bits 0-3 set in it; every other bit dropped
+local function became(sp, k) return H.readRomByte((H.sym("Ot6ClassSplitTbl") & 0x3FFFFF) + sp * 4 + k) end
+local function sixClass(b, sp)
   local n = 0
   for k = 0, 3 do
-    if (b >> k) & 1 == 1 then n = n | (((sel >> k) & 1 == 1) and SECOND[k] or (1 << k)) end
+    if (b >> k) & 1 == 1 then n = n | became(sp, k) end
   end
   return n
 end
-local function splitOf(sp) return H.readRomByte((H.sym("Ot6ClassSplitTbl") & 0x3FFFFF) + sp) end
 local PLANTED_CLASS = 0xFF
 local sixRuns = 0
 H.run({ maxFrames = 45000 }, {
@@ -66,7 +66,7 @@ H.run({ maxFrames = 45000 }, {
         "legacy knowledge migrated into slot "..n)
       local bad, elems = 0, 0
       for sp = 0, 0x17f do
-        if sram(base+0x190+sp) ~= sixClass(PLANTED_CLASS, splitOf(sp)) then bad = bad + 1 end
+        if sram(base+0x190+sp) ~= sixClass(PLANTED_CLASS, sp) then bad = bad + 1 end
         if sram(base+0x10+sp) ~= 0x08 then elems = elems + 1 end
       end
       H.assertEq(bad, 0, "slot "..n.."'s class table is the O7 codex's, migrated to the six classes")
@@ -74,7 +74,8 @@ H.run({ maxFrames = 45000 }, {
     end
     H.assertEq(sram(0x316c00) | (sram(0x316c01) << 8), 0x394f, "the New-Game page is signed 'O9' and blank")
     H.log(string.format("[codex] O7 -> three O9 pages; Ot6CodexSix ran %d times; species 0's class byte $%02X "
-      .. "(split $%02X)", sixRuns, sram(0x316190), splitOf(0)))
+      .. "(table %02X %02X %02X %02X)", sixRuns, sram(0x316190), became(0, 0), became(0, 1), became(0, 2),
+      became(0, 3)))
     local species = H.readWord(0x57c4)   -- guard slot (entity $0c) stash
     H.log(string.format("guard species=%d slot2 codex byte=%02x",
       species, sram(0x316410+species)))

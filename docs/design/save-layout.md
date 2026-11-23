@@ -91,7 +91,7 @@ never.
 | $2000-$2001 | 2 | slot1 | Codex page, slot 1: magic (`$394F` O9; `$384F` O8 is a four-class page from v0.5-v0.50 and `$374F` O7 the pre-v0.5 global codex, each migrated on first touch) | OT6_CODEX_MAGIC | load, play, save | Any other value: the page is zeroed and signed before use, so the codex starts empty; O7 is cloned into all three slots once; O8 has its class table rewritten once ("The six-class codex") |
 | $2002-$200F | 14 | slot1 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $2010-$218F | 384 | slot1 | Revealed weak elements, one byte per species | OT6_CODEX | load, play, save | Zero: nothing revealed |
-| $2190-$230F | 384 | slot1 | Revealed weapon classes, one byte per species: the six classes' bits `$01`-`$20` in an O9 page (v0.51 on), the four classes' bits `$01`-`$08` in an O8 or O7 page, which the first load rewrites | OT6_CODEX_CLASS | load, play, save | Zero: nothing revealed |
+| $2190-$230F | 384 | slot1 | Revealed weapon classes, one byte per species: the six classes' bits `$01`-`$20` in an O9 page (v0.51 on, "The six-class codex"), the four classes' bits `$01`-`$08` in an O8 or O7 page, which the first load rewrites | OT6_CODEX_CLASS | load, play, save | Zero: nothing revealed |
 | $2310-$23FF | 240 | slot1 | Reserved; a save into the slot zeroes it | OT6_CODEX_ROOT+OT6_CODEX_USED | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $2400-$2401 | 2 | slot2 | Codex page, slot 2: magic | OT6_CODEX_MAGIC+OT6_CODEX_STRIDE | load, play, save | as slot 1 |
 | $2402-$240F | 14 | slot2 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
@@ -388,34 +388,46 @@ the esper pages are), and an unsigned page reads as absent.
 
 ## The six-class codex
 
-v0.51 (#566) replaced the four weapon classes with six. A codex page's
-class table still holds one byte of revealed classes per species, but the
-byte's bits changed meaning, so the page's magic changed with them: O9
-(`OT6_CODEX_V3`) is a page of six-class bytes, O8 a page of four-class
-bytes. `OT6_SAVEVER` is untouched (it stays 2): the save block holds no
-class data, and the rule above puts a codex-page change in the page's own
-magic.
+v0.51 (#566) regrouped the four weapon classes (slash, pierce, bludgeon,
+special) into six. A codex page's class table still holds one byte of
+revealed classes per species, but the byte's bits changed meaning, so the
+page's magic changed with them: O9 (`OT6_CODEX_V3`) is a page of six-class
+bytes, O8 a page of four-class bytes. `OT6_SAVEVER` is untouched (it stays
+2): the save block holds no class data, and the rule above puts a
+codex-page change in the page's own magic.
 
-Each of a species' four-class weaknesses became exactly one of that class's
-two children, so a revealed four-class bit has one meaning per species.
-`Ot6ClassSplitTbl` (`ot6_class_split.inc`, one byte per species id 0-383)
-records which: bit k set means the weakness of four-class bit k became its
-second child, clear its first. `tools/check_save_layout.py` holds this table
-to the build:
+An O9 page fixes the class byte's bits, and `tools/check_save_layout.py`
+holds this table to the build:
 
-| Four-class bit | Class | First child | Second child |
-|---|---|---|---|
-| $01 | slash | OT6_SWORD `$01` | OT6_KATANA `$10` |
-| $02 | pierce | OT6_DAGGER `$02` | OT6_SPEAR `$20` |
-| $04 | bludgeon | OT6_FIST `$04` | OT6_ARCANE `$08` |
-| $08 | special | OT6_ARCANE `$08` | OT6_DAGGER `$02` |
+| Bit | Symbol | Class |
+|---|---|---|
+| $01 | OT6_SWORD | Sword |
+| $02 | OT6_DAGGER | Dagger |
+| $04 | OT6_BLUNT | Blunt |
+| $08 | OT6_RANGED | Ranged |
+| $10 | OT6_KATANA | Katana |
+| $20 | OT6_SPEAR | Spear |
+
+Bits `$40` and `$80` are not written. In an O8 (or O7) page the byte holds
+the four classes: slash `$01`, pierce `$02`, bludgeon `$04`, special `$08`.
+
+Each of a species' four-class weaknesses became a six-class weakness of
+that species (slash became Sword or Katana; pierce Dagger, Spear or Ranged;
+bludgeon and special Blunt or Ranged; and all six for the two species any
+weapon breaks), so a revealed four-class bit has one meaning per species.
+`Ot6ClassSplitTbl` (`ot6_class_split.inc`, written by
+`tools/proto_six/split.py`) records it: four bytes per species id 0-383,
+byte k the six-class bits the species' weakness of four-class bit k
+became, `$00` where the species had no such weakness.
 
 The migration (`Ot6CodexSix`, run by `Ot6CodexEnsure` when it meets an O8
-page, and on each clone of an O7 codex): every class byte becomes, for each
-of bits `$01`-`$08` set in it, the child the table above and the species'
-split byte name; every other bit is dropped; the element table, the pad and
-the tail are not touched; then the page is signed O9. A first child keeps
-its parent's bit, so only second children move.
+page, and on each clone of an O7 codex): every class byte becomes the OR of
+the species' table bytes for the bits `$01`-`$08` set in it; every other
+bit is dropped; the element table, the pad and the tail are not touched;
+then the page is signed O9. A revealed slash therefore shows as whichever
+of Sword and Katana that species now answers to, and a revealed bit of a
+weakness the species did not have in v0.50 (a save from a release whose row
+differed; the v0.28-v0.44 golden saves hold a few) becomes nothing.
 
 - **When.** At the first load of the slot on a six-class ROM (the title's
   Continue or the reload after a game over), while the load menu owns the
@@ -426,24 +438,25 @@ its parent's bit, so only second children move.
   already O9, over it.
 - **Once.** The magic is the only record that a page has been rewritten,
   and the rewrite is not repeatable (a Katana or Spear bit read again as
-  four-class would be dropped), so the magic is written last and nothing
-  writes O8 again. Its two bytes differ from O8's only in the high byte, so
-  the signing is one byte's write. A console that loses power inside the
-  384-byte rewrite keeps O8 over a part-rewritten table, and the next load
-  rewrites all of it: a reveal already moved to Katana or Spear can be lost
-  and has to be found again. An O7 migration rewrites page 1 last, so its
-  O7 magic restarts an interrupted one from a whole payload.
-- **No lie on screen.** A revealed bit the species' six-class row does not
-  answer to stays in the page and is never drawn: the seed masks the page's
-  byte with the body's row (`Ot6SeedShields`, `and OT6_BP_CLASS,y`). That
-  covers a save from a release whose row for the species differed from
-  v0.50's (the v0.28-v0.44 golden saves hold a few such bytes), any later
-  change to a row, and a part-migrated page. The next reveal for that
-  species writes the byte afresh, without the stale bit.
+  four-class would be dropped, a Sword bit could become Katana), so the
+  magic is written last and nothing writes O8 again. Its two bytes differ
+  from O8's only in the high byte, so the signing is one byte's write. A
+  console that loses power inside the 384-byte rewrite keeps O8 over a
+  part-rewritten table, and the next load rewrites all of it: a reveal
+  already moved can be lost and has to be found again. An O7 migration
+  rewrites page 1 last, so its O7 magic restarts an interrupted one from a
+  whole payload.
+- **No lie on screen.** The table's bytes are weaknesses the species has in
+  v0.51, so a migrated page reveals nothing false. After that, a revealed
+  bit a species' row no longer answers to (a later change to a row, or a
+  part-migrated page) stays in the page and is never drawn: the seed masks
+  the page's byte with the body's row (`Ot6SeedShields`,
+  `and OT6_BP_CLASS,y`). The next reveal for that species writes the byte
+  afresh, without the stale bit.
 - **The table is history.** `Ot6ClassSplitTbl` says what v0.50's saves
-  mean. Once v0.51 is published it never changes, even when a species'
-  row does: a changed row is a content change, and the mask above keeps it
-  honest.
+  mean under v0.51's rows. It moves with the rows until v0.51 is published
+  (`split.py` rewrites it) and never after, even when a species' row does:
+  a changed row is a content change, and the mask above keeps it honest.
 - **Old tools' names.** The harness's checkpoint layout tag stays
   `ot6-codex-o8-v1` (`OT6_CHECKPOINT_LAYOUT`, each checkpoint's
   `persistent_layout`): it names the family of batteries a step can
@@ -464,32 +477,33 @@ The owner accepts that a later release may return to four classes (#566,
   clone an O7 codex and re-sign the clones; and map an O9 page's bytes back
   (below). `OT6_SAVEVER` and the save block are again untouched: nothing in
   the block depends on the class count.
-- **Six to four.** Every child has a parent, so each six-class bit maps
-  back: Sword and Katana to slash, Spear to pierce, Fist to bludgeon. Dagger
-  is pierce's first child and special's second, and Arcane special's first
-  and bludgeon's second, so those two need the species: with
-  `Ot6ClassSplitTbl`, a revealed Dagger is special where the species' split
-  byte has bit `$08` and pierce otherwise, and a revealed Arcane is
-  bludgeon where it has bit `$04` and special otherwise. (Without the
-  table, reveal both parents and let the seed's row mask keep the one the
-  species answers to: never a false weakness, at worst a true one shown
-  before it was found.) What is lost is only the distinction the six
-  classes added: a save that had found Katana but not Sword shows slash.
+- **Six to four.** The regrouping is not a tree, so a six-class bit does
+  not name one four-class parent: a Ranged weakness may have been pierce,
+  bludgeon or special, a Blunt one bludgeon or special. Per species it is
+  still decidable, with
+  the table read backwards: a revealed six-class bit c reveals every
+  four-class bit k whose table byte holds c (`Ot6ClassSplitTbl[species][k]
+  & c`). That is exact for every weakness that came from v0.50's rows. A
+  weakness authored after the split has no table byte, and a reveal of it
+  maps to nothing unless that release decides otherwise; the two species
+  that take all six map every reveal back to the weaknesses they had.
+  The seed's row mask then keeps whatever that release's four-class rows
+  answer to, so nothing false is drawn. What is lost is only the
+  distinction the six classes added: a save that had found Katana but not
+  Sword, on a species weak to both, shows slash.
 - **The data.** The four-class rows (`Ot6ShieldTbl`, the generated floor),
   the weapon and skill class tables and the class constants come back from
-  v0.50 (`git show v0.50:ff6/src/battle/ot6_hud.asm`, `ot6_class.asm`), or
-  from the six-class rows through the same child-to-parent map
-  (`ff6/tools/six_class_split.json` records how each row was split); a row
+  v0.50 (`git show v0.50:ff6/src/battle/ot6_hud.asm`, `ot6_class.asm`).
+  `ff6/tools/six_class_split.json` records how each row was split; a row
   edited after the split needs a person's call.
 - **The checks.** `tools/golden_saves.py`'s `codex_loaded` gains the O9
   branch, the golden set by then holds v0.51's six-class saves to run it
   on, and `battle_sixcodex` gets a twin on one of them.
 
 What keeps that cheap while six classes ship: the class table stays one
-byte per species with the six bits where they are; a class added later has
-a four-class parent; `Ot6ClassSplitTbl` stays in the tree unchanged; and
-no other saved field starts to hold class bits (one that must would need
-its own map back).
+byte per species with the six bits where they are; `Ot6ClassSplitTbl`
+stays in the tree unchanged once v0.51 is out; and no other saved field
+starts to hold class bits (one that must would need its own map back).
 
 ## Compatibility history of the v0 releases
 
@@ -521,7 +535,7 @@ saying v0.29.
 | v0.44 | yes | Esper pages at `$3000-$3FFF` (new, signed); an older save loads with no esper progress | tested: 4 golden saves |
 | v0.45 | yes | The save-block signature `$1E2C-$1E2E` (new field); the first save of an older block zeroes its reserve, every save zeroes the slot's page reserves, and a New Game zeroes the scrap | tested: every golden save, all unsigned, is signed at its first save |
 | v0.46-v0.50 | yes | nothing in the layout (v0.49: event switch `$00E0`, a vanilla bit) | tested: four golden saves each |
-| v0.51 | yes | Layout version 2: the esper pages' row 12 (actor 12) in the pages' former tail reserve, read only from a version-2 block; a version-1 block is raised at its first save. The codex page becomes O9: its class table holds six weapon classes, and an O8 page's revealed classes are rewritten at its first load, each to the child its species took ("The six-class codex") | in development: every golden save v0.28-v0.50 loads with its page migrated |
+| v0.51 | yes | Layout version 2: the esper pages' row 12 (actor 12) in the pages' former tail reserve, read only from a version-2 block; a version-1 block is raised at its first save. The codex page becomes O9: its class table holds six weapon classes, and an O8 page's revealed classes are rewritten at its first load, each to the class that species' weakness became ("The six-class codex") | in development: every golden save v0.28-v0.50 loads with its page migrated |
 
 So no release has moved a field or read an old value under a new meaning:
 every layout change was an append (six new fields) or a migration behind a
@@ -559,8 +573,9 @@ reading, gil, bag, map, tile, story switches), that its codex page is the
 file's, migrated (byte for byte the page `Ot6CodexEnsure` must make of
 the file's: for an O8 page the class table rewritten by the built ROM's
 `Ot6ClassSplitTbl`, the element table, pad and tail as they were, the magic
-O9; the rewrite ran once at the first load and not again at the saves or
-the second load) and that its
+O9; an O9 page as it is; a page with no magic zeroed and signed; the
+rewrite ran once at the first load of an O8 page and not again at the
+saves or the second load) and that its
 esper progress carries over (none for a save from before v0.44, and none
 in row 12 for a block older than version 2: the live row must be zero
 whatever the slot's page holds there), saves into
@@ -596,15 +611,25 @@ codex and esper page's pads and tails, and in `$4000-$7FFF`.
   3's class table `$FF` (`golden_saves.py synthetic` builds it and `verify`
   holds it to that): all four classes revealed for every species, and four
   bits no four-class build wrote. Its load must migrate every byte exactly
-  (the four high bits dropped), and `battle_sixcodex` reads it in battle.
+  (each species' whole table row and nothing more), and `battle_sixcodex`
+  reads it in battle.
+- `v0.46-kolts-six3f` is that save with slot 3's page signed O9 and every
+  class byte `$3F` (built and verified the same way): a six-class page
+  holding more than its species answer to, as a v0.51 save would after a
+  later release took a class from a row. Its load must leave the page as it
+  is, without running the rewrite, and `battle_sixcodex` reads the seed's
+  mask on it.
 - `v0.50-kolts-unsigned` is `v0.50/kolts-summit-v1` with slot 3's codex
   magic zeroed and its tables left as they were (built and verified the
   same way): the load must zero both tables and sign the page, so the game
   starts with nothing revealed. (Through v0.50 an unsigned page for slot 2,
   slot 3 or an unsaved game ran into a BRK at its first touch: the wipe's
   loops for those pages were assembled 16-bit where the CPU arrives 8-bit.
-  No OT6 save leaves such a page, so nothing met it; v0.51's one loop is
-  held by this fixture.)
+  No OT6 save leaves such a page, so nothing met it; on origin/main's ROM
+  this fixture's first save enters `Ot6CodexEnsure` and the CPU is at the
+  BRK vector's target the same frame,
+  `build/attempts/wt/v051-six-classes/saves/main_unsigned/`. v0.51's one
+  loop is held by this fixture.)
 - `v0.44-mixed` (from `wor-gau-v1`, `$1CF7` = `$BF`) carries the Bushido
   word the page seeds there (`$0F64`, slot 0 set) and real Rage and Lore
   bytes beside impossible ones (an unlearned rage, a lore byte `$19`, an
@@ -621,19 +646,25 @@ reads the scrap and tail, then Continues a v0.44 save seating Gau
 bytes in its loadouts, and reads the lists a random battle builds: AUTO's
 eight rages, AUTO's five lores and the free row.
 
-`battle_sixcodex` Continues a four-class Mt. Kolts save, walks onto the
-cliff beside its save room and reads every body of a random battle before
-anyone acts: the species' class byte in the migrated page against the
-file's byte and the ROM's split byte, and the body's revealed classes
-(`$3EA5` + slot x 2) against the page's byte masked by the body's row. On
-`v0.46/kolts-summit-v1` as published it must find a weakness that took its
-first child and one that took its second; on `v0.46-kolts-classff` also a
-revealed bit the row does not answer to, kept in the page and not drawn,
-and the four dropped bits. Then the console's Reset, a second Continue and
-the same battle again: the rewrite has still run once, and the whole page
-is the file's, migrated.
+`battle_sixcodex` Continues a Mt. Kolts save, walks onto the cliff beside
+its save room and reads every body of a random battle before anyone acts:
+the species' class byte in the migrated page against the file's byte and
+the ROM's table bytes, and the body's revealed classes (`$3EA5` + slot x 2)
+against the page's byte masked by the body's row. On
+`v0.46/kolts-summit-v1` as published it finds the revealed weaknesses that
+kept their bit and those that moved to another class; on
+`v0.46-kolts-classff` also the bits that must add nothing (a weakness the
+species never had, the four high bits); on `v0.46-kolts-six3f` the classes
+the row does not answer to, kept in the page and not drawn, with the
+rewrite never run. What each battery must show is derived from the file,
+the ROM's table and its rows, so a regenerated table moves the witnesses
+and not the test. Then the console's Reset, a second Continue and the same
+battle again: the rewrite has still run once, and the whole page is the
+file's, migrated. `battle_codex` plants an O7 cartridge-wide codex with
+every class byte `$FF` and reads all three slot pages back migrated and
+signed O9.
 
-Thirteen mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
+Fourteen mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
 routine returning at once, or a labelled seam rewritten) must go red:
 
 - without `Ot6SaveSign`, the junk save's first save is unsigned;
@@ -648,15 +679,16 @@ routine returning at once, or a labelled seam rewritten) must go red:
 - without `Ot6NewGameClear`, Gau's Rage list comes up empty;
 - without `Ot6CodexSix`, a v0.50 save's codex page is not signed O9
   (the golden run and `battle_sixcodex`);
-- with the rewrite's first children dropped (`SixFirst`), a v0.50 save's
+- with the rewrite's table read giving nothing (`SixRead`), a v0.50 save's
   revealed classes are not the file's, migrated, and `battle_sixcodex`'s
-  first child is missing from the page;
-- with its second children dropped (`SixSecond`), `battle_sixcodex`'s
-  second child is missing;
-- with its four-bit mask gone (`SixFour`), the `$FF` fixture's class bytes
-  keep bits past the four;
-- with the seed's row mask gone (`SixMask`), the `$FF` fixture's stale
-  classes are drawn;
+  kept and moved weaknesses are missing from the page;
+- with the page signed O9 and its bytes left as the four classes wrote
+  them (`SixNext` jumping to `SixTail`: what the six-class ROM did before
+  the migration), the `$FF` fixture's class bytes are not exact;
+- with the rewrite's four-bit mask gone (`SixFour`), the `$FF` fixture's
+  golden run reads on into other species' table bytes;
+- with the seed's row mask gone (`SixMask`), the `$3F` fixture's classes
+  are drawn on bodies that do not answer to them;
 - with every load running the rewrite (`LoadEnsure`), the second load
   runs it a second time (the golden run and `battle_sixcodex`);
 - with an unsigned page signed but not zeroed (`FreshWipe`),

@@ -28,30 +28,13 @@ unnoticed:
     source only compares against it (`cmp #`), and the one that is not is
     the magic the source signs with (`lda #`).
   The six-class codex (section "## The six-class codex", #566): the table
-    of each four-class bit's two children.  Checked: four rows, bits $01
-    $02 $04 $08; each child symbol assembles to the value the row gives; a
-    first child is its parent's bit (the migration leaves first children
-    where they are); the built ROM's Ot6ClassSecondTbl maps every set of
-    four-class bits to the row's second children; Ot6ClassSplitTbl is 384
-    bytes of four selector bits and byte for byte the source's
+    of the class byte's six bits, which an O9 page fixes.  Checked: six
+    rows, bits $01 $02 $04 $08 $10 $20; each row's symbol assembles to its
+    bit, and OT6_CLASSES to all six; the built ROM's Ot6ClassSplitTbl (what
+    a four-class page's bits become: four bytes a species) is 384 x 4 bytes
+    of those six bits and byte for byte the source's
     (ff6/src/battle/ot6_class_split.inc); OT6_CODEX_FOUR is $0F and
     OT6_CODEX_SPECIES 384.
-  Save-block fields (section "## Save-block fields"): the OT6 fields inside
-    the vanilla $1600-$1FFF block, as before: every OT6 symbol the build
-    resolves into the block has a row at its address, every row's width
-    matches its range, rows do not overlap, and every row lies inside a
-    scrap the doc declares (a "Scrap `$xxxx-$xxxx`" line).
-  Event switches (section "## Event switches"): a vanilla event switch OT6
-    claims (#552), one row each: the switch, its byte and bit in vanilla's
-    switch array ($1E80 + switch/8, bit switch%8), and the symbol the build
-    reads it through.  Checked: the byte and bit are the switch's, every
-    `<name>_SWITCH` equate the modules assemble (the code's and the event
-    script's) is the row's switch, the byte
-    lies in the switch array ($1E80-$1F5F), the symbol assembles at that byte
-    (and its `<name>_BIT` equate, a `_FLAG` symbol's, is the bit), and every
-    OT6 symbol in the switch array has a row.  Such a symbol needs no
-    save-block field row: the switch array is vanilla's, read with vanilla's
-    encoding.
 
 Nothing is written.  Exit status 0 = clean.
 
@@ -351,28 +334,33 @@ def parse_magic_meaning(text):
 
 CODEX_MAGIC_SYM = re.compile(r"^OT6_CODEX_(?:V\d+|GLOBAL)$")
 SPLIT_INC = "ff6/src/battle/ot6_class_split.inc"
-SPLIT_BYTE = re.compile(r"^\s+\.byte\s+\$([0-9A-Fa-f]{2})\b")
-CHILD_CELL = re.compile(r"^`?(OT6_\w+)`?\s+`?\$([0-9A-Fa-f]{2})`?$")
+SPLIT_LINE = re.compile(r"^\s+\.byte\b([^;]*)")
+CLASS_ROW = re.compile(r"^`?(OT6_\w+)`?$")
 SPECIES = 384
+SIX_BITS = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20]
 
 
-def parse_children(text):
-    """The six-class codex table: [(bit, (first sym, value), (second sym,
-    value), line)]."""
+def parse_classes(text):
+    """The six-class codex table: [(bit, symbol, line)]."""
     out = []
     for i, cells in table_rows(section(text, "The six-class codex")):
-        if len(cells) < 4:
+        if len(cells) < 2:
             continue
         b = re.match(r"^`?\$([0-9A-Fa-f]{2})`?$", cells[0])
-        f, g = CHILD_CELL.match(cells[2]), CHILD_CELL.match(cells[3])
-        if b and f and g:
-            out.append((int(b.group(1), 16), (f.group(1), int(f.group(2), 16)),
-                        (g.group(1), int(g.group(2), 16)), i))
+        m = CLASS_ROW.match(cells[1])
+        if b and m:
+            out.append((int(b.group(1), 16), m.group(1), i))
     return out
 
 
 def parse_split_inc(text):
-    return [int(m.group(1), 16) for m in (SPLIT_BYTE.match(l) for l in text.splitlines()) if m]
+    """Every byte of the source table's `.byte $xx, ...` lines, in order."""
+    out = []
+    for line in text.splitlines():
+        m = SPLIT_LINE.match(line)
+        if m:
+            out += [int(x, 16) for x in re.findall(r"\$([0-9A-Fa-f]{2})\b", m.group(1))]
+    return out
 
 
 def source_uses(src_root, names):
@@ -422,59 +410,46 @@ def check_codex(text, allsyms, rom, uses, split_src):
     if len(current) == 1 and not signed:
         problems.append("%s: no source line signs a codex page with %s (`lda #%s`)" % (SRC, current[0], current[0]))
 
-    kids = parse_children(text)
-    if not kids:
+    classes = parse_classes(text)
+    if not classes:
         if section(text, "The six-class codex"):
-            problems.append("%s: \"The six-class codex\" has no table of the four classes' children" % DOC)
+            problems.append("%s: \"The six-class codex\" has no table of the class byte's six bits" % DOC)
         return problems
-    if [k[0] for k in kids] != [0x01, 0x02, 0x04, 0x08]:
-        problems.append("%s: the six-class codex table must hold the four-class bits $01 $02 $04 $08 in order, "
-                        "one row each; it holds %s" % (DOC, " ".join("$%02X" % k[0] for k in kids)))
+    if [c[0] for c in classes] != SIX_BITS:
+        problems.append("%s: the six-class codex table must hold the bits $01 $02 $04 $08 $10 $20 in order, one "
+                        "row each; it holds %s" % (DOC, " ".join("$%02X" % c[0] for c in classes)))
         return problems
-    for bit, first, second, line in kids:
-        for sym, val in (first, second):
-            if sym not in allsyms:
-                problems.append("%s:%d class %s: the build has no such symbol" % (DOC, line, sym))
-            elif allsyms[sym] != val:
-                problems.append("%s:%d class %s is $%02X in the doc, $%02X in the build"
-                                % (DOC, line, sym, val, allsyms[sym]))
-        if first[1] != bit:
-            problems.append("%s:%d the first child of four-class bit $%02X is %s $%02X: a first child must keep "
-                            "its parent's bit (Ot6CodexSix leaves first children where they are)"
-                            % (DOC, line, bit, first[0], first[1]))
-    for name, want in (("OT6_CODEX_FOUR", 0x0F), ("OT6_CODEX_SPECIES", SPECIES)):
+    for bit, sym, line in classes:
+        if sym not in allsyms:
+            problems.append("%s:%d class %s: the build has no such symbol" % (DOC, line, sym))
+        elif allsyms[sym] != bit:
+            problems.append("%s:%d class %s is bit $%02X in the doc, $%02X in the build (an O9 page fixes the "
+                            "class byte's bits)" % (DOC, line, sym, bit, allsyms[sym]))
+    for name, want in (("OT6_CLASSES", 0x3F), ("OT6_CODEX_FOUR", 0x0F), ("OT6_CODEX_SPECIES", SPECIES)):
         if allsyms.get(name) != want:
             problems.append("%s: %s is %s, not $%X" % (DBG, name, "missing" if name not in allsyms
                                                         else "$%X" % allsyms[name], want))
-    for name in ("Ot6ClassSecondTbl", "Ot6ClassSplitTbl", "Ot6CodexSix"):
+    for name in ("Ot6ClassSplitTbl", "Ot6CodexSix"):
         if name not in allsyms:
             problems.append("%s: no symbol %s (the six-class migration)" % (DBG, name))
-    if rom is None or "Ot6ClassSecondTbl" not in allsyms or "Ot6ClassSplitTbl" not in allsyms:
+    if rom is None or "Ot6ClassSplitTbl" not in allsyms:
         return problems
-    o = rom_offset(allsyms["Ot6ClassSecondTbl"])
-    for i in range(16):
-        want = 0
-        for bit, _, second, _ in kids:
-            if i & bit:
-                want |= second[1]
-        if rom[o + i] != want:
-            problems.append("%s: Ot6ClassSecondTbl[%d] is $%02X, not the second children $%02X of four-class "
-                            "bits $%02X" % (ROM, i, rom[o + i], want, i))
     o = rom_offset(allsyms["Ot6ClassSplitTbl"])
-    table = list(rom[o:o + SPECIES])
-    wide = [i for i, b in enumerate(table) if b & ~0x0F]
+    table = list(rom[o:o + SPECIES * 4])
+    wide = [i for i, b in enumerate(table) if b & ~0x3F]
     if wide:
-        problems.append("%s: Ot6ClassSplitTbl holds bits past the four selectors (species %d: $%02X)"
-                        % (ROM, wide[0], table[wide[0]]))
+        problems.append("%s: Ot6ClassSplitTbl holds a bit past the six classes (species %d, four-class bit $%02X: "
+                        "$%02X)" % (ROM, wide[0] // 4, 1 << (wide[0] % 4), table[wide[0]]))
     if split_src is None:
         problems.append("%s is missing (Ot6ClassSplitTbl's source)" % SPLIT_INC)
-    elif len(split_src) != SPECIES:
-        problems.append("%s holds %d bytes, not one per codex species (%d)" % (SPLIT_INC, len(split_src), SPECIES))
+    elif len(split_src) != SPECIES * 4:
+        problems.append("%s holds %d bytes, not four per codex species (%d)"
+                        % (SPLIT_INC, len(split_src), SPECIES * 4))
     elif split_src != table:
-        d = [i for i in range(SPECIES) if split_src[i] != table[i]]
-        problems.append("%s: Ot6ClassSplitTbl is not %s's bytes (%d differ; species %d is $%02X in the ROM, $%02X "
-                        "in the source): is the ROM built from this tree?"
-                        % (ROM, SPLIT_INC, len(d), d[0], table[d[0]], split_src[d[0]]))
+        d = [i for i in range(SPECIES * 4) if split_src[i] != table[i]]
+        problems.append("%s: Ot6ClassSplitTbl is not %s's bytes (%d differ; species %d, four-class bit $%02X is "
+                        "$%02X in the ROM, $%02X in the source): is the ROM built from this tree?"
+                        % (ROM, SPLIT_INC, len(d), d[0] // 4, 1 << (d[0] % 4), table[d[0]], split_src[d[0]]))
     return problems
 
 
@@ -713,12 +688,14 @@ SELF_DOC = """\
 | OT6_CODEX_V2 | $384F | four classes, migrated on first touch |
 
 ## The six-class codex
-| Four-class bit | Class | First child | Second child |
-|---|---|---|---|
-| $01 | slash | OT6_SWORD `$01` | OT6_KATANA `$10` |
-| $02 | pierce | OT6_DAGGER `$02` | OT6_SPEAR `$20` |
-| $04 | bludgeon | OT6_FIST `$04` | OT6_ARCANE `$08` |
-| $08 | special | OT6_ARCANE `$08` | OT6_DAGGER `$02` |
+| Bit | Symbol | Class |
+|---|---|---|
+| $01 | OT6_SWORD | Sword |
+| $02 | OT6_DAGGER | Dagger |
+| $04 | OT6_BLUNT | Blunt |
+| $08 | OT6_RANGED | Ranged |
+| $10 | OT6_KATANA | Katana |
+| $20 | OT6_SPEAR | Spear |
 
 ## Save-block fields
 | Address | Bytes | Symbol | Meaning |
@@ -754,12 +731,12 @@ SELF_DBG = (
     'sym\tname="OT6_CODEX_SPECIES",val=0x180,type=equ\n'
     'sym\tname="OT6_SWORD",val=0x1,type=lab\n'
     'sym\tname="OT6_DAGGER",val=0x2,type=lab\n'
-    'sym\tname="OT6_FIST",val=0x4,type=lab\n'
-    'sym\tname="OT6_ARCANE",val=0x8,type=lab\n'
+    'sym\tname="OT6_BLUNT",val=0x4,type=lab\n'
+    'sym\tname="OT6_RANGED",val=0x8,type=lab\n'
+    'sym\tname="OT6_CLASSES",val=0x3F,type=lab\n'
     'sym\tname="OT6_KATANA",val=0x10,type=lab\n'
     'sym\tname="OT6_SPEAR",val=0x20,type=lab\n'
     'sym\tname="Ot6CodexSix",val=0xC32000,type=lab\n'
-    'sym\tname="Ot6ClassSecondTbl",val=0xC32100,type=lab\n'
     'sym\tname="Ot6ClassSplitTbl",val=0xC32200,type=lab\n'
     'sym\tname="SRAMSlotPtrs",val=0xC31572,type=lab\n'
     'sym\tname="CopyGameDataToSRAM",val=0xC30100,type=lab\n'
@@ -777,12 +754,11 @@ def _self_rom():
     rom[0x030180 + 10:0x030180 + 13] = bytes.fromhex("e0fe09")
     rom[0x0301C0 + 10:0x0301C0 + 13] = bytes.fromhex("e00020")
     rom[0xFFD8] = 5
-    rom[0x032100:0x032110] = bytes.fromhex("0010203008182838021222320a1a2a3a")   # Ot6ClassSecondTbl
-    rom[0x032200:0x032200 + SPECIES] = bytes(SELF_SPLIT)                         # Ot6ClassSplitTbl
+    rom[0x032200:0x032200 + SPECIES * 4] = bytes(SELF_SPLIT)     # Ot6ClassSplitTbl
     return rom
 
 
-SELF_SPLIT = [(i * 7) & 0x0F for i in range(SPECIES)]
+SELF_SPLIT = [(i * 7) & 0x3F for i in range(SPECIES * 4)]
 SELF_USES = [("ot6_codex.asm", 22, "OT6_CODEX_V3     := $394f"), ("ot6_codex.asm", 23, "OT6_CODEX_V2     := $384f"),
              ("ot6_codex.asm", 77, "cmp     #OT6_CODEX_V3"), ("ot6_codex.asm", 80, ":       cmp     #OT6_CODEX_V2"),
              ("ot6_codex.asm", 117, "lda     #OT6_CODEX_V3")]
@@ -877,28 +853,27 @@ def selftest():
     red("ot6_codex.asm:138 uses the migrated codex magic OT6_CODEX_V2 other than to compare against it",
         uses=SELF_USES + [("ot6_codex.asm", 138, "lda     #OT6_CODEX_V2")])
     red("no source line signs a codex page with OT6_CODEX_V3", uses=SELF_USES[:-1])
-    # the six-class migration's tables: a child's value, a first child off
-    # its parent's bit, a row missing, the second-children table, the split
-    # table against its source, a selector past the four, the constants
-    red("class OT6_KATANA is $10 in the doc, $40 in the build",
+    # the six-class codex: a class off its bit, a row missing, the split
+    # table against its source, a bit past the six, the constants
+    red("class OT6_KATANA is bit $10 in the doc, $40 in the build",
         dbg=SELF_DBG.replace('name="OT6_KATANA",val=0x10', 'name="OT6_KATANA",val=0x40'))
-    red("the first child of four-class bit $04 is OT6_ARCANE $08",
-        doc=SELF_DOC.replace("| OT6_FIST `$04` | OT6_ARCANE `$08` |", "| OT6_ARCANE `$08` | OT6_FIST `$04` |"))
-    red("must hold the four-class bits $01 $02 $04 $08 in order",
-        doc=SELF_DOC.replace("| $08 | special | OT6_ARCANE `$08` | OT6_DAGGER `$02` |\n", ""))
+    red("class OT6_BLUNT: the build has no such symbol",
+        dbg=SELF_DBG.replace('name="OT6_BLUNT"', 'name="OT6_FIST"'))
+    red("must hold the bits $01 $02 $04 $08 $10 $20 in order",
+        doc=SELF_DOC.replace("| $08 | OT6_RANGED | Ranged |\n", ""))
     bad = _self_rom()
-    bad[0x032100 + 8] = 0x20
-    red("Ot6ClassSecondTbl[8] is $20, not the second children $02 of four-class bits $08", rom=bad)
+    bad[0x032200 + 50 * 4 + 1] ^= 0x01
+    red("Ot6ClassSplitTbl is not ff6/src/battle/ot6_class_split.inc's bytes (1 differ; species 50, four-class bit "
+        "$02", rom=bad)
     bad = _self_rom()
-    bad[0x032200 + 50] ^= 0x01
-    red("Ot6ClassSplitTbl is not ff6/src/battle/ot6_class_split.inc's bytes (1 differ; species 50", rom=bad)
-    bad = _self_rom()
-    bad[0x032200 + 9] = 0x1F
-    red("Ot6ClassSplitTbl holds bits past the four selectors (species 9: $1F)", rom=bad)
-    red("holds 383 bytes, not one per codex species", split=SELF_SPLIT[:-1])
+    bad[0x032200 + 9 * 4 + 3] = 0x7F
+    red("Ot6ClassSplitTbl holds a bit past the six classes (species 9, four-class bit $08: $7F)", rom=bad)
+    red("holds 1535 bytes, not four per codex species", split=SELF_SPLIT[:-1])
     red("ot6_class_split.inc is missing", split=None)
     red("OT6_CODEX_FOUR is $1F, not $F", dbg=SELF_DBG.replace('name="OT6_CODEX_FOUR",val=0xF', 'name="OT6_CODEX_FOUR",val=0x1F'))
-    assert parse_split_inc("Tbl:\n        .byte   $0a             ;  1 x\n; .byte $01\n        .byte   $03\n") == [0x0A, 0x03]
+    red("OT6_CLASSES is $7F, not $3F", dbg=SELF_DBG.replace('name="OT6_CLASSES",val=0x3F', 'name="OT6_CLASSES",val=0x7F'))
+    assert parse_split_inc("Tbl:\n        .byte   $0a, $00, $3f, $01 ;  1 x $55\n; .byte $01\n        .byte   $03\n") == \
+        [0x0A, 0x00, 0x3F, 0x01, 0x03]
     # the vanilla save code's shape
     bad = _self_rom()
     bad[0x030180 + 11] = 0xFC
@@ -943,8 +918,8 @@ def main():
     print("check_save_layout OK: %d save-block field(s), %d assembled symbol(s); "
           "%d battery ranges tile $0000-$7FFF, anchors, SRAM symbols, source "
           "literals and the vanilla save code agree with ff6-en.dbg and the ROM; "
-          "the codex signs one magic and only compares the migrated ones, and the "
-          "six-class migration's tables are the doc's and the source's"
+          "the codex signs one magic and only compares the migrated ones, the six "
+          "classes sit on the doc's bits, and the migration's table is the source's"
           % (len(rows), len(syms), len(brows)))
     return 0
 

@@ -903,10 +903,14 @@ MUTANTS = {
     # #566, the six-class codex migration (Ot6CodexSix).  Not run at all: a
     # v0.50 save's page stays a four-class page
     "nosix": ("Ot6CodexSix", "v0.50/wor-kt-plates-v1", "the slot's codex page is signed 'O9'"),
-    # its first children dropped (`eor 4,s` becomes `lda #$00`): a revealed
-    # slash that stayed Sword is lost
-    "sixfirst": ("SixFirst=a9008304", "v0.50/wor-kt-plates-v1",
-                 "the slot's revealed classes are the file's, migrated"),
+    # its table read gives nothing (`lda f:Ot6ClassSplitTbl,x` becomes
+    # `lda #$00`): every revealed weakness is lost
+    "sixdrop": ("SixRead=a900eaea", "v0.50/wor-kt-plates-v1",
+                "the slot's revealed classes are the file's, migrated"),
+    # its four-bit mask gone (`and #$ff`): the $FF fixture's high bits read
+    # on into the next species' table bytes
+    "sixfour": ("SixFour=29ff", "junk/v0.46-kolts-classff",
+                "the slot's revealed classes are the file's, migrated"),
     # every load runs it, signed or not (the load's `jsr Ot6CodexEnsure`
     # becomes `jsr Ot6CodexSix`): the second load rewrites a six-class page
     "loadsix": ("LoadEnsure=20{Ot6CodexSix}", "v0.50/wor-kt-plates-v1",
@@ -915,10 +919,10 @@ MUTANTS = {
     # becomes four nops): a page with no magic keeps what it held
     "nowipe": ("FreshWipe=eaeaeaea", "junk/v0.50-kolts-unsigned",
                "the slot's revealed classes are the file's, migrated"),
-    # its second children dropped, its four-bit mask gone, the seed's row
-    # mask gone (battle_sixcodex, below)
-    "sixsecond": ("SixSecond=a900eaea", None, None),
-    "sixfour": ("SixFour=29ff", None, None),
+    # the page signed O9 with its class bytes left as the four classes wrote
+    # them (the loop jumped over): what the six-class ROM did before the
+    # migration; and the seed's row mask gone (battle_sixcodex, below)
+    "sixnoop": ("SixNext=4c{SixTail}", None, None),
     "nomask": ("SixMask=eaeaea", None, None),
 }
 for name, (edit, fx, want) in MUTANTS.items():
@@ -967,23 +971,24 @@ for tag, fx, extra in (("newgame_gau", "v0.44/wor-gau-v1", ""),
     golden_outs.append(out)
 
 # battle_sixcodex (#566): a four-class save's revealed classes as the six
-# classes show them in battle.  On a release's Mt. Kolts save (a first and a
-# second child) and on that save with every class byte $FF
-# (golden-saves/junk/v0.46-kolts-classff: a bit the row does not answer to,
-# and four bits to drop); and on six mutants, each of which must turn the
-# assertion it breaks red.
+# classes show them in battle.  On a release's Mt. Kolts save (revealed
+# weaknesses that kept their bit, and that moved); on that save with every
+# class byte $FF (golden-saves/junk/v0.46-kolts-classff: bits that must add
+# nothing); on that save with an O9 page of $3F bytes
+# (junk/v0.46-kolts-six3f: the seed's row mask, and no rewrite); and on five
+# mutants, each of which must turn the assertion it breaks red.
 six_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
               copy_if_changed_from(sixcodex_suite), "tools/build/run_tagged_suite.sh"] + \
     [copy_if_changed_from(h) for h in LIBS] + HARNESS
-SIX_REAL, SIX_FF = "v0.46/kolts-summit-v1", "junk/v0.46-kolts-classff"
+SIX_REAL, SIX_FF, SIX_3F = "v0.46/kolts-summit-v1", "junk/v0.46-kolts-classff", "junk/v0.46-kolts-six3f"
 for tag, fx, mutant, want in (
         ("sixcodex_real", SIX_REAL, None, None),
         ("sixcodex_classff", SIX_FF, None, None),
+        ("sixcodex_six3f", SIX_3F, None, None),
         ("sixcodex_nosix", SIX_REAL, "nosix", "the slot's codex page is signed 'O9' after the load"),
-        ("sixcodex_sixfirst", SIX_REAL, "sixfirst", "FIRST child: revealed"),
-        ("sixcodex_sixsecond", SIX_REAL, "sixsecond", "SECOND child: revealed"),
-        ("sixcodex_sixfour", SIX_FF, "sixfour", "DROPPED: the page's class byte is the file's four bits"),
-        ("sixcodex_nomask", SIX_FF, "nomask", "STALE: a revealed class the body's row does not answer to is not drawn"),
+        ("sixcodex_sixdrop", SIX_FF, "sixdrop", " in the page (species"),
+        ("sixcodex_sixnoop", SIX_FF, "sixnoop", "EXACT: the page's class byte"),
+        ("sixcodex_nomask", SIX_3F, "nomask", "MASK: a revealed class the body's row does not answer to is not drawn"),
         ("sixcodex_loadsix", SIX_REAL, "loadsix", "load2: the four-to-six rewrite has run once")):
     d = f"{GOLDEN_DIR}/{fx}"
     deps = six_common + [f"{d}/manifest.json", f"{d}/battery.sram"]
