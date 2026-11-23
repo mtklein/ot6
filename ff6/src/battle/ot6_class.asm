@@ -28,7 +28,7 @@ OT6_NULLBRK := $80              ; property, not a class: high damage that
                                 ;   for future consumers (equip permits, hud).
 
 ; the classes the kits load by hand (no weapon, no table row)
-OT6_CLS_THIEF = OT6_DAGGER      ; Mug, Trickshot and the rest of Locke's hits
+OT6_CLS_THIEF = OT6_DAGGER      ; Trickshot and Dismantle (Mug swings the weapon in hand)
 OT6_CLS_COIN  = OT6_RANGED      ; Coin Toss and a character's GP Rain
 OT6_CLS_CLUB  = OT6_BLUNT      ; Umaro's Charge and Throw
 OT6_CLS_FANG  = OT6_DAGGER      ; Gau's own body: his bare hand, and his raging Fight
