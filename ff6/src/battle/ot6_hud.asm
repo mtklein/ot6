@@ -2060,10 +2060,10 @@ Ot6ShieldTbl:
                                 ;   (bosses-wob.md 5) (opening.md 10b).  bolt|water vanilla; ice
                                 ;   an ot6 add
         .word   $014a
-        .byte   6, OT6_DAGGER|OT6_KATANA ; kefka: 'any squad you route to him can break him'
-                                ;   (bosses-wob.md 10): the rider's row; fire and poison (TERRA,
-                                ;   EDGAR) take the other two cells (opening.md 11).
-                                ;   fire|poison an ot6 add
+        .byte   6, OT6_SWORD|OT6_DAGGER ; kefka: 'any squad you route to him can break him'
+                                ;   (bosses-wob.md 10): the swords, the daggers and fangs; fire
+                                ;   and poison take the other two cells, so the katana has none
+                                ;   (opening.md 11).  fire|poison an ot6 add
                                 ;   the Narshe defense record only (MONSTER::KEFKA_NARSHE); the
                                 ;   imperial camp gags carry no monster entity at all (see the
                                 ;   block comment)

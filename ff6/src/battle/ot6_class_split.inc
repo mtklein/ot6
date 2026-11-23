@@ -338,7 +338,7 @@ Ot6ClassSplitTbl:
         .byte   $00, $08, $00, $00 ; 327 MissileBay
         .byte   $10, $20, $00, $00 ; 328 Chadarnook
         .byte   $00, $20, $04, $00 ; 329 Ice Dragon
-        .byte   $10, $02, $00, $00 ; 330 Kefka
+        .byte   $01, $02, $00, $00 ; 330 Kefka
         .byte   $10, $01, $00, $00 ; 331 Storm Drgn
         .byte   $00, $20, $04, $00 ; 332 Dirt Drgn
         .byte   $01, $00, $00, $00 ; 333 Ipooh

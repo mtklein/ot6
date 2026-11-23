@@ -226,8 +226,9 @@ OPENING = {
     0x001c: (('sword', 'dagger', 'katana'), "opening 11: fidor: 'a raider should take the troopers' keys'"),
     0x003f: (('dagger', 'katana'), "opening 11: rider: 'slash for CYAN/SABIN, pierce for LOCKE/GAU' "
              "(bosses-wob.md, the soldier line); TERRA's Fire, EDGAR's poison"),
-    0x014a: (('dagger', 'katana'), "opening 11: kefka: 'any squad you route to him can break him' "
-             "(bosses-wob.md 10): the rider's row; fire and poison (TERRA, EDGAR) take the other two cells"),
+    0x014a: (('sword', 'dagger'), "opening 11: kefka: 'any squad you route to him can break him' "
+             "(bosses-wob.md 10): TERRA's, CELES's and EDGAR's swords, LOCKE's dagger, GAU's fangs; fire and poison "
+             "take the other two cells, so the katana has none"),
     # 12. Kohlingen and Zozo: any four of LOCKE, EDGAR, SABIN, CYAN, GAU, CELES
     0x0078: (('katana', 'spear'), "opening 12: red fang, a wolf: CYAN's katana, EDGAR's pike or Drill"),
     0x002a: (('dagger', 'crossbow'), "opening 12: vulture, a flier: the fliers' rule; one class would have one "

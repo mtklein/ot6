@@ -126,10 +126,12 @@ SHADOW_STARS = mem("SHADOW", [IMPERIAL], kit=["star"], says="Imperial; Throw, wi
                    "merchant sells")
 GAU = mem("GAU", ["fang"], says="his fangs; Rage")
 MOOGLES = {
-    "LOCKE's squad": [LOCKE0, mem("KUPEK", [PIKE]), mem("KUPOP", [MSTAR]), mem("KUMAMA", [CLAW])],
-    "MOG's squad": [mem("MOG", [PIKE]), mem("KUKU", [FLAIL]), mem("KUTAN", [MBLADE]), mem("KUPAN", [FULLMOON])],
-    "KUSHU's squad": [mem("KUSHU", [BRUSH]), mem("KURIN", [PIKE]), mem("KURU", [MBLADE]),
-                      mem("KAMOG", [BOOMERANG])],
+    "LOCKE's squad": [LOCKE0, mem("KUPEK", [PIKE], says="Mithril Pike"), mem("KUPOP", [MSTAR], says="Morning Star"),
+                      mem("KUMAMA", [CLAW], says="Mithril Claw")],
+    "MOG's squad": [mem("MOG", [PIKE], says="Mithril Pike"), mem("KUKU", [FLAIL], says="Flail"),
+                    mem("KUTAN", [MBLADE], says="Mithril Blade"), mem("KUPAN", [FULLMOON], says="Full Moon")],
+    "KUSHU's squad": [mem("KUSHU", [BRUSH], says="Chocobo Brush"), mem("KURIN", [PIKE], says="Mithril Pike"),
+                      mem("KURU", [MBLADE], says="Mithril Blade"), mem("KAMOG", [BOOMERANG], says="Boomerang")],
 }
 SEVEN = [TERRA, LOCKE, EDGAR_PIKE, SABIN_CLAW, CYAN, GAU, CELES]
 SIX = [LOCKE, EDGAR_DRILL, SABIN15, CYAN, GAU, CELES]
@@ -250,8 +252,9 @@ AREAS = [
                   ("the automated route's party 3: CYAN, SABIN (bare fists)",
                    [CYAN, mem("SABIN", [BARE], kit=["blitz"], elem=["holy"])])],
          teaches="The player forms three squads from seven without seeing the enemy, so one row serves the "
-                 "raiders: swords, daggers and fangs, the katana. On the hill the swords stop: the Rider and "
-                 "Kefka take the dagger, the katana, Fire and poison."),
+                 "raiders: swords, daggers and fangs, the katana. The Rider takes the dagger and the katana, "
+                 "Kefka the sword and the dagger, and both Fire and poison: his four cells are full, and the "
+                 "katana has none."),
     dict(key="12", name="Kohlingen, the plains and Zozo, with Dadaluma",
          legs=["figaro_submerged", "wob_kohlingen", "zozo_arrival", "zozo_clock_solved", "dadaluma_entry"],
          pools=dict(world=[9, 10, 11, 12, 13], maps=[221, 225], battles=[69], extra=[0x6C], skip=[433]),
@@ -489,6 +492,12 @@ def report(d):
                 for m in party:
                     mm = party_masks(d, [m])
                     r1, _ = share(d, gauged, mm)
+                    if label == a["parties"][0][0]:
+                        totals[("member", 4)] += r1[3][1]
+                        totals[("member", 6)] += r1[3][2]
+                        totals[("memberhand", 4)] += r1[1][1]
+                        totals[("memberhand", 6)] += r1[1][2]
+                        totals["member n"] += n
                     none = [d.name(sp) for sp in gauged if not any(keyed(d, sp, mm)[1])]
                     w("      %-7s six: in hand %d, by kit %d, by element %d, any %d of %d (four: any %d)%s" % (
                         m["name"], r1[0][2], r1[1][2], r1[2][2], r1[3][2], n, r1[3][1],
@@ -537,6 +546,12 @@ def report(d):
         w("   %-10s four %3d (%.0f%%)   six %3d (%.0f%%)" % (
             label, totals[(label, 4)], 100.0 * totals[(label, 4)] / totals["n"], totals[(label, 6)],
             100.0 * totals[(label, 6)] / totals["n"]))
+    w("   a single member of those parties (of two or more), species x members %d: any key four %d (%.0f%%), six %d "
+      "(%.0f%%); by weapon or skill four %d (%.0f%%), six %d (%.0f%%)" % (
+          totals["member n"], totals[("member", 4)], 100.0 * totals[("member", 4)] / totals["member n"],
+          totals[("member", 6)], 100.0 * totals[("member", 6)] / totals["member n"],
+          totals[("memberhand", 4)], 100.0 * totals[("memberhand", 4)] / totals["member n"],
+          totals[("memberhand", 6)], 100.0 * totals[("memberhand", 6)] / totals["member n"]))
     return "\n".join(out) + "\n"
 
 
@@ -554,7 +569,7 @@ def markdown(d):
             who = "; ".join("%s (%s)" % (m["name"], m["says"]) if m["says"] else m["name"] for m in party
                             if (m["name"], m["says"]) not in seen)
             rows, n = share(d, gauged, masks)
-            line = "**%s.** " % label[0].upper() + label[1:] if False else "**%s.** " % (label[0].upper() + label[1:])
+            line = "**%s.** " % (label[0].upper() + label[1:])
             if who:
                 line += who + ". "
             line += "Holds: %s in hand" % six_names(masks[2])
@@ -563,6 +578,12 @@ def markdown(d):
             line += "; elements: %s. " % el_names(masks[4])
             line += "Keys %d of %d species (%d in hand, %d by kit, %d by element); under four classes %d (%d in hand)." % (
                 rows[3][2], n, rows[0][2], rows[1][2], rows[2][2], rows[3][1], rows[0][1])
+            if 1 < len(party) <= 7:
+                each = []
+                for m in party:
+                    r1, _ = share(d, gauged, party_masks(d, [m]))
+                    each.append("%s %d" % (m["name"], r1[3][2]))
+                line += " Each member's own keys: %s." % ", ".join(each)
             w(line)
             w("")
             seen += [(m["name"], m["says"]) for m in party]

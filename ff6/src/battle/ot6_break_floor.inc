@@ -338,7 +338,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_RANGED  ; 327 MissileBay -> PIERCE -> RANGED
         .byte   OT6_KATANA  ; 328 Chadarnook -> SLASH -> KATANA
         .byte   OT6_BLUNT   ; 329 Ice Dragon -> PIERCE -> BLUNT
-        .byte   OT6_DAGGER  ; 330 Kefka -> SLASH -> DAGGER
+        .byte   OT6_SWORD   ; 330 Kefka -> SLASH -> SWORD
         .byte   OT6_SWORD   ; 331 Storm Drgn -> PIERCE -> SWORD
         .byte   OT6_BLUNT   ; 332 Dirt Drgn -> PIERCE -> BLUNT
         .byte   OT6_SWORD   ; 333 Ipooh -> SLASH -> SWORD
