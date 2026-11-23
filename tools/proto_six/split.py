@@ -319,10 +319,16 @@ def assign(masks, order, count, how, ev=None, stage=None, binds=None, departs=No
         if rule and binds is not None:
             binds.append((sp, sum(combo), rule))
         out[sp], kids_of[sp] = sum(combo), dict(zip(olds, combo))
+        for kind in getattr(pins, "ADD", {}).get(sp, ()):
+            extra = C.KIND_CLASS[kind]
+            if not out[sp] & extra:
+                out[sp] |= extra
+                notes.append("+%s added" % NEW_NAME[extra])
         how[sp] = ", ".join(notes) or "none"
         if count is not None:
-            for k in combo:
-                count[k] += 1
+            for k in NEW_NAME:
+                if out[sp] & k:
+                    count[k] += 1
     return out, kids_of
 
 
@@ -469,6 +475,32 @@ def report(r):
         out.append("  $%04x %-13s %-22s -> %-24s %s  <- %s" % (
             sp, nm, "|".join(OLD_NAME[b] for b in OLD_NAME if old & b) or "-",
             "|".join(NEW_NAME[b] for b in ORDER if mask & b) or "-", "; ".join(dep), pins.OPENING[sp][1]))
+    # the suites' pins on the opening's species: the opening's row wins; say where it leaves a pin
+    suite = getattr(pins, "_suite", None)
+    if suite is not None:
+        both = sorted(set(pins.OPENING) & (set(suite.SUITE) | set(suite.EVERY)))
+        left = []
+        for sp in both:
+            if sp in suite.EVERY:
+                want, why = 0, suite.EVERY[sp]
+                for o in (S, P, B, X):
+                    for c in CHILDREN[o] if rows[sp][1] & o else ():
+                        want |= c
+            else:
+                want, why = 0, suite.SUITE[sp][1]
+                for k in suite.SUITE[sp][0].values():
+                    want |= C.KIND_CLASS[k]
+            if want & ~new[sp]:
+                left.append((sp, want, why))
+        out.append("")
+        out.append("SUITE PINS THE OPENING OVERRIDES (pins_suite.py names %d of the opening's species; the opening's "
+                   "row holds every class the pin names for %d, and leaves one out for these %d): " % (
+                       len(both), len(both) - len(left), len(left)))
+        for sp, want, why in left:
+            nm = r["names"][sp] if sp < len(r["names"]) else ""
+            out.append("  $%04x %-11s the suite pins %-28s the opening's row is %-22s (%s)  <- %s" % (
+                sp, nm, "|".join(NEW_NAME[b] for b in ORDER if want & b), "|".join(
+                    NEW_NAME[b] for b in ORDER if new[sp] & b) or "-", pins.OPENING[sp][1], why[:150]))
     out.append("")
     out.append("THE HOLDER RULE BINDS (no split of the row met it; the split kept is the least bad): %d rows" % len(
         r["binds"]))

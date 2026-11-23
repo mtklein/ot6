@@ -285,29 +285,29 @@ transcription of that output and go stale if nobody re-runs it.
 
 **SwdTech** (magic ids `$55-$5c`, names from `BushidoName`)
 
-| tech | id | hits | tgt | class | pow | MP | mp/chip |
+| tech | id | hits | tgt | class/elem | pow | MP | mp/chip |
 |---|---|---|---|---|---|---|---|
-| Dispatch | `$55` | 1 | `$53` single | Katana | 120 | 4 | 4.0 |
-| Retort | `$56` | 1 | `$53` single | — | 56 | 10 | — (counter) |
-| Slash | `$57` | 1 | `$53` single | Katana | 8 | 13 | 13.0 |
-| **Quadra Slam** | `$58` | **4** | `$53` single | Katana | 72 | 16 | **4.0** |
-| Empowerer | `$59` | 2 | `$53` single | — | 49 | 18 | — (chips nothing) |
-| Stunner | `$5a` | 1 | `$7a` one-side | Katana | 97 | 28 | 28.0 |
-| **Quadra Slice** | `$5b` | **4** | `$53` single | wind | 70 | 50 | **12.5** (wind) |
-| Cleave | `$5c` | 1 | `$7a` one-side | Katana | 0 | 99 | — (execute) |
+| Dispatch | `$55` | 1 | `$53` single | katana | 120 | 4 | 4.0 |
+| Retort | `$56` | 1 | `$53` single | — (classless, #379) | 56 | 10 | — (counter) |
+| Slash | `$57` | 1 | `$53` single | katana | 8 | 13 | 13.0 |
+| **Quadra Slam** | `$58` | **4** | `$53` single | katana | 72 | 16 | **4.0** |
+| Empowerer | `$59` | 2 | `$53` single | — (classless, #379) | 49 | 18 | 9.0 |
+| Stunner | `$5a` | 1 | `$7a` one-side | katana | 97 | 28 | 28.0 |
+| **Quadra Slice** | `$5b` | **4** | `$53` single | wind (no class, #379) | 70 | 50 | **12.5** |
+| Cleave | `$5c` | 1 | `$7a` one-side | katana | 0 | 99 | — (execute) |
 
 **Blitz** (magic ids `$5d-$64`)
 
 | blitz | id | hits | tgt | class/elem | pow | MP | mp/chip |
 |---|---|---|---|---|---|---|---|
-| **Pummel** | `$5d` | **2** | `$53` single | Fist | 55 | 4 | **2.0** |
+| **Pummel** | `$5d` | **2** | `$53` single | blunt | 55 | 4 | **2.0** |
 | AuraBolt | `$5e` | 1 | `$53` single | holy | 68 | 10 | 10.0 |
-| Suplex | `$5f` | 1 | `$7e` one-half | Fist | 180 | 13 | 13.0 |
+| Suplex | `$5f` | 1 | `$7e` one-half | blunt | 180 | 13 | 13.0 |
 | Fire Dance | `$60` | 1 | `$7a` one-side | fire | 42 | 17 | 17.0 |
 | Mantra | `$61` | 1 | `$3e` allies | — | 1 | 16 | — |
 | Air Blade | `$62` | 1 | `$7a` one-side | wind | 78 | 28 | 28.0 |
 | Spiraler | `$63` | 1 | `$3e` | — | 200 | 50 | — |
-| **Bum Rush** | `$64` | **4** | `$53` single | Fist | 32 | 99 | **24.8** |
+| **Bum Rush** | `$64` | **4** | `$53` single | blunt | 32 | 99 | **24.8** |
 
 **Tools** (item ids `$a3-$aa`, `ItemProp`)
 
@@ -316,11 +316,11 @@ transcription of that output and go stale if nobody re-runs it.
 | NoiseBlaster | `$a3` | 1 | `$6a` one-side | — | 0 | 6 | — (confuse) |
 | Bio Blaster | `$a4` | 1 | `$6a` one-side | **poison + status** | 20 | 8 | 8.0 + duration |
 | Flash | `$a5` | 1 | `$6a` one-side | — | 42 | 6 | — (blind) |
-| Chain Saw | `$a6` | 1 | `$43` single | Sword | 252 | 18 | 18.0 |
+| Chain Saw | `$a6` | 1 | `$43` single | sword | 252 | 18 | 18.0 |
 | Debilitator | `$a7` | 1 | `$43` single | — | 0 | 10 | — (adds a weakness) |
-| **Drill** | `$a8` | **2** | `$43` single | Spear | 96 | 16 | **8.0** |
-| Air Anchor | `$a9` | 1 | `$43` single | Spear | 128 | 14 | 14.0 |
-| AutoCrossbow | `$aa` | **1/body** | `$6a` one-side | Spear | 125 | 4 | 4.0 (boss) |
+| **Drill** | `$a8` | **2** | `$43` single | spear | 96 | 16 | **8.0** |
+| Air Anchor | `$a9` | 1 | `$43` single | ranged | 128 | 14 | 14.0 |
+| AutoCrossbow | `$aa` | **1/body** | `$6a` one-side | ranged | 125 | 4 | 4.0 (boss) |
 
 **Targeting-byte caveat.** The `INIT` decode above is read from
 `const.inc:1298-1302` plus `ChooseTarget` (`battle_main.asm:14959-14978`), not

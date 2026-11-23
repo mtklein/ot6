@@ -12,7 +12,8 @@ are" (2026-11-23).
   `Ot6ShieldTbl` (`ff6/src/battle/ot6_hud.asm`); the masks are never edited
   by hand. They were applied with `--keep origin/wt/v051-six-classes`, which
   leaves every other row as that branch had it: the split's balance step
-  reads a running tally, so without it 45 rows nobody looked at move too.
+  reads a running tally, so without it dozens of rows nobody looked at move
+  too (59 at the last run).
 - The tables below are `python3 tools/proto_six/opening.py --md`, and the
   numbers `python3 tools/proto_six/opening.py`
   (`build/attempts/wt/v051-six-classes/opening/shares.txt`). The species of
@@ -249,7 +250,7 @@ Teaches: Each hand keys two of the raft's three: TERRA's blade, EDGAR's bolts, t
 
 ### 10a. TERRA's scenario: the raft, Narshe's mines and the back way
 
-**TERRA, EDGAR, BANON.** TERRA (a sword from South Figaro's shop; Fire, Cure); EDGAR (Mithril Blade; AutoCrossbow; the Bio Blaster from Figaro's tool merchant); BANON (Punisher (a rod); Health). Holds: Sword, Blunt in hand, Ranged by kit; elements: fire, poison. Keys 13 of 13 species (12 in hand, 13 by kit, 13 by element); under four classes 13 (12 in hand). Each member's own keys: TERRA 12, EDGAR 12, BANON 7.
+**TERRA, EDGAR, BANON.** TERRA (a sword from South Figaro's shop; Fire, Cure); EDGAR (Mithril Blade; AutoCrossbow; the Bio Blaster from Figaro's tool merchant); BANON (Punisher (a rod); Health). Holds: Sword, Blunt in hand, Ranged by kit; elements: fire, poison. Keys 13 of 13 species (12 in hand, 13 by kit, 13 by element); under four classes 13 (12 in hand). Each member's own keys: TERRA 12, EDGAR 12, BANON 6.
 
 | species | L | HP | shields | weapon weaknesses | elements | on main (four classes) |
 |---|---|---|---|---|---|---|
@@ -263,7 +264,7 @@ Teaches: Each hand keys two of the raft's three: TERRA's blade, EDGAR's bolts, t
 | `$038` Nautiloid | 11 | 236 | 2 | Blunt, Ranged | fire, bolt; absorbs water | pierce, bludg |
 | `$039` Exocite | 11 | 196 | 2 | Sword, Blunt | fire, bolt; absorbs water | slash, bludg |
 | `$022` Pterodon | 12 | 380 | 2 | Sword, Ranged | fire | slash, pierce |
-| `$060` Dark Side | 13 | 255 | 2 | Sword, Blunt | fire, holy; absorbs poison | slash, special |
+| `$060` Dark Side | 13 | 255 | 2 | Sword, Ranged | fire, holy; absorbs poison | slash, special |
 | `$0B6` Spectre | 13 | 235 | 2 | Blunt, Ranged | fire, holy; absorbs poison | bludg, special |
 | `$0CF` Rinn | 11 | 110 | 1 | Blunt, Ranged | fire, holy; absorbs poison | pierce, special |
 

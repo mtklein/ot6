@@ -86,8 +86,6 @@ PIN = {
     0x0124: ({S: 'katana'}, "row block 'his katana (slash) keys every body here' (Cyan's)"),
     0x0126: ({B: 'rod'}, "row block 'every body takes his rod (bludgeon)' (Strago's)"),
     0x0138: ({S: 'katana'}, "row block 'his katana (slash) keys every body here' (Cyan's)"),
-    0x013f: ({S: 'sword'}, "wob docs: Number 128's blades, the facility party's swords"),
-    0x0140: ({S: 'sword'}, "wob docs: Number 128's blades, the facility party's swords"),
     0x0144: ({P: 'spear'}, "row 'blades and the spear chip'"),
     0x0145: ({P: 'crossbow'}, "wob docs: Laser Gun, 'Edgar's AutoCrossbow keyed pierce on every part'"),
     0x0147: ({P: 'crossbow'}, "wob docs: MissileBay, 'Edgar's AutoCrossbow keyed pierce on every part'"),
@@ -169,7 +167,8 @@ OPENING = {
     # 10a. TERRA, EDGAR and BANON to Narshe: the raft again, the mines, the back way and its trap
     0x00ef: (('crossbow', 'rod'), "opening 10a: 1st class, a guard in plate: the bolt or BANON's rod"),
     0x00f4: (('sword', 'dagger'), "opening 10a: wild rat: a rat's row (the were-rat's)"),
-    0x0060: (('sword', 'rod'), "opening 10a: dark side (the checkpoint's trap): the blades or the rod"),
+    0x0060: (('sword', 'crossbow'), "opening 10a: dark side (the checkpoint's trap): the blades or the bolt; not "
+             "BANON's rod, which has the other two ('one spirit to each hand')"),
     0x00b6: (('rod', 'crossbow'), "opening 10a: spectre (the trap): BANON's rod, EDGAR's bolts"),
     0x00cf: (('crossbow', 'rod'), "opening 10a: rinn (the trap's x3): the sweep, or the rod"),
     # 10b. LOCKE alone in South Figaro, then with CELES
@@ -272,3 +271,6 @@ for _sp, (_kinds, _src) in _suite.SUITE.items():
     PIN[_sp] = (_merged, _old[1] + (" || " if _old[1] else "") + _src)
     HARD[_sp] = set(_kinds)
 EVERY |= set(_suite.EVERY)
+# a weakness a row gains beyond its four-class count ({species: [kind, ...]}),
+# where a design statement cannot be kept on the old count; each with its reason
+ADD = dict(getattr(_suite, "ADD", {}))

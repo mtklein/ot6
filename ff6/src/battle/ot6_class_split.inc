@@ -104,7 +104,7 @@ Ot6ClassSplitTbl:
         .byte   $02, $00, $00, $00 ;  93 Areneid
         .byte   $00, $00, $04, $00 ;  94 Actaneon
         .byte   $01, $20, $00, $00 ;  95 Sand Horse
-        .byte   $01, $00, $00, $04 ;  96 Dark Side
+        .byte   $01, $00, $00, $08 ;  96 Dark Side
         .byte   $01, $00, $00, $00 ;  97 Mad Oscar
         .byte   $01, $00, $04, $00 ;  98 Crawly
         .byte   $00, $02, $00, $00 ;  99 Bleary
