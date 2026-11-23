@@ -273,7 +273,7 @@ M.contracts["post-opera-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex row (ULTROS2; measured EMPTY, unseeded)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex row (ULTROS2; the fighting run revealed slash|pierce at the Lete -- re-measured 2026-08-31)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex row (ULTROS2; the fighting run revealed both classes of his row at the Lete: the ROM's row, #566)" },
   },
 }
 
@@ -322,7 +322,7 @@ M.contracts["mrf-save-room-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -353,7 +353,7 @@ M.contracts["n024-entry-save-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -382,7 +382,7 @@ M.contracts["minecart-platform-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -411,7 +411,7 @@ M.contracts["vector-escape-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -456,7 +456,7 @@ M.contracts["terra-returned-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -521,7 +521,7 @@ M.contracts["narshe-mission-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -610,7 +610,7 @@ M.contracts["gate-cave-save-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -663,7 +663,7 @@ M.contracts["vector-crash-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -732,7 +732,7 @@ M.contracts["banquet-done-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -792,7 +792,7 @@ M.contracts["crescent-landing-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -854,7 +854,7 @@ M.contracts["thamasa-night-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -910,7 +910,7 @@ M.contracts["fire-out-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -965,7 +965,7 @@ M.contracts["esper-mtn-save-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -1030,7 +1030,7 @@ M.contracts["ultros-won-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -1084,7 +1084,7 @@ M.contracts["thamasa-done-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
   },
 }
 
@@ -2783,6 +2783,7 @@ end
 function M.contractDiffs(c)
   local diffs, held = {}, 0
   local function field(label, want, got, hex)
+    if type(want) == "function" then want = want() end   -- #566: a value the ROM's tables give
     local fmt = hex and function(v) return string.format("0x%02X", v) end
                      or tostring
     if got == want then
