@@ -22,12 +22,15 @@
 ; Merit Award.
 ; ------------------------------------------------------------------------------
 
-; the permit's data, read by Ot6EquipWord and by the test harness
+; the permit's data (Ot6EquipWord reads the relic and the last actor; its fast
+; path tests the spear range with the constants below), read by the test harness
 ; (tools/tests/lib/ot6_field.lua): the first and last spear, the relic that
 ; lends them, and the last actor it reaches.
+OT6_SPEAR_FIRST = ITEM::MITHRIL_PIKE
+OT6_SPEAR_LAST = ITEM::IMP_HALBERD
 Ot6SpearPermit:
-        .byte   ITEM::MITHRIL_PIKE
-        .byte   ITEM::IMP_HALBERD
+        .byte   OT6_SPEAR_FIRST
+        .byte   OT6_SPEAR_LAST
         .byte   ITEM::DRAGOONBOOTS
         .byte   CHAR_PROP::GOGO
 
@@ -41,23 +44,20 @@ Ot6SpearPermit:
 ; banon_joined).  Callers run a16/i16; any data bank (the char blocks are
 ; read long).  Preserves X and Y.
 .proc Ot6EquipWord
-        php
+        .a16
+        .i16
+        cpx     #OT6_SPEAR_FIRST * 30   ; the fast path, a few cycles over
+        bcc     @plain                  ;   vanilla's load: every non-spear
+        cpx     #(OT6_SPEAR_LAST + 1) * 30
+        bcc     @slow
+@plain: lda     f:ItemProp+1,x
+        rtl
+@slow:  php
         longai
         phy
         phx
         lda     f:ItemProp+1,x
         pha                             ; 1,s word, 3,s X, 5,s Y
-        lda     f:Ot6SpearPermit        ; first spear
-        and     #$00ff
-        jsr     Times30
-        cmp     3,s
-        beq     @spear
-        bcs     @done                   ; X below the first spear
-        lda     f:Ot6SpearPermit+1      ; last spear
-        and     #$00ff
-        jsr     Times30
-        cmp     3,s
-        bcc     @done                   ; X past the last spear
 @spear: ldy     #16                     ; Y = character blocks to scan
         ldx     #0                      ; X = the block's offset
 @block: shorta
@@ -96,19 +96,6 @@ Ot6SpearPermit:
         plp
         rtl
 
-; A = A * 30 (16-bit).  uses one stack word.
-Times30:
-        asl                             ; 2n
-        pha
-        asl
-        asl
-        asl
-        asl                             ; 32n
-        sec
-        sbc     1,s                     ; 30n
-        sta     1,s
-        pla
-        rts
 .endproc  ; Ot6EquipWord
 
 ; ------------------------------------------------------------------------------
