@@ -312,8 +312,10 @@ end
 
 if fails == 0 then
   emu.log("breaktbl: all v0.6 break-coverage rows present - PASS")
+  print("breaktbl: all v0.6 break-coverage rows present - PASS")
   emu.stop(0)
 else
   emu.log(string.format("breaktbl: %d assertion(s) FAILED", fails))
+  print(string.format("breaktbl: %d assertion(s) FAILED", fails))
   emu.stop(1)
 end

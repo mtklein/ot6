@@ -36,7 +36,11 @@ end
 
 local function check(cond, msg)
   if not cond then fails = fails + 1 end
-  emu.log(string.format("breakfloor: %s %s", cond and "OK  " or "FAIL", msg))
+  -- print() reaches the run log; emu.log goes to Mesen's script log, which nothing reads headless
+  -- (battle_breaktbl.lua's check has the same note), so a failure here names itself
+  local line = string.format("breakfloor: %s %s", cond and "OK  " or "FAIL", msg)
+  emu.log(line)
+  print(line)
 end
 
 -- anchor: species 0..15 classes (the guard a spear, the soldier and the
@@ -51,6 +55,7 @@ local base = find(
 
 if not base then
   emu.log("breakfloor: FAIL OT6_FLOOR_CLASS not located")
+  print("breakfloor: FAIL OT6_FLOOR_CLASS not located")
   emu.stop(1)
   return
 end
@@ -84,8 +89,10 @@ check(zeros == 0,
 
 if fails == 0 then
   emu.log("breakfloor: break-floor table present and complete - PASS")
+  print("breakfloor: break-floor table present and complete - PASS")
   emu.stop(0)
 else
   emu.log(string.format("breakfloor: %d assertion(s) FAILED", fails))
+  print(string.format("breakfloor: %d assertion(s) FAILED", fails))
   emu.stop(1)
 end
