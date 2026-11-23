@@ -740,6 +740,25 @@ TEST_ENV = {
     # CELES's RunicBlade, EDGAR's Bolt sent back, in Darill's Tomb's east room
     "battle_runicblade": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
+    # CELES's rune, the Rune Knight's list and Break Blade (#563), on a staged
+    # body in Darill's Tomb's east room
+    "battle_spellblade": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
+    # #563: the Rune Knight's list follows the esper CELES wears (her own,
+    # Ifrit, none); three battles in the same room, the stones moved in the
+    # field's Skills menu between them
+    "battle_spellblade_esper": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
+    # #563: "RuneKnt" in the Status screen, GOGO's command picker and the
+    # battle command window, beside the Falcon by the Opera House (CELES and
+    # GOGO seated); menus and one random battle
+    "menu_runeknt": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-opera-v1",
+    # #563: a v0.50 release save (CELES L36, Imp learned, Break not) has
+    # Break by her level, in the field and in battle, with nothing written;
+    # a tracked golden save, not a capture (the suite edge below)
+    "save_celesbreak": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/golden-saves/v0.50/wor-cyan-v1",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
     # an elemental shield's spell, worn and taken off, beside Jidoor (#431)
@@ -804,7 +823,14 @@ for f in glob("tools/tests/*.lua"):
         deps += [f"build/states/{fx}.mss.lua", f"build/states/{fx}.mss",
                  f"build/states/{fx}.stamp"]
     env = TEST_ENV.get(t, "")
-    if "OT6_SRAM_CHECKPOINT=" in env:
+    # a suite that Continues a release's golden save (save_celesbreak): the
+    # tracked battery is its input, not a capture of the graph, and `ninja
+    # quick` has nothing to swap for it
+    golden_env = "OT6_SRAM_CHECKPOINT=tools/tests/golden-saves/" in env
+    if golden_env:
+        gdir = env.split("OT6_SRAM_CHECKPOINT=")[1].split()[0]
+        deps += [f"{gdir}/manifest.json", f"{gdir}/battery.sram"]
+    elif "OT6_SRAM_CHECKPOINT=" in env:
         key = env.split(f"OT6_SRAM_CHECKPOINT={sn.CAPTURE_DIR}/")[1].split()[0]
         if key not in captures:
             sys.exit(f"configure.py: {t} Continues {key}, which no run on "
@@ -819,7 +845,7 @@ for f in glob("tools/tests/*.lua"):
     # is its real one.  Never qualification (docs/TESTING.md).
     fixtures = {d.split("/")[-1].split(".")[0] for d in deps
                 if d.startswith("build/states/")}
-    ckpt = "OT6_SRAM_CHECKPOINT=" in env
+    ckpt = "OT6_SRAM_CHECKPOINT=" in env and not golden_env
     if ckpt or fixtures & quick_affected:
         qdeps = [d for d in deps if not d.startswith(("build/states/",
                                                       sn.CAPTURE_DIR + "/"))]

@@ -35,8 +35,9 @@
 --                  Ot6Oblivion's entry) holds 1 + min(boost, the allies it can
 --                  land on) bodies, each holds Safe after; the price drawn is
 --                  safe-b0's times (1 + boost), and that is charged;
---   imp-b1         CELES's Imp at a monster: the mask holds the target and
---                  one more monster it can land on, when there is one;
+--   imp-b1         CELES's Imp (Stray's: she wears the stone) at a monster:
+--                  the mask holds the target and one more monster it can land
+--                  on, when there is one;
 --   debil-b0/b2    EDGAR's Debilitator: the target gains min(1 + boost, the
 --                  elements it lacks) weaknesses; charged debil-b0's x (1 + b);
 --   noise-r/b1     R on NoiseBlaster refused; raised before it, the bank ends
@@ -47,17 +48,27 @@
 --   impa-b1/impl-b1  Imp at an ally (snapshot I after it: two allies imped),
 --                  then Imp at the imped ally reaches the other imped one and
 --                  lifts it from both;
---   quiet-b0/b1/r  CELES's spell the boost buys nothing on: R refused, a
---                  boost raised before it never charged, its price its own;
---   vanmon-b0/b1   Vanish at a monster: the boost dropped, its price its own;
+--   quiet-b0/b1/r  the Phantom wearer's spell the boost buys nothing on
+--                  (Demi): R refused, a boost raised before it never charged,
+--                  its price its own;
+--   vanmon-b0/b1   the Phantom wearer's Vanish at a monster: the boost
+--                  dropped, its price its own;
 --   debil-oc-b3    from snapshot D (after debil-b2), EDGAR's overclocked
 --                  Debilitator: eight firings at most, stopping when the
 --                  body has no element left; 80 MP.  The Tools list's drawn
 --                  price (the decorator's cost cell) is the charge.
 -- The run: Continue wor-kohlingen-v1 (EDGAR SABIN CELES SETZER outside
--- Kohlingen), CELES equips Phantom through the field menu (Vanish, Demi), pace to an encounter with two or more bodies standing, one with
+-- Kohlingen); through the field menu CELES equips Stray (Imp, Muddle) and the
+-- first seated member who is neither EDGAR nor CELES equips Phantom (Vanish,
+-- Demi); pace to an encounter with two or more bodies standing, one with
 -- a shield (the target); everyone Defends until EDGAR's window opens with
--- three pips banked (snapshot E), then on to CELES's with three (snapshot C).
+-- three pips banked (snapshot E), then on to CELES's with three (snapshot C)
+-- and the Phantom wearer's with three (snapshot P).
+-- Imp is the stone's, not CELES's own (#563: Break took Imp's place at level
+-- 13 in her natural magic, so a chain replayed on that ROM never teaches her
+-- Imp; an older save's learned Imp is not needed: a lab copy with that byte
+-- cleared passes, build/attempts/wt/v051-spellblade/sb2/F/).  One stone a
+-- wearer, so Phantom's cases are another member's.
 -- Nothing is written; everything is observed.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -69,7 +80,7 @@ local BANK, PEND, CURMP, BATTINV = 0x3E9C, 0x3E9D, 0x3C08, 0x2686
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_TOOLS = 0x00, 0x01, 0x02, 0x09
 local EDGAR, SABIN, CELES, SETZER = 4, 5, 6, 9
 local SAFE, IMP, VANISH = 0x1C, 0x23, 0x26
-local PHANTOM = 20
+local STRAY, PHANTOM = 8, 20             -- esper indices: $1A69's bits, +$1E of a record
 -- the reach spells (boost-rewards.md proposal 1), named here rather than read
 -- off the ROM, so a ROM without them is judged by the rule and not by itself
 local REACH = { [0x1B] = true, [0x1C] = true, [0x1D] = true, [0x1E] = true, [0x20] = true, [0x21] = true,
@@ -106,6 +117,7 @@ local function members()
   return t
 end
 local edgarS, celesS, sabinS, setzerS
+local phChar, phS      -- the Phantom wearer: a character id, and their battle seat
 local quiet
 local actS
 local tgtMon, allyS
@@ -212,8 +224,11 @@ local function installObservers()
       c.endF = H.frame
       c.mpEnd = mp(actS)
       c.cmdEnd, c.atkEnd = H.readByte(0x3A7C), H.readByte(0x3A7D)
-      ev(c, string.format("Ot6ActionEnd entry: 3a7c=$%02X 3a7d=$%02X %s | %s", H.readByte(0x3A7C),
-        H.readByte(0x3A7D), chars(), mons()))
+      -- the targets the cast missed ($3A5A: CalcAttackEffect clears it and
+      -- each miss adds the target's bit, battle_main.asm _c23b1b and CheckHit)
+      c.missed = H.readWord(0x3A5A)
+      ev(c, string.format("Ot6ActionEnd entry: 3a7c=$%02X 3a7d=$%02X missed $%04X %s | %s", H.readByte(0x3A7C),
+        H.readByte(0x3A7D), c.missed, chars(), mons()))
     end
   end)
 end
@@ -353,7 +368,7 @@ local function runCase(c)
       tick, held = 0, nil
       mf, tapNo = 0, -1
       c.log = {}
-      actS = c.who == "C" and celesS or edgarS
+      actS = c.who == "C" and celesS or c.who == "P" and phS or edgarS
       c.sent, c.after, c.endF, c.mask = false, false, nil, nil
       c.triedR, c.pendAfterR = false, nil
       c.allyT = allyS
@@ -518,13 +533,26 @@ local steps = {
     local have = {}
     for _, c in ipairs(members()) do have[c] = true end
     assert(have[EDGAR] and have[CELES], "EDGAR and CELES are in the party (wor-kohlingen-v1's contract)")
+    for _, c in ipairs(members()) do
+      if phChar == nil and c ~= EDGAR and c ~= CELES then phChar = c end
+    end
+    assert(phChar, "a third member is seated, to wear Phantom (wor-kohlingen-v1's party of four)")
+    local owned = H.readByte(0x1A69) | (H.readByte(0x1A6A) << 8) | (H.readByte(0x1A6B) << 16)
+    assert((owned >> STRAY) & 1 == 1, "the party owns Stray ($1A69 bit 8): gen_zozo5_ramuh, Zozo's leg, takes its stone")
+    assert((owned >> PHANTOM) & 1 == 1, "the party owns Phantom ($1A69 bit 20): gen_esper_tubes_done, the Magitek "
+      .. "factory's tube room, grants it")
+    H.log(string.format("[boostreach] CELES's learned Imp byte $%02X; Stray goes on her, Phantom on char %d",
+      H.readByte(0x1A6E + 54 * CELES + IMP), phChar))
     MPB = H.sym("MagicProp") & 0x3FFFFF
     installObservers()
   end),
-  -- CELES puts on Phantom (owned, worn by nobody here) through the field menu,
-  -- as a player would for its spells: Vanish and Demi, the latter one the
-  -- boost buys nothing on (a fraction)
-  H.equipEsper(function() return (H.readByte(0x1850 + CELES) >> 3) & 3 end, PHANTOM, { tag = "Phantom -> CELES" }),
+  -- the stones go on through the field menu, as a player would for their
+  -- spells: Stray on CELES for Imp (not hers by nature since #563), Phantom
+  -- on the third member for Vanish and Demi, the latter one the boost buys
+  -- nothing on (a fraction)
+  H.equipEsper(function() return (H.readByte(0x1850 + CELES) >> 3) & 3 end, STRAY, { tag = "Stray -> CELES" }),
+  H.equipEsper(function() return (H.readByte(0x1850 + phChar) >> 3) & 3 end, PHANTOM,
+    { tag = "Phantom -> the third member" }),
   (function()
     local P = H.newPacer({ tag = "boostreach pace" })
     local sx, sy
@@ -547,11 +575,12 @@ local steps = {
         H.waitUntil(function() return H.battleActive() end, 900, "battle up (draw " .. try .. ")", 5),
         H.waitFrames(60),
         H.call(function()
-          edgarS, celesS = nil, nil
+          edgarS, celesS, phS = nil, nil, nil
           for s = 0, 3 do
             local id = H.readByte(0x3ED8 + s * 2)
             if id == EDGAR then edgarS = s end
             if id == CELES then celesS = s end
+            if id == phChar then phS = s end
           end
           -- the target: a shielded body with the most HP, another standing
           -- beside it, and an element it is not weak to
@@ -562,6 +591,7 @@ local steps = {
             end
           end
           local ok = best ~= nil and liveCount() >= 2 and try > BURN and edgarS ~= nil and celesS ~= nil
+            and phS ~= nil
           H.log(string.format("[boostreach] draw %d: formation $%03X | %s -> %s", try, H.readWord(0x11E0), mons(),
             ok and ("target m" .. best) or "no target with a body beside it (run)"))
           if ok then tgtMon = best; measured = true end
@@ -587,19 +617,22 @@ local steps = {
         allyS = s
       end
     end
-    H.log(string.format("[boostreach] slots: EDGAR %d CELES %d (ally %s); target m%d; %s | %s", edgarS, celesS,
-      tostring(allyS), tgtMon, chars(), mons()))
+    H.log(string.format("[boostreach] slots: EDGAR %d CELES %d (ally %s) the Phantom wearer %d; target m%d; %s | %s",
+      edgarS, celesS, tostring(allyS), phS, tgtMon, chars(), mons()))
     assert(allyS, "an ally standing beside CELES")
-    assert(spellIdx(celesS, SAFE) and spellIdx(celesS, IMP), "CELES knows Safe and Imp (wor-kohlingen-v1)")
-    -- CELES's spell the boost buys nothing on, as Ot6SpellNoBoost reads the
-    -- ROM: not a tier family (Ot6FoldTbl, Break), not Scan, not a reach spell,
-    -- and a power of 0 or a fraction
+    assert(spellIdx(celesS, SAFE), "CELES knows Safe (her natural magic: wor-kohlingen-v1)")
+    assert(H.readByte(0x1600 + 37 * CELES + 0x1E) == STRAY and spellIdx(celesS, IMP),
+      "CELES wears Stray and her battle Magic list holds Imp, the stone's")
+    assert(H.readByte(0x1600 + 37 * phChar + 0x1E) == PHANTOM, "the third member wears Phantom")
+    -- the Phantom wearer's spell the boost buys nothing on, as Ot6SpellNoBoost
+    -- reads the ROM: not a tier family (Ot6FoldTbl, Break), not Scan, not a
+    -- reach spell, and a power of 0 or a fraction
     local fold = H.sym("Ot6FoldTbl") & 0x3FFFFF
     local inFold = { [0x0C] = true, [0x18] = true }
     for i = 0, 0x17 do inFold[H.readRomByte(fold + i)] = true end
     local list = {}
     for i = 0, 53 do
-      local id = H.readByte(0x2092 + celesS * 0x13C + i * 4)
+      local id = H.readByte(0x2092 + phS * 0x13C + i * 4)
       if id ~= 0xFF then
         list[#list + 1] = string.format("$%02X", id)
         local r = MPB + id * 14
@@ -607,10 +640,15 @@ local steps = {
            and ((H.readRomByte(r + 4) & 0x80) ~= 0 or H.readRomByte(r + 6) == 0) then quiet = id end
       end
     end
-    H.log(string.format("[boostreach] CELES's list: %s; the quiet spell %s", table.concat(list, " "),
-      quiet and string.format("$%02X", quiet) or "none"))
-    assert(quiet, "CELES's list holds a spell the boost buys nothing on (Float, Demi, Quartr...)")
-    assert(spellIdx(celesS, VANISH), "CELES's list holds Vanish")
+    local clist = {}
+    for i = 0, 53 do
+      local id = H.readByte(0x2092 + celesS * 0x13C + i * 4)
+      if id ~= 0xFF then clist[#clist + 1] = string.format("$%02X", id) end
+    end
+    H.log(string.format("[boostreach] CELES's list: %s; the Phantom wearer's list: %s; the quiet spell %s",
+      table.concat(clist, " "), table.concat(list, " "), quiet and string.format("$%02X", quiet) or "none"))
+    assert(quiet, "the Phantom wearer's list holds a spell the boost buys nothing on (Demi)")
+    assert(spellIdx(phS, VANISH), "the Phantom wearer's list holds Vanish")
     assert(bagIdx(GRAVITY), "the bag holds the Gravity Rod")
     assert(cmdRow(edgarS, CMD_TOOLS) and cmdRow(edgarS, CMD_ITEM), "EDGAR's list has Tools and Item")
   end),
@@ -618,6 +656,7 @@ local steps = {
 local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
 add(snapAt("E", function() return bank(edgarS) >= 3 end, function() return edgarS end))
 add(snapAt("C", function() return bank(celesS) >= 3 end, function() return celesS end))
+add(snapAt("P", function() return bank(phS) >= 3 end, function() return phS end))
 
 local CASES = {
   { name = "safe-b0",  snap = "C", who = "C", cmd = CMD_MAGIC, spell = SAFE, boost = 0, ally = true },
@@ -642,13 +681,13 @@ local CASES = {
   { name = "impa-b1",  snap = "C", who = "C", cmd = CMD_MAGIC, spell = IMP, boost = 1, ally = true, snapAfter = "I",
     snapCond = function() return bank(celesS) >= 1 end },
   { name = "impl-b1",  snap = "I", who = "C", cmd = CMD_MAGIC, spell = IMP, boost = 1, ally = true },
-  -- a spell the boost buys nothing on; Vanish at a monster
-  { name = "quiet-b0", snap = "C", who = "C", cmd = CMD_MAGIC, spell = "quiet", boost = 0, here = true },
-  { name = "quiet-b1", snap = "C", who = "C", cmd = CMD_MAGIC, spell = "quiet", boost = 1, here = true,
+  -- a spell the boost buys nothing on; Vanish at a monster (the Phantom wearer's)
+  { name = "quiet-b0", snap = "P", who = "P", cmd = CMD_MAGIC, spell = "quiet", boost = 0, here = true },
+  { name = "quiet-b1", snap = "P", who = "P", cmd = CMD_MAGIC, spell = "quiet", boost = 1, here = true,
     keep = "quiet-b0", sameMp = "quiet-b0" },
-  { name = "quiet-r",  snap = "C", who = "C", cmd = CMD_MAGIC, spell = "quiet", boost = 0, here = true, rowR = 0 },
-  { name = "vanmon-b0", snap = "C", who = "C", cmd = CMD_MAGIC, spell = VANISH, boost = 0 },
-  { name = "vanmon-b1", snap = "C", who = "C", cmd = CMD_MAGIC, spell = VANISH, boost = 1, keep = "vanmon-b0",
+  { name = "quiet-r",  snap = "P", who = "P", cmd = CMD_MAGIC, spell = "quiet", boost = 0, here = true, rowR = 0 },
+  { name = "vanmon-b0", snap = "P", who = "P", cmd = CMD_MAGIC, spell = VANISH, boost = 0 },
+  { name = "vanmon-b1", snap = "P", who = "P", cmd = CMD_MAGIC, spell = VANISH, boost = 1, keep = "vanmon-b0",
     sameMp = "vanmon-b0", vanmon = true },
   -- Debilitator overclocked on a body with fewer elements left than firings
   { name = "debil-d2", snap = "E", cmd = CMD_TOOLS, item = DEBIL, boost = 2, snapAfter = "D",
@@ -724,14 +763,32 @@ steps[#steps + 1] = H.call(function()
         for e = 0, 6, 2 do if c.imp0[e] then imped = imped + 1 end end
         H.log(string.format("[boostreach] impl-b1: %d all(ies) imped at snapshot I, mask $%04X", imped, c.mask))
         check(c.first ~= nil and c.imp0[c.first], c.name .. ": the target is imped (snapshot I)")
-        local n = 0
+        -- a body the cast missed keeps its Imp: the lift rolls against each
+        -- body's magic block as any Imp does (impa-b1's can miss its target
+        -- too, above).  Measured with Phantom on the seat beside CELES, two
+        -- draws run from first: "impl-b1: ... Ot6ActionEnd entry: ...
+        -- missed $0002 ... e2 1770hp s20 e4 1630hp s00", the lift landed on
+        -- entity 4 and missed entity 2 (build/attempts/wt/v051-spellblade/
+        -- sb2/F/boostreach_burn2_misslog/).  $3A5A at the caster's
+        -- Ot6ActionEnd names the bodies missed.
+        local n, hit = 0, 0
         for e = 0, 6, 2 do
-          if (c.mask & (1 << (e // 2))) ~= 0 then
+          local bit = 1 << (e // 2)
+          if (c.mask & bit) ~= 0 then
             n = n + 1
-            check(c.impAfter[e] == not c.imp0[e], string.format("%s: entity %d in the mask flipped (Imp toggles): "
-              .. "imped %s before, %s after", c.name, e, tostring(c.imp0[e]), tostring(c.impAfter[e])))
+            if ((c.missed or 0) & bit) ~= 0 then
+              H.log(string.format("[boostreach] impl-b1: the cast missed entity %d ($3A5A $%04X)", e, c.missed))
+              check(c.impAfter[e] == c.imp0[e], string.format("%s: entity %d, which the cast missed, is as it was: "
+                .. "imped %s before, %s after", c.name, e, tostring(c.imp0[e]), tostring(c.impAfter[e])))
+            else
+              hit = hit + 1
+              check(c.impAfter[e] == not c.imp0[e], string.format("%s: entity %d in the mask flipped (Imp toggles): "
+                .. "imped %s before, %s after", c.name, e, tostring(c.imp0[e]), tostring(c.impAfter[e])))
+            end
           end
         end
+        check(hit >= 1, string.format("%s: the cast landed on a body in its mask (%d of %d; $3A5A $%04X)", c.name,
+          hit, n, c.missed or 0))
         -- the point's walk from an imped target lifts only another imped
         -- ally (it takes the bodies the cast changes the same way): with
         -- one imped at snapshot I it finds none and is spent (measured on

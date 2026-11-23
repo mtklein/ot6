@@ -44,9 +44,12 @@
 ;                spell line as it does in the Magic list (Fire Blade, Fire 2
 ;                Blade, Fire 3 Blade; Poison to Bio), at the tier's own MP;
 ;                an element with no line takes none.
-;   BreakBlade   the divine, at a full boost, 99 MP: for three of her turns
-;                every hit of her weapon takes one shield, whatever the
-;                body's keys; the elemental rune waits and returns after.
+;   Shatter      the divine, at a full boost, 99 MP: her Break spell on the
+;                blade (the design's "break blade"; the player reads Shatter,
+;                since vanilla has a sword named Break Blade): for three of
+;                her turns every hit of her weapon takes one shield, whatever
+;                the body's keys; the elemental rune waits and returns after.
+;                The code and its symbols keep the design's name.
 ; Command $0b's queued attack byte is free (FixPlayerAttack has no $0b arm
 ; and $0b is not in CmdWithAttackTbl), so each row queues its own id and
 ; Cmd_0b's head dispatches on it (Ot6RuneExec).  An engine-chosen Runic
@@ -110,7 +113,7 @@ Ot6RuneName:
         .byte   $d9, $8f, $9e, $9a, $ab, $a5, $ff, $ff, $ff, $ff ; (sword)Pearl
         .byte   $d9, $84, $9a, $ab, $ad, $a1, $ff, $ff, $ff, $ff ; (sword)Earth
         .byte   $d9, $96, $9a, $ad, $9e, $ab, $ff, $ff, $ff, $ff ; (sword)Water
-        .byte   $d9, $81, $ab, $9e, $9a, $a4, $ff, $ff, $ff, $ff ; (sword)Break
+        .byte   $92, $a1, $9a, $ad, $ad, $9e, $ab, $ff, $ff, $ff ; Shatter
 
 ; the battle banner's names, 13 letters, $c8-$d9 (Runic's is never shown)
 OT6_RUNE_BANLEN = 13
@@ -132,7 +135,7 @@ Ot6RuneBanner:
         .byte   $8f, $9e, $9a, $ab, $a5, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff ; Pearl Blade
         .byte   $84, $9a, $ab, $ad, $a1, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff ; Earth Blade
         .byte   $96, $9a, $ad, $9e, $ab, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff ; Water Blade
-        .byte   $81, $ab, $9e, $9a, $a4, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff ; Break Blade
+        .byte   $92, $a1, $9a, $ad, $ad, $9e, $ab, $ff, $ff, $ff, $ff, $ff, $ff ; Shatter
 
 ; The swing's colours (btlgfx InitWeaponAnim, Ot6SwingPal_ext): AttackPal
 ; ids for the weapon's sprite and for the hit drawn on the target, by
