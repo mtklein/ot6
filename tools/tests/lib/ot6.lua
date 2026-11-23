@@ -7215,6 +7215,11 @@ local BATTLE = {
   -- $05 -> $38 with the target latched on herself (chars = 1<<actor); B ->
   -- $05; A commits ($38 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00).
   CMD_RUNIC = 0x0B,
+  -- since #563 Runic opens the Rune Knight's list ($05 -> $2E -> $01 -> $30,
+  -- the Tools shell, w7e6168 = 7): Runic $D0 its first row, a blade row
+  -- $D1 + element bit for each element the caster can cast, Break Blade $D9;
+  -- a row's A goes on to that same latched target select
+  RUNE_RUNIC = 0xD0, RUNE_BLADE = 0xD1, RUNE_BREAK = 0xD9,
   CMD_MORPH = 0x03,
   -- SETZER's Slot (probe_slot.lua, deleted in bd50a973; last version at f1f26173): A on Slot $05 -> $06 (OpenSlotWindow)
   -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the reels spin
@@ -17240,8 +17245,23 @@ function Driver:button(actor)
     return { "a" }
   end
   if (st == BATTLE.ST_TOOLS_OPEN or st == BATTLE.ST_TOOLS_CLOSE)
-     and (self.plan.kind == "skill" or self.plan.kind == "slot") then
+     and (self.plan.kind == "skill" or self.plan.kind == "slot" or self.plan.kind == "runic") then
     return nil                       -- the shell is building / closing; wait
+  end
+  -- CELES's Runic row (#563, ot6_rune.asm): the Runic command opens the Rune
+  -- Knight's list (w7e6168 = 7), whose first row is the stance; its A goes
+  -- on to the target select latched on her own seat, below.
+  if st == BATTLE.ST_TOOLS and self.plan.kind == "runic" then
+    local want
+    for i = 0, 7 do
+      if M.readByte(BATTLE.ITEMLIST + i * 3) == BATTLE.RUNE_RUNIC then want = i; break end
+    end
+    if want == nil then self:dropPlan("runic_row_missing"); return { "b" } end
+    local wc, wr = want % 2, want // 2
+    local cc, cr = M.readByte(BATTLE.BLCOL + actor), M.readByte(BATTLE.BLROW + actor)
+    if cc ~= wc then return { wc > cc and "right" or "left" } end
+    if cr ~= wr then return { wr > cr and "down" or "up" } end
+    return { "a" }
   end
   -- SETZER's Slot row (ot6_setzer.asm): the Slot command opens his table,
   -- whose first row closes it and opens the reels ($30 -> $01 -> $06 ...
@@ -18933,6 +18953,10 @@ function M.kitBattle(plan, opts)
         done(p, a, true)
       end
       pulse("b")
+    elseif st == 0x30 and p.cmd == 0x0B and p.row == nil and not p.peek then
+      -- Runic opens CELES's list since #563 (ot6_rune.asm, w7e6168 = 7); an
+      -- entry that names no row means the stance, the list's first row
+      p.row = 0xD0
     elseif (st == 0x30 or st == 0x2D) and p.row ~= nil then
       -- the Tools shell, or the Throw list in the same shell (#383: SHADOW's
       -- throwing kit; wItemList $4005, three-byte rows, $FF ends the list).

@@ -160,7 +160,11 @@ OT6_SLOTTIER         := $57ba   ; Slot's stored boost tier:
                                 ;   OT6_BOOST_REVEALED by Ot6SlotCommit so
                                 ;   Ot6ActionEnd charges what the reels
                                 ;   delivered (ot6_slot.asm, the Slot strip)
-; $57bb held OT6_PIPTAIL until v0.50 (written, never read since #540); free.
+; (#563) what the weapon swing now resolving carries from its character's
+; blade: the rune's elements the swing does not already hold (Ot6RuneSwing
+; writes it at every swing, 0 for none; Ot6SkillClass and Ot6ItemClass zero
+; it for everything that is no swing).  $57bb held OT6_PIPTAIL until v0.50.
+OT6_RUNESWING        := $57bb
 OT6_RANDPEND         := $57bc
 OT6_RANDBTL          := $57bd
 OT6_HUDVEIL          := $57be
@@ -321,6 +325,12 @@ OT6_RUNICTURNS       := $ed8e   ; 8 bytes (4 characters, stride 2)
 ; interaction nobody asked for and nobody would find.  The rule that a
 ; reactive earn happens once per round is shared; the storage is not.
 OT6_RUNICPAID        := $ed96
+; (#563) the rune on a character's blade: the element bits its weapon swings
+; carry onto a body weak to them (ot6_rune.asm), 0 for none.  One byte per
+; character in OT6_RUNICTURNS's odd bytes (by entity offset, stride 2), but
+; not the stance's state: Ot6RuneArm sets it, nothing clears it during a
+; battle, and InitBP zeroes it.
+OT6_RUNE             := OT6_RUNICTURNS + 1
 ; the retaliation pair (#236).  Two per-character bitmasks in the
 ; ----1234 shape OT6_COVERPAID / OT6_RUNICPAID / $3f2f already use.
 ;
@@ -422,6 +432,10 @@ OT6_WEAPSPELL        := $eda0
 ; and the one writer of that status (Cmd_13's start) always records first,
 ; so a stale byte is never read and InitBP need not clear it.
 OT6_DANCETIER        := $eda1   ; 8 bytes (4 characters, stride 2)
+; (#563) Break Blade's turns left, per character, in OT6_DANCETIER's odd
+; bytes (by entity offset, stride 2): set by the cast (Ot6RuneExec), counted
+; down by Ot6ActionEnd (Ot6RuneActionEnd), zeroed by InitBP.
+OT6_BREAKBLADE       := OT6_DANCETIER + 1
 .assert OT6_DANCETIER = OT6_WEAPSPELL + 1, error, "the dance tier must follow the weapon-spell flag without a gap"
 .assert OT6_DANCETIER + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
@@ -598,8 +612,13 @@ OT6_BLUESEEN         := $ee2b
 ; anchor commits, so it needs no init.
 OT6_HUDLEAD          := $ee2c   ; 12 bytes
 .assert OT6_HUDLEAD = OT6_BLUESEEN + 1, error, "the hud lead cells must follow the blue-magic mark"
-; $ee38 held OT6_GREYLIVE, the grey painter's wake flag, until #543 took the
-; grey look for broken monsters away (v0.46); it is free.
+; (#563) the swing now resolving, for Break Blade: bit 7, its character's
+; Break Blade is running, so each hit takes a shield (Ot6BreakBladeTake); bit
+; 0, the element chip already took this target's (Ot6Chip), so the hit takes
+; no second.  Written with OT6_RUNESWING.  $ee38 held OT6_GREYLIVE, the grey
+; painter's wake flag, until #543 took the grey look for broken monsters away.
+OT6_BLADESWING       := $ee38
+.assert OT6_BLADESWING = OT6_HUDLEAD + 12, error, "the Break Blade swing flags sit in the free byte past the hud lead cells"
 ; The boost tier a Rage was started at, per character (4 characters, stride
 ; 2, indexed by the rager's entity offset): Ot6RageTierStore writes it at the
 ; start turn (Cmd_10 and FixPlayerAttack's cmd-$10 arm), Ot6RageCoin reads it
@@ -738,5 +757,11 @@ OT6_LIMITBREAK       := $ef1d
 OT6_REFLCASTER       := $ef1e
 .assert OT6_REFLCASTER = OT6_LIMITBREAK + 1, error, "the bounce's caster must follow the limit-break mask"
 .assert OT6_REFLCASTER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+; (#563) the rune's elements that joined the last weapon hit computed
+; (Ot6TargetPre), for the swing's colour (Ot6SwingPal_ext); zeroed with
+; OT6_RUNESWING at every attack's load.  The shadow tail's last byte.
+OT6_RUNEHIT          := $ef1f
+.assert OT6_RUNEHIT = OT6_REFLCASTER + 1, error, "the rune's hit byte must follow the bounce's caster"
+.assert OT6_RUNEHIT <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif
