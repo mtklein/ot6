@@ -951,7 +951,8 @@ the divine in the eighth:
 - **Break Blade** (kit slot 8, the divine; owner, 2026-11-23): her Break
   spell on the blade.  Offered
   only with three points pending (the row greys and the A button buzzes
-  under three; a pick taken back to fewer does nothing and costs nothing),
+  under three; a list pick's boost cannot be lowered at target select,
+  #555, and a Mimic's copy short of three does nothing and costs nothing),
   99 MP.  For three of her turns after the cast (`OT6_BREAKBLADE`, counted
   down as each of her actions ends, the span a 3-BP Runic stands for; a
   fallen Celes takes no turns, so it waits on her) **every landed hit of her

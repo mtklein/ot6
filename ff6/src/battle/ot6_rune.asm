@@ -1011,9 +1011,10 @@ done:   rts
 ; banner (attack name type 3, Ot6RuneBanner).
 ;
 ; A blade row arms the attacker's blade with its element at the tier the
-; pending boost reaches (Ot6RuneBlade).  Break Blade under a full boost
-; (taken back after the pick, or a Mimic's copy short of three) does nothing
-; and costs nothing, as every list divine.  A caster who cannot pay the
+; pending boost reaches (Ot6RuneBlade).  Break Blade under a full boost (a
+; Mimic's copy short of three; her own menu cannot get here, since the row
+; refuses under three and a list pick's boost cannot be lowered at target
+; select, #555) does nothing and costs nothing, as every list divine.  A caster who cannot pay the
 ; row's MP ($3c08 below $3a4c, the cost staged at action load) does nothing
 ; here: CalcAttackEffect's universal check refuses the cast after this.
 ;
