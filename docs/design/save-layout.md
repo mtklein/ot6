@@ -416,7 +416,7 @@ that species (slash became Sword or Katana; pierce Dagger, Spear or Ranged;
 bludgeon and special Blunt or Ranged; and all six for the two species any
 weapon breaks), so a revealed four-class bit has one meaning per species.
 `Ot6ClassSplitTbl` (`ot6_class_split.inc`, written by
-`tools/proto_six/split.py`) records it: four bytes per species id 0-383,
+`tools/six_classes/split.py`) records it: four bytes per species id 0-383,
 byte k the six-class bits the species' weakness of four-class bit k
 became, `$00` where the species had no such weakness.
 

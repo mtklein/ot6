@@ -667,7 +667,7 @@ Ot6ClassGlyphTbl:
         .byte   $de             ; ranged: the thrown star
         .byte   $db             ; katana: the katana icon, mirrored in
                                 ;   the font so it reads apart from the
-                                ;   sword (tools/proto_six/font.py)
+                                ;   sword (tools/six_classes/font.py)
         .byte   $da             ; spear: the spear cell, redrawn upright
 
 ; 8x8 2bpp element icons, element-bit order (fire $01 ... water $80)

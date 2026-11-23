@@ -23,7 +23,7 @@
 --      were the blades, CYAN's katana and MOG's spear at once; six classes
 --      give two of those three hands, and the split kept the forced MOG's
 --      spear and the swords, since a third class would push the spear, MOG's
---      key, past the HUD's four cells: tools/proto_six/pins_suite.py ADD);
+--      key, past the HUD's four cells: tools/six_classes/pins_suite.py ADD);
 --      every boss absorbs ice and is weak to fire; the Psychot absorbs fire; Tritoch's record $144 carries a real
 --      row while the World of Balance's $114/$115 stay shieldless.
 -- All mismatches are logged before the verdict.

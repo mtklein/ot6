@@ -16,7 +16,7 @@ counted them; and from the battle lines:
             so a break by a battle's last action is not seen -- the same in
             both plays
 
-    python3 tools/proto_six/line_stats.py base/ six/ [--legs]
+    python3 tools/six_classes/line_stats.py base/ six/ [--legs]
 """
 import glob
 import os

@@ -9,7 +9,7 @@ owner, 2026-11-23: "katana is axe"; Ranged "gathers together all the ranged
 physicals"; "rods and fists could group", as Blunt). 6 physical + 8
 elemental = 14 weakness axes (Octopath has 12). Through v0.50 there were
 four (slash, pierce, bludgeon, special ¤); "How the four became six" below
-says what moved. `tools/proto_six/classes.py` is the grouping as data, and
+says what moved. `tools/six_classes/classes.py` is the grouping as data, and
 `ot6_class.asm`'s two tables are written from it: `Ot6WeapClassTbl` gives
 every weapon one class, `Ot6SkillClassTbl` every class-bearing skill.
 
@@ -100,7 +100,7 @@ weakness became one class its own weapons went to:
 | bludgeon | Blunt or Ranged |
 | special ¤ | Ranged or Blunt |
 
-Which one, in order (`tools/proto_six/split.py`, whose `--report-only`
+Which one, in order (`tools/six_classes/split.py`, whose `--report-only`
 prints every species' old row, new row and reason):
 
 1. pinned: the opening's rows are authored by hand, and where a World
@@ -119,7 +119,7 @@ prints every species' old row, new row and reason):
 Of the 349 species the game deals and gauges, 120 are weak to Sword, 102
 to Dagger, 79 to Spear, 83 to Katana, 141 to Blunt and 128 to Ranged.
 One class keys 23-40% of them, two classes 42-67%, three 62-85%, four
-81-94%, five 93-99% (`tools/proto_six/party_share.py`).
+81-94%, five 93-99% (`tools/six_classes/party_share.py`).
 
 A save from an older release keeps its revealed weaknesses, each shown as
 the class that weakness became for that monster
@@ -137,7 +137,7 @@ consumable icons are unchanged from vanilla.
 
 The HUD draws the same six glyphs for a revealed weakness, 8×8 and
 white, side by side, so each blade is on its own axis
-(`tools/proto_six/font.py`):
+(`tools/six_classes/font.py`):
 
 | Class | Cell | Glyph |
 |---|---|---|
@@ -187,7 +187,7 @@ scenario split is the stress test:
   a player can guess and then confirm by probing.
 - Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs.
 
-What a party holds, stage by stage (`tools/proto_six/party_share.py`; the
+What a party holds, stage by stage (`tools/six_classes/party_share.py`; the
 stages are `stages.py`'s, named by the first leg of the line). "Really
 held" is each member's signature weapon and commands (`classes.py`), with
 nobody re-armed for a key; "widest" adds every class of every weapon the

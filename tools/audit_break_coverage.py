@@ -89,9 +89,9 @@ So the model is split the way the two tiers always were:
   character to be required to get through fights").  Tier 2 also holds
   every stage of the line to it: for every gauged species with a class row
   that a stage can be dealt, the row's classes are REALLY held (signature
-  weapon or command, not "could equip": tools/proto_six/classes.py
+  weapon or command, not "could equip": tools/six_classes/classes.py
   SIGNATURE) by at least two characters the player can field there, or by
-  one the story forces into the party (tools/proto_six/stages.py STAGES:
+  one the story forces into the party (tools/six_classes/stages.py STAGES:
   roster and forced, by leg of the line; tools/ot6_class.py holder_rule,
   the rule split.py's HOLDERS step applies to the species the route met).
   A stage's legs are the generator logs' own names; what it can be dealt

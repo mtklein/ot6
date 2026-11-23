@@ -9,7 +9,7 @@
 
 ; six weapon classes (#566), after Octopath's six: the four of v0.50 and
 ; before (slash $01, pierce $02, bludgeon $04, special $08) regrouped by the
-; weapon in hand.  tools/proto_six/classes.py is the grouping as data, and
+; weapon in hand.  tools/six_classes/classes.py is the grouping as data, and
 ; this file's two tables follow it (the [kind] tags are its kinds).
 OT6_SWORD   := $01              ; swords; the chain saw
 OT6_DAGGER  := $02              ; daggers and ninja blades; a thief's hit

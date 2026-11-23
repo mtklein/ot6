@@ -1,6 +1,6 @@
 # The six classes, regrouped (owner, 2026-11-23) -- supersedes "Fist" and "Arcane"
 
-The owner mapped the classes to Octopath's six. `tools/proto_six/classes.py` is the grouping as data (run it to
+The owner mapped the classes to Octopath's six. `tools/six_classes/classes.py` is the grouping as data (run it to
 print holders and awkward fits).
 
 | class | bit | const | what carries it | who really holds it (signature weapon or command) |
@@ -42,5 +42,5 @@ there, or by one the story forces into the party (split.py HOLDERS step, stages.
 wearer equip a spear is another branch's (wt/v051-dragoon-spear, #567): do not build on it.
 
 Still to come: the opening (Narshe mines through the Narshe defense, then Kohlingen and Zozo) is being authored by
-hand, so those species' rows will move once more. `python3 tools/proto_six/split.py --report-only` prints the
+hand, so those species' rows will move once more. `python3 tools/six_classes/split.py --report-only` prints the
 current rows and reasons.

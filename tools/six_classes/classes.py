@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """classes.py -- the six weapon classes as data (#566): which class every
 weapon family, tool and class-bearing skill carries, who really holds each,
-and what each four-class weakness may become.  rewrite_class.py writes
-ot6_class.asm and the item icons from it, split.py splits the species' rows
-by it, party_share.py and the audits read the holders.  Regrouping the
-classes is an edit here and a re-run of those.
+and what each four-class weakness may become.  ot6_class.asm (edited by hand
+since the first write; tools/ot6_class.py selftest and check_six_classes.py
+hold it to this file) gives each weapon and skill its class, split.py splits
+the species' rows by it, party_share.py and the audits read the holders.
+Regrouping the classes is an edit here, in ot6_class.asm and a re-run of
+split.py.
 
 The grouping is the owner's of 2026-11-23, after Octopath's six (sword,
 spear, dagger, axe, bow, staff): "katana is axe"; Ranged "gathers together

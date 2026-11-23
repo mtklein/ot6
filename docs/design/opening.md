@@ -7,15 +7,15 @@ from zero on this release and judges the opening first: "the beginning of the
 game is especially important to get right because of how limited your options
 are" (2026-11-23).
 
-- The rows are `tools/proto_six/pins.py`'s `OPENING` block, 85 species, each
-  with its reason. `python3 tools/proto_six/split.py` writes them into
+- The rows are `tools/six_classes/pins.py`'s `OPENING` block, 85 species, each
+  with its reason. `python3 tools/six_classes/split.py` writes them into
   `Ot6ShieldTbl` (`ff6/src/battle/ot6_hud.asm`); the masks are never edited
   by hand. They were applied with `--keep origin/wt/v051-six-classes`, which
   leaves every other row as that branch had it: the split's balance step
   reads a running tally, so without it dozens of rows nobody looked at move
   too (59 at the last run).
-- The tables below are `python3 tools/proto_six/opening.py --md`, and the
-  numbers `python3 tools/proto_six/opening.py`
+- The tables below are `python3 tools/six_classes/opening.py --md`, and the
+  numbers `python3 tools/six_classes/opening.py`
   (`build/attempts/wt/v051-six-classes/opening/shares.txt`). The species of
   each area are decoded from the data (the maps' and World sectors' pools,
   the event battles, the monster-in-a-box chests), not listed by hand.
@@ -666,7 +666,7 @@ Element adds, shield counts, shops and events are outside this change.
 
 ## Evidence
 
-- `python3 tools/proto_six/opening.py`: each area's species, the party's
+- `python3 tools/six_classes/opening.py`: each area's species, the party's
   holds, and the species keyed in hand, by kit and by element under four
   classes and six, for each party and each member, every pick of four at
   Zozo, and the automated route's own hands.
@@ -675,10 +675,10 @@ Element adds, shield counts, shops and events are outside this change.
   under both; in hand 96 under four classes and 99 under six. A single
   member keys 77% under four and 70% under six, and by weapon or skill 70%
   and 57%: the party still holds a key, and who acts matters more.
-- `python3 tools/proto_six/split.py --report-only`: every row, its reason, the
+- `python3 tools/six_classes/split.py --report-only`: every row, its reason, the
   departures and the holder rule's binds.
   `build/attempts/wt/v051-six-classes/opening/split-report.txt`.
-- `python3 tools/proto_six/dlg_fit.py`: the school's pages wrapped as the
+- `python3 tools/six_classes/dlg_fit.py`: the school's pages wrapped as the
   field does it; none runs past four lines.
 - `ninja build/ot6.sfc` assembles, and on the built ROM
   `tools/check_shield_rows.py`, `tools/check_break_reach.py`,

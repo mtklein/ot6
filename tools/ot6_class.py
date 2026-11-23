@@ -253,18 +253,18 @@ def floor_classes(text: str, C: Classes):
 
 
 # ------------------------------------------------- the grouping and the holders --
-# tools/proto_six/classes.py is the grouping as data (which class every weapon
+# tools/six_classes/classes.py is the grouping as data (which class every weapon
 # family, tool and skill carries; SIGNATURE: who really holds each) and
-# tools/proto_six/stages.py the story's stages (who the player can field,
-# whom the story forces).  rewrite_class.py writes ot6_class.asm from the
-# first, so the two agree by construction; selftest() holds them to it, so a
+# tools/six_classes/stages.py the story's stages (who the player can field,
+# whom the story forces).  ot6_class.asm is edited by hand (the generator that
+# first wrote it from classes.py is retired; git has it); selftest() holds the two to agree, so a
 # tool may read the bits from the source and the holders from the grouping.
 
-PROTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "proto_six")
+PROTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "six_classes")
 
 
 def grouping():
-    """(classes, stages): the two modules of tools/proto_six."""
+    """(classes, stages): the two modules of tools/six_classes."""
     if PROTO not in sys.path:
         sys.path.insert(0, PROTO)
     import classes
@@ -364,7 +364,7 @@ def selftest(root: str) -> int:
     stray = ["$%03X" % r[0] for r in rows if r[0] < N_SPECIES and r[2] and not floor[r[0]] & r[2]]
     assert not stray, ("the floor byte of %s is not a class of its Ot6ShieldTbl row: run "
                        "python3 ff6/tools/gen_break_floor.py" % ", ".join(stray))
-    # the grouping (tools/proto_six/classes.py) restates the source's tables:
+    # the grouping (tools/six_classes/classes.py) restates the source's tables:
     # held to them, name by name and item by item
     K, S = grouping()
     assert {K.CONST[b]: b for b in K.CONST} == C.token, "classes.py CONST is not ot6_class.asm's class bits"

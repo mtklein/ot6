@@ -21,7 +21,7 @@ local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10
 -- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
 local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
--- what each of the four classes became (tools/proto_six/classes.py CHILDREN): slash a sword or a katana, pierce a
+-- what each of the four classes became (tools/six_classes/classes.py CHILDREN): slash a sword or a katana, pierce a
 -- dagger, a spear or a ranged hit, bludgeon a blunt or a ranged one
 local EDGE, POINT, BLOW = SWORD | KATANA, DAGGER | SPEAR | RANGED, BLUNT | RANGED
 local function nbits(m) local n = 0; while m ~= 0 do n = n + (m & 1); m = m >> 1 end; return n end

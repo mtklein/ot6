@@ -24,7 +24,7 @@ local H = dofile("tools/tests/lib/ot6.lua")   -- only for the ROM's weapon, skil
 
 local PRG = emu.memType.snesPrgRom
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
--- what each of the four classes became (tools/proto_six/classes.py CHILDREN): slash a sword or a katana, pierce a
+-- what each of the four classes became (tools/six_classes/classes.py CHILDREN): slash a sword or a katana, pierce a
 -- dagger, a spear or a ranged hit, bludgeon a blunt or a ranged one
 local EDGE, POINT, BLOW = SWORD | KATANA, DAGGER | SPEAR | RANGED, BLUNT | RANGED
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80

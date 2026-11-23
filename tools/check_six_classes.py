@@ -6,8 +6,8 @@
     python3 tools/check_six_classes.py --rom build/mutants/sixpike.sfc --red weapon
 
 The design is written once, below (DESIGN, FAMILIES, SKILLS, KIT, ART), from
-the issue and the owner's grouping of 2026-11-23 (tools/proto_six/REGROUP.md),
-not copied from the tables or from tools/proto_six/classes.py, which writes
+the issue and the owner's grouping of 2026-11-23 (tools/six_classes/REGROUP.md),
+not copied from the tables or from tools/six_classes/classes.py, which writes
 them: six classes, Sword $01, Dagger $02, Blunt $04, Ranged $08, Katana $10,
 Spear $20, and a null-break property $80.  Read from the ROM through
 ff6-en.dbg's symbols and held to it, rule by rule:

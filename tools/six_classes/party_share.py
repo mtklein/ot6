@@ -15,7 +15,7 @@ The parties are stages.py's rosters (the characters the player can field at
 each story stage; a roster larger than four is every four of it: the worst,
 the mean and the best four).
 
-    python3 tools/proto_six/party_share.py
+    python3 tools/six_classes/party_share.py
 """
 import itertools
 import re
@@ -105,7 +105,7 @@ def main():
     m6 = {sp: r["new"][sp] for sp in g}
     k = kits()
     print("the share of the %d species the game deals and gauges that a party can weapon-key" % len(g))
-    print("(tools/proto_six/party_share.py; four = origin/main, six = this tree's rows)")
+    print("(tools/six_classes/party_share.py; four = origin/main, six = this tree's rows)")
     print()
     print("held classes, how many of the species they key:")
     six = tuple(C.ORDER)

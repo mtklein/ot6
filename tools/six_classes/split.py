@@ -51,7 +51,7 @@ the floor rows from it) and ff6/src/battle/ot6_class_split.inc
 became -- what a four-class save's revealed bits mean, for the codex
 migration), and prints the report.
 
-    python3 tools/proto_six/split.py [--report-only] [--keep REV [--redo SP,SP...]]
+    python3 tools/six_classes/split.py [--report-only] [--keep REV [--redo SP,SP...]]
 
 --keep REV: every row but the opening's authored ones (and the rows that
 follow one by pins.FAMILY) is taken as REV's tree has it
@@ -401,7 +401,7 @@ def write_split_inc(r):
              "; what a four-class (v0.50 and older) save's revealed class bits mean: four",
              "; bytes a species id (0..383), byte k the six-class bits the species' weakness",
              "; of four-class bit k (slash $01, pierce $02, bludgeon $04, special $08) became;",
-             "; $00 where it had none.  Written by tools/proto_six/split.py when the six",
+             "; $00 where it had none.  Written by tools/six_classes/split.py when the six",
              "; classes replaced the four (#566); it describes the saves of the releases",
              "; before that, so it does not change when a row does.",
              "; ----------------------------------------------------------------------------",
@@ -441,7 +441,7 @@ def rewrite_hud(new):
 def report(r):
     out = []
     g, new, rows = r["gauged"], r["new"], r["rows"]
-    out.append("the six-class regrouping of the four-class weapon weaknesses (tools/proto_six/split.py)")
+    out.append("the six-class regrouping of the four-class weapon weaknesses (tools/six_classes/split.py)")
     out.append("%d Ot6ShieldTbl rows; %d dealt species; %d dealt and gauged" % (len(rows), len(r["held"]), len(g)))
     for label, masks, names in (("four classes", {sp: rows[sp][1] for sp in g}, OLD_NAME),
                                 ("six classes", {sp: new[sp] for sp in g}, NEW_NAME)):

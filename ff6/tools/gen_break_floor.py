@@ -58,7 +58,7 @@ CLASS_NAME = {OT6_SLASH: "SLASH", OT6_PIERCE: "PIERCE", OT6_BLUDG: "BLUDGEON"}
 #   2. Every other species -- no row, or a row with no class (the shields-only
 #      rows and the 0-shield markers) -- takes THE CHILD RULE: each parent's
 #      children are the classes its own weapons went to when the six were
-#      grouped (tools/proto_six/classes.py CHILDREN: slash's swords and
+#      grouped (tools/six_classes/classes.py CHILDREN: slash's swords and
 #      katanas; pierce's daggers, spears and bolts; bludgeon's fists and rods,
 #      and the returning arcs that went to Ranged), and every family of a
 #      parent deals its species to the parent's children IN TURN, in

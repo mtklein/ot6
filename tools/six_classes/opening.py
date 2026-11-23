@@ -19,9 +19,9 @@ under the four classes (origin/main's rows and weapon table) and under the six
 (the working tree's).  Then the same for the automated route's own hands, from
 the baseline play's [keys] lines, where it fought in the area.
 
-    python3 tools/proto_six/opening.py            # the report
-    python3 tools/proto_six/opening.py --md       # the areas' tables, as opening.md carries them
-    python3 tools/proto_six/opening.py --write    # both, under build/attempts/wt/v051-six-classes/opening/
+    python3 tools/six_classes/opening.py            # the report
+    python3 tools/six_classes/opening.py --md       # the areas' tables, as opening.md carries them
+    python3 tools/six_classes/opening.py --write    # both, under build/attempts/wt/v051-six-classes/opening/
 """
 import collections
 import importlib.util
@@ -456,7 +456,7 @@ def item_names():
 def report(d):
     out = []
     w = out.append
-    w("the opening under four classes (%s) and six (the working tree): tools/proto_six/opening.py" % BASE)
+    w("the opening under four classes (%s) and six (the working tree): tools/six_classes/opening.py" % BASE)
     w("a share is of the area's gauged species (a shield row with shields); 'any' is hand, kit or element")
     inames = item_names()
     totals = collections.Counter()

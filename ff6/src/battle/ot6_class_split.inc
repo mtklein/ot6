@@ -2,7 +2,7 @@
 ; what a four-class (v0.50 and older) save's revealed class bits mean: four
 ; bytes a species id (0..383), byte k the six-class bits the species' weakness
 ; of four-class bit k (slash $01, pierce $02, bludgeon $04, special $08) became;
-; $00 where it had none.  Written by tools/proto_six/split.py when the six
+; $00 where it had none.  Written by tools/six_classes/split.py when the six
 ; classes replaced the four (#566); it describes the saves of the releases
 ; before that, so it does not change when a row does.
 ; ----------------------------------------------------------------------------

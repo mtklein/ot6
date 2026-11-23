@@ -358,7 +358,7 @@ Each claim against `ff6/src/battle/ot6_class.asm`:
   example: five of Cyan's eight are Katana, Retort and Empowerer have no
   type and Quadra Slice is wind.
 
-Fit, by `python3 tools/proto_six/dlg_fit.py 0264` (the field's own wrap:
+Fit, by `python3 tools/six_classes/dlg_fit.py 0264` (the field's own wrap:
 the pen starts at 4, a word that would reach 224 starts a new line; every
 other school page it measures comes to four lines or fewer, as school.lua
 counts in game):

@@ -30,9 +30,9 @@ Usage:  python3 tools/check_break_reach.py [--repo ROOT] [-v]
 Beside the reach verdict it reports the owner's HOLDER RULE (2026-11-23: "we
 don't want just one particular character to be required to get through
 fights") for every gauged body the declared areas deal: its weapon keys are
-really held (signature weapon or command, tools/proto_six/classes.py) by at
+really held (signature weapon or command, tools/six_classes/classes.py) by at
 least two characters the player can field at the step's story stage
-(tools/proto_six/stages.py), or by one the story forces into the party.  A
+(tools/six_classes/stages.py), or by one the story forces into the party.  A
 HOLDER line names each stage and species it is not met for;
 --strict-holders makes them fail the run.
 """
@@ -140,7 +140,7 @@ MIMIC_ONLY = {"GOGO"}
 # --------------------------------------------------------------------------
 # area declarations.  An area is a list of steps; a step is a party plus the
 # random-encounter maps it walks and the forced battles it must fight.
-# stage: the step's story stage, by its first leg in tools/proto_six/stages.py
+# stage: the step's story stage, by its first leg in tools/six_classes/stages.py
 # (who the player can field there, whom the story forces), for the holder
 # rule; the party is the one the route walked in with, for the reach check.
 # events: (event battle id, tuple of EventBattleGroup word slots reached,
@@ -578,7 +578,7 @@ def check_area(data, area_name, area, party_override, drop_mask,
     for step in area["steps"]:
         if step["stage"] not in stage_tbl:
             raise SystemExit("check_break_reach: area %s step %r names stage %r, "
-                             "which tools/proto_six/stages.py does not start"
+                             "which tools/six_classes/stages.py does not start"
                              % (area_name, step["name"], step["stage"]))
         roster, forced, magitek = stage_tbl[step["stage"]]
         party = party_override or step["party"]
