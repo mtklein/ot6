@@ -7,19 +7,19 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the flier falls to the point (pierce) and not the edge; the moth takes SETZER's cards (special); the Over-Grunk is the three-shield tank.
+--   3. the lessons: the flier falls to the point (LOCKE's knife, dagger, or EDGAR's pike, spear) and not the edge (sword, katana); the moth takes SETZER's cards (arcane); the Over-Grunk is the three-shield tank.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x078] = { "Red Fang", 2, SLASH | PIERCE, 0, 0, POISON },
-  [0x02A] = { "Vulture", 2, PIERCE, WIND, 0, 0 },
-  [0x090] = { "Over-Grunk", 3, SLASH | BLUDG, FIRE, 0, 0 },
-  [0x08C] = { "Mind Candy", 2, SLASH | SPECIAL, FIRE | WIND, 0, 0 },
+  [0x078] = { "Red Fang", 2, DAGGER | KATANA, 0, 0, POISON },
+  [0x02A] = { "Vulture", 2, SPEAR, WIND, 0, 0 },
+  [0x090] = { "Over-Grunk", 3, SWORD | FIST, FIRE, 0, 0 },
+  [0x08C] = { "Mind Candy", 2, SWORD | ARCANE, FIRE | WIND, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -31,10 +31,12 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 8); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is the class of the weapon named for the member (the ROM's Ot6WeapClassTbl:
+-- a sword SWORD, a knife DAGGER, a pike SPEAR, a katana or ninja blade KATANA, claws and bare fists FIST, a rod,
+-- brush or cards ARCANE), with the class of a tool the design counts in the hand (the AutoCrossbow SPEAR)
 local PARTIES = {
-  { "LOCKE, EDGAR, SABIN, CELES (to Zozo)", { { "LOCKE", PIERCE, 0 }, { "EDGAR", PIERCE, POISON }, { "SABIN", BLUDG, FIRE | HOLY }, { "CELES", SLASH, 0 } }, nil },
-  { "LOCKE, EDGAR, SABIN, SETZER (to Narshe)", { { "LOCKE", PIERCE, 0 }, { "EDGAR", SLASH, ICE }, { "SABIN", SLASH, FIRE | HOLY }, { "SETZER", SPECIAL, 0 } }, nil },
+  { "LOCKE, EDGAR, SABIN, CELES (to Zozo)", { { "LOCKE", DAGGER, 0 }, { "EDGAR", SPEAR, POISON }, { "SABIN", FIST, FIRE | HOLY }, { "CELES", SWORD, 0 } }, nil },
+  { "LOCKE, EDGAR, SABIN, SETZER (to Narshe)", { { "LOCKE", DAGGER, 0 }, { "EDGAR", SWORD, ICE }, { "SABIN", FIST, FIRE | HOLY }, { "SETZER", ARCANE, 0 } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -144,8 +146,8 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(0x02A) & PIERCE) == 0 or (classOf(0x02A) & SLASH) ~= 0 then problem("$02A Vulture: the flier should take the point and not the edge") end
-    if (classOf(0x08C) & SPECIAL) == 0 then problem("$08C Mind Candy: SETZER's cards (special) hold no key") end
+    if (classOf(0x02A) & (DAGGER | SPEAR)) == 0 or (classOf(0x02A) & (SWORD | KATANA)) ~= 0 then problem("$02A Vulture: the flier should take the point (dagger or spear) and not the edge (sword, katana)") end
+    if (classOf(0x08C) & ARCANE) == 0 then problem("$08C Mind Candy: SETZER's cards (arcane) hold no key") end
     if shield[0x090] == nil or shield[0x090][1] ~= 3 then problem("$090 Over-Grunk: not the plains' three-shield tank") end
     H.log("the lessons: the flier falls to the point; the moth takes the cards; the Over-Grunk is the tank")
     H.assertEq(#problems, 0, "WoB plains break row mismatches")

@@ -15,22 +15,22 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x022] = { "Pterodon", 2, SLASH | PIERCE, FIRE, 0 },
-  [0x038] = { "Nautiloid", 2, PIERCE | BLUDG, FIRE | BOLT, WATER },
-  [0x039] = { "Exocite", 2, SLASH | BLUDG, FIRE | BOLT, WATER },
-  [0x060] = { "Dark Side", 2, SLASH | SPECIAL, FIRE | HOLY, POISON },
-  [0x0B6] = { "Spectre", 2, BLUDG | SPECIAL, FIRE | HOLY, POISON },
-  [0x0CF] = { "Rinn", 1, PIERCE | SPECIAL, FIRE | HOLY, POISON },
-  [0x079] = { "Bounty Man", 2, SLASH | PIERCE, FIRE, 0 },
-  [0x01C] = { "Fidor", 2, SLASH | PIERCE, FIRE, 0 },
-  [0x0C2] = { "Sp.Forces", 3, SLASH | PIERCE, POISON, 0 },
-  [0x00F] = { "Over-Mind", 2, SLASH | SPECIAL, FIRE | HOLY, POISON },
-  [0x131] = { "Siegfried", 1, SLASH | PIERCE | BLUDG, 0, 0 },
+  [0x022] = { "Pterodon", 2, SWORD | SPEAR, FIRE, 0 },
+  [0x038] = { "Nautiloid", 2, SPEAR | ARCANE, FIRE | BOLT, WATER },
+  [0x039] = { "Exocite", 2, SWORD | ARCANE, FIRE | BOLT, WATER },
+  [0x060] = { "Dark Side", 2, SWORD | DAGGER, FIRE | HOLY, POISON },
+  [0x0B6] = { "Spectre", 2, FIST | ARCANE, FIRE | HOLY, POISON },
+  [0x0CF] = { "Rinn", 1, SPEAR | ARCANE, FIRE | HOLY, POISON },
+  [0x079] = { "Bounty Man", 2, DAGGER | KATANA, FIRE, 0 },
+  [0x01C] = { "Fidor", 2, SWORD | DAGGER, FIRE, 0 },
+  [0x0C2] = { "Sp.Forces", 3, SWORD | SPEAR, POISON, 0 },
+  [0x00F] = { "Over-Mind", 2, SWORD | DAGGER, FIRE | HOLY, POISON },
+  [0x131] = { "Siegfried", 1, DAGGER | KATANA | FIST, 0, 0 },
 }
 -- 0-shield rows: the cutscene bodies a called battle deals, and the markers for bodies no reachable formation holds
 -- (tools/check_shield_rows.py proves the second list unreached; break-coverage-wob.md section 18 has the evidence)
@@ -42,21 +42,24 @@ local NO_GAUGE = {
   [0x178] = "$178", [0x17F] = "$17F",
 }
 -- the parties (their hands: weapon classes, and the elements their spells, tools and weapons reach), from the
--- tracked checkpoints' gear and the route's battle logs (break-coverage-wob.md sections 13-17)
-local TERRA = { "TERRA", SLASH, FIRE }
-local EDGAR = { "EDGAR", PIERCE, POISON }
-local BANON = { "BANON", BLUDG, 0 }
-local SABIN = { "SABIN", BLUDG, FIRE | HOLY }
+-- tracked checkpoints' gear and the route's battle logs (break-coverage-wob.md sections 13-17).  A hand is the
+-- class of the weapon named for the member (the ROM's Ot6WeapClassTbl): TERRA's blade SWORD, EDGAR's pike and
+-- AutoCrossbow SPEAR, BANON's Punisher (a rod) ARCANE, SABIN's fists and claws FIST, CYAN's katana and SHADOW's
+-- ninja blade KATANA, LOCKE's knife DAGGER
+local TERRA = { "TERRA", SWORD, FIRE }
+local EDGAR = { "EDGAR", SPEAR, POISON }
+local BANON = { "BANON", ARCANE, 0 }
+local SABIN = { "SABIN", FIST, FIRE | HOLY }
 local P = {
   raftUp = { "TERRA, EDGAR, SABIN, BANON", { TERRA, EDGAR, SABIN, BANON } },
   raft = { "TERRA, EDGAR, BANON", { TERRA, EDGAR, BANON } },
-  squad1 = { "TERRA, EDGAR, CELES", { TERRA, EDGAR, { "CELES", SLASH, ICE } } },
-  squad2 = { "CYAN, SABIN", { { "CYAN", SLASH, 0 }, SABIN } },
-  squad3 = { "LOCKE, GAU", { { "LOCKE", PIERCE, 0 }, { "GAU", BLUDG, 0 } } },
+  squad1 = { "TERRA, EDGAR, CELES", { TERRA, EDGAR, { "CELES", SWORD, ICE } } },
+  squad2 = { "CYAN, SABIN", { { "CYAN", KATANA, 0 }, SABIN } },
+  squad3 = { "LOCKE, GAU", { { "LOCKE", DAGGER, 0 }, { "GAU", FIST, 0 } } },
   -- battle 30 is fought during the banquet, before the roster rewrite, by vector-crash-v1's party
-  banquet = { "TERRA, LOCKE, EDGAR, SABIN", { { "TERRA", SLASH, FIRE | BOLT }, { "LOCKE", PIERCE, 0 },
-    { "EDGAR", SLASH | PIERCE, ICE | POISON }, { "SABIN", BLUDG, FIRE | HOLY | POISON } } },
-  train = { "SABIN, CYAN, SHADOW", { SABIN, { "CYAN", SLASH, 0 }, { "SHADOW", PIERCE, 0 } } },
+  banquet = { "TERRA, LOCKE, EDGAR, SABIN", { { "TERRA", SWORD, FIRE | BOLT }, { "LOCKE", DAGGER, 0 },
+    { "EDGAR", SWORD | SPEAR, ICE | POISON }, { "SABIN", FIST, FIRE | HOLY | POISON } } },
+  train = { "SABIN, CYAN, SHADOW", { SABIN, { "CYAN", KATANA, 0 }, { "SHADOW", KATANA, 0 } } },
 }
 -- the fights: { label, "event", { event battle groups } | "map", map, its SubBattleGroup, parties, species dealt }
 local FIGHTS = {
@@ -197,7 +200,7 @@ H.run({ maxFrames = 600 }, {
 
     -- 4. the lessons
     local raft = { 0x022, 0x038, 0x039 }
-    for _, hand in ipairs({ { "TERRA's blade", SLASH }, { "EDGAR's pike", PIERCE }, { "BANON's rod", BLUDG } }) do
+    for _, hand in ipairs({ { "TERRA's blade", SWORD }, { "EDGAR's pike", SPEAR }, { "BANON's rod", ARCANE } }) do
       local k = 0
       for _, sp in ipairs(raft) do if (classOf(sp) & hand[2]) ~= 0 then k = k + 1 end end
       if k ~= 2 then problem("the raft: %s keys %d of the three, want two", hand[1], k) end
@@ -205,10 +208,12 @@ H.run({ maxFrames = 600 }, {
     for _, sp in ipairs(raft) do
       if (weak(sp) & FIRE) == 0 then problem("the raft: $%03X is not fire-weak; TERRA's Fire keys all three", sp) end
     end
-    local trap = { [0x060] = SLASH, [0x0B6] = BLUDG, [0x0CF] = PIERCE }
+    -- one spirit to each of the three hands: TERRA's blade, BANON's rod, EDGAR's pike
+    local trap = { [0x060] = SWORD, [0x0B6] = ARCANE, [0x0CF] = SPEAR }
+    local THREE = SWORD | SPEAR | ARCANE
     for sp, hand in pairs(trap) do
-      if (classOf(sp) & (SLASH | PIERCE | BLUDG)) ~= hand then
-        problem("the trap: $%03X's one weapon key is $%02X, want $%02X", sp, classOf(sp) & 7, hand)
+      if (classOf(sp) & THREE) ~= hand then
+        problem("the trap: $%03X's keys among the three hands are $%02X, want the one $%02X", sp, classOf(sp) & THREE, hand)
       end
       if (weak(sp) & FIRE) == 0 or (absorb(sp) & POISON) == 0 then
         problem("the trap: $%03X should be fire-weak and drink poison", sp)
@@ -219,7 +224,9 @@ H.run({ maxFrames = 600 }, {
         problem("$%03X: a raider should take the troopers' keys ($%02X), not $%02X", sp, classOf(0x065), classOf(sp))
       end
     end
-    if classOf(0x131) ~= (SLASH | PIERCE | BLUDG) then problem("Siegfried: every weapon hand should break him") end
+    if classOf(0x131) ~= (SWORD | DAGGER | SPEAR | KATANA | FIST | ARCANE) then
+      problem("Siegfried: every weapon hand should break him (class $%02X, want all six)", classOf(0x131))
+    end
     H.log("the lessons: the raft splits its hands two-and-two, the trap one spirit to each hand, the raiders take "
       .. "the troopers' keys, any weapon breaks Siegfried")
     H.assertEq(#problems, 0, "WoB event-fight break row mismatches")

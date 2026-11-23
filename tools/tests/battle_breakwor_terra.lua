@@ -20,24 +20,27 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   [0x16A] = { "Phunbaba 1 (TERRA alone)", 0, 0, POISON },
-  [0x16B] = { "Phunbaba 2 (the first visit)", 4, BLUDG | SPECIAL, POISON },
-  [0x16C] = { "Phunbaba 3 (the return)", 5, BLUDG | SPECIAL, POISON },
-  [0x16D] = { "Phunbaba 4 (TERRA morphed)", 12, SLASH | BLUDG | SPECIAL, POISON },
+  [0x16B] = { "Phunbaba 2 (the first visit)", 4, DAGGER | FIST, POISON },
+  [0x16C] = { "Phunbaba 3 (the return)", 5, DAGGER | FIST, POISON },
+  [0x16D] = { "Phunbaba 4 (TERRA morphed)", 12, SWORD | DAGGER | FIST, POISON },
 }
 
 -- the hands (route-wor-terra.md 6): the four as they reach Mobliz
--- (wor-falcon-v1's kit), and TERRA as she joins (the Break Blade)
-local CELES  = { "CELES", SLASH, FIRE | ICE | BOLT }
-local SABIN  = { "SABIN", SLASH | BLUDG, FIRE | HOLY | WIND }
-local EDGAR  = { "EDGAR", SLASH | PIERCE, BOLT | POISON }
-local SETZER = { "SETZER", SPECIAL | PIERCE, 0 }
-local TERRA  = { "TERRA", SLASH, FIRE }
+-- (wor-falcon-v1's kit: CELES's swords; SABIN's claws and Blitzes, fist;
+-- EDGAR's Break Blade, sword, and his pike and AutoCrossbow, spear;
+-- SETZER's Cards, arcane, or Darts, dagger), and TERRA as she joins (the
+-- Break Blade, sword)
+local CELES  = { "CELES", SWORD, FIRE | ICE | BOLT }
+local SABIN  = { "SABIN", FIST, FIRE | HOLY | WIND }
+local EDGAR  = { "EDGAR", SWORD | SPEAR, BOLT | POISON }
+local SETZER = { "SETZER", ARCANE | DAGGER, 0 }
+local TERRA  = { "TERRA", SWORD, FIRE }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
@@ -157,8 +160,8 @@ H.run({ maxFrames = 600 }, {
       end
     end
     local tk = (classOf(0x16D) & TERRA[2]) ~= 0
-    H.log(string.format("$16D: TERRA's blade (slash) %s", tk and "is a key" or "is NOT a key"))
-    if not tk then problem("$16D: TERRA's blade (slash) does not key Phunbaba 4") end
+    H.log(string.format("$16D: TERRA's blade (sword) %s", tk and "is a key" or "is NOT a key"))
+    if not tk then problem("$16D: TERRA's blade (sword) does not key Phunbaba 4") end
     local four = { CELES, SABIN, EDGAR, SETZER }
     for i = 1, 4 do
       for j = i + 1, 4 do

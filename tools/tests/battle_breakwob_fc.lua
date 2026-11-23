@@ -7,16 +7,16 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the demon is the pool's three-shield elite; it takes the blades (slash) and special, and still drinks ice.
+--   3. the lessons: the demon is the pool's three-shield elite; it takes the blades (sword) and arcane (the special's ¤), and still drinks ice.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x169] = { "Naughty", 3, SLASH | PIERCE | SPECIAL, FIRE | BOLT | HOLY, ICE, 0 },
+  [0x169] = { "Naughty", 3, DAGGER | SPEAR | KATANA, FIRE | BOLT | HOLY, ICE, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -25,9 +25,11 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 12); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is the class of the weapon named for the member (the ROM's Ot6WeapClassTbl:
+-- a sword SWORD, a knife DAGGER, a pike SPEAR, a katana or ninja blade KATANA, claws and bare fists FIST, a rod,
+-- brush or cards ARCANE), with the class of a tool the design counts in the hand (the AutoCrossbow SPEAR)
 local PARTIES = {
-  { "TERRA, LOCKE, EDGAR, CELES", { { "TERRA", SLASH, 0 }, { "LOCKE", SLASH, ICE }, { "EDGAR", SLASH, BOLT }, { "CELES", SLASH, ICE } }, nil },
+  { "TERRA, LOCKE, EDGAR, CELES", { { "TERRA", SWORD, 0 }, { "LOCKE", SWORD, ICE }, { "EDGAR", SWORD, BOLT }, { "CELES", SWORD, ICE } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -137,10 +139,10 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(0x169) & SPECIAL) == 0 then problem("$169 Naughty: the demon should take special") end
+    if (classOf(0x169) & ARCANE) == 0 then problem("$169 Naughty: the demon should take arcane (the special's ¤)") end
     if (absorb(0x169) & ICE) == 0 then problem("$169 Naughty no longer absorbs ice") end
     if shield[0x169] == nil or shield[0x169][1] ~= 3 then problem("$169 Naughty: not the pool's three-shield elite") end
-    H.log("the lessons: the demon is the pool's elite; it takes the blades and special, and drinks ice")
+    H.log("the lessons: the demon is the pool's elite; it takes arcane, and drinks ice")
     H.assertEq(#problems, 0, "WoB fc break row mismatches")
     H.log("WoB fc break rows verified against the built ROM")
   end),

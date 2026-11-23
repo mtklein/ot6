@@ -7,20 +7,20 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: EDGAR's pike (pierce) keys every body; the Bio Blaster's poison keys the plains and heals the FossilFang, whose bones turn the blade.
+--   3. the lessons: EDGAR's pike (spear) keys every body; the Bio Blaster's poison keys the plains and heals the FossilFang, whose bones turn the blade.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x05C] = { "Sand Ray", 2, SLASH | PIERCE, ICE | WATER, 0, POISON },
-  [0x023] = { "FossilFang", 3, PIERCE | BLUDG, FIRE | ICE | HOLY | WATER, POISON, 0 },
-  [0x015] = { "Rhinotaur", 2, PIERCE | BLUDG, 0, BOLT, POISON },
-  [0x012] = { "Rhodox", 2, SLASH | PIERCE, 0, 0, POISON },
-  [0x0A8] = { "GreaseMonk", 2, PIERCE | BLUDG, POISON, 0, 0 },
+  [0x05C] = { "Sand Ray", 2, SWORD | SPEAR, ICE | WATER, 0, POISON },
+  [0x023] = { "FossilFang", 3, DAGGER | FIST, FIRE | ICE | HOLY | WATER, POISON, 0 },
+  [0x015] = { "Rhinotaur", 2, SPEAR | FIST, 0, BOLT, POISON },
+  [0x012] = { "Rhodox", 2, SPEAR | KATANA, 0, 0, POISON },
+  [0x0A8] = { "GreaseMonk", 2, DAGGER | FIST, POISON, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -32,9 +32,11 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 2); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is the class of the weapon named for the member (the ROM's Ot6WeapClassTbl:
+-- a sword SWORD, a knife DAGGER, a pike SPEAR, a katana or ninja blade KATANA, claws and bare fists FIST, a rod,
+-- brush or cards ARCANE), with the class of a tool the design counts in the hand (the AutoCrossbow SPEAR)
 local PARTIES = {
-  { "TERRA, LOCKE, EDGAR", { { "TERRA", PIERCE, FIRE }, { "LOCKE", SLASH, 0 }, { "EDGAR", PIERCE, POISON } }, nil },
+  { "TERRA, LOCKE, EDGAR", { { "TERRA", DAGGER, FIRE }, { "LOCKE", SWORD, 0 }, { "EDGAR", SPEAR, POISON } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -145,11 +147,11 @@ H.run({ maxFrames = 600 }, {
 
     -- 3. the lessons
     for _, sp in ipairs({ 0x05C, 0x023, 0x015, 0x012, 0x0A8 }) do
-      if (classOf(sp) & PIERCE) == 0 then problem("$%03X %s: EDGAR's pike (pierce) holds no key", sp, WANT[sp][1]) end
+      if (classOf(sp) & SPEAR) == 0 then problem("$%03X %s: EDGAR's pike (spear) holds no key", sp, WANT[sp][1]) end
     end
     if (absorb(0x023) & POISON) == 0 then problem("$023 FossilFang no longer absorbs poison (the Bio Blaster trap)") end
     if (weakOf(0x0A8) & POISON) == 0 then problem("$0A8 GreaseMonk: the Bio Blaster (poison) holds no key") end
-    if (classOf(0x023) & SLASH) ~= 0 then problem("$023 FossilFang: the blade keys the bones") end
+    if (classOf(0x023) & (SWORD | KATANA)) ~= 0 then problem("$023 FossilFang: the blade (sword, katana) keys the bones") end
     H.log("the lessons: EDGAR's pike keys every body; the Bio Blaster keys the plains and heals the FossilFang")
     H.assertEq(#problems, 0, "WoB desert break row mismatches")
     H.log("WoB desert break rows verified against the built ROM")

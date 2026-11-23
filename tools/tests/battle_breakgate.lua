@@ -9,16 +9,16 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local WANT = {                    -- species -> { shields, class mask }
   -- audit_break_coverage.py's break-dark findings (kolts + zozo):
-  [0x086] = { 2, 0x02 },          -- cirpius: pierce
-  [0x053] = { 2, 0x04 },          -- hadesgigas: bludg
-  [0x052] = { 2, 0x01 | 0x02 },   -- slamdancer: slash|pierce
-  [0x04E] = { 2, 0x01 | 0x02 },   -- harvester: slash|pierce
-  [0x0DF] = { 2, 0x02 },          -- gabbldegak: pierce
-  [0x06E] = { 2, 0x02 | 0x01 },   -- ninja: pierce|slash
-  [0x0E5] = { 2, 0x01 | 0x04 | 0x08 }, -- spirit: slash|bludg|special (#347)
-  [0x0B3] = { 2, 0x01 },          -- soft flier: slash
-  [0x048] = { 3, 0x02 | 0x04 },   -- shelled tank: pierce|bludg
-  [0x082] = { 4, 0x04 | 0x01 },   -- brute: bludg|slash
+  [0x086] = { 2, DAGGER },          -- cirpius: dagger
+  [0x053] = { 2, FIST },            -- hadesgigas: fist
+  [0x052] = { 2, SWORD | DAGGER },  -- slamdancer: sword|dagger
+  [0x04E] = { 2, SPEAR | KATANA },  -- harvester: spear|katana
+  [0x0DF] = { 2, SPEAR },           -- gabbldegak: spear
+  [0x06E] = { 2, SPEAR | KATANA },  -- ninja: spear|katana
+  [0x0E5] = { 2, SWORD | FIST | ARCANE }, -- spirit: sword|fist|arcane (#347)
+  [0x0B3] = { 2, KATANA },          -- soft flier: katana
+  [0x048] = { 3, SPEAR | FIST },    -- shelled tank: spear|fist
+  [0x082] = { 4, SWORD | ARCANE },  -- brute: sword|arcane
 }
 local PARTY_CLASSES = 0x01 | 0x02 | 0x04   -- slash+pierce+bludg on hand
 

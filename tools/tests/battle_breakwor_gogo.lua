@@ -21,42 +21,42 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
   [0x171] = { "Zone Eater", 0, 0, HOLY, ICE },
-  [0x0DC] = { "Karkass", 3, SLASH | BLUDG, FIRE | HOLY, POISON },
-  [0x07D] = { "Wart Puck", 3, PIERCE | BLUDG, FIRE, 0 },
-  [0x068] = { "Ogor", 3, SLASH | PIERCE, BOLT | POISON, 0 },
-  [0x0F0] = { "Tap Dancer", 2, SLASH | BLUDG, POISON, 0 },
-  [0x067] = { "Covert", 3, PIERCE | BLUDG, HOLY, POISON },
-  [0x0FA] = { "Woolly", 3, SLASH, FIRE, ICE | BOLT | POISON | WIND | EARTH | WATER },
-  [0x069] = { "Warlock", 2, BLUDG | SPECIAL, BOLT | POISON, 0 },
-  [0x074] = { "Slatter", 2, PIERCE | BLUDG, HOLY, 0 },
-  [0x09A] = { "Cluck", 2, SLASH | BLUDG, ICE, POISON },
-  [0x0A5] = { "Eland", 2, PIERCE | BLUDG, BOLT, 0 },
-  [0x0B5] = { "Hipocampus", 2, PIERCE | BLUDG, FIRE | HOLY, POISON },
-  [0x070] = { "Displayer", 3, BLUDG | SPECIAL, FIRE | HOLY, POISON },
-  [0x0C8] = { "Opinicus", 3, SLASH | BLUDG, FIRE | HOLY, POISON },
-  [0x123] = { "Hidon", 6, PIERCE | BLUDG, FIRE | HOLY | EARTH, POISON },
-  [0x126] = { "Hidonite (poison claw)", 2, SLASH | BLUDG, EARTH, POISON },
-  [0x160] = { "Hidonite (confuclaw)", 2, SLASH | BLUDG, 0, FIRE | ICE | BOLT | POISON | WIND | HOLY | WATER },
-  [0x161] = { "Hidonite (zombi claw)", 2, PIERCE | BLUDG, FIRE | HOLY, POISON },
-  [0x162] = { "Hidonite (mega claw)", 2, BLUDG, FIRE | ICE | BOLT | POISON | WIND | HOLY | EARTH | WATER, 0 },
-  [0x14C] = { "Dirt Drgn", 6, PIERCE | BLUDG, WIND | WATER, 0 },
-  [0x11D] = { "Doom Gaze", 8, PIERCE | SPECIAL, FIRE | HOLY, ICE | POISON },
+  [0x0DC] = { "Karkass", 3, KATANA | ARCANE, FIRE | HOLY, POISON },
+  [0x07D] = { "Wart Puck", 3, SPEAR | ARCANE, FIRE, 0 },
+  [0x068] = { "Ogor", 3, SWORD | DAGGER, BOLT | POISON, 0 },
+  [0x0F0] = { "Tap Dancer", 2, KATANA | ARCANE, POISON, 0 },
+  [0x067] = { "Covert", 3, SPEAR | ARCANE, HOLY, POISON },
+  [0x0FA] = { "Woolly", 3, SWORD, FIRE, ICE | BOLT | POISON | WIND | EARTH | WATER },
+  [0x069] = { "Warlock", 2, FIST | ARCANE, BOLT | POISON, 0 },
+  [0x074] = { "Slatter", 2, DAGGER | ARCANE, HOLY, 0 },
+  [0x09A] = { "Cluck", 2, KATANA | ARCANE, ICE, POISON },
+  [0x0A5] = { "Eland", 2, DAGGER | ARCANE, BOLT, 0 },
+  [0x0B5] = { "Hipocampus", 2, DAGGER | ARCANE, FIRE | HOLY, POISON },
+  [0x070] = { "Displayer", 3, FIST | ARCANE, FIRE | HOLY, POISON },
+  [0x0C8] = { "Opinicus", 3, SWORD | ARCANE, FIRE | HOLY, POISON },
+  [0x123] = { "Hidon", 6, DAGGER | ARCANE, FIRE | HOLY | EARTH, POISON },
+  [0x126] = { "Hidonite (poison claw)", 2, SWORD | ARCANE, EARTH, POISON },
+  [0x160] = { "Hidonite (confuclaw)", 2, KATANA | ARCANE, 0, FIRE | ICE | BOLT | POISON | WIND | HOLY | WATER },
+  [0x161] = { "Hidonite (zombi claw)", 2, SPEAR | ARCANE, FIRE | HOLY, POISON },
+  [0x162] = { "Hidonite (mega claw)", 2, ARCANE, FIRE | ICE | BOLT | POISON | WIND | HOLY | EARTH | WATER, 0 },
+  [0x14C] = { "Dirt Drgn", 6, DAGGER | ARCANE, WIND | WATER, 0 },
+  [0x11D] = { "Doom Gaze", 8, DAGGER | ARCANE, FIRE | HOLY, ICE | POISON },
 }
 
 -- the hands, as the arc seats them (route-wor-gogo.md section 2): TERRA (a dagger; Fire, Pearl), CELES (a
--- blade; Ice), RELM (a rod; Chocobo Brush in the bag: special), STRAGO (a rod; Pearl Rod holy), GOGO (no
+-- blade: sword; Ice), RELM (a rod, and the Chocobo Brush in the bag: both arcane), STRAGO (a rod: arcane; Pearl Rod holy), GOGO (no
 -- weapon and no Fight row: no key of his own; his Mimic copies the others' keys, which the union already
 -- holds)
-local TERRA = { "TERRA", PIERCE, FIRE | HOLY }
-local CELES = { "CELES", SLASH, ICE }
-local RELM = { "RELM", BLUDG | SPECIAL, 0 }
-local STRAGO = { "STRAGO", BLUDG, HOLY }
+local TERRA = { "TERRA", DAGGER, FIRE | HOLY }
+local CELES = { "CELES", SWORD, ICE }
+local RELM = { "RELM", ARCANE, 0 }
+local STRAGO = { "STRAGO", ARCANE, HOLY }
 local GOGO = { "GOGO", 0, 0 }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what, members = list }

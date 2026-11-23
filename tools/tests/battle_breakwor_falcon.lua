@@ -18,9 +18,9 @@
 --      before SETZER joins); in the tomb, the four.  A row of 0 shields
 --      (the Presenter) draws no gauge by design; its formation must hold
 --      a gauged body the party keys;
---   3. the bodies the design hangs a lesson on: special is a common key
---      (guidelines, owner 2026-10-01), so SETZER's Cards key each of the
---      six special bodies (the Bogy, the Deep Eye, the Orog, the
+--   3. the bodies the design hangs a lesson on: special (now arcane, ¤)
+--      is a common key (guidelines, owner 2026-10-01), so SETZER's Cards
+--      (arcane) key each of the six special bodies (the Bogy, the Deep Eye, the Orog, the
 --      Osteosaur, the PowerDemon, Dullahan); every member of the four
 --      holds a key on the Bogy, and on Dullahan, who absorbs ice, with
 --      either of SETZER's weapons; the Narshe Whelk's rows, which the
@@ -30,44 +30,46 @@
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   -- the Kohlingen continent (world groups 45-47)
-  [0x089] = { "Harpiai",    3, SLASH | PIERCE,   WIND },
-  [0x0DB] = { "Muus",       2, SLASH | BLUDG,    0 },
-  [0x0A7] = { "Deep Eye",   2, PIERCE | SPECIAL, FIRE },
-  [0x0D3] = { "Bogy",       3, SLASH | SPECIAL,  0 },
+  [0x089] = { "Harpiai",    3, SWORD | SPEAR,    WIND },
+  [0x0DB] = { "Muus",       2, SWORD | FIST,     0 },
+  [0x0A7] = { "Deep Eye",   2, SPEAR | ARCANE, FIRE },
+  [0x0D3] = { "Bogy",       3, SWORD | ARCANE,   0 },
   -- Darill's Tomb (groups 149-151)
-  [0x005] = { "Orog",       3, SLASH | BLUDG | SPECIAL,  FIRE | HOLY },
-  [0x010] = { "Osteosaur",  3, BLUDG | SPECIAL,          FIRE | HOLY },
-  [0x06F] = { "PowerDemon", 3, SLASH | PIERCE | SPECIAL, FIRE | HOLY },
-  [0x061] = { "Mad Oscar",  4, SLASH,            FIRE },
-  [0x091] = { "Exoray",     2, SLASH | PIERCE,   FIRE | HOLY },
+  [0x005] = { "Orog",       3, KATANA | FIST | ARCANE,   FIRE | HOLY },
+  [0x010] = { "Osteosaur",  3, FIST | ARCANE,            FIRE | HOLY },
+  [0x06F] = { "PowerDemon", 3, DAGGER | SPEAR | KATANA, FIRE | HOLY },
+  [0x061] = { "Mad Oscar",  4, SWORD,            FIRE },
+  [0x091] = { "Exoray",     2, SPEAR | KATANA,   FIRE | HOLY },
   -- the grave (event group 85)
-  [0x11C] = { "Dullahan",  10, PIERCE | BLUDG | SPECIAL, FIRE },
+  [0x11C] = { "Dullahan",  10, DAGGER | FIST | ARCANE, FIRE },
   -- the monster chest beside the save point (event group 116)
   [0x101] = { "Presenter",  0, 0,                FIRE },
-  [0x135] = { "Whelk Head", 6, PIERCE,           FIRE },
+  [0x135] = { "Whelk Head", 6, DAGGER,           FIRE },
 }
 
--- the hands (route-wor-falcon.md 8.1).  SABIN's wind is Air Blade (L30),
--- held at wor-edgar-v1; his holy is AuraBolt.
-local CELES  = { "CELES", SLASH, FIRE | ICE | BOLT }
-local SABIN  = { "SABIN", SLASH | BLUDG, FIRE | HOLY | WIND }
-local EDGAR  = { "EDGAR", SLASH | PIERCE, BOLT | POISON }
-local CARDS  = { "SETZER (Cards)", SPECIAL, 0 }
-local DARTS  = { "SETZER (Darts)", PIERCE, 0 }
+-- the hands (route-wor-falcon.md 8.1): CELES's swords; SABIN's claws, Pummel
+-- and Suplex, all fist; EDGAR's Break Blade, sword, or his pike, lance and
+-- AutoCrossbow, spear; SETZER's Cards, arcane, or his Darts, dagger.  SABIN's
+-- wind is Air Blade (L30), held at wor-edgar-v1; his holy is AuraBolt.
+local CELES  = { "CELES", SWORD, FIRE | ICE | BOLT }
+local SABIN  = { "SABIN", FIST, FIRE | HOLY | WIND }
+local EDGAR  = { "EDGAR", SWORD | SPEAR, BOLT | POISON }
+local CARDS  = { "SETZER (Cards)", ARCANE, 0 }
+local DARTS  = { "SETZER (Darts)", DAGGER, 0 }
 local function union(what, ...)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs({ ... }) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
   return h
 end
-local TRIO = union("CELES + SABIN + EDGAR (slash, pierce, bludg; fire, ice, bolt, poison, holy, wind)",
+local TRIO = union("CELES + SABIN + EDGAR (sword, spear, fist; fire, ice, bolt, poison, holy, wind)",
   CELES, SABIN, EDGAR)
-local FOUR = union("the four (+ SETZER: special or pierce)", CELES, SABIN, EDGAR, CARDS, DARTS)
+local FOUR = union("the four (+ SETZER: arcane or dagger)", CELES, SABIN, EDGAR, CARDS, DARTS)
 
 -- where the arc draws from (section 3), and who meets it there.  Group 44
 -- is the castle's desert on both sides (rows from the Edgar arc); groups
@@ -240,7 +242,7 @@ H.run({ maxFrames = 600 }, {
       problem("Dullahan absorb byte $%02X has lost vanilla ice", absorb(0x11C))
     end
     local narshe = { [0x100] = { "Whelk (Narshe shell)", 0, 0 },
-                     [0x134] = { "Head (Narshe Whelk)", 4, PIERCE } }
+                     [0x134] = { "Head (Narshe Whelk)", 4, SPEAR } }
     for sp, w in pairs(narshe) do
       local got = shield[sp]
       if got == nil or got[1] ~= w[2] or got[2] ~= w[3] then

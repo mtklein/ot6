@@ -43,8 +43,8 @@ end
 -- samurai slash, orog bludgeon, and so on), a distinctive 16-byte run
 -- (verified unique in [300000,310000) at authoring time).
 local base = find(
-  { PIERCE, PIERCE, PIERCE, SLASH, SLASH, BLUDG, SLASH, PIERCE,
-    SLASH, SLASH, SLASH, BLUDG, SLASH, SLASH, SLASH, SLASH },
+  { SPEAR, DAGGER, DAGGER, KATANA, SWORD, FIST, KATANA, SPEAR,
+    KATANA, SWORD, SWORD, FIST, KATANA, SWORD, KATANA, SWORD },
   0x300000, 0x310000)
 
 if not base then
@@ -57,10 +57,10 @@ emu.log(string.format("breakfloor: OT6_FLOOR_CLASS @%06X", base))
 -- floor[species] the classifier chose: one per class bit, plus a beast
 -- default.  These are the bytes the @formula seed reads as the fallback mask.
 local want = {
-  [0]  = { PIERCE, "guard (armored -> pierce)" },
-  [36] = { PIERCE, "white drgn (pierce)" },
-  [71] = { BLUDG,  "flan (soft body -> bludgeon)" },
-  [19] = { SLASH,  "were-rat (beast default -> slash)" },
+  [0]  = { SPEAR, "guard (armored -> pierce)" },
+  [36] = { SPEAR, "white drgn (pierce)" },
+  [71] = { FIST,   "flan (soft body -> bludgeon)" },
+  [19] = { SWORD,  "were-rat (beast default -> slash)" },
 }
 for species, w in pairs(want) do
   local got = rb(base + species)

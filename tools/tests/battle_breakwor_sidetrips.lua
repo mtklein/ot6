@@ -9,33 +9,34 @@
 --      vanilla weak and absorb bytes, and have no Ot6ElemAddTbl row;
 --   2. every species of every formation of world groups 111 and 54 has an authored row and a key for the four
 --      the cabin seats (SHADOW, CELES, CYAN, TERRA);
---   3. the lessons: the desert's Hoover takes the blades (slash); the forest's hide turns them (neither dinosaur
---      takes slash) and SHADOW's point (pierce) and the mages' ice key both; the Cactrot's one shield, so the
+--   3. the lessons: the desert's Hoover takes the blades (a sword or a katana); the forest's hide turns them
+--      (neither dinosaur takes sword or katana) and SHADOW's point (the stars and skeans he throws: dagger; his
+--      Striker is a katana under the six classes) and the mages' ice key both; the Cactrot's one shield, so the
 --      hit that breaks it is the hit that kills it.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x03E] = { "Hoover", 2, SLASH | BLUDG, ICE | WATER, 0 },
-  [0x04C] = { "Cactrot", 1, PIERCE, ICE | WATER, 0 },
-  [0x027] = { "Tyranosaur", 3, PIERCE | BLUDG, ICE, 0 },
-  [0x026] = { "Brachosaur", 6, PIERCE | BLUDG, ICE, 0 },
+  [0x03E] = { "Hoover", 2, KATANA | FIST, ICE | WATER, 0 },
+  [0x04C] = { "Cactrot", 1, DAGGER, ICE | WATER, 0 },
+  [0x027] = { "Tyranosaur", 3, DAGGER | FIST, ICE, 0 },
+  [0x026] = { "Brachosaur", 6, SPEAR | FIST, ICE, 0 },
 }
 local HOOVER, CACTROT, TYRANOSAUR, BRACHOSAUR = 0x03E, 0x04C, 0x027, 0x026
 -- the world groups (RandBattleGroup index = WorldBattleGroup byte) and the species each must deal
 local GROUPS = { { 111, "the Cactrot desert", { HOOVER, CACTROT } },
   { 54, "the dinosaur forest", { TYRANOSAUR, BRACHOSAUR } } }
--- the hands the cabin seats at wor-colosseum-v1 (route-wor-colosseum.md section 3): SHADOW (the Striker: pierce;
--- his skeans fire, water, bolt), CELES (a blade; Ice), CYAN (katanas; Quadra Slice wind), TERRA (a blade; Fire,
--- Ice, Bolt)
-local SHADOW = { "SHADOW", PIERCE, FIRE | WATER | BOLT }
-local CELES = { "CELES", SLASH, ICE }
-local CYAN = { "CYAN", SLASH, WIND }
-local TERRA = { "TERRA", SLASH, FIRE | ICE | BOLT }
+-- the hands the cabin seats at wor-colosseum-v1 (route-wor-colosseum.md section 3): SHADOW (the Striker: katana;
+-- the stars and skeans he throws: dagger, the skeans fire, water, bolt), CELES (a blade: sword; Ice), CYAN
+-- (katanas; Quadra Slice wind), TERRA (a blade: sword; Fire, Ice, Bolt)
+local SHADOW = { "SHADOW", KATANA | DAGGER, FIRE | WATER | BOLT }
+local CELES = { "CELES", SWORD, ICE }
+local CYAN = { "CYAN", KATANA, WIND }
+local TERRA = { "TERRA", SWORD, FIRE | ICE | BOLT }
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),
@@ -140,12 +141,12 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(HOOVER) & SLASH) == 0 then problem("$03E Hoover: the blades (slash) hold no key") end
+    if (classOf(HOOVER) & (SWORD | KATANA)) == 0 then problem("$03E Hoover: the blades (sword, katana) hold no key") end
     if (weakOf(HOOVER) & WATER) == 0 then problem("$03E Hoover: SHADOW's Water Edge holds no key") end
     for _, sp in ipairs({ TYRANOSAUR, BRACHOSAUR }) do
       local nm = WANT[sp][1]
-      if (classOf(sp) & SLASH) ~= 0 then problem("$%03X %s: the blades (slash) key it", sp, nm) end
-      if (classOf(sp) & PIERCE) == 0 then problem("$%03X %s: SHADOW's point (pierce) holds no key", sp, nm) end
+      if (classOf(sp) & (SWORD | KATANA)) ~= 0 then problem("$%03X %s: the blades (sword, katana) key it", sp, nm) end
+      if (classOf(sp) & DAGGER) == 0 then problem("$%03X %s: SHADOW's point (his Throw: dagger) holds no key", sp, nm) end
       if (weakOf(sp) & ICE) == 0 then problem("$%03X %s: the mages' Ice holds no key", sp, nm) end
     end
     if shield[CACTROT] == nil or shield[CACTROT][1] ~= 1 then

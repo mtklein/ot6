@@ -22,37 +22,38 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, elements added }
 local WANT = {
-  [0x0BC] = { "Phase", 2, SPECIAL, ICE, FIRE, HOLY },
-  [0x0BF] = { "Parasoul", 2, SLASH | PIERCE, ICE, FIRE, 0 },
-  [0x0F1] = { "Necromancr", 2, SLASH | SPECIAL, FIRE | HOLY, POISON, 0 },
-  [0x0F7] = { "Trixter", 2, PIERCE | SPECIAL, HOLY, 0, 0 },
-  [0x0EC] = { "Aquila", 3, SLASH | PIERCE, ICE, FIRE, 0 },
-  [0x0E2] = { "Chaos Drgn", 4, PIERCE | BLUDG, ICE, FIRE, 0 },
-  [0x0E9] = { "Sea Flower", 2, SLASH, ICE | BOLT, FIRE | WATER, 0 },
-  [0x093] = { "Uroburos", 1, BLUDG, ICE, FIRE, 0 },
-  [0x153] = { "Red Dragon", 6, PIERCE, ICE | WATER, FIRE, 0 },
-  [0x11D] = { "Doom Gaze", 8, PIERCE | SPECIAL, FIRE | HOLY, ICE | POISON, 0 },
+  [0x0BC] = { "Phase", 2, ARCANE, ICE, FIRE, HOLY },
+  [0x0BF] = { "Parasoul", 2, SWORD | SPEAR, ICE, FIRE, 0 },
+  [0x0F1] = { "Necromancr", 2, SWORD | ARCANE, FIRE | HOLY, POISON, 0 },
+  [0x0F7] = { "Trixter", 2, SPEAR | ARCANE, HOLY, 0, 0 },
+  [0x0EC] = { "Aquila", 3, SPEAR | KATANA, ICE, FIRE, 0 },
+  [0x0E2] = { "Chaos Drgn", 4, DAGGER | FIST, ICE, FIRE, 0 },
+  [0x0E9] = { "Sea Flower", 2, SWORD, ICE | BOLT, FIRE | WATER, 0 },
+  [0x093] = { "Uroburos", 1, ARCANE, ICE, FIRE, 0 },
+  [0x153] = { "Red Dragon", 6, SPEAR, ICE | WATER, FIRE, 0 },
+  [0x11D] = { "Doom Gaze", 8, DAGGER | ARCANE, FIRE | HOLY, ICE | POISON, 0 },
 }
 
 -- the hands (route-wor-locke.md 3; wor-phoenix-v1's kit,
 -- build/attempts/wt/v032-locke-arc/data/wor-phoenix-v1_dump.txt): party 1
--- TERRA (Man Eater; Fire, Pearl, Merton), STRAGO (Pearl Rod; Aqua Rake,
--- Aero), SABIN (Dragon Claw; Blitzes: bludgeon, fire, holy, wind), CYAN
--- (Tempest); party 2 CELES (Falchion; Ice, Tritoch's ice, bolt and
--- poison), RELM (Gravity Rod), MOG (Partisan), UMARO (Bone Club; ice)
-local TERRA  = { "TERRA", PIERCE, FIRE | HOLY }
-local STRAGO = { "STRAGO", BLUDG, HOLY | WATER | WIND }
-local SABIN  = { "SABIN", SLASH | BLUDG, FIRE | HOLY | WIND }
-local CYAN   = { "CYAN", SLASH, WIND }
-local CELES  = { "CELES", SLASH, ICE | BOLT | POISON }
-local RELM   = { "RELM", BLUDG, EARTH }
-local MOG    = { "MOG", PIERCE, 0 }
-local UMARO  = { "UMARO", BLUDG, ICE }
+-- TERRA (Man Eater: dagger; Fire, Pearl, Merton), STRAGO (Pearl Rod: arcane;
+-- Aqua Rake, Aero), SABIN (Dragon Claw and Blitzes: fist; fire, holy, wind),
+-- CYAN (Tempest: katana); party 2 CELES (Falchion: sword; Ice, Tritoch's ice,
+-- bolt and poison), RELM (Gravity Rod: arcane), MOG (Partisan: spear), UMARO
+-- (Bone Club: fist; ice)
+local TERRA  = { "TERRA", DAGGER, FIRE | HOLY }
+local STRAGO = { "STRAGO", ARCANE, HOLY | WATER | WIND }
+local SABIN  = { "SABIN", FIST, FIRE | HOLY | WIND }
+local CYAN   = { "CYAN", KATANA, WIND }
+local CELES  = { "CELES", SWORD, ICE | BOLT | POISON }
+local RELM   = { "RELM", ARCANE, EARTH }
+local MOG    = { "MOG", SPEAR, 0 }
+local UMARO  = { "UMARO", FIST, ICE }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do

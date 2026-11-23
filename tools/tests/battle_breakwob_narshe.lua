@@ -7,17 +7,17 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the Bio Blaster's poison keys the guard and heals the rat, which TERRA's Fire keys; BANON's rod (bludgeon) dents the guard's plate.
+--   3. the lessons: the Bio Blaster's poison keys the guard and heals the rat, which TERRA's Fire keys; BANON's rod (arcane) dents the guard's plate.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x0EF] = { "1st Class", 2, PIERCE | BLUDG, POISON, 0, 0 },
-  [0x0F4] = { "Wild Rat", 2, SLASH | PIERCE, FIRE, POISON, 0 },
+  [0x0EF] = { "1st Class", 2, SPEAR | FIST, POISON, 0, 0 },
+  [0x0F4] = { "Wild Rat", 2, SWORD | DAGGER, FIRE, POISON, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -26,10 +26,12 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 7); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is the class of the weapon named for the member (the ROM's Ot6WeapClassTbl:
+-- a sword SWORD, a knife DAGGER, a pike SPEAR, a katana or ninja blade KATANA, claws and bare fists FIST, a rod,
+-- brush or cards ARCANE), with the class of a tool the design counts in the hand (the AutoCrossbow SPEAR)
 local PARTIES = {
-  { "TERRA, EDGAR, BANON", { { "TERRA", 0, FIRE }, { "EDGAR", PIERCE, POISON }, { "BANON", BLUDG, 0 } }, nil },
-  { "LOCKE, EDGAR, SABIN, MOG", { { "LOCKE", PIERCE, 0 }, { "EDGAR", SLASH, ICE }, { "SABIN", SLASH, 0 }, { "MOG", PIERCE, 0 } }, nil },
+  { "TERRA, EDGAR, BANON", { { "TERRA", 0, FIRE }, { "EDGAR", SPEAR, POISON }, { "BANON", ARCANE, 0 } }, nil },
+  { "LOCKE, EDGAR, SABIN, MOG", { { "LOCKE", DAGGER, 0 }, { "EDGAR", SWORD, ICE }, { "SABIN", FIST, 0 }, { "MOG", SPEAR, 0 } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -142,7 +144,7 @@ H.run({ maxFrames = 600 }, {
     if (weakOf(0x0EF) & POISON) == 0 then problem("$0EF 1st Class: the Bio Blaster (poison) holds no key") end
     if (absorb(0x0F4) & POISON) == 0 then problem("$0F4 Wild Rat no longer absorbs poison") end
     if (weakOf(0x0F4) & FIRE) == 0 then problem("$0F4 Wild Rat: TERRA's Fire holds no key") end
-    if (classOf(0x0EF) & BLUDG) == 0 then problem("$0EF 1st Class: BANON's rod (bludgeon) holds no key") end
+    if (classOf(0x0EF) & ARCANE) == 0 then problem("$0EF 1st Class: BANON's rod (arcane) holds no key") end
     H.log("the lessons: the Bio Blaster keys the guard and heals the rat, which Fire keys; BANON's rod keys the guard")
     H.assertEq(#problems, 0, "WoB narshe break row mismatches")
     H.log("WoB narshe break rows verified against the built ROM")

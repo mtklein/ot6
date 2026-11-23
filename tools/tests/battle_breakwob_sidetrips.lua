@@ -11,22 +11,22 @@
 --   2. every species of every formation of those world groups has a key in the hands of the four that first meets
 --      it (the forests: the post-opera four; the islands: the four the wheel is handed to, SETZER among them), and
 --      each group still deals the species it is checked for;
---   3. the lessons: the Grenade answers a Fight that does not break it with Exploder, so it is keyed by the point
---      (LOCKE's knife, whose boosted swing breaks it in one; EDGAR's tools) and the blow (SABIN's blitzes, which
---      it does not answer), and not by the blades; the Intangir absorbs every element, so every other hand keys it,
---      SETZER's special too.
+--   3. the lessons: the Grenade answers a Fight that does not break it with Exploder, so it is keyed by a point
+--      the four hold (LOCKE's knife, dagger, whose boosted swing breaks it in one; or EDGAR's tools, spear) and
+--      the blow (SABIN's blitzes, fist, which it does not answer), and not by the blades (sword, katana); the
+--      Intangir absorbs every element, so every other hand keys it, SETZER's cards (arcane) too.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x0E8] = { "Bug", 2, SLASH | PIERCE, ICE | WATER, 0 },
-  [0x03D] = { "ChickenLip", 2, SLASH | BLUDG, ICE, 0 },
-  [0x0AA] = { "Grenade", 3, PIERCE | BLUDG, ICE | WATER, FIRE },
-  [0x0A3] = { "Intangir", 2, SLASH | PIERCE | BLUDG | SPECIAL, 0, 0xFF },
+  [0x0E8] = { "Bug", 2, DAGGER | KATANA, ICE | WATER, 0 },
+  [0x03D] = { "ChickenLip", 2, KATANA | FIST, ICE, 0 },
+  [0x0AA] = { "Grenade", 3, DAGGER | FIST, ICE | WATER, FIRE },
+  [0x0A3] = { "Intangir", 2, SWORD | DAGGER | FIST | ARCANE, 0, 0xFF },
 }
 local BUG, CHICKENLIP, GRENADE, INTANGIR = 0x0E8, 0x03D, 0x0AA, 0x0A3
 -- the world groups (RandBattleGroup index = WorldBattleGroup byte) and the species each must deal
@@ -38,11 +38,11 @@ local GROUPS = { { 20, "the forest east of Albrook", { BUG }, "post-opera" },
   { 27, "the bomb isle", { GRENADE }, "airship" },
   { 124, "Triangle Island", { INTANGIR }, "airship" }, { 28, "Triangle Island's shore", { INTANGIR }, "airship" } }
 -- the hands that meet each group: the forests, the post-opera four on foot (post-opera-v1: CELES's RegalCutlass,
--- slash; LOCKE's MithrilKnife, pierce; EDGAR's Mithril Pike and AutoCrossbow, pierce; SABIN's Kaiser and Pummel,
--- bludgeon); the islands, the four the wheel is handed to (terra-returned-v1: LOCKE's knife, pierce; EDGAR's
--- Blizzard, slash, and his tools, pierce; SABIN's Poison Claw, slash, and Pummel, bludgeon; SETZER's cards, special)
-local POST_OPERA = SLASH | PIERCE | BLUDG
-local AIRSHIP = SLASH | PIERCE | BLUDG | SPECIAL
+-- sword; LOCKE's MithrilKnife, dagger; EDGAR's Mithril Pike and AutoCrossbow, spear; SABIN's Kaiser and Pummel,
+-- fist); the islands, the four the wheel is handed to (terra-returned-v1: LOCKE's knife, dagger; EDGAR's
+-- Blizzard, sword, and his tools, spear; SABIN's Poison Claw and Pummel, fist; SETZER's cards, arcane)
+local POST_OPERA = SWORD | DAGGER | SPEAR | FIST
+local AIRSHIP = SWORD | DAGGER | SPEAR | FIST | ARCANE
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),
@@ -133,12 +133,14 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(GRENADE) & SLASH) ~= 0 then
-      problem("$0AA Grenade: a blade (slash) keys it; its keys are the point (one boosted swing, or a tool) and the blow "
+    if (classOf(GRENADE) & (SWORD | KATANA)) ~= 0 then
+      problem("$0AA Grenade: a blade (sword, katana) keys it; its keys are the point (one boosted swing, or a tool) and the blow "
         .. "(a blitz)")
     end
-    if (classOf(GRENADE) & PIERCE) == 0 then problem("$0AA Grenade: LOCKE's point and EDGAR's tools (pierce) hold no key") end
-    if (classOf(GRENADE) & BLUDG) == 0 then problem("$0AA Grenade: SABIN's blitzes (bludgeon) hold no key") end
+    if (classOf(GRENADE) & (DAGGER | SPEAR)) == 0 then
+      problem("$0AA Grenade: neither LOCKE's point (dagger) nor EDGAR's tools (spear) holds a key")
+    end
+    if (classOf(GRENADE) & FIST) == 0 then problem("$0AA Grenade: SABIN's blitzes (fist) hold no key") end
     if absorb(INTANGIR) ~= 0xFF then problem("$0A3 Intangir: no longer absorbs every element") end
     if (classOf(INTANGIR) & AIRSHIP) ~= AIRSHIP then
       problem("$0A3 Intangir: class $%02X, want every hand the four hold ($%02X): it absorbs every element",

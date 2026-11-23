@@ -7,9 +7,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local WANT = {                    -- species -> { shields, class mask }
-  [0x0C7] = { 2, 0x02 },          -- commando: pierce
-  [0x165] = { 2, 0x04 },          -- protoarmor: bludg
-  [0x102] = { 3, 0x02 | 0x04 },   -- mega armor: pierce|bludg
+  [0x0C7] = { 2, DAGGER },          -- commando: dagger
+  [0x165] = { 2, FIST },            -- protoarmor: fist
+  [0x102] = { 3, SPEAR | FIST },    -- mega armor: spear|fist
 }
 local FORMS = { 416, 417 }
 local PARTY_CLASSES = 0x01 | 0x02 | 0x04   -- slash+pierce+bludg on hand

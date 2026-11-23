@@ -6,7 +6,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local WANT = {                    -- species -> { shields, class mask }
-  [0x0AE] = { 5, 0x01 | 0x04 },   -- gigantos: slash|bludg
+  [0x0AE] = { 5, KATANA | FIST },   -- gigantos: katana|fist
 }
 local FORMS = { 170 }
 local PARTY_CLASSES = 0x01 | 0x02          -- slash+pierce on hand

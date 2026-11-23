@@ -15,7 +15,7 @@
 --      a key for the four who walk it (TERRA, CELES, RELM and GAU, as
 --      wor-veldt-cave-v1 seats them);
 --   3. the lesson: GAU alone holds a key to every body here (his fists and
---      his beasts' bludgeon, Were-Rat's poison), and the cave drinks
+--      his beasts' blows: fist; Were-Rat's poison), and the cave drinks
 --      CELES's ice (Toe Cutter, the SrBehemoth);
 --   4. the Veldt's fourteen: each carries its designed row, keeps the floor's
 --      shields and class (the World of Balance parties that meet them at
@@ -24,42 +24,42 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x08F] = { "Toe Cutter", 3, PIERCE | BLUDG, FIRE | WIND, ICE },
-  [0x07E] = { "Rhyos", 4, BLUDG, 0, 0 },
-  [0x0BB] = { "Allo Ver", 3, SLASH | BLUDG, FIRE | HOLY, POISON },
-  [0x119] = { "SrBehemoth", 6, PIERCE | BLUDG, FIRE | POISON, ICE },
+  [0x08F] = { "Toe Cutter", 3, DAGGER | FIST, FIRE | WIND, ICE },
+  [0x07E] = { "Rhyos", 4, FIST, 0, 0 },
+  [0x0BB] = { "Allo Ver", 3, KATANA | FIST, FIRE | HOLY, POISON },
+  [0x119] = { "SrBehemoth", 6, SPEAR | FIST, FIRE | POISON, ICE },
 }
 
 -- the hands (wor-veldt-cave-v1's kit: build/attempts/wt/v033-wor-gau/data/):
--- TERRA (a dagger; Fire, Pearl), CELES (two blades; Ice, bolt and poison),
--- RELM (a rod; earth), GAU (no weapon: his fists; his beasts: Were-Rat's
+-- TERRA (a dagger; Fire, Pearl), CELES (two blades: sword; Ice, bolt and poison),
+-- RELM (a rod: arcane; earth), GAU (no weapon: his fists; his beasts: Were-Rat's
 -- Poison, Rhinotaur's Mega Volt, the physical specials)
-local TERRA = { "TERRA", PIERCE, FIRE | HOLY }
-local CELES = { "CELES", SLASH, ICE | BOLT | POISON }
-local RELM = { "RELM", BLUDG, EARTH }
-local GAU = { "GAU", BLUDG, POISON | BOLT }
+local TERRA = { "TERRA", DAGGER, FIRE | HOLY }
+local CELES = { "CELES", SWORD, ICE | BOLT | POISON }
+local RELM = { "RELM", ARCANE, EARTH }
+local GAU = { "GAU", FIST, POISON | BOLT }
 -- the Veldt's fourteen: species -> { name, shields, classes, the floor's class
 -- (OT6_FLOOR_CLASS), vanilla weak, vanilla absorb, element added }
 local VELDT = {
-  [0x013] = { "Were-Rat", 2, SLASH | PIERCE, SLASH, FIRE, POISON, 0 },
-  [0x017] = { "Leafer", 2, SLASH | BLUDG, SLASH, FIRE | WATER, ICE, 0 },
-  [0x01B] = { "Vomammoth", 2, SLASH | BLUDG, SLASH, FIRE, 0, 0 },
-  [0x028] = { "Dark Wind", 2, SLASH | PIERCE, SLASH, FIRE, 0, 0 },
-  [0x042] = { "M-TekArmor", 3, PIERCE | BLUDG, PIERCE, BOLT, 0, POISON },
-  [0x04D] = { "Repo Man", 2, SLASH | PIERCE, SLASH, POISON, 0, 0 },
-  [0x05D] = { "Areneid", 2, SLASH | BLUDG, SLASH, ICE | WATER, 0, POISON },
-  [0x018] = { "Stray Cat", 3, SLASH | PIERCE, SLASH, 0, 0, POISON },
-  [0x029] = { "Beakor", 3, SLASH | PIERCE, SLASH, FIRE, 0, 0 },
-  [0x02F] = { "CrassHoppr", 3, PIERCE | BLUDG, PIERCE, FIRE | WIND, 0, 0 },
-  [0x04F] = { "Bomb", 3, SLASH | BLUDG, SLASH, ICE | WATER, FIRE, 0 },
-  [0x05A] = { "Ghost", 3, SLASH | SPECIAL, SLASH, FIRE | HOLY, POISON, 0 },
-  [0x076] = { "Rhobite", 3, SLASH | BLUDG, SLASH, WATER, 0, 0 },
-  [0x0A2] = { "Poplium", 3, SLASH | PIERCE, SLASH, FIRE | HOLY, POISON, 0 },
+  [0x013] = { "Were-Rat", 2, SPEAR | KATANA, SWORD, FIRE, POISON, 0 },
+  [0x017] = { "Leafer", 2, SWORD | ARCANE, KATANA, FIRE | WATER, ICE, 0 },
+  [0x01B] = { "Vomammoth", 2, KATANA | FIST, KATANA, FIRE, 0, 0 },
+  [0x028] = { "Dark Wind", 2, SWORD | SPEAR, KATANA, FIRE, 0, 0 },
+  [0x042] = { "M-TekArmor", 3, SPEAR | FIST, DAGGER, BOLT, 0, POISON },
+  [0x04D] = { "Repo Man", 2, SWORD | SPEAR, SWORD, POISON, 0, 0 },
+  [0x05D] = { "Areneid", 2, SWORD | ARCANE, SWORD, ICE | WATER, 0, POISON },
+  [0x018] = { "Stray Cat", 3, DAGGER | KATANA, SWORD, 0, 0, POISON },
+  [0x029] = { "Beakor", 3, DAGGER | KATANA, SWORD, FIRE, 0, 0 },
+  [0x02F] = { "CrassHoppr", 3, DAGGER | ARCANE, SPEAR, FIRE | WIND, 0, 0 },
+  [0x04F] = { "Bomb", 3, KATANA | ARCANE, SWORD, ICE | WATER, FIRE, 0 },
+  [0x05A] = { "Ghost", 3, SWORD | DAGGER, KATANA, FIRE | HOLY, POISON, 0 },
+  [0x076] = { "Rhobite", 3, KATANA | FIST, KATANA, WATER, 0, 0 },
+  [0x0A2] = { "Poplium", 3, SPEAR | KATANA, SWORD, FIRE | HOLY, POISON, 0 },
 }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }

@@ -21,55 +21,55 @@
 --   3. the lessons: TERRA alone keys every body of the dreamscape (she walks
 --      it alone until the stooges run); the bolt beam keys every body of the
 --      cave (the three ride Magitek armor there); the three stooges take
---      three different class pairs; the Soul Savers take the brush (¤) and
+--      three different class pairs; the Soul Savers take the brush (arcane ¤) and
 --      no other class; CYAN alone keys every body of the Ancient Castle (his
 --      katana, back with every SwdTech); the Blue Dragon keeps its vanilla
 --      bolt weakness and water absorb.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x034] = { "TumbleWeed", 3, SLASH | BLUDG, FIRE, WATER },
-  [0x0BE] = { "Barb-e", 3, SLASH | SPECIAL, POISON, 0 },
-  [0x0AB] = { "Critic", 2, SLASH | BLUDG, 0, 0 },
-  [0x085] = { "Allosaurus", 3, PIERCE | BLUDG, FIRE | HOLY, 0 },
-  [0x0B1] = { "Parasite", 2, SLASH, FIRE, 0 },
-  [0x0AC] = { "Pan Dora", 3, BLUDG | SPECIAL, FIRE | HOLY, POISON },
-  [0x00A] = { "Rain Man", 2, BLUDG | SPECIAL, ICE | HOLY | WATER, 0 },
-  [0x004] = { "Samurai", 3, SLASH | PIERCE, POISON, 0 },
-  [0x01E] = { "Suriander", 3, SLASH | BLUDG, HOLY, 0 },
-  [0x09D] = { "PlutoArmor", 3, PIERCE, BOLT | WATER, 0 },
-  [0x095] = { "Sky Cap", 2, PIERCE | SPECIAL, BOLT | WIND | WATER, 0 },
-  [0x0FE] = { "Io", 4, PIERCE | BLUDG, BOLT | HOLY | WATER, 0 },
-  [0x11F] = { "Curley", 4, SLASH | SPECIAL, ICE | WATER, FIRE },
-  [0x120] = { "Larry", 4, PIERCE | BLUDG, FIRE, ICE | WIND },
-  [0x121] = { "Moe", 4, SLASH | BLUDG, 0, BOLT },
-  [0x122] = { "Wrexsoul", 6, SLASH | SPECIAL, ICE, FIRE | HOLY },
-  [0x167] = { "SoulSaver", 2, SPECIAL, ICE, FIRE | HOLY },
-  [0x0A6] = { "Enuo", 2, SLASH | BLUDG, HOLY, 0 },
-  [0x06D] = { "Goblin", 3, SLASH | PIERCE, HOLY, 0 },
-  [0x057] = { "Figaliz", 3, SLASH | BLUDG, ICE, 0 },
-  [0x045] = { "Lethal Wpn", 4, SLASH | BLUDG, BOLT | WATER, 0 },
-  [0x051] = { "Boxed Set", 3, SLASH | BLUDG, HOLY, 0 },
-  [0x152] = { "Blue Drgn", 6, SLASH | PIERCE, BOLT, WATER },
+  [0x034] = { "TumbleWeed", 3, KATANA | ARCANE, FIRE, WATER },
+  [0x0BE] = { "Barb-e", 3, KATANA | ARCANE, POISON, 0 },
+  [0x0AB] = { "Critic", 2, SWORD | FIST, 0, 0 },
+  [0x085] = { "Allosaurus", 3, SPEAR | ARCANE, FIRE | HOLY, 0 },
+  [0x0B1] = { "Parasite", 2, SWORD, FIRE, 0 },
+  [0x0AC] = { "Pan Dora", 3, FIST | ARCANE, FIRE | HOLY, POISON },
+  [0x00A] = { "Rain Man", 2, FIST | ARCANE, ICE | HOLY | WATER, 0 },
+  [0x004] = { "Samurai", 3, SWORD | DAGGER, POISON, 0 },
+  [0x01E] = { "Suriander", 3, KATANA | ARCANE, HOLY, 0 },
+  [0x09D] = { "PlutoArmor", 3, SPEAR, BOLT | WATER, 0 },
+  [0x095] = { "Sky Cap", 2, DAGGER | ARCANE, BOLT | WIND | WATER, 0 },
+  [0x0FE] = { "Io", 4, SPEAR | ARCANE, BOLT | HOLY | WATER, 0 },
+  [0x11F] = { "Curley", 4, KATANA | ARCANE, ICE | WATER, FIRE },
+  [0x120] = { "Larry", 4, SPEAR | ARCANE, FIRE, ICE | WIND },
+  [0x121] = { "Moe", 4, SWORD | FIST, 0, BOLT },
+  [0x122] = { "Wrexsoul", 6, KATANA | ARCANE, ICE, FIRE | HOLY },
+  [0x167] = { "SoulSaver", 2, ARCANE, ICE, FIRE | HOLY },
+  [0x0A6] = { "Enuo", 2, KATANA | FIST, HOLY, 0 },
+  [0x06D] = { "Goblin", 3, DAGGER | KATANA, HOLY, 0 },
+  [0x057] = { "Figaliz", 3, KATANA | ARCANE, ICE, 0 },
+  [0x045] = { "Lethal Wpn", 4, KATANA | ARCANE, BOLT | WATER, 0 },
+  [0x051] = { "Boxed Set", 3, KATANA | ARCANE, HOLY, 0 },
+  [0x152] = { "Blue Drgn", 6, DAGGER | KATANA, BOLT, WATER },
   -- the two monster boxes (#487): the cave's Master Pug (event group 113) and the castle's KatanaSoul (95)
-  [0x138] = { "Master Pug", 6, SLASH | SPECIAL, 0, WATER },
-  [0x124] = { "KatanaSoul", 6, SLASH | PIERCE, POISON, 0 },
+  [0x138] = { "Master Pug", 6, DAGGER | KATANA, 0, WATER },
+  [0x124] = { "KatanaSoul", 6, SPEAR | KATANA, POISON, 0 },
 }
 
--- the hands, as the arc seats them (route-wor-dreams.md section 2): in the dream TERRA (a blade; Fire, Ice,
--- Bolt), CELES (a blade; Ice) and RELM (a rod: Pearl Rod holy); in the cave the three in Magitek armor, whose
--- rows are the beams (fire, bolt, ice), Bio Blast (poison) and TERRA's Tek Missile (pierce), with no Fight;
--- at the Ancient Castle CYAN (a katana; Quadra Slice wind) beside the three
-local TERRA = { "TERRA", SLASH, FIRE | ICE | BOLT }
-local CELES = { "CELES", SLASH, ICE }
-local RELM = { "RELM", BLUDG, HOLY }
-local CYAN = { "CYAN", SLASH, WIND }
-local MAGITEK = { "the Magitek rows", PIERCE, FIRE | ICE | BOLT | POISON }
+-- the hands, as the arc seats them (route-wor-dreams.md section 2): in the dream TERRA (a blade: sword; Fire,
+-- Ice, Bolt), CELES (a blade: sword; Ice) and RELM (a rod: arcane; Pearl Rod holy); in the cave the three in
+-- Magitek armor, whose rows are the beams (fire, bolt, ice), Bio Blast (poison) and TERRA's Tek Missile (spear),
+-- with no Fight; at the Ancient Castle CYAN (a katana; Quadra Slice wind) beside the three
+local TERRA = { "TERRA", SWORD, FIRE | ICE | BOLT }
+local CELES = { "CELES", SWORD, ICE }
+local RELM = { "RELM", ARCANE, HOLY }
+local CYAN = { "CYAN", KATANA, WIND }
+local MAGITEK = { "the Magitek rows", SPEAR, FIRE | ICE | BOLT | POISON }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what, members = list }
   for _, m in ipairs(list) do
@@ -242,8 +242,8 @@ H.run({ maxFrames = 600 }, {
       if pairs3[cl] then problem("$%03X %s takes the class pair $%02X another stooge takes", sp, WANT[sp][1], cl) end
       pairs3[cl] = true
     end
-    if classOf(0x167) ~= SPECIAL then
-      problem("$167 SoulSaver: class $%02X, want the brush alone ($%02X)", classOf(0x167), SPECIAL)
+    if classOf(0x167) ~= ARCANE then
+      problem("$167 SoulSaver: class $%02X, want the brush alone ($%02X)", classOf(0x167), ARCANE)
     end
     if (weakOf(0x152) & BOLT) == 0 or (absorb(0x152) & WATER) == 0 then
       problem("$152: the Blue Dragon lost its vanilla bolt weakness or its water absorb")

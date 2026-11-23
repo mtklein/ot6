@@ -7,19 +7,19 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the blades (slash) key every body; the Wyvern is the three-shield dragon, ice its element; the Joker takes special and bolt.
+--   3. the lessons: the blades (sword) key every body; the Wyvern is the three-shield dragon, ice its element; the Joker takes arcane (the special's ¤) and bolt.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x07B] = { "Ralph", 2, SLASH | PIERCE, 0, 0, POISON },
-  [0x081] = { "Wyvern", 3, SLASH | PIERCE, ICE, 0, 0 },
-  [0x08D] = { "WeedFeeder", 2, SLASH | BLUDG, FIRE | WIND, 0, 0 },
-  [0x06B] = { "Joker", 2, SLASH | SPECIAL, BOLT | POISON, 0, 0 },
+  [0x07B] = { "Ralph", 2, SWORD | SPEAR, 0, 0, POISON },
+  [0x081] = { "Wyvern", 3, DAGGER | KATANA, ICE, 0, 0 },
+  [0x08D] = { "WeedFeeder", 2, KATANA | FIST, FIRE | WIND, 0, 0 },
+  [0x06B] = { "Joker", 2, SWORD | ARCANE, BOLT | POISON, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -30,9 +30,11 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 9); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is the class of the weapon named for the member (the ROM's Ot6WeapClassTbl:
+-- a sword SWORD, a knife DAGGER, a pike SPEAR, a katana or ninja blade KATANA, claws and bare fists FIST, a rod,
+-- brush or cards ARCANE), with the class of a tool the design counts in the hand (the AutoCrossbow SPEAR)
 local PARTIES = {
-  { "TERRA, LOCKE", { { "TERRA", SLASH, FIRE | ICE }, { "LOCKE", SLASH, BOLT } }, nil },
+  { "TERRA, LOCKE", { { "TERRA", SWORD, FIRE | ICE }, { "LOCKE", SWORD, BOLT } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -143,14 +145,14 @@ H.run({ maxFrames = 600 }, {
 
     -- 3. the lessons
     for _, sp in ipairs({ 0x07B, 0x081, 0x08D }) do
-      if (classOf(sp) & SLASH) == 0 then problem("$%03X %s: the blades (slash) hold no key", sp, WANT[sp][1]) end
+      if (classOf(sp) & SWORD) == 0 then problem("$%03X %s: the blades (sword) hold no key", sp, WANT[sp][1]) end
     end
     if (weakOf(0x081) & ICE) == 0 then problem("$081 Wyvern: ice holds no key") end
     if shield[0x081] == nil or shield[0x081][1] ~= 3 then problem("$081 Wyvern: not three shields") end
-    if (classOf(0x06B) & SPECIAL) == 0 then problem("$06B Joker: the conjurer should take special") end
+    if (classOf(0x06B) & ARCANE) == 0 then problem("$06B Joker: the conjurer should take arcane (the special's ¤)") end
     if (weakOf(0x06B) & BOLT) == 0 then problem("$06B Joker: LOCKE's ThunderBlade (bolt) holds no key") end
     H.log("the lessons: the blades key every body; the Wyvern is the three-shield dragon, ice its element; the Joker "
-      .. "takes special and bolt")
+      .. "takes arcane and bolt")
     H.assertEq(#problems, 0, "WoB south break row mismatches")
     H.log("WoB south break rows verified against the built ROM")
   end),
