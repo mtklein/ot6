@@ -527,14 +527,14 @@ TEST_ENV = {
     # battle_jackpot: three passes and a bounded search (at most 320
     # candidates, about 2,800 frames each)
     "battle_jackpot": "OT6_TIMEOUT=9000",
-    "battle_cointoss": "OT6_TIMEOUT=3600 "
-        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
+    # #566: the coin suites boot wor_tomb_b1_hunt_b1 (B1's Orogs hold the
+    # arcane weakness the coins chip; the east room's bodies no longer do)
+    "battle_cointoss": "OT6_TIMEOUT=3600",
     "battle_hiredhelp": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_setzergrey": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
-    "battle_gprain": "OT6_TIMEOUT=3600 "
-        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
+    "battle_gprain": "OT6_TIMEOUT=3600",
     "battle_hirerefund": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     # battle_passretarget: 3-21 battles over its entry variations (11k-85k

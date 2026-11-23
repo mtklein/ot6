@@ -341,6 +341,11 @@ local steps = {
       "TERRA holds a dagger weapon (MithrilKnife)")
     H.assertEq(H.weaponClass(H.readByte(0x1600 + 37 * 1 + 0x1F)), SWORD,
       "LOCKE holds a sword weapon (MithrilBlade)")
+    -- the rows this fight is read against, as the ROM authors them (#566: the split may move a row; the
+    -- premise is a body the dagger hand keys and the sword hand does not, beside one no hand keys)
+    H.assertEq(H.speciesClassRow(CIRPIUS) & CLASSES, DAGGER,
+      "Cirpius's class row is the dagger alone (Ot6ShieldTbl): TERRA's knife keys it, LOCKE's sword does not")
+    H.assertEq(H.speciesClassRow(TUSKER) & CLASSES, 0, "the Tusker's class row holds no class (Ot6ShieldTbl)")
     -- the pool, as the ROM deals it, and the budget it implies
     local anyMixed, anyTeach = false, false
     for slot = 1, 4 do

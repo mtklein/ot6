@@ -1,22 +1,30 @@
--- @suite slow
+-- @suite slow savestate=wor_tomb_b1_hunt_b1
 -- battle_cointoss.lua -- SETZER's Coin Toss (#319, kits.md "Setzer"): the
 -- Slot row's table, and its second row thrown twice, unboosted and at 1 BP.
 --
--- Played, not staged: Continue the wor-tomb-v1 battery (CELES, SABIN,
--- EDGAR and SETZER on Darill's Tomb's B3 save point; SETZER back in the
--- World of Ruin, so his Jackpot is learned), walk the east room into
--- random battles (field group 151: a Mad Oscar; a Mad Oscar and an Exoray;
--- a PowerDemon and two Exorays), and play SETZER's turns through the real
--- menu (H.setzerBattle) in the battles that deal a crowd -- two or more
+-- Played, not staged: boot wor_tomb_b1_hunt_b1 (gen_wor_tomb_b1_hunt's frame
+-- on Darill's Tomb's B1 stairs: CELES, SABIN, EDGAR and SETZER; SETZER back
+-- in the World of Ruin, so his Jackpot is learned), walk B1 into random
+-- battles (field group 149: an Osteosaur; two Orogs; an Orog and two
+-- PowerDemons), and play SETZER's turns through the real menu
+-- (H.setzerBattle) in the battles that deal a crowd -- two or more
 -- monsters, one arcane-weak -- so a toss splits across bodies and chips
--- the arcane-weak one, asserted (coverage), since a lone Mad Oscar dealt
+-- the arcane-weak one, asserted (coverage), since a lone body dealt
 -- first had quietly stopped both from running.  Any other battle is fought
 -- out by the route's fight driver and followed by field care
--- (H.setzerCrowdBattles).  The budget is decoded from the room's pool: the
--- most encounters any encounter-counter state needs to the next crowd (19
--- on this ROM), per crowd the throws need -- at most two, since each crowd
--- battle gives at least one throw.  Every other assertion is derived from
--- the battle's own state.
+-- (H.setzerCrowdBattles).  The budget is decoded from the room's pool and
+-- the ROM's class rows (H.setzerCrowdBudget, which fails by name when the
+-- room deals no crowd): the most encounters any encounter-counter state
+-- needs to the next crowd, per crowd the throws need -- at most two, since
+-- each crowd battle gives at least one throw.  Every other assertion is
+-- derived from the battle's own state.
+--
+-- Why B1 (#566).  Until six classes this suite Continued wor-tomb-v1 and
+-- walked the tomb's east room (map 300, group 151: a Mad Oscar; a Mad Oscar
+-- and an Exoray; a PowerDemon and two Exorays), where the PowerDemon was the
+-- special-weak body.  The coins are Arcane now and the split left group 151
+-- no arcane-weak body (the PowerDemon's special became the dagger), so that
+-- room deals no crowd a toss can chip; B1's Orogs hold the arcane.
 --
 -- What it holds, per throw (the action's own edges: Ot6SetzerExec's entry
 -- and SETZER's Ot6ActionEnd):
@@ -36,7 +44,6 @@
 --     every body's HP and shields at the end.
 -- Negative controls: the mutant ROMs in build/attempts/wt/kit-setzer/
 -- (rate, boost, class) fail the named assertion.
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
@@ -57,6 +64,8 @@ local function coverage(all, tag)
 end
 
 local COIN = 0x59
+local STATE, MAP_B1 = "build/states/wor_tomb_b1_hunt_b1.mss.lua", 298
+local B1_LAP = { { 13, 16 }, { 13, 17 } }      -- gen_wor_tomb_b1_hunt's lap, clear of the stairs' tiles
 local ARCANE = 0x08     -- OT6_ARCANE: the coins' class (OT6_CLS_COIN; special until #566)
 
 local function checkList(l)
@@ -87,7 +96,7 @@ end
 local WANT = { { row = COIN, boost = 1 }, { row = COIN, boost = 0 } }
 local function crowdWalk(tag, want)
   return H.setzerCrowdBattles({
-    tag = tag, want = want, wps = { { 124, 26 }, { 120, 11 } },
+    tag = tag, want = want, wps = B1_LAP,
     setzerOpts = { onList = checkList, shot = "cointoss_table" },
     check = function(rec, i)
       H.assertEq(rec.row, COIN, string.format("record %d is a Coin Toss", i))
@@ -137,7 +146,15 @@ for e = 1, EXTRA do
 end
 
 H.run({ maxFrames = 1200000 }, {
-  H.bootCheckpoint("wor-tomb-v1"),
+  -- #566: the coins' crowd is dealt on B1 (the header), from gen_wor_tomb_b1_hunt's own frame on its stairs
+  H.waitFrames(20), H.loadState(STATE), H.waitFrames(20),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() and not H.dialogWaiting() end, 3000,
+    "control on B1's stairs", 5),
+  H.call(function()
+    H.assertEq(H.mapId() & 0x1ff, MAP_B1, "booted on Darill's Tomb's B1 (map 298), gen_wor_tomb_b1_hunt's stairs")
+    H.assertEq(H.readByte(0x1850 + 9) & 7, H.readByte(0x1A6D) & 7, "SETZER is in the active party")
+    H.assertEq(H.kitClass("coin"), ARCANE, "the coins' class is Arcane (Ot6KitClassTbl +1)")
+  end),
   walk,
   H.cond(function() return true end, extraSteps),
   H.call(function()

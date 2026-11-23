@@ -1,4 +1,4 @@
--- @suite slow
+-- @suite slow savestate=wor_tomb_b1_hunt_b1
 -- battle_gprain.lua -- the Coin Toss relic's GP Rain since #319: Slot gives
 -- way to GP Rain (no table), and its coins are Arcane (special until #566; one chip on a
 -- arcane-weak body) and boostable (the boost buys another toss a point, as
@@ -6,10 +6,13 @@
 -- Ot6BoostDmg's multiplier runs in CalcDmg and GP Rain's effect overwrites
 -- the damage).
 --
--- Played, no writes: Continue the wor-tomb-v1 battery, put the bag's Coin
+-- Played, no writes: boot wor_tomb_b1_hunt_b1 (gen_wor_tomb_b1_hunt's frame on
+-- Darill's Tomb's B1 stairs; until #566 the wor-tomb-v1 battery and the east
+-- room, whose bodies hold no arcane weakness under six classes: battle_cointoss's
+-- header), put the bag's Coin
 -- Toss relic on SETZER through the Relic menu (H.equipKit), care to full and
--- hand SETZER the party's widest guard (H.guardOn: the room Zombies), walk Darill's
--- Tomb's east room into random battles, and throw GP Rain from the command
+-- hand SETZER the party's widest guard (H.guardOn: the tomb Zombies), walk
+-- B1 (field group 149) into random battles, and throw GP Rain from the command
 -- row (H.setzerBattle's `cmd` entries) at 1 BP and unboosted in the
 -- battles that deal a crowd (two or more monsters, one arcane-weak), so a
 -- toss splits across bodies and chips the arcane-weak one (asserted:
@@ -22,7 +25,6 @@
 -- replayed (H.setzerCheckCoins: twice its gil over the bodies it hit, the
 -- shields' halving, the Broken double, the cap, Arcane on every hit, a
 -- shield off a arcane-weak body).
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
@@ -47,6 +49,8 @@ end
 
 local SETZER, COIN_TOSS_RELIC = 9, 0xD6
 local ARCANE = 0x08     -- OT6_ARCANE: the coins' class (OT6_CLS_COIN; special until #566)
+local STATE, MAP_B1 = "build/states/wor_tomb_b1_hunt_b1.mss.lua", 298
+local B1_LAP = { { 13, 16 }, { 13, 17 } }      -- gen_wor_tomb_b1_hunt's lap, clear of the stairs' tiles
 
 local function checkRain(r, i)
   return H.setzerCheckCoins(r, i, 30, function() return ARCANE end, "gprain")
@@ -55,7 +59,7 @@ end
 local WANT = { { cmd = 0x18, boost = 1 }, { cmd = 0x18, boost = 0 } }
 local function crowdWalk(tag, want)
   return H.setzerCrowdBattles({
-    tag = tag, want = want, wps = { { 124, 26 }, { 120, 11 } },
+    tag = tag, want = want, wps = B1_LAP,
     onBattle = function()
       local slot = nil
       for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == SETZER then slot = s end end
@@ -116,7 +120,15 @@ for e = 1, EXTRA do
 end
 
 H.run({ maxFrames = 1200000 }, {
-  H.bootCheckpoint("wor-tomb-v1"),
+  -- #566: the coins' crowd is dealt on B1 (the header), from gen_wor_tomb_b1_hunt's own frame on its stairs
+  H.waitFrames(20), H.loadState(STATE), H.waitFrames(20),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() and not H.dialogWaiting() end, 3000,
+    "control on B1's stairs", 5),
+  H.call(function()
+    H.assertEq(H.mapId() & 0x1ff, MAP_B1, "booted on Darill's Tomb's B1 (map 298), gen_wor_tomb_b1_hunt's stairs")
+    H.assertEq(H.readByte(0x1850 + 9) & 7, H.readByte(0x1A6D) & 7, "SETZER is in the active party")
+    H.assertEq(H.kitClass("coin"), ARCANE, "the coins' class is Arcane (Ot6KitClassTbl +1)")
+  end),
   H.call(function()
     H.assertEq(H.invCountOf(COIN_TOSS_RELIC) > 0, true, "the bag holds the Coin Toss relic")
   end),
