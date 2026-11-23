@@ -1253,7 +1253,9 @@ NaturalMagic:
 ; (guidelines: "Stronger spells come from boosting, never from a list"):
 ; boosting Fire casts Fire 2 and Fire 3.  "join" is level 1, so the spell is
 ; known at whatever level she joins.  The kit's story entries (Terra's
-; Trance, Celes's Runic and RunicBlade) are not spells and are not here.
+; Trance, Celes's Runic and Break Blade) are not spells and are not here.
+; A save made before #563 put Break in Celes's list has her past 13 without
+; it learned: Ot6CelesBreak (ot6_progression.asm) grants it by her level.
 ;
 ; Each list is 16 [spell, level] pairs.  The unused pairs are NATURAL_NONE
 ; ($ff, $ff): no level reaches $ff (the cap is 99), so neither learn loop
@@ -1279,7 +1281,7 @@ NaturalMagic:
 ; celes
         .byte ATTACK::ICE, 1            ; join
         .byte ATTACK::CURE, 4
-        .byte ATTACK::IMP, 13
+        .byte ATTACK::BREAK, 13         ; #563: was Imp (kits.md, Celes)
         .byte ATTACK::SCAN, 18
         .byte ATTACK::SAFE, 22
         .byte ATTACK::HASTE, 32

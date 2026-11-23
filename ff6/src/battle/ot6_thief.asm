@@ -1220,7 +1220,7 @@ OT6_THIEF_NAMELEN = 10
         jsl     Ot6PaintBannerName      ; Relm's rows (#538)
         plp
         rtl
-:       cmp     #OT6_RUNE_RUNIC
+:       cmp     #OT6_RUNE_TIERED
         bcc     :+
         cmp     #OT6_RUNE_LAST+1
         bcs     :+

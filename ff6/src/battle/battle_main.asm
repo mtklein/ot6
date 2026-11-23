@@ -1916,7 +1916,9 @@ CalcTargetDmg:
         bit     $11a1
         beq     @0c1e
         jsl     Ot6Chip                 ; ot6: weakness hit chips shields
-        jsl     Ot6WeakDouble           ; ot6 #550: x2, saturating at $ffff
+        jsl     Ot6RuneWeakMul          ; ot6 #550: x2, saturating at $ffff
+                                        ;   (Ot6WeakDouble); #563: x3 or x4
+                                        ;   for a hit a tiered rune bit
         nop4                            ;   (was lda $f1 / bmi / asl / rol:
                                         ;   32,768 and up went undoubled)
 @0c1e:  jsl     Ot6HitJoin              ; ot6: class chip, then broken double

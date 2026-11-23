@@ -52,6 +52,11 @@
         sta     f:$7e0000+OT6_BREAKBLADE+6
         sta     f:$7e0000+OT6_RUNESWING
         sta     f:$7e0000+OT6_BLADESWING
+        sta     f:$7e0000+OT6_RUNEADD
+        sta     f:$7e0000+OT6_RUNETIER
+        sta     f:$7e0000+OT6_RUNETIER+2
+        sta     f:$7e0000+OT6_RUNETIER+4
+        sta     f:$7e0000+OT6_RUNETIER+6
         sta     f:$7e0000+OT6_WEAPSPELL ; nor a weapon-spell flag from the
                                 ;   last battle's final pass
         sta     f:$7e0000+OT6_ULTIMAFOLD ; nor a folded-Ultima mark

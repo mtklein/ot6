@@ -161,9 +161,9 @@ OT6_SLOTTIER         := $57ba   ; Slot's stored boost tier:
                                 ;   Ot6ActionEnd charges what the reels
                                 ;   delivered (ot6_slot.asm, the Slot strip)
 ; (#563) what the weapon swing now resolving carries from its character's
-; blade: the rune's elements the swing does not already hold (Ot6RuneSwing
-; writes it at every swing, 0 for none; Ot6SkillClass and Ot6ItemClass zero
-; it for everything that is no swing).  $57bb held OT6_PIPTAIL until v0.50.
+; blade: the rune's elements (Ot6RuneSwing writes it at every swing, 0 for
+; none; Ot6SkillClass and Ot6ItemClass zero it for everything that is no
+; swing).  $57bb held OT6_PIPTAIL until v0.50.
 OT6_RUNESWING        := $57bb
 OT6_RANDPEND         := $57bc
 OT6_RANDBTL          := $57bd
@@ -612,10 +612,12 @@ OT6_BLUESEEN         := $ee2b
 ; anchor commits, so it needs no init.
 OT6_HUDLEAD          := $ee2c   ; 12 bytes
 .assert OT6_HUDLEAD = OT6_BLUESEEN + 1, error, "the hud lead cells must follow the blue-magic mark"
-; (#563) the swing now resolving, for Break Blade: bit 7, its character's
-; Break Blade is running, so each hit takes a shield (Ot6BreakBladeTake); bit
-; 0, the element chip already took this target's (Ot6Chip), so the hit takes
-; no second.  Written with OT6_RUNESWING.  $ee38 held OT6_GREYLIVE, the grey
+; (#563) the swing now resolving: bit 7, its character's Break Blade is
+; running, so each hit takes a shield (Ot6BreakBladeTake); bits 4-5, the
+; tier of the rune it carries; bit 1, the rune bit this target
+; (Ot6TargetPre, for Ot6RuneWeakMul); bit 0, the element chip already took
+; this target's shield (Ot6Chip), so a Break Blade hit takes no second.
+; Written with OT6_RUNESWING.  $ee38 held OT6_GREYLIVE, the grey
 ; painter's wake flag, until #543 took the grey look for broken monsters away.
 OT6_BLADESWING       := $ee38
 .assert OT6_BLADESWING = OT6_HUDLEAD + 12, error, "the Break Blade swing flags sit in the free byte past the hud lead cells"
@@ -631,6 +633,11 @@ OT6_BLADESWING       := $ee38
 ; writer of that status (Cmd_10's start) always records first, so a stale
 ; byte is never read (the OT6_DANCETIER contract).
 OT6_RAGETIER         := $ee39   ; 8 bytes (4 characters, stride 2)
+; (#563) the tier of the rune on a character's blade, 1-3 (the place of the
+; spell that armed it in its line), in OT6_RAGETIER's odd bytes (by entity
+; offset, stride 2): set with OT6_RUNE by Ot6RuneArm, read only while
+; OT6_RUNE is non-zero, zeroed by InitBP.
+OT6_RUNETIER         := OT6_RAGETIER + 1
 .assert OT6_RAGETIER = OT6_HUDLEAD + 13, error, "the rage tier must sit one free byte past the hud lead cells"
 .assert OT6_RAGETIER >= OT6_SHADOW + $70, error, "OT6 rage tier must sit PAST InitBP's shadow clear (it is stored per trance, not per battle)"
 .assert OT6_RAGETIER + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
@@ -757,4 +764,11 @@ OT6_LIMITBREAK       := $ef1d
 OT6_REFLCASTER       := $ef1e
 .assert OT6_REFLCASTER = OT6_LIMITBREAK + 1, error, "the bounce's caster must follow the limit-break mask"
 .assert OT6_REFLCASTER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+; (#563) the rune's elements the weapon swing now resolving does not already
+; carry (Ot6RuneSwing), which Ot6TargetPre adds to the hit on a body they
+; bite and takes off again for the next; zeroed with OT6_RUNESWING at every
+; attack's load.  The shadow tail's last byte.
+OT6_RUNEADD          := $ef1f
+.assert OT6_RUNEADD = OT6_REFLCASTER + 1, error, "the rune's added bits must follow the bounce's caster"
+.assert OT6_RUNEADD <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 .endif

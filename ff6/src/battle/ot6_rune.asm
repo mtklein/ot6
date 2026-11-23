@@ -10,7 +10,13 @@
 ;     Ot6RunicBP, where the absorb is certain), an enemy's spell or an ally's
 ;     (vanilla's ally-spell quirk, kept), by CELES or a GOGO (#547);
 ;   * a blade row of the list below.
-; A later arming replaces it; a spell without an element leaves it.  Nothing
+; The rune has a tier, 1 to 3: the place of the spell that armed it in its
+; line (Ot6FoldTbl: Fire 2 is tier 2, Ice 3 tier 3, Bio tier 2; any other
+; spell tier 1).  The tier buys damage, not shields: on a body the rune
+; bites, the hit's weakness multiplier is x2, x3 or x4 (Ot6RuneWeakMul), and
+; the chip stays one a hit.
+; A later arming replaces it, element and tier together; a spell without an
+; element leaves it.  Nothing
 ; clears it but the battle's end (InitBP): it stays through her fall and her
 ; return, and it is not the Runic stance's bit ($3e4c.2), which comes and
 ; goes with her turns.
@@ -31,10 +37,13 @@
 ; Relm's behind Sketch (mode w7e6168 = 7):
 ;   Runic        the stance, as it always was (free; a boost buys turns; at
 ;                three points RunicBlade, ot6_runicblade.asm)
-;   <Elem>Blade  one row per element the caster can cast in this battle (a
+;   (sword)Elem  one row per element the caster can cast in this battle (a
 ;                spell of it in the battle Magic list: her own, and what her
 ;                worn esper lends), priced at the cheapest such spell: her
-;                turn arms her blade with it.  Takes no boost.
+;                turn arms her blade with it.  A boost climbs the element's
+;                spell line as it does in the Magic list (Fire Blade, Fire 2
+;                Blade, Fire 3 Blade; Poison to Bio), at the tier's own MP;
+;                an element with no line takes none.
 ;   BreakBlade   the divine, at a full boost, 99 MP: for three of her turns
 ;                every hit of her weapon takes one shield, whatever the
 ;                body's keys; the elemental rune waits and returns after.
@@ -51,7 +60,12 @@ OT6_RUNE_RUNIC  = $d0           ; the Runic row: the stance
 OT6_RUNE_BLADE  = $d1           ; $d1-$d8: a blade row, element bit (id - $d1)
 OT6_RUNE_BREAK  = $d9           ; Break Blade, the divine
 OT6_RUNE_LAST   = $d9
-OT6_RUNE_IDS    = OT6_RUNE_LAST - OT6_RUNE_RUNIC + 1
+OT6_RUNE_TIERED = $c8           ; $c8-$cf: a boosted blade row's name and
+                                ;   banner, $c8 + line * 2 + (tier - 2); never
+                                ;   queued (Ot6RuneExec names the banner so)
+OT6_RUNE_IDS    = OT6_RUNE_LAST - OT6_RUNE_TIERED + 1
+OT6_RUNE_LINES  = 4             ; fire, ice, bolt, poison: Ot6FoldTbl's first
+                                ;   rows, in element bit order
 
 OT6_BREAK_TURNS = 3             ; Break Blade lasts three of her turns
 OT6_BREAK_MP    = 99
@@ -73,22 +87,42 @@ OT6_RUIN_BIT    = 1 << ($00a4 & 7)
 Ot6RuneBitTbl:
         .byte   $01, $02, $04, $08, $10, $20, $40, $80
 
-; the list's names, ten letters each, $d0-$d9, in AttackName's encoding
+; the list's names, ten cells each, $c8-$d9, in AttackName's encoding.  A
+; blade row is the item lists' sword icon ($d9) and its element, or its
+; line's spell when a boost climbs it: ten letters ("Fire3Blade") run into
+; the row's two-digit price, and a sword before a name is how the game
+; already writes a blade.  The banner spells it out (Ot6RuneBanner).
 Ot6RuneName:
+        .byte   $d9, $85, $a2, $ab, $9e, $ff, $b6, $ff, $ff, $ff ; (sword)Fire 2
+        .byte   $d9, $85, $a2, $ab, $9e, $ff, $b7, $ff, $ff, $ff ; (sword)Fire 3
+        .byte   $d9, $88, $9c, $9e, $ff, $b6, $ff, $ff, $ff, $ff ; (sword)Ice 2
+        .byte   $d9, $88, $9c, $9e, $ff, $b7, $ff, $ff, $ff, $ff ; (sword)Ice 3
+        .byte   $d9, $81, $a8, $a5, $ad, $ff, $b6, $ff, $ff, $ff ; (sword)Bolt 2
+        .byte   $d9, $81, $a8, $a5, $ad, $ff, $b7, $ff, $ff, $ff ; (sword)Bolt 3
+        .byte   $d9, $81, $a2, $a8, $ff, $ff, $ff, $ff, $ff, $ff ; (sword)Bio
+        .byte   $d9, $81, $a2, $a8, $ff, $ff, $ff, $ff, $ff, $ff ; (sword)Bio
         .byte   $91, $ae, $a7, $a2, $9c, $ff, $ff, $ff, $ff, $ff ; Runic
-        .byte   $85, $a2, $ab, $9e, $81, $a5, $9a, $9d, $9e, $ff ; FireBlade
-        .byte   $88, $9c, $9e, $81, $a5, $9a, $9d, $9e, $ff, $ff ; IceBlade
-        .byte   $81, $a8, $a5, $ad, $81, $a5, $9a, $9d, $9e, $ff ; BoltBlade
-        .byte   $8f, $a8, $a2, $ac, $a7, $81, $a5, $9a, $9d, $9e ; PoisnBlade
-        .byte   $96, $a2, $a7, $9d, $81, $a5, $9a, $9d, $9e, $ff ; WindBlade
-        .byte   $8f, $9e, $9a, $ab, $a5, $81, $a5, $9a, $9d, $9e ; PearlBlade
-        .byte   $84, $9a, $ab, $ad, $a1, $81, $a5, $9a, $9d, $9e ; EarthBlade
-        .byte   $96, $9a, $ad, $9e, $ab, $81, $a5, $9a, $9d, $9e ; WaterBlade
-        .byte   $81, $ab, $9e, $9a, $a4, $81, $a5, $9a, $9d, $9e ; BreakBlade
+        .byte   $d9, $85, $a2, $ab, $9e, $ff, $ff, $ff, $ff, $ff ; (sword)Fire
+        .byte   $d9, $88, $9c, $9e, $ff, $ff, $ff, $ff, $ff, $ff ; (sword)Ice
+        .byte   $d9, $81, $a8, $a5, $ad, $ff, $ff, $ff, $ff, $ff ; (sword)Bolt
+        .byte   $d9, $8f, $a8, $a2, $ac, $a8, $a7, $ff, $ff, $ff ; (sword)Poison
+        .byte   $d9, $96, $a2, $a7, $9d, $ff, $ff, $ff, $ff, $ff ; (sword)Wind
+        .byte   $d9, $8f, $9e, $9a, $ab, $a5, $ff, $ff, $ff, $ff ; (sword)Pearl
+        .byte   $d9, $84, $9a, $ab, $ad, $a1, $ff, $ff, $ff, $ff ; (sword)Earth
+        .byte   $d9, $96, $9a, $ad, $9e, $ab, $ff, $ff, $ff, $ff ; (sword)Water
+        .byte   $d9, $81, $ab, $9e, $9a, $a4, $ff, $ff, $ff, $ff ; (sword)Break
 
-; the battle banner's names, 13 letters, $d0-$d9 (Runic's is never shown)
+; the battle banner's names, 13 letters, $c8-$d9 (Runic's is never shown)
 OT6_RUNE_BANLEN = 13
 Ot6RuneBanner:
+        .byte   $85, $a2, $ab, $9e, $fe, $b6, $fe, $81, $a5, $9a, $9d, $9e, $ff ; Fire 2 Blade
+        .byte   $85, $a2, $ab, $9e, $fe, $b7, $fe, $81, $a5, $9a, $9d, $9e, $ff ; Fire 3 Blade
+        .byte   $88, $9c, $9e, $fe, $b6, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff ; Ice 2 Blade
+        .byte   $88, $9c, $9e, $fe, $b7, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff ; Ice 3 Blade
+        .byte   $81, $a8, $a5, $ad, $fe, $b6, $fe, $81, $a5, $9a, $9d, $9e, $ff ; Bolt 2 Blade
+        .byte   $81, $a8, $a5, $ad, $fe, $b7, $fe, $81, $a5, $9a, $9d, $9e, $ff ; Bolt 3 Blade
+        .byte   $81, $a2, $a8, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff, $ff, $ff ; Bio Blade
+        .byte   $81, $a2, $a8, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff, $ff, $ff ; Bio Blade
         .byte   $91, $ae, $a7, $a2, $9c, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff ; Runic
         .byte   $85, $a2, $ab, $9e, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff, $ff ; Fire Blade
         .byte   $88, $9c, $9e, $fe, $81, $a5, $9a, $9d, $9e, $ff, $ff, $ff, $ff ; Ice Blade
@@ -129,26 +163,59 @@ Ot6SwingHitPalTbl:
 
 ; ------------------------------------------------------------------------------
 
-; [ arm a character's blade with an element ]
+; [ arm a character's blade with an element, at a tier ]
 ; The one place a rune is set: a Runic absorb (Ot6RuneAbsorb), a blade row
-; (Ot6RuneExec), and any later source.  in: A = the element bits, Y = the
-; character's entity offset (0/2/4/6).  a8, either index width, db=$7e.
-; Preserves X and Y; clobbers A.
+; (Ot6RuneExec), and any later source.  in: A = the element bits, B = the
+; tier (1-3), Y = the character's entity offset (0/2/4/6).  a8, either index
+; width, db=$7e.  Preserves X and Y; clobbers A and B.
 .proc Ot6RuneArm
         .a8
         sta     OT6_RUNE,y
+        xba
+        sta     OT6_RUNETIER,y
         rtl
+.endproc
+
+; [ a spell's tier: its place in its line ]
+; Ot6FoldTbl's rows are [head, one boost, two boosts]: the second column is
+; tier 2 (Fire 2, Ice 2, Bolt 2, Bio), the third tier 3 (Fire 3, Ice 3, Bolt
+; 3; poison's repeats Bio, already 2), anything else tier 1.
+; in: A = spell id.  out: A = 1-3.  a8, either index width.  Preserves X, Y.
+.proc Ot6RuneTierOf
+        .a8
+        cmp     f:Ot6FoldTbl+1
+        beq     @two
+        cmp     f:Ot6FoldTbl+4
+        beq     @two
+        cmp     f:Ot6FoldTbl+7
+        beq     @two
+        cmp     f:Ot6FoldTbl+10
+        beq     @two
+        cmp     f:Ot6FoldTbl+2
+        beq     @three
+        cmp     f:Ot6FoldTbl+5
+        beq     @three
+        cmp     f:Ot6FoldTbl+8
+        beq     @three
+        lda     #$01
+        rts
+@two:   lda     #$02
+        rts
+@three: lda     #$03
+        rts
 .endproc
 
 ; [ a Runic absorb arms the blade with the spell's element ]
 ; jsr from Ot6RunicBP, past its gates: the absorb has happened, and it was
 ; the Runic command's stance (not a raging monster's "enemy runic").  $11a1
 ; is still the absorbed spell's element byte (RunicEffect rewrites the
-; attack into the MP restore only after its entity loop).  A spell with no
-; element leaves the rune; one with several is kept whole, and each element
-; is judged on its own at the swing (none of the 20 elemental spells Runic
-; can absorb carries two).  The Runic command is CELES's, and a GOGO's who
-; picked it (#547).
+; attack into the MP restore only after its entity loop) and $b6 the spell
+; (Ot6BladeAbsorb reads it there too), whose place in its line is the
+; rune's tier: Fire 3 absorbed is a tier-3 fire rune, a spell in no line
+; tier 1.  A spell with no element leaves the rune; one with several is
+; kept whole, and each element is judged on its own at the swing (none of
+; the 20 elemental spells Runic can absorb carries two).  The Runic command
+; is CELES's, and a GOGO's who picked it (#547).
 ; a8, either index width, db=$7e; y = the absorber.  Preserves X and Y.
 .proc Ot6RuneAbsorb
         .a8
@@ -159,7 +226,10 @@ Ot6SwingHitPalTbl:
         beq     @arm
         cmp     #OT6_CHAR_GOGO
         bne     @out
-@arm:   lda     $11a1
+@arm:   lda     $b6
+        jsr     Ot6RuneTierOf
+        xba
+        lda     $11a1
         jsl     Ot6RuneArm
 @out:   rts
 .endproc
@@ -175,6 +245,7 @@ Ot6SwingHitPalTbl:
         pha
         lda     #$00
         sta     f:$7e0000+OT6_RUNESWING
+        sta     f:$7e0000+OT6_RUNEADD
         sta     f:$7e0000+OT6_BLADESWING
         pla
         rts
@@ -182,11 +253,11 @@ Ot6SwingHitPalTbl:
 
 ; [ a weapon swing: what the swinging character's blade holds ]
 ; jsr from Ot6WeaponClass, after the hand's element is in $11a1 and a Tint
-; is OR'd in.  OT6_RUNESWING = the rune's elements the swing does not
-; already carry (so Ot6RuneTarget can take them off again), or 0; under
-; Break Blade the rune waits and OT6_BLADESWING's bit 7 says every hit takes
-; a shield.  a8/i16, x = the attacker's entity offset plus the hand.
-; Preserves x and y.
+; is OR'd in.  OT6_RUNESWING = the rune's elements, OT6_RUNEADD those of
+; them the swing does not already carry (so Ot6TargetPre can take them off
+; again), and OT6_BLADESWING's bits 4-5 the rune's tier; under Break Blade
+; the rune waits and OT6_BLADESWING's bit 7 says every hit takes a shield.
+; a8/i16, x = the attacker's entity offset plus the hand.  Preserves x, y.
 .proc Ot6RuneSwing
         .a8
         .i16
@@ -206,10 +277,20 @@ Ot6SwingHitPalTbl:
         lda     #$80
         sta     f:$7e0000+OT6_BLADESWING
         bra     @done
-@rune:  lda     f:$7e11a1
+@rune:  lda     f:$7e0000+OT6_RUNE,x
+        beq     @done
+        sta     f:$7e0000+OT6_RUNESWING
+        lda     f:$7e11a1
         eor     #$ff
         and     f:$7e0000+OT6_RUNE,x
-        sta     f:$7e0000+OT6_RUNESWING
+        sta     f:$7e0000+OT6_RUNEADD
+        lda     f:$7e0000+OT6_RUNETIER,x
+        asl
+        asl
+        asl
+        asl
+        and     #$30
+        sta     f:$7e0000+OT6_BLADESWING
 @done:  plx
 @out:   rts
 .endproc
@@ -246,19 +327,21 @@ Ot6SwingHitPalTbl:
 ; [ CalcTargetDmg, each target: does the rune bite this body? ]
 ; jsl from CalcTargetDmg in place of its jsl Ot6SeraphHeal, which this ends
 ; in.  The rune's elements join the hit only on a body they bite
-; (Ot6RuneBites): there the hit truly carries the element, and vanilla's
-; weak branch below doubles it and chips (Ot6Chip).  On any other body the
-; rune adds nothing, so it never turns her Fight into something a body
-; drinks.
+; (Ot6RuneBites): there the hit truly carries the element, vanilla's weak
+; branch below runs, Ot6Chip chips, and Ot6RuneWeakMul multiplies by the
+; rune's tier (OT6_BLADESWING bit 1 says the rune bit this target).  On any
+; other body the rune adds nothing, so it never turns her Fight into
+; something a body drinks.
 ; a8, either index width, db=$7e; x = the attacker, y = the target.
 ; Preserves x and y; clobbers A.
 .proc Ot6TargetPre
         .a8
         lda     f:$7e0000+OT6_BLADESWING
-        and     #$80            ; this target's element chip has not happened
+        and     #$b0            ; this target's verdicts are not yet in
         sta     f:$7e0000+OT6_BLADESWING
         lda     f:$7e0000+OT6_RUNESWING
         beq     @out            ; no rune on this swing
+        lda     f:$7e0000+OT6_RUNEADD
         eor     #$ff
         and     $11a1           ; the swing's own elements again (an earlier
         sta     $11a1           ;   target's verdict is not this one's)
@@ -267,7 +350,42 @@ Ot6SwingHitPalTbl:
         beq     @out
         ora     $11a1
         sta     $11a1
+        lda     f:$7e0000+OT6_BLADESWING
+        ora     #$02
+        sta     f:$7e0000+OT6_BLADESWING
 @out:   jml     Ot6SeraphHeal
+.endproc
+
+; [ the weakness multiplier of a hit the rune bit: x2, x3 or x4 by tier ]
+; jsl from CalcTargetDmg's weak branch in place of its jsl Ot6WeakDouble
+; (vanilla's x2, saturating), which a hit without a rune, or with a tier-1
+; rune, still takes.  A tier-2 rune's hit is x3 and a tier-3 rune's x4: the
+; tier buys damage, and the chip (Ot6Chip, just before) stays one a hit.
+; a8 in and out; $f0 = the amount.  x/y kept.
+.proc Ot6RuneWeakMul
+        .a8
+        lda     f:$7e0000+OT6_BLADESWING
+        bit     #$02
+        beq     @two            ; the rune did not bite this target
+        and     #$30
+        cmp     #$20
+        bcc     @two            ; tier 1
+        beq     @three
+        jsl     Ot6WeakDouble   ; tier 3: x2, and x2 again
+@two:   jml     Ot6WeakDouble
+@three: php
+        rep     #$20
+        .a16
+        lda     $f0
+        asl
+        bcs     @sat
+        adc     $f0             ; x3 (carry clear)
+        bcc     :+
+@sat:   lda     #$ffff
+:       sta     $f0
+        plp
+        .a8
+        rtl
 .endproc
 
 ; [ Ot6Chip took a shield from this target: Break Blade takes no second ]
@@ -355,18 +473,17 @@ done:   rts
         rtl
 .endproc
 
-; [ can this caster cast a spell of an element, and what does the cheapest
-;   cost? ]
+; [ can this caster cast a spell of an element, and which is the cheapest? ]
 ; The caster's battle Magic list ($302c,x: row 0 the esper, rows 1-54 the
 ; spells this character can cast in this battle, natural and esper-lent, a
 ; GOGO's the seated party's union) is the list the Magic window draws, so a
-; blade row follows an esper swap with no state of its own.  The price is
-; the spell's own (Ot6SpellMP: MagicProp's cost through the caster's Gold
+; blade row follows an esper swap with no state of its own.  Cheapest by the
+; spell's own price (Ot6SpellMP: MagicProp's cost through the caster's Gold
 ; Hairpin or Economizer), not the row's cell, which a pending boost folds.
 ; in: A = the element's bit index (0-7), X = the caster's entity offset.
-; out: carry set = yes, A = the cheapest MP; clear = no such spell, A = 0.
+; out: carry set = yes, A = that spell; clear = no such spell, A = 0.
 ; a8/i16, db=$7e.  Preserves X and Y.  Stack only: it runs from the menu.
-.proc Ot6BladeCost
+.proc Ot6BladeSpell
         .a8
         .i16
         phy
@@ -378,12 +495,14 @@ done:   rts
         lda     f:Ot6RuneBitTbl,x
         pha                     ; the element's bit
         lda     #$ff
-        pha                     ; the cheapest so far ($ff: none)
+        pha                     ; the cheapest spell so far ($ff: none)
+        pha                     ; and its price
         lda     #54
-        pha                     ; [1,s] rows left, [2,s] cheapest, [3,s] the
-                                ;   bit, [4,s] the caster (a word), [6,s] Y
+        pha                     ; [1,s] rows left, [2,s] the price, [3,s] the
+                                ;   spell, [4,s] the bit, [5,s] the caster (a
+                                ;   word), [7,s] Y
         longa
-        lda     $04,s
+        lda     $05,s
         tax
         lda     $302c,x
         tay                     ; -> the caster's list, row 0
@@ -407,10 +526,10 @@ done:   rts
         pla
         shorta0
         lda     f:MagicProp+1,x ; its elements
-        and     $04,s
+        and     $05,s
         beq     @skip
         longa
-        lda     $05,s
+        lda     $06,s
         tax                     ; the caster
         shorta0
         lda     $01,s
@@ -418,13 +537,16 @@ done:   rts
         cmp     $03,s
         bcs     @skip
         sta     $03,s
+        lda     $01,s
+        sta     $04,s
 @skip:  pla
 @next:  lda     $01,s
         dec     a
         sta     $01,s
         bne     @row
         pla                     ; the rows
-        pla                     ; the cheapest
+        pla                     ; the price
+        pla                     ; the spell
         sta     $01,s           ; (over the bit)
         pla
         plx
@@ -434,6 +556,118 @@ done:   rts
         sec
         rtl
 @none:  lda     #$00
+        clc
+        rtl
+.endproc
+
+; an element's line: Ot6FoldTbl's row for element A (0 to OT6_RUNE_LINES - 1),
+; column Y (0-2).  out: A = the spell.  a8/i16.  Preserves X and Y.
+.proc Ot6LineSpell
+        .a8
+        .i16
+        phx
+        pha
+        asl
+        clc
+        adc     $01,s           ; * 3
+        sta     $01,s
+        tya
+        clc
+        adc     $01,s
+        sta     $01,s
+        pla
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6FoldTbl,x
+        plx
+        rts
+.endproc
+
+; the steps a pending boost climbs a line: 0, 1, or 2 for two points and for
+; three (a third adds nothing, as in the Magic list; Terra's fourth fold is
+; Fire's, not a blade's).  in: X = the caster.  out: Y = the steps.
+; a8/i16, db=$7e.  Preserves X; clobbers A.
+.proc Ot6BladeSteps
+        .a8
+        .i16
+        lda     OT6_BOOST_REVEALED,x
+        cmp     #$03
+        bcc     :+
+        lda     #$02
+:       longa
+        and     #$00ff
+        tay
+        shorta0
+        rts
+.endproc
+
+; [ does this caster's blade row climb a line? ]
+; It does when the element has a line (fire, ice, bolt, poison) and the
+; cheapest spell of it she can cast is the line's head: boost then reaches
+; up from the head as it does in the Magic list, whether or not she knows
+; the tiers.  Pearl, Quake, W Wind and the rest head no line.
+; in: A = the element's bit index, X = the caster.  out: carry set = yes.
+; a8/i16, db=$7e.  Preserves X and Y; clobbers A.
+.proc Ot6BladeClimbs
+        .a8
+        .i16
+        phy
+        pha                     ; [1,s] the element
+        cmp     #OT6_RUNE_LINES
+        bcs     @no
+        jsl     Ot6BladeSpell
+        bcc     @no
+        pha                     ; [1,s] her cheapest
+        ldy     #$0000
+        lda     $02,s
+        jsr     Ot6LineSpell
+        cmp     $01,s
+        bne     @no1
+        pla
+        pla
+        ply
+        sec
+        rtl
+@no1:   pla
+@no:    pla
+        ply
+        clc
+        rtl
+.endproc
+
+; [ the spell a caster's blade row stands for at the boost pending ]
+; The cheapest spell of the element she can cast, or, when the row climbs
+; (Ot6BladeClimbs), its line's spell at the pending boost: the row's name,
+; its price (Ot6SpellMP of it) and the rune's tier (Ot6RuneTierOf) all come
+; from it.  in: A = the element's bit index, X = the caster.  out: carry set
+; = she has the row, A = the spell; clear = no spell of the element, A = 0.
+; a8/i16, db=$7e.  Preserves X and Y.
+.proc Ot6BladeRow
+        .a8
+        .i16
+        phy
+        pha                     ; [1,s] the element
+        jsl     Ot6BladeSpell
+        bcc     @none
+        pha                     ; [1,s] her cheapest, [2,s] the element
+        lda     $02,s
+        jsl     Ot6BladeClimbs
+        bcc     @have
+        jsr     Ot6BladeSteps
+        lda     $02,s
+        jsr     Ot6LineSpell
+        sta     $01,s
+@have:  pla
+        sta     $01,s
+        pla
+        ply
+        sec
+        rtl
+@none:  pla
+        ply
+        lda     #$00
         clc
         rtl
 .endproc
@@ -491,8 +725,9 @@ done:   rts
         cmp     $03,s
         bcs     @full
         lda     $01,s
-        jsl     Ot6BladeCost
+        jsl     Ot6BladeRow     ; the row's spell at the boost pending
         bcc     @nexte
+        jsl     Ot6SpellMP
         pha                     ; [1,s] the price, [2,s] e, [3,s] k
         lda     $03,s
         jsr     Ot6PaintCell    ; y = the k-th packed cell
@@ -536,8 +771,10 @@ done:   rts
 .endproc
 
 ; [ a row's price as the window draws it, and as the confirm reads it ]
-; Ot6KitRowCost's mode-7 arm.  in: A = id.  out: A = the price for the
-; caster whose window is open.  a8/i16, db=$7e.  Preserves X and Y.
+; Ot6KitRowCost's mode-7 arm (and so Ot6RaiseUnpaid's: R adds no point the
+; row's next tier costs more MP than she has, #555).  in: A = id.  out: A =
+; the price for the caster whose window is open, at the boost pending.
+; a8/i16, db=$7e.  Preserves X and Y.
 .proc Ot6RuneRowCost
         .a8
         .i16
@@ -553,8 +790,10 @@ done:   rts
         pha
         jsr     Ot6RuneCaster
         pla
-        jsl     Ot6BladeCost
-        plx
+        jsl     Ot6BladeRow
+        bcc     :+
+        jsl     Ot6SpellMP
+:       plx
         rtl
 @free:  lda     #$00
         rtl
@@ -564,7 +803,8 @@ done:   rts
 ; in: A = the queued id ($3a7b), X = the attacker.  out: A = the price.
 ; a8/i16, db=$7e.  Preserves X and Y.
 ;   Runic (and the $00 or $ff of a Runic no list queued): 0, as always;
-;   a blade row: the cheapest spell of its element the caster holds;
+;   a blade row: its spell's price at the boost pending (Ot6BladeRow: the
+;     cheapest spell of its element she holds, or its line's tier);
 ;   Break Blade: 99 at three points pending, else 0 (a divine taken back
 ;     does nothing and charges nothing, kits.md "Divines").
 .proc Ot6RuneCharge
@@ -581,7 +821,9 @@ done:   rts
         sbc     #OT6_RUNE_BLADE
         cmp     #8
         bcs     @free
-        jml     Ot6BladeCost
+        jsl     Ot6BladeRow
+        bcc     @free
+        jml     Ot6SpellMP
 @free:  lda     #$00
         rtl
 .endproc
@@ -611,14 +853,30 @@ done:   rts
         rtl
 .endproc
 
-; [ R on the Rune Knight's list: a blade row buys nothing with a boost ]
-; in: A = the row's id.  out: carry set = refuse.  Preserves A, X and Y.
+; [ R on the Rune Knight's list: a blade with no line to climb buys nothing ]
+; Runic buys turns, Break Blade is its own gate, and a blade row whose
+; element has a line (Ot6BladeClimbs) buys its tiers; a row that climbs
+; nothing (Pearl's, Quake's, W Wind's) refuses R, as every row a boost buys
+; nothing on does.  in: A = the row's id.  out: carry set = refuse.
+; a8/i16, db=$7e.  Preserves A, X and Y.
 .proc Ot6RuneNoBoost
         .a8
+        .i16
         cmp     #OT6_RUNE_BLADE
         bcc     @buys           ; Runic: turns
         cmp     #OT6_RUNE_BREAK
         bcs     @buys           ; Break Blade: its gate
+        pha
+        phx
+        sec
+        sbc     #OT6_RUNE_BLADE
+        pha
+        jsr     Ot6RuneCaster
+        pla
+        jsl     Ot6BladeClimbs
+        plx
+        pla
+        bcs     @buys
         sec
         rtl
 @buys:  clc
@@ -628,6 +886,8 @@ done:   rts
 ; ------------------------------------------------------------------------------
 
 ; [ a row's name, for Ot6KitListName (mode 7) ]
+; A blade row that climbs is named by its line's spell at the boost pending
+; (Fire 2, Bolt 3, Bio), as a Magic row shows the folded spell.
 ; in: A = id, Y = the line buffer offset, $56 = the attribute.  out: carry
 ; set = drawn (Y past the name); clear = not a row (A, Y unchanged).
 ; a8/i16, db=$7e.  Preserves X.
@@ -635,11 +895,37 @@ done:   rts
         .a8
         .i16
         pha                     ; [1,s] the id
-        sec
-        sbc     #OT6_RUNE_RUNIC
-        cmp     #OT6_RUNE_IDS
+        cmp     #OT6_RUNE_RUNIC
+        bcc     @no
+        cmp     #OT6_RUNE_LAST+1
         bcs     @no
         phx
+        cmp     #OT6_RUNE_BLADE
+        bcc     @plain
+        cmp     #OT6_RUNE_BLADE+OT6_RUNE_LINES
+        bcs     @plain
+        sec
+        sbc     #OT6_RUNE_BLADE
+        pha                     ; [1,s] the line
+        jsr     Ot6RuneCaster
+        lda     $01,s
+        jsl     Ot6BladeRow
+        jsr     Ot6RuneTierOf
+        cmp     #$02
+        bcc     @tier1
+        sbc     #$02            ; (carry set) 0 or 1
+        sta     $04,s           ; over the id: scratch
+        pla
+        asl
+        clc
+        adc     $03,s
+        clc
+        adc     #OT6_RUNE_TIERED
+        bra     @index
+@tier1: pla
+@plain: lda     $03,s           ; the id
+@index: sec
+        sbc     #OT6_RUNE_TIERED
         longa
         and     #$00ff
         pha
@@ -673,13 +959,14 @@ done:   rts
 .endproc
 
 ; [ attack name type 3 for a row: its banner ]
-; From Ot6ThiefBannerName for ids $d0-$d9.  in: A = id, a8/i16, db=$7e.
-; Writes the name, $00-terminated, at w7e57d5.  clobbers a/x/y.  rtl.
+; From Ot6ThiefBannerName for ids $c8-$d9 (a boosted blade's is one of the
+; tiered ids, which Ot6RuneExec leaves in $b6).  in: A = id, a8/i16,
+; db=$7e.  Writes the name, $00-terminated, at w7e57d5.  clobbers a/x/y.
 .proc Ot6RuneBannerName
         .a8
         .i16
         sec
-        sbc     #OT6_RUNE_RUNIC
+        sbc     #OT6_RUNE_TIERED
         ldy     #$0000
         cmp     #OT6_RUNE_IDS
         bcs     @end
@@ -720,18 +1007,18 @@ done:   rts
 ; way Cmd_0b ends in ExecSelfAttack: Runic's raised sword, and for a row its
 ; banner (attack name type 3, Ot6RuneBanner).
 ;
-; A blade row takes no boost: one raised on the command window before the
-; row was picked is dropped, never charged (Ot6KeepBoost; R on the row is
-; refused, Ot6RuneNoBoost).  Break Blade under a full boost (taken back
-; after the pick, or a Mimic's copy short of three) does nothing and costs
-; nothing, as every list divine.  A caster who cannot pay the row's MP
-; ($3c08 below $3a4c, the cost staged at action load) does nothing here:
-; CalcAttackEffect's universal check refuses the cast after this.
+; A blade row arms the attacker's blade with its element at the tier the
+; pending boost reaches (Ot6RuneBlade).  Break Blade under a full boost
+; (taken back after the pick, or a Mimic's copy short of three) does nothing
+; and costs nothing, as every list divine.  A caster who cannot pay the
+; row's MP ($3c08 below $3a4c, the cost staged at action load) does nothing
+; here: CalcAttackEffect's universal check refuses the cast after this.
 ;
 ; A Mimic's copy runs the same way, free, on the copier: Mimic copies the
 ; action, and the action is self-targeted (as a copy of Runic raises the
 ; copier's own stance), so a GOGO's copy of a blade row arms GOGO's blade
-; with that element, and his copy of Break Blade takes his own full boost.
+; with that element, at the tier his own pending boost reaches, and his copy
+; of Break Blade takes his own full boost.
 ; Preserves x and y.
 .proc Ot6RuneExec
         .a8
@@ -752,17 +1039,13 @@ done:   rts
         bcs     @plain          ; (a monster never queues these)
         cmp     #OT6_RUNE_BREAK
         beq     @break
-        jsl     Ot6KeepBoost    ; a blade takes no boost (clobbers A)
-        jsr     Ot6RunePays
-        bcc     @ran            ; short: nothing done (the fizzle follows)
-        phx
-        lda     $b6
-        sec
-        sbc     #OT6_RUNE_BLADE
-        tax
-        lda     f:Ot6RuneBitTbl,x
-        plx
-        jsl     Ot6RuneArm      ; y = the attacker
+        phy
+        rep     #$10
+        .i16
+        jsr     Ot6RuneBlade
+        sep     #$10
+        .i8
+        ply
         bra     @ran
 @break: lda     OT6_BOOST_REVEALED,x
         cmp     #OT6_BREAK_BOOST
@@ -786,6 +1069,77 @@ done:   rts
 @plain: plp
         clc
         rtl
+.endproc
+
+; [ a blade row: arm the attacker's blade, at the tier the boost reaches ]
+; The row's spell at the pending boost (Ot6BladeRow) gives the tier, and its
+; id names the banner.  A row that climbs spends its boost as a boosted
+; spell does (a third point too, which adds nothing); one that climbs
+; nothing takes no boost: a boost raised on the command window before the
+; row was picked is dropped, never charged (Ot6KeepBoost; R on the row is
+; refused, Ot6RuneNoBoost).  A copier who cannot cast the element at all (a
+; Mimic's copy) climbs the element's line by his own boost, if it has one.
+; a8/i16, db=$7e, x = the attacker, $b6 = the row's id.  Sets $b6 to the
+; banner's id.  Preserves x; clobbers a and y.
+.proc Ot6RuneBlade
+        .a8
+        .i16
+        lda     $b6
+        sec
+        sbc     #OT6_RUNE_BLADE
+        pha                     ; [1,s] the element
+        jsl     Ot6BladeClimbs
+        bcs     @climb
+        lda     $01,s
+        jsl     Ot6BladeSpell
+        bcs     @flat           ; she casts it, and it heads no line
+        lda     $01,s
+        cmp     #OT6_RUNE_LINES
+        bcc     @line           ; a copy: the line by the copier's boost
+@flat:  jsl     Ot6KeepBoost    ; no line: the boost is dropped
+        lda     #$01
+        bra     @tier
+@climb:
+@line:  jsr     Ot6BladeSteps
+        lda     $01,s
+        jsr     Ot6LineSpell
+        jsr     Ot6RuneTierOf
+@tier:  pha                     ; [1,s] the tier, [2,s] the element
+        longa
+        lda     $3c08,x         ; the caster's MP ...
+        cmp     $3a4c           ; ... against the row's cost
+        sep     #$20
+        .a8
+        bcc     @name           ; short: nothing armed (the fizzle follows)
+        phx
+        longa
+        lda     $04,s
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6RuneBitTbl,x
+        plx
+        pha
+        lda     $02,s           ; the tier
+        xba
+        pla                     ; the element's bit
+        txy
+        jsl     Ot6RuneArm
+@name:  lda     $01,s
+        cmp     #$02
+        bcc     @done           ; tier 1: the row's own name
+        sbc     #$02            ; (carry set)
+        sta     $01,s
+        lda     $02,s
+        asl
+        clc
+        adc     $01,s
+        clc
+        adc     #OT6_RUNE_TIERED
+        sta     $b6
+@done:  pla
+        pla
+        rts
 .endproc
 
 ; can the attacker pay the action's staged MP?  a8/i8, x = the attacker,

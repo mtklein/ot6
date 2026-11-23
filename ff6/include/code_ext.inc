@@ -40,6 +40,7 @@ CODE_EXT_INC = 1
 .global Ot6RuneListOpen          ; #563 celes's kit: runic -> tools-shell list
 .global Ot6RuneExec              ;   Cmd_0b's execute-side dispatch (the rows)
 .global Ot6TargetPre             ;   CalcTargetDmg: the rune joins a weak body's hit
+.global Ot6RuneWeakMul           ;   ... and its tier multiplies it
 .global Ot6SwingPal_ext          ;   InitWeaponAnim: the swing's colour
 .global LoadSpriteAnimPal        ;   btlgfx, for that one's tail
 .global Ot6PaintListOpen         ; #538 relm's kit: sketch -> tools-shell list
