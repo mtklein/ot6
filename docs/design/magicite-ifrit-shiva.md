@@ -9,6 +9,13 @@ divine. The proposed *learned-passive* system (magicite.md) is not assumed
 anywhere below. Neither esper carries a named passive, because the passive
 channel does not exist in the ROM (see §12).
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> below are the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in: slash is now Sword or Katana,
+> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+
 **The three overridden `.dat` bytes are an assembly splice.**
 `magic_prop_en.dat` is byte-identical to the FF3us 1.0 base;
 `MagicProp` is four `.incbin` runs with three named `.byte` overrides between
@@ -65,7 +72,7 @@ so it needs to be visible in review.
 The Facility party is **Locke, Celes + two** for Ifrit & Shiva and Number 024,
 and the same fixed four for Number 128 and the Cranes —
 `bosses-wob.md` §13–16. The roster the two new stones compete inside is Locke
-(pierce, thief), Celes (slash, ice + Runic), and two of {Edgar, Sabin, Cyan,
+(Dagger, thief), Celes (Sword, ice + Runic), and two of {Edgar, Sabin, Cyan,
 Gau, Setzer}. Terra is not in this dungeon.
 
 What that party already brings:
@@ -76,8 +83,10 @@ What that party already brings:
 | fire | **Sabin**'s Fire Dance (blitz #4, L15, 9 MP — kits.md) |
 | bolt | **Ramuh** (Bolt + Rasp, `genju_prop.asm:82-83`) |
 | heal | **Kirin** (Cure/Regen, `genju_prop.asm`; Antdot and Scan were dropped for magicite.md's planned list, #305) |
-| pierce chip | Locke, Edgar (AutoCrossbow, whole side) |
-| slash chip | Celes, Cyan (Quadra Slam ×4), Sabin-with-claws |
+| Dagger chip | Locke |
+| Spear chip | Edgar (AutoCrossbow, whole side) |
+| Sword chip | Celes |
+| Katana chip | Cyan (Quadra Slam ×4) |
 | **MP sustain** | **nobody** |
 | **magic mitigation** | **nobody** (Celes's Safe is L22 and is physical mitigation) |
 
@@ -119,12 +128,15 @@ is what the player carries out of the dungeon.
 
 ### 2.3 Boss shield/class rows (already authored)
 
-`Ot6ShieldTbl`, `ot6_hud.asm:1542-1557`: Ifrit 6·pierce, Shiva 6·slash, Number
-024 7·slash|pierce, Number 128 7·pierce, both Cranes 6·pierce. Every Facility
-boss is **class-breakable by the party's existing weapons**: Locke pierces and
-Celes slashes. The class axis is the reliable axis in this dungeon, so
-**anything that makes ordinary weapon swings hit harder is worth
-more here than any element.**
+`Ot6ShieldTbl`, `ot6_hud.asm:1542-1557`: Ifrit 6·Spear, Shiva 6·Sword, Number
+024 7·Sword|Dagger, Number 128 7·Spear, the Left Crane 6·Spear, the Right
+Crane 6·Dagger. Under four classes every Facility boss was **class-breakable
+by the party's existing weapons**: Locke pierced and Celes slashed. Now
+Celes's sword keys Shiva and Number 024 and Locke's daggers key Number 024
+and the Right Crane; Ifrit, Number 128 and the Left Crane are Spear, which
+Edgar holds and the fixed pair does not. The class axis is the reliable axis
+in this dungeon, so **anything that makes ordinary weapon swings hit harder
+is worth more here than any element.**
 
 ### 2.4 Boss MP pools
 
@@ -388,9 +400,10 @@ Freeze the rest of the party first.
 
 Neither esper carries a weapon permit. No equip-side code reads a permit; the
 only mention in the source is a forward-looking comment (`ot6_class.asm:17`).
-Every Facility boss is slash|pierce-breakable (§2.3) and the fixed party
-covers both, and Sabin can already switch his Fight to slashing by equipping
-claws, so a claw permit on Ifrit would add nothing.
+When this was decided every Facility boss was slash|pierce-breakable (§2.3),
+the fixed party covered both, and Sabin could switch his Fight to slashing by
+equipping claws, so a claw permit on Ifrit would have added nothing. Claws
+are Fist now, and no Facility boss row is Fist.
 
 ---
 
@@ -428,10 +441,10 @@ Six stones for four slots.
 
 | fight | element key | class key | what Ifrit adds | what Shiva adds |
 |---|---|---|---|---|
-| Ifrit & Shiva `$109`/`$108` | ice → Ifrit, fire → Shiva | pierce / slash | *(not yet owned)* | *(not yet owned)* |
-| Number 024 `$10a` | rotating, re-hidden | slash\|pierce | **vigor on the class axis**; Drain (element-independent) | **Shell** vs the wall's tier-2 payoff; Osmose vs a 777 pool. *Slow is immune here* |
-| Number 128 `$10b` | authored bolt/water (see below) | pierce | vigor; Drain | **Diamond Dust's Slow**; Shell. *Ice is absorbed — do not cast it* |
-| Cranes `$10d`/`$10e` | water (both), bolt (right only) | pierce | vigor; Drain. *Inferno is absorbed by the right Crane* | **Slow on two independent fuses**; Shell vs Fire 3 / Giga Volt |
+| Ifrit & Shiva `$109`/`$108` | ice → Ifrit, fire → Shiva | Spear / Sword | *(not yet owned)* | *(not yet owned)* |
+| Number 024 `$10a` | rotating, re-hidden | Sword\|Dagger | **vigor on the class axis**; Drain (element-independent) | **Shell** vs the wall's tier-2 payoff; Osmose vs a 777 pool. *Slow is immune here* |
+| Number 128 `$10b` | authored bolt/water (see below) | Spear | vigor; Drain | **Diamond Dust's Slow**; Shell. *Ice is absorbed — do not cast it* |
+| Cranes `$10d`/`$10e` | water (both), bolt (right only) | Spear / Dagger | vigor; Drain. *Inferno is absorbed by the right Crane* | **Slow on two independent fuses**; Shell vs Fire 3 / Giga Volt |
 
 Both stones contribute to all three post-acquisition fights without their
 element. Number 128's body is authored bolt|water

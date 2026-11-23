@@ -2,6 +2,15 @@
 
 Scope: measurement, not tuning.
 
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Fist, Arcane
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are
+> the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in: slash is now Sword or
+> Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special
+> Arcane or Dagger.
+
 The weakness spread and the per-monster shield table cannot be tuned
 by feel alone across three scenario parties, so measurement comes
 first. `tools/tests/metrics_battle.lua` plays a fight by policy and
@@ -30,7 +39,7 @@ A policy sets only the **boost discipline**; what a character actually
 *does* with the turn comes from a per-character **kit** table (`KITS`,
 keyed on the character index at `$3ED9+slot*2`), so one named policy
 plays a whole party: Terra probes and exploits with Fire, Locke opens
-with Steal then Fights, Edgar's Tools carry pierce/poison, and Sabin
+with Steal then Fights, Edgar's Tools carry Spear/poison, and Sabin
 inputs Blitz. Every stat fans out per party slot (`char_actions`, `char_dmg`,
 `char_chips`, `char_breaks`, `char_boosts`, `char_bp_*`,
 `char_dmg_taken`) using the same `sN:value` CSV the monster lines use.
