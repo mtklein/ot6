@@ -97,6 +97,9 @@ buys what his own command would: a Mimic of Edgar's Tool overclocks, of
 Celes's Runic is a RunicBlade, of Shadow's Throw assassinates, of Terra's
 Fire is Ultima, and (when he carries Lore) of Strago's Scan studies, each
 free as every copy is.  Under three of his points each is its plain self.
+A Mimic of a Dance copies the step that was danced and rolls none of its
+own, so the opener ladder (kits.md, Mog) belongs to a Dance pick, his or
+Mog's, and not to a copy (`battle_danceopener`).
 
 ## 5. Tests
 

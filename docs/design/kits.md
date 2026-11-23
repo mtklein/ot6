@@ -1346,13 +1346,16 @@ there).
   the engine starts on its own (Muddle, the Colosseum: `RandCharAction`
   calls `RandDance` directly and never reaches the hook).  This is a boost
   reward, not a divine: Mog's divine stays open.  GOGO's Dance takes the
-  same ladder from his own pending boost.  His Mimic of a Dance start
-  copies the action, as every Mimic does: the step the dancer opened with,
-  whatever his own boost (which buys him the multiplier and the stumble
-  ladder, as before).  `battle_danceopener` predicts every start's opener
-  from its draw at 0-3 BP for MOG and GOGO, a 3-BP start on every dance MOG
-  knows, the stumble, the later steps and an engine start, and reads the
-  rows and their odds from the ROM.
+  same ladder from his own pending boost.  His Mimic of a Dance copies
+  the action, as every Mimic does (`mimicreplace` copies the saved command
+  and attack): the step that was last danced, with no roll of its own,
+  whatever his boost, which buys the copy the multiplier and the stumble
+  ladder as before.  So a boosted Mimic does not buy the rare step; a
+  Mimic of a rare opener is the rare step again, free.  `battle_danceopener`
+  predicts every start's opener from its draw at 0-3 BP for MOG and GOGO, a
+  3-BP start on every dance MOG knows, the stumble, the later steps, a
+  boosted Mimic of a Dance and an engine start, and reads the rows and
+  their odds from the ROM.
 - **Umaro — Berserker (bludgeoning: club, fists)**: see "Umaro" below
   (#380).
 
