@@ -1,16 +1,16 @@
 ; ------------------------------------------------------------------------------
 ; OT6: weapon/ability class data (M3)
 ;
-; four physical classes, one bit each, sharing a byte with the null-break
-; property. together with the 8 elements these are octopath's 12 probe axes.
+; six physical classes, one bit each, sharing a byte with the null-break
+; property. with the 8 elements these are 14 probe axes (octopath has 12).
 ; the weapon sets Fight's class; abilities keep their own class byte
-; (sabin with claws equipped slashes on Fight, and Pummel stays bludgeoning).
+; (sabin with a claw equipped is katana on Fight, and Pummel stays blunt).
 ; ------------------------------------------------------------------------------
 
 ; six weapon classes (#566), after Octopath's six: the four of v0.50 and
 ; before (slash $01, pierce $02, bludgeon $04, special $08) regrouped by the
 ; weapon in hand.  tools/proto_six/classes.py is the grouping as data, and
-; this file's two tables are written from it.
+; this file's two tables follow it (the [kind] tags are its kinds).
 OT6_SWORD   := $01              ; swords; the chain saw
 OT6_DAGGER  := $02              ; daggers and ninja blades; a thief's hit
 OT6_BLUNT   := $04              ; fists and knuckles, rods and brushes, flails
@@ -46,15 +46,16 @@ OT6_CLS_FANG  = OT6_DAGGER      ; Gau's own body: his bare hand, and his raging 
 ;   - heal rod $33: no class. a healing rod teaches nothing, and leaving it
 ;     classless avoids the undead/heal-reversal ambiguity until it is needed.
 ;   - the returning-arc family (full moon, boomerang, rising sun, sniper,
-;     wing edge) is all bludgeoning per "boomerangs (ranged bludgeon)",
-;     even the edgy-looking discs; one-way thrown points (shuriken, stars,
-;     darts, hawk eye) are piercing per "thrown edges, darts".
-;   - hawk eye $49: piercing (a thrown blade, not a returning arc).
-;   - air anchor $a9: piercing (it fires a harpoon).
-;   - atma weapon $1c: plain slashing, not null-break.
-;   - empty hand $ff: bludgeoning. fists are a real class ("claws are how
-;     the monk buys into a second class"), so bare knuckles stay bludgeon
-;     and umaro is classified correctly with no special case.
+;     wing edge) is all ranged, with what else is thrown (shuriken, stars,
+;     darts, cards, dice); v0.50 had the arcs bludgeon ("boomerangs (ranged
+;     bludgeon)") and the thrown points pierce ("thrown edges, darts").
+;   - hawk eye $49: ranged (a thrown blade; vanilla drew it with the flails).
+;   - air anchor $a9: ranged (it fires a harpoon, as the crossbow its bolts).
+;   - atma weapon $1c: a plain sword, not null-break.
+;   - empty hand $ff: blunt, a fist. the knuckles strike and are blunt too;
+;     the edged claws cut and are katana ("claws are how the monk buys
+;     into a second class"). umaro needs no special case; gau's empty
+;     hand is his fangs, dagger, in Ot6WeaponClass (OT6_CLS_FANG).
 ;   - dried meat is $fe and "empty" is $ff in equipment slots; only $ff
 ;     ever appears in a hand.
 
@@ -149,7 +150,7 @@ Ot6WeapClassTbl:
         .byte   OT6_RANGED      ; $4e darts [dart]
         .byte   OT6_RANGED      ; $4f doom darts [dart]
         .byte   OT6_RANGED      ; $50 trump [card]
-        .byte   OT6_RANGED      ; $51 dice (ordinary ¤: chips) [dice]
+        .byte   OT6_RANGED      ; $51 dice (ordinary: chips) [dice]
         .byte   OT6_RANGED|OT6_NULLBRK; $52 fixed dice: high damage, teaches nothing [dice]
         ; claws $53-$59
         .byte   OT6_BLUNT       ; $53 metalknuckle [knuckle]
@@ -166,18 +167,18 @@ Ot6WeapClassTbl:
         .byte   $00             ; $a3 noiseblaster
         .byte   $00             ; $a4 bio blaster (resolves as its spell)
         .byte   $00             ; $a5 flash (resolves as its spell)
-        .byte   OT6_SWORD       ; $a6 chain saw ("buys edgar slashing") [chainsaw]
+        .byte   OT6_SWORD       ; $a6 chain saw (edgar's sword key) [chainsaw]
         .byte   $00             ; $a7 debilitator
         .byte   OT6_SPEAR       ; $a8 drill [drill]
         .byte   OT6_RANGED      ; $a9 air anchor (harpoon) [air anchor]
         .byte   OT6_RANGED      ; $aa autocrossbow [crossbow]
         ; skeans/edges $ab-$ad resolve as their spells $51-$53, whose class
-        ; is Ot6SkillClassTbl's (pierce, #383); the Inviz and Shadow Edges
+        ; is Ot6SkillClassTbl's (ranged, #383); the Inviz and Shadow Edges
         ; deal no damage (ot6_shadow.asm): no class here
         .res    $b0 - $ab, $00
         ; relics $b0-$e6, consumables $e7-$fe: no class
         .res    $ff - $b0, $00
-        .byte   OT6_BLUNT       ; $ff empty hand: bare fists bludgeon [fist]
+        .byte   OT6_BLUNT       ; $ff empty hand: bare fists [fist]
 
 ; ------------------------------------------------------------------------------
 
@@ -189,17 +190,17 @@ Ot6WeapClassTbl:
 ; (aurabolt is a holy chip, not a punch). WoB physical skills only;
 ; slots attacks, dances, and rage specials stay unclassified.
 ;
-;   - swdtechs slash: cyan is the slashing specialist, and quadra slam is
-;     the strongest slash chip in the game.  three are not slashes (#379,
+;   - swdtechs are katana: cyan is its specialist, and quadra slam is
+;     the strongest katana chip in the game.  three are not cuts (#379,
 ;     kits.md's chip column): retort ($56) is a counter stance and
 ;     empowerer ($59) a drain, so both are classless and chip nothing; quadra
 ;     slice ($5b) is wind, its element byte (battle_main.asm's MagicProp
 ;     override), so it is absent here and chips wind shields four times.
 ;   - $55 dispatch doubles as slots' "joker doom" (vanilla reuses the
 ;     record, and renamed its attack-name slot), so a failed joker doom
-;     is a slashing probe. that is vanilla behaviour, kept as it is.
-;   - pummel/suplex/bum rush bludgeon regardless of claws ✦.
-;   - tekmissile is piercing: the whelk tutorial's fourth chip
+;     is a katana probe. that is vanilla behaviour, kept as it is.
+;   - pummel/suplex/bum rush are blunt regardless of claws ✦.
+;   - tekmissile is ranged: the whelk tutorial's fourth chip
 ;     ("three beams and a tekmissile").
 
 Ot6SkillClassTbl:
@@ -209,11 +210,11 @@ Ot6SkillClassTbl:
         .byte   $5a, OT6_KATANA ; stunner [swdtech]
         .byte   $5c, OT6_KATANA ; cleave [swdtech]
         .byte   $5d, OT6_BLUNT  ; pummel [blitz]
-        .byte   $5f, OT6_BLUNT  ; suplex (the train is bludgeon-weak) [blitz]
+        .byte   $5f, OT6_BLUNT  ; suplex (the ghost train takes it) [blitz]
         .byte   $64, OT6_BLUNT  ; bum rush [blitz]
         .byte   $8a, OT6_RANGED ; tekmissile [tekmissile]
-        .byte   $51, OT6_RANGED ; fire skean  (thrown edges pierce, #383: [skean]
-        .byte   $52, OT6_RANGED ; water edge   each chips pierce and its [skean]
+        .byte   $51, OT6_RANGED ; fire skean  (thrown, so ranged, #383: [skean]
+        .byte   $52, OT6_RANGED ; water edge   each chips ranged and its [skean]
         .byte   $53, OT6_RANGED ; bolt edge    element) [skean]
         .byte   $ff
 
