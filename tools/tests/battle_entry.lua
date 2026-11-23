@@ -42,11 +42,12 @@ H.run({ maxFrames = 8000 }, {
       H.log(string.format("guard shields $7E3E44,$7E3E46 = %d,%d",
         H.readByte(0x3E44), H.readByte(0x3E46)))
       -- Ot6SeedShields seeds this fixture's opening guard pair with 2
-      -- shields each and class row PIERCE ($02).
+      -- shields each and class row SPEAR ($20, OT6_SPEAR; #566: the six
+      -- classes' child of the guards' v0.50 pierce).
       H.assertEq(H.readByte(0x3E44), 2, "guard 1 shields seeded (Ot6SeedShields ran)")
       H.assertEq(H.readByte(0x3E46), 2, "guard 2 shields seeded (Ot6SeedShields ran)")
-      H.assertEq(H.readByte(0x3EA8), 0x02, "guard 1 authored piercing-weak")
-      H.assertEq(H.readByte(0x3EAA), 0x02, "guard 2 authored piercing-weak")
+      H.assertEq(H.readByte(0x3EA8), 0x20, "guard 1 authored spear-weak")
+      H.assertEq(H.readByte(0x3EAA), 0x20, "guard 2 authored spear-weak")
     end),
   }, {
     H.call(function()

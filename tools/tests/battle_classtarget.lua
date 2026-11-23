@@ -6,20 +6,20 @@
 -- weakness codex does NOT know Cirpius yet: a first Cirpius fight opens
 -- with no class shown (`encounter 1: s2=086 sh=2 crev=00 ...` on main,
 -- build/attempts/wt/draw-budgets/lab/draw-budgets/baseline_classtarget.log).
--- A pierce hit on a Cirpius teaches the codex (Ot6ClassChip stores the
+-- A dagger hit on a Cirpius teaches the codex (Ot6ClassChip stores the
 -- class to OT6_CODEX_CLASS), and every later Cirpius fight opens with
--- pierce shown on every Cirpius slot (Ot6SeedShields pre-reveals it).  Walking the spawn tile's lane (the same
+-- dagger shown on every Cirpius slot (Ot6SeedShields pre-reveals it).  Walking the spawn tile's lane (the same
 -- oscillation gen_kolts_cave verifies the pool with) draws map 96's
 -- encounters; the mixed one -- Tusker (no class key) beside Cirpius x3
--- (pierce) -- is the #157 picture: TERRA holds a MithrilKnife (pierce),
--- LOCKE and EDGAR MithrilBlades (slash).  A pierce hand should Fight a
--- Cirpius; a slash hand has no key here.
+-- (dagger) -- is the #157 picture: TERRA holds a MithrilKnife (dagger),
+-- LOCKE and EDGAR MithrilBlades (sword).  A dagger hand should Fight a
+-- Cirpius; a sword hand has no key here.
 --
 -- Which encounter deals the mixed formation is not the fixture's to
 -- choose: map 96's group deals it at 80/256 (the pool is read from the ROM
 -- below, H.encounterPool), and the save's encounter counter decides when.
 -- Every regeneration of the chain moves that counter, so the hunt takes
--- the mixed formation only ONCE PIERCE IS KNOWN (a mixed fight that opens
+-- the mixed formation only ONCE DAGGER IS KNOWN (a mixed fight that opens
 -- before then is fought -- which teaches -- and the lane walks on), and its
 -- encounter budget is the most any counter state needs to deal an
 -- all-Cirpius formation (which teaches) and after it the mixed one
@@ -30,15 +30,15 @@
 -- the party worn down.
 --
 -- What it checks, on the real fight the lane reaches:
---   1. selection: the driver's chipAim aims the pierce hand (TERRA) at a
---      pierce-keyed Cirpius, not the unkeyed Tusker, and gives a slash hand
+--   1. selection: the driver's chipAim aims the dagger hand (TERRA) at a
+--      dagger-keyed Cirpius, not the unkeyed Tusker, and gives a sword hand
 --      (LOCKE) no target at all (nil).
 --   2. negative control: opts.aim = false stubs the pick back to the old
 --      shape in place -- chipAim then returns nil, the engine's default
 --      cursor -- and the "aims at a Cirpius" assertion goes red.
---   3. the aim's effect (A/B from one snapshot, Tools off so the pierce
+--   3. the aim's effect (A/B from one snapshot, Tools off so the dagger
 --      Fight is the only Cirpius chipper): through the whole fight, aim-on
---      never aims TERRA's Fight at the unkeyed Tusker while a pierce-keyed
+--      never aims TERRA's Fight at the unkeyed Tusker while a dagger-keyed
 --      Cirpius stands, and aim-off, the old shape, does -- each Fight's
 --      target read at the engine's hand-off of the confirmed input
 --      (GetPlayerTargets).  Narrowed (#468): a Fight whose aimed monster was
@@ -46,7 +46,7 @@
 --      party-mate's queued blow) lands where the engine's fallback cursor
 --      puts it; the suite does not claim where that Fight lands.  It is
 --      counted apart, and aim-on must still have at least one keyed Fight
---      that is not set apart.  The pierce chips landed on a Cirpius (counted
+--      that is not set apart.  The dagger chips landed on a Cirpius (counted
 --      at Ot6ClassChip's store), the Cirpius broken and the frames each
 --      branch's fight took from its own restore are logged beside it, not
 --      asserted; why is at the A/B below.
@@ -60,12 +60,14 @@ local STATE = "build/states/kolts_cave.mss.lua"
 local MAP = 96
 
 local TUSKER, CIRPIUS = 0x07A, 0x086
-local PIERCE = 0x02
+local DAGGER = 0x02        -- OT6_DAGGER (#566: the knife and the Cirpius row were pierce)
+local SWORD = 0x01         -- OT6_SWORD (LOCKE's MithrilBlade; was slash)
+local CLASSES = 0x3F       -- OT6_CLASSES: every class bit a body can show
 
 -- ---- the lane's pool, and the encounter budget it implies ------------------
 -- A slot is MIXED when every formation it can deal holds a Tusker and a
 -- Cirpius, and TEACHES when every one is Cirpius alone (every target a
--- Cirpius, so the party's first pierce hit lands on one).
+-- Cirpius, so the party's first dagger hit lands on one).
 local POOL = H.encounterPool(H.fieldEncounterGroup(MAP))
 local MIXED, TEACHES = {}, {}
 for slot = 1, 4 do
@@ -117,13 +119,13 @@ local function formationText()
   return table.concat(parts, " ")
 end
 
--- ---- pierce chips on a Cirpius, at the ROM's own store --------------------
+-- ---- dagger chips on a Cirpius, at the ROM's own store --------------------
 -- Ot6ClassChip (ot6_break.asm) is where a landed hit's class chip happens:
 -- `dec a / sta OT6_SHIELD_CUR,y` is its one store to a shield cell, so a
 -- write to a monster's cell ($3E40 + 2*slot, OT6_SHIELD_CUR + 8) made from
--- inside that routine is exactly one chip.  It is a PIERCE chip when the
+-- inside that routine is exactly one chip.  It is a DAGGER chip when the
 -- attack's class (OT6_ATKCLASS, $57B8) and the target's class weaknesses
--- (OT6_BP_CLASS + 8, $3EA4 + 2*slot) share the pierce bit -- the match the
+-- (OT6_BP_CLASS + 8, $3EA4 + 2*slot) share the dagger bit -- the match the
 -- routine itself made.  The routine's end is the next proc in the file,
 -- Ot6RevealCommit.  Reads only; `branchRecord` is the record of the branch
 -- being measured, nil outside one.
@@ -141,7 +143,7 @@ emu.addMemoryCallback(function(addr, value)
   if pc < CLASSCHIP or pc >= CLASSCHIP_END then return end
   local slot = off // 2
   if speciesAt(slot) ~= CIRPIUS then return end
-  if (H.readByte(ATKCLASS) & H.readByte(BP_CLASS + slot * 2) & PIERCE) == 0 then return end
+  if (H.readByte(ATKCLASS) & H.readByte(BP_CLASS + slot * 2) & DAGGER) == 0 then return end
   branchRecord.chips = branchRecord.chips + 1
   branchRecord.on[slot] = (branchRecord.on[slot] or 0) + 1
   -- the chip that empties the gauge is the break, read at its own store, so
@@ -150,13 +152,13 @@ emu.addMemoryCallback(function(addr, value)
   if value == 0 then branchRecord.broke[slot] = true end
 end, emu.callbackType.write, 0x7E0000 + SH_CUR, 0x7E0000 + SH_CUR + 11)
 
--- ---- where the pierce hand's Fights were aimed ----------------------------
+-- ---- where the dagger hand's Fights were aimed ----------------------------
 -- GetPlayerTargets (battle_main.asm) turns a confirmed menu input into an
 -- action: X = the actor's entity offset, Y = its input-queue offset, and
 -- the queue holds the command ($2BAF), attack ($2BB0) and the target word
 -- the cursor confirmed ($2BB1: characters low, monsters high).  Each Fight
 -- TERRA confirms is recorded with the monster it was aimed at and whether
--- a pierce-keyed Cirpius stood at that moment -- the input the aim
+-- a dagger-keyed Cirpius stood at that moment -- the input the aim
 -- changes, read at the engine's own hand-off.
 local TERRA_ENT = nil       -- TERRA's entity offset, set when the fight is found
 -- Is a confirmed Fight set apart as "the aimed monster fell during the
@@ -178,7 +180,7 @@ do
     for s = 0, 5 do if mons == (1 << s) then slot = s end end
     local keyed = false
     for s = 0, 5 do
-      if alive(s) and speciesAt(s) == CIRPIUS and (classRev(s) & PIERCE) ~= 0 then keyed = true end
+      if alive(s) and speciesAt(s) == CIRPIUS and (classRev(s) & DAGGER) ~= 0 then keyed = true end
     end
     local at = slot and speciesAt(slot) or nil
     -- the monster the driver's plan aimed this Fight at (plan.aim, read each
@@ -224,11 +226,11 @@ end
 local function mixedNow()
   return firstSlot(CIRPIUS) ~= nil and firstSlot(TUSKER) ~= nil
 end
--- Does this fight open with the Cirpius' pierce class already shown (the
+-- Does this fight open with the Cirpius' dagger class already shown (the
 -- codex pre-reveal, taught by an earlier fight on this lane)?
-local function pierceKnown()
+local function daggerKnown()
   local c = firstSlot(CIRPIUS)
-  return c ~= nil and (classRev(c) & PIERCE) == PIERCE
+  return c ~= nil and (classRev(c) & DAGGER) == DAGGER
 end
 
 -- ---- state carried across the step list ----------------------------------
@@ -236,8 +238,8 @@ local S = { found = false, blob = nil, terra = nil, locke = nil,
             cirp = nil, tusk = nil, ab = {}, seen = {} }
 
 -- one measured A/B branch, from the restore that starts it: drive to the
--- end of the fight with Tools off so the pierce Fight is the only thing
--- that can chip a Cirpius, and record the pierce chips that landed on a
+-- end of the fight with Tools off so the dagger Fight is the only thing
+-- that can chip a Cirpius, and record the dagger chips that landed on a
 -- Cirpius (branchRecord), how many Cirpius broke, and how many frames the
 -- fight took from the restored snapshot.
 local function measure(name, aim)
@@ -276,7 +278,7 @@ local function measure(name, aim)
       for s = 0, 5 do
         if out.on[s] then per[#per + 1] = string.format("s%d:%d", s, out.on[s]) end
       end
-      H.log(string.format("[classtarget] %s: pierce chips on a Cirpius=%d (%s), cirpius "
+      H.log(string.format("[classtarget] %s: dagger chips on a Cirpius=%d (%s), cirpius "
         .. "broken=%d, fight took %d frames from the restored snapshot (f%d..f%d); TERRA's "
         .. "Fights aimed at: %s -- %d off the key while a keyed Cirpius stood, %d more where "
         .. "the aimed monster fell during the cursor walk", name,
@@ -288,8 +290,8 @@ local function measure(name, aim)
 end
 
 -- lane-walk to the next encounter; classify it.  The mixed formation with
--- pierce already shown is snapshotted and stops the hunt; anything else --
--- a uniform pool, or the mixed one before pierce is known -- is fought out
+-- dagger already shown is snapshotted and stops the hunt; anything else --
+-- a uniform pool, or the mixed one before dagger is known -- is fought out
 -- with the ordinary driver (which is what teaches) and the lane resumes.
 local function huntStep(i)
   return H.cond(function() return not S.found end, {
@@ -300,10 +302,10 @@ local function huntStep(i)
     H.waitUntil(function() return H.battleActive() end, 1500, "battle " .. i .. " active", 20),
     H.waitFrames(150),
     H.call(function()
-      local mixed, known = mixedNow(), pierceKnown()
+      local mixed, known = mixedNow(), daggerKnown()
       S.seen[#S.seen + 1] = string.format("%d:%s%s", i, mixed and "mixed" or "uniform",
-        known and "+pierce" or "")
-      H.log(string.format("[classtarget] encounter %d: %s mixed=%s pierce-known=%s%s",
+        known and "+dagger" or "")
+      H.log(string.format("[classtarget] encounter %d: %s mixed=%s dagger-known=%s%s",
         i, formationText(), tostring(mixed), tostring(known),
         (mixed and not known) and " -- fought to teach, not taken" or ""))
       if mixed and known then
@@ -335,10 +337,10 @@ local steps = {
   H.call(function()
     H.assertEq(H.mapId() & 0x1ff, MAP, "booted in the Mt. Kolts cave (map 96)")
     -- the hands this fixture carries to the mountain
-    H.assertEq(H.weaponClass(H.readByte(0x1600 + 37 * 0 + 0x1F)), PIERCE,
-      "TERRA holds a pierce weapon (MithrilKnife)")
-    H.assertEq(H.weaponClass(H.readByte(0x1600 + 37 * 1 + 0x1F)), 0x01,
-      "LOCKE holds a slash weapon (MithrilBlade)")
+    H.assertEq(H.weaponClass(H.readByte(0x1600 + 37 * 0 + 0x1F)), DAGGER,
+      "TERRA holds a dagger weapon (MithrilKnife)")
+    H.assertEq(H.weaponClass(H.readByte(0x1600 + 37 * 1 + 0x1F)), SWORD,
+      "LOCKE holds a sword weapon (MithrilBlade)")
     -- the pool, as the ROM deals it, and the budget it implies
     local anyMixed, anyTeach = false, false
     for slot = 1, 4 do
@@ -366,17 +368,17 @@ for i = 1, BUDGET do steps[#steps + 1] = huntStep(i) end
 
 steps[#steps + 1] = H.call(function()
   H.assertEq(S.found, true, string.format(
-    "the mixed Cirpius formation, with pierce already known, was reached within %d lane "
+    "the mixed Cirpius formation, with dagger already known, was reached within %d lane "
     .. "encounters, the most any encounter-counter state needs (encounters: %s) -- "
-    .. "an all-Cirpius fight that did not teach pierce shows here as a uniform with no "
-    .. "+pierce after it", BUDGET, table.concat(S.seen, " ")))
+    .. "an all-Cirpius fight that did not teach dagger shows here as a uniform with no "
+    .. "+dagger after it", BUDGET, table.concat(S.seen, " ")))
   H.assertEq(S.terra ~= nil and S.locke ~= nil, true, "TERRA and LOCKE are in the fight")
   H.assertEq(S.cirp ~= nil and S.tusk ~= nil, true,
     "the formation pairs a Cirpius with a Tusker")
-  -- the pierce key is shown on the Cirpius, and the Tusker shows no class
-  H.assertEq(classRev(S.cirp) & PIERCE, PIERCE,
-    "the Cirpius opens with its pierce class revealed (the codex, taught on this lane)")
-  H.assertEq(classRev(S.tusk) & 0x0F, 0,
+  -- the dagger key is shown on the Cirpius, and the Tusker shows no class
+  H.assertEq(classRev(S.cirp) & DAGGER, DAGGER,
+    "the Cirpius opens with its dagger class revealed (the codex, taught on this lane)")
+  H.assertEq(classRev(S.tusk) & CLASSES, 0,
     "the Tusker shows no revealed class -- nothing a hand can break")
 end)
 
@@ -402,14 +404,14 @@ steps[#steps + 1] = H.call(function()
   local off = H.newFightDriver("sel-off", { tactical = true, aim = false })
   local pickOn = on.driver:chipAim(S.terra, 0)
   local pickOff = off.driver:chipAim(S.terra, 0)
-  local slashPick = on.driver:chipAim(S.locke, 0)
+  local swordPick = on.driver:chipAim(S.locke, 0)
   H.log(string.format("[classtarget] chipAim(TERRA) aim-on=%s aim-off=%s ; chipAim(LOCKE)=%s ; cirp slot=%s tusk slot=%s",
-    tostring(pickOn), tostring(pickOff), tostring(slashPick), tostring(S.cirp), tostring(S.tusk)))
+    tostring(pickOn), tostring(pickOff), tostring(swordPick), tostring(S.cirp), tostring(S.tusk)))
 
-  -- the pick aims the pierce hand at a pierce-keyed Cirpius, never the Tusker
+  -- the pick aims the dagger hand at a dagger-keyed Cirpius, never the Tusker
   local function aimsAtCirpius(pick)
-    H.assertEq(pick ~= nil and speciesAt(pick) == CIRPIUS and (classRev(pick) & PIERCE) == PIERCE, true,
-      "the pierce hand is aimed at a pierce-keyed Cirpius")
+    H.assertEq(pick ~= nil and speciesAt(pick) == CIRPIUS and (classRev(pick) & DAGGER) == DAGGER, true,
+      "the dagger hand is aimed at a dagger-keyed Cirpius")
   end
   aimsAtCirpius(pickOn)
 
@@ -426,8 +428,8 @@ steps[#steps + 1] = H.call(function()
     "a Fight confirmed elsewhere while its aimed monster stands is not set apart")
   H.assertEq(pickOn ~= S.tusk, true, "and NOT at the unkeyed Tusker")
 
-  -- a slash hand has no key in this formation, so it keeps the default cursor
-  H.assertEq(slashPick, nil, "a slash hand (LOCKE) is given no class target here")
+  -- a sword hand has no key in this formation, so it keeps the default cursor
+  H.assertEq(swordPick, nil, "a sword hand (LOCKE) is given no class target here")
 
   -- negative control: the stub (aim=false) reverts the pick to nil (default
   -- cursor), and the same assertion that passes for the new pick goes red.
@@ -452,9 +454,9 @@ steps[#steps + 1] = H.call(function()
 end)
 
 -- 3. the aim's effect, A/B from the one snapshot.  What the aim changes is
--- where the pierce hand's Fight is aimed: counted at the engine's own
+-- where the dagger hand's Fight is aimed: counted at the engine's own
 -- hand-off of each confirmed input (GetPlayerTargets, above), aim-on
--- never aims TERRA's Fight at the unkeyed Tusker while a pierce-keyed
+-- never aims TERRA's Fight at the unkeyed Tusker while a dagger-keyed
 -- Cirpius stands, and aim-off -- the engine's default cursor -- does, on
 -- this fight.  Across twelve different mixed fights (lab copies that flee
 -- 0, 1, 2, 3, 4, 5, 6, 8, 10, 13, 16 and 21 lane encounters before the
@@ -463,7 +465,7 @@ end)
 -- `[classtarget] A/B`), aim-on aimed 0 of its 3 to 5 Fights off the key
 -- and aim-off 1 to 3 of its 4 or 5, every time: once the Cirpius the
 -- default cursor starts on falls, the cursor sits on the Tusker.
--- What is not asserted, and why.  The pierce chips landed on a Cirpius
+-- What is not asserted, and why.  The dagger chips landed on a Cirpius
 -- came out aim-on 4 against aim-off 4 in six of those fights, 5 in four
 -- and 3 in two -- a Cirpius takes two chips and then breaks, and the
 -- default cursor's first target is a Cirpius as well -- so "aim-on lands
@@ -496,7 +498,7 @@ steps[#steps + 1] = (function()
       H.log(string.format("[classtarget] A/B: TERRA Fights aimed off the key while a keyed "
         .. "Cirpius stood %d of %d counted (%d more set apart: the aimed monster fell during "
         .. "the cursor walk; %d Fights in all) vs %d of %d counted (%d set apart; %d in all); "
-        .. "pierce chips on a Cirpius %d vs %d; cirpius broken %d vs %d; frames from the "
+        .. "dagger chips on a Cirpius %d vs %d; cirpius broken %d vs %d; frames from the "
         .. "restore %d vs %d (on/off %.3f)", a.offKey, a.counted, a.fellOff, #a.fights,
         b.offKey, b.counted, b.fellOff, #b.fights, a.chips, b.chips, a.nbroke, b.nbroke,
         a.frames, b.frames, a.frames / b.frames))
@@ -504,7 +506,7 @@ steps[#steps + 1] = (function()
         .. "Cirpius stood and not set apart as fallen during the cursor walk (the count below "
         .. "is not vacuous)")
       H.assertEq(a.offKey, 0, string.format("aim-on never aims TERRA's Fight at the unkeyed "
-        .. "Tusker while a pierce-keyed Cirpius stands, outside Fights whose aimed monster "
+        .. "Tusker while a dagger-keyed Cirpius stands, outside Fights whose aimed monster "
         .. "fell during the cursor walk (%d counted, %d set apart)", a.counted, a.fellOff))
       H.assertEq(#b.fights > 0, true, "the same hook saw the aim-off branch's Fights "
         .. "(the count above is a reading, not a default)")

@@ -3,8 +3,9 @@
 
 --   tools/tests/run.sh tools/tests/battle_class.lua
 
--- The entry-point guards are authored piercing-weak (Ot6ShieldTbl now carries
--- a class byte), so the seed itself is under test before any pokes.  The
+-- The entry-point guards are authored spear-weak (Ot6ShieldTbl carries a
+-- class byte; #566: six classes, the guards' pierce became Spear $20, the
+-- TekMissile probe's class), so the seed itself is under test before any pokes.  The
 -- magitek party has no Fight command, so this borrows battle_hits's
 -- driver: rewrite the live command lists to Fight-only and berserk the
 -- party (RandCharAction -> Cmd_00 -> FightAttack, with no menus).  The class
@@ -12,39 +13,42 @@
 -- probe class without touching damage stats, and each phase re-arms the
 -- party with a different weapon and watches the shield counter:
 
---   0. seed: shields 2/2, class-weak $02 (authored), revealed-class 0,
---      slot codex magic re-signed 'O8' (fresh init after self-clean)
---   1. slash phase (MithrilBlade $0a): swings land, nothing chips
---   2. pierce phase (Dirk $00): chip + reveal ($3ea9 bit $02) + class
---      codex byte learned
+--   0. seed: shields 2/2, class-weak $20 (authored), revealed-class 0
+--      (fresh codex init after self-clean)
+--   1. sword phase (MithrilBlade $0a): swings land, nothing chips
+--   1b. dagger phase (Dirk $00, #566): the knife was the guards' key while
+--      pierce was one class; under six it is the spear's sibling and
+--      chips nothing, reveals nothing
+--   2. spear phase (Mithril Pike $1d): chip + reveal ($3ea9 bit $20) +
+--      class codex byte learned
 --   3. keep swinging: shields 0 -> broken timer
 --   4. recovery: shields restore and the revealed class survives
 --   5. null-break phase (Fixed Dice $52 = class $88, guards re-poked
 --      ¤-weak): swings land, nothing chips, nothing revealed
 --   6. ¤ phase (Dice $51 = class $08): the chip fires
---   7. heal-reversal phase: slash-weak guards absorb fire and swings carry
+--   7. heal-reversal phase: sword-weak guards absorb fire and swings carry
 --      fire (hand element poked), so every hit resolves as a heal, and a
 --      resolved heal must chip nothing (the $f2 bit-0 gate; the per-frame HP
 --      watcher shows heals landed, so the assert is not empty)
 --   8. flagged-skill phase (TekMissile $8a, flags3 $20 "can't dodge"):
 --      terra is un-berserked, her real commands restored, and her menu
 --      driven to TekMissile.  A flags3-nonzero classed skill must chip a
---      pierce-weak guard.  The drive traverses terra's magitek list, so
+--      spear-weak guard.  The drive traverses terra's magitek list, so
 --      its rendered rows also carry the ability-list assert: TekMissile
---      (elementless, Ot6SkillClassTbl pierce) wears the pierce class icon
+--      (elementless, Ot6SkillClassTbl spear) wears the spear class icon
 --      after its name, where elemental abilities wear their element icon
 --   9. tools-list phase (staged, since no fixture reaches a Tools user):
 --      three tool items are poked into the battle inventory ($2686
 --      stride 5: id / usage flags, bit $40 = the tools-window scan bit /
 --      targeting / qty) and terra's command slot 0 becomes Tools ($09).
 --      opening it renders the tools list through ListTextCmd_0e +
---      Ot6ToolListIcon_ext: Chain Saw wears slash, Drill wears pierce
+--      Ot6ToolListIcon_ext: Chain Saw wears sword, Drill wears spear
 --      (each replacing the name field's trailing blank), NoiseBlaster
 --      (classless, and a full-width 13-char name) keeps its last letter
 
--- The under-enemy HUD is asserted around phases 0-2: an authored-pierce
+-- The under-enemy HUD is asserted around phases 0-2: an authored-spear
 -- guard with no element weakness shows [shield]['?'] before any probe,
--- and the '?' becomes the pierce class icon ($da, white like the '?')
+-- and the '?' becomes the spear class icon ($da, white like the '?')
 -- once the class is revealed, because the class slots use the same
 -- revealed-versus-'?' code the element slots use.
 
@@ -63,6 +67,12 @@
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
+
+-- the six classes (ot6_class.asm, #566) this suite names
+local SWORD, DAGGER, ARCANE, SPEAR = 0x01, 0x02, 0x08, 0x20
+local NULLBRK = 0x80
+-- a revealed class's HUD/list word: Ot6ClassGlyphTbl's cell in the white row
+local ICON_SWORD, ICON_SPEAR = 0x21D9, 0x21DA
 
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 local function codexBase()
@@ -224,8 +234,15 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(s1, 2, "guard 1 shields seeded")           -- GUESS(seed-2)
     H.assertEq(s2, 2, "guard 2 shields seeded")
     local w1, w2 = classWeak()
-    H.assertEq(w1, 0x02, "guard 1 authored piercing-weak")
-    H.assertEq(w2, 0x02, "guard 2 authored piercing-weak")
+    H.assertEq(w1, SPEAR, "guard 1 authored spear-weak")
+    H.assertEq(w2, SPEAR, "guard 2 authored spear-weak")
+    -- the hands the phases arm, by the ROM's own table: the design this
+    -- suite stands on (a sword and the knife are not the guards' key; the
+    -- pike is)
+    H.assertEq(H.weaponClass(0x0A), SWORD, "MithrilBlade $0a is a sword")
+    H.assertEq(H.weaponClass(0x00), DAGGER, "Dirk $00 is a dagger")
+    H.assertEq(H.weaponClass(0x1D), SPEAR, "Mithril Pike $1d is a spear")
+    H.assertEq(H.skillClass(0x8A), SPEAR, "TekMissile $8a is a spear skill")
     local r1, r2 = classRev()
     H.assertEq(r1, 0, "guard 1 opens with no class revealed")
     H.assertEq(r2, 0, "guard 2 opens with no class revealed")
@@ -282,50 +299,70 @@ H.run({ maxFrames = 90000 }, {
       terra, holder))
   end),
 
-  -- 1. slash phase: wrong class, no chip
-  armRightHands(0x0A),                     -- MithrilBlade: slashing
+  -- 1. sword phase: wrong class, no chip
+  armRightHands(0x0A),                     -- MithrilBlade: a sword
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  H.driveUntil(function() return (classWrites[0x01] or 0) >= 2 end,
-    2000, driveStep, "two slashing swings to resolve"),
+  H.driveUntil(function() return (classWrites[SWORD] or 0) >= 2 end,
+    2000, driveStep, "two sword swings to resolve"),
   watchClasses(false),
-  report("slash-phase"),
+  report("sword-phase"),
   H.call(function()
-    H.assertEq((classWrites[0x01] or 0) >= 2, true,
-      "two slashing swings actually resolved during the phase")
+    H.assertEq((classWrites[SWORD] or 0) >= 2, true,
+      "two sword swings actually resolved during the phase")
     local s1, s2 = shields()
-    H.assertEq(s1, s1c, "slash swings never chip a pierce-weak guard")
-    H.assertEq(s2, s2c, "slash swings never chip a pierce-weak guard (2)")
+    H.assertEq(s1, s1c, "sword swings never chip a spear-weak guard")
+    H.assertEq(s2, s2c, "sword swings never chip a spear-weak guard (2)")
     local r1, r2 = classRev()
     H.assertEq(r1 | r2, 0, "and reveal nothing")
   end),
 
-  -- 2. pierce phase: chip + reveal + codex
-  armRightHands(0x00),                     -- Dirk: piercing
+  -- 1b. dagger phase (#566): the knife, pierce's other child, is no key to
+  -- a spear-weak guard
+  armRightHands(0x00),                     -- Dirk: a dagger
+  H.call(function() s1c, s2c = shields() end),
+  watchClasses(true),
+  H.driveUntil(function() return (classWrites[DAGGER] or 0) >= 2 end,
+    2000, driveStep, "two dagger swings to resolve"),
+  watchClasses(false),
+  report("dagger-phase"),
+  H.call(function()
+    H.assertEq((classWrites[DAGGER] or 0) >= 2, true,
+      "two dagger swings actually resolved during the phase")
+    local s1, s2 = shields()
+    H.assertEq(s1, s1c, "dagger swings never chip a spear-weak guard")
+    H.assertEq(s2, s2c, "dagger swings never chip a spear-weak guard (2)")
+    local r1, r2 = classRev()
+    H.assertEq(r1 | r2, 0, "and reveal nothing")
+  end),
+
+  -- 2. spear phase: chip + reveal + codex
+  armRightHands(0x1D),                     -- Mithril Pike: a spear
   H.driveUntil(function()
     local r1, r2 = classRev()
-    return ((r1 | r2) & 0x02) == 0x02
-  end, 15000, driveStep, "a piercing chip to reveal the class"),
-  report("pierce-chip"),
+    return ((r1 | r2) & SPEAR) == SPEAR
+  end, 15000, driveStep, "a spear chip to reveal the class"),
+  report("spear-chip"),
   H.call(function()
     local s1, s2 = shields()
     H.assertEq(s1 < 2 or s2 < 2, true, "the revealing hit also chipped")
     local species = H.readWord(0x57C4)
     H.log(string.format("guard species=%d", species))
-    H.assertEq(sram(codexBase() + 0x190 + species) & 0x02, 0x02,
-      "class codex learned piercing")
+    H.assertEq(sram(codexBase() + 0x190 + species) & SPEAR, SPEAR,
+      "class codex learned the spear")
   end),
 
-  -- hud: the revealed class replaces its '?' with the pierce icon ($da,
-  -- white, the same glyph the menus use for piercing weapons).  This uses
+  -- hud: the revealed class replaces its '?' with the spear icon ($da,
+  -- white, the same glyph the menus use for spears).  This uses
   -- waitUntil because the revealing swing's animation can contest bg3 for a
   -- few dozen frames.
   H.waitUntil(function()
     for _, w in ipairs(hudSlotWords()) do
-      if w == 0x21DA then return true end
+      if w == ICON_SPEAR then return true end
     end
     return false
-  end, 600, "revealed pierce icon in the hud row", 10),
+  end, 600, "revealed spear icon in the hud row", 10),
+  -- (the tag keeps its v0.50 name: tools/manual/shots.py's "shields" shot reads it)
   H.call(function() H.screenshot("class_hud_pierce") end),
 
   -- 3. keep swinging until a break
@@ -358,48 +395,48 @@ H.run({ maxFrames = 90000 }, {
     local s1, s2 = shields()
     local r1, r2 = classRev()
     H.assertEq(s1 == 2 or s2 == 2, true, "shields restored to max")
-    H.assertEq((r1 | r2) & 0x02, 0x02, "revealed class survives recovery")
+    H.assertEq((r1 | r2) & SPEAR, SPEAR, "revealed class survives recovery")
   end),
 
   -- 5. null-break phase: ¤-weak guards, Fixed Dice teach nothing
   H.call(function()
-    H.writeByte(0x3EA8, 0x08)              -- guards now ¤-weak only
-    H.writeByte(0x3EAA, 0x08)
+    H.writeByte(0x3EA8, ARCANE)            -- guards now ¤-weak (arcane) only
+    H.writeByte(0x3EAA, ARCANE)
   end),
   armRightHands(0x52),                     -- Fixed Dice: ¤ + null-break
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  -- The same guard as the slash phase: require two null-break ¤ Fights
+  -- The same guard as the sword phase: require two null-break ¤ Fights
   -- to resolve before accepting "nothing chips", or fail.
-  H.driveUntil(function() return (classWrites[0x88] or 0) >= 2 end,
+  H.driveUntil(function() return (classWrites[ARCANE | NULLBRK] or 0) >= 2 end,
     2000, driveStep, "two null-break ¤ swings to resolve"),
   watchClasses(false),
   report("nullbreak-phase"),
   H.call(function()                        -- GUESS(dice)
-    H.assertEq((classWrites[0x88] or 0) >= 2, true,
+    H.assertEq((classWrites[ARCANE | NULLBRK] or 0) >= 2, true,
       "two null-break ¤ swings actually resolved during the phase")
     local s1, s2 = shields()
     H.assertEq(s1, s1c, "fixed dice never chip")
     H.assertEq(s2, s2c, "fixed dice never chip (2)")
     local r1, r2 = classRev()
-    H.assertEq((r1 | r2) & 0x08, 0, "and never reveal ¤")
+    H.assertEq((r1 | r2) & ARCANE, 0, "and never reveal ¤")
   end),
 
-  -- 6. ¤ phase: ordinary dice chip the special class
+  -- 6. ¤ phase: ordinary dice chip the arcane class
   armRightHands(0x51),                     -- Dice: ¤, chips
   H.driveUntil(function()
     local r1, r2 = classRev()
-    return ((r1 | r2) & 0x08) == 0x08
+    return ((r1 | r2) & ARCANE) == ARCANE
   end, 15000, driveStep, "a ¤ chip to reveal the class"),  -- GUESS(dice)
-  report("special-chip"),
+  report("arcane-chip"),
   H.call(function()
     local s1, s2 = shields()
     H.assertEq(s1 < s1c or s2 < s2c, true, "the ¤ reveal also chipped")
-    H.screenshot("class_special")
+    H.screenshot("class_arcane")
   end),
 
   -- 7. heal-reversal phase: a hit that resolves as a heal must not chip.
-  -- Slash-weak guards absorb fire, and the right hands are slash blades whose
+  -- Sword-weak guards absorb fire, and the right hands are swords whose
   -- pre-baked hand element ($3b90) is poked to fire, so every landed swing
   -- heals the guard (CalcTargetDmg's absorb path flips $f2 bit 0) and the
   -- class gate must skip it.  The per-frame HP watcher shows heals landed:
@@ -407,8 +444,8 @@ H.run({ maxFrames = 90000 }, {
   H.call(function()
     H.writeByte(0x3E44, 2); H.writeByte(0x3E46, 2)   -- stage shields clean
     H.writeByte(0x3E94, 0); H.writeByte(0x3E96, 0)   -- no timers running
-    H.writeByte(0x3EA8, 0x01)              -- guards slash-weak
-    H.writeByte(0x3EAA, 0x01)
+    H.writeByte(0x3EA8, SWORD)             -- guards sword-weak
+    H.writeByte(0x3EAA, SWORD)
     H.writeByte(0x3BD8, 0x01)              -- and fire-ABSORBING
     H.writeByte(0x3BDA, 0x01)
     for _, a in ipairs({ 0x3B90, 0x3B92, 0x3B94 }) do
@@ -416,18 +453,18 @@ H.run({ maxFrames = 90000 }, {
     end
     repokeHp()
     H.vars.healSeen = false
-    H.log("heal-reversal lab: slash-weak fire-absorbing guards, fire slashes")
+    H.log("heal-reversal lab: sword-weak fire-absorbing guards, fire swords")
   end),
-  armRightHands(0x0A),                     -- MithrilBlade: slashing
+  armRightHands(0x0A),                     -- MithrilBlade: a sword
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  -- Drive until at least one swing has resolved as a heal and two slashing
+  -- Drive until at least one swing has resolved as a heal and two sword
   -- Fights have resolved.  Both are hard preconditions for the "no chip"
   -- negative below, so a too-short window now times out and fails rather than
   -- passing without testing anything.  This replaces a flat 1500-frame
   -- budget.
   H.driveUntil(function()
-    return H.vars.healSeen and (classWrites[0x01] or 0) >= 2
+    return H.vars.healSeen and (classWrites[SWORD] or 0) >= 2
   end, 2500, {
     H.call(function()
       pinParty()
@@ -442,19 +479,19 @@ H.run({ maxFrames = 90000 }, {
       end
     end),
     H.waitFrames(1),
-  }, "a heal to land and two slashing swings to resolve"),
+  }, "a heal to land and two sword swings to resolve"),
   watchClasses(false),
   report("heal-reversal"),
   H.call(function()
-    H.assertEq((classWrites[0x01] or 0) >= 2, true,
-      "two slashing swings actually resolved during the phase")
+    H.assertEq((classWrites[SWORD] or 0) >= 2, true,
+      "two sword swings actually resolved during the phase")
     H.assertEq(H.vars.healSeen, true,
       "at least one swing resolved as a heal (absorb reversal ran)")
     local s1, s2 = shields()
-    H.assertEq(s1, s1c, "healing hits never chip a slash-weak guard")
-    H.assertEq(s2, s2c, "healing hits never chip a slash-weak guard (2)")
+    H.assertEq(s1, s1c, "healing hits never chip a sword-weak guard")
+    H.assertEq(s2, s2c, "healing hits never chip a sword-weak guard (2)")
     local r1, r2 = classRev()
-    H.assertEq((r1 | r2) & 0x01, 0, "and reveal nothing")
+    H.assertEq((r1 | r2) & SWORD, 0, "and reveal nothing")
   end),
 
   -- 7b. edge case: a resolved heal is never scaled by the shielded-resistance
@@ -463,7 +500,7 @@ H.run({ maxFrames = 90000 }, {
   -- hp whether the target still holds shields or not.  This is a same-guard
   -- comparison (guard 1 is the reliably-swung target; berserk rarely picks
   -- guard 2): two windows on guard 1, shielded then shieldless, both
-  -- fire-absorbing from phase 7 so every fire slash heals it.  A high max hp
+  -- fire-absorbing from phase 7 so every fire sword swing heals it.  A high max hp
   -- keeps the heal off the clamp.  While shielded the heal survives only via
   -- the $f2 gate; if that gate were broken the shielded window's heal would
   -- come back at about half the shieldless window's, far under the 0.75x
@@ -559,7 +596,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   H.call(function()
-    H.writeByte(0x3EA8, 0x02); H.writeByte(0x3EAA, 0x02)  -- pierce-weak
+    H.writeByte(0x3EA8, SPEAR); H.writeByte(0x3EAA, SPEAR)  -- spear-weak
     H.writeByte(0x3BD8, 0); H.writeByte(0x3BDA, 0)        -- absorb off
     H.writeByte(0x3E44, 2); H.writeByte(0x3E46, 2)        -- shields staged
     H.writeByte(0x3E94, 0); H.writeByte(0x3E96, 0)
@@ -571,7 +608,7 @@ H.run({ maxFrames = 90000 }, {
     local st2 = 0x3EE5 + terra * 2
     H.writeByte(st2, H.readByte(st2) & 0xEF)              -- un-berserk
     H.vars.tplan, H.vars.tpf = nil, 1
-    H.log("tek lab: terra's menu restored; berserkers keep slashing air")
+    H.log("tek lab: terra's menu restored; berserkers keep swinging swords at air")
   end),
   watchClasses(true),
   H.driveUntil(function()
@@ -614,24 +651,24 @@ H.run({ maxFrames = 90000 }, {
   watchClasses(false),
   report("tek-chip"),
   H.call(function()
-    H.assertEq((classWrites[0x02] or 0) >= 1, true,
-      "a piercing skill load resolved -- with slash blades in every hand, " ..
-      "only TekMissile ($8a) stores $02")
+    H.assertEq((classWrites[SPEAR] or 0) >= 1, true,
+      "a spear skill load resolved -- with swords in every hand, " ..
+      "only TekMissile ($8a) stores $20")
     local s1, s2 = shields()
     H.assertEq(s1 < 2 or s2 < 2, true,
-      "the flags3-$20 skill chipped a pierce-weak guard")
+      "the flags3-$20 skill chipped a spear-weak guard")
     local species = H.readWord(0x57C4)
-    H.assertEq(sram(codexBase() + 0x190 + species) & 0x02, 0x02,
-      "class codex holds piercing after the skill chip")
+    H.assertEq(sram(codexBase() + 0x190 + species) & SPEAR, SPEAR,
+      "class codex holds the spear after the skill chip")
     -- ability list: the drive rendered Terra's magitek list on the way
     -- to TekMissile, and rendered rows persist in the menu map (the
     -- battle_break precedent).  TekMissile is elementless, so its icon
-    -- column must carry the Ot6SkillClassTbl pierce glyph in white,
+    -- column must carry the Ot6SkillClassTbl spear glyph in white,
     -- where Fire Beam carries its red element icon.
     local tek = findName({0x93,0x9e,0xa4,0x8c,0xa2,0xac,0xac,0xa2,0xa5,0x9e})
     H.assertEq(tek ~= nil, true, "TekMissile row rendered in the menu map")
-    H.assertEq(emu.readWord((tek + 10) * 2, emu.memType.snesVideoRam), 0x21DA,
-      "pierce class icon right of TekMissile in the magitek list")
+    H.assertEq(emu.readWord((tek + 10) * 2, emu.memType.snesVideoRam), ICON_SPEAR,
+      "spear class icon right of TekMissile in the magitek list")
     H.screenshot("class_tek")
   end),
 
@@ -650,7 +687,7 @@ H.run({ maxFrames = 90000 }, {
   -- The battle tools window is a two-column grid and only its first row
   -- is on-screen (verified live: a third tool lands in an unrendered
   -- second row).  So the two asserted tools sit in slots 0 and 1, Chain Saw
-  -- (col 0, slashing) and Drill (col 1, piercing), and both wear their
+  -- (col 0, a sword) and Drill (col 1, a spear), and both wear their
   -- class icon after the name, where a magitek skill wears its
   -- element icon.  NoiseBlaster fills slot 2, the hidden row, so
   -- the list has the 3-entry shape that renders cleanly.
@@ -707,17 +744,17 @@ H.run({ maxFrames = 90000 }, {
     -- last column ({tool} leading icon plus name, then the class icon), so
     -- findName lands on the letters and the glyph sits at +11, the
     -- same column the '{tool}Chain Saw' and '{tool}Drill' names leave blank.
-    -- Chain Saw (col 0): slashing -> the slash icon $d9.
+    -- Chain Saw (col 0): a sword -> the sword icon $d9.
     local saw = findName({0x82,0xa1,0x9a,0xa2,0xa7})       -- "Chain"
     H.assertEq(saw ~= nil, true, "Chain Saw row rendered")
-    H.assertEq(emu.readWord((saw + 11) * 2, emu.memType.snesVideoRam), 0x21D9,
-      "slash class icon after Chain Saw in the tools list")
-    -- Drill (col 1): piercing -> the spear icon $da, as TekMissile
+    H.assertEq(emu.readWord((saw + 11) * 2, emu.memType.snesVideoRam), ICON_SWORD,
+      "sword class icon after Chain Saw in the tools list")
+    -- Drill (col 1): a spear -> the spear icon $da, as TekMissile
     -- wears it in the magitek list above.
     local drill = findName({0x83,0xab,0xa2,0xa5,0xa5})     -- "Drill"
     H.assertEq(drill ~= nil, true, "Drill row rendered")
-    H.assertEq(emu.readWord((drill + 11) * 2, emu.memType.snesVideoRam), 0x21DA,
-      "pierce class icon after Drill in the tools list")
+    H.assertEq(emu.readWord((drill + 11) * 2, emu.memType.snesVideoRam), ICON_SPEAR,
+      "spear class icon after Drill in the tools list")
     H.screenshot("class_tools")
   end),
 
