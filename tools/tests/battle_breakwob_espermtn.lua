@@ -7,11 +7,14 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the insect, the shell and the ooze turn the blades (sword, katana) and take STRAGO's rod (arcane); the ooze takes RELM's brush (arcane); the Adamanchyt holds five, the wall TERRA's new Break is measured on.
+--   3. the lessons: the insect, the shell and the ooze turn the blades (a sword, a katana) and take STRAGO's rod; the ooze takes RELM's brush; the Adamanchyt holds five, the wall TERRA's new Break is measured on.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
@@ -30,12 +33,12 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 11); the pools
--- each meets (nil: all).  A hand is the class of the weapon named for the member (the ROM's Ot6WeapClassTbl:
--- a sword SWORD, a knife DAGGER, a pike SPEAR, a katana or ninja blade KATANA, claws and bare fists FIST, a rod,
--- brush or cards ARCANE), with the class of a tool the design counts in the hand (the AutoCrossbow SPEAR)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "TERRA, LOCKE, STRAGO", { { "TERRA", SWORD, ICE }, { "LOCKE", SWORD, BOLT }, { "STRAGO", ARCANE, FIRE } }, nil },
-  { "TERRA, LOCKE, STRAGO, RELM", { { "TERRA", SWORD, ICE }, { "LOCKE", SWORD, BOLT }, { "STRAGO", ARCANE, FIRE }, { "RELM", ARCANE, 0 } }, nil },
+  -- esper-mtn-save-v1: TERRA the Blizzard $0E, LOCKE the ThunderBlade $0F, STRAGO the Fire Rod $35; thamasa-done-v1:
+  -- RELM the Chocobo Brush $3D
+  { "TERRA, LOCKE, STRAGO", { { "TERRA", W(0x0E), ICE }, { "LOCKE", W(0x0F), BOLT }, { "STRAGO", W(0x35), FIRE } }, nil },
+  { "TERRA, LOCKE, STRAGO, RELM", { { "TERRA", W(0x0E), ICE }, { "LOCKE", W(0x0F), BOLT }, { "STRAGO", W(0x35), FIRE }, { "RELM", W(0x3D), 0 } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -146,10 +149,10 @@ H.run({ maxFrames = 600 }, {
 
     -- 3. the lessons
     for _, sp in ipairs({ 0x0D0, 0x0D6, 0x0B8 }) do
-      if (classOf(sp) & (SWORD | KATANA)) ~= 0 then problem("$%03X %s: the blades (sword, katana) key it", sp, WANT[sp][1]) end
-      if (classOf(sp) & ARCANE) == 0 then problem("$%03X %s: STRAGO's rod (arcane) holds no key", sp, WANT[sp][1]) end
+      if (classOf(sp) & (SWORD | KATANA)) ~= 0 then problem("$%03X %s: the blades (a sword, a katana) key it", sp, WANT[sp][1]) end
+      if (classOf(sp) & W(0x35)) == 0 then problem("$%03X %s: STRAGO's rod holds no key", sp, WANT[sp][1]) end
     end
-    if (classOf(0x0B8) & ARCANE) == 0 then problem("$0B8 Slurm: RELM's brush (arcane) holds no key") end
+    if (classOf(0x0B8) & W(0x3D)) == 0 then problem("$0B8 Slurm: RELM's brush holds no key") end
     if shield[0x0D6] == nil or shield[0x0D6][1] < 5 then problem("$0D6 Adamanchyt: under five shields, so TERRA's 3-BP Break (four) cannot be told on it") end
     H.log("the lessons: the shells and the ooze turn the blades and take STRAGO's rod; the ooze takes RELM's brush; the shell holds five")
     H.assertEq(#problems, 0, "WoB espermtn break row mismatches")

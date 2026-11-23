@@ -18,9 +18,9 @@
 --      before SETZER joins); in the tomb, the four.  A row of 0 shields
 --      (the Presenter) draws no gauge by design; its formation must hold
 --      a gauged body the party keys;
---   3. the bodies the design hangs a lesson on: special (now arcane, ¤)
---      is a common key (guidelines, owner 2026-10-01), so SETZER's Cards
---      (arcane) key each of the six special bodies (the Bogy, the Deep Eye, the Orog, the
+--   3. the bodies the design hangs a lesson on: special is a common key
+--      (guidelines, owner 2026-10-01), so SETZER's Cards key each of the
+--      six special bodies (the Bogy, the Deep Eye, the Orog, the
 --      Osteosaur, the PowerDemon, Dullahan); every member of the four
 --      holds a key on the Bogy, and on Dullahan, who absorbs ice, with
 --      either of SETZER's weapons; the Narshe Whelk's rows, which the
@@ -31,6 +31,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 
 -- species -> { name, shields, class mask, vanilla weak byte }
@@ -53,23 +56,24 @@ local WANT = {
   [0x135] = { "Whelk Head", 6, DAGGER,           FIRE },
 }
 
--- the hands (route-wor-falcon.md 8.1): CELES's swords; SABIN's claws, Pummel
--- and Suplex, all fist; EDGAR's Break Blade, sword, or his pike, lance and
--- AutoCrossbow, spear; SETZER's Cards, arcane, or his Darts, dagger.  SABIN's
--- wind is Air Blade (L30), held at wor-edgar-v1; his holy is AuraBolt.
-local CELES  = { "CELES", SWORD, FIRE | ICE | BOLT }
-local SABIN  = { "SABIN", FIST, FIRE | HOLY | WIND }
-local EDGAR  = { "EDGAR", SWORD | SPEAR, BOLT | POISON }
-local CARDS  = { "SETZER (Cards)", ARCANE, 0 }
-local DARTS  = { "SETZER (Darts)", DAGGER, 0 }
+-- the hands (route-wor-falcon.md 8.1): CELES's Enhancer $13 and ThunderBlade
+-- $0F; SABIN's Fire Knuckles $57, Pummel $5D and Suplex $5F; EDGAR's Break
+-- Blade $11, or his Mithril Pike $1D, Gold Lance $22 or Man Eater $06, and his
+-- AutoCrossbow $AA; SETZER's Cards $4D, or his Darts $4E.  SABIN's wind is
+-- Air Blade (L30), held at wor-edgar-v1; his holy is AuraBolt.
+local CELES  = { "CELES", W(0x13) | W(0x0F), FIRE | ICE | BOLT }
+local SABIN  = { "SABIN", W(0x57) | SK(0x5D) | SK(0x5F), FIRE | HOLY | WIND }
+local EDGAR  = { "EDGAR", W(0x11) | W(0x1D) | W(0x22) | W(0x06) | W(0xAA), BOLT | POISON }
+local CARDS  = { "SETZER (Cards)", W(0x4D), 0 }
+local DARTS  = { "SETZER (Darts)", W(0x4E), 0 }
 local function union(what, ...)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs({ ... }) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
   return h
 end
-local TRIO = union("CELES + SABIN + EDGAR (sword, spear, fist; fire, ice, bolt, poison, holy, wind)",
+local TRIO = union("CELES + SABIN + EDGAR (their weapons and skills; fire, ice, bolt, poison, holy, wind)",
   CELES, SABIN, EDGAR)
-local FOUR = union("the four (+ SETZER: arcane or dagger)", CELES, SABIN, EDGAR, CARDS, DARTS)
+local FOUR = union("the four (+ SETZER: his Cards or his Darts)", CELES, SABIN, EDGAR, CARDS, DARTS)
 
 -- where the arc draws from (section 3), and who meets it there.  Group 44
 -- is the castle's desert on both sides (rows from the Edgar arc); groups

@@ -23,6 +23,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, elements added }
@@ -41,19 +44,19 @@ local WANT = {
 
 -- the hands (route-wor-locke.md 3; wor-phoenix-v1's kit,
 -- build/attempts/wt/v032-locke-arc/data/wor-phoenix-v1_dump.txt): party 1
--- TERRA (Man Eater: dagger; Fire, Pearl, Merton), STRAGO (Pearl Rod: arcane;
--- Aqua Rake, Aero), SABIN (Dragon Claw and Blitzes: fist; fire, holy, wind),
--- CYAN (Tempest: katana); party 2 CELES (Falchion: sword; Ice, Tritoch's ice,
--- bolt and poison), RELM (Gravity Rod: arcane), MOG (Partisan: spear), UMARO
--- (Bone Club: fist; ice)
-local TERRA  = { "TERRA", DAGGER, FIRE | HOLY }
-local STRAGO = { "STRAGO", ARCANE, HOLY | WATER | WIND }
-local SABIN  = { "SABIN", FIST, FIRE | HOLY | WIND }
-local CYAN   = { "CYAN", KATANA, WIND }
-local CELES  = { "CELES", SWORD, ICE | BOLT | POISON }
-local RELM   = { "RELM", ARCANE, EARTH }
-local MOG    = { "MOG", SPEAR, 0 }
-local UMARO  = { "UMARO", FIST, ICE }
+-- TERRA (Man Eater $06; Fire, Pearl, Merton), STRAGO (Pearl Rod $39; Aqua
+-- Rake, Aero), SABIN (Dragon Claw $58; Blitzes, Pummel $5D: fire, holy, wind),
+-- CYAN (Tempest $2E); party 2 CELES (Falchion $15; Ice, Tritoch's ice, bolt
+-- and poison), RELM (Gravity Rod $3A), MOG (Partisan $20), UMARO (Bone Club
+-- $4A; ice)
+local TERRA  = { "TERRA", W(0x06), FIRE | HOLY }
+local STRAGO = { "STRAGO", W(0x39), HOLY | WATER | WIND }
+local SABIN  = { "SABIN", W(0x58) | SK(0x5D), FIRE | HOLY | WIND }
+local CYAN   = { "CYAN", W(0x2E), WIND }
+local CELES  = { "CELES", W(0x15), ICE | BOLT | POISON }
+local RELM   = { "RELM", W(0x3A), EARTH }
+local MOG    = { "MOG", W(0x20), 0 }
+local UMARO  = { "UMARO", W(0x4A), ICE }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do

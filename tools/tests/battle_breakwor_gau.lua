@@ -14,8 +14,8 @@
 --      master (event group 82) -- has an authored row, and every gauged one
 --      a key for the four who walk it (TERRA, CELES, RELM and GAU, as
 --      wor-veldt-cave-v1 seats them);
---   3. the lesson: GAU alone holds a key to every body here (his fists and
---      his beasts' blows: fist; Were-Rat's poison), and the cave drinks
+--   3. the lesson: GAU alone holds a key to every body here (his own body's class, in
+--      his bare hand and in a rage's Fight; Were-Rat's poison), and the cave drinks
 --      CELES's ice (Toe Cutter, the SrBehemoth);
 --   4. the Veldt's fourteen: each carries its designed row, keeps the floor's
 --      shields and class (the World of Balance parties that meet them at
@@ -25,6 +25,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
@@ -36,13 +39,13 @@ local WANT = {
 }
 
 -- the hands (wor-veldt-cave-v1's kit: build/attempts/wt/v033-wor-gau/data/):
--- TERRA (a dagger; Fire, Pearl), CELES (two blades: sword; Ice, bolt and poison),
--- RELM (a rod: arcane; earth), GAU (no weapon: his fists; his beasts: Were-Rat's
+-- TERRA (a dagger, the Man Eater $06; Fire, Pearl), CELES (two blades, the Falchion $15; Ice, bolt and poison),
+-- RELM (a rod, the Pearl Rod $39; earth), GAU (no weapon: H.handClass, his own body; his beasts: Were-Rat's
 -- Poison, Rhinotaur's Mega Volt, the physical specials)
-local TERRA = { "TERRA", DAGGER, FIRE | HOLY }
-local CELES = { "CELES", SWORD, ICE | BOLT | POISON }
-local RELM = { "RELM", ARCANE, EARTH }
-local GAU = { "GAU", FIST, POISON | BOLT }
+local TERRA = { "TERRA", W(0x06), FIRE | HOLY }
+local CELES = { "CELES", W(0x15), ICE | BOLT | POISON }
+local RELM = { "RELM", W(0x39), EARTH }
+local GAU = { "GAU", H.handClass(0x0B, 0xFF, true), POISON | BOLT }
 -- the Veldt's fourteen: species -> { name, shields, classes, the floor's class
 -- (OT6_FLOOR_CLASS), vanilla weak, vanilla absorb, element added }
 local VELDT = {

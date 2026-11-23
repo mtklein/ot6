@@ -7,11 +7,14 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: AuraBolt (holy) and CYAN's katana key every ghost; the two spirits take arcane (the special's ¤), the walking body SABIN's fists.
+--   3. the lessons: AuraBolt (holy) and CYAN's katana key every ghost; the two spirits take a special holder's hand (the cards or the brush), the walking body SABIN's fists.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
@@ -29,11 +32,10 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 6); the pools
--- each meets (nil: all).  A hand is the class of the weapon named for the member (the ROM's Ot6WeapClassTbl:
--- a sword SWORD, a knife DAGGER, a pike SPEAR, a katana or ninja blade KATANA, claws and bare fists FIST, a rod,
--- brush or cards ARCANE), with the class of a tool the design counts in the hand (the AutoCrossbow SPEAR)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "SABIN, CYAN, SHADOW", { { "SABIN", FIST, FIRE | HOLY }, { "CYAN", KATANA, 0 }, { "SHADOW", KATANA, 0 } }, nil },
+  -- camp-escaped-v1: SABIN the MetalKnuckle $53, CYAN the Ashura $2B, SHADOW the Imperial $25
+  { "SABIN, CYAN, SHADOW", { { "SABIN", W(0x53), FIRE | HOLY }, { "CYAN", W(0x2B), 0 }, { "SHADOW", W(0x25), 0 } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -145,13 +147,13 @@ H.run({ maxFrames = 600 }, {
     -- 3. the lessons
     for _, sp in ipairs({ 0x008, 0x00E, 0x0BA }) do
       if (weakOf(sp) & HOLY) == 0 then problem("$%03X %s: SABIN's AuraBolt (holy) holds no key", sp, WANT[sp][1]) end
-      if (classOf(sp) & KATANA) == 0 then problem("$%03X %s: CYAN's katana holds no key", sp, WANT[sp][1]) end
+      if (classOf(sp) & W(0x2B)) == 0 then problem("$%03X %s: CYAN's katana holds no key", sp, WANT[sp][1]) end
     end
     for _, sp in ipairs({ 0x008, 0x00E }) do
-      if (classOf(sp) & ARCANE) == 0 then problem("$%03X %s: a spirit should take arcane (the special's ¤)", sp, WANT[sp][1]) end
+      if (classOf(sp) & (W(0x4D) | W(0x3D))) == 0 then problem("$%03X %s: a spirit should take a special holder's hand (the cards or the brush)", sp, WANT[sp][1]) end
     end
-    if (classOf(0x0BA) & FIST) == 0 then problem("$0BA StillGoing: SABIN's fists hold no key on the body") end
-    H.log("the lessons: holy and the katana key every ghost; the spirits take arcane, the walking body the fists")
+    if (classOf(0x0BA) & W(0x53)) == 0 then problem("$0BA StillGoing: SABIN's fists hold no key on the body") end
+    H.log("the lessons: holy and the katana key every ghost; the spirits take the cards or the brush, the walking body the fists")
     H.assertEq(#problems, 0, "WoB train break row mismatches")
     H.log("WoB train break rows verified against the built ROM")
   end),

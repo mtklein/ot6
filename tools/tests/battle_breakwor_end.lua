@@ -8,7 +8,7 @@
 --      no Ot6ElemAddTbl row;
 --   2. event battle 101 deals formation 471, and FinalBattleIDTbl chains 471 -> 512 -> 513 -> 514; every species of
 --      the four has an authored row;
---   3. the lessons: each tier between its bodies takes every hand (sword, dagger, spear, katana, fist, arcane), so any four the
+--   3. the lessons: each tier between its bodies takes every hand (sword, dagger, spear, katana, blunt, ranged), so any four the
 --      order menu puts in front hold a key in every tier; Kefka takes every hand, and holds more shields than any
 --      other species' row in Ot6ShieldTbl (the most of any boss, #514).
 -- All mismatches are logged before the verdict.
@@ -16,7 +16,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
-local HANDS = SWORD | DAGGER | SPEAR | KATANA | FIST | ARCANE
+local HANDS = SWORD | DAGGER | SPEAR | KATANA | BLUNT | RANGED
 local ALL = 0xFF
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }

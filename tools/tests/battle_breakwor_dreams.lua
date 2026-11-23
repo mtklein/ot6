@@ -21,7 +21,7 @@
 --   3. the lessons: TERRA alone keys every body of the dreamscape (she walks
 --      it alone until the stooges run); the bolt beam keys every body of the
 --      cave (the three ride Magitek armor there); the three stooges take
---      three different class pairs; the Soul Savers take the brush (arcane ¤) and
+--      three different class pairs; the Soul Savers take the brush and
 --      no other class; CYAN alone keys every body of the Ancient Castle (his
 --      katana, back with every SwdTech); the Blue Dragon keeps its vanilla
 --      bolt weakness and water absorb.
@@ -29,6 +29,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
@@ -61,15 +64,16 @@ local WANT = {
   [0x124] = { "KatanaSoul", 6, SPEAR | KATANA, POISON, 0 },
 }
 
--- the hands, as the arc seats them (route-wor-dreams.md section 2): in the dream TERRA (a blade: sword; Fire,
--- Ice, Bolt), CELES (a blade: sword; Ice) and RELM (a rod: arcane; Pearl Rod holy); in the cave the three in
--- Magitek armor, whose rows are the beams (fire, bolt, ice), Bio Blast (poison) and TERRA's Tek Missile (spear),
--- with no Fight; at the Ancient Castle CYAN (a katana; Quadra Slice wind) beside the three
-local TERRA = { "TERRA", SWORD, FIRE | ICE | BOLT }
-local CELES = { "CELES", SWORD, ICE }
-local RELM = { "RELM", ARCANE, HOLY }
-local CYAN = { "CYAN", KATANA, WIND }
-local MAGITEK = { "the Magitek rows", SPEAR, FIRE | ICE | BOLT | POISON }
+-- the hands, as the arc seats them (route-wor-dreams.md section 2): in the dream TERRA (a blade, the Enhancer
+-- $13; Fire, Ice, Bolt), CELES (a blade, the Falchion $15; Ice) and RELM (a rod: the Pearl Rod $39, holy); in the
+-- cave the three in Magitek armor, whose rows are the beams (fire, bolt, ice), Bio Blast (poison) and TERRA's Tek
+-- Missile ($8A), with no Fight; at the Ancient Castle CYAN (a katana, the Strato $31; Quadra Slice wind) beside
+-- the three
+local TERRA = { "TERRA", W(0x13), FIRE | ICE | BOLT }
+local CELES = { "CELES", W(0x15), ICE }
+local RELM = { "RELM", W(0x39), HOLY }
+local CYAN = { "CYAN", W(0x31), WIND }
+local MAGITEK = { "the Magitek rows", SK(0x8A), FIRE | ICE | BOLT | POISON }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what, members = list }
   for _, m in ipairs(list) do
@@ -242,8 +246,8 @@ H.run({ maxFrames = 600 }, {
       if pairs3[cl] then problem("$%03X %s takes the class pair $%02X another stooge takes", sp, WANT[sp][1], cl) end
       pairs3[cl] = true
     end
-    if classOf(0x167) ~= ARCANE then
-      problem("$167 SoulSaver: class $%02X, want the brush alone ($%02X)", classOf(0x167), ARCANE)
+    if classOf(0x167) ~= W(0x3D) then
+      problem("$167 SoulSaver: class $%02X, want the brush alone ($%02X)", classOf(0x167), W(0x3D))
     end
     if (weakOf(0x152) & BOLT) == 0 or (absorb(0x152) & WATER) == 0 then
       problem("$152: the Blue Dragon lost its vanilla bolt weakness or its water absorb")

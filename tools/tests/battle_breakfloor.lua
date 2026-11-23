@@ -43,11 +43,11 @@ local function check(cond, msg)
   print(line)
 end
 
--- anchor: species 0..15 classes (the guard a spear, the soldier and the
--- templar daggers, the ninja a katana, the samurai a sword, the orog a fist,
--- and so on: the classifier's slash, pierce and bludgeon, each split in two
--- by six_class_split.json), a distinctive 16-byte run (unique in
--- [300000,310000) on the six-class ROM, #566).
+-- anchor: species 0..15 classes (the classifier's slash, pierce and bludgeon
+-- for the guard, the soldier, the templar and so on, each become one of the
+-- six classes by six_class_split.json), a distinctive 16-byte run (unique in
+-- [300000,310000) on the six-class ROM, #566).  The run and the sample rows
+-- below are re-derived from the shipped table when the split moves.
 local base = find(
   { RANGED, RANGED, RANGED, SWORD, KATANA, BLUNT, SWORD, SPEAR,
     KATANA, SWORD, KATANA, BLUNT, SWORD, KATANA, KATANA, SWORD },
@@ -64,10 +64,10 @@ emu.log(string.format("breakfloor: OT6_FLOOR_CLASS @%06X", base))
 -- floor[species] the classifier chose: one per class bit, plus a beast
 -- default.  These are the bytes the @formula seed reads as the fallback mask.
 local want = {
-  [0]  = { RANGED, "guard (armored -> pierce: the spear)" },
-  [36] = { SPEAR, "white drgn (pierce: the spear)" },
-  [71] = { BLUNT,  "flan (soft body -> bludgeon: the fist)" },
-  [19] = { KATANA, "were-rat (beast default -> slash: the sword)" },
+  [0]  = { RANGED, "guard (armored -> the classifier's pierce)" },
+  [36] = { SPEAR, "white drgn (the classifier's pierce)" },
+  [71] = { BLUNT,  "flan (soft body -> the classifier's bludgeon)" },
+  [19] = { KATANA, "were-rat (beast default -> the classifier's slash)" },
 }
 for species, w in pairs(want) do
   local got = rb(base + species)
@@ -78,7 +78,7 @@ end
 -- every floor byte must name at least one breakable class; that is what the
 -- floor is for, so that no un-authored species is left with a zero class
 -- mask, which would make it unbreakable.  Sweep all 384 species.
-local ANY = SWORD | DAGGER | FIST | ARCANE | KATANA | SPEAR
+local ANY = SWORD | DAGGER | BLUNT | RANGED | KATANA | SPEAR
 local zeros = 0
 for species = 0, 383 do
   local got = rb(base + species)

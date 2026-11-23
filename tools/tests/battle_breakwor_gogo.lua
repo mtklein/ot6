@@ -22,6 +22,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
@@ -49,14 +52,14 @@ local WANT = {
   [0x11D] = { "Doom Gaze", 8, DAGGER | RANGED, FIRE | HOLY, ICE | POISON },
 }
 
--- the hands, as the arc seats them (route-wor-gogo.md section 2): TERRA (a dagger; Fire, Pearl), CELES (a
--- blade: sword; Ice), RELM (a rod, and the Chocobo Brush in the bag: both arcane), STRAGO (a rod: arcane; Pearl Rod holy), GOGO (no
+-- the hands, as the arc seats them (route-wor-gogo.md section 2): TERRA (a dagger, the Man Eater $06; Fire, Pearl), CELES (a
+-- blade, the Falchion $15; Ice), RELM (a rod, the Pearl Rod $39; the Chocobo Brush $3D in the bag), STRAGO (a rod; Pearl Rod holy), GOGO (no
 -- weapon and no Fight row: no key of his own; his Mimic copies the others' keys, which the union already
 -- holds)
-local TERRA = { "TERRA", DAGGER, FIRE | HOLY }
-local CELES = { "CELES", SWORD, ICE }
-local RELM = { "RELM", ARCANE, 0 }
-local STRAGO = { "STRAGO", ARCANE, HOLY }
+local TERRA = { "TERRA", W(0x06), FIRE | HOLY }
+local CELES = { "CELES", W(0x15), ICE }
+local RELM = { "RELM", W(0x39) | W(0x3D), 0 }
+local STRAGO = { "STRAGO", W(0x39), HOLY }
 local GOGO = { "GOGO", 0, 0 }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what, members = list }

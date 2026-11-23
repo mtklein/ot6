@@ -7,11 +7,14 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the demon is the pool's three-shield elite; it takes the blades (sword) and arcane (the special's ¤), and still drinks ice.
+--   3. the lessons: the demon is the pool's three-shield elite; it takes the blades and a special holder's hand (SETZER's cards or RELM's brush), and still drinks ice.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
@@ -25,11 +28,11 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 12); the pools
--- each meets (nil: all).  A hand is the class of the weapon named for the member (the ROM's Ot6WeapClassTbl:
--- a sword SWORD, a knife DAGGER, a pike SPEAR, a katana or ninja blade KATANA, claws and bare fists FIST, a rod,
--- brush or cards ARCANE), with the class of a tool the design counts in the hand (the AutoCrossbow SPEAR)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "TERRA, LOCKE, EDGAR, CELES", { { "TERRA", SWORD, 0 }, { "LOCKE", SWORD, ICE }, { "EDGAR", SWORD, BOLT }, { "CELES", SWORD, ICE } }, nil },
+  -- fc-landing-v1: TERRA the Break Blade $11, LOCKE the Blizzards $0E, EDGAR the ThunderBlade $0F; CELES a blade
+  -- (the RegalCutlass $0B)
+  { "TERRA, LOCKE, EDGAR, CELES", { { "TERRA", W(0x11), 0 }, { "LOCKE", W(0x0E), ICE }, { "EDGAR", W(0x0F), BOLT }, { "CELES", W(0x0B), ICE } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -139,10 +142,11 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(0x169) & ARCANE) == 0 then problem("$169 Naughty: the demon should take arcane (the special's ¤)") end
+    -- special, the four classes' fourth, was the hand of the cards (the Cards $4D) and the brushes (the Chocobo Brush $3D)
+    if (classOf(0x169) & (W(0x4D) | W(0x3D))) == 0 then problem("$169 Naughty: the demon should take a special holder's hand (the cards or the brush)") end
     if (absorb(0x169) & ICE) == 0 then problem("$169 Naughty no longer absorbs ice") end
     if shield[0x169] == nil or shield[0x169][1] ~= 3 then problem("$169 Naughty: not the pool's three-shield elite") end
-    H.log("the lessons: the demon is the pool's elite; it takes arcane, and drinks ice")
+    H.log("the lessons: the demon is the pool's elite; it takes the cards or the brush, and drinks ice")
     H.assertEq(#problems, 0, "WoB fc break row mismatches")
     H.log("WoB fc break rows verified against the built ROM")
   end),

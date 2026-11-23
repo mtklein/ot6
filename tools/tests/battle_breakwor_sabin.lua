@@ -11,16 +11,21 @@
 --   2. every species the stretch can draw has an authored row, and every
 --      formation it can draw holds a key for Celes alone with a sword and
 --      her own Ice (the weakest hand section 8 designs for): a species
---      whose break class (authored, else the floor) includes sword, or
+--      whose break class (authored, else the floor) includes her sword's class, or
 --      whose weakness (vanilla or added) includes ice.
---   3. arcane, the special's ¤, is a common key (guidelines, #347): the
---      designed rows that take it are counted and the count is logged.
+--   3. special (¤) was a common key (guidelines, #347); under the six
+--      classes its holders' hands are the cards (ranged) and the brushes
+--      (blunt): the designed rows that take the cards' class are counted
+--      and the count is logged.
 --
 -- All mismatches are logged before the verdict, so a red run names every
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, HOLY, WATER = 0x01, 0x02, 0x04, 0x20, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte }
@@ -49,7 +54,7 @@ local FIELD_MAPS   = { 311 }
 local EVENT_GROUPS = { 150 }
 
 -- the weakest hand section 8 designs for: Celes alone, a sword, her Ice
-local HAND_CLASSES, HAND_ELEMS = SWORD, ICE
+local HAND_CLASSES, HAND_ELEMS = W(0x11), ICE     -- wor-island-v1: the Break Blade $11
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),
@@ -179,9 +184,9 @@ H.run({ maxFrames = 600 }, {
     local nspecial, nids = 0, 0
     for sp in pairs(WANT) do
       nids = nids + 1
-      if shield[sp] and (shield[sp][2] & ARCANE) ~= 0 then nspecial = nspecial + 1 end
+      if shield[sp] and (shield[sp][2] & W(0x4D)) ~= 0 then nspecial = nspecial + 1 end
     end
-    H.log(string.format("arcane: %d of %d designed species take ¤ in this ROM", nspecial, nids))
+    H.log(string.format("the cards: %d of %d designed species take SETZER's cards' class in this ROM", nspecial, nids))
 
     H.assertEq(#problems, 0, "WoR island-to-Tzen break row mismatches")
     H.log("WoR island-to-Tzen break rows verified against the built ROM")

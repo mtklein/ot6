@@ -8,17 +8,23 @@
 --      no Ot6ElemAddTbl row;
 --   2. every species of every formation the tower's twenty pool groups and eight event battles deal has an authored
 --      row, and a key for each party whose lane meets it (LANES);
---   3. the lessons: the factory's machines turn the blades (no sword, no katana) and take a point and a blow (a
---      dagger or a spear, and a fist or a rod) and bolt; the three statues each take the brush and the cards
---      (arcane), and between them a blade (sword or katana), a point (dagger or spear) and the fist, the three
---      other hands of the four classes; the Guardian the tower fights ($112) has a gauge, and the World of
---      Balance's ($111) still has none.
+--   3. the lessons: the factory's machines turn the blades (no sword, no katana) and take a point and a blow
+--      (what the four classes' pierce and bludgeon became: a dagger, a spear or a ranged hit, and a blunt or a
+--      ranged one; two different classes) and bolt; the three statues each take the cards or the brush (what
+--      special became), and between them a blade, a point and a blow, four classes or more; the Guardian the
+--      tower fights ($112) has a gauge, and the World of Balance's ($111) still has none.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
-local EDGE, POINT, BLOW = SWORD | KATANA, DAGGER | SPEAR, FIST | ARCANE
+-- what each of the four classes became (tools/proto_six/classes.py CHILDREN): slash a sword or a katana, pierce a
+-- dagger, a spear or a ranged hit, bludgeon a blunt or a ranged one
+local EDGE, POINT, BLOW = SWORD | KATANA, DAGGER | SPEAR | RANGED, BLUNT | RANGED
+local function nbits(m) local n = 0; while m ~= 0 do n = n + (m & 1); m = m >> 1 end; return n end
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
@@ -63,24 +69,24 @@ local EVENTS = { 98, 99, 100, 112, 114, 135, 136, 140 }
 -- the three parties the route seats (route-wor-kefka-tower.md section 4) and the lanes they walk (section 2): the
 -- pool groups and event battles each meets, the class keys its weapons hold and the elements its spells, skeans
 -- and lores reach at wor-desert-v1.  A species keys a party when either meets it.
---   party 1: TERRA (a blade: sword; Fire, Ice, Bolt), RELM (a rod: arcane), EDGAR (a knife: dagger), SETZER
---            (cards: arcane): the north-west,
+--   party 1: TERRA (a blade, the Falchion $15; Fire, Ice, Bolt), RELM (a rod, the Magus Rod $3C), EDGAR (a knife,
+--            the Man Eater $06), SETZER (cards, the Trump $50): the north-west,
 --            303, 304, 292, the machines' hall 352, 295; the chamber's east column, the Goddess (354)
---   party 2: CELES (a blade: sword; Ice), STRAGO (a rod: arcane; Aqua Rake), LOCKE (the Wing Edge, a returning
---            arc: arcane), MOG (a spear): 338, 331
+--   party 2: CELES (a blade, the Falchion; Ice), STRAGO (a rod, the Pearl Rod $39; Aqua Rake), LOCKE (the Wing
+--            Edge $4C), MOG (a spear, the Partisan $20): 338, 331
 --            (Atma), 329, 409, 292, 294, 335 (the Gold Dragon), 354; the chamber's middle, Guardian (291), 287,
 --            the Poltergeist (334)
---   party 3: CYAN (katanas), SHADOW (the Striker: katana; the stars and skeans he throws: dagger, the skeans fire,
---            water, bolt), SABIN (claws: fist; fire, holy), GOGO (a knife: dagger): 339, the factory 410 (Inferno), 296, 293, 354 (the Skull Dragon); the chamber's west
+--   party 3: CYAN (katanas, the Strato $31), SHADOW (the Striker $29; the skeans he throws, $51-$53: fire,
+--            water, bolt), SABIN (claws, the Dragon Claw $58; fire, holy), GOGO (a knife, the Man Eater): 339, the factory 410 (Inferno), 296, 293, 354 (the Skull Dragon); the chamber's west
 --            column, Doom (355)
 -- The chamber's gate switches shut each column behind the party that enters it, so the order the weights fall
 -- in sets the lanes (route-wor-kefka-tower.md section 2): party 1 east, party 3 west, party 2 the middle.
 local LANES = TOWER_LANES or {
-  { "party 1", SWORD | ARCANE | DAGGER, FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
+  { "party 1", W(0x15) | W(0x3C) | W(0x06) | W(0x50), FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
     226 }, { 99 } },
-  { "party 2", SWORD | ARCANE | SPEAR, ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
+  { "party 2", W(0x15) | W(0x39) | W(0x4C) | W(0x20), ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
     { 112, 135, 140, 100 } },
-  { "party 3", KATANA | DAGGER | FIST, FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
+  { "party 3", W(0x31) | W(0x29) | SK(0x51) | W(0x58) | W(0x06), FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
     { 114, 136, 98 } },
 }
 
@@ -195,20 +201,20 @@ H.run({ maxFrames = 600 }, {
     -- 3. the lessons
     for _, sp in ipairs(MACHINES) do
       local nm = WANT[sp][1]
-      if (classOf(sp) & EDGE) ~= 0 then problem("$%03X %s: a machine the blades (sword, katana) key", sp, nm) end
-      if (classOf(sp) & POINT) == 0 or (classOf(sp) & BLOW) == 0 then
-        problem("$%03X %s: a machine not keyed by a point (dagger, spear) and a blow (fist, rod)", sp, nm)
+      if (classOf(sp) & EDGE) ~= 0 then problem("$%03X %s: a machine the blades (a sword, a katana) key", sp, nm) end
+      if (classOf(sp) & POINT) == 0 or (classOf(sp) & BLOW) == 0 or nbits(classOf(sp) & (POINT | BLOW)) < 2 then
+        problem("$%03X %s: a machine not keyed by a point and a blow, two classes (class $%02X)", sp, nm, classOf(sp))
       end
       if (weakOf(sp) & BOLT) == 0 then problem("$%03X %s: a machine Bolt does not key", sp, nm) end
     end
     local hands = 0
     for _, sp in ipairs(STATUES) do
-      if (classOf(sp) & ARCANE) == 0 then problem("$%03X %s: a statue the brush and cards (arcane) do not key", sp,
+      if (classOf(sp) & (W(0x50) | W(0x3F))) == 0 then problem("$%03X %s: a statue neither the cards nor the brush keys", sp,
         WANT[sp][1]) end
       hands = hands | classOf(sp)
     end
-    if (hands & EDGE) == 0 or (hands & POINT) == 0 or (hands & FIST) == 0 then
-      problem("the three statues together key class mask $%02X, want a blade, a point and the fist beside arcane", hands)
+    if (hands & EDGE) == 0 or (hands & POINT) == 0 or (hands & BLOW) == 0 or nbits(hands) < 4 then
+      problem("the three statues together key class mask $%02X, want a blade, a point and a blow, four classes or more", hands)
     end
     if shield[0x111] == nil or shield[0x111][1] ~= 0 then problem("$111 Guardian (the WoB's): not shieldless") end
     H.log("the lessons: the machines turn the blades and take the point, the blow and bolt; each statue takes the "

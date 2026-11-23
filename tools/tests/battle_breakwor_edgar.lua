@@ -14,22 +14,26 @@
 --      groups, field maps and event group -- has an authored row, and a
 --      key for the party that meets it there: a break class (authored,
 --      else the floor) the party holds, or a weakness (vanilla or added)
---      one of its elements carries.  CELES + SABIN hold sword and fist,
---      ice, bolt, fire and holy; at the Tentacles EDGAR adds spear (and
---      his own sword) and poison;
+--      one of its elements carries.  CELES + SABIN hold her swords and his knuckles and blitzes,
+--      ice, bolt, fire and holy; at the Tentacles EDGAR adds his pike, his
+--      AutoCrossbow (and his own sword) and poison;
 --   3. at the Tentacles the classes carry the fight: three of the four
 --      absorb one of the party's fire, ice or bolt, so every Tentacle has
 --      a class key for the three members together, and each member holds
---      a class key on at least three of the four (CELES's sword misses
+--      a class key on at least three of the four (CELES's swords miss
 --      `$13D`, the design's one).
---   4. arcane, the special's ¤, is a common key (guidelines, #347): the
---      designed rows that take it are counted and the count is logged.
+--   4. special (¤) was a common key (guidelines, #347); under the six
+--      classes the designed rows that take the cards' class are counted
+--      and the count is logged.
 --
 -- All mismatches are logged before the verdict, so a red run names every
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, HOLY, WATER = 0x01, 0x02, 0x04, 0x08, 0x20, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte }
@@ -57,13 +61,15 @@ local WANT = {
   [0x13E] = { "Tentacle",   5, SPEAR | KATANA, 0 },
 }
 
--- the hands (route-wor-edgar.md 8.1): CELES's swords; SABIN's claws, Pummel,
--- Suplex and bare fists, all fist; EDGAR's AutoCrossbow and Mithril Pike,
--- spear, and his Break Blade, sword
-local DUO = { cls = SWORD | FIST, el = ICE | BOLT | FIRE | HOLY,
-              what = "CELES + SABIN (sword, fist; ice, bolt, fire, holy)" }
-local TRIO = { cls = SWORD | FIST | SPEAR, el = ICE | BOLT | FIRE | HOLY | POISON,
-               what = "CELES + SABIN + EDGAR (+ spear, poison)" }
+-- the hands (route-wor-edgar.md 8.1; wor-sabin-v1): CELES's Blizzard $0E and
+-- ThunderBlade $0F; SABIN's Fire Knuckles $57, Pummel $5D, Suplex $5F and bare
+-- fists $FF; EDGAR's AutoCrossbow $AA, Mithril Pike $1D and Break Blade $11
+local CELES_HAND, SABIN_HAND = W(0x0E) | W(0x0F), W(0x57) | SK(0x5D) | SK(0x5F) | W(0xFF)
+local EDGAR_HAND = W(0xAA) | W(0x1D) | W(0x11)
+local DUO = { cls = CELES_HAND | SABIN_HAND, el = ICE | BOLT | FIRE | HOLY,
+              what = "CELES + SABIN (her swords, his knuckles and blitzes; ice, bolt, fire, holy)" }
+local TRIO = { cls = CELES_HAND | SABIN_HAND | EDGAR_HAND, el = ICE | BOLT | FIRE | HOLY | POISON,
+               what = "CELES + SABIN + EDGAR (+ his pike, AutoCrossbow and blade; poison)" }
 -- where the stretch draws from (section 3), and who meets it there.  The
 -- Black Drgn's desert (group 40) is on the walk to Nikeah; the cave's maps
 -- are walked out again with EDGAR, but the duo's key is the stricter one.
@@ -204,7 +210,7 @@ H.run({ maxFrames = 600 }, {
       end
     end
     H.log(string.format("the Tentacles: %d of 4 absorb one of the party's fire, ice or bolt", absorbing))
-    local members = { { "CELES", SWORD }, { "SABIN", FIST }, { "EDGAR", SWORD | SPEAR } }
+    local members = { { "CELES", CELES_HAND }, { "SABIN", SABIN_HAND }, { "EDGAR", EDGAR_HAND } }
     for _, m in ipairs(members) do
       local n = 0
       for _, sp in ipairs(TENTACLES) do
@@ -217,9 +223,9 @@ H.run({ maxFrames = 600 }, {
     local nspecial, nids = 0, 0
     for sp in pairs(WANT) do
       nids = nids + 1
-      if shield[sp] and (shield[sp][2] & ARCANE) ~= 0 then nspecial = nspecial + 1 end
+      if shield[sp] and (shield[sp][2] & W(0x4D)) ~= 0 then nspecial = nspecial + 1 end
     end
-    H.log(string.format("arcane: %d of %d designed species take ¤ in this ROM", nspecial, nids))
+    H.log(string.format("the cards: %d of %d designed species take SETZER's cards' class in this ROM", nspecial, nids))
 
     H.assertEq(#problems, 0, "WoR Tzen-to-Edgar break row mismatches")
     H.log("WoR Tzen-to-Edgar break rows verified against the built ROM")

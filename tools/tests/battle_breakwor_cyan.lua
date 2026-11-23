@@ -13,7 +13,7 @@
 --      gauged one a key for the hands that meet it;
 --   3. the lessons: CYAN's katana keys the Storm Dragon, and each of
 --      the four who fight it holds a key; it absorbs wind, so CYAN's
---      Tempest heals it; a Luridan herd is keyed by CYAN's Stunner (katana)
+--      Tempest heals it; a Luridan herd is keyed by CYAN's Stunner (a SwdTech)
 --      and by the Tempest (its vanilla wind weakness); the Scrapper absorbs
 --      poison beside the Punishers (the Bio Blaster heals it); the Mantodea
 --      takes a blade (a sword or a katana).
@@ -21,6 +21,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
@@ -40,21 +43,24 @@ local WANT = {
 }
 
 -- the hands (route-wor-cyan.md 6): the four who reach Mt. Zozo first
--- (wor-terra-v1's kit: TERRA's and CELES's swords; SABIN's claws and
--- Blitzes, fist; EDGAR's Break Blade, sword, and his pike and AutoCrossbow,
--- spear), and CYAN as the cabin dresses him (his Tempest, a katana)
-local TERRA = { "TERRA", SWORD, FIRE }
-local CELES = { "CELES", SWORD, FIRE | ICE | BOLT }
-local SABIN = { "SABIN", FIST, FIRE | HOLY | WIND }
-local EDGAR = { "EDGAR", SWORD | SPEAR, BOLT | POISON }
-local CYAN  = { "CYAN", KATANA, WIND }
+-- (wor-terra-v1's kit: TERRA's Enhancer $13 and CELES's Flame Sabres $0D;
+-- SABIN's Fire Knuckles $57 and Pummel $5D; EDGAR's Break Blade $11, or his
+-- Mithril Pike $1D or Man Eater $06, and his AutoCrossbow $AA), and the four
+-- with CYAN as the cabin dresses them (wor-mtzozo-v1: his Tempest $2E; SABIN
+-- now with the Dragon Claw $58 beside a Fire Knuckle)
+local TERRA = { "TERRA", W(0x13), FIRE }
+local CELES = { "CELES", W(0x0D), FIRE | ICE | BOLT }
+local SABIN = { "SABIN", W(0x57) | SK(0x5D), FIRE | HOLY | WIND }
+local SABIN2 = { "SABIN", W(0x58) | W(0x57) | SK(0x5D), FIRE | HOLY | WIND }
+local EDGAR = { "EDGAR", W(0x11) | W(0x1D) | W(0x06) | W(0xAA), BOLT | POISON }
+local CYAN  = { "CYAN", W(0x2E), WIND }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
   return h
 end
 local FIRST = union("the four who first climb (TERRA, CELES, SABIN, EDGAR)", { TERRA, CELES, SABIN, EDGAR })
-local SECOND = union("the four with CYAN (CYAN, TERRA, CELES, SABIN)", { CYAN, TERRA, CELES, SABIN })
+local SECOND = union("the four with CYAN (CYAN, TERRA, CELES, SABIN)", { CYAN, TERRA, CELES, SABIN2 })
 
 -- world groups at the landings (both trips), Mt. Zozo's field groups
 -- (179: 160, 176: 161, 177/178: 162), the dragon's event group
@@ -184,17 +190,17 @@ H.run({ maxFrames = 600 }, {
     local ck = (classOf(STORM) & CYAN[2]) ~= 0
     H.log(string.format("$14B: CYAN's katana %s", ck and "is a key" or "is NOT a key"))
     if not ck then problem("$14B: CYAN's katana does not key the Storm Dragon") end
-    for _, m in ipairs({ CYAN, TERRA, CELES, SABIN }) do
+    for _, m in ipairs({ CYAN, TERRA, CELES, SABIN2 }) do
       local ok = keys(STORM, m[2], m[3])
       H.log(string.format("$14B: %s %s", m[1], ok and "holds a key" or "holds NO key"))
       if not ok then problem("$14B: %s holds no key on the Storm Dragon", m[1]) end
     end
     if (absorb(STORM) & WIND) == 0 then problem("$14B: the Storm Dragon no longer absorbs wind (the Tempest lesson)") end
-    local lk = (classOf(0x08E) & KATANA) ~= 0 and (weakOf(0x08E) & WIND) ~= 0
-    H.log(string.format("$08E: CYAN's Stunner (katana) and Tempest (wind) %s the Luridan", lk and "both key" or "do NOT both key"))
-    if not lk then problem("$08E: the Luridan is not keyed by both katana and wind") end
+    local lk = (classOf(0x08E) & SK(0x5A)) ~= 0 and (weakOf(0x08E) & WIND) ~= 0
+    H.log(string.format("$08E: CYAN's Stunner (SwdTech $5A) and Tempest (wind) %s the Luridan", lk and "both key" or "do NOT both key"))
+    if not lk then problem("$08E: the Luridan is not keyed by both the Stunner's class and wind") end
     if (absorb(0x0C5) & POISON) == 0 then problem("$0C5: the Scrapper no longer absorbs poison") end
-    if (classOf(0x0D2) & (SWORD | KATANA)) == 0 then problem("$0D2: the Mantodea takes no blade (sword, katana)") end
+    if (classOf(0x0D2) & (SWORD | KATANA)) == 0 then problem("$0D2: the Mantodea takes no blade (a sword, a katana)") end
     H.assertEq(#problems, 0, "WoR Cyan break row mismatches")
     H.log("WoR Cyan break rows verified against the built ROM")
   end),

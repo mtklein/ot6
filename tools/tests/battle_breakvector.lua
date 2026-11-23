@@ -20,6 +20,8 @@
 --   battle_prop     CF5900             ; BattleMonsters CF6200 -> $0F6200
 --   ot6_code        F00000  -> $300000   (Ot6ShieldTbl, self-located below)
 
+local H = dofile("tools/tests/lib/ot6.lua")   -- only for the ROM's weapon, skill and hand classes
+
 local PRG = emu.memType.snesPrgRom
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local EDGE = SWORD | KATANA             -- a blade of either kind (the four classes' slash)
@@ -48,8 +50,8 @@ local function classStr(m)
   if m & DAGGER ~= 0 then s = s .. "dagger " end
   if m & SPEAR  ~= 0 then s = s .. "spear "  end
   if m & KATANA ~= 0 then s = s .. "katana " end
-  if m & FIST   ~= 0 then s = s .. "fist "   end
-  if m & ARCANE ~= 0 then s = s .. "arcane " end
+  if m & BLUNT  ~= 0 then s = s .. "blunt "  end
+  if m & RANGED ~= 0 then s = s .. "ranged " end
   return (s:gsub("%s+$", ""))
 end
 
@@ -191,22 +193,25 @@ end
 -- is not yet active and Setzer is flying the getaway).  These are the
 -- classes each brings for free, from the joining kit and abilities only,
 -- with no shop trip:
---   Locke  swords + daggers            sword|dagger
---   Celes  swords + daggers            sword|dagger
---   Edgar  spears + Tools, Chain Saw   sword|spear   (his swords and the Chain Saw; his spears,
---                                                    the AutoCrossbow and the Drill)
---   Sabin  claws / fists + Blitz       fist
---   Cyan   katanas + all 8 SwdTechs    katana
---   Gau    bare fists ($ff -> FIST)    fist
--- Classes from ot6_class.asm's constants, weapon bytes Ot6WeapClassTbl, ability
--- bytes Ot6SkillClassTbl.  No one of the six holds an arcane hand: the rods,
--- brushes, cards and dice are STRAGO's, RELM's and SETZER's, and a returning arc
--- (the Full Moon, the Boomerang) is a shop trip.
-local LOCKE, CELES = SWORD | DAGGER, SWORD | DAGGER
+--   Locke  swords + daggers            the MithrilBlade $0A, the Dirk $00
+--   Celes  swords + daggers            the same
+--   Edgar  spears + Tools, Chain Saw   the Mithril Pike $1D, the AutoCrossbow $AA, the Drill $A8, the Chain Saw
+--                                      $A6, and a sword
+--   Sabin  claws / fists + Blitz       the MetalKnuckle $53 he joins with, bare fists $FF, Pummel $5D (an
+--                                      edged claw, a katana's class under the six, is a shop trip)
+--   Cyan   katanas + all 8 SwdTechs    the Ashura $2B, Dispatch $55
+--   Gau    his own body               H.handClass: his empty hand and his raging Fight (his fangs, #566;
+--                                      bare fists and bludgeon under the four classes)
+-- Every class is read from the built ROM (Ot6WeapClassTbl, Ot6SkillClassTbl, Ot6KitClassTbl).
+local W, SK = H.weaponClass, H.skillClass
+local LOCKE, CELES = W(0x0A) | W(0x00), W(0x0A) | W(0x00)
 local PICKS = {
-  { "Edgar", SWORD | SPEAR }, { "Sabin", FIST },
-  { "Cyan",  KATANA },        { "Gau",   FIST },
+  { "Edgar", W(0x1D) | W(0xAA) | W(0xA8) | W(0xA6) | W(0x0A) }, { "Sabin", W(0x53) | W(0xFF) | SK(0x5D) },
+  { "Cyan",  W(0x2B) | SK(0x55) },        { "Gau",   H.handClass(0x0B, 0xFF, true) },
 }
+-- every class some free party can field
+local FIELDABLE = LOCKE | CELES
+for _, p in ipairs(PICKS) do FIELDABLE = FIELDABLE | p[2] end
 local parties = {}
 for a = 1, #PICKS do
   for b = a + 1, #PICKS do
@@ -228,15 +233,16 @@ local function formationKeys(f)
 end
 
 -- ------------------------------------------------- reachability, the real one
--- "No encounter chippable only by a class no party can field."  Arcane (¤) is
--- the one class none of the six holds: Setzer and his Cards are flying the
--- getaway, and no rod or brush wielder has joined.  A formation whose only key
--- is ¤ would be unbreakable for this whole section.
+-- "No encounter chippable only by a class no party can field."  Under the four
+-- classes that class was special (Setzer's Cards, and he is flying the
+-- getaway); under the six it is whatever FIELDABLE lacks, read from the ROM.  A
+-- formation with no key among the fieldable classes would be unbreakable for
+-- this whole section.
 do
   local bad = 0
   local function sweep(f, where)
     local keys = formationKeys(f)
-    if keys == 0 or keys == ARCANE then
+    if keys & FIELDABLE == 0 then
       bad = bad + 1
       emu.log(string.format(
         "breakvector: formation $%03X (%s) keys=%s -- no fieldable class",
@@ -270,56 +276,58 @@ do
 end
 
 -- --------------------------------------------------- the one deliberate cost
--- Formation $168 (Rhinox x2) is the section's single hard demand: the fist
--- (the four classes' bludgeon, as SABIN and GAU hold it) or nothing.  Asserted
--- from both sides so it stays intentional:
---   * it is fist-only on the class axis, and
+-- Formation $168 (Rhinox x2) is the section's single hard demand: one class,
+-- the blow's (SABIN's Pummel's class, read from the ROM; the four classes'
+-- bludgeon), or nothing.  Asserted from both sides so it stays intentional:
+--   * it is keyed by that class alone, and
 --   * no element substitutes, because Rhinox has no vanilla weakness at all
 --     and absorbs bolt, the element the rest of the facility teaches.
 do
   local keys = formationKeys(0x168)
-  check(keys == FIST, string.format(
-    "formation $168 (Rhinox x2) is fist-only on the class axis (keys=%s)",
+  local BLOW = SK(0x5D)
+  check(BLOW ~= 0 and keys == BLOW, string.format(
+    "formation $168 (Rhinox x2) is keyed by the Pummel's class alone (keys=%s)",
     classStr(keys)))
   check(rb(MPROP + 0x0075 * MREC + OFF_WEAK) == 0x00,
     "rhinox $075 has NO vanilla element weakness -- the class row is its "
     .. "entire break axis")
   check(rb(MPROP + 0x0075 * MREC + OFF_ABSORB) & BOLT ~= 0,
     "rhinox $075 ABSORBS bolt -- the area's taught element would heal it, "
-    .. "which is why the fist alone is legitimate here")
-  -- and that a party can pay it: Sabin or Gau bring the fist for free.
+    .. "which is why one class alone is legitimate here")
+  -- and that a party can pay it: under the four classes SABIN or GAU brought
+  -- bludgeon for free, five of the six parties.
   local payable = 0
   for _, p in ipairs(parties) do
-    if p.cls & FIST ~= 0 then payable = payable + 1 end
+    if p.cls & keys ~= 0 then payable = payable + 1 end
   end
   check(payable == 5, string.format(
-    "%d of the 6 free four-parties already hold the fist (the sixth, "
-    .. "Edgar+Cyan, buys a Flail; the Full Moon is arcane now)", payable))
+    "%d of the 6 free four-parties already hold formation $168's key (want 5: "
+    .. "the sixth buys a Flail)", payable))
 end
 
 do
   -- the shares, like for like with the four classes: a blade of either kind
-  -- (sword or katana) for slash, a point of either kind (dagger or spear) for
-  -- pierce, and the fist alone for bludgeon (an arcane key is one this
-  -- section's parties cannot field, so it does not count toward the blow)
+  -- (sword or katana) for slash, a point (dagger or spear) for pierce, and the
+  -- blow (blunt) for bludgeon; ranged, which all of pierce, bludgeon and
+  -- special may have become, counts toward none of them
   local slashW, bludgW, pierceW, total = 0, 0, 0, 0
   for _, e in ipairs(randForms) do
     local keys = formationKeys(e.f)
     total = total + e.w
     if keys & EDGE ~= 0 then slashW = slashW + e.w end
     if keys & (DAGGER | SPEAR) ~= 0 then pierceW = pierceW + e.w end
-    if keys & FIST ~= 0 then bludgW = bludgW + e.w end
+    if keys & BLUNT ~= 0 then bludgW = bludgW + e.w end
   end
   emu.log(string.format(
-    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% fist %.2f%%",
+    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% blunt %.2f%%",
     100 * slashW, 100 * pierceW, 100 * bludgW))
   print(string.format(
-    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% fist %.2f%%",
+    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% blunt %.2f%%",
     100 * slashW, 100 * pierceW, 100 * bludgW))
   check(math.abs(total - 1.0) < 1e-6, string.format(
     "draw weights sum to 1.0 (got %.6f)", total))
   check(bludgW > slashW, string.format(
-    "the fist (%.2f%%) outranks the blades (%.2f%%) as an area key -- a blade is no "
+    "blunt (%.2f%%) outranks the blades (%.2f%%) as an area key -- a blade is no "
     .. "longer the automatic answer", 100 * bludgW, 100 * slashW))
   check(slashW < 0.35, string.format(
     "a blade (sword or katana) keys only %.2f%% of draws (slash was 67.86%% under the generated floor)",

@@ -101,19 +101,19 @@ local want = {
   [0x005e] = { 2, BLUNT,          "actaneon (trench)" },
   -- the trench trio is Sabin + Cyan + Gau and none of them pierces: Gau's
   -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
-  -- hands read $ff -> OT6_FIST.
+  -- hands read $ff -> OT6_BLUNT (Gau's own are his fangs, OT6_DAGGER, #566).
   [0x0059] = { 2, BLUNT,          "aspik (trench) -- #23, was a dead PIERCE" },
   -- the floating continent's random pool (map 394): the FC party carries
-  -- RELM, whose brushes are arcane (the special's ¤, weapon-classes.md), and
-  -- it is a common key (guidelines, #347): the three magic bodies take it;
-  -- the beasts, the dragons and the ninja do not
+  -- RELM, whose brushes were special (weapon-classes.md), and special was a
+  -- common key (guidelines, #347): the three magic bodies took it; the
+  -- beasts, the dragons and the ninja did not
   [0x0020] = { 3, SWORD | SPEAR,            "behemoth (FC)" },
   [0x0083] = { 3, SPEAR | KATANA,           "dragon (FC)" },
-  [0x000c] = { 2, SWORD | DAGGER | BLUNT, "apokryphos (FC): a demon, arcane" },
-  [0x00a4] = { 2, SWORD | DAGGER | BLUNT, "misfit (FC): conjured, arcane" },
+  [0x000c] = { 2, SWORD | DAGGER | BLUNT, "apokryphos (FC): a demon (it took special)" },
+  [0x00a4] = { 2, SWORD | DAGGER | BLUNT, "misfit (FC): conjured (it took special)" },
   [0x0003] = { 2, SWORD | DAGGER,           "ninja (FC)" },
   [0x00d8] = { 2, SWORD | DAGGER,           "wirey drgn (FC)" },
-  [0x004a] = { 2, SWORD | DAGGER | BLUNT, "brainpan (FC): a mind, arcane" },
+  [0x004a] = { 2, SWORD | DAGGER | BLUNT, "brainpan (FC): a mind (it took special)" },
 }
 for id, w in pairs(want) do
   local r = S[id]
@@ -135,8 +135,12 @@ check(E[0x0042] ~= nil and E[0x0042][1] == POISON, "m-tekarmor $0042 keeps poiso
 check(E[0x009f] ~= nil and E[0x009f][1] == POISON, "heavyarmor $009F keeps poison")
 
 -- the rows both tables opened with
-check(S[0x0000] ~= nil and S[0x0000][2] == SPEAR, "regression: guard $0000 spear (the TekMissile's class)")
-check(S[0x0134] ~= nil and S[0x0134][2] == SPEAR, "regression: whelk head $0134 spear (the TekMissile's class)")
+-- the Magitek party's one class key is TERRA's TekMissile ($8A): its class is read from the ROM
+local TEK = H.skillClass(0x8A)
+check(TEK ~= 0 and S[0x0000] ~= nil and S[0x0000][2] == TEK, string.format(
+  "regression: guard $0000 takes the TekMissile's class alone ($%02X)", TEK))
+check(TEK ~= 0 and S[0x0134] ~= nil and S[0x0134][2] == TEK, string.format(
+  "regression: whelk head $0134 takes the TekMissile's class alone ($%02X)", TEK))
 check(E[0x0134] ~= nil and E[0x0134][1] == FIRE, "regression: whelk head fire add")
 
 -- ------------------------------------------------------------------------
@@ -221,7 +225,7 @@ check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,
 --   row)?
 --
 -- The Shurikens the merchant already sold are not a key: item $41 is
--- OT6_DAGGER (ot6_class.asm, Ot6WeapClassTbl), the shield row is OT6_FIST,
+-- OT6_RANGED (ot6_class.asm, Ot6WeapClassTbl), the shield row is OT6_BLUNT,
 -- and a Shuriken throw has no element, so it is damage without a chip.
 --
 -- ShopProp is `.incbin shop_prop.dat` spliced at shop.asm.  PRG offsets
@@ -275,11 +279,12 @@ do
   local weak = rb(MPROP + GHOSTTRAIN * MREC + OFF_WEAK)
   local add = E[GHOSTTRAIN] and E[GHOSTTRAIN][1] or 0
   local chippable = weak | add
-  -- the premise, pinned: 4 shields (6 until #400) behind the fist (Pummel, Suplex), which is what makes
+  -- the premise, pinned: 4 shields (6 until #400) behind the class of SABIN's Suplex ($5F, read from the ROM), which is what makes
   -- Sabin the only chipper in a party of Sabin, Cyan and Shadow.
   local row = S[GHOSTTRAIN]
-  check(row ~= nil and row[1] == 4 and row[2] == FIST, string.format(
-    "GhostTrain $%04X row is 4 shields / OT6_FIST (got %s) -- the premise of "
+  local SUPLEX = H.skillClass(0x5F)
+  check(SUPLEX ~= 0 and row ~= nil and row[1] == 4 and row[2] == SUPLEX, string.format(
+    "GhostTrain $%04X row is 4 shields / the Suplex's class alone (got %s) -- the premise of "
     .. "#74", GHOSTTRAIN,
     row and string.format("%d/%02X", row[1], row[2]) or "MISSING"))
   check(chippable ~= 0, string.format(

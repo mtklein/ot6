@@ -21,6 +21,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 
 -- species -> { name, shields, class mask, vanilla weak byte }
@@ -32,15 +35,15 @@ local WANT = {
 }
 
 -- the hands (route-wor-terra.md 6): the four as they reach Mobliz
--- (wor-falcon-v1's kit: CELES's swords; SABIN's claws and Blitzes, fist;
--- EDGAR's Break Blade, sword, and his pike and AutoCrossbow, spear;
--- SETZER's Cards, arcane, or Darts, dagger), and TERRA as she joins (the
--- Break Blade, sword)
-local CELES  = { "CELES", SWORD, FIRE | ICE | BOLT }
-local SABIN  = { "SABIN", FIST, FIRE | HOLY | WIND }
-local EDGAR  = { "EDGAR", SWORD | SPEAR, BOLT | POISON }
-local SETZER = { "SETZER", ARCANE | DAGGER, 0 }
-local TERRA  = { "TERRA", SWORD, FIRE }
+-- (wor-falcon-v1's kit: CELES's Flame Sabres $0D; SABIN's Fire Knuckles $57
+-- and Pummel $5D; EDGAR's Break Blade $11, or his Mithril Pike $1D or Man
+-- Eater $06, and his AutoCrossbow $AA; SETZER's Trump $50 or Darts $4E), and
+-- TERRA as she joins (the Break Blade)
+local CELES  = { "CELES", W(0x0D), FIRE | ICE | BOLT }
+local SABIN  = { "SABIN", W(0x57) | SK(0x5D), FIRE | HOLY | WIND }
+local EDGAR  = { "EDGAR", W(0x11) | W(0x1D) | W(0x06) | W(0xAA), BOLT | POISON }
+local SETZER = { "SETZER", W(0x50) | W(0x4E), 0 }
+local TERRA  = { "TERRA", W(0x11), FIRE }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
@@ -160,8 +163,8 @@ H.run({ maxFrames = 600 }, {
       end
     end
     local tk = (classOf(0x16D) & TERRA[2]) ~= 0
-    H.log(string.format("$16D: TERRA's blade (sword) %s", tk and "is a key" or "is NOT a key"))
-    if not tk then problem("$16D: TERRA's blade (sword) does not key Phunbaba 4") end
+    H.log(string.format("$16D: TERRA's blade %s", tk and "is a key" or "is NOT a key"))
+    if not tk then problem("$16D: TERRA's blade does not key Phunbaba 4") end
     local four = { CELES, SABIN, EDGAR, SETZER }
     for i = 1, 4 do
       for j = i + 1, 4 do

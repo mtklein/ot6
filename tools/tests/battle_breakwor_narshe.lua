@@ -24,6 +24,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
@@ -49,14 +52,14 @@ local WANT = {
 
 -- the hands (route-wor-narshe.md 5.4, 6): the three who walk into Narshe
 -- (wor-cyan-v1's kit: TERRA knows Fire and Quake, CELES Ice, CYAN's
--- Tempest is wind; TERRA's and CELES's blades are swords, CYAN's a katana),
--- MOG's spear with them once he joins, and UMARO's club (fist) and Storm on
--- the plain at the end with MOG, TERRA and CELES
-local TERRA = { "TERRA", SWORD, FIRE | EARTH }
-local CELES = { "CELES", SWORD, ICE }
-local CYAN  = { "CYAN", KATANA, WIND }
-local MOG   = { "MOG", SPEAR, 0 }
-local UMARO = { "UMARO", FIST, ICE }
+-- Tempest $2E is wind; TERRA's and CELES's blades, the Falchion $15),
+-- MOG's spear (the Partisan $20) with them once he joins, and UMARO's Bone
+-- Club $4A and Storm on the plain at the end with MOG, TERRA and CELES
+local TERRA = { "TERRA", W(0x15), FIRE | EARTH }
+local CELES = { "CELES", W(0x15), ICE }
+local CYAN  = { "CYAN", W(0x2E), WIND }
+local MOG   = { "MOG", W(0x20), 0 }
+local UMARO = { "UMARO", W(0x4A), ICE }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
@@ -209,8 +212,8 @@ H.run({ maxFrames = 600 }, {
 
     -- 3. the lessons
     local RIDER, DRAGON, TRITOCH, UMAROSP = 0x09C, 0x149, 0x144, 0x110
-    if classOf(RIDER) ~= SPEAR then problem("$09C: the Test Rider's only class key is not MOG's spear") end
-    if (classOf(DRAGON) & SPEAR) == 0 then problem("$149: MOG's spear does not key the Ice Dragon") end
+    if classOf(RIDER) ~= MOG[2] then problem("$09C: the Test Rider's only class key is not MOG's spear") end
+    if (classOf(DRAGON) & MOG[2]) == 0 then problem("$149: MOG's spear does not key the Ice Dragon") end
     for _, sp in ipairs({ DRAGON, TRITOCH, UMAROSP }) do
       if (absorb(sp) & ICE) == 0 then problem("$%03X no longer absorbs ice", sp) end
       if (weakOf(sp) & FIRE) == 0 then problem("$%03X is not weak to fire", sp) end

@@ -8,9 +8,10 @@
 --   * fire-weak for real -- Ot6ElemAddTbl authors $0134 + fire
 --     (ff6/src/battle/ot6_break.asm:404-406, "the tutorial probe"), so the
 --     chip key is the one the game teaches rather than one this file writes;
---   * a real gauge -- Ot6ShieldTbl gives $0134 four shields and OT6_SPEAR,
---     the TekMissile's class (ff6/src/battle/ot6_hud.asm, "the tutorial
---     probe"; it was OT6_PIERCE under the four classes, #566);
+--   * a real gauge -- Ot6ShieldTbl gives $0134 four shields and the class of
+--     TERRA's TekMissile (ff6/src/battle/ot6_hud.asm, "the tutorial probe":
+--     OT6_PIERCE under the four classes; under the six, whatever the ROM's
+--     Ot6SkillClassTbl gives ability $8A, #566);
 --   * 1600 HP (monster_prop.dat $0134 +8) against a party that chips it for
 --     a few hundred a hit;
 --   * and only Terra beams.  Vicks and Wedge spend their turns on Heal
@@ -18,7 +19,7 @@
 --     one spell.
 --
 -- Asserts, in order:
---   1. the head seeds at 4 shields, fire-weak, class-weak SPEAR -- the
+--   1. the head seeds at 4 shields, fire-weak, class-weak to the TekMissile -- the
 --      authored row, read not written.  This is the positive control for
 --      everything below: without a real weakness no beam would chip at all.
 --   2. a fire hit chips the head's shield and reveals the fire weakness
@@ -116,13 +117,14 @@ end
 -- grey, well apart from that white; and neither the colour of any weakness
 -- icon, save the ones named here.  The seven white icons (wind and the six
 -- weapon classes: each class glyph's stroke is the palette's white, #566;
--- the four classes' staff icon, drawn in grey alone, is no longer a class's)
+-- the staff cell the four classes' bludgeon drew in grey alone is redrawn a
+-- mallet with a white stroke)
 -- share the gauge's white and earth's icon shares the '?' grey: the battle text palettes
 -- hold no other white or mid grey, and every one of their eight palettes
 -- is drawn in (build/attempts/wt/v044-shield-colors/census_*.log).  The
 -- lists are exact, so a recoloured icon, or the gauge put back on a hue,
 -- goes red here.  #397's gold gauge was lightning's and holy's yellow.
-local SHARE_WHITE = { wind = true, sword = true, dagger = true, fist = true, arcane = true, katana = true,
+local SHARE_WHITE = { wind = true, sword = true, dagger = true, blunt = true, ranged = true, katana = true,
   spear = true }
 local SHARE_GREY = { earth = true }
 local function rgb(c) return c & 31, (c >> 5) & 31, (c >> 10) & 31 end
@@ -154,7 +156,7 @@ local function colourCheck()
   H.assertEq(r - qr >= 8, true, "the '?' grey stands well apart from the gauge's white")
 end
 -- the head's weakness cells while nothing is revealed: its fire '?' and its
--- SPEAR '?', both in the '?' attribute
+-- class '?', both in the '?' attribute
 local function qmarksShown()
   local a = headLine()
   return a ~= nil and vword(a + 1) == (H.HUD_QMARK_ATTR << 8) | 0xBF
@@ -461,14 +463,16 @@ H.run({ maxFrames = 60000 }, {
       hs, shell, terra))
     armHitWatch()
 
-    -- Ot6ShieldTbl authors $0134 as 4 shields / OT6_SPEAR (ot6_hud.asm)
+    -- Ot6ShieldTbl authors $0134 as 4 shields / the TekMissile's class (ot6_hud.asm)
     H.assertEq(shields(), 4, "head seeded at its authored 4 shields")
     H.assertEq(maxShield(), 4, "and 4 is its max")
     -- Ot6ElemAddTbl authors $0134 + fire (ot6_break.asm:404-406)
     H.assertEq(H.readByte(WEAK + hs * 2) & 0x01, 0x01,
       "head is really fire-weak -- the authored tutorial probe, not a poke")
-    H.assertEq(H.readByte(CWEAK + hs * 2), 0x20,
-      "and class-weak SPEAR ($20, the TekMissile's class), the other authored axis")
+    local tek = H.skillClass(0x8A)
+    H.assertEq(tek ~= 0, true, "the TekMissile ($8A) carries a class in the ROM's Ot6SkillClassTbl")
+    H.assertEq(H.readByte(CWEAK + hs * 2), tek, string.format(
+      "and class-weak to the TekMissile alone ($%02X), the other authored axis", tek))
     H.assertEq(revealed(), 0, "nothing revealed before the first chip")
     H.assertEq(headHp() > 1000, true,
       "the head carries the headroom this measurement needs (1600 authored)")
