@@ -650,7 +650,7 @@ local actions = {
     H.assertEq(H.readByte(0x021f), 3,
       "the chain saves as it goes: lifecycle reads 3 (the .srm seed program)")
     H.assertEq(sram(SLOT3), 0x4f, "slot-3 codex magic 'O'")
-    H.assertEq(sram(SLOT3 + 1), 0x38, "slot-3 codex magic '8'")
+    H.assertEq(sram(SLOT3 + 1), 0x39, "slot-3 codex magic '9'")
     local known = 0
     for off = 0x10, PAGE_USED - 1 do
       if sram(SLOT3 + off) ~= 0 then known = known + 1 end
@@ -702,7 +702,7 @@ local actions = {
     H.assertEq(sram(0x307ff0), 1, "SRAM last-saved-slot marker is 1")
     H.assertEq(H.readByte(0x021f), 1, "lifecycle follows the save to 1")
     H.assertEq(sram(SLOT1), 0x4f, "slot 1 codex magic 'O'")
-    H.assertEq(sram(SLOT1 + 1), 0x38, "slot 1 codex magic '8'")
+    H.assertEq(sram(SLOT1 + 1), 0x39, "slot 1 codex magic '9'")
     -- SaveAs copied the ACTIVE (slot 3) page, so the pages are equal
     -- right now, and any later divergence is a post-save codex write,
     -- attributable to a page

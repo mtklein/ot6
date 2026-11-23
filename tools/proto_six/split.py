@@ -15,19 +15,34 @@ Setzer's Darts, Relm's and Strago's knives -- so a card, dice or brush
 wielder can still put the key in hand where the split took it from Arcane.)
 
 The rule, in order:
-  1. PINNED: where docs/design/bosses-wob.md's break story or the v0.50 row's
-     own comment names the member whose weapon or skill is the key (or the
-     party it lists can hold only one of the two children), the weakness
-     becomes that member's new class.  The table below, with its source.
+  1. PINNED: where docs/design/bosses-wob.md's break story names the member
+     whose weapon or skill is the key (or the party it lists can hold only one
+     of the two children), the weakness becomes that member's new class.  The
+     PIN table's "wob" rows, each with its source line.
   2. FAMILY: Ultros's four records share one row.
-  3. BALANCE: every other weakness, in species-id order (slash, pierce,
-     bludgeon, special within a species), goes to whichever of its two
-     children fewer of the species the game deals (and gauges) hold so far;
-     a tie takes the first-named child; a species never takes one class twice.
-     Species no battle deals, and the generated floor's rows, follow the same
-     rule after the dealt ones and do not count toward the balance.
+  3. ROUTE: of the splits steps 1-2 leave open for a species, keep those under
+     which the fewest of the route's own fights against it leave the party
+     that fought it holding none of its classes -- first by the weapons in
+     hand, then by the party's whole kit (hands, class-bearing skills, the
+     bag's tools and throwables) -- and among those the split that puts a key
+     in the most members' hands, so a row keyed by the hands of the party
+     that met it keeps a key in those hands.  The fights and what each party held are
+     the baseline play's `[keys]` lines (main's ROM, this branch's harness:
+     tools/proto_six/route_fights.py --keys over its leg logs), re-read under
+     the six-class weapon table: the story's party at that point keeps a key
+     wherever a split can give it one, with the weapons it really carries.
+     Without those logs, the qualification log's [outcome] lines and a
+     signature kit a member (ROUTE_KIT) stand in.
+  4. COMMENT: then the split the four-class row's own comment suggests, where
+     it named a member's weapon (the PIN table's "row" rows): a preference,
+     not a pin, since several describe hands the route does not hold.
+  5. BALANCE: then, in species-id order, the split whose classes the fewest
+     of the species the game deals (and gauges) hold so far; a tie takes the
+     first-named children; a species never takes one class twice.  Species no
+     battle deals, and the generated floor's rows, follow the same rule after
+     the dealt ones and do not count toward the balance.
 
-Reads v0.50's ot6_hud.asm from git (so it is idempotent), rewrites the class
+Reads the four-class ot6_hud.asm from git (BASE: origin/main; so it is idempotent), rewrites the class
 masks of Ot6ShieldTbl's rows in the working tree's ot6_hud.asm, writes
 ff6/tools/six_class_split.json (species -> new mask and how it was chosen;
 gen_break_floor.py reads the floor rows from it) and prints the report.
@@ -162,6 +177,31 @@ for _sp in (0x0074, 0x009a, 0x00a5, 0x00b5, 0x00c8, 0x0123, 0x0126, 0x0160, 0x01
 for _sp in (0x00a6, 0x006d, 0x0057, 0x0045, 0x0051, 0x0152, 0x0138, 0x0124):
     PIN[_sp] = ({S: KATANA}, "row block 'his katana (slash) keys every body here' (Cyan's)")
 
+# the World of Balance design docs' break stories (wob-side-trips.md,
+# break-coverage-vector.md, vector-route.md, floating-continent-route.md,
+# airforce.md, bosses-wob.md), read for the six-class docs (2026-11-23): each
+# names the hands that keyed the row
+PIN.update({
+    0x0102: ({P: DAGGER}, "wob docs: Mega Armor, 'Locke's daggers keyed pierce'"),
+    0x00ae: ({S: SWORD}, "wob docs: Gigantos, 'the landing party's three blades hold the key' (Terra, Locke, Edgar's swords)"),
+    0x00aa: ({P: SPEAR, B: FIST}, "wob docs: Grenade, 'edgar's tools (pierce) and sabin's blitzes (bludgeon)'"),
+    0x0109: ({P: DAGGER}, "wob docs: Ifrit, 'Every Facility boss is class-breakable by Locke and Celes' (Locke's daggers)"),
+    0x010a: ({S: SWORD, P: DAGGER}, "wob docs: Number 024, 'class-breakable by Locke and Celes'"),
+    0x010b: ({P: DAGGER}, "wob docs: Number 128, 'class-breakable by Locke and Celes' (Celes is separated: Locke's daggers)"),
+    0x013f: ({S: SWORD}, "wob docs: Number 128's blades, the facility party's swords"),
+    0x0140: ({S: SWORD}, "wob docs: Number 128's blades, the facility party's swords"),
+    0x010d: ({P: DAGGER}, "wob docs: Left Crane, 'class-breakable by Locke and Celes' (Locke's daggers)"),
+    0x010e: ({P: DAGGER}, "wob docs: Right Crane, 'class-breakable by Locke and Celes' (Locke's daggers)"),
+    0x0113: ({P: SPEAR}, "wob docs: AirForce, 'Edgar's AutoCrossbow keyed pierce on every part'"),
+    0x0145: ({P: SPEAR}, "wob docs: Laser Gun, 'Edgar's AutoCrossbow keyed pierce on every part'"),
+    0x0147: ({P: SPEAR}, "wob docs: MissileBay, 'Edgar's AutoCrossbow keyed pierce on every part'"),
+})
+# the two rows whose story is "any weapon breaks it" (bosses-wob.md L1051
+# Speck: "any weapon in the game breaks it"; wob-side-trips.md Intangir:
+# "every class breaks it"): they took all four classes and take all six, the
+# one place a species' number of weapon weaknesses changes (4 -> 6)
+EVERY = {0x00a3, 0x0146}
+
 # ---- 2. families ---------------------------------------------------------------
 FAMILY = {0x012d: 0x012c, 0x012e: 0x012c, 0x0168: 0x012c}      # Ultros 2, 3, 4 take Ultros 1's row
 
@@ -177,6 +217,8 @@ BASE = os.environ.get("OT6_SPLIT_BASE", "origin/main")       # the four-class tr
 # the route's fights (route_fights.py over the qualification log main's play
 # made); absent, the ROUTE step is skipped
 FIGHTS = ROOT / "build/attempts/wt/proto-six-classes/route-fights-v050.json"
+# ... and the exact ones: the baseline play's [keys] lines (route_fights.py --keys)
+KEYS = ROOT / "build/attempts/wt/v051-six-classes/line/route-keys-base.json"
 # a member's signature kit under six classes, by character id: the weapon
 # family the member is built around and the class-bearing skills that come
 # with them (EDGAR: spear and tools, and a sword, his other family and the
@@ -190,17 +232,72 @@ def v050(path, text=True):
                           text=text).stdout
 
 
+def weapon_table(text, bits):
+    """Ot6WeapClassTbl out of an ot6_class.asm: item id -> class mask (a
+    null-break weapon holds none)."""
+    out, item, on = {}, 0, False
+    for line in text.splitlines():
+        if line.startswith("Ot6WeapClassTbl:"):
+            on = True
+            continue
+        if on and line and not line[0].isspace() and not line.startswith(";"):
+            break
+        if not on:
+            continue
+        r = re.match(r"\s+\.res\s+\$([0-9a-f]+) - \$([0-9a-f]+)", line)
+        m = re.match(r"\s+\.byte\s+(\S+)", line)
+        if r:
+            item = int(r.group(1), 16)
+        elif m:
+            if "OT6_NULLBRK" not in m.group(1):
+                out[item] = sum(bits.get(tok, 0) for tok in m.group(1).split("|"))
+            item += 1
+    return out
+
+
+def six_weapons():
+    return weapon_table((ROOT / "ff6/src/battle/ot6_class.asm").read_text(),
+                        {v: k for k, v in NEW_CONST.items()})
+
+
 def route_parties():
-    """species -> [party kit mask, ...], one per route fight against it."""
+    """species -> [(kit mask, hands mask), ...], one per route fight against
+    it, under six classes; and which evidence it is."""
     out = collections.defaultdict(list)
+    if KEYS.exists():
+        w = six_weapons()
+        skill = {"B": FIST, "S": KATANA, "M": SPEAR, "T": DAGGER}
+        for f in json.loads(KEYS.read_text()):
+            bag_tools = sum(w.get(i, 0) for i in f["bag"] if 0xA3 <= i <= 0xAA)
+            bag_throw = sum(w.get(i, 0) for i in f["bag"] if 0x41 <= i <= 0x43)
+            if any(0xAB <= i <= 0xAD for i in f["bag"]):
+                bag_throw |= DAGGER
+            kit = hands = 0
+            each = []
+            for m in f["members"]:
+                h = w.get(m["r"], 0) if m.get("r") is not None else 0
+                h |= w.get(m["l"], 0) if m.get("l") is not None else 0
+                k = h
+                for s in m["skills"]:
+                    k |= skill[s]
+                if m["tools"]:
+                    k |= bag_tools
+                if m["throw"]:
+                    k |= bag_throw
+                kit, hands = kit | k, hands | h
+                each.append(h)
+            for sp in f["species"]:
+                out[sp].append((kit, hands, tuple(each)))
+        return out, "the baseline play's [keys] lines (%s)" % KEYS.relative_to(ROOT)
     if FIGHTS.exists():
         for f in json.loads(FIGHTS.read_text()):
             kit = 0
             for c in f["chars"]:
                 kit |= ROUTE_KIT.get(c, 0)
             for sp in f["species"]:
-                out[sp].append(kit)
-    return out
+                out[sp].append((kit, kit, tuple(ROUTE_KIT.get(c, 0) for c in f["chars"])))
+        return out, "the qualification log's [outcome] lines and signature kits (%s)" % FIGHTS.relative_to(ROOT)
+    return out, "none"
 
 
 def old_rows():
@@ -237,7 +334,16 @@ def assign(masks, order, count, how, parties=None):
                 if count is not None and out[sp] & b:
                     count[b] += 1
             continue
-        pin = {o: k for o, k in PIN.get(sp, ({}, None))[0].items() if old & o}
+        if sp in EVERY and old == 15:
+            out[sp], kids_of[sp] = 0x3f, {o: CHILDREN[o][0] for o in (S, P, B, X)}
+            how[sp] = "every class: all four -> all six"
+            for b in NEW_NAME:
+                if count is not None:
+                    count[b] += 1
+            continue
+        pins, src = PIN.get(sp, ({}, ""))
+        pin = {o: k for o, k in pins.items() if old & o and src.startswith("wob")}
+        soft = {o: k for o, k in pins.items() if old & o and not src.startswith("wob")}
         olds = [o for o in (S, P, B, X) if old & o]
         tally = count if count is not None else collections.Counter()
         best = None
@@ -245,18 +351,24 @@ def assign(masks, order, count, how, parties=None):
             if len(set(combo)) != len(combo):
                 continue                                # one class twice
             mask = sum(combo)
-            nokey = sum(1 for kit in parties.get(sp, ()) if not kit & mask)
-            key = (nokey, sum(tally[k] for k in combo),
+            ev = parties.get(sp, ())
+            nohand = sum(1 for _, hands, _e in ev if not hands & mask)
+            nokey = sum(1 for kit, _h, _e in ev if not kit & mask)
+            holders = sum(1 for _k, _h, each in ev for h in each if h & mask)
+            off = sum(1 for o, k in zip(olds, combo) if o in soft and soft[o] != k)
+            key = (nohand, nokey, -holders, off, sum(tally[k] for k in combo),
                    tuple(CHILDREN[o].index(k) for o, k in zip(olds, combo)))
             if best is None or key < best[0]:
                 best = (key, combo)
         assert best is not None, "species $%04x: no split satisfies its pins" % sp
         combo = best[1]
         fights = len(parties.get(sp, ()))
-        notes = ["%s->%s%s" % (OLD_NAME[o], NEW_NAME[k], " pinned" if o in pin else "")
-                 for o, k in zip(olds, combo)]
+        notes = ["%s->%s%s" % (OLD_NAME[o], NEW_NAME[k], " pinned" if o in pin else (
+            " (comment)" if soft.get(o) == k else (" (not the comment's %s)" % NEW_NAME[soft[o]] if o in soft else "")))
+            for o, k in zip(olds, combo)]
         if fights:
-            notes.append("route: %d of %d fights keyless" % (best[0][0], fights))
+            notes.append("route: %d fights, %d without a key in hand, %d without one in the kit, %d member-hands "
+                         "holding one" % (fights, best[0][0], best[0][1], -best[0][2]))
         out[sp], kids_of[sp] = sum(combo), dict(zip(olds, combo))
         how[sp] = ", ".join(notes) or "none"
         if count is not None:
@@ -273,7 +385,7 @@ def compute():
     gauged = sorted(sp for sp in held if rows.get(sp, (0, 0))[0] > 0)
     how, count = {}, collections.Counter()
     masks = {sp: m for sp, (sh, m) in rows.items()}
-    parties = route_parties()
+    parties, evidence = route_parties()
     new, kids = assign(masks, gauged, count, how, parties)
     final_count = collections.Counter(count)
     rest = sorted(sp for sp in rows if sp not in new)
@@ -294,7 +406,7 @@ def compute():
         m = kids.get(sp, fkids[sp])
         sel[sp] = sum(o for o, k in m.items() if CHILDREN[o].index(k) == 1)
     return dict(rows=rows, held=held, gauged=gauged, new=new, how=how, count=final_count, floor=floor,
-                floor_old=floor_old, names=names, sel=sel, parties=parties)
+                floor_old=floor_old, names=names, sel=sel, parties=parties, evidence=evidence)
 
 
 def write_split_inc(r):
@@ -357,9 +469,12 @@ def report(r):
                 n, k, 100.0 * k / len(g), 100.0 * k / tot))
     fought = [sp for sp in g if r["parties"].get(sp)]
     nf = sum(len(r["parties"][sp]) for sp in fought)
-    nk = sum(1 for sp in fought for kit in r["parties"][sp] if not kit & new[sp])
-    out.append("route fights (species x fight) with a signature-kit key under six: %d of %d (%d keyless, over %d "
-               "species the route fought)" % (nf - nk, nf, nk, len(fought)))
+    nk = sum(1 for sp in fought for kit, _h, _e in r["parties"][sp] if not kit & new[sp])
+    nh = sum(1 for sp in fought for _k, hands, _e in r["parties"][sp] if not hands & new[sp])
+    out.append("route evidence: %s" % r["evidence"])
+    out.append("route fights (species x fight, %d over %d species): the party's kit holds one of the species' six "
+               "classes in %d (%d without); its weapons in hand in %d (%d without)" % (
+                   nf, len(fought), nf - nk, nk, nf - nh, nh))
     pinned = sum(1 for sp in g if "pinned" in r["how"][sp])
     npin = sum(r["how"][sp].count("pinned") for sp in g)
     nfam = sum(1 for sp in g if r["how"][sp].startswith("family"))
@@ -374,7 +489,7 @@ def report(r):
             sp, nm, sh, "|".join(OLD_NAME[b] for b in OLD_NAME if old & b) or "-",
             "|".join(NEW_NAME[b] for b in ORDER if new[sp] & b) or "-", r["how"][sp],
             "" if sp in r["held"] else "  [not dealt]",
-            ("  <- " + PIN[sp][1]) if sp in PIN and "pinned" in r["how"][sp] else ""))
+            ("  <- " + PIN[sp][1]) if sp in PIN else ""))
     return "\n".join(out) + "\n"
 
 

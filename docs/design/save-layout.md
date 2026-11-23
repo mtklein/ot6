@@ -107,19 +107,23 @@ never.
 | $3000-$3001 | 2 | slot1 | Esper page, slot 1: magic `$3145` ('E1') | OT6_ESPER_ROOT | save | Any other value: the slot has no esper progress |
 | $3002-$300F | 14 | slot1 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $3010-$327F | 624 | slot1 | Magic Points per character (actors 0-11) per esper slot (26, GenjuProp order, Odin and Raiden share one), little-endian words, actor-major, capped at 9999 | OT6_ESPER_ROOT+OT6_ESPER_CTR | save | Read only when signed |
-| $3280-$33FF | 384 | slot1 | Reserved; a save into the slot zeroes it | OT6_ESPER_ROOT+OT6_ESPER_COPY | zero | Zero in a slot a signing build (v0.45 on) saved |
+| $3280-$32B3 | 52 | slot1 | Row 12: Magic Points for actor 12 (Gogo's slot: a holder once revealed as Leo, while Summon is one of his picks), 26 words as the rows above (v0.51, layout version 2) | OT6_ESPER_ROOT+OT6_ESPER_LEO | save | Read only when the page is signed and the slot's block is signed with `OT6_SAVEVER` 2 or more; otherwise no progress (reserve before v0.51: zero from v0.45 on, junk possible in a v0.44 page) |
+| $32B4-$33FF | 332 | slot1 | Reserved; a save into the slot zeroes it | OT6_ESPER_ROOT+OT6_ESPER_COPY | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $3400-$3401 | 2 | slot2 | Esper page, slot 2: magic | OT6_ESPER_ROOT+OT6_ESPER_STRIDE | save | as slot 1 |
 | $3402-$340F | 14 | slot2 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $3410-$367F | 624 | slot2 | Magic Points, as slot 1 | - | save | Read only when signed |
-| $3680-$37FF | 384 | slot2 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
+| $3680-$36B3 | 52 | slot2 | Row 12, as slot 1 | - | save | as slot 1 |
+| $36B4-$37FF | 332 | slot2 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $3800-$3801 | 2 | slot3 | Esper page, slot 3: magic | OT6_ESPER_ROOT+$0800 | save | as slot 1 |
 | $3802-$380F | 14 | slot3 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $3810-$3A7F | 624 | slot3 | Magic Points, as slot 1 | - | save | Read only when signed |
-| $3A80-$3BFF | 384 | slot3 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
+| $3A80-$3AB3 | 52 | slot3 | Row 12, as slot 1 | - | save | as slot 1 |
+| $3AB4-$3BFF | 332 | slot3 | Reserved; a save into the slot zeroes it | - | zero | Zero in a slot a signing build (v0.45 on) saved |
 | $3C00-$3C01 | 2 | shared | Live esper page: magic. The only page play reads and writes | OT6_ESPER_LIVE+OT6_ESPER_MAGIC | load, newgame, play, save | Unsigned: cleared and signed before use (no progress) |
 | $3C02-$3C0F | 14 | shared | Reserved | - | never | - |
 | $3C10-$3E7F | 624 | shared | Live Magic Points: a load copies its slot's page here, a victory adds to them, a save copies them into the slot | OT6_ESPER_LIVE+OT6_ESPER_CTR | load, newgame, play | - |
-| $3E80-$3EFF | 128 | shared | Unused, zeroed with the counters | OT6_ESPER_LIVE+OT6_ESPER_COPY | load, newgame | - |
+| $3E80-$3EB3 | 52 | shared | Live row 12 (actor 12): a load copies its slot's row here when the block is version 2 or more and clears it otherwise (`Ot6EsperLeoRow`), a victory adds to it once Leo is revealed, a save copies it into the slot | OT6_ESPER_LIVE+OT6_ESPER_LEO | load, newgame, play | - |
+| $3EB4-$3EFF | 76 | shared | Unused, zeroed with the counters | OT6_ESPER_LIVE+OT6_ESPER_COPY | load, newgame | - |
 | $3F00-$3F03 | 4 | shared | Victory screen's pending rank lines, one byte per party slot | OT6_ESPER_LIVE+OT6_ESPER_PEND | load, newgame, play | Zero: none |
 | $3F04-$3F05 | 2 | shared | Magic Points to announce on the victory screen (0 = none) | OT6_ESPER_LIVE+OT6_ESPER_SHOWN | load, newgame, play | Zero: none |
 | $3F06-$3FFF | 250 | shared | Reserved | - | never | - |
@@ -133,7 +137,7 @@ never.
 | OT6_CODEX_GLOBAL | $374F | 'O7', the v0.1-v0.4 cartridge-wide codex (page 1 only), migrated on first touch |
 | OT6_ESPER_MAGIC_WORD | $3145 | 'E1', an esper page |
 | OT6_SAVESIG_WORD | $5653 | 'SV' (bytes `$53 $56` at `$1E2C`), a signed save block |
-| OT6_SAVEVER_CUR | $0001 | the layout version today's ROM signs with (a byte at `$1E2E`) |
+| OT6_SAVEVER_CUR | $0002 | the layout version today's ROM signs with (a byte at `$1E2E`); 2 since v0.51 |
 
 Vanilla's validity word `$E41B` (`menu_sram.asm`) is not an OT6 symbol.
 
@@ -150,8 +154,8 @@ vanilla leaves unused, and names the rest of that range as reserve. Address is i
 | $1E1D-$1E1E | 2 | OT6_LOADOUT | Cyan's Bushido loadout: a packed word, three bits per boost slot (slots 1/2/3 at bits 3-5/6-8/9-11), each a 0..7 SwdTech index. `$0000` = AUTO. | ot6_bushido.asm `Ot6BushidoTech` reads it in battle; ot6_loadout.asm `Ot6LoadoutAssign` writes a slot and `Ot6LoadoutInput` writes `$0000` to revert to AUTO; `Ot6LoadoutUnpack`/`Ot6LoadoutIsAuto`/`Ot6LoadoutSlotTech` read it in the field page. | v0.5 | `$0000` = AUTO. A non-zero word is decoded per slot and a slot naming an unlearned tech falls back to AUTO (`Ot6TechLearned`). |
 | $1E1F-$1E26 | 8 | OT6_RAGELOAD | Gau's 8-slot Rage loadout, one byte per slot: byte = rage id + 1, `$00` = unset. All eight `$00` = AUTO. | ot6_rage.asm `Ot6RageList` builds the battle Rage list from it; `Ot6RageSeed` writes the window on the first edit, `Ot6RageCycleCore`/`Ot6RageInput` write field edits; `Ot6RageSlot`/`Ot6RageIsAuto` read it. | v0.7 | all `$00` = AUTO. A byte naming an unknown or unlearned rage is dropped from the list. |
 | $1E27-$1E2B | 5 | OT6_LORELOAD | Strago's 5-slot Lore loadout, one byte per slot: byte = lore id + 1 (ids 0..23), `$00` = unset. All five `$00` = AUTO. | ot6_lore.asm `Ot6LoreMask`/`Ot6LoreMaskSet` build the battle Lore mask from it; `Ot6LoreSeed`, `Ot6LoreCycleCore`/`Ot6LoreInput` write it; `Ot6LoreSlot`/`Ot6LoreIsAuto` read it. | v0.13 | all `$00` = AUTO. A byte naming an unknown or unlearned lore is dropped from the mask. |
-| $1E2C-$1E2D | 2 | OT6_SAVESIG | The block's signature, `$5653` ('SV') when signed. | ot6_codex.asm `Ot6SaveSign` writes it when it signs an unsigned block, at the save, before the checksum; `Ot6NewGameClear` zeroes it at New Game. | v0.45 | Signed means `$5653` here AND an `OT6_SAVEVER` of 1 through `OT6_SAVEVER_CUR`; a signed block keeps its version. Anything else is unsigned, and its first save zeroes `OT6_SAVERSV` and `OT6_SAVETAIL`, then signs. |
-| $1E2E | 1 | OT6_SAVEVER | The layout version that signed the block (today 1). | `Ot6SaveSign` writes it with the signature, only when it signs an unsigned block. | v0.45 | 0, or past `OT6_SAVEVER_CUR`: the block is unsigned. |
+| $1E2C-$1E2D | 2 | OT6_SAVESIG | The block's signature, `$5653` ('SV') when signed. | ot6_codex.asm `Ot6SaveSign` writes it when it signs an unsigned block, at the save, before the checksum; `Ot6NewGameClear` zeroes it at New Game. | v0.45 | Signed means `$5653` here AND an `OT6_SAVEVER` of 1 through `OT6_SAVEVER_CUR`; a signed block keeps its signature. Anything else is unsigned, and its first save zeroes `OT6_SAVERSV` and `OT6_SAVETAIL`, then signs. |
+| $1E2E | 1 | OT6_SAVEVER | The layout version of the block (today 2): every field a version names is set up in the block and its slot's pages. Version 2 (v0.51) adds the esper pages' row 12. | `Ot6SaveSign` writes it with the signature when it signs an unsigned block, and raises a lower signed version to `OT6_SAVEVER_CUR` at the save (`Raise`), after `Ot6EsperSaveAs` has written the new field. | v0.45 | 0, or past `OT6_SAVEVER_CUR`: the block is unsigned. 1 (v0.45-v0.50): signed, its esper pages' row 12 reads as no progress. |
 | $1E2F-$1E3F | 17 | OT6_SAVERSV | Reserved. | Zeroed by `Ot6SaveSign` when it first signs a block, and by `Ot6NewGameClear`. | v0.45 | Zero in a signed block; junk possible in an unsigned one. |
 | $1FF7-$1FFD | 7 | OT6_SAVETAIL | Reserved (vanilla's unused tail inside the checksum window). | Zeroed as `OT6_SAVERSV` is. | v0.45 | Zero in a signed block; junk possible in an unsigned one. |
 
@@ -304,7 +308,7 @@ Reserved space for v1.y:
 |---|---|---|
 | Save block `OT6_SAVERSV` `$1E2F-$1E3F`, `OT6_SAVETAIL` `$1FF7-$1FFD` | 24 per slot | In a signed block (`OT6_SAVESIG` = `$5653`): zeroed when it was first signed. An unsigned block (a save from v0.44 or earlier) may hold junk until its first save on v0.45 or later |
 | Codex page pads `+$002-$00F` and tails `+$310-$3FF`, slots 1-3 | 254 per page | In a slot saved by v0.45 or later: every save zeroes the destination's. Not in the New-Game page |
-| Esper page pads `+$002-$00F` and tails `+$280-$3FF`, slots 1-3 | 398 per page | As the codex pages |
+| Esper page pads `+$002-$00F` and tails `+$2B4-$3FF`, slots 1-3 | 346 per page | As the codex pages (`+$280-$2B3` was reserve until v0.51 and is now row 12) |
 | Live esper page `+$002-$00F`, `+$306-$3FF` | 260 | No: never written |
 | Battery `$1E00-$1FEF`, `$1FF2-$1FF7` | 502 | Yes, in any battery the load menu has cleared (`ClearSRAM`) |
 | Battery `$4000-$7FFF` | 16384 | No: never written |
@@ -316,8 +320,9 @@ past the build's own, is unsigned (junk can match two bytes, and a version
 this build does not know promises nothing it can check). A save signs only
 an unsigned block: it zeroes the reserve and the tail and writes the
 signature and `OT6_SAVEVER_CUR`. A signed block
-keeps its signature and its version through every later save of this
-build.
+keeps its signature through every later save; a signed block of a lower
+version is raised to `OT6_SAVEVER_CUR` at its next save, once the save has
+written the fields the higher version adds.
 
 A later release that adds a field to the reserve raises `OT6_SAVEVER_CUR`.
 It reads the field only from a block signed with a version at least that
@@ -328,6 +333,23 @@ the rest of the block), then raises the version byte, so no block ever
 claims a version whose fields it does not hold. A signing build also zeroes
 the destination slot's codex and esper page pads and tails at every save
 (the release that claims such bytes stops zeroing them).
+
+Version 2 (v0.51, #552 piece F) is the first raise. Its field is the
+esper pages' row 12 (`$x280-$x2B3` of each slot's page, `$3E80-$3EB3` live):
+Magic Points for actor 12, Gogo's slot, who wears espers once revealed as
+General Leo, while Summon is one of his picks ([leo-reveal.md](leo-reveal.md)). It sits in what was the
+pages' tail reserve: zero in every slot a signing build (v0.45-v0.50) saved,
+but a v0.44 page never had its tail zeroed, so the row is read only from a
+block that says version 2 (`Ot6EsperLeoRow`, at every load: the slot's row
+is copied live when the block is signed with version 2 or more, and the live
+row cleared otherwise). An older save therefore loads with Leo holding no
+esper progress, whatever its page's tail holds, and Gogo's worn-esper byte
+(`$161E` of record 12) is `$FF` in every golden save and tracked checkpoint
+(checked: `build/attempts/wt/v051-leo-espers/row12_saves.txt`), so he
+wears nothing either. Its first save copies the live row (zeros, or what was
+earned since the load) into the slot, then raises the block to version 2.
+Nothing else in the block changes meaning, so version 1 is otherwise read
+exactly as before.
 
 Rules for future fields elsewhere:
 
@@ -383,9 +405,11 @@ saying v0.29.
 | v0.30-v0.43 | yes | nothing in the layout | tested: three saves each from v0.31, v0.35 and v0.42, and the golden sets of v0.40 and v0.43 (early, middle, World of Ruin, end game) |
 | v0.44 | yes | Esper pages at `$3000-$3FFF` (new, signed); an older save loads with no esper progress | tested: 4 golden saves |
 | v0.45 | yes | The save-block signature `$1E2C-$1E2E` (new field); the first save of an older block zeroes its reserve, every save zeroes the slot's page reserves, and a New Game zeroes the scrap | tested: every golden save, all unsigned, is signed at its first save |
+| v0.46-v0.50 | yes | nothing in the layout (v0.49: event switch `$00E0`, a vanilla bit) | tested: four golden saves each |
+| v0.51 | yes | Layout version 2: the esper pages' row 12 (actor 12) in the pages' former tail reserve, read only from a version-2 block; a version-1 block is raised at its first save | in development |
 
 So no release has moved or re-encoded a field: every layout change was an
-append (five new fields, one migration), the last at v0.45. Three releases
+append (six new fields, one migration), the last at v0.51. Three releases
 changed content that a save fixes when it is written (v0.8, v0.23, v0.28);
 those saves load and play, without the new rule for what they already hold.
 
@@ -415,16 +439,21 @@ in `ninja release`.
 release signs esper pages). For each one, qualification Continues it on
 today's ROM, checks that the game it loads is the file's (tools/roster.py's
 reading, gil, bag, map, tile, story switches), that its codex page and
-esper progress carry over (none for a save from before v0.44), saves into
+esper progress carry over (none for a save from before v0.44, and none
+in row 12 for a block older than version 2: the live row must be zero
+whatever the slot's page holds there), saves into
 the same slot, reloads, and checks that the battery changed only inside the
 ranges the battery map says today's ROM writes. The run saves twice. The
 first save of a save from before v0.45 must sign it, zero its reserve and
 tail, and change nothing else in the block (the loadouts included)
 but the play time, the timers and the checksum (read against the block at
 `CopyGameDataToSRAM`'s entry); the reload must read that save back byte for
-byte; the second save, of a signed block, must change only the play time,
-timers and checksum. A copy of a v0.44 save with its esper signature zeroed
-is the negative: the check must refuse it.
+byte; the first save of a version-1 block (v0.45-v0.50) must raise its
+version to 2 and change nothing else but the save's own bytes; the second
+save, of a block signed with today's version, must change only the play
+time, timers and checksum. After each save the slot's esper page, row 12
+included, is the live page. A copy of a v0.44 save with its esper signature
+zeroed is the negative: the check must refuse it.
 
 `golden-saves/junk/` holds synthetic saves built from v0.44 ones, carrying
 the `$FF` an all-ones console leaves: in the reserve and tail, in every
@@ -437,7 +466,10 @@ codex and esper page's pads and tails, and in `$4000-$7FFF`.
   pages and `$4000-$7FFF` must be untouched.
 - `v0.44-sig-ver0` and `v0.44-sig-verFF` carry the signature with version
   0 or `$FF`: each must be treated as unsigned, so its first save zeroes the
-  reserve and signs it version 1.
+  reserve and signs it version 2.
+- every junk save's slot pages carry `$FF` in what is now row 12: its load
+  must read row 12 as no progress (the live row zero), and its first save
+  writes the live row's zeros there.
 - `v0.44-mixed` (from `wor-gau-v1`, `$1CF7` = `$BF`) carries the Bushido
   word the page seeds there (`$0F64`, slot 0 set) and real Rage and Lore
   bytes beside impossible ones (an unlearned rage, a lore byte `$19`, an
@@ -445,7 +477,7 @@ codex and esper page's pads and tails, and in `$4000-$7FFF`.
 
 The New Game's first save is the play from power-on's first save
 (`world-narshe-v1`, `gen_worldmap`); `first_save_signed` checks that
-capture: signed `$5653` version 1, its reserve, tail and page reserves zero,
+capture: signed `$5653` version 2, its reserve, tail and page reserves zero,
 its loadouts AUTO.
 
 `battle_newgameloadouts` starts a New Game under an all-ones power-on fill,
@@ -454,12 +486,15 @@ reads the scrap and tail, then Continues a v0.44 save seating Gau
 bytes in its loadouts, and reads the lists a random battle builds: AUTO's
 eight rages, AUTO's five lores and the free row.
 
-Four mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
+Six mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
 routine returning at once, or a labelled seam rewritten) must go red:
 
 - without `Ot6SaveSign`, the junk save's first save is unsigned;
 - with the version test gone (`VerCheck`), `v0.44-sig-ver0` passes for
-  signed: its version 0 stays, and its junk reserve with it;
+  signed: its version 0 is raised in place, and its junk reserve stays;
+- without row 12's version test (`Ot6EsperLeoRow` returning at once), a
+  junk save's `$FF` row 12 loads as Leo's progress;
+- without the raise (`Raise`), a v0.50 save's first save keeps version 1;
 - reading the slot loaded (`wSaveSlotToLoad`) instead of the slot saved
   into (`SlotAt`), the save over slot 1 leaves slot 1's page reserves
   junk;

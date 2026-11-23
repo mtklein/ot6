@@ -191,3 +191,7 @@ OT6_LEO_SWITCH = $00e0
 OT6_LEO_FLAG := $7e1e80 + (OT6_LEO_SWITCH >> 3)
 OT6_LEO_BIT = 1 << (OT6_LEO_SWITCH & 7)
 .global Ot6LeoReveal, Ot6LeoBattleRow, Ot6LeoActorMask
+.global Ot6EsperVictory, Ot6VictoryNext ; #552 piece F: a revealed Leo earns at
+                                 ;   victory (ot6_esper.asm; the loop's next member)
+.global Ot6FieldLeoMagic         ; #552 piece F: his own stone's spells in the
+                                 ;   field Magic list (ot6_progression.asm)

@@ -542,10 +542,10 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; The class (OT6_ATKCLASS), set here because nothing on GP Rain's path loads
 ; one (no MagicProp, no weapon, no item) and the per-target chip runs after
 ; this effect:
-;   Coin Toss, and any character's GP Rain: special (coins are ¤, like
+;   Coin Toss, and any character's GP Rain: arcane (coins, like
 ;     Setzer's cards and dice), one chip on each body it hits;
 ;   Hired Help: the sellsword's weapon fits the target -- the first of
-;     slashing, piercing, bludgeoning in the target's weakness row, or none
+;     the six classes (bit order) in the target's weakness row, or none
 ;     (the hit lands unkeyed);
 ;   a monster's GP Rain: none (it is vanilla's, and hits the party).
 ;
@@ -628,7 +628,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 @done:  rtl
 .endproc
 
-; [ Hired Help's class: the first physical class the target is weak to ]
+; [ Hired Help's class: the first of the six the target is weak to ]
 ; $b9 = the monster half of the target mask (ChooseTarget has run).  a8, any
 ; index width.  writes OT6_ATKCLASS; preserves X and Y.
 .proc Ot6HireClass
@@ -684,8 +684,8 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;                   Train ghost (owner, 2026-10-02: the fourth is never Shadow
 ;                   when Shadow could not be hired)
 ;               cc  the weapon's class (Ot6CoinPrice ors it in once the
-;                   target is known): 0 none, 1 slashing, 2 piercing,
-;                   3 bludgeoning
+;                   target is known): 0 none, 1 a blade (sword, katana),
+;                   2 a point (dagger, spear), 3 a blow (fist, arcane)
 ;               L   the action's last pass (Setzer comes back after it)
 ;               F   its first (Setzer steps out before it)
 ; The pass is k = boost - $3a70: Ot6SetzerEffect adds the boost to the count
@@ -907,8 +907,8 @@ Ot6HireImpSeam = * + 2                  ; (a seam for the negative's mutant)
         .byte   CHAR_GFX::MERCHANT, CHAR_GFX::SOLDIER, CHAR_GFX::IMP, CHAR_GFX::SHADOW
         .byte   $ff, CHAR_GFX::GHOST
 
-; the weapon each figure swings, by class (none, slashing, piercing,
-; bludgeoning): the Fight animation's weapon number, item id + 1
+; the weapon each figure swings, by family (none, a blade, a point,
+; a blow): the Fight animation's weapon number, item id + 1
 Ot6HireWeapTbl:
         .byte   $00+1, $0b+1, $00+1, $34+1     ; merchant: dirk, regal cutlass, dirk, mithril rod
         .byte   $0a+1, $0a+1, $1d+1, $46+1     ; soldier: mithrilblade, mithrilblade, mithril pike, morning star
@@ -1412,7 +1412,7 @@ OT6_HIRE_YX    = $61d4-$61c7    ; a pincer walks with X this far back
 ; here, after CalcDmg), and the MP price is flat.
 ;
 ; Null-break (kits.md: the Fixed Dice are the outliers, large numbers and no
-; chip): OT6_ATKCLASS = special | null-break, and the element is clear.  The
+; chip): OT6_ATKCLASS = arcane | null-break, and the element is clear.  The
 ; triple can't be dodged.  The dice faces go to $b6/$b7 and $b5 = $26, the
 ; dice-roll animation vanilla's effect queues.
 ;

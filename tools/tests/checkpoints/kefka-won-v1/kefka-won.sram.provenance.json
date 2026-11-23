@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "3eaf5fa847bd0aa704ea4b02ba72cb508dd747930986cf3dd302d6686c80adff",
-  "generator_sig": "7e908481d38d685d33878d86f233b05b5fa99cfbc3bc080adfc575a9b5f8ee21 gen_kefka_won",
+  "payload_sha256": "2fa7eb7938ee458f282e7024c047b9c22bd7a7b37bfb5c0d2c5df760a18970b1",
+  "generator_sig": "e8eadcda01b33ea35a9ed91fd8fbacba15d9b943b3ad545f18d6c1b96caffba3 gen_kefka_won",
   "ancestors": [
     {
       "path": "build/states/kefka_entry.stamp",
-      "sha256": "b4747694a9afe1561dcdbd32737f3ab6bd769b7f0108a475729c9a6d942b8ed1"
+      "sha256": "ebef6a339f1a302e8e47e27f16500e89928b14a17bb5a6594dec316286431d7f"
     }
   ]
 }
