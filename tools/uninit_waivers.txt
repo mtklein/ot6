@@ -38,5 +38,5 @@ unread wram 9AE8 a menu HDMA table byte, read while WaitVblank spins (menu_commo
 unread wram EE2C the high byte of Ot6BlueLearn's 16-bit read of OT6_BLUESEEN (ot6_blue.asm:121), masked off by `and #$00ff`; OT6_BLUESEEN itself is cleared at battle start (ot6_boost.asm:52).
 unread sram 1FF1 the battery's random seed, which the load menu adds to before ClearSRAM or a load sets it (menu_common.asm:226); "any value is valid" (save-layout.md).
 unread sram 1FF8-1FFF the validity words, read to decide whether the battery is valid (menu_sram.asm:10-16); by design.
-unread sram 2000-2001 the slot-1 codex page's magic, read to tell O7 from O8 before signing (ot6_codex.asm:65); by design (save-layout.md: unsigned reads as absent).
+unread sram 2000-2001 the slot-1 codex page's magic, read to tell an O7 cartridge-wide codex from a per-save page before signing (ot6_codex.asm:74, Ot6CodexEnsure); by design (save-layout.md: unsigned reads as absent).
 unread sram 3C00-3C01 the live esper page's magic, read before it is signed (ot6_esper.asm:465); by design.

@@ -157,8 +157,8 @@ H.run({ maxFrames = 20000 }, {
       "SRAM $307ff0 records slot 3 (the context-stable witness, #29)")
     H.assertEq(emu.read(0x316800, emu.memType.snesMemory), 0x4f,
       "slot 3 has OT6 codex magic O")
-    H.assertEq(emu.read(0x316801, emu.memType.snesMemory), 0x38,
-      "slot 3 has OT6 codex magic 8")
+    H.assertEq(emu.read(0x316801, emu.memType.snesMemory), 0x39,
+      "slot 3 has OT6 codex magic 9")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
