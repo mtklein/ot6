@@ -897,6 +897,12 @@ MUTANTS = {
     "srcpages": ("SlotAt=ad1f02", "junk/v0.44-wor-cyan", "saveas: slot 1's codex and esper page pads"),
     # no New Game clear (battle_newgameloadouts, below)
     "noclear": ("Ot6NewGameClear", None, None),
+    # #566, the six classes' negatives (below, and the six_classes check):
+    # the Mithril Pike's class byte a sword's; katana drawing the sword's
+    # glyph cell; a sword's reveal showing the daggers' line
+    "sixpike": ("Ot6WeapClassTbl+29=01", None, None),
+    "sixglyph": ("Ot6ClassGlyphTbl+4=d9", None, None),
+    "sixmsg": ("Ot6ClassMsgTbl=46", None, None),
 }
 for name, (edit, fx, want) in MUTANTS.items():
     w.edge([f"build/mutants/{name}.sfc"], "sh",
@@ -942,6 +948,26 @@ for tag, fx, extra in (("newgame_gau", "v0.44/wor-gau-v1", ""),
            desc=f"suite {tag}", pool="side")
     qual.append(out)
     golden_outs.append(out)
+
+# #566: the two six-class suites on their mutants, each red for the reason
+# named: battle_sixhud where katana draws the sword's cell, battle_sixchip
+# where a sword's first reveal loads the daggers' line.  Screenshots and
+# states go to the run's own directory, not over the real suites' shots.
+for tag, t, mutant, want in (
+        ("sixhud_sixglyph", "battle_sixhud", "sixglyph", "the six classes draw six different tiles"),
+        ("sixchip_sixmsg", "battle_sixchip", "sixmsg", "it is the class's")):
+    f = f"tools/tests/{t}.lua"
+    deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
+            copy_if_changed_from(f), "tools/build/run_tagged_suite.sh",
+            f"build/mutants/{mutant}.sfc"] + [copy_if_changed_from(h) for h in LIBS] + HARNESS
+    deps += fixture_deps(f)
+    out = f"build/results/tagged/{tag}.ok"
+    w.edge([out], "sh", implicit=deps,
+           cmd=f"OT6_ROM=build/mutants/{mutant}.sfc OT6_DBG=ff6/rom/ff6-en.dbg "
+               f"OT6_ARTIFACT_DIR=build/results/tagged/{tag} "
+               f"nice tools/build/run_tagged_suite.sh {t} {tag} {out} red \"{want}\"",
+           desc=f"suite {tag} (must go red)", pool="side")
+    qual.append(out)
 
 # ------------------------------------------------------------------ checks --
 def check(name, cmd, deps, desc=None):
@@ -1127,6 +1153,18 @@ check("hud_columns",
        "ff6/src/menu/colosseum.asm", "ff6/include/const.inc",
        "ff6/src/battle/battle_main.asm"] + sorted(glob("ff6/src/event/*.asm"))
       + glob("src/event/*.asm", "ff6"))
+# #566: the six weapon classes' tables in the built ROM against the design
+# (every item's class byte, each weapon's icon and type word, the HUD's
+# glyph cells and their art, the skill and kit rows, the six messages).  The
+# selftest's mutants change one byte each; the mutant ROM sixpike (the
+# Mithril Pike's byte a sword's) must fail the weapon rule.
+check("six_classes",
+      "python3 tools/check_six_classes.py --selftest"
+      " && python3 tools/check_six_classes.py"
+      " && python3 tools/check_six_classes.py --rom build/mutants/sixpike.sfc --red weapon",
+      ["tools/check_six_classes.py", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc"),
+       "build/mutants/sixpike.sfc", "ff6/tools/char_table/text_en.json",
+       "ff6/tools/char_table/small_symbols_en.json"])
 check("spell_grants",
       "python3 tools/check_spell_grants.py --selftest"
       " && python3 tools/check_spell_grants.py",

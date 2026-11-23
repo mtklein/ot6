@@ -3,6 +3,7 @@
 
     python3 tools/check_six_classes.py [--rom build/ot6.sfc] [--dbg ff6/rom/ff6-en.dbg]
     python3 tools/check_six_classes.py --selftest
+    python3 tools/check_six_classes.py --rom build/mutants/sixpike.sfc --red weapon
 
 The design is written once, below (DESIGN, FAMILIES, SKILLS, KIT, ART), from
 the issue and the owner's ruling, not copied from the tables: six classes,
@@ -30,6 +31,8 @@ held to it, rule by rule:
 No emulator.  --selftest runs every rule against the built ROM with one
 byte changed (a mutant per rule: each must fail its own rule and no other
 rule's mutant may pass unnoticed), and the unchanged ROM, which must pass.
+--red RULE is the negative on a mutant ROM file (tools/build/mutant_rom.py):
+exit 0 only when that ROM fails, and fails RULE.
 A battle on a body weak to each class is tools/tests/battle_sixchip.lua;
 the HUD's cells drawn in a battle are tools/tests/battle_sixhud.lua.
 """
@@ -333,11 +336,20 @@ def main():
     ap.add_argument("--rom", default=os.path.join(ROOT, "build", "ot6.sfc"))
     ap.add_argument("--dbg", default=os.path.join(ROOT, "ff6", "rom", "ff6-en.dbg"))
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--red", metavar="RULE", help="the ROM must fail this rule (a mutant ROM's negative)")
     args = ap.parse_args()
     if args.selftest:
         return selftest(args.rom, args.dbg)
     rom, sym, table = load(args.rom, args.dbg)
     bad = check(rom, sym, table)
+    if args.red:
+        hit = [m for r, m in bad if r == args.red]
+        if not hit:
+            print("six classes: FAIL -- %s must fail rule '%s' and %s" % (args.rom, args.red, "failed only: "
+                  + ", ".join(sorted({r for r, _ in bad})) if bad else "passed"))
+            return 1
+        print("six classes: %s is red as it must be: FAIL %s %s" % (os.path.relpath(args.rom, ROOT), args.red, hit[0]))
+        return 0
     if bad:
         print("six classes: %d failure(s) in %s" % (len(bad), args.rom))
         for rule, msg in bad:

@@ -319,7 +319,7 @@ local function branch(cls, side)
         planDone = function()
           -- (asked only once the entry is confirmed: the action that ends after this is the Fight)
           if r.confirmAt == nil then r.confirmAt = H.frame end
-          if r.shotAt ~= nil and H.frame >= r.shotAt then
+          if type(r.shotAt) == "number" and H.frame >= r.shotAt then
             r.shotAt = false
             H.screenshot("sixchip_" .. cls.name .. "_msg")
           end
