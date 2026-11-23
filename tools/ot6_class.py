@@ -359,6 +359,11 @@ def selftest(root: str) -> int:
         floor = floor_classes(f.read(), C)
     assert len(rows) >= 300 and all(r[2] & ~C.mask == 0 for r in rows), "an Ot6ShieldTbl class byte leaves OT6_CLASSES"
     assert all(v and v & (v - 1) == 0 and v & C.mask for v in floor), "a floor byte is not one class"
+    # the floor follows the rows (gen_break_floor.py's rule 1): a species
+    # whose row names a class has one of that row's classes as its floor byte
+    stray = ["$%03X" % r[0] for r in rows if r[0] < N_SPECIES and r[2] and not floor[r[0]] & r[2]]
+    assert not stray, ("the floor byte of %s is not a class of its Ot6ShieldTbl row: run "
+                       "python3 ff6/tools/gen_break_floor.py" % ", ".join(stray))
     # the grouping (tools/proto_six/classes.py) restates the source's tables:
     # held to them, name by name and item by item
     K, S = grouping()

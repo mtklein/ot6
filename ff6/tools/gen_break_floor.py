@@ -17,11 +17,12 @@
 #
 # Six classes (v0.51, #566): the keyword families still sort a body into one
 # of three PARENTS (pierce: armor, carapace, dragons; bludgeon: brutes, rock,
-# ooze, bone; slash: beasts and the default), and FLOOR_CHILDREN / FLOOR_LEAD /
-# FLOOR_KEPT below turn the parent into the one class byte the table ships.
-# The generator stands on its own: it reads the monster names and the class
-# names of ot6_class.asm, nothing else (the migration read the bytes from
-# six_class_split.json, which this no longer opens).
+# ooze, bone; slash: beasts and the default), and FLOOR_CHILDREN below deals
+# the parent to one class; a species whose Ot6ShieldTbl row names a class
+# takes that row's lowest class bit instead.  The generator stands on its
+# own: it reads the monster names, ot6_class.asm's class names and
+# Ot6ShieldTbl's rows, nothing else (the migration read the bytes from
+# six_class_split.json, which nothing opens any more).
 #
 #   python3 ff6/tools/gen_break_floor.py            write the .inc and the review
 #   python3 ff6/tools/gen_break_floor.py --check    exit 1 if either file on disk
@@ -45,54 +46,37 @@ OT6_BLUDG = 0x04   # fists, staves, rods, flails, boomerangs
 CLASS_NAME = {OT6_SLASH: "SLASH", OT6_PIERCE: "PIERCE", OT6_BLUDG: "BLUDGEON"}
 
 # ------------------------------------------------------------------------------
-# The child rule (six classes).  The three constants above are the keyword
+# The floor byte (six classes).  The three constants above are the keyword
 # rule's PARENTS, v0.50's classes; they are no longer class bits of the ROM.
-# Each parent's children are the classes its own weapons went to when the six
-# were grouped (tools/proto_six/classes.py CHILDREN: slash's swords and
-# katanas; pierce's daggers, spears and bolts; bludgeon's fists and rods, and
-# the returning arcs that went to Ranged), named here by their source tokens
-# (main() refuses a token ot6_class.asm does not define):
 #
-#   every family of a parent deals its species to the parent's children IN
-#   TURN, in species-id order: a species takes whichever child of its parent
-#   the fewest species hold so far, the first-named child on a tie.
+#   1. A species with an Ot6ShieldTbl row that names a class takes THE ROW'S
+#      LOWEST CLASS BIT.  The game never reads that byte (Ot6SeedShields takes
+#      the row), but a floor byte is then always a key its own row holds: the
+#      floor follows a re-split by construction, and battle_breakwor_gau's
+#      "the floor's class is a class of the row" holds for every species.  The
+#      rows are read through tools/ot6_class.py.
+#   2. Every other species -- no row, or a row with no class (the shields-only
+#      rows and the 0-shield markers) -- takes THE CHILD RULE: each parent's
+#      children are the classes its own weapons went to when the six were
+#      grouped (tools/proto_six/classes.py CHILDREN: slash's swords and
+#      katanas; pierce's daggers, spears and bolts; bludgeon's fists and rods,
+#      and the returning arcs that went to Ranged), and every family of a
+#      parent deals its species to the parent's children IN TURN, in
+#      species-id order: a species takes whichever child of its parent the
+#      fewest species hold so far, the first-named child on a tie.
 #
-# So a parent's bodies spread evenly over the weapon families that inherited
-# it, with no keyword deciding which (a name says "armor", not "dagger, spear
-# or bolt").  Ranged is a child of two parents and has one tally.  Two frozen
-# inputs make the dealing reproduce the table the six-class split shipped,
-# byte for byte, so the ROM did not move when this generator stopped reading
-# the split's json:
-#
-#   FLOOR_LEAD  each class's head start when the dealing begins: the authored
-#               rows' tallies on the day of the split, which the floor was
-#               dealt after, less the smallest of them.
-#   FLOOR_KEPT  the species the dealing would hand another child, which keep
-#               the child their own Ot6ShieldTbl row was pinned to on that
-#               day (the floor was written row-first).  Every one of them has
-#               an authored row, so its floor byte is never read
-#               (Ot6SeedShields takes the row); a kept species still counts
-#               toward its child's tally.
-#
-# Editing either moves floor bytes; a new species needs neither.
-# (build/attempts/wt/v051-six-classes/tools/derive_floor.py found both from
-# the shipped table.)
+# The dealing runs over every species id, rowed or not, from nothing (Ranged
+# is a child of two parents and has one tally), and rule 1 then replaces the
+# rowed ones: so the byte of a species with no row depends on the monster
+# names alone, and does not move when a row is authored or re-split.  A
+# parent's bodies spread evenly over the weapon families that inherited it,
+# with no keyword deciding which (a name says "armor", not "dagger, spear or
+# bolt").  The children are named by their source tokens; main() refuses a
+# token ot6_class.asm does not define.
 FLOOR_CHILDREN = {
     OT6_SLASH:  ("OT6_SWORD", "OT6_KATANA"),
     OT6_PIERCE: ("OT6_DAGGER", "OT6_SPEAR", "OT6_RANGED"),
     OT6_BLUDG:  ("OT6_BLUNT", "OT6_RANGED"),
-}
-FLOOR_LEAD = {"OT6_SWORD": 5, "OT6_DAGGER": 1, "OT6_BLUNT": 31, "OT6_RANGED": 30, "OT6_KATANA": 5, "OT6_SPEAR": 0}
-FLOOR_KEPT = {
-    0x000: "OT6_RANGED", 0x001: "OT6_RANGED", 0x002: "OT6_RANGED", 0x00e: "OT6_KATANA",
-    0x011: "OT6_DAGGER", 0x039: "OT6_SPEAR", 0x03a: "OT6_KATANA", 0x057: "OT6_KATANA",
-    0x071: "OT6_SWORD", 0x072: "OT6_SWORD", 0x098: "OT6_SWORD", 0x09c: "OT6_SPEAR",
-    0x09d: "OT6_RANGED", 0x0ba: "OT6_KATANA", 0x0ca: "OT6_SWORD", 0x0d3: "OT6_SWORD",
-    0x0e6: "OT6_SWORD", 0x0f5: "OT6_SWORD", 0x102: "OT6_DAGGER", 0x104: "OT6_DAGGER",
-    0x108: "OT6_SWORD", 0x10a: "OT6_SWORD", 0x113: "OT6_RANGED", 0x124: "OT6_KATANA",
-    0x12d: "OT6_SWORD", 0x12e: "OT6_SWORD", 0x140: "OT6_SWORD", 0x145: "OT6_RANGED",
-    0x147: "OT6_RANGED", 0x14d: "OT6_SWORD", 0x153: "OT6_SPEAR", 0x155: "OT6_KATANA",
-    0x156: "OT6_KATANA", 0x16d: "OT6_SWORD", 0x173: "OT6_SWORD",
 }
 
 # ------------------------------------------------------------------------------
@@ -267,56 +251,73 @@ def build_rows(names):
 
 
 def floor_children(rows):
-    """[child token] per row of build_rows(): the child rule above."""
+    """[child token] per row of build_rows(): the child rule (rule 2), dealt
+    over every species id."""
     tally = {t: 0 for kids in FLOOR_CHILDREN.values() for t in kids}
-    for t, lead in FLOOR_LEAD.items():
-        if t not in tally or lead < 0:
-            raise SystemExit(f"gen_break_floor: FLOOR_LEAD {t} = {lead}: not a child's head start")
-        tally[t] = lead
     out = []
-    for sid, _name, parent, _label in rows:
+    for _sid, _name, parent, _label in rows:
         kids = FLOOR_CHILDREN[parent]
         child = min(kids, key=lambda t: (tally[t], kids.index(t)))
-        if sid in FLOOR_KEPT:
-            child = FLOOR_KEPT[sid]
-            if child not in kids:
-                raise SystemExit(f"gen_break_floor: FLOOR_KEPT ${sid:03x} is {child}, not a child of "
-                                 f"{CLASS_NAME[parent]} ({', '.join(kids)})")
         tally[child] += 1
         out.append(child)
     return out
 
 
-def check_tokens(repo_root):
-    """Every child token is a class ot6_class.asm defines (tools/ot6_class.py)."""
+def source_classes(repo_root):
+    """(ot6_class.asm's classes, {species: (shields, class byte)} of
+    Ot6ShieldTbl, first row a species), through tools/ot6_class.py; every
+    child token must be a class the source defines, and every class dealt."""
     sys.path.insert(0, os.path.join(repo_root, "tools"))
     import ot6_class
     C = ot6_class.read(repo_root)
-    used = {t for pair in FLOOR_CHILDREN.values() for t in pair} | set(FLOOR_KEPT.values())
+    used = {t for pair in FLOOR_CHILDREN.values() for t in pair}
     missing = sorted(used - set(C.token))
     if missing:
         raise SystemExit("gen_break_floor: ot6_class.asm defines no " + ", ".join(missing))
     if used != set(C.token):
         raise SystemExit("gen_break_floor: the floor never deals " + ", ".join(sorted(set(C.token) - used))
                          + ": a class of ot6_class.asm with no parent in FLOOR_CHILDREN")
+    with open(os.path.join(repo_root, ot6_class.HUD_ASM), encoding="utf-8") as f:
+        table = ot6_class.shield_rows(f.read(), C)
+    if not table:
+        raise SystemExit("gen_break_floor: Ot6ShieldTbl parsed empty")
+    shield = {}
+    for sp, sh, mask, _line, _comment in table:
+        shield.setdefault(sp, (sh, mask))
+    return C, shield
 
 
-def inc_text(rows):
+def floor_bytes(rows, C, shield):
+    """[(token, how)] per species: the row's lowest class bit where its row
+    names a class (rule 1), else the dealt child (rule 2)."""
+    token_of = {v: n for n, v in C.token.items()}
+    out = []
+    for (sid, _name, parent, _label), dealt in zip(rows, floor_children(rows)):
+        mask = shield.get(sid, (0, 0))[1] & C.mask
+        if mask:
+            out.append((token_of[mask & -mask], "row"))
+        else:
+            out.append((dealt, CLASS_NAME[parent]))
+    return out
+
+
+def inc_text(rows, floor):
     lines = []
     lines.append("; ----------------------------------------------------------------------------")
     lines.append("; OT6 break-floor class table -- GENERATED by tools/gen_break_floor.py")
     lines.append("; DO NOT EDIT BY HAND. Re-run the generator to regenerate.")
     lines.append(";")
     lines.append("; One class byte per species, directly indexed by species id (0..383),")
-    lines.append("; matching OT6_CODEX width. DATA ONLY -- not yet referenced by ot6.asm")
-    lines.append("; (the @formula lookup wiring is Phase 2). Class bits mirror ot6_class.asm.")
+    lines.append("; matching OT6_CODEX width. Ot6SeedShields' @formula reads it for a species")
+    lines.append("; with no Ot6ShieldTbl row.  `row`: the lowest class bit of the species' own")
+    lines.append("; row; SLASH / PIERCE / BLUDGEON: the keyword parent, dealt to a child class.")
     lines.append("; ----------------------------------------------------------------------------")
     lines.append("")
     lines.append("OT6_FLOOR_CLASS:")
-    for (sid, name, cls, _label), six in zip(rows, floor_children(rows)):
+    for (sid, name, _cls, _label), (six, how) in zip(rows, floor):
         shown = name if name != "" else "(unused)"
         lines.append(
-            f"        .byte   {six:<12}; {sid:>3} {shown} -> {CLASS_NAME[cls]} -> {six[4:]}"
+            f"        .byte   {six:<12}; {sid:>3} {shown} -> {how} -> {six[4:]}"
         )
     lines.append("")
     lines.append(f"        ; {CODEX_WIDTH} bytes total (codex width)")
@@ -419,8 +420,9 @@ def main():
               f"{CODEX_WIDTH}; tail handled by padding/truncation.")
 
     rows = build_rows(names)
-    check_tokens(os.path.dirname(ff6_dir))
-    inc = inc_text(rows)
+    C, shield = source_classes(os.path.dirname(ff6_dir))
+    floor = floor_bytes(rows, C, shield)
+    inc = inc_text(rows, floor)
     authored = load_authored_species(hud_path)
     review, counts, origins, n_authored = review_text(rows, authored)
 
@@ -434,8 +436,9 @@ def main():
             print("gen_break_floor --check: " + ", ".join(stale) + " is not what the generator writes; "
                   "run python3 ff6/tools/gen_break_floor.py (the .inc is generated: never edit it by hand)")
             sys.exit(1)
+        n_row = len([1 for _t, how in floor if how == "row"])
         print(f"gen_break_floor --check OK: {len(rows)} floor bytes and the review are the generator's own "
-              f"({len(FLOOR_KEPT)} kept ids)")
+              f"({n_row} follow their row, {len(rows) - n_row} dealt)")
         return
     for path, text in ((inc_path, inc), (review_path, review)):
         with open(path, "w", encoding="utf-8", newline="\n") as f:

@@ -443,6 +443,28 @@
         sta     OT6_SCR_BIT
         lda     #$00
         sta     OT6_SCR_IDX     ; class index 0-5
+        lda     $3ea4,y         ; #566: a body every class breaks says so in
+        and     #OT6_CLASSES    ;   ONE cell, the any-weapon mark (six icons
+        cmp     #OT6_CLASSES    ;   would not fit the line's four cells): the
+        bne     @cbit           ;   mark once any class of it is revealed
+        inx
+        inx                     ; claim the next cell
+        txa
+        sec
+        sbc     $01,s
+        cmp     #$09
+        bcs     @edone          ; past slot cell 4
+        lda     $3ea5,y
+        and     #OT6_CLASSES
+        beq     @anyq
+        lda     #OT6_ANYWEAPON
+        sta     f:$7e0000+OT6_SHADOW+4,x
+        bra     @edone
+@anyq:  lda     #OT6_QMARK_ATTR ; '?' in grey, attr first
+        sta     f:$7e0000+OT6_SHADOW+5,x
+        lda     #OT6_QMARK
+        sta     f:$7e0000+OT6_SHADOW+4,x
+        bra     @edone
 @cbit:  lda     OT6_SCR_BIT
         cmp     #OT6_CLASSES+1
         bcs     @edone          ; all six classes walked

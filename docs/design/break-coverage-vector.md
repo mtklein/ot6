@@ -606,12 +606,12 @@ Every species a table above names, with the row `ot6_hud.asm` ships today.
 | Crane | `$10e` | 6 · dagger |
 | Guardian | `$111` | 0 · — |
 | Guardian | `$112` | 10 · ranged\|spear |
-| Garm | `$0cb` | 2 · ranged\|spear |
+| Garm | `$0cb` | 2 · dagger\|ranged |
 | Commando | `$0c7` | 2 · dagger |
 | ProtoArmor | `$165` | 2 · ranged |
 | Pipsqueak | `$041` | 2 · dagger |
 | Flan | `$047` | 2 · ranged |
-| General | `$066` | 2 · dagger\|ranged |
+| General | `$066` | 2 · ranged\|spear |
 | Trapper | `$02d` | 2 · ranged |
 | Gobbler | `$088` | 2 · sword\|dagger |
 | Rhinox | `$075` | 2 · ranged |
