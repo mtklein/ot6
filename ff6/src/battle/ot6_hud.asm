@@ -2213,9 +2213,9 @@ Ot6ShieldTbl:
         .word   $010b
         .byte   7, OT6_DAGGER ; number 128 (body)
         .word   $013f
-        .byte   3, OT6_SWORD ; right blade
+        .byte   3, OT6_KATANA ; right blade
         .word   $0140
-        .byte   3, OT6_SWORD ; left blade
+        .byte   3, OT6_KATANA ; left blade
         .word   $010d
         .byte   6, OT6_DAGGER ; crane (element sides verified at m6 entry)
         .word   $010e
@@ -2229,7 +2229,7 @@ Ot6ShieldTbl:
         ; facility teaches, so it is the one body only a fist answers.
         ; shield counts: all twelve at 2 against a formula value of 4.
         .word   $00cb
-        .byte   2, OT6_DAGGER|OT6_RANGED ; garm: a magitek quadruped
+        .byte   2, OT6_SPEAR|OT6_RANGED ; garm: a magitek quadruped
                                 ;   (Program 95) rather than a hound: spear the
                                 ;   joints or cave the housing. commonest
                                 ;   body at the entrance, where the section
@@ -2424,7 +2424,7 @@ Ot6ShieldTbl:
         ; blitzes) and SETZER (cards and dice: arcane).  Vanilla elements
         ; stay.
         .word   $00e8
-        .byte   2, OT6_SWORD|OT6_DAGGER ; bug: a shell on wings; a katana or
+        .byte   2, OT6_SWORD|OT6_SPEAR ; bug: a shell on wings; a katana or
                                 ;   a dagger.  ice|water vanilla; alone, it
                                 ;   answers a Fight with a petrifying spine
         .word   $003d
@@ -2566,7 +2566,7 @@ Ot6ShieldTbl:
         .byte   3, OT6_SWORD|OT6_DAGGER ; wyvern: a dragon's hide.  ice
                                 ;   vanilla
         .word   $008d
-        .byte   2, OT6_SWORD|OT6_BLUNT ; weedfeeder: fire|wind vanilla
+        .byte   2, OT6_SWORD|OT6_RANGED ; weedfeeder: fire|wind vanilla
         .word   $006b
         .byte   2, OT6_SWORD|OT6_BLUNT ; joker: a conjurer (world group
                                 ;   15, three to a formation: the grind
@@ -2577,7 +2577,7 @@ Ot6ShieldTbl:
         .byte   2, OT6_SWORD|OT6_DAGGER ; cephaler: bolt vanilla (locke's
                                 ;   thunderblade)
         .word   $001f
-        .byte   4, OT6_SWORD|OT6_DAGGER ; chimera: 2237 hp, miniboss-grade;
+        .byte   4, OT6_SWORD|OT6_RANGED ; chimera: 2237 hp, miniboss-grade;
                                 ;   poison an ot6 add
         .word   $001d
         .byte   2, OT6_SWORD|OT6_DAGGER ; baskervor: a hound (world group
@@ -2592,7 +2592,7 @@ Ot6ShieldTbl:
         .byte   2, OT6_DAGGER|OT6_BLUNT ; insecare: an insect's shell.
                                 ;   fire|wind vanilla
         .word   $00eb
-        .byte   2, OT6_SWORD|OT6_DAGGER ; abolisher: no element
+        .byte   2, OT6_SWORD|OT6_SPEAR ; abolisher: no element
         .word   $00d6
         .byte   5, OT6_DAGGER|OT6_BLUNT ; adamanchyt: the mountain's wall,
                                 ;   five shields, the floor's, kept above
@@ -2605,7 +2605,7 @@ Ot6ShieldTbl:
                                 ;   vanilla
         ; -- the floating continent (map 393) --
         .word   $0169
-        .byte   3, OT6_SWORD|OT6_DAGGER|OT6_RANGED ; naughty: a demon,
+        .byte   3, OT6_SWORD|OT6_SPEAR|OT6_RANGED ; naughty: a demon,
                                 ;   the pool's elite.  fire|bolt|holy
                                 ;   vanilla; absorbs ice
         ; ---- the world of balance towns and boxes (docs/design/wob-
@@ -2621,7 +2621,7 @@ Ot6ShieldTbl:
         .byte   3, OT6_KATANA|OT6_BLUNT ; specter (the train's chest) (opening.md 10c).
                                 ;   fire|holy vanilla; absorbs poison
         .word   $00ae
-        .byte   5, OT6_SWORD|OT6_BLUNT ; gigantos: the floating
+        .byte   5, OT6_SWORD|OT6_RANGED ; gigantos: the floating
                                 ;   continent's boxed giant, 6000 hp: a
                                 ;   boss-grade gauge.  hamstring it or
                                 ;   break its bones: a katana (shadow's
@@ -2742,7 +2742,7 @@ Ot6ShieldTbl:
                                 ;   its fire|holy vanilla (and its runic
                                 ;   fire 2) the real handles
         .word   $00a9
-        .byte   3, OT6_SWORD|OT6_DAGGER|OT6_BLUNT ; neckhunter: a
+        .byte   3, OT6_SWORD|OT6_SPEAR|OT6_BLUNT ; neckhunter: a
                                 ;   reaper, a sword or a spear; death's
                                 ;   own shape is a spirit: arcane too
                                 ;   (#347).  poison vanilla (bio blaster)
@@ -2753,7 +2753,7 @@ Ot6ShieldTbl:
                                 ;   answers magic with magic: a dagger
                                 ;   too (#347).  poison vanilla
         .word   $008b
-        .byte   2, OT6_DAGGER|OT6_RANGED ; drop: a blade passes through water;
+        .byte   2, OT6_SPEAR|OT6_RANGED ; drop: a blade passes through water;
                                 ;   a fist or a spear splashes it.
                                 ;   bolt|water vanilla
         ; -- the engine room's tentacles (event group 84, formation 454) --
@@ -2787,7 +2787,7 @@ Ot6ShieldTbl:
         ; tools/tests/battle_breakwor_falcon.lua reads them back from the ROM.
         ; -- the kohlingen continent (world groups 45-47) --
         .word   $0089
-        .byte   3, OT6_SWORD|OT6_SPEAR ; harpiai: a winged woman, a flier
+        .byte   3, OT6_SWORD|OT6_RANGED ; harpiai: a winged woman, a flier
                                 ;   (spear, the WoB's pierce convention) and
                                 ;   a sword.  wind vanilla: sabin's air blade
         .word   $00db
@@ -2802,7 +2802,7 @@ Ot6ShieldTbl:
                                 ;   sleeps whoever meets its gaze: arcane
                                 ;   too.  fire vanilla
         .word   $00d3
-        .byte   3, OT6_SWORD|OT6_RANGED ; bogy: a ghost behind safe with no
+        .byte   3, OT6_SWORD|OT6_BLUNT|OT6_RANGED ; bogy: a ghost behind safe with no
                                 ;   vanilla weakness, so this row is its
                                 ;   only key: a sword for the trio, and
                                 ;   setzer's cards: a spirit
@@ -2879,29 +2879,29 @@ Ot6ShieldTbl:
         ; fire, bolt, water).  Mt. zozo's five come in packs and pairs:
         ; cyan's stunner cuts every body at once.
         .word   $005b
-        .byte   3, OT6_DAGGER|OT6_RANGED ; crawler: a shelled crawler; a
+        .byte   3, OT6_DAGGER|OT6_BLUNT ; crawler: a shelled crawler; a
                                 ;   rod cracks it, a dagger finds the
                                 ;   joints.  ice vanilla
         .word   $0099
-        .byte   3, OT6_SPEAR|OT6_KATANA ; geckorex: lizard hide.  ice
+        .byte   3, OT6_SWORD|OT6_DAGGER ; geckorex: lizard hide.  ice
                                 ;   vanilla
         .word   $003b
-        .byte   2, OT6_RANGED ; reach frog: soft; arcane.  ice vanilla
+        .byte   2, OT6_BLUNT ; reach frog: soft; arcane.  ice vanilla
         .word   $00d2
-        .byte   3, OT6_KATANA|OT6_BLUNT|OT6_RANGED ; mantodea: cut or crush
+        .byte   3, OT6_SWORD|OT6_BLUNT|OT6_RANGED ; mantodea: cut or crush
                                 ;   the scythes; three, so the party breaks
                                 ;   it before its battle lands (route-wor-
                                 ;   terra 8); relm's brush keys it the day
                                 ;   she joins (route-wor-thamasa 4.3).
                                 ;   fire vanilla
         .word   $0087
-        .byte   3, OT6_SWORD|OT6_SPEAR ; sprinter: a running bird.  bolt
+        .byte   3, OT6_SWORD|OT6_DAGGER ; sprinter: a running bird.  bolt
                                 ;   vanilla
         .word   $00b0
-        .byte   1, OT6_SPEAR|OT6_KATANA|OT6_BLUNT ; spek tor: 250 hp; sword,
+        .byte   1, OT6_SWORD|OT6_DAGGER|OT6_BLUNT ; spek tor: 250 hp; sword,
                                 ;   spear or fist.  water vanilla
         .word   $008e
-        .byte   2, OT6_SWORD|OT6_DAGGER ; luridan: horned, in herds of three
+        .byte   2, OT6_DAGGER|OT6_KATANA ; luridan: horned, in herds of three
                                 ;   and six.  fire|wind vanilla (cyan's
                                 ;   tempest)
         .word   $00f2
@@ -2928,9 +2928,9 @@ Ot6ShieldTbl:
         ; and fire; fist arrives with umaro at the end.  Vanilla elements
         ; stay: the arc is ice, and every boss absorbs it and is weak to fire.
         .word   $00f8
-        .byte   2, OT6_DAGGER|OT6_KATANA ; red wolf: a wolf, as the wob lobo
+        .byte   2, OT6_SWORD|OT6_DAGGER ; red wolf: a wolf, as the wob lobo
         .word   $00ce
-        .byte   2, OT6_KATANA|OT6_BLUNT ; nastidon: a hide; fire vanilla
+        .byte   2, OT6_SWORD|OT6_RANGED ; nastidon: a hide; fire vanilla
         .word   $009c
         .byte   3, OT6_SPEAR ; test rider: the lance-rider; mog's spear
                                 ;   unseats it (the recruit's key: before
@@ -2966,25 +2966,25 @@ Ot6ShieldTbl:
         .byte   2, OT6_SPEAR|OT6_RANGED ; tomb thumb: a cursed body (arcane
                                 ;   for cursed bodies).  bolt|water vanilla
         .word   $0054
-        .byte   4, OT6_KATANA|OT6_BLUNT ; pug: the rare one in umaro's cave,
+        .byte   4, OT6_KATANA|OT6_RANGED ; pug: the rare one in umaro's cave,
                                 ;   miniboss-grade.  fire|bolt vanilla
         .word   $00ff
         .byte   4, OT6_KATANA|OT6_RANGED ; pugs: the same body, the chest in
                                 ;   umaro's cave (event group 152); the
                                 ;   split gave it the pug's other halves
         .word   $0110
-        .byte   6, OT6_SPEAR|OT6_KATANA ; umaro: 17200 hp; break him before
+        .byte   6, OT6_SWORD|OT6_SPEAR ; umaro: 17200 hp; break him before
                                 ;   his green cherry (under 10240 hp).
                                 ;   fire|poison vanilla; absorbs ice
         .word   $0144
-        .byte   10, OT6_SPEAR|OT6_KATANA ; tritoch (the world of ruin's
+        .byte   10, OT6_SWORD|OT6_SPEAR|OT6_KATANA ; tritoch (the world of ruin's
                                 ;   record: only battle 119 reaches it;
                                 ;   $0114/$0115 stay shieldless below):
                                 ;   30000 hp, def 254, so a katana and the
                                 ;   spear chip what they barely hurt; fire
                                 ;   (vanilla) burns it; absorbs ice
         .word   $0149
-        .byte   6, OT6_SPEAR|OT6_BLUNT ; ice dragon: 24400 hp; mog's spear
+        .byte   6, OT6_SPEAR|OT6_RANGED ; ice dragon: 24400 hp; mog's spear
                                 ;   is the class key, fire (vanilla)
                                 ;   everyone's; absorbs ice.  six, not the
                                 ;   plan's ten: with only the spear and
@@ -3011,7 +3011,7 @@ Ot6ShieldTbl:
         .byte   1, OT6_DAGGER|OT6_KATANA ; wild cat: in fours.  fire|water
                                 ;   vanilla
         .word   $0009
-        .byte   2, OT6_SWORD|OT6_BLUNT ; dahling: a painting; celes's
+        .byte   2, OT6_KATANA|OT6_RANGED ; dahling: a painting; celes's
                                 ;   runic eats its ice 2 and bolt 2.  poison
                                 ;   vanilla
         .word   $0033
@@ -3028,35 +3028,35 @@ Ot6ShieldTbl:
                                 ;   swords, with fire and pearl (vanilla
                                 ;   fire|holy); absorbs bolt
         .word   $002b
-        .byte   2, OT6_SPEAR|OT6_BLUNT ; harpy: thamasa's plain; relm's
+        .byte   2, OT6_DAGGER|OT6_BLUNT ; harpy: thamasa's plain; relm's
                                 ;   brush
         .word   $008a
-        .byte   3, OT6_SPEAR|OT6_BLUNT ; gloomshell: a shell, strago's rod.
+        .byte   3, OT6_DAGGER|OT6_BLUNT ; gloomshell: a shell, strago's rod.
                                 ;   ice vanilla
         .word   $00d4
-        .byte   3, OT6_KATANA|OT6_RANGED ; prussian: a bear
+        .byte   3, OT6_SWORD|OT6_BLUNT ; prussian: a bear
         ; The fanatics' tower is magic-only (battle switch $38): only spells
         ; chip, on a weakness or by ot6's break.  The species meet no class
         ; on this arc; arcane, the magical body's key, stands for the few
         ; places outside the tower they appear.  L.20 and L.70 start with
         ; reflect: quake (earth, added in Ot6ElemAddTbl) reaches them.
         .word   $0132
-        .byte   1, OT6_RANGED ; l.10 magic: fire|holy vanilla
+        .byte   1, OT6_BLUNT ; l.10 magic: fire|holy vanilla
         .word   $0130
         .byte   2, OT6_BLUNT ; l.20 magic: reflect; +earth
         .word   $0125
-        .byte   2, OT6_RANGED ; l.30 magic: poison vanilla; absorbs holy
+        .byte   2, OT6_BLUNT ; l.30 magic: poison vanilla; absorbs holy
         .word   $012b
-        .byte   2, OT6_RANGED ; l.40 magic: bolt vanilla
+        .byte   2, OT6_BLUNT ; l.40 magic: bolt vanilla
         .word   $0133
         .byte   2, OT6_BLUNT ; l.50 magic: fire|holy vanilla
         .word   $0139
         .byte   3, OT6_BLUNT ; l.60 magic: fire vanilla; absorbs ice
         .word   $0143
-        .byte   3, OT6_RANGED ; l.70 magic: reflect; +earth; ice|water
+        .byte   3, OT6_BLUNT ; l.70 magic: reflect; +earth; ice|water
                                 ;   vanilla, absorbs fire
         .word   $0163
-        .byte   3, OT6_RANGED ; l.80 magic: poison vanilla
+        .byte   3, OT6_BLUNT ; l.80 magic: poison vanilla
         .word   $0164
         .byte   0, $00 ; l.90 magic: reflect and nulls holy, earth,
                                 ;   water: nothing the party casts reaches
@@ -3064,11 +3064,11 @@ Ot6ShieldTbl:
         .word   $0055
         .byte   0, $00 ; magic urn: a gift, not a fight
         .word   $0024
-        .byte   6, OT6_RANGED ; white drgn (the holy dragon): no
+        .byte   6, OT6_BLUNT ; white drgn (the holy dragon): no
                                 ;   weakness and no reflect: ot6's break is
                                 ;   its key
         .word   $0166
-        .byte   8, OT6_RANGED ; magimaster: his wall's one weakness
+        .byte   8, OT6_BLUNT ; magimaster: his wall's one weakness
                                 ;   (wallchange), or ot6's break
         ; ---- the world of ruin: the phoenix cave (locke; the red dragon;
         ; doom gaze in the sky on the way; docs/design/route-wor-locke.md
@@ -3081,18 +3081,18 @@ Ot6ShieldTbl:
         ; key of its own: holy on the casters and the phantom, a class on
         ; the beasts.  Vanilla elements stay.
         .word   $00bc
-        .byte   2, OT6_RANGED ; phase: a phantom; +holy (Ot6ElemAddTbl)
+        .byte   2, OT6_BLUNT ; phase: a phantom; +holy (Ot6ElemAddTbl)
                                 ;   beside its ice: the key for the half
                                 ;   with no ice.  absorbs fire
         .word   $00bf
-        .byte   2, OT6_SPEAR|OT6_KATANA ; parasoul: cut or puncture the
+        .byte   2, OT6_DAGGER|OT6_KATANA ; parasoul: cut or puncture the
                                 ;   canopy.  ice vanilla; absorbs fire
         .word   $00f1
         .byte   2, OT6_SWORD|OT6_BLUNT ; necromancr: a robed caster;
                                 ;   celes's runic eats its doom and flare.
                                 ;   fire|holy vanilla
         .word   $00f7
-        .byte   2, OT6_SPEAR|OT6_RANGED ; trixter: a fire imp; mog's spear
+        .byte   2, OT6_SPEAR|OT6_BLUNT ; trixter: a fire imp; mog's spear
                                 ;   for the half with no holy.  holy vanilla
         .word   $00ec
         .byte   3, OT6_SPEAR|OT6_KATANA ; aquila: a bird, the cave's rare
@@ -3130,7 +3130,7 @@ Ot6ShieldTbl:
         .byte   4, OT6_DAGGER ; rhyos: an armoured horn (def 150), the
                                 ;   cave's rare body; no element
         .word   $00bb
-        .byte   3, OT6_DAGGER|OT6_KATANA ; allo ver: bones in the monster
+        .byte   3, OT6_SWORD|OT6_DAGGER ; allo ver: bones in the monster
                                 ;   chest; doom and condemned.  fire|holy
                                 ;   vanilla; absorbs poison
         .word   $0119
@@ -3203,10 +3203,10 @@ Ot6ShieldTbl:
         ; weak only to those (ogor, tap dancer) take a class, and each row
         ; keys two of the four.  Vanilla elements stay.
         .word   $00dc
-        .byte   3, OT6_KATANA|OT6_BLUNT ; karkass: a carcass; break the
+        .byte   3, OT6_SWORD|OT6_BLUNT ; karkass: a carcass; break the
                                 ;   bones.  fire|holy vanilla; absorbs poison
         .word   $007d
-        .byte   3, OT6_SPEAR|OT6_RANGED ; wart puck: a warty imp.  fire
+        .byte   3, OT6_DAGGER|OT6_BLUNT ; wart puck: a warty imp.  fire
                                 ;   vanilla
         .word   $0068
         .byte   3, OT6_SWORD|OT6_DAGGER ; ogor: an ogre's hide.  bolt|poison
@@ -3215,10 +3215,10 @@ Ot6ShieldTbl:
         .byte   2, OT6_SWORD|OT6_BLUNT ; tap dancer: a dancer; muddles.
                                 ;   poison vanilla, which the four lack
         .word   $0067
-        .byte   3, OT6_SPEAR|OT6_RANGED ; covert: a ninja (evade 50);
+        .byte   3, OT6_DAGGER|OT6_BLUNT ; covert: a ninja (evade 50);
                                 ;   pinned or crushed.  holy vanilla (pearl)
         .word   $00fa
-        .byte   3, OT6_KATANA ; woolly: shear the wool.  fire vanilla;
+        .byte   3, OT6_SWORD ; woolly: shear the wool.  fire vanilla;
                                 ;   absorbs ice, bolt, poison, wind, earth,
                                 ;   water
         .word   $0171
@@ -3242,7 +3242,7 @@ Ot6ShieldTbl:
         .byte   2, OT6_KATANA|OT6_BLUNT ; cluck: a bird.  ice vanilla;
                                 ;   absorbs poison
         .word   $00a5
-        .byte   2, OT6_SPEAR|OT6_BLUNT ; eland: an antelope.  bolt vanilla
+        .byte   2, OT6_DAGGER|OT6_BLUNT ; eland: an antelope.  bolt vanilla
         .word   $00b5
         .byte   2, OT6_DAGGER|OT6_BLUNT ; hipocampus: a sea horse.
                                 ;   fire|holy vanilla; absorbs poison
@@ -3250,16 +3250,16 @@ Ot6ShieldTbl:
         .byte   3, OT6_BLUNT|OT6_RANGED ; displayer: an eye.  fire|holy
                                 ;   vanilla; absorbs poison
         .word   $00c8
-        .byte   3, OT6_KATANA|OT6_BLUNT ; opinicus: a griffin.  fire|holy
+        .byte   3, OT6_SWORD|OT6_BLUNT ; opinicus: a griffin.  fire|holy
                                 ;   vanilla; absorbs poison
         .word   $0123
-        .byte   6, OT6_SPEAR|OT6_BLUNT ; hidon: strago's old foe;
+        .byte   6, OT6_DAGGER|OT6_BLUNT ; hidon: strago's old foe;
                                 ;   fire|holy|earth vanilla, absorbs poison
         .word   $0126
-        .byte   2, OT6_KATANA|OT6_BLUNT ; hidonite (poison claw): earth
+        .byte   2, OT6_SWORD|OT6_BLUNT ; hidonite (poison claw): earth
                                 ;   vanilla; absorbs poison
         .word   $0160
-        .byte   2, OT6_KATANA|OT6_BLUNT ; hidonite (confuclaw): reflect,
+        .byte   2, OT6_SWORD|OT6_BLUNT ; hidonite (confuclaw): reflect,
                                 ;   and drinks every element: a weapon only
         .word   $0161
         .byte   2, OT6_DAGGER|OT6_BLUNT ; hidonite (zombi claw): fire|holy
@@ -3270,7 +3270,7 @@ Ot6ShieldTbl:
         ; ---- the world of ruin: the opera house (the dirt dragon;
         ; route-wor-gogo.md section 3) --------------------------------------
         .word   $014c
-        .byte   6, OT6_DAGGER|OT6_BLUNT ; dirt drgn: an earth dragon; the
+        .byte   6, OT6_SPEAR|OT6_RANGED ; dirt drgn: an earth dragon; the
                                 ;   floor's pierce (dagger) and a rod's blow.
                                 ;   wind|water vanilla (strago's aqua rake)
         ; ---- the world of ruin: the plain west of doma castle (world group
@@ -3289,7 +3289,7 @@ Ot6ShieldTbl:
         .byte   3, OT6_SWORD|OT6_KATANA ; barb-e: a dream's siren; a katana
                                 ;   or a brush.  poison vanilla
         .word   $00ab
-        .byte   2, OT6_KATANA|OT6_RANGED ; critic: a shrieking bird
+        .byte   2, OT6_SWORD|OT6_RANGED ; critic: a shrieking bird
         .word   $0085
         .byte   3, OT6_SPEAR|OT6_RANGED ; allosaurus: a dinosaur's hide.
                                 ;   fire|holy vanilla (terra's fire)
@@ -3306,7 +3306,7 @@ Ot6ShieldTbl:
                                 ;   dream's war; steel answers steel.
                                 ;   poison vanilla
         .word   $001e
-        .byte   3, OT6_KATANA|OT6_BLUNT ; suriander: a ghostly beast.  holy
+        .byte   3, OT6_KATANA|OT6_RANGED ; suriander: a ghostly beast.  holy
                                 ;   vanilla
         ; the cave below the dream's train: the three ride magitek armor
         ; there (_cb93bf), whose rows are the beams (fire, bolt, ice) and
@@ -3319,18 +3319,18 @@ Ot6ShieldTbl:
         .byte   2, OT6_SPEAR|OT6_RANGED ; sky cap: a flying cap.
                                 ;   bolt|wind|water vanilla
         .word   $00fe
-        .byte   4, OT6_DAGGER|OT6_RANGED ; io: a war machine.  bolt|holy|
+        .byte   4, OT6_SPEAR|OT6_RANGED ; io: a war machine.  bolt|holy|
                                 ;   water vanilla; nulls poison|wind|earth
         ; the dream stooges (event battle 90): each takes another pair, and
         ; the three together hold every key but a dagger
         .word   $011f
-        .byte   4, OT6_KATANA|OT6_BLUNT ; curley: ice|water vanilla;
+        .byte   4, OT6_KATANA|OT6_RANGED ; curley: ice|water vanilla;
                                 ;   absorbs fire
         .word   $0120
-        .byte   4, OT6_SPEAR|OT6_BLUNT ; larry: fire vanilla; absorbs
+        .byte   4, OT6_SPEAR|OT6_RANGED ; larry: fire vanilla; absorbs
                                 ;   ice|wind
         .word   $0121
-        .byte   4, OT6_KATANA|OT6_RANGED ; moe: no weakness; absorbs bolt
+        .byte   4, OT6_SWORD|OT6_BLUNT ; moe: no weakness; absorbs bolt
         ; wrexsoul (event battle 92): a composite of the war's spirits
         .word   $0122
         .byte   6, OT6_KATANA|OT6_BLUNT ; wrexsoul: a katana or a brush.
@@ -3356,12 +3356,12 @@ Ot6ShieldTbl:
         .byte   3, OT6_KATANA|OT6_RANGED ; boxed set: an empty armor.  holy
                                 ;   vanilla
         .word   $0152
-        .byte   6, OT6_DAGGER|OT6_KATANA ; blue drgn: a water dragon's
+        .byte   6, OT6_SPEAR|OT6_KATANA ; blue drgn: a water dragon's
                                 ;   scales.  bolt vanilla; absorbs water
         ; the two monster boxes (#487; met nowhere else: event groups 113
         ; and 95)
         .word   $0138
-        .byte   6, OT6_KATANA|OT6_BLUNT ; master pug (the cave's box, 401
+        .byte   6, OT6_KATANA|OT6_RANGED ; master pug (the cave's box, 401
                                 ;   (58,43)): the pugs' row.  no weakness
                                 ;   vanilla, and wallchange moves the one
                                 ;   it takes; absorbs water
@@ -3415,7 +3415,7 @@ Ot6ShieldTbl:
                                 ;   lands before its second meteor (four
                                 ;   lost the pair 1 in 3).  ice vanilla
         .word   $0026
-        .byte   6, OT6_DAGGER|OT6_BLUNT ; brachosaur: that hide (a spear's) on a
+        .byte   6, OT6_DAGGER|OT6_RANGED ; brachosaur: that hide (a spear's) on a
                                 ;   46050-hp body; a break holds its turns,
                                 ;   ultima among them.  ice vanilla
         ; ---- the world of ruin: kefka's tower (route-wor-kefka-tower.md
@@ -3431,7 +3431,7 @@ Ot6ShieldTbl:
         ; Vanilla elements stay.
         ; map 334, 287, 303, 338, 339: the tower's first floors
         .word   $0084
-        .byte   3, OT6_SPEAR|OT6_BLUNT ; brontaur: a horned beast's hide,
+        .byte   3, OT6_DAGGER|OT6_BLUNT ; brontaur: a horned beast's hide,
                                 ;   as the dinosaurs'.  ice vanilla
         .word   $00b7
         .byte   3, OT6_KATANA|OT6_BLUNT ; evil oscar: a cursed flower; a katana
@@ -3449,7 +3449,7 @@ Ot6ShieldTbl:
         .byte   3, OT6_BLUNT|OT6_RANGED ; dark force: a floating curse.
                                 ;   holy vanilla
         .word   $00bd
-        .byte   3, OT6_DAGGER|OT6_KATANA ; outsider: a knife-thrower; steel
+        .byte   3, OT6_SWORD|OT6_DAGGER ; outsider: a knife-thrower; steel
                                 ;   answers steel.  holy vanilla
         .word   $006a
         .byte   3, OT6_KATANA|OT6_RANGED ; madam: a sorceress.  poison
@@ -3468,11 +3468,11 @@ Ot6ShieldTbl:
         .byte   4, OT6_SPEAR|OT6_RANGED ; steroidite: a brute's hide.  holy
                                 ;   vanilla
         .word   $0056
-        .byte   1, OT6_KATANA|OT6_BLUNT ; mover: 120 hp; the break is the
+        .byte   1, OT6_KATANA|OT6_RANGED ; mover: 120 hp; the break is the
                                 ;   kill.  absorbs poison
         ; map 294, 295, 293: the beasts of the ruins
         .word   $0025
-        .byte   4, OT6_DAGGER|OT6_BLUNT ; doom drgn: a dark dragon; a
+        .byte   4, OT6_SPEAR|OT6_BLUNT ; doom drgn: a dark dragon; a
                                 ;   dagger or the brush.  no weakness vanilla
         .word   $00e4
         .byte   3, OT6_BLUNT|OT6_RANGED ; vectagoyle: a stone gargoyle;
@@ -3482,28 +3482,28 @@ Ot6ShieldTbl:
                                 ;   vanilla; absorbs earth
         ; the factory: the machines (bolt|water vanilla on every one)
         .word   $00fd
-        .byte   2, OT6_SPEAR|OT6_BLUNT ; ironhitman
+        .byte   2, OT6_SPEAR|OT6_RANGED ; ironhitman
         .word   $00d9
         .byte   3, OT6_SPEAR|OT6_RANGED ; dueller
         .word   $00ea
         .byte   4, OT6_SPEAR|OT6_RANGED ; fortis: a walking tank
         .word   $00ed
-        .byte   2, OT6_DAGGER|OT6_RANGED ; junk
+        .byte   2, OT6_SPEAR|OT6_RANGED ; junk
         .word   $00f6
-        .byte   3, OT6_DAGGER|OT6_RANGED ; innoc
+        .byte   3, OT6_SPEAR|OT6_RANGED ; innoc
         .word   $0105
         .byte   4, OT6_SPEAR|OT6_RANGED ; prometheus
         .word   $00fc
         .byte   2, OT6_SPEAR|OT6_RANGED ; sky base
         .word   $00a1
-        .byte   4, OT6_SPEAR|OT6_BLUNT ; scullion: 27000 hp
+        .byte   4, OT6_SPEAR|OT6_RANGED ; scullion: 27000 hp
         ; the bosses
         .word   $010c
         .byte   6, OT6_SPEAR|OT6_RANGED ; inferno (event battle 114, map
                                 ;   410): the factory's engine.  bolt
                                 ;   vanilla; absorbs fire
         .word   $0142
-        .byte   3, OT6_DAGGER|OT6_KATANA ; striker: inferno's arm.  fire
+        .byte   3, OT6_SPEAR|OT6_KATANA ; striker: inferno's arm.  fire
                                 ;   vanilla; absorbs ice
         .word   $0141
         .byte   3, OT6_KATANA|OT6_RANGED ; rough: inferno's other arm.  ice
@@ -3529,7 +3529,7 @@ Ot6ShieldTbl:
                                 ;   the atmaweapon's rematch; katana here.
                                 ;   no weakness vanilla; absorbs five
         .word   $0150
-        .byte   6, OT6_DAGGER|OT6_KATANA ; gold drgn (event battle 135, map
+        .byte   6, OT6_SPEAR|OT6_KATANA ; gold drgn (event battle 135, map
                                 ;   335): a storm dragon's scales.  water
                                 ;   vanilla; absorbs bolt
         .word   $0151
@@ -3544,30 +3544,30 @@ Ot6ShieldTbl:
         ; spear and fist (no arcane).  Vanilla elements stay.
         ; formation 471: the arms and the face
         .word   $0157
-        .byte   6, OT6_DAGGER|OT6_RANGED ; short arm: a machine's arm; a
+        .byte   6, OT6_SPEAR|OT6_BLUNT ; short arm: a machine's arm; a
                                 ;   dagger and a rod's blow.  water vanilla
         .word   $0158
-        .byte   6, OT6_DAGGER|OT6_KATANA ; long arm: a claw on sinew; cut
+        .byte   6, OT6_SWORD|OT6_DAGGER|OT6_KATANA ; long arm: a claw on sinew; cut
                                 ;   it.  wind vanilla
         .word   $0159
         .byte   8, OT6_BLUNT|OT6_RANGED ; face: magic made stone, as the
                                 ;   statues.  fire vanilla; nulls earth
         ; formation 512: the four figures
         .word   $015d
-        .byte   6, OT6_KATANA|OT6_RANGED ; hit: a warrior in plate.  poison
+        .byte   6, OT6_SWORD|OT6_BLUNT ; hit: a warrior in plate.  poison
                                 ;   vanilla
         .word   $015a
-        .byte   6, OT6_SPEAR|OT6_KATANA ; tiger: a beast's hide.  ice
+        .byte   6, OT6_DAGGER|OT6_KATANA ; tiger: a beast's hide.  ice
                                 ;   vanilla; absorbs earth
         .word   $015b
-        .byte   6, OT6_DAGGER|OT6_RANGED ; tools: a machine, as the
+        .byte   6, OT6_SPEAR|OT6_RANGED ; tools: a machine, as the
                                 ;   factory's.  bolt vanilla
         .word   $015c
         .byte   8, OT6_KATANA|OT6_RANGED ; magic: a sorceress, as the
                                 ;   madam.  earth vanilla
         ; formation 513: the lady and the sleeper
         .word   $015e
-        .byte   3, OT6_SPEAR|OT6_KATANA ; girl: 9999 hp; absorbs every
+        .byte   3, OT6_SWORD|OT6_DAGGER|OT6_SPEAR|OT6_KATANA|OT6_RANGED ; girl: 9999 hp; absorbs every
                                 ;   element, so steel is the way in, and a
                                 ;   break holds the life 2 she casts on the
                                 ;   sleeper when she stands alone
@@ -3621,7 +3621,7 @@ Ot6ShieldTbl:
         ; -- the banquet's sparring troopers (battle 30): terra and
         ; locke's blades --
         .word   $00c2
-        .byte   3, OT6_SWORD|OT6_DAGGER ; sp forces: the imperial elite,
+        .byte   3, OT6_SWORD|OT6_SPEAR ; sp forces: the imperial elite,
                                 ;   a tank's three; the trooper line's
                                 ;   sword, and a spear.  poison vanilla
         ; -- the phantom train: sabin, cyan, shadow --
