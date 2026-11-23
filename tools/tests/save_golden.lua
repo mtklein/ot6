@@ -21,7 +21,11 @@
 --      confirm hands it to the field, the slot's codex page, the live esper
 --      page) for golden_saves.py, and asserted here: the block is the
 --      slot's bytes, the
---      codex page is the one the battery held, and the live esper page is
+--      codex page is the one the battery held, migrated (#566: a page from
+--      v0.50 or earlier holds the four weapon classes' revealed bits, and
+--      the load rewrites them for the six by the ROM's Ot6ClassSplitTbl and
+--      signs the page O9; that rewrite, Ot6CodexSix, ran once), and the live
+--      esper page is
 --      the slot's (a signed page) or empty (an unsigned one: a save from
 --      before v0.44), its row 12 (actor 12) the slot's only for a block of
 --      layout version 2 or more and no progress for any older one;
@@ -35,7 +39,9 @@
 --      the version raised to 2; the loadouts, junk ones included, are
 --      untouched;
 --   5. the console's Reset, the title, Continue again: the reload is the
---      saved block, and the live esper page is what was saved;
+--      saved block, the live esper page is what was saved, and the codex
+--      page is as the first load left it (the rewrite has still run once,
+--      here and after every save below);
 --   6. saved again: a signed block, so only play time, timers and checksum
 --      move;
 --   7. a golden-saves/junk/ fixture is also saved over slot 1: slot 1's
@@ -52,7 +58,9 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local SLOT_PTR = { [1] = 0x0000, [2] = 0x0A00, [3] = 0x1400 }
 local CODEX, ESPER, LIVE = 0x2000, 0x3000, 0x3C00   -- battery offsets
-local ESPER_MAGIC, CODEX_MAGIC = 0x3145, 0x384F
+local ESPER_MAGIC, CODEX_MAGIC = 0x3145, 0x394F   -- 'E1'; 'O9', a six-class codex page
+local CODEX_FOUR, CODEX_GLOBAL = 0x384F, 0x374F   -- 'O8' (v0.5-v0.50), 'O7' (v0.1-v0.4)
+local ELEMS, CLASSES, TABLES_END, SPECIES = 0x010, 0x190, 0x310, 384
 local CTR, CTR_END = 0x0010, 0x02B4               -- esper page: 13 actors x 26 words
 local LEO = 0x0280                                -- row 12 (actor 12), read from a version-2 block only
 -- The loaded block is read where the Continue's confirm hands the game to
@@ -68,6 +76,7 @@ local loaded, hooked = nil, false
 -- time, the timers, the checksum, and (signing an unsigned block) the
 -- signature and the reserve.
 local presave = nil
+local sixRuns = 0       -- Ot6CodexSix's entries: the four-to-six class rewrite of a codex page
 local function hook()
   if hooked then return end
   hooked = true
@@ -76,6 +85,8 @@ local function hook()
     loaded = {}
     for a = 0x1600, 0x1FFF do loaded[a] = H.readByte(a) end
   end, emu.callbackType.exec, at, at)
+  local six = H.sym("Ot6CodexSix")
+  emu.addMemoryCallback(function() sixRuns = sixRuns + 1 end, emu.callbackType.exec, six, six)
   local sv = H.sym("CopyGameDataToSRAM")
   emu.addMemoryCallback(function()
     presave = {}
@@ -208,6 +219,87 @@ local function assertLive(tag, B)
     "no progress (a block older than version 2)"))
 end
 
+-- A four-class revealed byte as the six classes hold it (#566,
+-- ot6_codex.asm Ot6CodexSix): each of bits 0-3 becomes its second child
+-- (Katana, Spear, Arcane, Dagger) where the species' Ot6ClassSplitTbl byte
+-- has that bit, its first (Sword, Dagger, Fist, Arcane: the same bit)
+-- otherwise; every other bit is dropped.  The table is the built ROM's.
+local SECOND = { [0] = 0x10, 0x20, 0x08, 0x02 }
+local function sixClass(b, sel)
+  local n = 0
+  for k = 0, 3 do
+    if (b >> k) & 1 == 1 then n = n | (((sel >> k) & 1 == 1) and SECOND[k] or (1 << k)) end
+  end
+  return n
+end
+local function splitOf(sp) return H.readRomByte((H.sym("Ot6ClassSplitTbl") & 0x3FFFFF) + sp) end
+
+-- The slot's codex page as the load must leave it, from battery B (the
+-- file's, before the game touched it): an O9 page as it is; an O8 page with
+-- its class table rewritten; anything else zeroed (no golden save holds an
+-- O7 cartridge-wide codex, asserted).  The pad and the tail are B's: a save
+-- zeroes them, not a load.  Returns the page and what kind it was.
+local function codexLoaded(B)
+  local page = CODEX + (slot - 1) * 0x400
+  local magic = bw(B, page)
+  H.assertEq(bw(B, CODEX) ~= CODEX_GLOBAL, true, "the battery holds no O7 cartridge-wide codex at page 1")
+  local t = {}
+  for o = 0, 0x3FF do t[o] = B[page + o] end
+  local kind = "six"
+  if magic == CODEX_FOUR then
+    kind = "four"
+    for sp = 0, SPECIES - 1 do t[CLASSES + sp] = sixClass(B[page + CLASSES + sp], splitOf(sp)) end
+  elseif magic ~= CODEX_MAGIC then
+    kind = "unsigned"
+    for o = ELEMS, TABLES_END - 1 do t[o] = 0 end
+  end
+  t[0], t[1] = CODEX_MAGIC & 0xFF, CODEX_MAGIC >> 8
+  return t, kind
+end
+
+-- load1: the page is the file's, migrated (the title's Continue ensures
+-- the slot's page: Ot6EsperContinue -> Ot6CodexLoaded), and the rewrite ran
+-- once for a four-class page and not at all for any other.
+local wantSix = 0
+local function assertCodexLoaded(tag, B)
+  local page = CODEX + (slot - 1) * 0x400
+  local want, kind = codexLoaded(B)
+  wantSix = (kind == "four") and 1 or 0
+  local n, first, second, lost, kept = 0, 0, 0, 0, 0
+  for o = ELEMS, TABLES_END - 1 do if sram(page + o) ~= 0 then n = n + 1 end end
+  H.log(string.format("[golden] %s: slot %d's codex page was a %s-class page ($%04X in the file); it holds %d "
+    .. "revealed bytes, magic $%04X; Ot6CodexSix ran %d time(s)", tag, slot, kind, bw(B, page), n, sramW(page),
+    sixRuns))
+  H.assertEq(sramW(page), CODEX_MAGIC, tag .. ": the slot's codex page is signed 'O9'")
+  H.assertEq(sixRuns, wantSix, tag .. ": the four-to-six rewrite ran once for a four-class page (never for another)")
+  local elems, classes, rest = 0, 0, 0
+  for o = 2, 0x3FF do
+    local got = sram(page + o)
+    if got ~= want[o] then
+      if o >= CLASSES and o < TABLES_END then
+        classes = classes + 1
+        if classes <= 6 then
+          H.log(string.format("[golden] %s: species %d's classes: the file holds %02X (split %02X), expected %02X, "
+            .. "the page holds %02X", tag, o - CLASSES, B[page + o], splitOf(o - CLASSES), want[o], got))
+        end
+      elseif o >= ELEMS and o < CLASSES then elems = elems + 1
+      else rest = rest + 1 end
+    end
+    if o >= CLASSES and o < TABLES_END and kind == "four" then
+      local old, sel = B[page + o] & 0x0F, splitOf(o - CLASSES)
+      if old & ~sel & 0x0F ~= 0 then first = first + 1 end
+      if old & sel ~= 0 then second = second + 1 end
+    end
+  end
+  H.log(string.format("[golden] %s: of the file's revealed classes, %d species hold a first child and %d a second",
+    tag, first, second))
+  H.assertEq(classes, 0, tag .. ": the slot's revealed classes are the file's, migrated to the six classes")
+  H.assertEq(elems, 0, tag .. ": the slot's revealed elements are the file's")
+  H.assertEq(rest, 0, tag .. ": the load left the codex page's pad and tail as the battery held them")
+end
+
+-- load2, and after each save: the page is what battery B held (already
+-- six-class), and no later touch ran the rewrite again.
 local function assertCodex(tag, B)
   local page = CODEX + (slot - 1) * 0x400
   local bad, n = 0, 0
@@ -215,10 +307,30 @@ local function assertCodex(tag, B)
     if sram(page + o) ~= B[page + o] then bad = bad + 1 end
     if o >= 0x10 and o < 0x310 and sram(page + o) ~= 0 then n = n + 1 end
   end
-  H.log(string.format("[golden] %s: slot %d's codex page holds %d revealed bytes, magic $%04X", tag, slot, n,
-    sramW(page)))
-  H.assertEq(sramW(page), CODEX_MAGIC, tag .. ": the slot's codex page is signed")
+  H.log(string.format("[golden] %s: slot %d's codex page holds %d revealed bytes, magic $%04X; Ot6CodexSix has run "
+    .. "%d time(s)", tag, slot, n, sramW(page), sixRuns))
+  H.assertEq(sramW(page), CODEX_MAGIC, tag .. ": the slot's codex page is signed 'O9'")
+  H.assertEq(sixRuns, wantSix, tag .. ": the four-to-six rewrite has run once, at the first load, and not again")
   H.assertEq(bad, 0, tag .. ": the slot's codex page is the one the battery held")
+end
+
+-- after a save: the slot's codex magic and tables are the ones the load
+-- left (a save zeroes only the page's pad and tail), and the save's own
+-- touch (Ot6CodexSaveAs -> Ot6CodexEnsure) did not run the rewrite again
+local loadedPage
+local function snapCodex()
+  loadedPage = {}
+  local page = CODEX + (slot - 1) * 0x400
+  for o = 0, 0x3FF do loadedPage[o] = sram(page + o) end
+end
+local function assertCodexKept(tag, B)
+  local page = CODEX + (slot - 1) * 0x400
+  local bad = 0
+  for o = 0, TABLES_END - 1 do
+    if (o < 2 or o >= ELEMS) and B[page + o] ~= loadedPage[o] then bad = bad + 1 end
+  end
+  H.assertEq(sixRuns, wantSix, tag .. ": the four-to-six rewrite has run once, at the first load, and not again")
+  H.assertEq(bad, 0, tag .. ": the slot's codex magic and tables are the ones the first load left")
 end
 
 -- Signed, as Ot6SaveSign decides it: the signature and a version 1..VER.
@@ -338,13 +450,15 @@ H.run({ maxFrames = 40000 }, {
   readout("load1"),
   H.call(function()
     assertBlock("load1", B0)
-    assertCodex("load1", B0)
+    assertCodexLoaded("load1", B0)
+    snapCodex()
     assertLive("load1", B0)
   end),
   H.saveGame({ slot = 3, baseline = false, tag = "the golden save's re-save" }),
   H.call(function()
     B1 = battery()
     assertSaved("save1", B1, not signedBlock(function(a) return slotByte(B0, a) end))
+    assertCodexKept("save1", B1)
     dump("save1", "slot", function(a) return slotByte(B1, a) end, 0x1600, 0x0A00)
     local page = ESPER + (slot - 1) * 0x400
     H.assertEq(bw(B1, page), ESPER_MAGIC, "after the save, slot " .. slot .. "'s esper page is signed")
@@ -368,6 +482,7 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     B2 = battery()
     assertSaved("save2", B2, false)
+    assertCodexKept("save2", B2)
   end),
   H.cond(function() return JUNK end, {
     H.saveGame({ slot = 1, baseline = false, tag = "the junk save over slot 1" }),
@@ -375,6 +490,7 @@ H.run({ maxFrames = 40000 }, {
       local B3 = battery()
       assertSaved("saveas", B3, false, 1)
       assertSaveAs(B3)
+      assertCodexKept("saveas", B3)
     end),
   }, {}),
   H.call(function()

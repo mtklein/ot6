@@ -18,7 +18,12 @@ Continue again.  This script holds that run to the fixture file:
             from the file (every character's level, HP, MP, experience,
             esper and gear), and the file's gil, bag, map, tile, story
             switches and treasure bits;
-          * the slot's codex page is the file's;
+          * the slot's codex page is the file's, migrated: byte for byte
+            the file's page as today's ROM leaves it at the load (an O8
+            page's revealed classes rewritten for the six classes by the
+            built ROM's own Ot6ClassSplitTbl, the element table and the
+            reserves as they were, the magic O9), and the same after the
+            saves;
           * the live esper page is the slot's page (a release from v0.44
             on), or empty for an older save, whose page is unsigned;
           * the battery after the save differs from the file only inside
@@ -42,6 +47,12 @@ Continue again.  This script holds that run to the fixture file:
         a New Game's first save (the play from power-on's world-narshe-v1
         capture): its slot is signed $5653 version 2, its reserve, tail
         and page reserves are zero, and its loadouts are AUTO
+    golden_saves.py classff
+        (re)build golden-saves/junk/v0.46-kolts-classff, the synthetic
+        fixture for the six-class migration: v0.46/kolts-summit-v1 with
+        every byte of slot 3's revealed-class table $FF (every four-class
+        bit, and the four bits no four-class build wrote); verify holds
+        the tracked fixture to that
     golden_saves.py notes NOTES.md
         the release notes' save line: "Saves from vX.Y and later load in
         this release", vX.Y the oldest release in the golden set, and no
@@ -54,6 +65,7 @@ Continue again.  This script holds that run to the fixture file:
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import os
@@ -77,6 +89,12 @@ LAYOUT = "ot6-codex-o8-v1"
 SLOT_PTR = sc.SLOT_PTR
 BLOCK = 0x0A00
 CODEX, ESPER, LIVE = 0x2000, 0x3000, 0x3C00
+# the codex page's magics (docs/design/save-layout.md "Magic words"), its
+# two tables, and the four-to-six class rule (ot6_codex.asm Ot6CodexSix)
+CODEX_SIX, CODEX_FOUR, CODEX_GLOBAL = 0x394F, 0x384F, 0x374F
+ELEMS, CLASSES, TABLES_END, SPECIES = 0x010, 0x190, 0x310, 384
+FIRST_CHILD = (0x01, 0x02, 0x04, 0x08)      # Sword, Dagger, Fist, Arcane
+SECOND_CHILD = (0x10, 0x20, 0x08, 0x02)     # Katana, Spear, Arcane, Dagger
 ESPER_MAGIC = 0x3145
 CTR, CTR_END = 0x0010, 0x02B4      # 13 rows of 26 words
 LEO = 0x0280                        # row 12 (actor 12): read from a version-2 block only (#552)
@@ -94,6 +112,83 @@ class GoldenError(Exception):
 
 def w16(b, o):
     return b[o] | (b[o + 1] << 8)
+
+
+def six_class(b, sel):
+    """A four-class revealed byte as the six classes hold it: each of bits
+    0-3 set in `b` becomes its second child where `sel` (the species'
+    Ot6ClassSplitTbl byte) has that bit, its first otherwise; every other
+    bit of `b` is dropped."""
+    n = 0
+    for k in range(4):
+        if b >> k & 1:
+            n |= SECOND_CHILD[k] if sel >> k & 1 else FIRST_CHILD[k]
+    return n
+
+
+def rom_split(rom=None, dbg=None):
+    """Ot6ClassSplitTbl, read from the built ROM (the bytes the migration
+    itself reads; tools/check_save_layout.py holds them to the source)."""
+    rom = Path(rom or os.environ.get("OT6_ROM") or ROOT / "build" / "ot6.sfc")
+    dbg = Path(dbg or os.environ.get("OT6_DBG") or ROOT / csl.DBG)
+    try:
+        syms = csl.parse_dbg_all(dbg.read_text(encoding="utf-8"))
+        data = rom.read_bytes()
+    except OSError as e:
+        raise GoldenError(f"the class split table: {e}")
+    if "Ot6ClassSplitTbl" not in syms:
+        raise GoldenError(f"{dbg} has no Ot6ClassSplitTbl")
+    o = csl.rom_offset(syms["Ot6ClassSplitTbl"])
+    t = list(data[o:o + SPECIES])
+    if len(t) != SPECIES or any(x & ~0x0F for x in t):
+        raise GoldenError(f"{rom}: Ot6ClassSplitTbl is not {SPECIES} bytes of four selector bits")
+    return t
+
+
+def codex_loaded(f, slot, split):
+    """Slot `slot`'s $400-byte codex page as today's ROM leaves it when it
+    loads battery `f` (Ot6CodexEnsure): an O9 page as it is; an O8 page with
+    its class table rewritten for the six classes; an O7 cartridge-wide
+    codex (page 1) cloned and rewritten; anything else zeroed.  The magic is
+    O9, and the pad and tail are the file's (a save zeroes them, not a
+    load)."""
+    base = CODEX + (slot - 1) * 0x400
+    page = bytearray(f[base:base + 0x400])
+    magic = w16(f, base)
+    if w16(f, CODEX) == CODEX_GLOBAL:
+        page[ELEMS:TABLES_END] = f[CODEX + ELEMS:CODEX + TABLES_END]
+        magic = CODEX_FOUR
+    if magic == CODEX_FOUR:
+        for sp in range(SPECIES):
+            page[CLASSES + sp] = six_class(page[CLASSES + sp], split[sp])
+    elif magic != CODEX_SIX:
+        page[ELEMS:TABLES_END] = bytes(TABLES_END - ELEMS)
+    page[0:2] = CODEX_SIX.to_bytes(2, "little")
+    return bytes(page)
+
+
+def magic_and_tables(page):
+    """A codex page with its reserves (the pad and the tail, which a save
+    zeroes) blanked: what a save must carry."""
+    b = bytearray(0x400)
+    b[0:2] = page[0:2]
+    b[ELEMS:TABLES_END] = page[ELEMS:TABLES_END]
+    return bytes(b)
+
+
+def page_diff(what, want, got):
+    """One problem line naming where a codex page departs from `want`."""
+    bad = [o for o in range(len(want)) if want[o] != got[o]]
+    o = bad[0]
+    if o < 2:
+        where = f"its magic is ${w16(got, 0):04X}, not ${w16(want, 0):04X}"
+    elif ELEMS <= o < CLASSES:
+        where = f"species {o - ELEMS}'s elements read ${got[o]:02X}, not ${want[o]:02X}"
+    elif CLASSES <= o < TABLES_END:
+        where = f"species {o - CLASSES}'s classes read ${got[o]:02X}, not ${want[o]:02X}"
+    else:
+        where = f"its reserve byte +${o:03X} reads ${got[o]:02X}, not ${want[o]:02X}"
+    return f"{what} ({len(bad)} byte(s) differ; the first: {where})"
 
 
 def parse_log(text):
@@ -203,7 +298,7 @@ def allowed_offsets(rows, slot, also=()):
     return ok
 
 
-def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows, also=()):
+def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows, also=(), split=None):
     """Problems (strings) for one run; empty = the save is compatible."""
     p = []
     f = fixture_bytes
@@ -227,10 +322,18 @@ def check_run(fixture_bytes, roster_rows, esper, dumps, after, rows, also=()):
         n = sum(1 for a, b in zip(d1["wram"], fblock) if a != b)
         p.append(f"load1: the loaded $1600-$1FFF block differs from the slot in {n} byte(s)")
 
-    # 2. codex carries over
+    # 2. the codex carries over: the page the load leaves is the file's as
+    # today's ROM reads it, exactly (an O8 page's classes rewritten for the
+    # six, nothing else moved), and the saves keep its magic and tables
     cpage = CODEX + (slot - 1) * 0x400
-    if d1["codex"] != f[cpage:cpage + 0x400]:
-        p.append(f"load1: slot {slot}'s codex page is not the file's")
+    if split is None:
+        split = rom_split()
+    cwant = codex_loaded(f, slot, split)
+    if d1["codex"] != cwant:
+        p.append(page_diff(f"load1: slot {slot}'s codex page is not the file's, migrated", cwant, d1["codex"]))
+    if magic_and_tables(after[cpage:cpage + 0x400]) != magic_and_tables(cwant):
+        p.append(page_diff(f"after the saves, slot {slot}'s codex magic and tables are not the file's, migrated",
+                           magic_and_tables(cwant), magic_and_tables(after[cpage:cpage + 0x400])))
 
     # 3. esper progress: the slot's signed page, or none; its row 12 only from
     # a block of layout version 2 or more (an older page held reserve there)
@@ -372,8 +475,44 @@ def verify():
     diff = [o for o in range(sc.SRAM_SIZE) if a[o] != b[o]]
     if diff != [0x3800, 0x3801] or w16(b, 0x3800) != 0:
         raise GoldenError(f"{neg}: must be v0.44/wor-cyan-v1 with $3800-$3801 zeroed, differs at {diff[:6]}")
+    # the six-class migration's fixture is its source with the class table $FF
+    _, cpay = sc.load(GOLDEN / CLASSFF[0], LAYOUT)
+    if cpay.read_bytes() != classff_bytes()[0]:
+        raise GoldenError(f"{GOLDEN / CLASSFF[0]}: must be {CLASSFF[1]} with slot 3's class table all $FF "
+                          f"(python3 tools/golden_saves.py classff)")
     print(f"golden saves: {n} fixtures from {len(m['sets'])} releases match MANIFEST.json; "
-          f"the negative is v0.44/wor-cyan-v1 with slot 3's esper signature zeroed")
+          f"the negative is v0.44/wor-cyan-v1 with slot 3's esper signature zeroed; "
+          f"{CLASSFF[0]} is {CLASSFF[1]} with slot 3's class table $FF")
+    return 0
+
+
+# The six-class migration's synthetic fixture (#566): a real four-class
+# save whose class table holds everything a byte can.  Every species then
+# has a revealed bit its six-class row does not answer to (a species has at
+# most four children and few rows hold them all), and four bits the
+# migration must drop.
+CLASSFF = ("junk/v0.46-kolts-classff", "v0.46/kolts-summit-v1")
+
+
+def classff_bytes():
+    src = bytearray((GOLDEN / CLASSFF[1] / "battery.sram").read_bytes())
+    slot = src[0x1FF0]
+    base = CODEX + (slot - 1) * 0x400
+    if w16(src, base) != CODEX_FOUR:
+        raise GoldenError(f"{CLASSFF[1]}: slot {slot}'s codex page is not a four-class (O8) page")
+    src[base + CLASSES:base + TABLES_END] = b"\xff" * SPECIES
+    return bytes(src), slot
+
+
+def classff():
+    data, slot = classff_bytes()
+    prov = (f"a synthetic fixture for the six-class codex migration (#566), not a release save: "
+            f"golden-saves/{CLASSFF[1]} with every byte of slot {slot}'s revealed-class table "
+            f"(${CODEX + (slot - 1) * 0x400 + CLASSES:04X}-${CODEX + (slot - 1) * 0x400 + TABLES_END - 1:04X}) "
+            f"set to $FF: all four classes revealed for every species, and the four bits no four-class "
+            f"build wrote; nothing else differs (tools/golden_saves.py classff rebuilds it)")
+    write_fixture(GOLDEN / CLASSFF[0], data, prov, expectation(GOLDEN / CLASSFF[1])["esper"])
+    print(f"golden saves: wrote {CLASSFF[0]} from {CLASSFF[1]}")
     return 0
 
 
@@ -461,6 +600,12 @@ def oldest_golden():
 
 
 # ----------------------------------------------------------------- selftest --
+# a split table for the selftest: species 5's slash took its second child,
+# species 6's bludgeon and special theirs, every other weakness its first
+SELF_SPLIT = [0] * SPECIES
+SELF_SPLIT[5], SELF_SPLIT[6] = 0x01, 0x0C
+
+
 def _synthetic():
     """A battery with slot 3 populated, signed pages, and a matching run."""
     f = bytearray(sc.SRAM_SIZE)
@@ -476,30 +621,39 @@ def _synthetic():
     f[b + 0x1860 - 0x1600] = 0x34
     f[b + 0x1F64 - 0x1600] = 0x20
     cp = CODEX + 0x800
-    f[cp], f[cp + 1] = 0x4F, 0x38
+    f[cp], f[cp + 1] = 0x4F, 0x38   # O8: a four-class page
     f[cp + 0x20] = 5
+    # revealed classes: slash and pierce where slash took its second child
+    # (Katana, Dagger); bludgeon and special where both took theirs (Arcane,
+    # Dagger); slash under four bits no four-class build wrote (Sword)
+    f[cp + CLASSES + 5], f[cp + CLASSES + 6], f[cp + CLASSES + 7] = 0x03, 0x0C, 0xF1
+    page = codex_loaded(f, 3, SELF_SPLIT)
+    assert (page[0:2], page[CLASSES + 5], page[CLASSES + 6], page[CLASSES + 7], page[0x20]) == \
+        (b"\x4f\x39", 0x12, 0x0A, 0x01, 5), page[CLASSES:CLASSES + 8].hex()
     ep = ESPER + 0x800
     f[ep], f[ep + 1] = 0x45, 0x31
     f[ep + 0x12] = 7
     f[LIVE], f[LIVE + 1] = 0x45, 0x31
     f[LIVE + 0x12] = 7
     after = bytearray(f)
+    after[cp:cp + 0x400] = page     # the load migrated the page in place
     after[0x1FF1] = 9               # title seed (shared, title)
     after[b + 0x1863 - 0x1600] = 1  # play time moved (slot3, save)
     after[b + SIG - 0x1600] = 0x53  # signed $5653, version 1
     after[b + SIG + 1 - 0x1600] = 0x56
     after[b + SIG + 2 - 0x1600] = SIGVER
     def dumps(blk_after):
-        return {"load1": {"wram": bytes(block_of(f, 3)), "codex": bytes(f[cp:cp + 0x400]),
+        return {"load1": {"wram": bytes(block_of(f, 3)), "codex": page,
                           "live": bytes(f[LIVE:LIVE + 0x400])},
                 "save1": {"slot": bytes(blk_after)},
-                "load2": {"wram": bytes(blk_after), "codex": bytes(f[cp:cp + 0x400]),
+                "load2": {"wram": bytes(blk_after), "codex": page,
                           "live": bytes(f[LIVE:LIVE + 0x400])}}
     return f, after, dumps
 
 
 def selftest():
     rows = doc_rows()
+    check_run = functools.partial(globals()["check_run"], split=SELF_SPLIT)
     f, after, dumps = _synthetic()
     rr = roster_of_block(block_of(f, 3))
     assert len(rr) == 4, rr
@@ -543,7 +697,43 @@ def selftest():
     # the codex not carried over
     def cod(d):
         w = bytearray(d["load1"]["codex"]); w[0x20] = 0; d["load1"]["codex"] = bytes(w)
-    bad(mut_dumps=cod, want="codex page is not the file's")
+    bad(mut_dumps=cod, want="codex page is not the file's, migrated (1 byte(s) differ; the first: species 16's elements")
+    # the six-class migration (#566), each way it can be wrong
+    cp = CODEX + 0x800
+    def page_as(fn):
+        def mut(d):
+            w = bytearray(d["load1"]["codex"]); fn(w); d["load1"]["codex"] = bytes(w)
+        return mut
+    # ... not run at all: the file's own page
+    bad(mut_dumps=lambda d: d["load1"].__setitem__("codex", bytes(f[cp:cp + 0x400])),
+        want="not the file's, migrated (4 byte(s) differ; the first: its magic is $384F, not $394F")
+    # ... the tables rewritten but the page still signed O8
+    bad(mut_dumps=page_as(lambda w: w.__setitem__(1, 0x38)), want="its magic is $384F, not $394F")
+    # ... a second child left where its parent was (slash read as Sword)
+    bad(mut_dumps=page_as(lambda w: w.__setitem__(CLASSES + 5, 0x03)), want="species 5's classes read $03, not $12")
+    # ... the wrong second child (special's is Dagger, not Spear)
+    bad(mut_dumps=page_as(lambda w: w.__setitem__(CLASSES + 6, 0x28)), want="species 6's classes read $28, not $0A")
+    # ... a bit past the four kept
+    bad(mut_dumps=page_as(lambda w: w.__setitem__(CLASSES + 7, 0xF1)), want="species 7's classes read $F1, not $01")
+    # ... a first child dropped
+    bad(mut_dumps=page_as(lambda w: w.__setitem__(CLASSES + 5, 0x10)), want="species 5's classes read $10, not $12")
+    # ... run a second time by a later touch (the Katana bit read as four-class and dropped)
+    bad(mut_after=lambda a: a.__setitem__(cp + CLASSES + 5, 0x02),
+        want="after the saves, slot 3's codex magic and tables are not the file's, migrated (1 byte(s) differ; "
+             "the first: species 5's classes read $02, not $12")
+    # ... the load touching the page's reserve
+    bad(mut_dumps=page_as(lambda w: w.__setitem__(0x320, 1)), want="its reserve byte +$320 reads $01, not $00")
+    # an O9 page is left as it is, an unsigned one reads empty, an O7 codex is cloned
+    g9 = bytearray(f); g9[cp + 1] = 0x39
+    assert codex_loaded(g9, 3, SELF_SPLIT) == bytes(g9[cp:cp + 0x400])
+    gu = bytearray(f); gu[cp] = 0
+    assert codex_loaded(gu, 3, SELF_SPLIT) == b"\x4f\x39" + bytes(0x3FE)
+    g7 = bytearray(f); g7[CODEX:CODEX + 0x400] = f[cp:cp + 0x400]; g7[CODEX + 1] = 0x37
+    g7[cp:cp + 0x400] = bytes(0x400)
+    assert codex_loaded(g7, 3, SELF_SPLIT) == codex_loaded(f, 3, SELF_SPLIT)
+    assert [six_class(1 << k, 0) for k in range(4)] == list(FIRST_CHILD)
+    assert [six_class(1 << k, 0xF) for k in range(4)] == list(SECOND_CHILD)
+    assert six_class(0xFF, 0x05) == 0x10 | 0x02 | 0x08 | 0x08 and six_class(0xF0, 0xF) == 0
     # esper ranks lost on the load
     def esp(d):
         w = bytearray(d["load1"]["live"]); w[0x12] = 0; d["load1"]["live"] = bytes(w)
@@ -574,9 +764,9 @@ def selftest():
 
     def dv2(blk, live=None):
         lv = bytes(live if live is not None else v2[LIVE:LIVE + 0x400])
-        return {"load1": {"wram": bytes(block_of(v2, 3)), "codex": bytes(v2[cp:cp + 0x400]), "live": lv},
+        return {"load1": {"wram": bytes(block_of(v2, 3)), "codex": codex_loaded(v2, 3, SELF_SPLIT), "live": lv},
                 "save1": {"slot": bytes(blk)},
-                "load2": {"wram": bytes(blk), "codex": bytes(v2[cp:cp + 0x400]),
+                "load2": {"wram": bytes(blk), "codex": codex_loaded(v2, 3, SELF_SPLIT),
                           "live": bytes(v2[LIVE:LIVE + 0x400])}}
     rr2 = roster_of_block(block_of(v2, 3))
     ok2 = check_run(bytes(v2), rr2, "signed", dv2(block_of(a2, 3)), bytes(a2), rows)
@@ -655,6 +845,8 @@ def main(argv):
             print(f"golden firstsave: {srams[0]}: the New Game's first save is signed $5653 version {SIGVER}, its "
                   f"reserves zero and its loadouts AUTO")
             return 0
+        if argv[:1] == ["classff"]:
+            return classff()
         if argv[:1] == ["list"]:
             for d in fixture_dirs():
                 print(d.relative_to(ROOT))
@@ -674,7 +866,7 @@ def main(argv):
                 print(f"golden: FAIL {fx.relative_to(ROOT) if fx.is_absolute() else fx}: {x}")
             if probs:
                 return 1
-            print(f"golden: PASS {fx}: loads, matches the file, carries its codex and esper pages, "
+            print(f"golden: PASS {fx}: loads, matches the file, carries its codex (migrated) and esper pages, "
                   f"writes only the documented ranges, and round-trips")
             return 0
         if argv[:1] == ["add"] and len(argv) >= 4:

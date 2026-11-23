@@ -189,6 +189,7 @@ OT6_CODEX_SPECIES = 384         ; species a table holds, one byte each
         shorta
         ldy     #$0000          ; y = species; x = page offset + species
 SixNext: lda    f:OT6_CODEX_CLASS,x
+SixFour:                        ; (mutant_rom.py's seam: the four bits kept)
         and     #OT6_CODEX_FOUR
         pha                     ; [1,s] the revealed four-class bits
         phx                     ; [1,s] x, [3,s] the bits
@@ -203,6 +204,7 @@ SixFirst:                       ; (mutant_rom.py's seam: the first children)
         and     #$00ff
         tax
         shorta
+SixSecond:                      ; (mutant_rom.py's seam: the second children)
         lda     f:Ot6ClassSecondTbl,x
         ora     3,s             ; first and second children together
         plx
@@ -491,6 +493,7 @@ SlotAt: lda     5,s             ; the destination slot (under the phx/phy)
 @ensure:
         jsr     Ot6EsperLoaded  ; #328: the slot's esper progress goes live
                                 ;   (A = the slot; Ot6CodexEnsure clobbers A)
+LoadEnsure:                     ; (mutant_rom.py's seam: a load's ensure)
         jsr     Ot6CodexEnsure
         plp
         rtl
