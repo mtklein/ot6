@@ -49,7 +49,7 @@ both states.
 | Slot | Setzer | the bare reels: Setzer's table opened for Setzer alone (`Ot6SetzerListOpen`, `ot6_setzer.asm:90-93`) | **Setzer's table**: Slot, Coin Toss, Hired Help and Jackpot (once switch `$00CA`), priced from Gogo's level and bought with his own points (`ot6_setzer.asm:91-95`).  The hires walk in where he stood: `Ot6HireSwap` (`ot6_setzer.asm:1350`) swaps whatever graphics the slot holds and puts them back, Gogo's or the revealed Leo's |
 | Lore | Strago | **already his**: Strago's loadout and Aqua Rake, one mask for every caster (`Ot6LoreMask`, `ot6_lore.asm:200`, read by `InitSpellList`, `battle_main.asm:14646`).  Analyze (Scan) and Bserk ride Strago's Magic row, so Gogo had them only through Magic with Strago seated (`Ot6UnionEspers`, `ot6_progression.asm:326`, skipped Gogo); Study was Strago's (`Ot6StudyOne`, `ot6_analyze.asm:141`; `Ot6MagicPrice`, `ot6_boost.asm:2584`) | **Scan and Bserk** join his Magic list whenever he carries Lore, Bserk once Strago has learned it (`Ot6UnionEspers`, `ot6_progression.asm:325-339`); **Study**: his Scan at 3 BP, carrying Lore, learns every lore the present species could cast, 99 MP (`Ot6StudyCaster`, `ot6_gogo.asm`; `ot6_analyze.asm:141`, `ot6_boost.asm:2585`) |
 | Painter (Sketch) | Relm | **already his** since v0.47: Relm's whole list (`Ot6PaintListOpen`, `ot6_paint.asm:230`), with the rows she has learned, and Skills > Painter shows it | unchanged; the command is named Painter now (owner, 2026-11-21), and Sketch is its first row |
-| Dance | Mog | **already his**: Mog's dances (`$1D4C`) and the stumble ladder, his own tier (`OT6_DANCETIER`, stride 2; `Ot6DanceTerrain`, `ot6_dance.asm:36`).  Mog has no divine (#478) | unchanged |
+| Dance | Mog | **already his**: Mog's dances (`$1D4C`) and the stumble ladder, his own tier (`OT6_DANCETIER`, stride 2; `Ot6DanceTerrain`, `ot6_dance.asm`).  Mog has no divine (#478) | unchanged; since v0.51 a boosted start's opener ladder is his too, from his own pending boost (`Ot6DanceOpener`, `battle_danceopener`) |
 | Rage | Gau | **already his**: Gau's loadout, one list for every rager (`Ot6RageList`, `ot6_rage.asm:152`, `$257E`), and the coin and special ladder at his own tier (`Ot6RageTierStore`, `ot6_rage.asm:564`).  Gau has no divine (owner, 2026-11-15) | unchanged; Leap is an engine limit (section 3) |
 | Control | (the Fake Mustache's Painter) | vanilla Control | unchanged |
 
@@ -99,6 +99,9 @@ weapon with that element, of her Break Blade starts his own: both are
 self-targeted, so the copy lands on the copier, #563), of Shadow's Throw assassinates, of Terra's
 Fire is Ultima, and (when he carries Lore) of Strago's Scan studies, each
 free as every copy is.  Under three of his points each is its plain self.
+A Mimic of a Dance copies the step that was danced and rolls none of its
+own, so the opener ladder (kits.md, Mog) belongs to a Dance pick, his or
+Mog's, and not to a copy (`battle_danceopener`).
 
 ## 5. Tests
 
