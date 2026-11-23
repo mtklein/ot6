@@ -715,9 +715,10 @@ H.run({ maxFrames = 150000 }, {
   -- cast is the stance (Cmd_07 zeroes its power) and lands nothing, so the
   -- arm takes the first hit row above it and banks the pip its boost needs
   -- with real unboosted turns first (confirmAtBank).
-  -- (the chip and reveal halves live in the labeled arm below: every SwdTech
-  -- is authored slash $01 and this pool's species author $02, so no
-  -- chip can fire here in normal play)
+  -- (the chip and reveal halves live in the labeled arm below: a hitting
+  -- SwdTech's class is Ot6SkillClassTbl's -- Katana $10 under six classes,
+  -- #566; slash $01 under four -- and whether this pool's species hold it is
+  -- the ROM's rows' business, so the arm below stages the bit)
   (function()
     local g0, b0, seqNo, mark
     return H.repeatN(1, {
@@ -961,8 +962,8 @@ H.run({ maxFrames = 150000 }, {
     return H.repeatN(1, steps)
   end)(),
   -- (b) the class-chip and reveal half (labeled): the
-  --     tech class is slash ($01, Ot6SkillClassTbl) and this pool authors
-  --     $02, so the tech's class bit is staged into every live monster's
+  --     tech class is read from Ot6SkillClassTbl (Katana $10, #566) and this
+  --     pool need not author it, so the tech's class bit is staged into every live monster's
   --     weak mask (the tech's default target is the engine's pick) and the
   --     real tech -- arm 5's hit row, Dispatch below ceiling 3, banked for
   --     with real unboosted turns where its boost is past 1 -- then runs the
@@ -1042,17 +1043,17 @@ H.run({ maxFrames = 150000 }, {
               .. "taking the next encounter")
             return
           end
-          local chipped, slashVisible = false, false
+          local chipped, classVisible = false, false
           for m = 0, 5 do
             local sh1 = H.readByte(0x3E38 + (8 + m*2))
             local rv1 = H.readByte(0x3E9D + (8 + m*2))
             if sh1 < (sh0[m] or 0) then chipped = true end
-            -- This long-lived fixture may already know slash from an
+            -- This long-lived fixture may already know the class from an
             -- upstream fight.  The contract is that the real Dispatch chip
             -- leaves its class revealed, not that this particular replay is
             -- the first time the save has ever learned it.
             if sh1 < (sh0[m] or 0) and (rv1 & techClass(DMG_T)) ~= 0 then
-              slashVisible = true
+              classVisible = true
             end
             if sh1 ~= sh0[m] or rv1 ~= rv0[m] then
               H.log(string.format("  monster %d: shields %d -> %d, revealed "
@@ -1062,7 +1063,7 @@ H.run({ maxFrames = 150000 }, {
           H.assertEq(chipped, true, string.format(
             "the real %s chipped the (staged) class-$%02x-weak monster's "
             .. "shields", techName(DMG_T), techClass(DMG_T)))
-          H.assertEq(slashVisible, true, string.format(
+          H.assertEq(classVisible, true, string.format(
             "and the chipped target exposes the tech's class ($%02x)",
             techClass(DMG_T)))
           chipSeen = true

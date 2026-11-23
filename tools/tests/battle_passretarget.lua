@@ -23,8 +23,11 @@
 -- east room into random battles (field group 151: a Mad Oscar; a Mad Oscar
 -- and an Exoray; a PowerDemon and two Exorays) and fight each out with the
 -- route's fight driver (boost on: every member boost-Fights at what it has
--- banked; SABIN's Blitz is Pummel), care after each.  In a crowd (two or
--- more monsters, one special-weak) past the first PASS_SKIP, SETZER first
+-- banked; SABIN's Blitz is Pummel), care after each.  In a crowd (three or
+-- more monsters: the PowerDemon and its two Exorays.  Until #566 "two or
+-- more, one special-weak", the coin suites' crowd, which was that formation
+-- and no other; no rule here reads a chip, and under six classes the room
+-- holds no body weak to the coins) past the first PASS_SKIP, SETZER first
 -- plays each kind still unmet through the real menu (H.setzerBattle, whose
 -- confirm lands only on the target asked for), each from the battle's
 -- opening snapshot (TESTING.md: branch one legitimately reached state):
@@ -198,16 +201,14 @@ end
 local wp = 1
 local WPS = { { 124, 26 }, { 120, 11 } }
 
+local CROWD = 3      -- the bodies a crowd deals: the budget below is decoded for the same number
 local function crowdHere()
-  local alive, weak = 0, 0
+  local alive = 0
   local mask = H.readByte(0x3A75)
   for b = 0, 5 do
-    if (mask >> b) & 1 == 1 then
-      alive = alive + 1
-      if (H.readByte(0x3EA4 + b * 2) & 0x08) ~= 0 and H.readByte(0x3E40 + b * 2) > 0 then weak = weak + 1 end
-    end
+    if (mask >> b) & 1 == 1 then alive = alive + 1 end
   end
-  return alive >= 2 and weak >= 1, alive
+  return alive >= CROWD, alive
 end
 
 -- the cure in reach for SETZER's control-taking status (M.controlTaken's
@@ -392,7 +393,7 @@ H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   H.call(function()
     PW = H.passWatch()
-    W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG)
+    W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG, { bodies = CROWD, weak = false })
   end),
   H.driveUntil(function() return allSeen() end, 2200000, steps,
     "every kind meets an action spent because its body fell while another stands"),

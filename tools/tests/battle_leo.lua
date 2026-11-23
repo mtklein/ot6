@@ -36,7 +36,7 @@ local BMON, BREC = 0x0F6200, 15
 
 local function walk(base)   -- 4-byte rows {word id, b1, b2}; $ffff ends
   local t, o = {}, base
-  for _ = 1, 400 do
+  for _ = 1, 1024 do
     local id = rw(o)
     if id == 0xffff then break end
     t[id] = { rb(o + 2), rb(o + 3) }
@@ -45,31 +45,19 @@ local function walk(base)   -- 4-byte rows {word id, b1, b2}; $ffff ends
   return t
 end
 
-local function find(seq, lo, hi)
-  for o = lo, hi do
-    local hit = true
-    for i = 1, #seq do
-      if rb(o + i - 1) ~= seq[i] then hit = false; break end
-    end
-    if hit then return o end
-  end
-  return nil
-end
-
 local function check(cond, msg)
   if not cond then fails = fails + 1 end
   local line = string.format("leo: %s %s", cond and "OK  " or "FAIL", msg)
   emu.log(line); print(line)
 end
 
--- locate both tables by their opening anchor runs:
--- ShieldTbl opens guard/lobo/whelk-shell; ElemAddTbl opens whelk-head/vargas.
-local shieldBase = find(
-  { 0x00, 0x00, 0x02, 0x02, 0x19, 0x00, 0x03, 0x02, 0x00, 0x01, 0x00, 0x00 },
-  0x300000, 0x310000)
-local elemBase = find(
-  { 0x34, 0x01, 0x01, 0x00, 0x03, 0x01, 0x20, 0x00 },
-  0x300000, 0x310000)
+-- both tables by the build's own symbols.  (Until #566 they were found by
+-- their opening bytes, guard/lobo/whelk-shell and whelk-head/vargas; that
+-- run held the guard's and the lobo's class byte, $02 pierce, and under six
+-- classes it matched nothing: "tables not located", exit 1,
+-- build/attempts/wt/v051-six-classes/suites/b03/battle_leo.out.)
+local shieldBase = H.sym("Ot6ShieldTbl") & 0x3FFFFF
+local elemBase = H.sym("Ot6ElemAddTbl") & 0x3FFFFF
 
 if not shieldBase or not elemBase then
   emu.log(string.format("leo: FAIL tables not located (shield=%s elem=%s)",

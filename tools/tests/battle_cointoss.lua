@@ -8,8 +8,8 @@
 -- random battles (field group 151: a Mad Oscar; a Mad Oscar and an Exoray;
 -- a PowerDemon and two Exorays), and play SETZER's turns through the real
 -- menu (H.setzerBattle) in the battles that deal a crowd -- two or more
--- monsters, one special-weak -- so a toss splits across bodies and chips
--- the special-weak one, asserted (coverage), since a lone Mad Oscar dealt
+-- monsters, one arcane-weak -- so a toss splits across bodies and chips
+-- the arcane-weak one, asserted (coverage), since a lone Mad Oscar dealt
 -- first had quietly stopped both from running.  Any other battle is fought
 -- out by the route's fight driver and followed by field care
 -- (H.setzerCrowdBattles).  The budget is decoded from the room's pool: the
@@ -31,8 +31,8 @@
 --   * every toss replayed from the opening state (H.setzerReplay): twice
 --     its gil over the bodies it hit, each share halved while shields hold,
 --     doubled once Broken (a toss's own chip can break it), capped at 9,999
---     and the HP; the class special ($08) on every hit, a shield off a
---     special-weak body that stood shielded and unbroken -- held against
+--     and the HP; the class Arcane ($08: the coins', #566) on every hit, a shield off a
+--     arcane-weak body that stood shielded and unbroken -- held against
 --     every body's HP and shields at the end.
 -- Negative controls: the mutant ROMs in build/attempts/wt/kit-setzer/
 -- (rate, boost, class) fail the named assertion.
@@ -40,9 +40,9 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
--- crept in, and the split across bodies and the special chip stopped
+-- crept in, and the split across bodies and the arcane chip stopped
 -- running): at least one toss over two or more bodies, and at least one
--- chip on a special-weak body
+-- chip on a arcane-weak body
 local function coverage(all, tag)
   local split, chip = 0, 0
   for _, ps in ipairs(all) do
@@ -51,12 +51,13 @@ local function coverage(all, tag)
       for _, h in ipairs(p.hits) do if h.chip then chip = chip + 1 end end
     end
   end
-  H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d special chip(s)", tag, split, chip))
+  H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d arcane chip(s)", tag, split, chip))
   H.assertEq(split > 0, true, tag .. ": a toss split across two or more bodies (the draw deals a crowd)")
-  H.assertEq(chip > 0, true, tag .. ": a toss chipped a special-weak body")
+  H.assertEq(chip > 0, true, tag .. ": a toss chipped a arcane-weak body")
 end
 
 local COIN = 0x59
+local ARCANE = 0x08     -- OT6_ARCANE: the coins' class (OT6_CLS_COIN; special until #566)
 
 local function checkList(l)
   local want = { [0] = 0x5C, 0xFF, 0x59, 0xFF, 0x5A, 0xFF, 0x5B, 0xFF }
@@ -80,7 +81,7 @@ end
 -- ally with a Revivify before SETZER's next throw; every throw checked
 -- below ran on SETZER's own aim.
 local function checkThrow(r, i)
-  return H.setzerCheckCoins(r, i, 30, function() return 0x08 end, "cointoss")
+  return H.setzerCheckCoins(r, i, 30, function() return ARCANE end, "cointoss")
 end
 
 local WANT = { { row = COIN, boost = 1 }, { row = COIN, boost = 0 } }
@@ -96,8 +97,8 @@ local function crowdWalk(tag, want)
   })
 end
 local walk, S = crowdWalk("cointoss", WANT)
--- A crowd is chosen as it opens (two or more bodies, one special-weak and
--- shielded), and the special-weak body can be dead before SETZER's first
+-- A crowd is chosen as it opens (two or more bodies, one arcane-weak and
+-- shielded), and the arcane-weak body can be dead before SETZER's first
 -- toss: the v0.33 qualification's wor-tomb-v1 draw Zombied him three times
 -- in crowd battle 1 while the others fought, and both his tosses found it
 -- at 0 HP ("slot 0: HP 0 -> 0, shields 3 -> 3"; build/attempts/wt/
@@ -128,7 +129,7 @@ local extraSteps = {}
 for e = 1, EXTRA do
   extraSteps[#extraSteps + 1] = H.cond(function() return chips(played()) == 0 end, {
     H.call(function()
-      H.log(string.format("[cointoss] no toss so far chipped a special-weak body (the crowd's died before SETZER's "
+      H.log(string.format("[cointoss] no toss so far chipped a arcane-weak body (the crowd's died before SETZER's "
         .. "tosses reached it): crowd %d more, one Coin Toss", e))
     end),
     extras[e].walk,
