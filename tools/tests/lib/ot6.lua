@@ -4353,13 +4353,27 @@ function M.skillClass(id)
   return 0
 end
 
+-- The class a character's hand swings: the weapon's (M.weaponClass), except
+-- GAU's own body, which is his fangs (Ot6WeaponClass, #566): his empty hand,
+-- and either hand while he rages (his hands then hold the rage's graphics
+-- code, not an item).  On a ROM without the fangs (no Ot6KitClassTbl) it is
+-- the weapon table's answer, as that ROM plays.
+function M.handClass(char, item, raging)
+  if char == 0x0B and (item == 0xFF or raging)
+     and not (type(OT6_SYMS) == "table" and OT6_SYMS["Ot6KitClassTbl"] == nil) then
+    return M.kitClass("fang")
+  end
+  return M.weaponClass(item)
+end
+
 -- The classes the kits load by hand, from Ot6KitClassTbl (ot6_class.asm):
 -- "thief" LOCKE's hits (Mug, Trickshot), "coin" Coin Toss and GP Rain,
 -- "club" UMARO's Charge and Throw, "hire" every class a hire may swing.
 function M.kitClass(which)
-  local k = ({ thief = 0, coin = 1, club = 2, hire = 3 })[which]
+  local k = ({ thief = 0, coin = 1, club = 2, hire = 3, fang = 4 })[which]
   if type(OT6_SYMS) == "table" and OT6_SYMS["Ot6KitClassTbl"] == nil then
-    return ({ 0x02, 0x08, 0x04, 0x07 })[k + 1]    -- v0.50: pierce, special, bludgeon, the three a hire swung
+    -- the four-class ROM: pierce, special, bludgeon, the three a hire swung, GAU's bare fist
+    return ({ 0x02, 0x08, 0x04, 0x07, 0x04 })[k + 1]
   end
   return M.readRomByte((M.sym("Ot6KitClassTbl") & 0x3FFFFF) + k) & 0x7F
 end
@@ -4835,7 +4849,7 @@ M.HUD_QMARK_ATTR = 0x25
 -- with each icon's palette taken from Ot6ElemPalTbl and its cell from
 -- Ot6ElemGlyphTbl / Ot6ClassGlyphTbl.
 M.HUD_ICON_NAMES = { "fire", "ice", "lightning", "poison", "wind", "holy", "earth", "water",
-  "sword", "dagger", "fist", "arcane", "katana", "spear" }
+  "sword", "dagger", "blunt", "ranged", "katana", "spear" }
 function M.hudColours(drawn)
   local vr, rom, cg = emu.memType.snesVideoRam, emu.memType.snesPrgRom, emu.memType.snesCgRam
   local function stroke(cell, pal)
@@ -7591,9 +7605,12 @@ end
 local function fightChips(actor, slot, boost)
   local r, l = handsOf(actor)
   local mainHits, offHits = M.fightHits(l ~= nil and 2 or 1, boost)
-  local n = M.absorbedHand(slot, r) and 0 or mainHits * hitChips(slot, M.weaponClass(r), M.weaponElement(r))
+  local ch = M.readByte(BATTLE.BCHID + actor * 2)
+  local raging = (M.readByte(BATTLE.ST4 + actor * 2) & 0x01) ~= 0
+  local n = M.absorbedHand(slot, r) and 0
+    or mainHits * hitChips(slot, M.handClass(ch, r, raging), M.weaponElement(r))
   if l and not M.absorbedHand(slot, l) then
-    n = n + offHits * hitChips(slot, M.weaponClass(l), M.weaponElement(l))
+    n = n + offHits * hitChips(slot, M.handClass(ch, l, raging), M.weaponElement(l))
   end
   return n
 end
@@ -7686,7 +7703,7 @@ function M.keyLine(tag)
         if c == 0 then k = k | M.skillClass(0x8A); s = s .. ":M" end
       else
         local r, l = handsOf(e)
-        h = M.weaponClass(r) | (l and M.weaponClass(l) or 0)
+        h = M.handClass(c, r, false) | (l and M.handClass(c, l, false) or 0)
         s = s .. string.format(":r%02X", r) .. (l and string.format(":l%02X", l) or "")
       end
       if cmdRow(e, BATTLE.CMD_BLITZ) then k = k | M.skillClass(0x5D); s = s .. ":B" end
@@ -10508,7 +10525,7 @@ function Driver:rageLine(actor, have)
             v = power
             if elem ~= 0 and (weak & elem) ~= 0 then v = v * 2
             elseif elem ~= 0 and (half & elem) ~= 0 then v = v // 2 end
-            v = v + 1000 * hitChips(s, phys and M.weaponClass(0xFF) or 0, elem)
+            v = v + 1000 * hitChips(s, phys and M.handClass(0x0B, 0xFF, true) or 0, elem)
             if all then score = score + v elseif v > top then top = v end
           end
         end

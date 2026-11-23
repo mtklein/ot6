@@ -9,7 +9,8 @@
         katana $db   vanilla's, mirrored: a thin blade up to the right /
         spear  $da   redrawn: upright, a leaf head on a thin shaft     |
         dagger $d8   redrawn: level, the point to the left             -
-    (the fist is the claw $e1 and arcane the sparkle $df, both vanilla's).
+        blunt  $dc   redrawn: a mallet, a broad head on a short shaft   T
+        ranged $de   vanilla's thrown star                              *
     These cells are also the icons the weapons' names wear.
 
 Run from the repo root.  Idempotent: the glyphs are rebuilt from the font at
@@ -22,8 +23,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = os.environ.get("OT6_SPLIT_BASE", "origin/main")
-MSG = {0x45: "Weak against swords", 0x46: "Weak against daggers", 0x47: "Weak against fists",
-       0x48: "Weak against arcane", 0x4a: "Weak against katanas", 0x4b: "Weak against spears"}
+MSG = {0x45: "Weak against swords", 0x46: "Weak against daggers", 0x47: "Weak against blunt",
+       0x48: "Weak against ranged", 0x4a: "Weak against katanas", 0x4b: "Weak against spears"}
 KATANA = 0xDB
 # ' ' 0 clear, '.' 1 shadow, 'o' 2 grey, '#' 3 white (the text palette's stroke)
 ART = {
@@ -31,6 +32,14 @@ ART = {
            "  ###.  ",
            "  ###.  ",
            "   #..  ",
+           "   o.   ",
+           "   o.   ",
+           "   o.   ",
+           "   o.   "],
+    0xDC: [" #####  ",          # blunt: a mallet
+           " #####. ",
+           " #####. ",
+           "  .o... ",
            "   o.   ",
            "   o.   ",
            "   o.   ",
