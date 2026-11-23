@@ -6,6 +6,14 @@ up to Kefka, his battle, the ending and the staff roll. This doc decodes the
 climb and the battle from the ROM, designs the battle's break rows, and
 measures the fight.
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> keys below are the present ones. Quoted logs, dated measurements and
+> "before" columns keep the words they were recorded in: slash is now Sword
+> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
+> or Dagger.
+
 Evidence is under `build/attempts/wt/v040-the-end/`. Line numbers are into
 `ff6/src/event/event_main.asm` unless a file is named.
 
@@ -88,33 +96,40 @@ unpicked in list order.
 
 | formation | species | L / HP | vanilla | shields | classes |
 |---|---|---|---|---|---|
-| 471 | Short Arm `$157` | 73 / 27,000 | weak water | 6 | pierce, bludgeon |
-| 471 | Long Arm `$158` | 73 / 33,000 | weak wind | 6 | slash, pierce |
-| 471 | Face `$159` | 74 / 30,000 | weak fire; nulls earth | 8 | bludgeon, special |
-| 512 | Hit `$15D` | 73 / 28,000 | weak poison | 6 | slash, bludgeon |
-| 512 | Tiger `$15A` | 70 / 30,000 | weak ice; absorbs earth | 6 | slash, pierce |
-| 512 | Tools `$15B` | 73 / 24,000 | weak bolt | 6 | pierce, bludgeon |
-| 512 | Magic `$15C` | 72 / 41,000 | weak earth | 8 | slash, special |
-| 513 | Girl `$15E` | 58 / 9,999 | absorbs every element | 3 | slash, pierce |
-| 513 | Sleep `$15F` | 71 / 40,000 | none | 8 | bludgeon, special |
-| 514 | Kefka `$12A` | 71 / 62,000 | none; nulls poison | 16 | slash, pierce, bludgeon, special |
+| 471 | Short Arm `$157` | 73 / 27,000 | weak water | 6 | Dagger, Arcane |
+| 471 | Long Arm `$158` | 73 / 33,000 | weak wind | 6 | Sword, Spear |
+| 471 | Face `$159` | 74 / 30,000 | weak fire; nulls earth | 8 | Fist, Arcane |
+| 512 | Hit `$15D` | 73 / 28,000 | weak poison | 6 | Sword, Fist |
+| 512 | Tiger `$15A` | 70 / 30,000 | weak ice; absorbs earth | 6 | Sword, Dagger |
+| 512 | Tools `$15B` | 73 / 24,000 | weak bolt | 6 | Spear, Arcane |
+| 512 | Magic `$15C` | 72 / 41,000 | weak earth | 8 | Sword, Arcane |
+| 513 | Girl `$15E` | 58 / 9,999 | absorbs every element | 3 | Sword, Dagger |
+| 513 | Sleep `$15F` | 71 / 40,000 | none | 8 | Fist, Arcane |
+| 514 | Kefka `$12A` | 71 / 62,000 | none; nulls poison | 16 | Sword, Dagger, Spear, Fist |
 
 The generated floor stood for each before (six shields, slash only). The
 lessons:
 
-- **Every hand in every tier.** Whoever the order puts in front meets the
-  tier, so each formation between its bodies takes slash, pierce, bludgeon
-  and special: any four hold a key somewhere, and the order decides who
-  breaks what. The bodies keep the tower's grammar: the Short Arm and the
-  Tools are machines (the point and the blow, as the factory's), the Face
-  and the Sleep are magic made stone (the blow and the brush, as the
-  statues), the Magic a sorceress (the Madam's pair), the Hit a warrior in
-  plate (the Retainer's), the Tiger and the Long Arm hide and sinew.
+- **Four or five classes in every tier.** Whoever the order puts in front
+  meets the tier. Under the four classes each formation between its bodies
+  took all four, so any four held a key somewhere and the order decided
+  who breaks what. Under the six, formations 471 and 512 take five (all
+  but Katana), 513 four (Sword, Dagger, Fist, Arcane) and Kefka four. No
+  tier takes Katana: CYAN's katana and SwdTech and SHADOW's ninja blade
+  key nothing here. The bodies keep part of the tower's grammar: the Short
+  Arm and the Tools are machines (Dagger or Spear, and Arcane, as the
+  factory's), the Face and the Sleep are magic made stone (Fist and Arcane,
+  the Poltergeist's pair). The Magic, a sorceress, is Sword, Arcane (the
+  Madam's pair is Katana, Arcane now); the Hit, a warrior in plate, is
+  Sword, Fist (the Retainer's is Katana, Arcane now); the Tiger and the
+  Long Arm are hide and sinew.
 - **Steel for the lady.** The Girl absorbs every element, so a spell heals
   her and only a weapon breaks her. When she stands alone she casts Life 2
   on the dead (`AIScript::_350`); a break holds that turn.
-- **Kefka takes every hand**, sixteen shields, the most of any boss (#514,
-  5.5; twelve until v0.43): the last fight is the whole party's.
+- **Kefka takes four classes** (Sword, Dagger, Spear, Fist; all four of the
+  old ones before), sixteen shields, the most of any boss (#514, 5.5;
+  twelve until v0.43). He takes neither Katana (CYAN, SHADOW's blade) nor
+  Arcane (RELM, STRAGO, SETZER).
 
 `battle_breakwor_end` checks the rows in the built ROM, their vanilla weak
 and absorb bytes, that event battle 101 opens on 471 and the tier table
@@ -146,9 +161,9 @@ What the bodies do (ai_script.asm `_343`-`_351`, `_298`):
 The line picks the twelve by level, the most HP first among equals (a
 player puts the strongest in front): at `wor-kt-plates-v1`, "TERRA, CELES,
 RELM, STRAGO, CYAN, SHADOW, LOCKE, MOG, GOGO, SABIN, EDGAR, SETZER" (the
-leg's `[order] committed` line). The first four hold slash (TERRA's and
-CELES's blades) and bludgeon (RELM's and STRAGO's rods); the bench behind
-them brings the pierce and the cards.
+leg's `[order] committed` line). The first four hold Sword (TERRA's and
+CELES's blades) and Arcane (RELM's and STRAGO's rods); the bench behind
+them brings Katana, Dagger, Spear and Fist.
 
 Before the plate each party is cared for in turn (`H.splitCare`), and the
 leg asserts all twelve stand (`T.standing`).
@@ -242,7 +257,7 @@ stock policy); `p5` with the Girl first, "PASS (frame 144993) attempts=1/1",
 
 **Negatives** (#480, #513; `neg/`, `negs.sh`, lab batteries edited by
 `make_negative.py` from the graph's captures), each red at its assert:
-gen_wor_kt_poltergeist with the four bludgeons emptied, "a bludgeon for
+gen_wor_kt_poltergeist with the four rods emptied, "a bludgeon for
 STRAGO in the bag or his hands ... got false"; with one Wall Ring left, "a
 Wall Ring for each of the 2 members who wear one for the Poltergeist, in the
 bag or worn (1): got false"; gen_wor_kefka with LOCKE fallen and no Fenix
@@ -703,8 +718,8 @@ opening keys won 27, lost 1" (`air/tally_g12.txt`); "4 Kefka: won 46, lost
   4 of 48 runs at either shield count (5.5); the replayed line puts RELM
   third and loses none. The order is decided by a level and HP tie-break,
   so a later replay can bring the STRAGO order back; a rule that keeps a
-  bludgeon and a special for the Sleep in front was measured only as RELM
-  third (`or16`), not made.
+  bludgeon and a special for the Sleep in front (Fist and Arcane today) was
+  measured only as RELM third (`or16`), not made.
 - **STRAGO's options** (#512): his nuke lore never reaches his turns
   (`v039-kefka-tower-2/pg0`: "actor=1 char=7 plan=fight" every turn, no lore
   line at all, so a rule ahead of the nuke repertoire decides first); Kefka's
