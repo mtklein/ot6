@@ -22,6 +22,8 @@ OT6_KATANA  := $10              ; katanas and the edged claws; swdtech
 OT6_SPEAR   := $20              ; spears; the drill
 OT6_CLASSES := $3f              ; every class bit
 OT6_NCLASS  = 6
+OT6_ANYWEAPON = $df             ; the HUD's mark for a body every class breaks
+                                ;   (vanilla's sparkle cell; no class wears it)
 OT6_NULLBRK := $80              ; property, not a class: high damage that
                                 ;   chips nothing (the physical mirror of
                                 ;   non-elemental magic). class bits stay set
