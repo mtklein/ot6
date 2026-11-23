@@ -36,7 +36,8 @@ Under each enemy is one line:
 - then one cell for each weakness. A grey **?** is a weakness you have not
   found. Once you hit it, the cell shows the icon of the element or weapon
   type. The line shows up to four weaknesses, elements first; an enemy with
-  more has them all the same.
+  more has them all the same. An enemy that any weapon breaks shows one
+  cell for it: a sparkle, once a weapon has hit.
 
 While an enemy has shields it takes half damage. Each hit that matches a
 weakness removes one shield. A hit that matches both an element and a weapon

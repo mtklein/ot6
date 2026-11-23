@@ -152,8 +152,10 @@ The first hit on a hidden weakness names it: "Weak against swords",
 
 The line under a monster has four weakness cells, elements first, then
 classes in the order Sword, Dagger, Blunt, Ranged, Katana, Spear. A body
-with more weaknesses than cells has them all the same: the Intangir and
-the Speck take all six classes and show the first four.
+with more weaknesses than cells has them all the same. A body every class
+breaks (the Intangir, the Speck) shows one cell for the six: a '?' until
+any weapon chips it, then the any-weapon mark, vanilla's sparkle at $df
+(`OT6_ANYWEAPON`; no class wears it).
 
 Rule: if more visual distinction between weapon types is wanted, add
 another weapon class rather than a second icon set with no mechanical
