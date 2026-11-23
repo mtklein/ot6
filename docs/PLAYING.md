@@ -372,7 +372,8 @@ a stopped enemy only does damage. A broken enemy is slowed but never stopped.
 Enemies that ignore Slow or Stop still do. A dagger before an enemy's shield
 means it is slowed, by a throw or a spell; a knife in the same place means it
 is stopped. Each appears with the hit that causes it and goes when the status
-ends. Gogo's Throw and a Mimic of a throw work the same way, so Shadow can
+ends. (A boss with a big move pending shows a yellow **!** there; if it is
+also slowed or stopped the two take turns.) Gogo's Throw and a Mimic of a throw work the same way, so Shadow can
 slow an enemy and Gogo can stop it.
 
 | Item | Where | Effect |
