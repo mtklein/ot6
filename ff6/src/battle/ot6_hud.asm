@@ -2023,10 +2023,10 @@ Ot6ShieldTbl:
         .word   $000b
         .byte   2, OT6_SWORD ; brawler: absorbs poison (monster_prop.dat
                                 ;   +$0177 = $08), so the mountain's usual
-                                ;   bio-blaster answer would heal it; slash
-                                ;   because terra/locke/edgar's other
-                                ;   weapons are all pierce (ot6_class.asm:
-                                ;   48,49,59) except edgar's mithril blade
+                                ;   bio-blaster answer would heal it; sword
+                                ;   because edgar's mithril blade is the
+                                ;   party's one (terra's and locke's knives
+                                ;   are daggers, his pike a spear)
         ; (cirpius $0086 lived here as a shields-only row through v0.16;
         ; its row is now the keyed one in the break-dark block below --
         ; Ot6SeedShields takes the FIRST match, so a species may appear
@@ -2070,52 +2070,52 @@ Ot6ShieldTbl:
         ; species from Ot6HpScale, which the armor-line ElemAddTbl block deliberately
         ; avoided, but a class weakness has nowhere else to live, so
         ; per-party breakability takes that trade here (HpScale ships 1x,
-        ; inert today). palette: armored soldiers read pierce (a blade finds
+        ; inert today). palette: armored soldiers read dagger (a blade finds
         ; the gaps) plus lightning where a party can conduct it; the Cyan solo
-        ; duel is slash (the samurai out-cuts them); Sabin's brawls add
-        ; bludg (a monk caves the plate).
+        ; duel is katana (the samurai out-cuts them); Sabin's brawls add
+        ; fist (a monk caves the plate).
         ;
         ; -- imperial soldier line --
         .word   $0001
         .byte   2, OT6_DAGGER|OT6_KATANA ; soldier: Cyan's duel cuts it
-                                ;   (slash), Shadow's throw finds the seam
-                                ;   (pierce)
+                                ;   (katana), Shadow's throw finds the seam
+                                ;   (dagger)
         .word   $0002
-        .byte   3, OT6_DAGGER ; templar: Shadow's throw (pierce) /
+        .byte   3, OT6_DAGGER ; templar: Shadow's throw (dagger) /
                                 ;   Bolt Edge (+bolt in ElemAddTbl)
         .word   $014e
-        .byte   3, OT6_KATANA ; leader: Cyan solo Doma duel, slash only;
+        .byte   3, OT6_KATANA ; leader: Cyan solo Doma duel, katana only;
                                 ;   no other party fights him
         .word   $014f
         .byte   2, OT6_KATANA|OT6_FIST ; grunt: Doma courtyard defense,
-                                ;   held by Cyan (slash) + Sabin (bludg)
+                                ;   held by Cyan (katana) + Sabin (fist)
         .word   $0176
         .byte   3, OT6_KATANA|OT6_FIST ; cadet: same Doma defense, same two
                                 ;   heroes, a bigger body
         .word   $0175
         .byte   2, OT6_DAGGER ; officer: Locke solo occupied South Figaro;
-                                ;   pierce is Locke's one key
+                                ;   dagger is Locke's one key
         .word   $0065
         .byte   2, OT6_SWORD|OT6_DAGGER ; trooper: Narshe defense waves;
-                                ;   slash for a Cyan/Sabin squad, pierce
-                                ;   for a Locke/Gau squad
+                                ;   sword for Terra/Edgar/Celes, dagger for
+                                ;   Locke; a Cyan/Sabin squad holds neither
         .word   $003f
         .byte   3, OT6_SWORD|OT6_DAGGER ; rider: also a Narshe wave, same
                                 ;   squad coverage. keeps vanilla fire|poison
         .word   $009f
         .byte   3, OT6_DAGGER|OT6_KATANA ; heavyarmor: Locke solo S.Figaro
-                                ;   guards (pierce) and a Narshe wave (slash
+                                ;   guards (dagger) and a Narshe wave (katana
                                 ;   for a Cyan/Sabin squad)
         .word   $013a
         .byte   2, OT6_DAGGER ; merchant: Locke solo disguise fight; a
                                 ;   civilian with no vanilla weakness at all
-        ; -- Serpent Trench (Sabin + Cyan + Gau): bludgeon and slash is the
-        ; whole ring the party can reach. Gau cannot equip a pierce weapon
+        ; -- Serpent Trench (Sabin + Cyan + Gau): fist and katana is the
+        ; whole ring the party can reach. Gau cannot equip a weapon
         ; on this scenario (his only legal one, the Imp Halberd, is a
-        ; WoB-late treasure stocked by no shop, ot6_class.asm:86) and his
-        ; bare-handed Fight reads as OT6_BLUDG (ot6_class.asm:163); Sabin
-        ; brings fists/Pummel/Suplex/Bum Rush (bludg) plus claws (slash),
-        ; Cyan brings katanas and SwdTechs (slash). all three absorb water
+        ; WoB-late treasure stocked by no shop, ot6_class.asm) and his
+        ; bare-handed Fight reads as OT6_FIST (the table's $ff row); Sabin
+        ; brings fists, claws, Pummel, Suplex and Bum Rush (all fist),
+        ; Cyan brings katanas and SwdTechs (katana). all three absorb water
         ; and their vanilla element is dead or L15-gated for this party, so
         ; class is the only reliable break.
         .word   $003a
@@ -2143,8 +2143,8 @@ Ot6ShieldTbl:
         ; the opera's timed rafter chase forces Locke + Edgar + Sabin through
         ; packs of as many as five rats: two shields (the early-trash count
         ; used at Kolts and Zozo) keeps the break window part of the chase.
-        ; both classes are carried by the forced party (dagger/autocrossbow
-        ; and Pummel); no element is reachable here.
+        ; each row's two are carried by the forced party (autocrossbow or
+        ; dagger, and Pummel); no element is reachable here.
         .word   $0073
         .byte   2, OT6_SPEAR|OT6_FIST ; sewer rat
         .word   $00d1
@@ -2168,17 +2168,17 @@ Ot6ShieldTbl:
         .byte   6, OT6_SPEAR ; crane (element sides verified at m6 entry)
         .word   $010e
         .byte   6, OT6_DAGGER ; crane
-        ; ---- Vector / Magitek Factory random pool: bludgeon carries most
+        ; ---- Vector / Magitek Factory random pool: fist carries most
         ; of the section (vanilla already labels six of the ten random-pool
-        ; bodies as machines, a `Program NN` special-attack name), pierce is
-        ; the imperial line's key, and slash comes off the section's few
-        ; organic bodies.  Rhinox (formation $168) has no vanilla weakness
+        ; bodies as machines, a `Program NN` special-attack name), dagger is
+        ; the imperial line's key, and a katana takes the section's one
+        ; soft body.  Rhinox (formation $168) has no vanilla weakness
         ; and absorbs bolt ($075 +$17 = $04), the element the rest of the
-        ; facility teaches, so it is the one body only bludgeon answers.
+        ; facility teaches, so it is the one body only a fist answers.
         ; shield counts: all twelve at 2 against a formula value of 4.
         .word   $00cb
         .byte   2, OT6_SPEAR|OT6_FIST ; garm: a magitek quadruped
-                                ;   (Program 95) rather than a hound: pierce the
+                                ;   (Program 95) rather than a hound: spear the
                                 ;   joints or cave the housing. commonest
                                 ;   body at the entrance, where the section
                                 ;   teaches its rule, so it teaches both
@@ -2186,7 +2186,7 @@ Ot6ShieldTbl:
         .word   $00c7
         .byte   2, OT6_DAGGER ; commando: imperial rank keeps the imperial
                                 ;   answer: templar $0002 and officer
-                                ;   $0175 are both pierce above, so this is
+                                ;   $0175 are both dagger above, so this is
                                 ;   consistent with them
         .word   $0165
         .byte   2, OT6_FIST ; protoarmor: a sealed suit has no seam to
@@ -2194,7 +2194,7 @@ Ot6ShieldTbl:
                                 ;   bolt stays the ranged key
         .word   $0041
         .byte   2, OT6_SPEAR ; pipsqueak: the swarm body (up to x5);
-                                ;   pierce so Edgar's AutoCrossbow (whole
+                                ;   spear so Edgar's AutoCrossbow (whole
                                 ;   enemy side) answers a five-stack
         .word   $0047
         .byte   2, OT6_FIST ; flan: an ooze cannot be cut. its element
@@ -2220,7 +2220,7 @@ Ot6ShieldTbl:
         .byte   2, OT6_FIST ; rhinox: no weakness of any kind, and it
                                 ;   absorbs bolt, so the facility's usual
                                 ;   answer would heal it. armoured bulk, no
-                                ;   seam, so bludgeon and bludgeon alone
+                                ;   seam, so a fist and a fist alone
         .word   $0006
         .byte   2, OT6_FIST ; mag roader (minecart, 5 forced fights): a
                                 ;   thing on wheels, smash the wheel. vanilla
@@ -2240,7 +2240,7 @@ Ot6ShieldTbl:
                                 ;   to 4 so a solo guest at arrival level wins
                                 ;   with intent but can lose careless (loss
                                 ;   is a GAME OVER, event_main.asm:76471).
-                                ;   SLASH is Leo's sword (the Crystal,
+                                ;   SWORD is Leo's blade (the Crystal,
                                 ;   char_prop.asm:336), the only tool the
                                 ;   player holds here. no element add: Leo's
                                 ;   whole solo kit is non-elemental (Shock
@@ -2260,7 +2260,7 @@ Ot6ShieldTbl:
         .word   $0083
         .byte   3, OT6_SPEAR|OT6_KATANA ; dragon: the other elite
         ; the three bodies of the pool that are magic rather than flesh or
-        ; scale (each holy-weak, each casting) take special too, so Relm's
+        ; scale (each holy-weak, each casting) take arcane too, so Relm's
         ; brushes key them (#347; she is in the FC party); the beasts, the
         ; dragons and the ninja do not.
         .word   $000c
@@ -2283,7 +2283,7 @@ Ot6ShieldTbl:
         .word   $0168
         .byte   7, OT6_SWORD|OT6_SPEAR ; ultros 4: one last time
         .word   $012f
-        .byte   4, OT6_FIST ; chupon: bludgeon is the only key
+        .byte   4, OT6_FIST ; chupon: fist is the only key
         .word   $0113
         .byte   8, OT6_SPEAR ; airforce
         .word   $0145
@@ -2292,7 +2292,7 @@ Ot6ShieldTbl:
         .byte   3, OT6_DAGGER ; missilebay: the part-break cancel
         .word   $0146
         .byte   1, OT6_DAGGER|OT6_SPEAR|OT6_KATANA|OT6_FIST
-                                ; speck: any weapon in the game breaks it
+                                ; speck: four of the six (no sword, no arcane)
         .word   $0117
         .byte   11, OT6_SWORD|OT6_SPEAR ; atmaweapon: the WoB final exam
                                 ;   (the hud draws 11 in two numerals, #292)
@@ -2320,9 +2320,10 @@ Ot6ShieldTbl:
                                 ;   absorbs earth; poison vanilla
         .word   $0052
         .byte   2, OT6_SWORD|OT6_DAGGER ; slamdancer: a street thug,
-                                ;   cut or stuck.  poison vanilla
+                                ;   a sword or a dagger.  poison vanilla
         .word   $004E
-        .byte   2, OT6_SPEAR|OT6_KATANA ; harvester: ditto.  poison vanilla
+        .byte   2, OT6_SPEAR|OT6_KATANA ; harvester: ditto, by a katana or a
+                                ;   spear.  poison vanilla
         .word   $00DF
         .byte   2, OT6_SPEAR ; gabbldegak: the x4 swarm --
                                 ;   AutoCrossbow sweeps it, the pipsqueak
@@ -2337,18 +2338,18 @@ Ot6ShieldTbl:
         ; from L6), fire on the behemoth but ABSORBED by the ninja (the
         ; area's absorb lesson) -- and stay untouched.  These rows add the
         ; class axis the coverage rule requires: every body chippable by
-        ; the forced party's own hands.
+        ; the forced party's own hands (but $00b3, katana only since #566).
         .word   $006E
         .byte   2, OT6_SPEAR|OT6_KATANA ; ninja: an assassin in cloth --
-                                ;   a blade finds him.  ice|holy vanilla;
+                                ;   a katana or a spear.  ice|holy vanilla;
                                 ;   absorbs fire (the trap stays)
         .word   $00E5
         .byte   2, OT6_SWORD|OT6_FIST|OT6_ARCANE ; spirit: swept apart
                                 ;   or beaten through, and a spirit:
-                                ;   special for a Setzer brought along
+                                ;   arcane for a Setzer brought along
                                 ;   (#347).  holy vanilla
         .word   $00B3
-        .byte   2, OT6_KATANA ; the soft flier; ice vanilla
+        .byte   2, OT6_KATANA ; the soft flier (a katana's); ice vanilla
         .word   $0048
         .byte   3, OT6_SPEAR|OT6_FIST ; the shelled tank, in threes:
                                 ;   AutoCrossbow sweeps the stack, fists
@@ -2361,34 +2362,34 @@ Ot6ShieldTbl:
         ; ---- the world of balance off the story's path (wob-side-trips.md) --
         ; What no story leg walks: the forests by Albrook (world groups 17,
         ; 18, 20), on foot from the opera's landing, where the post-opera four
-        ; meet them: CELES (a blade), LOCKE (a knife: the point), EDGAR (a
-        ; pike and his tools: the point) and SABIN (fists and blitzes: the
-        ; blow); and the airship's islands, the bomb isle (27) and Triangle
+        ; meet them: CELES (a sword), LOCKE (a knife: dagger), EDGAR (a
+        ; pike and his tools: spear) and SABIN (fists and blitzes:
+        ; fist); and the airship's islands, the bomb isle (27) and Triangle
         ; Island (124, 28), first reached once Setzer hands over the wheel,
-        ; by LOCKE, EDGAR (a blade now), SABIN (claws: an edge, and his
-        ; blitzes) and SETZER (cards and dice: special).  Vanilla elements
+        ; by LOCKE, EDGAR (a sword now), SABIN (claws: fist, as his
+        ; blitzes) and SETZER (cards and dice: arcane).  Vanilla elements
         ; stay.
         .word   $00e8
-        .byte   2, OT6_DAGGER|OT6_KATANA ; bug: a shell on wings; cut or
-                                ;   spear it.  ice|water vanilla; alone, it
+        .byte   2, OT6_DAGGER|OT6_KATANA ; bug: a shell on wings; a katana or
+                                ;   a dagger.  ice|water vanilla; alone, it
                                 ;   answers a Fight with a petrifying spine
         .word   $003d
         .byte   2, OT6_KATANA|OT6_FIST ; chickenlip: a heavy bird, packs of
-                                ;   five; the blade or the fist.  ice
+                                ;   five; a katana or the fist.  ice
                                 ;   vanilla
         .word   $00aa
         .byte   3, OT6_DAGGER|OT6_FIST ; grenade: answers a Fight with
                                 ;   Exploder (its own hp) unless the blow
                                 ;   breaks it, since a broken body does not
                                 ;   counter: break it in one swing (locke's
-                                ;   point, boosted) or use what it does not
-                                ;   answer, edgar's tools (pierce) and
-                                ;   sabin's blitzes (bludgeon).  ice|water
+                                ;   dagger, boosted) or use what it does not
+                                ;   answer: sabin's blitzes (fist); edgar's
+                                ;   tools are spear and miss it.  ice|water
                                 ;   vanilla; absorbs fire
         .word   $00a3
         .byte   2, OT6_SWORD|OT6_DAGGER|OT6_FIST|OT6_ARCANE ; intangir:
-                                ;   absorbs every element, so every class
-                                ;   breaks it, setzer's special among them,
+                                ;   absorbs every element, so four classes
+                                ;   break it, setzer's arcane among them,
                                 ;   but not a blade of an element it drinks.
                                 ;   its meteo after a hit and its escape
                                 ;   under 1280 hp run through its turns,
@@ -2414,14 +2415,14 @@ Ot6ShieldTbl:
                                 ;   knife or her fire.  fire|holy
                                 ;   vanilla; absorbs bolt
         ; -- the figaro desert and the plains to south figaro (world
-        ; groups 1, 12, 3, 5): terra's knife, locke's blade, edgar's pike;
+        ; groups 1, 12, 3, 5): terra's and locke's knives, edgar's pike;
         ; edgar's bio blaster is the plains' element (poison) --
         .word   $005c
-        .byte   2, OT6_SWORD|OT6_SPEAR ; sand ray: a flat fish; any edge.
+        .byte   2, OT6_SWORD|OT6_SPEAR ; sand ray: a flat fish; sword, spear.
                                 ;   ice|water vanilla, poison an ot6 add
         .word   $0023
-        .byte   3, OT6_DAGGER|OT6_FIST ; fossilfang: bones; the blade
-                                ;   slides off, point or blow cracks
+        .byte   3, OT6_DAGGER|OT6_FIST ; fossilfang: bones; a sword
+                                ;   slides off, a dagger or a fist cracks
                                 ;   them.  fire|ice|holy|water vanilla;
                                 ;   absorbs poison (bio heals it)
         .word   $0015
@@ -2435,8 +2436,8 @@ Ot6ShieldTbl:
         .byte   2, OT6_DAGGER|OT6_FIST ; greasemonk: slick, so stab or
                                 ;   club it.  poison vanilla
         ; -- the south figaro cave (map 72): all three fire-weak, terra's
-        ; fire the cave's lesson; the eye takes the point, the worm the
-        ; edge --
+        ; fire the cave's lesson; the eye takes the pike, the worm a
+        ; sword --
         .word   $0063
         .byte   2, OT6_SPEAR ; bleary: an eye.  fire vanilla
         .word   $0062
@@ -2445,15 +2446,15 @@ Ot6ShieldTbl:
         .byte   1, OT6_SPEAR|OT6_KATANA ; hornet: a pest.  fire vanilla
         ; -- mt. kolts (map 98) --
         .word   $0032
-        .byte   2, OT6_DAGGER|OT6_KATANA ; trilium: a flower; cut the stalk.
+        .byte   2, OT6_DAGGER|OT6_KATANA ; trilium: a flower; a knife's stalk.
                                 ;   fire vanilla; absorbs water
         ; -- locke and celes out of south figaro (maps 87, 69, 70): locke's
-        ; daggers pierce, celes's blade slashes; each body takes one of the
-        ; two, the bear only the blade --
+        ; daggers, celes's sword; each body takes one of the
+        ; two, the bear only the sword --
         .word   $0011
         .byte   2, OT6_SWORD|OT6_DAGGER ; commander: imperial rank, the
-                                ;   imperial answer (pierce), and celes's
-                                ;   blade (slash).  poison vanilla
+                                ;   imperial answer (dagger), and celes's
+                                ;   sword.  poison vanilla
         .word   $0071
         .byte   2, OT6_SWORD|OT6_DAGGER ; vector pup: a hound.  fire
                                 ;   vanilla
@@ -2490,8 +2491,8 @@ Ot6ShieldTbl:
         .byte   2, OT6_DAGGER|OT6_KATANA ; red fang: a wolf; poison an ot6
                                 ;   add
         .word   $002a
-        .byte   2, OT6_SPEAR ; vulture: a flier, brought down by the
-                                ;   point.  wind vanilla
+        .byte   2, OT6_SPEAR ; vulture: a flier, brought down by a
+                                ;   spear.  wind vanilla
         .word   $0090
         .byte   3, OT6_SWORD|OT6_FIST ; over-grunk: the plains' tank.
                                 ;   fire vanilla
@@ -2522,8 +2523,8 @@ Ot6ShieldTbl:
         .byte   2, OT6_SWORD|OT6_SPEAR ; baskervor: a hound (world group
                                 ;   24, the forest by thamasa); poison an
                                 ;   ot6 add
-        ; -- esper mountain (maps 372, 375): strago's rod is the key the
-        ; blades lack (the shell, the ooze), relm's brush the ooze's --
+        ; -- esper mountain (maps 372, 375): strago's rod (arcane) is the key
+        ; the blades lack (the shell, the ooze), as relm's brush is --
         .word   $00ee
         .byte   2, OT6_KATANA|OT6_ARCANE ; mandrake: a root.  fire vanilla;
                                 ;   absorbs water
@@ -2537,7 +2538,7 @@ Ot6ShieldTbl:
                                 ;   five shields, the floor's, kept above
                                 ;   the house curve for battle_breakfour's
                                 ;   measurement (a 3-bp break takes four of
-                                ;   the five).  the blades turn.
+                                ;   the five).  swords and knives turn.
                                 ;   no element
         .word   $00b8
         .byte   2, OT6_FIST|OT6_ARCANE ; slurm: an ooze, not cut.  fire
@@ -2553,25 +2554,25 @@ Ot6ShieldTbl:
         .word   $0102
         .byte   3, OT6_SPEAR|OT6_FIST ; mega armor: the imperial base's
                                 ;   magitek guard beside a protoarmor
-                                ;   (2, bludg).  the bigger suit has
-                                ;   joints a pike or a dagger finds, and
+                                ;   (2, fist).  the bigger suit has
+                                ;   joints a pike finds (spear), and
                                 ;   still dents.  bolt|water vanilla
         .word   $0156
         .byte   3, OT6_KATANA|OT6_ARCANE ; specter: the phantom train's
                                 ;   boxed ghost.  cyan's blade cuts it,
-                                ;   and a spirit takes special (#347).
+                                ;   and a spirit takes arcane (#347).
                                 ;   fire|holy vanilla (sabin's aurabolt)
         .word   $00ae
         .byte   5, OT6_KATANA|OT6_FIST ; gigantos: the floating
                                 ;   continent's boxed giant, 6000 hp: a
                                 ;   boss-grade gauge.  hamstring it or
-                                ;   break its bones; the landing party's
-                                ;   three blades hold the key.  poison
+                                ;   break its bones: a katana (shadow's
+                                ;   blade) or a fist is the key.  poison
                                 ;   vanilla
         ; ---- the world of ruin: the solitary island to tzen's collapsing
         ; house (docs/design/route-wor-sabin.md section 8) ---------------
-        ; Celes is alone to Tzen and holds slash (every sword; pierce only
-        ; on the 26-30-power daggers); Sabin joins in Tzen and adds bludg.
+        ; Celes is alone to Tzen and holds sword (every sword; dagger only
+        ; on the 26-30-power daggers); Sabin joins in Tzen and adds fist.
         ; Vanilla element bits stay and carry the plains' lesson: ice on
         ; three of six bodies (her own spell), fire on the mantis, bolt on
         ; the plated one.  Shields follow the house curve: 1 for the 1-hp
@@ -2585,7 +2586,7 @@ Ot6ShieldTbl:
                                 ;   chum wave).  ice|water vanilla
         .word   $00b2
         .byte   1, OT6_SWORD ; earthguard: the other 1-hp pest; the floor
-                                ;   (pierce) was keyless for a sword Celes.
+                                ;   (pierce then) was keyless for her sword.
                                 ;   water vanilla
         .word   $00d5
         .byte   4, OT6_SWORD ; black drgn: 4000 hp on the beach and again
@@ -2594,11 +2595,11 @@ Ot6ShieldTbl:
                                 ;   (Maduin, Fire Dance, AuraBolt)
         ; -- the plains (world groups 31, 34 on the route; 33, 35, 36 beside)
         .word   $0021
-        .byte   3, OT6_SWORD|OT6_SPEAR ; mesosaur: a hide a blade or a
-                                ;   point opens.  ice vanilla
+        .byte   3, OT6_SWORD|OT6_SPEAR ; mesosaur: a hide a sword or a
+                                ;   spear opens.  ice vanilla
         .word   $0031
-        .byte   3, OT6_SWORD|OT6_ARCANE ; gilomantis: slash the limbs, bludg
-                                ;   the carapace.  fire vanilla is the
+        .byte   3, OT6_SWORD|OT6_ARCANE ; gilomantis: a sword for the limbs,
+                                ;   a rod on the carapace.  fire vanilla is the
                                 ;   better key: its Sickle counter answers
                                 ;   only Fight
         .word   $007c
@@ -2612,8 +2613,8 @@ Ot6ShieldTbl:
         .byte   2, OT6_SWORD|OT6_DAGGER ; lunaris: no vanilla weakness, so
                                 ;   this row is its only key
         .word   $00e6
-        .byte   2, OT6_SWORD|OT6_DAGGER ; osprey: a flier (pierce, the WoB
-                                ;   convention) plus slash for a solo
+        .byte   2, OT6_SWORD|OT6_DAGGER ; osprey: a flier (dagger, the WoB's
+                                ;   pierce convention) plus sword for a solo
                                 ;   blade.  ice vanilla breaks it fast
         ; -- tzen's collapsing house (map 311, group 128; event group 150)
         .word   $00e1
@@ -2627,13 +2628,13 @@ Ot6ShieldTbl:
         .word   $00c0
         .byte   2, OT6_SWORD|OT6_DAGGER ; pm stalker: a floating ghost,
                                 ;   the blade in Celes's hand, and a
-                                ;   spirit: special too (#347).  fire|holy
+                                ;   spirit: a dagger too (#347).  fire|holy
                                 ;   vanilla; absorbs poison
         ; ---- the world of ruin: tzen to edgar (nikeah, south figaro, the
         ; figaro cave, the castle's engine room; docs/design/route-wor-
         ; edgar.md section 8) ------------------------------------------------
-        ; Celes and Sabin hold slash (swords, claws) and bludg (Pummel,
-        ; Suplex); Edgar joins at the Tentacles and adds pierce (the
+        ; Celes holds sword and Sabin fist (claws, Pummel,
+        ; Suplex); Edgar joins at the Tentacles and adds spear (the
         ; AutoCrossbow).  Vanilla element bits stay.  Shields follow the
         ; house curve (1 pests, 2 trash, 3 tanks, 4 miniboss-grade); the
         ; Tentacles are a four-body boss at 5 each.  None of these species
@@ -2653,7 +2654,7 @@ Ot6ShieldTbl:
                                 ;   by fists; its counter answers only
                                 ;   magic.  fire|water vanilla
         .word   $003c
-        .byte   3, OT6_SWORD|OT6_DAGGER ; lizard: scales a blade or a point
+        .byte   3, OT6_SWORD|OT6_DAGGER ; lizard: scales a sword or a dagger
                                 ;   opens.  ice vanilla
         .word   $0030
         .byte   2, OT6_SPEAR|OT6_FIST ; delta bug: def 220 / mdef 5, a shell
@@ -2684,22 +2685,22 @@ Ot6ShieldTbl:
                                 ;   fire 2) the real handles
         .word   $00a9
         .byte   3, OT6_SWORD|OT6_SPEAR|OT6_ARCANE ; neckhunter: a
-                                ;   reaper, a blade or a point; death's
-                                ;   own shape is a spirit: special too
+                                ;   reaper, a sword or a spear; death's
+                                ;   own shape is a spirit: arcane too
                                 ;   (#347).  poison vanilla (bio blaster)
         .word   $00d7
         .byte   4, OT6_DAGGER|OT6_KATANA|OT6_FIST ; dante: the cave's
                                 ;   miniboss-grade body; broken, it cannot
                                 ;   counter with L.3 Muddle.  a demon that
-                                ;   answers magic with magic: special too
-                                ;   (#347).  poison vanilla
+                                ;   answers magic with magic: a dagger
+                                ;   too (#347).  poison vanilla
         .word   $008b
         .byte   2, OT6_SPEAR|OT6_FIST ; drop: a blade passes through water;
-                                ;   a fist or a point splashes it.
+                                ;   a fist or a spear splashes it.
                                 ;   bolt|water vanilla
         ; -- the engine room's tentacles (event group 84, formation 454) --
         ; each absorbs one of the party's elements, so the classes carry
-        ; the fight; each member holds a class key on three of the four
+        ; the fight: celes's sword keys one, sabin's fists two, edgar three
         .word   $011b
         .byte   5, OT6_SPEAR|OT6_KATANA ; tentacle (7000 hp): weak ice|water,
                                 ;   absorbs fire
@@ -2715,12 +2716,12 @@ Ot6ShieldTbl:
         ; ---- the world of ruin: edgar to the falcon (the kohlingen
         ; continent, darill's tomb, dullahan, the tomb's monster chest;
         ; docs/design/route-wor-falcon.md section 8) -------------------------
-        ; Celes (slash), Sabin (slash, bludg) and Edgar (slash, pierce; the
-        ; AutoCrossbow's pierce on every body); Setzer joins at Kohlingen
-        ; with the special class (Cards, Trump, Dice) or pierce (Darts).
-        ; Special is a common key (guidelines, owner 2026-10-01): the
-        ; spirits, the magical and the cursed bodies take it beside their
-        ; other keys (six of the twelve), the plants and beasts do not.
+        ; Celes (sword), Sabin (fist) and Edgar (sword, spear; the
+        ; AutoCrossbow's spear on every body); Setzer joins at Kohlingen
+        ; with arcane (Cards, Trump, Dice) or dagger (Darts).
+        ; Special was a common key (guidelines, owner 2026-10-01): the
+        ; spirits, the magical and the cursed bodies took it beside their
+        ; other keys (six of the twelve: arcane now, the powerdemon dagger).
         ; Vanilla element bits stay.  House curve: 2 trash, 3 tanks, 4
         ; miniboss-grade; Dullahan by bosses-wob's curve.  None of the
         ; random species is met in the WoB; the chest pair's formation 433
@@ -2729,40 +2730,40 @@ Ot6ShieldTbl:
         ; -- the kohlingen continent (world groups 45-47) --
         .word   $0089
         .byte   3, OT6_SWORD|OT6_SPEAR ; harpiai: a winged woman, a flier
-                                ;   (pierce, the WoB convention) and a
-                                ;   blade.  wind vanilla: sabin's air blade
+                                ;   (spear, the WoB's pierce convention) and
+                                ;   a sword.  wind vanilla: sabin's air blade
         .word   $00db
         .byte   2, OT6_SWORD|OT6_FIST ; muus: nulls five elements and
                                 ;   counters magic with pep up: a fight
-                                ;   body, the blade and the fist, so the
+                                ;   body, a sword and the fist, so the
                                 ;   crossbow does not sweep the muus x3
         .word   $00a7
-        .byte   2, OT6_SPEAR|OT6_ARCANE ; deep eye: a point in the eye;
+        .byte   2, OT6_SPEAR|OT6_ARCANE ; deep eye: a spear in the eye;
                                 ;   two shields so the autocrossbow cracks
                                 ;   six in two sweeps.  a magic eye that
-                                ;   sleeps whoever meets its gaze: special
+                                ;   sleeps whoever meets its gaze: arcane
                                 ;   too.  fire vanilla
         .word   $00d3
         .byte   3, OT6_SWORD|OT6_ARCANE ; bogy: a ghost behind safe with no
                                 ;   vanilla weakness, so this row is its
-                                ;   only key: the blade for the trio, and
+                                ;   only key: a sword for the trio, and
                                 ;   setzer's cards: a spirit
         ; -- darill's tomb (groups 149-151): fire on all five, holy on four,
         ; zombie on four, poison absorbed by four --
         .word   $0005
         .byte   3, OT6_KATANA|OT6_FIST|OT6_ARCANE ; orog: a zombie mass a
-                                ;   blade or a blow opens, and cursed
-                                ;   flesh (special); broken, it neither
+                                ;   katana or a fist opens, and cursed
+                                ;   flesh (arcane); broken, it neither
                                 ;   zombies nor counters.  fire|holy vanilla
         .word   $0010
         .byte   3, OT6_FIST|OT6_ARCANE ; osteosaur: bones are broken,
                                 ;   not cut or stuck (the floor's pierce
                                 ;   was wrong); risen bones are cursed
-                                ;   (special).  fire|holy vanilla
+                                ;   (arcane).  fire|holy vanilla
         .word   $006f
         .byte   3, OT6_DAGGER|OT6_SPEAR|OT6_KATANA ; powerdemon: the
                                 ;   tomb's tank, in all three basements; a
-                                ;   demon (special).  fire|holy vanilla
+                                ;   demon (a dagger too).  fire|holy vanilla
         .word   $0061
         .byte   4, OT6_SWORD ; mad oscar: the plant is cut; four so the
                                 ;   break lands before sour mouth's second
@@ -2774,9 +2775,9 @@ Ot6ShieldTbl:
         ; -- the grave (event group 85, formation 455) --
         .word   $011c
         .byte   10, OT6_DAGGER|OT6_FIST|OT6_ARCANE ; dullahan: an armored
-                                ;   knight, the point through the joints,
-                                ;   the blow on the plate; a headless
-                                ;   spirit in it (special, the third key).
+                                ;   knight, a dagger through the joints,
+                                ;   a fist on the plate; a headless
+                                ;   spirit in it (arcane, the third key).
                                 ;   fire vanilla; absorbs ice
         ; -- the monster chest beside the save point (event group 116,
         ; formation 433): the narshe whelk's rows grown for the WoR --
@@ -2785,12 +2786,12 @@ Ot6ShieldTbl:
                                 ;   the shell is the mistake
         .word   $0135
         .byte   6, OT6_DAGGER ; whelk head (the WoR head): the narshe
-                                ;   head's 4 * pierce, grown.  fire vanilla
+                                ;   head's row grown; dagger here.  fire vanilla
         ; ---- the world of ruin: terra (mobliz, phunbaba's four records;
         ; docs/design/route-wor-terra.md section 6) ------------------------
         ; One demon, four records.  Vanilla poison stays (edgar's bio
         ; blaster); bolt stays absorbed (his bolt 2/3 are celes's runic).
-        ; Blows and special open the hide in both of the party's fights; the
+        ; Fists and daggers open the hide in both of the party's fights; the
         ; last record, where terra fights morphed beside the two the second
         ; bababreath left, takes her blade too.
         .word   $016a
@@ -2811,7 +2812,7 @@ Ot6ShieldTbl:
         .word   $016d
         .byte   12, OT6_SWORD|OT6_DAGGER|OT6_FIST ; phunbaba 4: terra
                                 ;   morphed with two of the four, 26000 hp
-                                ;   to the kill; slash is her blade's key
+                                ;   to the kill; sword is her blade's key
         ; ---- the world of ruin: cyan (the plains round zozo, jidoor and
         ; maranda, mt. zozo, the storm dragon; docs/design/route-wor-cyan.md
         ; section 6) -------------------------------------------------------
@@ -2820,14 +2821,14 @@ Ot6ShieldTbl:
         ; fire, bolt, water).  Mt. zozo's five come in packs and pairs:
         ; cyan's stunner cuts every body at once.
         .word   $005b
-        .byte   3, OT6_DAGGER|OT6_ARCANE ; crawler: a shelled crawler; the
-                                ;   blow cracks it, the point finds the
+        .byte   3, OT6_DAGGER|OT6_ARCANE ; crawler: a shelled crawler; a
+                                ;   rod cracks it, a dagger finds the
                                 ;   joints.  ice vanilla
         .word   $0099
         .byte   3, OT6_SWORD|OT6_SPEAR ; geckorex: lizard hide.  ice
                                 ;   vanilla
         .word   $003b
-        .byte   2, OT6_ARCANE ; reach frog: soft, crushed.  ice vanilla
+        .byte   2, OT6_ARCANE ; reach frog: soft; arcane.  ice vanilla
         .word   $00d2
         .byte   3, OT6_KATANA|OT6_FIST|OT6_ARCANE ; mantodea: cut or crush
                                 ;   the scythes; three, so the party breaks
@@ -2839,8 +2840,8 @@ Ot6ShieldTbl:
         .byte   3, OT6_SWORD|OT6_SPEAR ; sprinter: a running bird.  bolt
                                 ;   vanilla
         .word   $00b0
-        .byte   1, OT6_SWORD|OT6_SPEAR|OT6_FIST ; spek tor: 250 hp, any
-                                ;   blow.  water vanilla
+        .byte   1, OT6_SWORD|OT6_SPEAR|OT6_FIST ; spek tor: 250 hp; sword,
+                                ;   spear or fist.  water vanilla
         .word   $008e
         .byte   2, OT6_SPEAR|OT6_KATANA ; luridan: horned, in herds of three
                                 ;   and six.  fire|wind vanilla (cyan's
@@ -2858,15 +2859,15 @@ Ot6ShieldTbl:
         .byte   2, OT6_SWORD|OT6_FIST ; ursus: two, so it breaks before it
                                 ;   runs.  fire vanilla
         .word   $014b
-        .byte   14, OT6_SPEAR|OT6_KATANA ; storm drgn: 42000 hp; blades cut
+        .byte   14, OT6_SPEAR|OT6_KATANA ; storm drgn: 42000 hp; katanas cut
                                 ;   the hide (cyan's quadra slam chips four
                                 ;   a turn), bolt (vanilla) finds it; wind
                                 ;   it absorbs (cyan's tempest heals it)
         ; ---- the world of ruin: narshe (the town, the mines, the moogle
         ; cave, the cliffs, umaro's cave; the ice dragon, tritoch and umaro;
         ; docs/design/route-wor-narshe.md section 4) ------------------------
-        ; The party holds slash (terra, celes, cyan), pierce (mog's spear)
-        ; and fire; bludgeon arrives with umaro at the end.  Vanilla elements
+        ; The party holds sword (terra, celes), katana (cyan), spear (mog)
+        ; and fire; fist arrives with umaro at the end.  Vanilla elements
         ; stay: the arc is ice, and every boss absorbs it and is weak to fire.
         .word   $00f8
         .byte   2, OT6_DAGGER|OT6_KATANA ; red wolf: a wolf, as the wob lobo
@@ -2880,8 +2881,8 @@ Ot6ShieldTbl:
         .word   $00c4
         .byte   2, OT6_DAGGER|OT6_SPEAR|OT6_KATANA ; wizard: a robed
                                 ;   caster, met in the moogle cave before
-                                ;   mog, so blades key it; special for a
-                                ;   magical body; celes's runic eats its
+                                ;   mog, so cyan's katana keys it; dagger for
+                                ;   a magical body; celes's runic eats its
                                 ;   whole list.  bolt|poison vanilla
         .word   $00da
         .byte   1, OT6_SPEAR|OT6_ARCANE ; psychot: floats; absorbs fire
@@ -2904,14 +2905,15 @@ Ot6ShieldTbl:
                                 ;   absorbs bolt and water (its bolt
                                 ;   weakness never applies)
         .word   $009e
-        .byte   2, OT6_SPEAR|OT6_ARCANE ; tomb thumb: a cursed body (special
+        .byte   2, OT6_SPEAR|OT6_ARCANE ; tomb thumb: a cursed body (arcane
                                 ;   for cursed bodies).  bolt|water vanilla
         .word   $0054
         .byte   4, OT6_SWORD|OT6_ARCANE ; pug: the rare one in umaro's cave,
                                 ;   miniboss-grade.  fire|bolt vanilla
         .word   $00ff
         .byte   4, OT6_DAGGER|OT6_KATANA ; pugs: the same body, the chest in
-                                ;   umaro's cave (event group 152)
+                                ;   umaro's cave (event group 152); the
+                                ;   split gave it the pug's other halves
         .word   $0110
         .byte   6, OT6_SPEAR|OT6_KATANA ; umaro: 17200 hp; break him before
                                 ;   his green cherry (under 10240 hp).
@@ -2920,7 +2922,7 @@ Ot6ShieldTbl:
         .byte   10, OT6_SPEAR|OT6_KATANA ; tritoch (the world of ruin's
                                 ;   record: only battle 119 reaches it;
                                 ;   $0114/$0115 stay shieldless below):
-                                ;   30000 hp, def 254, so blades and the
+                                ;   30000 hp, def 254, so a katana and the
                                 ;   spear chip what they barely hurt; fire
                                 ;   (vanilla) burns it; absorbs ice
         .word   $0149
@@ -2934,9 +2936,9 @@ Ot6ShieldTbl:
         ; ---- the world of ruin: jidoor and thamasa (owzer's house and
         ; chadarnook, the plains, the fanatics' tower; the holy dragon and
         ; magimaster; docs/design/route-wor-thamasa.md section 4) ---------
-        ; Into owzer's the party holds slash (terra, celes, cyan), fire,
-        ; holy (terra's pearl) and ice/bolt/poison (celes's tritoch); relm
-        ; adds special, strago bludgeon.  Vanilla elements stay.
+        ; Into owzer's the party holds sword (terra, celes), katana (cyan),
+        ; fire, holy (terra's pearl), ice/bolt/poison (celes's tritoch); relm
+        ; and strago add arcane.  Vanilla elements stay.
         .word   $00cc
         .byte   1, OT6_DAGGER|OT6_KATANA ; vindr: a bird that dodges blades
                                 ;   (evade 90): fire (vanilla) is the key
@@ -2945,8 +2947,8 @@ Ot6ShieldTbl:
         .byte   2, OT6_KATANA|OT6_ARCANE ; souldancer: a dancing spirit.
                                 ;   poison vanilla
         .word   $0092
-        .byte   3, OT6_DAGGER|OT6_FIST ; crusher: the house's tank; no
-                                ;   blade keys it, fire (vanilla) does
+        .byte   3, OT6_DAGGER|OT6_FIST ; crusher: the house's tank; no sword or
+                                ;   katana keys it, fire (vanilla) does
         .word   $0077
         .byte   1, OT6_SPEAR|OT6_KATANA ; wild cat: in fours.  fire|water
                                 ;   vanilla
@@ -2965,7 +2967,7 @@ Ot6ShieldTbl:
                                 ;   the fight's mistake, so no gauge
         .word   $0148
         .byte   6, OT6_SWORD|OT6_SPEAR ; chadarnook (the demon): the
-                                ;   blades, with fire and pearl (vanilla
+                                ;   swords, with fire and pearl (vanilla
                                 ;   fire|holy); absorbs bolt
         .word   $002b
         .byte   2, OT6_DAGGER|OT6_ARCANE ; harpy: thamasa's plain; relm's
@@ -2977,7 +2979,7 @@ Ot6ShieldTbl:
         .byte   3, OT6_SWORD|OT6_FIST ; prussian: a bear
         ; The fanatics' tower is magic-only (battle switch $38): only spells
         ; chip, on a weakness or by ot6's break.  The species meet no class
-        ; on this arc; special, the magical body's key, stands for the few
+        ; on this arc; arcane, the magical body's key, stands for the few
         ; places outside the tower they appear.  L.20 and L.70 start with
         ; reflect: quake (earth, added in Ot6ElemAddTbl) reaches them.
         .word   $0132
@@ -3014,9 +3016,9 @@ Ot6ShieldTbl:
         ; doom gaze in the sky on the way; docs/design/route-wor-locke.md
         ; section 3) ------------------------------------------------------
         ; The cave splits the party: party 1 (terra, strago, sabin, cyan)
-        ; holds slash, pierce, bludgeon, fire, holy, wind and water but no
+        ; holds sword, katana, fist, arcane, fire, holy, wind and water but no
         ; ice; party 2 (celes, relm, mog, umaro) holds the cave's vanilla
-        ; key, ice, with slash, pierce and bludgeon.  Nearly every species
+        ; key, ice, with sword, spear, fist and arcane.  Nearly every species
         ; here is weak to ice and drinks fire, so each row gives party 1 a
         ; key of its own: holy on the casters and the phantom, a class on
         ; the beasts.  Vanilla elements stay.
@@ -3045,7 +3047,7 @@ Ot6ShieldTbl:
                                 ;   vanilla; absorbs fire|water
         .word   $0093
         .byte   1, OT6_ARCANE ; uroburos: 50 hp behind defence 252; one
-                                ;   crushing blow breaks it.  ice vanilla
+                                ;   blow of a rod breaks it.  ice vanilla
         .word   $0153
         .byte   6, OT6_SPEAR ; red dragon: 30000 hp; mog's spear between
                                 ;   the scales, celes's ice; ice|water
@@ -3057,10 +3059,10 @@ Ot6ShieldTbl:
                                 ;   vanilla; absorbs ice|poison
         ; ---- the world of ruin: the veldt cave (gau; the srbehemoth;
         ; docs/design/route-wor-gau.md section 3) --------------------------
-        ; The four who walk it (terra, celes, relm, gau) hold slash
-        ; (celes), pierce (terra's dagger), bludgeon (relm's rod, gau's
-        ; fists) and fire; every body here but rhyos drinks or nulls one of
-        ; celes's spells (ice, poison).  The rows key bludgeon, so gau's
+        ; The four who walk it (terra, celes, relm, gau) hold sword
+        ; (celes), dagger (terra's), arcane (relm's rod), fist (gau's
+        ; hands) and fire; every body here but rhyos drinks or nulls one of
+        ; celes's spells (ice, poison).  The rows key fist, so gau's
         ; fists and his beasts' physical turns break what celes's ice heals.
         .word   $008f
         .byte   3, OT6_DAGGER|OT6_FIST ; toe cutter: a scythed shell; crack
@@ -3083,9 +3085,9 @@ Ot6ShieldTbl:
         ; 3) -------------------------------------------------------------
         ; The Veldt deals every formation the save has fought; these fourteen
         ; World of Balance bodies rode the floor and the play met them there
-        ; (the sweeps' [key] lines, met.txt).  Each keeps the floor's
-        ; shields and class, so the World of Balance parties that meet them
-        ; at home keep their key, and gains one from its body.
+        ; (the sweeps' [key] lines, met.txt).  Each kept the floor's
+        ; shields and class and gained one from its body; #566 then split
+        ; each of the two in two, by the parties the route met them with.
         .word   $0013
         .byte   2, OT6_SPEAR|OT6_KATANA ; were-rat: a rat; fire vanilla
         .word   $0017
@@ -3125,8 +3127,8 @@ Ot6ShieldTbl:
                                 ;   vanilla, absorbs poison
         ; ---- the world of ruin: the zone eater's belly (gogo; route-wor-
         ; gogo.md section 3) -----------------------------------------------
-        ; The four who walk it (terra, celes, relm, strago) hold pierce
-        ; (terra's dagger), slash (celes), bludgeon (the two rods), fire and
+        ; The four who walk it (terra, celes, relm, strago) hold dagger
+        ; (terra's), sword (celes), arcane (the two rods), fire and
         ; holy (terra) and ice (celes), and no bolt or poison: the bodies
         ; weak only to those (ogor, tap dancer) take a class, and each row
         ; keys two of the four.  Vanilla elements stay.
@@ -3156,9 +3158,9 @@ Ot6ShieldTbl:
                                 ;   mistake, so no gauge
         ; ---- the world of ruin: ebot's rock (strago's hidon, gogo's first
         ; area; route-wor-gogo.md section 3) ------------------------------
-        ; Strago, relm, gogo and terra walk it: bludgeon (the rods), pierce
-        ; (terra's dagger), fire and holy.  It is strago's quest, so every
-        ; body takes his rod (bludgeon) beside a key of its own; gogo's
+        ; Strago, relm, gogo and terra walk it: arcane (the rods), dagger
+        ; (terra's), fire and holy.  It is strago's quest, so every
+        ; body takes his rod (arcane) beside a key of its own; gogo's
         ; mimic copies whichever key was just struck.  Vanilla elements stay.
         .word   $0069
         .byte   2, OT6_FIST|OT6_ARCANE ; warlock: a robed caster (mdef
@@ -3199,7 +3201,7 @@ Ot6ShieldTbl:
         ; route-wor-gogo.md section 3) --------------------------------------
         .word   $014c
         .byte   6, OT6_DAGGER|OT6_ARCANE ; dirt drgn: an earth dragon; the
-                                ;   floor's pierce and a crushing blow.
+                                ;   floor's pierce (dagger) and a rod's blow.
                                 ;   wind|water vanilla (strago's aqua rake)
         ; ---- the world of ruin: the plain west of doma castle (world group
         ; 52; route-wor-dreams.md section 3): its other bodies' rows are the
@@ -3209,12 +3211,12 @@ Ot6ShieldTbl:
                                 ;   crush it.  fire vanilla; absorbs water
         ; ---- the world of ruin: cyan's dream (route-wor-dreams.md section
         ; 3) -------------------------------------------------------------------
-        ; Terra, celes and relm walk it (cyan is the dream's): slash (the two
-        ; blades), bludgeon (relm's rod), fire, ice, bolt and holy.  Terra
+        ; Terra, celes and relm walk it (cyan is the dream's): sword (the two
+        ; blades), arcane (relm's rod), fire, ice, bolt and holy.  Terra
         ; walks the dreamscape alone until the stooges run, so every body
-        ; there takes her blade or her fire.  Vanilla elements stay.
+        ; there took her blade or her fire (a katana's now, on some rows).
         .word   $00be
-        .byte   3, OT6_KATANA|OT6_ARCANE ; barb-e: a dream's siren; steel
+        .byte   3, OT6_KATANA|OT6_ARCANE ; barb-e: a dream's siren; a katana
                                 ;   or a brush.  poison vanilla
         .word   $00ab
         .byte   2, OT6_SWORD|OT6_FIST ; critic: a shrieking bird
@@ -3238,7 +3240,7 @@ Ot6ShieldTbl:
                                 ;   vanilla
         ; the cave below the dream's train: the three ride magitek armor
         ; there (_cb93bf), whose rows are the beams (fire, bolt, ice) and
-        ; terra's tek missile (pierce); every body is weak to bolt vanilla,
+        ; terra's tek missile (spear); every body is weak to bolt vanilla,
         ; so the bolt beam breaks them all
         .word   $009d
         .byte   3, OT6_SPEAR ; plutoarmor: an armored rider; the
@@ -3250,7 +3252,7 @@ Ot6ShieldTbl:
         .byte   4, OT6_SPEAR|OT6_ARCANE ; io: a war machine.  bolt|holy|
                                 ;   water vanilla; nulls poison|wind|earth
         ; the dream stooges (event battle 90): each takes another pair, and
-        ; the three together hold a key for every hand
+        ; the three together hold every key but a dagger
         .word   $011f
         .byte   4, OT6_KATANA|OT6_ARCANE ; curley: ice|water vanilla;
                                 ;   absorbs fire
@@ -3261,7 +3263,7 @@ Ot6ShieldTbl:
         .byte   4, OT6_SWORD|OT6_FIST ; moe: no weakness; absorbs bolt
         ; wrexsoul (event battle 92): a composite of the war's spirits
         .word   $0122
-        .byte   6, OT6_KATANA|OT6_ARCANE ; wrexsoul: steel or a brush.
+        .byte   6, OT6_KATANA|OT6_ARCANE ; wrexsoul: a katana or a brush.
                                 ;   ice vanilla; absorbs fire|holy
         .word   $0167
         .byte   2, OT6_ARCANE ; soulsaver: a soul; the brush, or celes's
@@ -3270,7 +3272,7 @@ Ot6ShieldTbl:
         ; section 3) ---------------------------------------------------------
         ; Every body wears reflect and most have mdef 250: spells bounce
         ; and steel decides.  Cyan comes back from his dream with every
-        ; swdtech, and his katana (slash) keys every body here.
+        ; swdtech, and his katana keys every body here.
         .word   $00a6
         .byte   2, OT6_KATANA|OT6_FIST ; enuo: a slime.  holy vanilla
         .word   $006d
@@ -3296,7 +3298,7 @@ Ot6ShieldTbl:
         .word   $0124
         .byte   6, OT6_SPEAR|OT6_KATANA ; katanasoul (the castle's box, 406
                                 ;   (10,17)): a swordsman's ghost; steel
-                                ;   answers steel (the samurai's pair).
+                                ;   answers steel: katana and spear.
                                 ;   poison vanilla
         ; ---- the world of ruin: the colosseum's own bodies (route-wor-
         ; colosseum.md section 3) ----------------------------------------------
@@ -3313,16 +3315,16 @@ Ot6ShieldTbl:
                                 ;   fighter out, so no gauge
         .word   $007f
         .byte   6, OT6_DAGGER|OT6_ARCANE ; srbehemoth (the colosseum's): the
-                                ;   dead beast, as the veldt cave's: horn and
-                                ;   bone.  fire|holy vanilla; absorbs poison
+                                ;   dead beast, as the veldt cave's; a dagger
+                                ;   or a rod.  fire|holy vanilla; absorbs poison
         ; ---- the world of ruin: the side trips by the falcon (route-wor-side-
         ; trips.md section 2) --------------------------------------------------
         ; The Cactrot desert beside Maranda (world group 111) and the dinosaur
         ; forest north of Gau's father's house (world group 54).  The cabin
-        ; seats three blades (slash) and SHADOW's point (pierce, his skeans
-        ; fire, water and bolt); vanilla elements stay.  The desert keys the
-        ; blades; the forest's hide turns them, so it wants the point, a blow
-        ; or the mages' ice.
+        ; seats three blades and SHADOW's throw (dagger, his skeans
+        ; fire, water and bolt); vanilla elements stay.  The desert keys a
+        ; katana or his throw; the forest's hide wants a dagger, a spear, a
+        ; fist or the mages' ice.
         .word   $003e
         .byte   2, OT6_KATANA|OT6_FIST ; hoover: a soft sand-eater; cut it
                                 ;   or crush it.  ice|water vanilla (shadow's
@@ -3335,15 +3337,15 @@ Ot6ShieldTbl:
         .byte   1, OT6_DAGGER ; cactrot: 3 hp under evade 250: a hit that
                                 ;   lands does 1, and 0 while it shields, so
                                 ;   the break is the kill.  shadow's throw
-                                ;   (pierce) or ice|water (vanilla)
+                                ;   (dagger) or ice|water (vanilla)
         .word   $0027
         .byte   3, OT6_DAGGER|OT6_FIST ; tyranosaur: a dinosaur's hide, as
-                                ;   the allosaurus's; a point or a blow, not
-                                ;   an edge.  three, so the pair's break
+                                ;   the allosaurus's; a dagger or a fist, not
+                                ;   a sword.  three, so the pair's break
                                 ;   lands before its second meteor (four
                                 ;   lost the pair 1 in 3).  ice vanilla
         .word   $0026
-        .byte   6, OT6_SPEAR|OT6_FIST ; brachosaur: the same hide on a
+        .byte   6, OT6_SPEAR|OT6_FIST ; brachosaur: that hide (a spear's) on a
                                 ;   46050-hp body; a break holds its turns,
                                 ;   ultima among them.  ice vanilla
         ; ---- the world of ruin: kefka's tower (route-wor-kefka-tower.md
@@ -3351,19 +3353,19 @@ Ot6ShieldTbl:
         ; Three parties, each a carrier beside the bench.  The tower is two
         ; places: the empire's factory (maps 292, 352, 409, 410, 329, 355:
         ; the machines, weak to bolt and water vanilla) and its ruins (the
-        ; beasts, the dead and the court).  The machines turn the blades: a
-        ; point or a blow finds their joints, so the bench's spears, clubs
-        ; and knives carry there, and the carriers' blades want Bolt.  The
+        ; beasts, the dead and the court).  The machines turn swords and
+        ; katanas: a dagger, a spear, a fist or a rod finds their joints, so
+        ; the bench carries there, and the carriers' blades want Bolt.  The
         ; statues are magic made stone: each takes the brush or the cards
-        ; and one other hand, and the three together ask for every hand.
+        ; and one other hand: a katana, a dagger and a fist between them.
         ; Vanilla elements stay.
         ; map 334, 287, 303, 338, 339: the tower's first floors
         .word   $0084
         .byte   3, OT6_DAGGER|OT6_ARCANE ; brontaur: a horned beast's hide,
                                 ;   as the dinosaurs'.  ice vanilla
         .word   $00b7
-        .byte   3, OT6_KATANA|OT6_ARCANE ; evil oscar: a cursed flower; cut
-                                ;   it or a brush.  fire vanilla; absorbs
+        .byte   3, OT6_KATANA|OT6_ARCANE ; evil oscar: a cursed flower; a katana
+                                ;   or a brush.  fire vanilla; absorbs
                                 ;   every other element
         .word   $0080
         .byte   2, OT6_SPEAR|OT6_KATANA ; vectaur: a soft insect body in a
@@ -3400,8 +3402,8 @@ Ot6ShieldTbl:
                                 ;   kill.  absorbs poison
         ; map 294, 295, 293: the beasts of the ruins
         .word   $0025
-        .byte   4, OT6_DAGGER|OT6_ARCANE ; doom drgn: a dark dragon; the
-                                ;   point or the brush.  no weakness vanilla
+        .byte   4, OT6_DAGGER|OT6_ARCANE ; doom drgn: a dark dragon; a
+                                ;   dagger or the brush.  no weakness vanilla
         .word   $00e4
         .byte   3, OT6_FIST|OT6_ARCANE ; vectagoyle: a stone gargoyle;
                                 ;   crush it.  no weakness vanilla
@@ -3454,7 +3456,7 @@ Ot6ShieldTbl:
                                 ;   absorbs fire|wind
         .word   $017d
         .byte   10, OT6_SPEAR|OT6_KATANA ; atma (event battle 112, map 331):
-                                ;   the atmaweapon's row, the rematch.
+                                ;   the atmaweapon's rematch; katana here.
                                 ;   no weakness vanilla; absorbs five
         .word   $0150
         .byte   6, OT6_SWORD|OT6_SPEAR ; gold drgn (event battle 135, map
@@ -3466,14 +3468,14 @@ Ot6ShieldTbl:
                                 ;   vanilla; absorbs poison
         ; ---- the end: kefka's battle (route-wor-the-end.md section 2) ------
         ; Battle 101 is four formations in one fight, met by whoever the
-        ; order menu puts in front: each tier between its bodies takes every
-        ; hand (slash, pierce, bludgeon, special), so any four the player
-        ; picks hold a key in every tier, and the order decides who breaks
-        ; what.  Kefka takes every hand.  Vanilla elements stay.
+        ; order menu puts in front: each tier between its bodies took every
+        ; hand of the four classes.  Of the six, no row here takes a katana,
+        ; the third tier takes no spear, and Kefka takes sword, dagger,
+        ; spear and fist (no arcane).  Vanilla elements stay.
         ; formation 471: the arms and the face
         .word   $0157
-        .byte   6, OT6_DAGGER|OT6_ARCANE ; short arm: a machine's arm; the
-                                ;   point and the blow.  water vanilla
+        .byte   6, OT6_DAGGER|OT6_ARCANE ; short arm: a machine's arm; a
+                                ;   dagger and a rod's blow.  water vanilla
         .word   $0158
         .byte   6, OT6_SWORD|OT6_SPEAR ; long arm: a claw on sinew; cut
                                 ;   it.  wind vanilla
@@ -3505,7 +3507,7 @@ Ot6ShieldTbl:
         ; formation 514
         .word   $012a
         .byte   16, OT6_SWORD|OT6_DAGGER|OT6_SPEAR|OT6_FIST ; kefka:
-                                ;   every hand finds him, and the most
+                                ;   four of the six find him, and the most
                                 ;   shields of any boss (storm drgn 14).
                                 ;   no weakness vanilla; nulls poison
         ; ---- the world of balance: the event fights the design audit
@@ -3513,13 +3515,13 @@ Ot6ShieldTbl:
         ; 13-17; battle_breakwob_events checks them in the ROM).  Vanilla
         ; elements stay; the house curve as above.
         ; -- the lete river's raft (event battles 7 and 8): terra's
-        ; blade, edgar's pike, banon's rod (and sabin's fists upstream);
-        ; each hand keys two of the three, terra's fire all three --
+        ; sword, edgar's pike, banon's rod (sabin's fists key none here);
+        ; each of the three keys two of the three, terra's fire all three --
         .word   $0022
         .byte   2, OT6_SWORD|OT6_SPEAR ; pterodon: a winged reptile; a
-                                ;   blade or a point.  fire vanilla
+                                ;   sword or a spear.  fire vanilla
         .word   $0038
-        .byte   2, OT6_SPEAR|OT6_ARCANE ; nautiloid: a shell; a point in
+        .byte   2, OT6_SPEAR|OT6_ARCANE ; nautiloid: a shell; a spear in
                                 ;   its mouth or a rod on the shell.
                                 ;   fire|bolt vanilla; absorbs water
         .word   $0039
@@ -3546,7 +3548,7 @@ Ot6ShieldTbl:
         ; takes the troopers' keys --
         .word   $0079
         .byte   2, OT6_DAGGER|OT6_KATANA ; bounty man: hired muscle in the
-                                ;   troopers' file, their keys.  fire
+                                ;   troopers' file: dagger, katana.  fire
                                 ;   vanilla
         .word   $001c
         .byte   2, OT6_SWORD|OT6_DAGGER ; fidor: the troopers' war hound,
@@ -3561,7 +3563,7 @@ Ot6ShieldTbl:
         .word   $00c2
         .byte   3, OT6_SWORD|OT6_SPEAR ; sp forces: the imperial elite,
                                 ;   a tank's three; the trooper line's
-                                ;   keys.  poison vanilla
+                                ;   sword, and a spear.  poison vanilla
         ; -- the phantom train: sabin, cyan, shadow --
         .word   $000f
         .byte   2, OT6_SWORD|OT6_DAGGER ; over-mind: a spirit of the
@@ -3573,7 +3575,7 @@ Ot6ShieldTbl:
                                 ;   train's, battle 109): a 100-hp
                                 ;   braggart, not a boss; any real blow
                                 ;   kills him, so the first blow of any
-                                ;   weapon breaks him.  no weakness
+                                ;   of the three breaks him.  no weakness
                                 ;   vanilla
         ; scripted set-pieces: no gauge drawn
         .word   $0111

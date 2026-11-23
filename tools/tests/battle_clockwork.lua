@@ -67,7 +67,7 @@ local function pinField()
   for _, m in ipairs(msPresent) do
     local e = 8 + m * 2
     H.writeByte(0x3BE8 + m * 2, 0)      -- no element weak (class path only)
-    H.writeByte(0x3EA4 + m * 2, 0x0F)   -- weak to EVERY weapon class
+    H.writeByte(0x3EA4 + m * 2, 0x3F)   -- weak to EVERY weapon class (OT6_CLASSES: six, #566; Slash is a Katana hit)
     H.writeByte(0x3E88 + e, 0)          -- never broken
     H.writeByte(0x3EF8 + e, H.readByte(0x3EF8 + e) | 0x10)   -- stopped
     if H.readWord(0x3BFC + m * 2) ~= GUARD_HP then
