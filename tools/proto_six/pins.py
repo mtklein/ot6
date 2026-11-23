@@ -120,8 +120,6 @@ PIN = {
     0x0134: ({P: 'tekmissile'}, "wob L151 'Three beams and a TekMissile': the Magitek party's one class key"),
     0x0138: ({S: 'katana'}, "row block 'his katana (slash) keys every body here' (Cyan's)"),
     0x013a: ({P: 'dagger'}, "row 'Locke solo disguise fight'"),
-    0x013f: ({S: 'sword'}, "wob docs: Number 128's blades, the facility party's swords"),
-    0x0140: ({S: 'sword'}, "wob docs: Number 128's blades, the facility party's swords"),
     0x0144: ({P: 'spear'}, "row 'blades and the spear chip'"),
     0x0145: ({P: 'crossbow'}, "wob docs: Laser Gun, 'Edgar's AutoCrossbow keyed pierce on every part'"),
     0x0147: ({P: 'crossbow'}, "wob docs: MissileBay, 'Edgar's AutoCrossbow keyed pierce on every part'"),
@@ -166,3 +164,6 @@ for _sp, (_kinds, _src) in _suite.SUITE.items():
     PIN[_sp] = (_merged, _old[1] + (" || " if _old[1] else "") + _src)
     HARD[_sp] = set(_kinds)
 EVERY |= set(_suite.EVERY)
+# a weakness a row gains beyond its four-class count ({species: [kind, ...]}),
+# where a design statement cannot be kept on the old count; each with its reason
+ADD = dict(getattr(_suite, "ADD", {}))
