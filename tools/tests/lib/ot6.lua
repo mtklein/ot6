@@ -3996,6 +3996,33 @@ end
 -- (build/attempts/wt/wor-tzen-door/lab/lab_grind_noring2.log: `class=lost
 -- to a status: 1 member(s) Petrified or Zombied, no deaths`, where the
 -- class read "no deaths recorded" before, lab_grind_noring.log).
+-- The fallen members whose Life 3 the engine will still answer, or nil
+-- (#564).  flags is $3ebc: with LoseBattle's bit 0 set the battle is lost
+-- whatever anyone carried.  Otherwise each entity's latest death record
+-- (Driver:watchHits) that carried Life 3 and has not been raised yet is a
+-- raise to come: ReraiseEffect (battle_main.asm @0799) queues a Life on
+-- the body, and CheckBattleEnd, which reads the alive mask after it, never
+-- sees the party gone.  MagiMaster's dying Ultima took all four at once,
+-- three wearing Life 3, and the battle was won with three standing
+-- (build/attempts/wt/v051-wipe-win/wor_tower.2026-11-22.log.gz: '[end]
+-- f250800 ... life3=1' on e0-e2, 'partyhp=448,433,452,0', 'battle $162
+-- WON').  A list of entities, or nil when nothing holds the wipe back.
+function M.lastDeathOf(deaths, e)
+  for i = #(deaths or {}), 1, -1 do
+    if deaths[i].e == e then return deaths[i] end
+  end
+  return nil
+end
+function M.wipeHeld(flags, deaths)
+  if (flags & 0x01) ~= 0 then return nil end
+  local held = {}
+  for e = 0, 3 do
+    local d = M.lastDeathOf(deaths, e)
+    if d ~= nil and d.life3 and not d.raised then held[#held + 1] = e end
+  end
+  return #held > 0 and held or nil
+end
+
 function M.wipeClass(deaths, o)
   o = o or {}
   local onePct, early, banked = o.onePct or 80, o.early or 1800, o.banked or 3
@@ -17826,6 +17853,7 @@ function Driver:idle()
   self.slotWatch = nil
   self.dmgHit, self.hitLedger, self.partyHpLast = {}, {}, {}
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
+  self.life3Seen, self.allFellSaid = {}, false
   self.monTurn = {}
   self.romWorst = nil
   self.raisePending, self.topUpOwed, self.unmuddlePending = nil, {}, nil
@@ -21836,6 +21864,16 @@ function Driver:watchHits()
       end
       self.doomStep[e] = { acc = acc, count = dc, at = at }
     end
+    -- Life 3 (STATUS4 bit 2, $3EF9) as last read while the member stood: the
+    -- engine clears it as it queues the raise (ReraiseEffect, battle_main.asm
+    -- @0799), so on the frame the HP word reads 0 the bit is already gone
+    -- (wor_tower 2026-11-22: '[end] f250800 ... e0 3591 shell=0 life3=1',
+    -- then '[end] f250920 ... e0 0 shell=0 life3=0'); its reading from a
+    -- living frame is what says the engine will raise them (#564)
+    self.life3Seen = self.life3Seen or {}
+    if hp > 0 and hp ~= 0xFFFF and maxhp > 0 then
+      self.life3Seen[e] = (M.readByte(0x3EF9 + e * 2) & 0x04) ~= 0
+    end
     if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
        and not self.deathSaid[e] then
       self.deathSaid[e] = true
@@ -21863,17 +21901,19 @@ function Driver:watchHits()
                     from = from, maxhp = maxhp, bp = bp,
                     slot = self.monAct and self.monAct.slot, cmd = self.monAct and self.monAct.cmd,
                     atk = self.monAct and self.monAct.atk, oneAction = oneAction,
-                    ally = ally and ally.e, allyMuddled = ally and ally.muddled }
+                    ally = ally and ally.e, allyMuddled = ally and ally.muddled,
+                    life3 = self.life3Seen[e] == true }
       self.battleDeaths[#self.battleDeaths + 1] = rec
       M.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d "
-        .. "by %s%s bp=%d party_bp=%s%s", self.tag or "fight", self.battleTick, e,
+        .. "by %s%s bp=%d party_bp=%s%s%s", self.tag or "fight", self.battleTick, e,
         rec.char, from, maxhp,
         self.monAct and string.format("slot %d cmd $%02X atk $%02X", self.monAct.slot,
           self.monAct.cmd, self.monAct.atk)
           or (ally and self:allyActSaid(ally, e)) or "nobody (no monster action attributed)",
         oneAction and " (ONE ACTION from >= 80%)" or "", bp,
         table.concat(pbp, ","),
-        bp >= BATTLE.BANKED_BP and string.format(" -- died holding %d BP", bp) or ""))
+        bp >= BATTLE.BANKED_BP and string.format(" -- died holding %d BP", bp) or "",
+        rec.life3 and " -- Life 3 was on: the engine raises this member" or ""))
       if self.recovery then
         self.recovery.death(M.frame, { entity = e, char = rec.char, tick = self.battleTick,
           from = from, maxhp = maxhp, bp = bp, party_bp = table.concat(pbp, ","),
@@ -21881,6 +21921,17 @@ function Driver:watchHits()
       end
       self.monAct = savedAct
     elseif hp > 0 and hp ~= 0xFFFF then
+      -- back up from a [death]: said, so a log that read every seat at 0
+      -- says how the battle went on (#564: three of MagiMaster's four stood
+      -- at an eighth of their HP after his dying Ultima and the battle
+      -- read won with no line saying why)
+      if self.deathSaid[e] then
+        local d = M.lastDeathOf(self.battleDeaths, e)
+        if d ~= nil then d.raised = true end
+        M.log(string.format("[%s] [raised] f+%d entity %d char %d up from 0 to %d/%d%s", self.tag or "fight",
+          self.battleTick, e, M.readByte(BATTLE.BCHID + e * 2), hp, maxhp,
+          (d ~= nil and d.life3) and " by Life 3 (the engine's own raise, at an eighth of max HP)" or ""))
+      end
       self.deathSaid[e] = nil
     end
     self.partyHpLast[e] = hp
@@ -21891,6 +21942,23 @@ function Driver:watchHits()
   -- in the fight is a level problem; three or more pips banked at a
   -- death is a driver problem ("we weren't trying our best").
   if not self.wipeSaid and M.partyWipedInBattle and M.partyWipedInBattle() then
+    -- Every seat at 0 HP is no loss yet while a fallen member carried Life 3
+    -- and LoseBattle's bit is clear: the engine raises them after the
+    -- killing action (M.wipeHeld).  Said once as [allfell]; the [wipe]
+    -- comes if the bit sets, and the [outcome] line decides
+    local held = M.wipeHeld(M.readByte(0x3ebc), self.battleDeaths)
+    if held ~= nil then
+      if not self.allFellSaid then
+        self.allFellSaid = true
+        local es = {}
+        for _, e in ipairs(held) do es[#es + 1] = "e" .. e end
+        M.log(string.format("[%s] [allfell] f+%d every seat at 0 HP, and not a wipe: %s carried Life 3 "
+          .. "and LoseBattle's bit is clear ($3ebc=%02X), so the engine raises them; a raised line says "
+          .. "each one up, a wipe line follows only if the bit sets, and the outcome line is the verdict",
+          self.tag or "fight", self.battleTick, table.concat(es, ","), M.readByte(0x3ebc)))
+      end
+      return
+    end
     self.wipeSaid = true
     local pbp, ds = {}, {}
     for p = 0, 3 do pbp[#pbp + 1] = tostring(M.readByte(BATTLE.BP + p * 2)) end
