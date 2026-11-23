@@ -56,9 +56,9 @@ Pike: pierce; Bio Blaster: poison), from `world-figaro-v1`.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$05C` Sand Ray | a flat fish | 6 | 67 | ice\|water (+poison) | — | 2 · slash | 2 · sword\|spear |
-| `$023` FossilFang | bones | 20 | 1399 | fire\|ice\|holy\|water | poison | 4 · pierce | **3** · dagger\|blunt |
-| `$015` Rhinotaur | a horned hide | 8 | 232 | (+poison) | bolt | 3 · slash | **2** · dagger\|blunt |
+| `$05C` Sand Ray | a flat fish | 6 | 67 | ice\|water (+poison) | — | 2 · slash | 2 · katana\|spear |
+| `$023` FossilFang | bones | 20 | 1399 | fire\|ice\|holy\|water | poison | 4 · pierce | **3** · blunt\|spear |
+| `$015` Rhinotaur | a horned hide | 8 | 232 | (+poison) | bolt | 3 · slash | **2** · blunt\|spear |
 | `$012` Rhodox | a small beast | 7 | 119 | (+poison) | — | 2 · slash | 2 · sword\|spear |
 | `$0A8` GreaseMonk | a slick brawler | 8 | 132 | poison | — | 3 · bludg | **2** · ranged\|spear |
 
@@ -155,9 +155,9 @@ from `narshe-mission-v1`.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$078` Red Fang | a wolf | 14 | 325 | (+poison) | — | 3 · slash | **2** · dagger\|katana |
+| `$078` Red Fang | a wolf | 14 | 325 | (+poison) | — | 3 · slash | **2** · katana\|spear |
 | `$02A` Vulture | a flier | 15 | 412 | wind | — | 3 · slash | **2** · dagger |
-| `$090` Over-Grunk | the plains' tank | 15 | 492 | fire | — | 3 · slash | 3 · sword\|ranged |
+| `$090` Over-Grunk | the plains' tank | 15 | 492 | fire | — | 3 · slash | 3 · ranged\|katana |
 | `$08C` Mind Candy | a magic moth | 15 | 290 | fire\|wind | — | 3 · slash | **2** · sword\|ranged |
 
 Lesson: the flier falls to the point and not the edge (weapon-classes.md's
@@ -174,7 +174,7 @@ pierce). EDGAR and SABIN fight the same formation before the banquet.
 |---|---|---|---|---|---|---|---|
 | `$07B` Ralph | a beast | 17 | 620 | (+poison) | — | 4 · slash | **2** · sword\|dagger |
 | `$081` Wyvern | a dragon | 18 | 892 | ice | — | 4 · pierce | **3** · sword\|dagger |
-| `$08D` WeedFeeder | a grazer | 17 | 480 | fire\|wind | — | 4 · slash | **2** · blunt\|katana |
+| `$08D` WeedFeeder | a grazer | 17 | 480 | fire\|wind | — | 4 · slash | **2** · sword\|blunt |
 | `$06B` Joker | a conjurer, in threes | 17 | 467 | bolt\|poison | — | 4 · slash | **2** · sword\|blunt |
 
 Lesson: the blades key every body (the floor's pierce-only Wyvern did not
@@ -211,7 +211,7 @@ TERRA, LOCKE and STRAGO as above, and RELM (Chocobo Brush: blunt) from
 |---|---|---|---|---|---|---|---|
 | `$0EE` Mandrake | a root | 23 | 1150 | fire | water | 4 · slash | **2** · sword\|blunt |
 | `$0D0` Insecare | an insect's shell | 23 | 977 | fire\|wind | — | 4 · pierce | **2** · dagger\|blunt |
-| `$0EB` Abolisher | a beast | 24 | 860 | — | — | 5 · slash | **2** · sword\|spear |
+| `$0EB` Abolisher | a beast | 24 | 860 | — | — | 5 · slash | **2** · sword\|dagger |
 | `$0D6` Adamanchyt | the mountain's wall | 24 | 1305 | — | — | 5 · bludg | 5 · dagger\|blunt |
 | `$0B8` Slurm | an ooze | 23 | 505 | fire | — | 4 · bludg | **2** · blunt\|ranged |
 
@@ -236,7 +236,7 @@ Epee: slash, bolt), and CELES or SHADOW, from `fc-landing-v1` and
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$169` Naughty | a demon | 24 | 3000 | fire\|bolt\|holy | ice | 5 · slash | **3** · dagger\|ranged\|katana |
+| `$169` Naughty | a demon | 24 | 3000 | fire\|bolt\|holy | ice | 5 · slash | **3** · sword\|dagger\|ranged |
 
 The pool's elite at the elite's three, like the Behemoth and the Dragon;
 special like the pool's other magic bodies (Apokryphos, Misfit, Brainpan).
@@ -274,7 +274,7 @@ Pterodon.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$022` Pterodon | a winged reptile | 12 | 380 | fire | — | 3 · pierce | **2** · katana\|spear |
+| `$022` Pterodon | a winged reptile | 12 | 380 | fire | — | 3 · pierce | **2** · sword\|spear |
 | `$038` Nautiloid | a shell | 11 | 236 | fire\|bolt | water | 3 · pierce | **2** · blunt\|spear |
 | `$039` Exocite | a crab | 11 | 196 | fire\|bolt | water | 3 · pierce | **2** · sword\|blunt |
 
@@ -315,7 +315,7 @@ the v0.45 lab, party 1's descent fought Fidor's formation three times
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
 | `$079` Bounty Man | hired muscle | 13 | 285 | fire | — | 3 · slash | **2** · sword\|dagger |
-| `$01C` Fidor | the troopers' war hound | 13 | 355 | fire | — | 3 · slash | **2** · sword\|spear |
+| `$01C` Fidor | the troopers' war hound | 13 | 355 | fire | — | 3 · slash | **2** · sword\|dagger |
 
 Lesson: every raider takes the troopers' keys, so each squad's hands carry
 over from one wave to the next. The lab ran `gen_narshe_battle` unchanged
@@ -346,7 +346,7 @@ AuraBolt). During the banquet's free time a trooper offers a two-minute bout
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$0C2` Sp.Forces | the imperial elite | 21 | 700 | poison | — | 4 · pierce | **3** · sword\|spear |
+| `$0C2` Sp.Forces | the imperial elite | 21 | 700 | poison | — | 4 · pierce | **3** · sword\|dagger |
 
 The trooper line's keys, at a tank's three: three of them against a party
 whose blades and pierce hands all key it, in a timed bout.
@@ -358,7 +358,7 @@ SABIN, CYAN and SHADOW, as section 6.
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
 | `$00F` Over-Mind | a spirit | 13 | 390 | fire\|holy | poison | 3 · slash | **2** · ranged\|katana |
-| `$131` Siegfried | a braggart | 7 | 100 | — | — | 2 · slash | **1** · dagger\|blunt\|katana |
+| `$131` Siegfried | a braggart | 7 | 100 | — | — | 2 · slash | **1** · sword\|dagger\|blunt\|ranged\|katana\|spear |
 
 Over-Mind is the vestibule car's own body (map 149, pool 71, with Hazer,
 Whisper and StillGoing), and it gets the train's spirit row. Siegfried is

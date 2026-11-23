@@ -705,7 +705,7 @@ it* can reach:
 | Officer | `$0175` | 2 · dagger | Locke SOLO S.Figaro `b9` | the thief's dagger finds the seam |
 | Trooper | `$0065` | 2 · sword\|dagger | Narshe waves — a squad with a sword or a dagger | sword for Terra/Celes/Edgar's blade, dagger for Locke and for Gau's fangs; Cyan's katana and Sabin's knuckles hold neither (both slashed through v0.50) |
 | Rider | `$003F` | 3 · sword\|dagger | Narshe waves — a squad with a sword or a dagger | ditto (fire still breaks it on the train) |
-| HeavyArmor | `$009F` | 3 · dagger\|katana | Locke SOLO `b11` (dagger) + Narshe wave (Cyan's katana, Locke's dagger) | heavy plate; a blade at the seams |
+| HeavyArmor | `$009F` | 3 · sword\|dagger | Locke SOLO `b11` (dagger) + Narshe wave (a sword or a dagger) | heavy plate; a blade at the seams |
 
 Shields track the early-war stretch (2 basic infantry, 3 for the elite /
 heavier / duel bodies). **Class chips ignore absorb/null**, so
@@ -732,8 +732,7 @@ absorb, no null).
 **Trooper and Rider.** Both carry a sword\|dagger class row: vanilla
 poison stays the Edgar squad's key, and the class is the key of any
 squad with a sword or a dagger in it. Formation 88 (Trooper+HeavyArmor, `battle 23`,
-event_main.asm:108505) is breakable by those squads, and by CYAN's
-katana through the HeavyArmor, not by Edgar alone. A squad of SABIN and
+event_main.asm:108505) is breakable by those squads, not by Edgar alone. A squad of SABIN and
 GAU alone holds Blunt and a Dagger (GAU's fangs): the dagger keys every
 wave body, SABIN's knuckles none (under four classes his claws slashed).
 
@@ -1008,7 +1007,7 @@ Party: your chosen three (Shadow is waiting on the continent).
 | part | shields | weak |
 |---|---|---|
 | Ultros ④ | 7 | fire, bolt, **poison** + sword, spear — the row, one bit *added* |
-| Chupon | 4 | ice, water + blunt |
+| Chupon | 4 | ice, water + ranged |
 
 (Decoded, not recalled: Ultros ④ is a **different species** from the
 first three — `$168`, where the Lete/opera/gate fights are `$12c`/`$12d`/
@@ -1041,7 +1040,8 @@ must not be — `$168` absorbs water, as does every Ultros record
   Ultros before the first Sneeze if you can (7 shields across three
   bodies, which is tight) and dump everything. Chupon's 4-shield gauge
   is optional, and not every lineup can break it, because it needs
-  Blunt (SABIN, UMARO, STRAGO's rod, RELM's brush, or an emptied hand).
+  Ranged (EDGAR's AutoCrossbow, SETZER's cards and darts, SHADOW's thrown
+  stars).
 - **Jank:** Sneeze still removes a character with no lasting penalty,
   and Chupon still has no dialogue.
 
@@ -1083,7 +1083,7 @@ the Speck's purpose is to absorb spells.)
 
 Party: three + Shadow (forced).
 
-**Shields:** 11 · **Weak:** fire, ice, bolt + katana, spear.
+**Shields:** 11 · **Weak:** fire, ice, bolt + sword, dagger.
 Vanilla has *no* weaknesses here; the whole row is added, and wide on
 purpose — the FC party is a free pick plus Shadow, and any lineup must
 hold at least two of these five axes. The capstone examines rhythm, not
