@@ -289,9 +289,11 @@ Ot6NewGameZero:
 ; An unsigned block (a save from before this build, or a New Game's first
 ; save) has the rest of the scrap ($1e2f-$1e3f) and the block's unused
 ; tail ($1ff7-$1ffd) zeroed, then takes the signature and version; a
-; signed block is left as it is.  Every save also zeroes the destination
+; signed block keeps its signature, and a lower version is raised to
+; today's (#552: version 2's esper row 12 is written by Ot6EsperSaveAs just
+; before).  Every save also zeroes the destination
 ; slot's codex and esper page reserves (each page's +$002-$00f, the codex
-; page past +$310 and the esper page past +$280): no build writes them, and
+; page past +$310 and the esper page past +$2b4): no build writes them, and
 ; bank $31 is never cleared, so a battery can hold junk there.  So a slot a
 ; signing build wrote holds zero in every reserve it owns.
 ; A (a8) = destination slot 1..3.  a/x/y widths saved; A preserved; Y
@@ -316,6 +318,16 @@ VerCheck:                       ; (mutant_rom.py's seam for the version test)
         beq     Sign
         cmp     #OT6_SAVEVER_CUR+1
         bcs     Sign
+        cmp     #OT6_SAVEVER_CUR
+        bcs     Pages           ; signed with today's version: as it is
+        ; A lower signed version (1, v0.45-v0.50): its one new field, the
+        ; esper page's row 12 (#552 piece F), is set up already: the live
+        ; page's row 12 was cleared by the load (Ot6EsperLeoRow) and has
+        ; only what this game earned since, and Ot6EsperSaveAs has just
+        ; copied it into the slot.  Nothing else in the block changed
+        ; meaning, so the block now claims today's version.
+Raise:  lda     #OT6_SAVEVER_CUR        ; (mutant_rom.py's seam: 6 bytes)
+        sta     f:OT6_SAVEVER
         bra     Pages
 Sign:   shorta
         lda     #$00

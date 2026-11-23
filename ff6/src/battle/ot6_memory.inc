@@ -45,14 +45,22 @@ OT6_CODEX_USED       := $0310
 ; Each page: a magic word, then one word per character (actors 0..11) per
 ; esper slot (26: Odin and Raiden share one), actor-major.  The live page
 ; also holds the victory screen's pending messages past the copied range.
+; Since layout version 2 (#552 piece F) a thirteenth row follows the twelve:
+; actor 12, Gogo's slot, which holds espers once he is revealed as Leo
+; (OT6_LEO_FLAG).  A slot page's row 12 is read only from a block signed
+; with OT6_SAVEVER 2 or more (Ot6EsperLeoRow): an older block's page had
+; reserve there, zero from a signing build and junk possible before.
 OT6_ESPER_ROOT       := $317000
 OT6_ESPER_STRIDE     := $0400
 OT6_ESPER_LIVE       := OT6_ESPER_ROOT+$0c00
 OT6_ESPER_MAGIC      := $0000   ; page offset of the magic word
 OT6_ESPER_CTR        := $0010   ; page offset of the counters
-OT6_ESPER_CHARS      = 12
+OT6_ESPER_CHARS      = 12       ; the actors that always hold espers (0..11)
+OT6_ESPER_LEOACTOR   = 12       ; Gogo's actor, a holder once revealed as Leo
 OT6_ESPER_SLOTS      = 26
-OT6_ESPER_COPY       := OT6_ESPER_CTR + OT6_ESPER_CHARS * OT6_ESPER_SLOTS * 2
+OT6_ESPER_LEO        := OT6_ESPER_CTR + OT6_ESPER_CHARS * OT6_ESPER_SLOTS * 2
+OT6_ESPER_LEOVER     = 2        ; the layout version whose pages hold row 12
+OT6_ESPER_COPY       := OT6_ESPER_LEO + OT6_ESPER_SLOTS * 2
 OT6_ESPER_PEND       := $0300   ; live page only: rank reached, per party slot (4)
 OT6_ESPER_SHOWN      := $0304   ; live page only: Magic Points to announce (word, 0 = none)
 
@@ -118,10 +126,11 @@ OT6_SAVERSV_LEN      = $11
 OT6_SAVETAIL         := $7e1ff7     ; vanilla's unused tail, through $1ffd
 OT6_SAVETAIL_LEN     = 7
 OT6_SAVESIG_WORD     = $5653        ; 'S','V' (bytes $53 $56)
-OT6_SAVEVER_CUR      = 1
+OT6_SAVEVER_CUR      = 2          ; 2 (#552): the esper pages' row 12
 OT6_SCRAP_LEN        = $23          ; the whole scrap New Game clears, from OT6_LOADOUT
 .assert (OT6_SAVESIG & $ffff) = (OT6_LORELOAD & $ffff) + OT6_LORESLOTS, error, "the signature must follow the lore bytes without a gap"
 .assert OT6_SAVEVER = OT6_SAVESIG + 2, error, "the version byte follows the signature"
+.assert OT6_ESPER_LEOVER <= OT6_SAVEVER_CUR, error, "row 12's layout version is past the one this build signs"
 .assert OT6_SAVERSV = OT6_SAVEVER + 1, error, "the reserve follows the version byte"
 .assert (OT6_SAVERSV & $ffff) + OT6_SAVERSV_LEN - 1 = $1e3f, error, "the reserve ends at the scrap's end"
 .assert (OT6_SAVETAIL & $ffff) + OT6_SAVETAIL_LEN - 1 = $1ffd, error, "the tail ends where the checksum window does"

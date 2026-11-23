@@ -220,14 +220,58 @@ Continue, party changes and the parties of Kefka's Tower (`save_leo`).
   ("LEO as Gogo": the small name the record's, the big name row 12) and his
   scene, with and without the reveal.
 
-## Espers (the next step)
+## Espers
 
-Letting him wear espers is a second step with a save-version bump (#552
-piece F): the esper pages hold Magic Points for actors 0-11 only (624 bytes,
-26 stones each), so actor 12 needs 52 more bytes in each slot's esper page
-reserve, read only when `OT6_SAVEVER` is 2 or more.  What this step learned
-for it: the menus that refuse him an esper key on the actor (`menu_common.asm`
-`$0C`, `skills.asm`, `config.asm`, `battle_main.asm` 14677/14833/16098), so the
-esper step branches there on the switch too; `Ot6EsperFold` already runs for
-every slot in UpdateEquip, so his kept rungs would fold in through the same
-path once the counters exist.
+Piece F (#552; owner, 2026-11-23: "as long as we can keep reading the old
+saves, let's give it a shot", and the same day: the esper is one of his
+picks, swappable like the others, nothing locked in by the reveal).  Once
+the switch is set, Gogo's command picker on the Status screen offers
+Summon, and while Summon is one of his three picks he wears a stone as
+actors 0-11 do.  Before the reveal nothing changes for Gogo.
+
+The pick is Summon (`$19`, BattleCmdName "Summon"): it is the command that
+casts the worn stone, vanilla already lets Gogo use it (BattleCmdProp's Gogo
+flag), it fits the list's seven cells, and the Skills list's row for the
+stones stays "Espers".  Vanilla never offered it only because no record
+holds it.
+
+| What | How | Where |
+|---|---|---|
+| The pick | After the reveal the picker lists Summon once (from his own record once picked, else appended); the list holds up to 17 rows (the blank, 14 commands, Summon, Shock), so its cursor table and the status menu's BG3 scroll got one more row | `Ot6LeoSummonList`, `Ot6GogoCmdListProp`/`Pos`, `Ot6StatusBG3ScrollHDMA` (ot6_painter_page.asm) |
+| Who holds espers | Actors 0-11, and actor 12 once the switch is set and Summon is one of his four commands (`Ot6LeoPicked` reads the record); every esper gate asks this one test (it read `actor < 12` before) | `Ot6EsperHolder` (ot6_esper.asm): `Ot6EsperEarn`, `Ot6EsperFold`, `Ot6EsperCount` (the signatures), `Ot6EsperProgress`, `Ot6RungDescText` |
+| The Skills list | His Espers row is white while Summon is picked, grey otherwise (vanilla's rule for Gogo) | `Ot6LeoGenjuRow` |
+| Progress | Magic Points in the esper pages' row 12 (52 bytes after the twelve rows, each slot's page and the live one); the save layout's version 2 | `OT6_ESPER_LEO`; save-layout.md |
+| Earning | The victory loop skipped every actor from Gogo up; he earns there while the stone is his (no LearnItemMagic: he has no spell table) | `Ot6EsperVictory` |
+| Summon | The Summon command casts the stone ($3344), and with Magic picked so does the Magic list's esper row; once a battle: the Summon command now greys once spent, as the esper row does (vanilla left Gogo's Summon white, so it summoned every turn) | `UpdateCmd_08`, and FixPlayerAttack asks for the command list's update when the summon is queued |
+| Unpicked | The stone stays in his record (re-picking restores it), but does nothing: no ranks, no earning, no spells, and in battle no esper row and no stone in `$3344` | `Ot6LeoInertStone` (from `Ot6PackSpellList`), the gates above |
+| Spells | Gogo's battle list takes the whole union; his stone's spells and his worn items' grants join it while the stone is his | `Ot6UnionLeo` |
+| The field Magic list | His stone's and worn items' grants, beside what the others know | `Ot6FieldLeoMagic` |
+
+Remembered, not unequipped: the owner preferred it, and it keeps the pick
+a pure swap (unpick and re-pick in the same menu visit changes nothing).
+The cost: the one-owner rule still sees his stone, so another character
+cannot equip it until he re-picks Summon and takes it off, and the
+Status screen still names it.
+
+Every Gogo rule keyed on actor `$0C` (Mimic, the command picker, the final
+battle's order, the kits of #547) is untouched.  Umaro (`$0D`) still wears
+nothing.  A Mimic runs as the mimic's own action, so a revealed Leo holding
+Bahamut's signature passes 9999 with his copies too.
+
+Old saves: a block of layout version 1 or older reads row 12 as no progress
+(`Ot6EsperLeoRow` clears the live row at every load unless the block says
+version 2), Gogo's worn-esper byte is `$FF` and no Gogo record holds Summon
+in any golden save or tracked checkpoint
+(`build/attempts/wt/v051-leo-espers/row12_saves.txt`,
+`gogo_summon_saves.txt`), so a revealed Leo from a v0.49 or v0.50 save
+starts with no pick, no stone and no progress; its next save writes his row
+and raises the block to version 2.
+
+Tests: `battle_leoespers` (before the reveal no Summon in the picker and the
+Espers row grey; after it, unpicked grey, picked white, a stone put on him,
+random battles until his first rung is held: the summon once a battle, the
+union spell, the earn, the rank line, the kept stat points; unpicked: no
+esper row, no stone, no rungs, no earning, the stone kept; re-picked: all
+back; the save, a Reset and the Continue), `menu_leo` (the picker's 17
+rows), and the golden saves (every release's save loads with row 12 empty,
+the junk saves' `$FF` rows included; the mutants `leorowall`, `noraise`).
