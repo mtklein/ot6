@@ -1,22 +1,44 @@
 -- @suite slow
 -- battle_codex: weakness codex is migrated, persistent, and per-save-slot.
 -- Seed an old cartridge-global O7 codex, assert its knowledge migrates into
--- all three O8 slot pages even when slot 2 is loaded first, then teach slot 2
+-- all three slot pages even when slot 2 is loaded first, then teach slot 2
 -- after migration. Fight 2 runs as slot 1 and must see the migrated knowledge
 -- but not slot 2's new learning.
+--
+-- #566: the slot pages are six-class pages (O9).  O7's class table holds the
+-- four classes, so each clone's class bytes are rewritten for the six
+-- (Ot6CodexSix, once a page: three runs), by the ROM's Ot6ClassSplitTbl.
+-- The planted class byte is $FF for every species: all four classes, and the
+-- four bits no four-class build wrote, which the rewrite must drop.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
+-- a four-class revealed byte as the six classes hold it (ot6_codex.asm
+-- Ot6CodexSix): each of bits 0-3 becomes its second child where the species'
+-- Ot6ClassSplitTbl byte has that bit, its first (the same bit) otherwise
+local SECOND = { [0] = 0x10, 0x20, 0x08, 0x02 }
+local function sixClass(b, sel)
+  local n = 0
+  for k = 0, 3 do
+    if (b >> k) & 1 == 1 then n = n | (((sel >> k) & 1 == 1) and SECOND[k] or (1 << k)) end
+  end
+  return n
+end
+local function splitOf(sp) return H.readRomByte((H.sym("Ot6ClassSplitTbl") & 0x3FFFFF) + sp) end
+local PLANTED_CLASS = 0xFF
+local sixRuns = 0
 H.run({ maxFrames = 45000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
   H.call(function()
+    local six = H.sym("Ot6CodexSix")
+    emu.addMemoryCallback(function() sixRuns = sixRuns + 1 end, emu.callbackType.exec, six, six)
     -- Plant legacy O7 over the entry-point fixture's codex pages (the fixture
     -- is generated from a cold boot, so they arrive unformatted; this write
     -- fully specifies page 1 either way).
-    -- Poison is old global knowledge; O8 migration must preserve it in all
+    -- Poison is old global knowledge; the migration must preserve it in all
     -- slots.  Slot 2 is loaded first on purpose: migration must not depend on
     -- slot 1 being the first page exercised.
     H.writeByte(0x0224, 2)
@@ -25,7 +47,7 @@ H.run({ maxFrames = 45000 }, {
     emu.write(0x316001, 0x37, emu.memType.snesMemory)
     for i = 0, 0x17f do
       emu.write(0x316010+i, 0x08, emu.memType.snesMemory)
-      emu.write(0x316190+i, 0x00, emu.memType.snesMemory)
+      emu.write(0x316190+i, PLANTED_CLASS, emu.memType.snesMemory)
     end
   end),
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
@@ -35,15 +57,24 @@ H.run({ maxFrames = 45000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle 1 active", 30),
   H.waitFrames(240),
   H.call(function()
+    H.assertEq(sixRuns, 3, "the four-to-six rewrite ran once for each of the three clones of the O7 codex")
     for n, base in ipairs({ 0x316000, 0x316400, 0x316800 }) do
-      if n == 1 then
-        H.assertEq(sram(base), 0x4f, "slot "..n.." codex magic 'O' " ..
-          "(re-magicked from the planted 0x37)")
-        H.assertEq(sram(base+1), 0x39, "slot "..n.." codex magic '9'")
-      end
+      H.assertEq(sram(base), 0x4f, "slot "..n.." codex magic 'O' " ..
+        "(re-magicked from the planted O7)")
+      H.assertEq(sram(base+1), 0x39, "slot "..n.." codex magic '9'")
       H.assertEq(sram(base+0x10) & 0x08, 0x08,
         "legacy knowledge migrated into slot "..n)
+      local bad, elems = 0, 0
+      for sp = 0, 0x17f do
+        if sram(base+0x190+sp) ~= sixClass(PLANTED_CLASS, splitOf(sp)) then bad = bad + 1 end
+        if sram(base+0x10+sp) ~= 0x08 then elems = elems + 1 end
+      end
+      H.assertEq(bad, 0, "slot "..n.."'s class table is the O7 codex's, migrated to the six classes")
+      H.assertEq(elems, 0, "slot "..n.."'s element table is the O7 codex's")
     end
+    H.assertEq(sram(0x316c00) | (sram(0x316c01) << 8), 0x394f, "the New-Game page is signed 'O9' and blank")
+    H.log(string.format("[codex] O7 -> three O9 pages; Ot6CodexSix ran %d times; species 0's class byte $%02X "
+      .. "(split $%02X)", sixRuns, sram(0x316190), splitOf(0)))
     local species = H.readWord(0x57c4)   -- guard slot (entity $0c) stash
     H.log(string.format("guard species=%d slot2 codex byte=%02x",
       species, sram(0x316410+species)))
