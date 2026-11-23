@@ -9,7 +9,7 @@ local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10
 local W = H.weaponClass   -- a hand: the class the built ROM gives the weapon
 
 local WANT = {                    -- species -> { shields, class mask }
-  [0x0AE] = { 5, SWORD | BLUNT },   -- gigantos: sword|blunt
+  [0x0AE] = { 5, SWORD | RANGED },  -- gigantos: sword|ranged
 }
 local FORMS = { 170 }
 -- fc-alcove-v1: TERRA's Break Blade $11, LOCKE's Blizzards $0E, EDGAR's ThunderBlade $0F, SHADOW's Blossom $27

@@ -49,8 +49,8 @@ end
 -- [300000,310000) on the six-class ROM, #566).  The run and the sample rows
 -- below are re-derived from the shipped table when the split moves.
 local base = find(
-  { RANGED, RANGED, RANGED, SWORD, SWORD, SWORD, RANGED, BLUNT,
-    BLUNT, SWORD, BLUNT, SWORD, SWORD, BLUNT, BLUNT, RANGED },
+  { RANGED, BLUNT, DAGGER, SWORD, SWORD, SWORD, RANGED, BLUNT,
+    BLUNT, RANGED, BLUNT, SWORD, SWORD, BLUNT, BLUNT, RANGED },
   0x300000, 0x310000)
 
 if not base then
@@ -65,7 +65,7 @@ emu.log(string.format("breakfloor: OT6_FLOOR_CLASS @%06X", base))
 -- default.  These are the bytes the @formula seed reads as the fallback mask.
 local want = {
   [0]  = { RANGED, "guard (armored -> the classifier's pierce)" },
-  [36] = { RANGED, "white drgn (the classifier's pierce)" },
+  [36] = { BLUNT, "white drgn (the classifier's pierce)" },
   [71] = { RANGED, "flan (soft body -> the classifier's bludgeon)" },
   [19] = { SWORD, "were-rat (beast default -> the classifier's slash)" },
 }

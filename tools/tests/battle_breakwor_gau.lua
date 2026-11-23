@@ -34,7 +34,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 local WANT = {
   [0x08F] = { "Toe Cutter", 3, DAGGER | BLUNT, FIRE | WIND, ICE },
   [0x07E] = { "Rhyos", 4, DAGGER, 0, 0 },
-  [0x0BB] = { "Allo Ver", 3, DAGGER | KATANA, FIRE | HOLY, POISON },
+  [0x0BB] = { "Allo Ver", 3, SWORD | DAGGER, FIRE | HOLY, POISON },
   [0x119] = { "SrBehemoth", 6, DAGGER | BLUNT, FIRE | POISON, ICE },
 }
 
@@ -50,14 +50,14 @@ local GAU = { "GAU", H.handClass(0x0B, 0xFF, true), POISON | BOLT }
 -- (OT6_FLOOR_CLASS), vanilla weak, vanilla absorb, element added }
 local VELDT = {
   [0x013] = { "Were-Rat", 2, SWORD | DAGGER, SWORD, FIRE, POISON, 0 },
-  [0x017] = { "Leafer", 2, SWORD | RANGED, SWORD, FIRE | WATER, ICE, 0 },
-  [0x01B] = { "Vomammoth", 2, KATANA | RANGED, RANGED, FIRE, 0, 0 },
-  [0x028] = { "Dark Wind", 2, SWORD | DAGGER, SWORD, FIRE, 0, 0 },
+  [0x017] = { "Leafer", 2, SWORD | DAGGER, SWORD, FIRE | WATER, ICE, 0 },
+  [0x01B] = { "Vomammoth", 2, SWORD | BLUNT, SWORD, FIRE, 0, 0 },
+  [0x028] = { "Dark Wind", 2, DAGGER | RANGED, DAGGER, FIRE, 0, 0 },
   [0x042] = { "M-TekArmor", 3, DAGGER | RANGED, DAGGER, BOLT, 0, POISON },
-  [0x04D] = { "Repo Man", 2, DAGGER | KATANA, DAGGER, POISON, 0, 0 },
-  [0x05D] = { "Areneid", 2, SWORD | BLUNT, SWORD, ICE | WATER, 0, POISON },
-  [0x018] = { "Stray Cat", 3, DAGGER | KATANA, DAGGER, 0, 0, POISON },
-  [0x029] = { "Beakor", 3, DAGGER | KATANA, DAGGER, FIRE, 0, 0 },
+  [0x04D] = { "Repo Man", 2, SWORD | DAGGER, SWORD, POISON, 0, 0 },
+  [0x05D] = { "Areneid", 2, DAGGER, DAGGER, ICE | WATER, 0, POISON },
+  [0x018] = { "Stray Cat", 3, DAGGER | BLUNT, DAGGER, 0, 0, POISON },
+  [0x029] = { "Beakor", 3, KATANA | RANGED, RANGED, FIRE, 0, 0 },
   [0x02F] = { "CrassHoppr", 3, DAGGER | BLUNT, DAGGER, FIRE | WIND, 0, 0 },
   [0x04F] = { "Bomb", 3, KATANA | RANGED, RANGED, ICE | WATER, FIRE, 0 },
   [0x05A] = { "Ghost", 3, KATANA | BLUNT, BLUNT, FIRE | HOLY, POISON, 0 },

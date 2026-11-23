@@ -67,7 +67,7 @@ end
 -- anchors: ShieldTbl opens guard/lobo/whelk(shell); ElemAddTbl opens
 -- whelk-head(fire)/vargas(holy). both are distinctive multi-record runs.
 local shieldBase = find(
-  { 0x00, 0x00, 0x02, 0x08, 0x19, 0x00, 0x03, 0x20, 0x00, 0x01, 0x00, 0x00 },
+  { 0x00, 0x00, 0x02, 0x08, 0x19, 0x00, 0x03, 0x22, 0x00, 0x01, 0x00, 0x00 },
   0x300000, 0x310000)
 local elemBase = find(
   { 0x34, 0x01, 0x01, 0x00, 0x03, 0x01, 0x20, 0x00 },
@@ -87,22 +87,22 @@ local E = walk(elemBase)
 
 -- the v0.6 class rows: id -> {shields, class, name}
 local want = {
-  [0x0001] = { 2, KATANA | RANGED, "soldier" },
-  [0x0002] = { 3, RANGED,         "templar" },
+  [0x0001] = { 2, KATANA | BLUNT, "soldier" },
+  [0x0002] = { 3, DAGGER | BLUNT, "templar" },
   [0x014e] = { 3, KATANA,         "leader (Cyan duel)" },
   [0x014f] = { 2, KATANA | BLUNT, "grunt" },
   [0x0176] = { 3, KATANA | BLUNT, "cadet" },
   [0x0175] = { 2, DAGGER,         "officer" },
-  [0x0065] = { 2, SWORD | DAGGER, "trooper" },
-  [0x003f] = { 3, SWORD | DAGGER, "rider" },
-  [0x009f] = { 3, SWORD | DAGGER, "heavyarmor" },
+  [0x0065] = { 2, SWORD | DAGGER | KATANA, "trooper" },
+  [0x003f] = { 3, DAGGER | KATANA, "rider" },
+  [0x009f] = { 3, DAGGER, "heavyarmor" },
   [0x013a] = { 2, DAGGER,         "merchant" },
   [0x003a] = { 2, KATANA,         "anguiform (trench)" },
   [0x005e] = { 2, BLUNT,          "actaneon (trench)" },
   -- the trench trio is Sabin + Cyan + Gau and none of them pierces: Gau's
   -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
   -- hands read $ff -> OT6_BLUNT (Gau's own are his fangs, OT6_DAGGER, #566).
-  [0x0059] = { 2, BLUNT,          "aspik (trench) -- #23, was a dead PIERCE" },
+  [0x0059] = { 2, DAGGER,         "aspik (trench) -- #23, was a dead PIERCE" },
   -- the floating continent's random pool (map 394): the FC party carries
   -- RELM, whose brushes were special (weapon-classes.md), and special was a
   -- common key (guidelines, #347): the three magic bodies took it; the

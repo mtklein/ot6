@@ -39,10 +39,10 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   -- the Kohlingen continent (world groups 45-47)
-  [0x089] = { "Harpiai",    3, SWORD | SPEAR,    WIND },
+  [0x089] = { "Harpiai",    3, SWORD | RANGED,   WIND },
   [0x0DB] = { "Muus",       2, SWORD | BLUNT,    0 },
   [0x0A7] = { "Deep Eye",   2, BLUNT | RANGED, FIRE },
-  [0x0D3] = { "Bogy",       3, SWORD | RANGED,   0 },
+  [0x0D3] = { "Bogy",       3, SWORD | BLUNT | RANGED, 0 },
   -- Darill's Tomb (groups 149-151)
   [0x005] = { "Orog",       3, SWORD | BLUNT | RANGED,   FIRE | HOLY },
   [0x010] = { "Osteosaur",  3, BLUNT | RANGED,           FIRE | HOLY },

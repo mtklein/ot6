@@ -31,8 +31,8 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x0F8] = { "Red Wolf", 2, DAGGER | KATANA, 0, 0 },
-  [0x0CE] = { "Nastidon", 2, KATANA | BLUNT, FIRE, 0 },
+  [0x0F8] = { "Red Wolf", 2, SWORD | DAGGER, 0, 0 },
+  [0x0CE] = { "Nastidon", 2, SWORD | RANGED, FIRE, 0 },
   [0x09C] = { "Test Rider", 3, SPEAR, POISON, 0 },
   [0x0C4] = { "Wizard", 2, DAGGER | KATANA | RANGED, BOLT | POISON, 0 },
   [0x0DA] = { "Psychot", 1, DAGGER | RANGED, ICE, FIRE },
@@ -43,11 +43,11 @@ local WANT = {
   [0x0C6] = { "Ceritops", 3, SPEAR | RANGED, FIRE, BOLT },
   [0x0B4] = { "Anemone", 2, KATANA, FIRE | BOLT, BOLT | WATER },
   [0x09E] = { "Tomb Thumb", 2, SPEAR | RANGED, BOLT | WATER, 0 },
-  [0x054] = { "Pug", 4, KATANA | BLUNT, FIRE | BOLT, WATER },
+  [0x054] = { "Pug", 4, KATANA | RANGED, FIRE | BOLT, WATER },
   [0x0FF] = { "Pugs", 4, KATANA | RANGED, FIRE, WATER },
-  [0x110] = { "Umaro", 6, SPEAR | KATANA, FIRE | POISON, ICE },
-  [0x144] = { "Tritoch", 10, SPEAR | KATANA, FIRE, ICE },
-  [0x149] = { "Ice Dragon", 6, SPEAR | BLUNT, FIRE, ICE },
+  [0x110] = { "Umaro", 6, SWORD | SPEAR, FIRE | POISON, ICE },
+  [0x144] = { "Tritoch", 10, SWORD | SPEAR | KATANA, FIRE, ICE },
+  [0x149] = { "Ice Dragon", 6, SPEAR | RANGED, FIRE, ICE },
 }
 
 -- the hands (route-wor-narshe.md 5.4, 6): the three who walk into Narshe

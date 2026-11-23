@@ -13,11 +13,11 @@ local W, SK = H.weaponClass, H.skillClass   -- a hand: the class the built ROM g
 
 local WANT = {                    -- species -> { shields, class mask }
   -- audit_break_coverage.py's break-dark findings (kolts + zozo):
-  [0x086] = { 2, SPEAR },           -- cirpius: spear
-  [0x053] = { 2, RANGED },          -- hadesgigas: ranged
-  [0x052] = { 2, SWORD | DAGGER },  -- slamdancer: sword|dagger
-  [0x04E] = { 2, SWORD | DAGGER },  -- harvester: sword|dagger
-  [0x0DF] = { 2, DAGGER },          -- gabbldegak: dagger
+  [0x086] = { 2, DAGGER | RANGED }, -- cirpius: dagger|ranged
+  [0x053] = { 2, BLUNT | RANGED },  -- hadesgigas: blunt|ranged
+  [0x052] = { 2, SWORD | KATANA },  -- slamdancer: sword|katana
+  [0x04E] = { 2, SWORD | SPEAR },   -- harvester: sword|spear
+  [0x0DF] = { 2, DAGGER | RANGED }, -- gabbldegak: dagger|ranged
   [0x06E] = { 2, SWORD | DAGGER },  -- ninja: sword|dagger
   [0x0E5] = { 2, KATANA | BLUNT | RANGED }, -- spirit: katana|blunt|ranged (#347)
   [0x0B3] = { 2, KATANA },          -- soft flier: katana

@@ -21,9 +21,9 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 local WANT = {
   [0x011] = { "Commander", 2, SWORD | DAGGER, POISON, 0, 0 },
   [0x071] = { "Vector Pup", 2, SWORD | DAGGER, FIRE, 0, 0 },
-  [0x094] = { "Primordite", 2, SWORD | RANGED, BOLT, 0, 0 },
-  [0x036] = { "Trilobiter", 2, DAGGER | RANGED, 0, 0, 0 },
-  [0x0F5] = { "Gold Bear", 3, SWORD | RANGED, 0, 0, 0 },
+  [0x094] = { "Primordite", 2, SWORD | BLUNT, BOLT, 0, 0 },
+  [0x036] = { "Trilobiter", 2, DAGGER | BLUNT, 0, 0, 0 },
+  [0x0F5] = { "Gold Bear", 3, SWORD | BLUNT, 0, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal

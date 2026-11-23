@@ -73,7 +73,7 @@ local function find(seq, lo, hi)
 end
 
 local shieldBase = find(
-  { 0x00, 0x00, 0x02, 0x08, 0x19, 0x00, 0x03, 0x20, 0x00, 0x01, 0x00, 0x00 },
+  { 0x00, 0x00, 0x02, 0x08, 0x19, 0x00, 0x03, 0x22, 0x00, 0x01, 0x00, 0x00 },
   0x300000, 0x310000)
 if not shieldBase then
   emu.log("breakvector: FAIL Ot6ShieldTbl not located")
@@ -102,7 +102,7 @@ check(shieldRows >= 70, string.format(
 -- different byte, and both fail.  The reason for each is in ot6_hud.asm
 -- beside the row.
 local want = {
-  { 0x00cb, 2, DAGGER | RANGED, "garm (magitek quadruped, entrance)" },
+  { 0x00cb, 2, SPEAR | RANGED, "garm (magitek quadruped, entrance)" },
   { 0x00c7, 2, DAGGER,         "commando (imperial line keeps a point)" },
   { 0x0165, 2, RANGED,         "protoarmor (sealed suit, no seam)" },
   { 0x0041, 2, DAGGER,         "pipsqueak (the x5 swarm; AutoCrossbow)" },

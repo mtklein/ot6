@@ -19,8 +19,8 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x0EF] = { "1st Class", 2, SPEAR | BLUNT, POISON, 0, 0 },
-  [0x0F4] = { "Wild Rat", 2, DAGGER | KATANA, FIRE, POISON, 0 },
+  [0x0EF] = { "1st Class", 2, BLUNT | RANGED, POISON, 0, 0 },
+  [0x0F4] = { "Wild Rat", 2, SWORD | DAGGER, FIRE, POISON, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal

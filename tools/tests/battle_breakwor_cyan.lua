@@ -28,13 +28,13 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x05B] = { "Crawler", 3, DAGGER | RANGED, ICE, 0 },
-  [0x099] = { "Geckorex", 3, SPEAR | KATANA, ICE, 0 },
-  [0x03B] = { "Reach Frog", 2, RANGED, ICE, 0 },
-  [0x0D2] = { "Mantodea", 3, KATANA | BLUNT | RANGED, FIRE, 0 },  -- + special: RELM (route-wor-thamasa 4.3)
-  [0x087] = { "Sprinter", 3, SWORD | SPEAR, BOLT, 0 },
-  [0x0B0] = { "Spek Tor", 1, SPEAR | KATANA | BLUNT, WATER, 0 },
-  [0x08E] = { "Luridan", 2, SWORD | DAGGER, FIRE | WIND, 0 },
+  [0x05B] = { "Crawler", 3, DAGGER | BLUNT, ICE, 0 },
+  [0x099] = { "Geckorex", 3, SWORD | DAGGER, ICE, 0 },
+  [0x03B] = { "Reach Frog", 2, BLUNT, ICE, 0 },
+  [0x0D2] = { "Mantodea", 3, SWORD | BLUNT | RANGED, FIRE, 0 },  -- + special: RELM (route-wor-thamasa 4.3)
+  [0x087] = { "Sprinter", 3, SWORD | DAGGER, BOLT, 0 },
+  [0x0B0] = { "Spek Tor", 1, SWORD | DAGGER | BLUNT, WATER, 0 },
+  [0x08E] = { "Luridan", 2, DAGGER | KATANA, FIRE | WIND, 0 },
   [0x0F2] = { "Borras", 4, SWORD | BLUNT, POISON, 0 },
   [0x0DD] = { "Punisher", 3, SWORD | DAGGER, POISON, 0 },
   [0x0C5] = { "Scrapper", 2, SWORD | BLUNT, 0, POISON },

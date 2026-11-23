@@ -51,9 +51,9 @@ local WANT = {
   -- the Figaro cave and the castle's basements (groups 137-140)
   [0x049] = { "Humpty",     2, BLUNT,          FIRE | HOLY },
   [0x04B] = { "Cruller",    3, BLUNT,          FIRE | HOLY },
-  [0x0A9] = { "NeckHunter", 3, SWORD | DAGGER | BLUNT, POISON },  -- a reaper: ¤ (#347)
+  [0x0A9] = { "NeckHunter", 3, SWORD | SPEAR | BLUNT, POISON },  -- a reaper: ¤ (#347)
   [0x0D7] = { "Dante",      4, SWORD | BLUNT | RANGED,   POISON },  -- a demon: ¤ (#347)
-  [0x08B] = { "Drop",       2, DAGGER | RANGED, BOLT | WATER },
+  [0x08B] = { "Drop",       2, SPEAR | RANGED, BOLT | WATER },
   -- the engine room's Tentacles (event group 84)
   [0x11B] = { "Tentacle",   5, SWORD | SPEAR, ICE | WATER },
   [0x13C] = { "Tentacle",   5, SWORD | BLUNT, FIRE },

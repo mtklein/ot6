@@ -23,17 +23,17 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x022] = { "Pterodon", 2, SWORD | SPEAR, FIRE, 0 },
-  [0x038] = { "Nautiloid", 2, SPEAR | BLUNT, FIRE | BOLT, WATER },
+  [0x022] = { "Pterodon", 2, SWORD | RANGED, FIRE, 0 },
+  [0x038] = { "Nautiloid", 2, BLUNT | RANGED, FIRE | BOLT, WATER },
   [0x039] = { "Exocite", 2, SWORD | BLUNT, FIRE | BOLT, WATER },
   [0x060] = { "Dark Side", 2, SWORD | RANGED, FIRE | HOLY, POISON },
   [0x0B6] = { "Spectre", 2, BLUNT | RANGED, FIRE | HOLY, POISON },
-  [0x0CF] = { "Rinn", 1, SPEAR | RANGED, FIRE | HOLY, POISON },
-  [0x079] = { "Bounty Man", 2, SWORD | DAGGER, FIRE, 0 },
-  [0x01C] = { "Fidor", 2, SWORD | DAGGER, FIRE, 0 },
-  [0x0C2] = { "Sp.Forces", 3, SWORD | DAGGER, POISON, 0 },
+  [0x0CF] = { "Rinn", 1, BLUNT | RANGED, FIRE | HOLY, POISON },
+  [0x079] = { "Bounty Man", 2, SWORD | DAGGER | KATANA, FIRE, 0 },
+  [0x01C] = { "Fidor", 2, SWORD | DAGGER | KATANA, FIRE, 0 },
+  [0x0C2] = { "Sp.Forces", 3, SWORD | SPEAR, POISON, 0 },
   [0x00F] = { "Over-Mind", 2, KATANA | RANGED, FIRE | HOLY, POISON },
-  [0x131] = { "Siegfried", 1, SWORD | DAGGER | SPEAR | KATANA | BLUNT | RANGED, 0, 0 },
+  [0x131] = { "Siegfried", 1, DAGGER | KATANA | BLUNT, 0, 0 },
 }
 -- 0-shield rows: the cutscene bodies a called battle deals, and the markers for bodies no reachable formation holds
 -- (tools/check_shield_rows.py proves the second list unreached; break-coverage-wob.md section 18 has the evidence)

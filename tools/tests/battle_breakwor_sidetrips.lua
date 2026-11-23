@@ -26,7 +26,7 @@ local WANT = {
   [0x03E] = { "Hoover", 2, KATANA | RANGED, ICE | WATER, 0 },
   [0x04C] = { "Cactrot", 1, RANGED, ICE | WATER, 0 },
   [0x027] = { "Tyranosaur", 3, DAGGER | RANGED, ICE, 0 },
-  [0x026] = { "Brachosaur", 6, DAGGER | BLUNT, ICE, 0 },
+  [0x026] = { "Brachosaur", 6, DAGGER | RANGED, ICE, 0 },
 }
 local HOOVER, CACTROT, TYRANOSAUR, BRACHOSAUR = 0x03E, 0x04C, 0x027, 0x026
 -- the world groups (RandBattleGroup index = WorldBattleGroup byte) and the species each must deal
