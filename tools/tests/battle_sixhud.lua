@@ -27,17 +27,25 @@
 --   3. every class in every cell it can take.  For each class c, a row of c
 --      and the classes below it (c alone; c and one below; ...): the class
 --      sits in the cell its rank says, up to the fourth.
---   4. the cap, measured.  A's row := all six, all revealed.  The line has
---      four weakness cells after the count (elements first, then classes in
---      bit order), so a body weak to more than four things shows the first
---      four: this step logs exactly what a six-class body draws and which
---      classes it does not, asserts the cells it does draw are the right
---      glyphs in order, and takes screenshot sixhud_allsix.  It does not
---      assert the cap either way: see the [sixhud] MEASURED line.
+--   4. a body every class breaks draws one cell for its classes, the
+--      any-weapon mark (OT6_ANYWEAPON, the sparkle $DF, white; six icons
+--      would not fit the line's four cells).  A's row := all six: with
+--      nothing revealed its classes are one grey '?' and the other three
+--      cells blank; with any one class revealed (each of the six in turn),
+--      and with all six, the one cell is the mark; behind a weak element the
+--      mark is the cell after the element's.  The mark's tile is none of the
+--      six classes' and its pixels differ from each of theirs.  Screenshots
+--      sixhud_any_hidden, sixhud_any.
+--   5. a five-class body still draws class by class.  Each of the six rows
+--      of five classes, all revealed: the first four of its classes in bit
+--      order, and the [sixhud] MEASURED line names the fifth, which the line
+--      has no cell for (elements and classes past four cells are not drawn:
+--      the known limit).
 --
 -- Mutants (build/attempts/wt/v051-six-classes/newsuites/): two classes
 -- sharing a glyph cell; the katana's cell holding the sword's picture; the
--- line walking four class bits.
+-- line walking four class bits; the every-class test never true; the
+-- every-class test taking five classes for six.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 
@@ -85,6 +93,7 @@ local ART = {
              "   o.   ",
              "   o.   " },
 }
+local ANYWEAPON = 0xDF                  -- the design: the mark for a body every class breaks
 local QMARK = (H.HUD_QMARK_ATTR << 8) | 0xBF
 local BLANK = 0x21FF
 local WHITE = H.HUD_GAUGE_ATTR
@@ -127,8 +136,8 @@ end
 
 local A, Bd = nil, nil       -- the two Guards' slots
 -- stage one body's line: no elements, this class row, this much of it revealed
-local function stage(s, rowv, revv)
-  H.writeByte(ELEM + s * 2, 0)
+local function stage(s, rowv, revv, elems)
+  H.writeByte(ELEM + s * 2, elems or 0)
   H.writeByte(ROW + s * 2, rowv)
   H.writeByte(REV + s * 2, revv)
 end
@@ -256,28 +265,69 @@ for i, c in ipairs(CLASSES) do
   end
 end
 
--- 4. the cap, measured
-steps[#steps + 1] = H.call(function() stage(A, 0x3F, 0x3F); stage(Bd, 0x3F, 0x00) end)
+-- 4. a body every class breaks: one cell, the any-weapon mark
+local MARK = (WHITE << 8) | ANYWEAPON
+steps[#steps + 1] = H.call(function() stage(A, 0x3F, 0x00); stage(Bd, 0x00, 0x00) end)
+steps[#steps + 1] = settle()
+steps[#steps + 1] = H.call(function()
+  local a = cells(A)
+  H.log(string.format("[sixhud] every class, nothing revealed (row $3F): %s", said(a)))
+  H.assertEq(a[1], QMARK, "every class, nothing revealed: its classes are one grey '?'")
+  for k = 2, 4 do H.assertEq(a[k], BLANK, string.format("every class, nothing revealed: weakness cell %d is blank", k)) end
+  H.screenshot("sixhud_any_hidden")
+end)
+steps[#steps + 1] = H.waitFrames(4)
+for _, c in ipairs(CLASSES) do
+  steps[#steps + 1] = H.call(function() stage(A, 0x3F, c.bit) end)
+  steps[#steps + 1] = H.waitFrames(12)
+  steps[#steps + 1] = H.call(function()
+    local a = cells(A)
+    H.assertEq(a[1], MARK, string.format("every class, %s revealed: the one cell is the any-weapon mark $%02X, white "
+      .. "(line: %s)", c.name, ANYWEAPON, said(a)))
+    for k = 2, 4 do H.assertEq(a[k], BLANK, string.format("every class, %s revealed: weakness cell %d is blank", c.name, k)) end
+  end)
+end
+steps[#steps + 1] = H.call(function() stage(A, 0x3F, 0x3F); stage(Bd, 0x3F, 0x01, 0x01) end)
 steps[#steps + 1] = settle()
 steps[#steps + 1] = H.call(function()
   local a, b = cells(A), cells(Bd)
-  local drawn, missing = {}, {}
-  for _, c in ipairs(CLASSES) do
-    local at = nil
-    for k = 1, 4 do if a[k] == ((WHITE << 8) | c.glyph) then at = k end end
-    if at then drawn[#drawn + 1] = string.format("%s (cell %d)", c.name, at) else missing[#missing + 1] = c.name end
-  end
   H.log(string.format("[sixhud] MEASURED: a body weak to all six classes, all revealed (row $3F, revealed $3F, no "
-    .. "elements) draws weakness cells %s: %d of its 6 classes -- %s; NOT drawn: %s.  The same body with nothing "
-    .. "revealed draws %s", said(a), #drawn, table.concat(drawn, ", "), #missing > 0 and table.concat(missing, ", ")
-    or "none", said(b)))
-  local want = expect(0x3F, 0x3F)
-  for k = 1, 4 do
-    H.assertEq(a[k], want[k], string.format("all six: weakness cell %d is the class of rank %d, in bit order", k, k))
+    .. "elements) draws weakness cells %s: one cell, the any-weapon mark; the same row behind one weak element "
+    .. "(fire, not revealed) draws %s", said(a), said(b)))
+  H.assertEq(a[1], MARK, "every class, all revealed: the one cell is the any-weapon mark")
+  for k = 2, 4 do H.assertEq(a[k], BLANK, string.format("every class, all revealed: weakness cell %d is blank", k)) end
+  H.assertEq(b[1], QMARK, "behind a weak element: cell 1 is the element's '?'")
+  H.assertEq(b[2], MARK, "behind a weak element: cell 2 is the any-weapon mark")
+  for k = 3, 4 do H.assertEq(b[k], BLANK, string.format("behind a weak element: weakness cell %d is blank", k)) end
+  -- the mark's tile is nobody's class glyph, in number or in pixels
+  local mark = tileBytes(ANYWEAPON)
+  for _, c in ipairs(CLASSES) do
+    H.assertEq(c.glyph ~= ANYWEAPON, true, "the any-weapon mark's cell is not the " .. c.name .. " glyph's")
+    H.assertEq(tileBytes(c.glyph) ~= mark, true, "the any-weapon mark's pixels differ from the " .. c.name .. " glyph's")
   end
-  H.screenshot("sixhud_allsix")
+  H.assertEq(mark ~= string.rep("00", 16), true, "the any-weapon mark is not blank")
+  for r, line in ipairs(art(ANYWEAPON)) do H.log(string.format("[sixhud]   %-6s |%s|", r == 1 and "any" or "", line)) end
+  H.screenshot("sixhud_any")
 end)
 steps[#steps + 1] = H.waitFrames(4)
+
+-- 5. five classes: class by class, the first four
+for _, out in ipairs(CLASSES) do
+  local rowv = 0x3F & ~out.bit
+  steps[#steps + 1] = H.call(function() stage(A, rowv, rowv); stage(Bd, 0x00, 0x00) end)
+  steps[#steps + 1] = H.waitFrames(12)
+  steps[#steps + 1] = H.call(function()
+    local a, want = cells(A), expect(rowv, rowv)
+    local fifth = nil
+    for _, c in ipairs(CLASSES) do if (rowv & c.bit) ~= 0 then fifth = c.name end end
+    H.log(string.format("[sixhud] MEASURED: a five-class body (row $%02X, all revealed, no elements) draws %s: its "
+      .. "first four classes; NOT drawn: %s (the line has four weakness cells)", rowv, said(a), fifth))
+    for k = 1, 4 do
+      H.assertEq(a[k], want[k], string.format("five classes (row $%02X): weakness cell %d is its class of rank %d, "
+        .. "not the any-weapon mark (line: %s)", rowv, k, k, said(a)))
+    end
+  end)
+end
 steps[#steps + 1] = H.call(function() H.log("[sixhud] PASS") end)
 
 H.run({ maxFrames = 20000 }, steps)

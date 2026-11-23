@@ -158,8 +158,14 @@ local function hudText(t)
 end
 -- which weakness cell a class takes on a body: its elements first, then its
 -- classes in bit order (ot6_hud.asm @slots); 1..4, or more when the line has
--- no cell left for it
-local function hudCellOf(s, bit) return bits(weakElems(s)) + bits(row(s) & (bit - 1)) + 1 end
+-- no cell left for it.  A body every class breaks has one cell for them all,
+-- the any-weapon mark (ot6_hud.asm @cls).
+local ALL, ANYWEAPON = 0x3F, 0xDF
+local function everyClass(s) return (row(s) & ALL) == ALL end
+local function hudCellOf(s, bit)
+  if everyClass(s) then return bits(weakElems(s)) + 1 end
+  return bits(weakElems(s)) + bits(row(s) & (bit - 1)) + 1
+end
 
 -- ---- what one attack did, read at the ROM's own stores ----------------------
 local rec = nil          -- the record of the branch being played, nil outside one
@@ -454,8 +460,9 @@ local function branch(cls, side)
           H.assertEq(r.hud0[cell], (H.HUD_QMARK_ATTR << 8) | QMARK, string.format("%s: before the hit the HUD's "
             .. "weakness cell %d was the grey '?'", name, cell))
         end
-        H.assertEq(w, (WHITE << 8) | cls.glyph, string.format("%s: after it, cell %d of slot %d's HUD line is the "
-          .. "%s glyph $%02X, white", name, cell, at, cls.name, cls.glyph))
+        local glyph = everyClass(at) and ANYWEAPON or cls.glyph
+        H.assertEq(w, (WHITE << 8) | glyph, string.format("%s: after it, cell %d of slot %d's HUD line is the "
+          .. "%s glyph $%02X, white", name, cell, at, everyClass(at) and "any-weapon" or cls.name, glyph))
         RESULT[cls.name].hud = true
         H.screenshot("sixchip_" .. cls.name .. "_hud")
       else
