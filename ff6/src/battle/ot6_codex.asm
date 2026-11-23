@@ -19,8 +19,14 @@
 ;   * the menu's own live clock stops one byte short: wGameTimeHours..
 ;     Frames are $021b-$021e, ticked 8-bit (IncGameTime, menu_common.asm:3522-3546
 ;     under .a8), so the tick never carries into $021f.
-OT6_CODEX_V2     := $384f       ; 'O8': per-save elements + classes
+OT6_CODEX_V3     := $394f       ; 'O9': per-save elements + six classes (#566)
+OT6_CODEX_V2     := $384f       ; 'O8': per-save elements + four classes
+                                ;   (v0.5-v0.50): read and migrated, never
+                                ;   written
 OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
+OT6_CODEX_FOUR   = $0f          ; the class bits an O7 or O8 page can hold:
+                                ;   slash, pierce, bludgeon, special
+OT6_CODEX_SPECIES = 384         ; species a table holds, one byte each
 
 ; Return the active codex page offset ($000/$400/$800/$c00) in X and ensure
 ; that page is initialized. Invalid values conservatively use transient.
@@ -48,10 +54,12 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         rts
 .endproc
 
-; Ensure codex page X is signed 'O8'.  The one-time O7 migration clones the
+; Ensure codex page X is signed 'O9'.  The one-time O7 migration clones the
 ; former global knowledge into all three slots: existing players lose nothing,
-; while discoveries made after migration remain isolated.  A fresh page is
-; zeroed independently.
+; while discoveries made after migration remain isolated.  A four-class page
+; (O8, or an O7 clone) has its class bytes rewritten for the six classes
+; once (Ot6CodexSix), and takes the new magic.  A fresh page is zeroed
+; independently.
 .proc Ot6CodexEnsure
         php
         longi
@@ -66,11 +74,13 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         cmp     #OT6_CODEX_GLOBAL
         beq     @legacy
         lda     f:OT6_CODEX_MAGIC,x
-        cmp     #OT6_CODEX_V2
+        cmp     #OT6_CODEX_V3
         bne     :+
         jmp     @done
-:
-        bra     @fresh
+:       cmp     #OT6_CODEX_V2
+        bne     @fresh
+        jsr     Ot6CodexSix     ; #566: a four-class page, on its first touch
+        jmp     @done
 
 @legacy:
         ; O7's two tables already occupy page 1.  Clone their contiguous
@@ -84,11 +94,16 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         inx
         cpx     #$0300
         bcc     @migrate
-        longa
-        lda     #OT6_CODEX_V2
-        sta     f:OT6_CODEX_MAGIC
-        sta     f:OT6_CODEX_MAGIC+$0400
-        sta     f:OT6_CODEX_MAGIC+$0800
+        ; #566: O7's classes are the four, so each clone becomes a six-class
+        ; page and takes its magic.  Page 1 goes last: its O7 magic is what
+        ; starts this over, from a payload still whole, if the console loses
+        ; power before all three are done.
+        ldx     #$0400
+        jsr     Ot6CodexSix
+        ldx     #$0800
+        jsr     Ot6CodexSix
+        ldx     #$0000
+        jsr     Ot6CodexSix
         ; The legacy global knowledge belongs to existing saved games, not a
         ; newly started unsaved game. Initialize its transient page blank.
         shorta0
@@ -99,68 +114,118 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         cpx     #$0300
         bcc     @wipet
         longa
-        lda     #OT6_CODEX_V2
+        lda     #OT6_CODEX_V3
         sta     f:OT6_CODEX_MAGIC+$0c00
         bra     @done
 
 @fresh:
-        ; Select one of three fixed loops so no scratch RAM is needed while
-        ; battle initialization is live.
+        ; An unsigned page: zero both tables, then sign it.  One loop for
+        ; whichever page, long through X, so no scratch RAM is needed while
+        ; battle initialization is live.  (Through v0.50 this was a fixed
+        ; loop a page, and the three after the first were assembled with
+        ; the 16-bit accumulator of the lines above them while the CPU
+        ; arrived 8-bit: an unsigned page for slot 2, slot 3 or an unsaved
+        ; game ran `lda #$00` into a BRK.  No OT6 save leaves such a page.)
         shorta0
-        cpx     #$0400
-        beq     @fresh2
-        cpx     #$0800
-        beq     @fresh3
-        cpx     #$0c00
-        beq     @fresht
         lda     #$00
-        ldx     #$0000
-@wipe1: sta     f:OT6_CODEX,x
+        ldy     #$0300
+@wipe:  sta     f:OT6_CODEX,x
         inx
-        cpx     #$0300
-        bcc     @wipe1
+        dey
+        bne     @wipe
         longa
-        lda     #OT6_CODEX_V2
-        sta     f:OT6_CODEX_MAGIC
-        bra     @done
-@fresh2:
-        lda     #$00
-        ldx     #$0000
-@wipe2: sta     f:OT6_CODEX+$0400,x
-        inx
-        cpx     #$0300
-        bcc     @wipe2
-        longa
-        lda     #OT6_CODEX_V2
-        sta     f:OT6_CODEX_MAGIC+$0400
-        bra     @done
-@fresh3:
-        lda     #$00
-        ldx     #$0000
-@wipe3: sta     f:OT6_CODEX+$0800,x
-        inx
-        cpx     #$0300
-        bcc     @wipe3
-        longa
-        lda     #OT6_CODEX_V2
-        sta     f:OT6_CODEX_MAGIC+$0800
-        bra     @done
-@fresht:
-        lda     #$00
-        ldx     #$0000
-@wipet2:
-        sta     f:OT6_CODEX+$0c00,x
-        inx
-        cpx     #$0300
-        bcc     @wipet2
-        longa
-        lda     #OT6_CODEX_V2
-        sta     f:OT6_CODEX_MAGIC+$0c00
+        lda     3,s             ; the page offset (under the phy)
+        tax
+        lda     #OT6_CODEX_V3
+        sta     f:OT6_CODEX_MAGIC,x
 @done:  ply
         plx
         plp
         rts
 .endproc
+
+; [ a four-class codex page becomes a six-class one ] (#566)
+;
+; v0.51 split each of the four weapon classes in two.  A page written by
+; v0.50 or earlier (magic O8, or an O7 clone) holds, per species, the
+; revealed bits of the four: slash $01, pierce $02, bludgeon $04, special
+; $08.  Each of a species' four-class weaknesses became exactly one of two
+; children, and Ot6ClassSplitTbl records which (one byte a species: bit k
+; set = the weakness of four-class bit k became its second child).  So each
+; class byte becomes, for every four-class bit k set in it:
+;
+;       bit k   split bit k clear (first)   split bit k set (second)
+;       $01     Sword  $01                  Katana $10
+;       $02     Dagger $02                  Spear  $20
+;       $04     Fist   $04                  Arcane $08
+;       $08     Arcane $08                  Dagger $02
+;
+; and every other bit is dropped.  A first child keeps its parent's bit, so
+; those bits stay where they are; Ot6ClassSecondTbl maps the rest.  The
+; element table is untouched.  The page then takes the six-class magic, so
+; this runs once a page: the rewrite is not its own inverse (a Katana bit
+; read again as four-class would be dropped), and the magic is the only
+; record that it has been done.  The magic is written last, and only its
+; high byte differs from O8's.
+;
+; A revealed bit the species' six-class row does not answer to (a row that
+; changed since the save was written) is kept here and never drawn:
+; Ot6SeedShields masks the byte with the body's row.
+;
+; No scratch RAM (battle initialization may be live, as in Ot6CodexEnsure)
+; and no data-bank change: the page is read and written long through X, and
+; X is lent to the two table reads.  X (i16) = the page offset.  x/y and
+; widths preserved; A clobbered.
+.proc Ot6CodexSix
+        php
+        longi
+        phx
+        phy
+        shorta
+        ldy     #$0000          ; y = species; x = page offset + species
+SixNext: lda    f:OT6_CODEX_CLASS,x
+        and     #OT6_CODEX_FOUR
+        pha                     ; [1,s] the revealed four-class bits
+        phx                     ; [1,s] x, [3,s] the bits
+        tyx
+        and     f:Ot6ClassSplitTbl,x    ; those whose weakness took its
+        pha                     ;   second child: [1,s], x [2,s], bits [4,s]
+SixFirst:                       ; (mutant_rom.py's seam: the first children)
+        eor     4,s             ; the rest keep their bit: a first child
+        sta     4,s             ;   sits where its parent did
+        pla                     ; the second-takers (0..15)
+        longa
+        and     #$00ff
+        tax
+        shorta
+        lda     f:Ot6ClassSecondTbl,x
+        ora     3,s             ; first and second children together
+        plx
+        sta     f:OT6_CODEX_CLASS,x
+        pla                     ; drop the bits
+        inx
+        iny
+        cpy     #OT6_CODEX_SPECIES
+        bcc     SixNext
+        ply
+        plx
+        longa
+SixSign:                        ; (mutant_rom.py's seam: the page's new magic)
+        lda     #OT6_CODEX_V3
+        sta     f:OT6_CODEX_MAGIC,x
+        plp
+        rts
+.endproc
+
+; the second children of a set of four-class bits (index 0..15): slash's is
+; Katana, pierce's Spear, bludgeon's Arcane, special's Dagger
+Ot6ClassSecondTbl:
+.repeat 16, i
+        .byte   ((i & $01) * OT6_KATANA) | (((i >> 1) & $01) * OT6_SPEAR) | (((i >> 2) & $01) * OT6_ARCANE) | (((i >> 3) & $01) * OT6_DAGGER)
+.endrepeat
+
+        .include "ot6_class_split.inc"  ; Ot6ClassSplitTbl
+.assert * - Ot6ClassSplitTbl = OT6_CODEX_SPECIES, error, "Ot6ClassSplitTbl is one byte a codex species"
 
 ; Begin an unsaved New Game with a freshly blank transient codex page.
 .proc Ot6CodexNewGame
@@ -174,7 +239,7 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
         cpx     #$0300
         bcc     @wipe
         longa
-        lda     #OT6_CODEX_V2
+        lda     #OT6_CODEX_V3
         sta     f:OT6_CODEX_MAGIC+$0c00
         jsr     Ot6EsperNewGame ; #328: and no esper progress
         jsr     Ot6NewGameClear ; #389: and no power-on junk in the scrap
@@ -428,7 +493,7 @@ copy:   lda     f:OT6_CODEX+(src),x
         cpx     #$0300
         bcc     copy
         longa
-        lda     #OT6_CODEX_V2
+        lda     #OT6_CODEX_V3
         sta     f:OT6_CODEX_MAGIC+(dst)
         shorta0
 .endmacro
