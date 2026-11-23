@@ -844,8 +844,8 @@ The list (`ot6_rune.asm`; the Tools shell, as Locke's and Relm's):
 | # | Row | What it does | MP | Boost | Learned |
 |---|---|---|---|---|---|
 | 1 | Runic ✦ | the stance: absorbs the next spell as MP and **+1 BP** ✦; arms her blade with the spell's element | 0 | **turns** ✦ (1/2/3 of her own); at 3 BP **RunicBlade**, a fold | join |
-| 2+ | *Elem*Blade (Fire, Ice, Bolt, Poisn, Wind, Pearl, Earth, Water) | arms her blade with that element for the rest of the battle | the cheapest spell of it she holds | none: refused | one row per element she can cast now |
-| last | **BreakBlade** (divine) | for three of her turns every hit of her weapon takes a shield, whatever the body's keys | 99 | three points only | the Floating Continent (switch `$0266`, or `$00A4`) |
+| 2+ | a blade row, drawn as the sword icon and the element (Fire, Ice, Bolt, Poison, Wind, Pearl, Earth, Water) | arms her blade with that element for the rest of the battle | the cheapest spell of it she holds | **the spell line's tier**, as in the Magic list: Fire, Fire 2, Fire 3 at each tier's MP (Poison to Bio); an element with no line refuses | one row per element she can cast now |
+| last | **Break** with the sword icon, Break Blade (divine) | her Break spell on the blade: for three of her turns every hit of her weapon takes a shield, whatever the body's keys | 99 | three points only | the Floating Continent (switch `$0266`, or `$00A4`) |
 
 Her eight slots: the command and her natural magic (vanilla's levels), with
 the divine in the eighth:
@@ -855,15 +855,30 @@ the divine in the eighth:
 | 1 | Runic ✦ (the RuneKnt list: the stance, the blade rows) | join |
 | 2 | Ice | join (vanilla 1) |
 | 3 | Cure | 4 (vanilla) |
-| 4 | Imp | 13 (vanilla) |
+| 4 | Break | 13 (was Imp, #563) |
 | 5 | Scan | 18 (vanilla) |
 | 6 | Safe | 22 (vanilla) |
 | 7 | Haste | 32 (vanilla) |
 | 8 | **Break Blade** (divine) | the Floating Continent (story: switch `$0266`, else `$00A4`) |
 
+- **Break at 13, where vanilla has Imp** (owner, 2026-11-23: "let's get one
+  of break/osmose/drain onto her spell list natively. what value does imp
+  have really on the list?").  Imp is refused by most of the roster: 299 of
+  `monster_prop.dat`'s 384 records carry the Imp immunity bit (status
+  immunity byte 1, bit `$20`), and an Imped caster stops casting, which
+  starves Runic.  Of the three offered, Drain is already Terra's natural
+  spell and Osmose duplicates what Runic pays her in MP; OT6's Break (a
+  shield whatever the keys, one more a point, `ot6_breakspell.asm`) suits a
+  rune knight and makes Break Blade the blade of a spell she owns, as her
+  other blades come from what she can cast.  Stray still lends Imp to
+  whoever wears it.  A save from before the change has her past 13 with Imp
+  learned and Break not: the three spell-known hooks grant her Break by her
+  level (`Ot6CelesBreak`, as they grant Strago's Analyze) and write nothing,
+  so the load leaves the save's block as the file has it (the golden saves);
+  such a save keeps the Imp it learned.
 - **The rune.**  Her blade holds one element (or none) for the rest of the
   battle (`OT6_RUNE`, per character; armed only through `Ot6RuneArm`, which
-  takes a character and an element).  Two things arm it:
+  takes a character, an element and a tier).  Two things arm it:
   - a **Runic absorb** of a spell that carries an element (`MagicProp`'s
     element byte, read at the absorb: `Ot6RuneAbsorb`, from `Ot6RunicBP`).
     An enemy's spell or an ally's: vanilla's ally-spell quirk is kept on
@@ -872,7 +887,8 @@ the divine in the eighth:
     own standing stance arms it too.  A spell without an element leaves the
     rune as it was.
   - a **blade row**.
-  A later arming replaces it.  Nothing else clears it: it stays through her
+  A later arming replaces it, element and tier together.  Nothing else
+  clears it: it stays through her
   fall and her return (the simplest rule that reads: the rune is the
   blade's, and a wipe ends the battle), and `InitBP` zeroes it for the next
   battle.  It is separate from the stance's bit (`$3e4c.2`), which comes and
@@ -897,17 +913,33 @@ the divine in the eighth:
   not a swing (as for Tint), nor is the spell her weapon casts by itself (a
   ThunderBlade's Bolt).  Halving is refused with absorbing and nulling
   because a halved hit also hurts more than it helps.
+- **The rune's tier buys damage, not shields** (owner and lead,
+  2026-11-23).  A rune is tier 1, 2 or 3: the place of the spell that armed
+  it in its line (`Ot6FoldTbl`: Fire 2, Ice 2, Bolt 2 and Bio are tier 2,
+  the 3s tier 3, every other spell tier 1; `Ot6RuneTierOf`).  A blade row
+  boosted climbs its line as the Magic list's row does, so one point on the
+  Fire row is a Fire 2 Blade and two a Fire 3 Blade, at the tier's own MP,
+  the row showing the tier's name and price as R is pressed; R adds no
+  point her MP cannot pay for (#555), a third point adds nothing, and the
+  boost is spent as any boosted action's is (no point earned that turn).
+  Whether she "knows" the tier is the Magic list's rule: boost reaches up
+  from the line's head.  Pearl, Quake, W Wind and the other spells that head
+  no line take no boost (R is refused, `Ot6RuneNoBoost`, and a boost raised
+  on the command window first is dropped before it costs anything,
+  `Ot6KeepBoost`).  An absorb takes the tier of the spell absorbed: Fire 3
+  caught is a tier-3 fire rune.  On a body the rune bites, the hit's
+  weakness multiplier is x2 at tier 1 (vanilla's), x3 at tier 2 and x4 at
+  tier 3 (`Ot6RuneWeakMul`); the chip stays one a hit at every tier.
 - **Blade rows follow what she can cast.**  A row is listed for each element
   some spell in her battle Magic list carries (`Ot6BladeCost` walks the list
   the Magic window draws: her natural spells and the ones her worn esper
   lends), so the rows follow an esper swap with no save data: Ifrit gives a
   Fire Blade, Ramuh a Bolt Blade, Maduin all three; with no esper she has
-  Ice.  The price is the cheapest such spell's own (through a Gold Hairpin
-  or Economizer; not the list cell, which a pending boost folds).  The row
-  takes her turn, targets herself as Runic does, and takes **no boost**: R
-  on the row is refused (`Ot6RuneNoBoost`), and a boost raised on the
-  command window first is dropped before it costs anything
-  (`Ot6KeepBoost`), as for every action a boost buys nothing on.  Mute does
+  Ice (and Break, which carries no element and so has no row but the
+  divine's).  The worn shields that grant a spell count too.  The price is
+  the cheapest such spell's own (through a Gold Hairpin or Economizer), or
+  its line's tier at the boost pending.  The row takes her turn and targets
+  herself as Runic does.  Mute does
   not stop a blade row (it is not a cast); an Imp's command window turns
   Runic into Fight, as vanilla's does.  Like Runic itself, the command
   greys without a runic weapon in hand (vanilla's `UpdateCmd_01`), and the
@@ -916,7 +948,8 @@ the divine in the eighth:
   Break Blade and six blades.  Celes never has more (Ice and one esper's
   spells); a Gogo whose seated party holds all seven elements player magic
   has is not offered the last in element order.
-- **Break Blade** (kit slot 8, the divine; owner, 2026-11-23).  Offered
+- **Break Blade** (kit slot 8, the divine; owner, 2026-11-23): her Break
+  spell on the blade.  Offered
   only with three points pending (the row greys and the A button buzzes
   under three; a pick taken back to fewer does nothing and costs nothing),
   99 MP.  For three of her turns after the cast (`OT6_BREAKBLADE`, counted
@@ -1008,7 +1041,12 @@ the divine in the eighth:
     there (`Ot6RuneSignStage`, written with the boost cells).  The name row
     is full (six of name, the boost cell, four of HP, six of gauge), so a
     six-letter name shows no sign; CELES, GOGO and LEO are shorter.
-  - *The banner* at a blade row or Break Blade: its name.
+  - *The banner* at a blade row or Break Blade: its name, with the tier
+    ("Fire 3 Blade").  The sign has one cell, so it does not show the tier.
+  - *The list* draws a blade row as the item lists' sword icon and the
+    element, or the line's spell at the boost pending ("Fire 3"), with the
+    price after it: ten letters ("Fire3Blade") ran into the two-digit
+    price.
 - **Gogo** opens the same list with his Runic pick (#547): the stance (a
   RunicBlade at 3 BP), a blade row for each element *he* can cast (his
   Magic list is the seated party's), and Break Blade once the party has
@@ -1028,7 +1066,17 @@ the divine in the eighth:
   CELES chipped four, `build/attempts/wt/v051-spellblade/suite/`).  That is
   what Tint already gives any fighter for four turns at 10 MP and Relm's
   turn; the rune costs Celes's own turn and 4-6 MP (or nothing, from an
-  absorb), lasts the battle, is hers alone, and cannot backfire.  Break
+  absorb), lasts the battle, is hers alone, and cannot backfire.  The
+  tiers, on a body staged weak to fire with its shields up, a two-weapon
+  CELES at level 33 (`build/attempts/wt/v051-spellblade/tier/`): a 0-BP
+  Fight's two hits took 575 and 598 HP with a tier-1 rune and about 1,144
+  with a tier-3 one (the hits read 1,164 and 1,124 before the shield's
+  half), where they take about 290 with no rune; Fire 3 cast at the same
+  body took 2,986 and 2,820.  A Fire 3 Blade costs Fire 3's 51 MP, so it
+  has repaid one cast of Fire 3 after about ten hits over a tier-1 blade
+  (4 MP) and seven over a bare one: five unboosted two-weapon Fights, or
+  little more than one at 3 BP (eight hits), and every hit also chips.  It
+  is a long fight's purchase, not a random battle's.  Break
   Blade, from a bank of five and through the real menu in Darill's Tomb's
   random battles (a two-weapon CELES, nothing staged, six uses over two
   seeds, `build/attempts/wt/v051-spellblade/balance/`): 41 weapon hits

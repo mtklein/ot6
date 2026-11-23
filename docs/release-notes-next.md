@@ -11,12 +11,19 @@ an enemy's or an ally's, leaves that element on her blade for the rest of
 the battle. Her weapon's hits then carry it onto any enemy weak to it, for
 double damage and a shield a hit; on other enemies it does nothing. The list
 also has a blade row for each element she can cast, her own spells and her
-Esper's, which arms her blade for her turn and that spell's MP. Her swing
+Esper's, which arms her blade for her turn and that spell's MP. Boosting a
+blade works as boosting the spell does: a Fire 2 Blade or Fire 3 Blade, for
+that spell's MP, bites for 3x or 4x where the plain blade bites for 2x. Her
+swing
 takes the element's colour when it bites, and its icon stands beside her
 name. Her ultimate is now Break Blade, learned on the Floating Continent: at
 3 BP and 99 MP, every hit of her weapon takes a shield for three of her
 turns. Runic at 3 BP still sends spells back. Gogo's Runic opens the same
 list.
+
+Celes learns Break at level 13 where she used to learn Imp. A save in which
+she is already past 13 has Break when it loads, and keeps the Imp she
+learned. Stray still lends Imp.
 
 ## Saves
 

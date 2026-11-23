@@ -127,7 +127,7 @@ guidelines, a bug.
 | Morph | duration; Trance at 3 (Terra) |
 | Revert | refused (`Ot6RevertTake`) |
 | Runic (the RuneKnt list's first row) | duration; RunicBlade at 3 (Celes; a fold since #563) |
-| A blade row of the RuneKnt list | refused (R on the row, `Ot6RuneNoBoost`; a boost raised on the command window first is dropped, `Ot6KeepBoost`) |
+| A blade row of the RuneKnt list | the tier, as its spell's line in the Magic list (Fire 2 Blade, Fire 3 Blade; the tier's MP; x3 and x4 on a body it bites); a row whose spell heads no line (Pearl, Quake, W Wind): refused (R on the row, `Ot6RuneNoBoost`; a boost raised on the command window first is dropped, `Ot6KeepBoost`) |
 | Break Blade | its gate: three points, like every list divine |
 | Steal | certainty |
 | Filch | a shield a point (#469) |

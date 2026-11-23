@@ -106,11 +106,11 @@ Locke's Filch, Sabin's Bum Rush and Cyan's Cleave on a boss.
 | Kind of action | Examples | A point buys |
 |---|---|---|
 | Fight | Fight, Mug, Capture | one more hit with a weapon in hand. With the Genji Glove and two weapons, both hands swing again. No MP. |
-| Spell families | Fire, Ice, Bolt, Poison, Cure, Life, Slow, Haste | the next spell of the line: one point casts Fire 2, two points Fire 3. A third point adds nothing. You pay the MP of the spell cast. |
+| Spell families | Fire, Ice, Bolt, Poison, Cure, Life, Slow, Haste; Celes's Fire, Ice, Bolt and Poison blades | the next spell of the line: one point casts Fire 2, two points Fire 3. A third point adds nothing. You pay the MP of the spell cast. |
 | Damage or healing | Blitz, Tools, Lores, Dances, Esper summons, Drain, Pearl, Quake, Merton, Ultima, items that heal a number | double damage for 1 point, 4x for 2, 8x for 3 |
 | Chance | Steal, Slot, Rage, a Dance's start | better odds; the third point removes the gamble |
 | Duration | Runic, Morph | more of the character's own turns, or more time |
-| None | Celes's blade rows, and anything else a boost would do nothing for | R is refused, and points raised earlier are kept |
+| None | anything a boost would do nothing for | R is refused, and points raised earlier are kept |
 | Reach | Safe, Shell, Rflect, Vanish (on your party), Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle, Stop, Imp, Dispel; Shadow's smoke and exit | one more target per point |
 | Shields | the Break spell, Filch | one more shield per point |
 | Steps | Dismantle, Debilitator | one more application per point |
@@ -270,8 +270,10 @@ that can die, dies. A boss loses four shields and takes a very heavy cut.
 
 ### Celes, Rune Knight (sword, ice)
 
-- **Spells by level.** Ice from the start; Cure at 4, Imp at 13, Scan at 18,
-  Safe at 22, Haste at 32.
+- **Spells by level.** Ice from the start; Cure at 4, Break at 13, Scan at
+  18, Safe at 22, Haste at 32. (Break takes the place of Imp. If your save
+  already has her past level 13, she has Break when you load it, and keeps
+  her Imp.)
 - **RuneKnt** is her command, and it opens a list.
 - **Runic**, its first row, is hers from the start. It absorbs the next spell
   as MP and gives Celes 1 BP. As in FF6 it also absorbs spells her allies
@@ -289,12 +291,18 @@ that can die, dies. A boss loses four shields and takes a very heavy cut.
 - **Blade rows** (Fire Blade, Ice Blade, Bolt Blade and so on) put an
   element on her blade directly. She has one for each element she can cast:
   Ice by herself, and whatever her Esper lends her. A blade costs her turn
-  and the MP of her cheapest spell of that element, and takes no boost.
+  and the MP of her cheapest spell of that element. Boost it as you would
+  the spell: one point makes Fire Blade a Fire 2 Blade, two a Fire 3 Blade,
+  for that spell's MP. A stronger blade hits harder where it bites (3x for
+  Fire 2, 4x for Fire 3, where a plain blade is 2x); it still takes one
+  shield a hit. A spell Runic absorbs leaves a blade of its own strength.
+  Blades of spells with no stronger form (Pearl, Quake) take no boost.
 - **What you see.** The element's icon stands beside her name while her
   blade holds it, and her swing is drawn in the element's colour when it
   bites.
-- **Ultimate: Break Blade**, learned on the Floating Continent when Celes
-  turns her sword on Kefka. At 3 BP, for 99 MP: for three of her turns every
+- **Ultimate: Break Blade**, her Break spell on the blade, learned on the
+  Floating Continent when Celes turns her sword on Kefka. At 3 BP, for 99
+  MP: for three of her turns every
   hit of her weapon takes a shield, whatever the enemy's weaknesses. Her
   rune comes back when it ends.
 
