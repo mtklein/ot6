@@ -140,7 +140,9 @@ emu.addMemoryCallback(function()
   if not watching then return end
   local x = emu.getState()["cpu.x"] & 0xFFFF
   local off = H.readByte(EVQ + x + 1)
-  applies[#applies + 1] = { f = H.frame, slot = off // 2, mark = (H.readByte(EVQ + x + 4) >> 4) & 3 }
+  -- the event's class byte: six class bits, the mark after the hit in bits 6-7 (#566, Ot6EvPush/Ot6EvApply;
+  -- bits 4-5 under four classes, where a throw's mark now reads 0 or a class bit)
+  applies[#applies + 1] = { f = H.frame, slot = off // 2, mark = (H.readByte(EVQ + x + 4) >> 6) & 3 }
 end, emu.callbackType.exec, EVAPPLY, EVAPPLY)
 -- the Stop arm: ExecAction meets a Stopped monster with a turn pending; the AI script must not run for it
 emu.addMemoryCallback(function() acting = false end, emu.callbackType.exec, ENDACT, ENDACT)
