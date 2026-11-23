@@ -480,7 +480,7 @@ local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) == H.readByte(0
 -- "the target select never reached monster 0 (15 presses)", chip2.log; and
 -- battle_vargas's control waits for both Ipoohs down), so the side that
 -- needs him is played from a second snapshot, B.late, taken once the party
--- has fought both Ipoohs down with plain Fights (H.kitBattle's fight-out).
+-- has fought both Ipoohs down (the library's fight driver, Tools off).
 local VARGAS = 0x103
 local function vargasAlone()
   local n, v = 0, false
@@ -500,7 +500,15 @@ local function vargas(tag, prep, names)
       H.call(function() aPh = (aPh + 1) % 8; H.setPad(aPh < 4 and { "a" } or {}) end),
     }, tag .. ": the VARGAS scene reaches its battle"),
     openBattle(tag),
-    H.kitBattle({}, { care = false, maxFrames = 30000, giveUp = vargasAlone }),
+    (function()
+      -- the ordinary fight driver, Tools off so nothing but a hand reaches VARGAS's gauge
+      local F = H.newFightDriver(tag, { tactical = true, boost = true, items = true, bank = 0, healPercent = 55,
+        tools = false })
+      return H.driveUntil(function() return vargasAlone() or not H.battleLoadStarted() end, 30000, {
+        H.call(function() F.frame() end),
+      }, tag .. ": the Ipoohs fought down")
+    end)(),
+    H.release(),
     H.call(function()
       H.assertEq(vargasAlone() and H.battleLoadStarted(), true, tag .. ": both Ipoohs are down and VARGAS stands alone")
     end),
