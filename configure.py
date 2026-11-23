@@ -911,6 +911,10 @@ MUTANTS = {
     # becomes `jsr Ot6CodexSix`): the second load rewrites a six-class page
     "loadsix": ("LoadEnsure=20{Ot6CodexSix}", "v0.50/wor-kt-plates-v1",
                 "load2: the four-to-six rewrite has run once"),
+    # an unsigned page signed without its tables zeroed (the wipe's store
+    # becomes four nops): a page with no magic keeps what it held
+    "nowipe": ("FreshWipe=eaeaeaea", "junk/v0.50-kolts-unsigned",
+               "the slot's revealed classes are the file's, migrated"),
     # its second children dropped, its four-bit mask gone, the seed's row
     # mask gone (battle_sixcodex, below)
     "sixsecond": ("SixSecond=a900eaea", None, None),

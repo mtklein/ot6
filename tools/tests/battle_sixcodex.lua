@@ -21,7 +21,7 @@
 --     revealed classes hold a weakness that took its FIRST child and one
 --     that took its SECOND, among the species the cliff deals;
 --   golden-saves/junk/v0.46-kolts-classff, that save with every class byte
---     $FF (tools/golden_saves.py classff): every species then also holds a
+--     $FF (tools/golden_saves.py synthetic): every species then also holds a
 --     revealed bit its row does not answer to (STALE), and four bits no
 --     four-class build wrote, which the rewrite must DROP.
 -- By hand:

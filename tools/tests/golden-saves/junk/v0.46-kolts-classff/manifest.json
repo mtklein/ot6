@@ -5,7 +5,7 @@
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
   "sha256": "c1781af647948488b595aee57aaaa8221d6ddc45ae7403cf89f7676991e0b56c",
-  "provenance": "a synthetic fixture for the six-class codex migration (#566), not a release save: golden-saves/v0.46/kolts-summit-v1 with every byte of slot 3's revealed-class table ($2990-$2B0F) set to $FF: all four classes revealed for every species, and the four bits no four-class build wrote; nothing else differs (tools/golden_saves.py classff rebuilds it)",
+  "provenance": "a synthetic fixture for the six-class codex migration (#566), not a release save: golden-saves/v0.46/kolts-summit-v1 with every byte of slot 3's revealed-class table ($2990-$2B0F) set to $FF: all four classes revealed for every species, and the four bits no four-class build wrote; nothing else differs (tools/golden_saves.py synthetic rebuilds it)",
   "golden": {
     "esper": "signed"
   }

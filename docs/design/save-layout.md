@@ -437,7 +437,7 @@ its parent's bit, so only second children move.
   answer to stays in the page and is never drawn: the seed masks the page's
   byte with the body's row (`Ot6SeedShields`, `and OT6_BP_CLASS,y`). That
   covers a save from a release whose row for the species differed from
-  v0.50's (three such species in the v0.28-v0.44 golden saves), any later
+  v0.50's (the v0.28-v0.44 golden saves hold a few such bytes), any later
   change to a row, and a part-migrated page. The next reveal for that
   species writes the byte afresh, without the stale bit.
 - **The table is history.** `Ot6ClassSplitTbl` says what v0.50's saves
@@ -593,10 +593,18 @@ codex and esper page's pads and tails, and in `$4000-$7FFF`.
   must read row 12 as no progress (the live row zero), and its first save
   writes the live row's zeros there.
 - `v0.46-kolts-classff` is `v0.46/kolts-summit-v1` with every byte of slot
-  3's class table `$FF` (`golden_saves.py classff` builds it and `verify`
+  3's class table `$FF` (`golden_saves.py synthetic` builds it and `verify`
   holds it to that): all four classes revealed for every species, and four
   bits no four-class build wrote. Its load must migrate every byte exactly
   (the four high bits dropped), and `battle_sixcodex` reads it in battle.
+- `v0.50-kolts-unsigned` is `v0.50/kolts-summit-v1` with slot 3's codex
+  magic zeroed and its tables left as they were (built and verified the
+  same way): the load must zero both tables and sign the page, so the game
+  starts with nothing revealed. (Through v0.50 an unsigned page for slot 2,
+  slot 3 or an unsaved game ran into a BRK at its first touch: the wipe's
+  loops for those pages were assembled 16-bit where the CPU arrives 8-bit.
+  No OT6 save leaves such a page, so nothing met it; v0.51's one loop is
+  held by this fixture.)
 - `v0.44-mixed` (from `wor-gau-v1`, `$1CF7` = `$BF`) carries the Bushido
   word the page seeds there (`$0F64`, slot 0 set) and real Rage and Lore
   bytes beside impossible ones (an unlearned rage, a lore byte `$19`, an
@@ -625,7 +633,7 @@ and the four dropped bits. Then the console's Reset, a second Continue and
 the same battle again: the rewrite has still run once, and the whole page
 is the file's, migrated.
 
-Twelve mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
+Thirteen mutant ROMs (`tools/build/mutant_rom.py`: the real build with one
 routine returning at once, or a labelled seam rewritten) must go red:
 
 - without `Ot6SaveSign`, the junk save's first save is unsigned;
@@ -650,7 +658,9 @@ routine returning at once, or a labelled seam rewritten) must go red:
 - with the seed's row mask gone (`SixMask`), the `$FF` fixture's stale
   classes are drawn;
 - with every load running the rewrite (`LoadEnsure`), the second load
-  runs it a second time (the golden run and `battle_sixcodex`).
+  runs it a second time (the golden run and `battle_sixcodex`);
+- with an unsigned page signed but not zeroed (`FreshWipe`),
+  `v0.50-kolts-unsigned` loads with the reveals its tables held.
 
 At each release, after it is published, add its saves:
 

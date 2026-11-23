@@ -267,8 +267,9 @@ local function assertCodexLoaded(tag, B)
   wantSix = (kind == "four") and 1 or 0
   local n, first, second, lost, kept = 0, 0, 0, 0, 0
   for o = ELEMS, TABLES_END - 1 do if sram(page + o) ~= 0 then n = n + 1 end end
-  H.log(string.format("[golden] %s: slot %d's codex page was a %s-class page ($%04X in the file); it holds %d "
-    .. "revealed bytes, magic $%04X; Ot6CodexSix ran %d time(s)", tag, slot, kind, bw(B, page), n, sramW(page),
+  local what = { four = "a four-class page", six = "a six-class page", unsigned = "an unsigned page" }
+  H.log(string.format("[golden] %s: slot %d's codex page was %s ($%04X in the file); it holds %d "
+    .. "revealed bytes, magic $%04X; Ot6CodexSix ran %d time(s)", tag, slot, what[kind], bw(B, page), n, sramW(page),
     sixRuns))
   H.assertEq(sramW(page), CODEX_MAGIC, tag .. ": the slot's codex page is signed 'O9'")
   H.assertEq(sixRuns, wantSix, tag .. ": the four-to-six rewrite ran once for a four-class page (never for another)")
@@ -293,8 +294,10 @@ local function assertCodexLoaded(tag, B)
   end
   H.log(string.format("[golden] %s: of the file's revealed classes, %d species hold a first child and %d a second",
     tag, first, second))
-  H.assertEq(classes, 0, tag .. ": the slot's revealed classes are the file's, migrated to the six classes")
-  H.assertEq(elems, 0, tag .. ": the slot's revealed elements are the file's")
+  H.assertEq(classes, 0, tag .. ": the slot's revealed classes are the file's, migrated to the six classes"
+    .. (kind == "unsigned" and " (an unsigned page's: none)" or ""))
+  H.assertEq(elems, 0, tag .. ": the slot's revealed elements are the file's"
+    .. (kind == "unsigned" and " (an unsigned page's: none)" or ""))
   H.assertEq(rest, 0, tag .. ": the load left the codex page's pad and tail as the battery held them")
 end
 

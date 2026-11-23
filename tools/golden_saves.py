@@ -47,12 +47,16 @@ Continue again.  This script holds that run to the fixture file:
         a New Game's first save (the play from power-on's world-narshe-v1
         capture): its slot is signed $5653 version 2, its reserve, tail
         and page reserves are zero, and its loadouts are AUTO
-    golden_saves.py classff
-        (re)build golden-saves/junk/v0.46-kolts-classff, the synthetic
-        fixture for the six-class migration: v0.46/kolts-summit-v1 with
-        every byte of slot 3's revealed-class table $FF (every four-class
-        bit, and the four bits no four-class build wrote); verify holds
-        the tracked fixture to that
+    golden_saves.py synthetic
+        (re)build the two synthetic codex fixtures, which verify holds to
+        their sources:
+          golden-saves/junk/v0.46-kolts-classff, for the six-class
+            migration: v0.46/kolts-summit-v1 with every byte of slot 3's
+            revealed-class table $FF (every four-class bit, and the four
+            bits no four-class build wrote);
+          golden-saves/junk/v0.50-kolts-unsigned, for a page with no
+            magic: v0.50/kolts-summit-v1 with slot 3's codex magic zeroed
+            (its tables left as they were: the load must zero them)
     golden_saves.py notes NOTES.md
         the release notes' save line: "Saves from vX.Y and later load in
         this release", vX.Y the oldest release in the golden set, and no
@@ -479,10 +483,15 @@ def verify():
     _, cpay = sc.load(GOLDEN / CLASSFF[0], LAYOUT)
     if cpay.read_bytes() != classff_bytes()[0]:
         raise GoldenError(f"{GOLDEN / CLASSFF[0]}: must be {CLASSFF[1]} with slot 3's class table all $FF "
-                          f"(python3 tools/golden_saves.py classff)")
+                          f"(python3 tools/golden_saves.py synthetic)")
+    _, upay = sc.load(GOLDEN / UNSIGNED[0], LAYOUT)
+    if upay.read_bytes() != unsigned_bytes()[0]:
+        raise GoldenError(f"{GOLDEN / UNSIGNED[0]}: must be {UNSIGNED[1]} with slot 3's codex magic zeroed "
+                          f"(python3 tools/golden_saves.py synthetic)")
     print(f"golden saves: {n} fixtures from {len(m['sets'])} releases match MANIFEST.json; "
           f"the negative is v0.44/wor-cyan-v1 with slot 3's esper signature zeroed; "
-          f"{CLASSFF[0]} is {CLASSFF[1]} with slot 3's class table $FF")
+          f"{CLASSFF[0]} is {CLASSFF[1]} with slot 3's class table $FF; "
+          f"{UNSIGNED[0]} is {UNSIGNED[1]} with slot 3's codex magic zeroed")
     return 0
 
 
@@ -504,15 +513,41 @@ def classff_bytes():
     return bytes(src), slot
 
 
-def classff():
+# A codex page with no magic (a battery whose bank $31 another program or a
+# vanilla cartridge left): "the page is zeroed and signed before use".  The
+# tables keep the release's bytes, so a load that signed the page without
+# zeroing it would show them.
+UNSIGNED = ("junk/v0.50-kolts-unsigned", "v0.50/kolts-summit-v1")
+
+
+def unsigned_bytes():
+    src = bytearray((GOLDEN / UNSIGNED[1] / "battery.sram").read_bytes())
+    slot = src[0x1FF0]
+    base = CODEX + (slot - 1) * 0x400
+    if w16(src, base) != CODEX_FOUR or not any(src[base + ELEMS:base + TABLES_END]):
+        raise GoldenError(f"{UNSIGNED[1]}: slot {slot}'s codex page is not a four-class page with reveals")
+    src[base:base + 2] = b"\x00\x00"
+    return bytes(src), slot
+
+
+def synthetic():
     data, slot = classff_bytes()
+    base = CODEX + (slot - 1) * 0x400
     prov = (f"a synthetic fixture for the six-class codex migration (#566), not a release save: "
             f"golden-saves/{CLASSFF[1]} with every byte of slot {slot}'s revealed-class table "
-            f"(${CODEX + (slot - 1) * 0x400 + CLASSES:04X}-${CODEX + (slot - 1) * 0x400 + TABLES_END - 1:04X}) "
+            f"(${base + CLASSES:04X}-${base + TABLES_END - 1:04X}) "
             f"set to $FF: all four classes revealed for every species, and the four bits no four-class "
-            f"build wrote; nothing else differs (tools/golden_saves.py classff rebuilds it)")
+            f"build wrote; nothing else differs (tools/golden_saves.py synthetic rebuilds it)")
     write_fixture(GOLDEN / CLASSFF[0], data, prov, expectation(GOLDEN / CLASSFF[1])["esper"])
     print(f"golden saves: wrote {CLASSFF[0]} from {CLASSFF[1]}")
+    data, slot = unsigned_bytes()
+    base = CODEX + (slot - 1) * 0x400
+    prov = (f"a synthetic fixture for a codex page with no magic (#566), not a release save: "
+            f"golden-saves/{UNSIGNED[1]} with slot {slot}'s codex magic (${base:04X}-${base + 1:04X}) zeroed "
+            f"and its two tables left as the release wrote them; nothing else differs "
+            f"(tools/golden_saves.py synthetic rebuilds it)")
+    write_fixture(GOLDEN / UNSIGNED[0], data, prov, expectation(GOLDEN / UNSIGNED[1])["esper"])
+    print(f"golden saves: wrote {UNSIGNED[0]} from {UNSIGNED[1]}")
     return 0
 
 
@@ -845,8 +880,8 @@ def main(argv):
             print(f"golden firstsave: {srams[0]}: the New Game's first save is signed $5653 version {SIGVER}, its "
                   f"reserves zero and its loadouts AUTO")
             return 0
-        if argv[:1] == ["classff"]:
-            return classff()
+        if argv[:1] == ["synthetic"]:
+            return synthetic()
         if argv[:1] == ["list"]:
             for d in fixture_dirs():
                 print(d.relative_to(ROOT))
