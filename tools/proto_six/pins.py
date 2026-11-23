@@ -153,3 +153,16 @@ EVERY = {0x00a3, 0x0146}
 
 # Ultros 2, 3, 4 take Ultros 1's row ("the row he keeps all game")
 FAMILY = {0x012d: 0x012c, 0x012e: 0x012c, 0x0168: 0x012c}
+
+# ---- the break-row suites' proofs (pins_suite.py): each binds, weakness by
+# weakness (HARD), over whatever a row comment preferred
+import pins_suite as _suite  # noqa: E402
+
+HARD = {}
+for _sp, (_kinds, _src) in _suite.SUITE.items():
+    _old = PIN.get(_sp, ({}, ""))
+    _merged = dict(_old[0])
+    _merged.update(_kinds)
+    PIN[_sp] = (_merged, _old[1] + (" || " if _old[1] else "") + _src)
+    HARD[_sp] = set(_kinds)
+EVERY |= set(_suite.EVERY)
