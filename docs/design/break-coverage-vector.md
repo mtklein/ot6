@@ -1,9 +1,10 @@
 # Break coverage — Vector / Magitek Research Facility
 
 > **Class names.** Written under the four weapon classes (slash, pierce, bludgeon,
-> special ¤). Since v0.51 (#566) there are six: slash became Sword or Katana, pierce
-> Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger, each species
-> keeping its number of weapon weaknesses. This survey and its numbers describe the four-class floor of its day and are left
+> special ¤). Since v0.51 (#566) there are six (Sword, Dagger, Spear, Katana, Blunt,
+> Ranged): slash became Sword or Katana, pierce Dagger, Spear or Ranged, bludgeon Blunt
+> or Ranged, special Ranged or Blunt, each species keeping its number of weapon
+> weaknesses. This survey and its numbers describe the four-class floor of its day and are left
 > as written; the last section lists today's rows.
 
 Everything below is decoded from the vendored data under `ff6/`.
@@ -593,27 +594,27 @@ Every species a table above names, with the row `ot6_hud.asm` ships today.
 
 | species | id | shields · class |
 |---|---|---|
-| Mag Roader | `$006` | 2 · fist |
-| Mag Roader | `$0af` | 2 · fist |
-| Number 128 | `$10b` | 7 · spear |
+| Mag Roader | `$006` | 2 · ranged |
+| Mag Roader | `$0af` | 2 · ranged |
+| Number 128 | `$10b` | 7 · dagger |
 | Left Blade | `$140` | 3 · sword |
-| RightBlade | `$13f` | 3 · katana |
-| Ifrit | `$109` | 6 · spear |
+| RightBlade | `$13f` | 3 · sword |
+| Ifrit | `$109` | 6 · dagger |
 | Shiva | `$108` | 6 · sword |
 | Number 024 | `$10a` | 7 · sword\|dagger |
-| Crane | `$10d` | 6 · spear |
+| Crane | `$10d` | 6 · dagger |
 | Crane | `$10e` | 6 · dagger |
 | Guardian | `$111` | 0 · — |
-| Guardian | `$112` | 10 · dagger\|fist |
-| Garm | `$0cb` | 2 · fist\|spear |
+| Guardian | `$112` | 10 · ranged\|spear |
+| Garm | `$0cb` | 2 · ranged\|spear |
 | Commando | `$0c7` | 2 · dagger |
-| ProtoArmor | `$165` | 2 · fist |
-| Pipsqueak | `$041` | 2 · spear |
-| Flan | `$047` | 2 · fist |
-| General | `$066` | 2 · dagger\|fist |
-| Trapper | `$02d` | 2 · fist |
-| Gobbler | `$088` | 2 · dagger\|katana |
-| Rhinox | `$075` | 2 · fist |
-| Chaser | `$0a0` | 2 · dagger\|fist |
+| ProtoArmor | `$165` | 2 · ranged |
+| Pipsqueak | `$041` | 2 · dagger |
+| Flan | `$047` | 2 · ranged |
+| General | `$066` | 2 · dagger\|ranged |
+| Trapper | `$02d` | 2 · ranged |
+| Gobbler | `$088` | 2 · sword\|dagger |
+| Rhinox | `$075` | 2 · ranged |
+| Chaser | `$0a0` | 2 · dagger\|blunt |
 
 <!-- end six-class rows -->

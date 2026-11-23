@@ -56,12 +56,23 @@ CLASS_BIT = dict(_C.bit)
 CLASS_BIT.update(_C.token)
 ALL_CLASSES = _C.mask
 
-# The four classes v0.50 and older named.  A weakness cell that still names
-# one makes no claim this checker can hold to the six-class table, so it is
-# refused rather than read as silence (the word would otherwise drop out of
-# the cell and leave its element claim looking complete).
-RETIRED_CLASS = re.compile(
-    r"\b(slashing|slash|piercing|pierce|bludgeoning|bludgeon|bludg|special)\b", re.I)
+# The four classes v0.50 and older named, and the two names the six-class
+# prototype tried and dropped (Fist, Arcane: regrouped into Blunt and Ranged,
+# with other members).  A weakness cell that still names one makes no claim
+# this checker can hold to the table, so it is refused rather than read as
+# silence (the word would otherwise drop out of the cell and leave its
+# element claim looking complete).  A name that is a class again is not
+# retired.
+_RETIRED = ("slashing", "slash", "piercing", "pierce", "bludgeoning", "bludgeon", "bludg",
+            "special", "fist", "arcane")
+
+
+def _retired_re():
+    words = [w for w in _RETIRED if w not in CLASSES]
+    return re.compile(r"\b(%s)\b" % "|".join(words), re.I)
+
+
+RETIRED_CLASS = _retired_re()
 
 
 def elem_str(mask: int) -> str:
@@ -96,7 +107,7 @@ OFF_WEAK = 25
 
 class Data:
     def __init__(self, root: str):
-        global CLASS_TOKEN, ALL_CLASSES
+        global CLASS_TOKEN, ALL_CLASSES, RETIRED_CLASS
         self.root = root
         self.classes = ot6_class.read(root)
         CLASSES[:] = list(self.classes.bit)
@@ -105,6 +116,7 @@ class Data:
         CLASS_BIT.update(self.classes.token)
         ALL_CLASSES = self.classes.mask
         CLASS_TOKEN = _class_token_re()
+        RETIRED_CLASS = _retired_re()
         self.prop = self._read(MONSTER_PROP)
         assert len(self.prop) == REC * 384, len(self.prop)
         self.names = self._monster_names()
@@ -775,8 +787,8 @@ def check(root, verbose=False):
         # table can be held to: it must be renamed, never read as silence
         if c.retired:
             problems.append(
-                "%s\n    RETIRED CLASS: the weakness names %s, a four-class key "
-                "(v0.50 and older); the classes are %s (%s)"
+                "%s\n    RETIRED CLASS: the weakness names %s, a key of the four "
+                "classes (v0.50 and older) or of the dropped Fist/Arcane; the classes are %s (%s)"
                 % (tag, ", ".join(c.retired), ", ".join(CLASSES), ot6_class.CLASS_ASM))
 
         # a row that names classes but no element, for a species that has

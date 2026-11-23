@@ -1,9 +1,10 @@
 # Break coverage — the World of Balance species the route met on the floor (#254)
 
 > **Class names.** Written under the four weapon classes (slash, pierce, bludgeon,
-> special ¤). Since v0.51 (#566) there are six: slash became Sword or Katana, pierce
-> Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger, each species
-> keeping its number of weapon weaknesses. Each table's row column and the hands named with their weapon below are in the
+> special ¤). Since v0.51 (#566) there are six (Sword, Dagger, Spear, Katana, Blunt,
+> Ranged): slash became Sword or Katana, pierce Dagger, Spear or Ranged, bludgeon Blunt
+> or Ranged, special Ranged or Blunt, each species keeping its number of weapon
+> weaknesses. Each table's row column and the hands named with their weapon below are in the
 > six classes' names, as `ot6_hud.asm` ships them; a "floor" column and the dated
 > reasoning keep the names of the day.
 
@@ -43,7 +44,7 @@ TERRA (MithrilKnife: dagger; Fire).
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$046` Vaporite | a wisp | 5 | 15 | fire\|holy | bolt | 2 · bludg | **1** · dagger\|arcane |
+| `$046` Vaporite | a wisp | 5 | 15 | fire\|holy | bolt | 2 · bludg | **1** · dagger\|blunt |
 
 The floor's bludgeon was a key she does not hold. One shield: the hit that
 breaks it is the hit that kills it, and both her knife and her Fire key it.
@@ -56,10 +57,10 @@ Pike: pierce; Bio Blaster: poison), from `world-figaro-v1`.
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
 | `$05C` Sand Ray | a flat fish | 6 | 67 | ice\|water (+poison) | — | 2 · slash | 2 · sword\|spear |
-| `$023` FossilFang | bones | 20 | 1399 | fire\|ice\|holy\|water | poison | 4 · pierce | **3** · dagger\|fist |
-| `$015` Rhinotaur | a horned hide | 8 | 232 | (+poison) | bolt | 3 · slash | **2** · fist\|spear |
-| `$012` Rhodox | a small beast | 7 | 119 | (+poison) | — | 2 · slash | 2 · katana\|spear |
-| `$0A8` GreaseMonk | a slick brawler | 8 | 132 | poison | — | 3 · bludg | **2** · dagger\|fist |
+| `$023` FossilFang | bones | 20 | 1399 | fire\|ice\|holy\|water | poison | 4 · pierce | **3** · dagger\|blunt |
+| `$015` Rhinotaur | a horned hide | 8 | 232 | (+poison) | bolt | 3 · slash | **2** · dagger\|blunt |
+| `$012` Rhodox | a small beast | 7 | 119 | (+poison) | — | 2 · slash | 2 · sword\|spear |
+| `$0A8` GreaseMonk | a slick brawler | 8 | 132 | poison | — | 3 · bludg | **2** · ranged\|spear |
 
 Lesson: EDGAR's pike keys every body here, and his Bio Blaster keys the
 plains (poison, vanilla or added) except the FossilFang, which drinks it and
@@ -75,7 +76,7 @@ The same three.
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
 | `$063` Bleary | an eye | 7 | 119 | fire | — | 2 · slash | 2 · spear |
-| `$062` Crawly | a soft worm | 7 | 122 | fire | — | 2 · slash | 2 · sword\|arcane |
+| `$062` Crawly | a soft worm | 7 | 122 | fire | — | 2 · slash | 2 · sword\|ranged |
 | `$02E` Hornet | a pest | 6 | 92 | fire | — | 2 · pierce | **1** · katana\|spear |
 
 Lesson: every body is fire-weak, so TERRA's Fire is the cave's master key;
@@ -89,7 +90,7 @@ from `kolts-summit-v1`.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$032` Trilium | a flower | 9 | 147 | fire | water | 3 · slash | **2** · dagger\|katana |
+| `$032` Trilium | a flower | 9 | 147 | fire | water | 3 · slash | **2** · sword\|spear |
 
 Cut the stalk or stab it; Fire still burns it, and it still drinks water.
 Two shields matches the mountain's other trash (the Kolts block).
@@ -104,9 +105,9 @@ slash). Map 87 is met again in the World of Ruin by CELES, EDGAR and SABIN
 |---|---|---|---|---|---|---|---|
 | `$011` Commander | an imperial officer | 10 | 102 | poison | — | 3 · pierce | **2** · sword\|dagger |
 | `$071` Vector Pup | a hound | 11 | 166 | fire | — | 3 · slash | **2** · sword\|dagger |
-| `$094` Primordite | a soft primitive body | 11 | 145 | bolt | — | 3 · bludg | **2** · sword\|fist |
-| `$036` Trilobiter | a shell | 12 | 150 | — | — | 3 · pierce | **2** · dagger\|fist |
-| `$0F5` Gold Bear | the cave's tank | 13 | 275 | — | — | 3 · slash | 3 · sword\|arcane |
+| `$094` Primordite | a soft primitive body | 11 | 145 | bolt | — | 3 · bludg | **2** · sword\|ranged |
+| `$036` Trilobiter | a shell | 12 | 150 | — | — | 3 · pierce | **2** · dagger\|ranged |
+| `$0F5` Gold Bear | the cave's tank | 13 | 275 | — | — | 3 · slash | 3 · sword\|ranged |
 
 Lesson: the two hands split the cave. The basement's soldiers take both;
 the shell takes only LOCKE's point; the soft body and the bear only CELES's
@@ -114,14 +115,14 @@ blade. The floor's Primordite row (bludgeon) was a key neither held.
 
 ## 6. The Phantom Train (maps 141, 142, 145)
 
-SABIN (MetalKnuckle: fist; Fire Dance, AuraBolt: fire, holy), CYAN (Ashura:
-slash), SHADOW (Imperial: katana), from `camp-escaped-v1`.
+SABIN (MetalKnuckle: blunt; Fire Dance, AuraBolt: fire, holy), CYAN (Ashura:
+slash), SHADOW (Imperial: dagger), from `camp-escaped-v1`.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$008` Hazer | a spirit | 12 | 120 | holy | — | 3 · slash | **2** · arcane\|katana |
-| `$00E` Whisper | a spirit | 12 | 230 | fire\|holy | poison | 3 · slash | **2** · dagger\|katana |
-| `$0BA` StillGoing | a walking body | 12 | 200 | fire\|holy | poison | 3 · slash | **2** · fist\|katana |
+| `$008` Hazer | a spirit | 12 | 120 | holy | — | 3 · slash | **2** · blunt\|katana |
+| `$00E` Whisper | a spirit | 12 | 230 | fire\|holy | poison | 3 · slash | **2** · blunt\|katana |
+| `$0BA` StillGoing | a walking body | 12 | 200 | fire\|holy | poison | 3 · slash | **2** · blunt\|katana |
 
 Lesson: holy and CYAN's katana key every ghost, the train weapon-classes.md
 names ("holy + slash featured"). The two spirits take special (#347, "Special
@@ -131,15 +132,15 @@ hallway (map 151) and map 149, which play has not claimed yet (#286).
 
 ## 7. Narshe's back way with BANON (map 48)
 
-TERRA (Fire), EDGAR (pike: spear; poison), BANON (a rod: arcane), at
+TERRA (Fire), EDGAR (pike: spear; poison), BANON (a rod: blunt), at
 `terra_clifftop`; and LOCKE, EDGAR, SABIN and MOG meet the guards' formation
 on the `water_rondo` leg (`water-rondo-v1`: knife, Blizzard, Poison Claw,
 pike).
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$0EF` 1st Class | a guard in plate | 11 | 180 | poison | — | 3 · pierce | **2** · fist\|spear |
-| `$0F4` Wild Rat | a rat | 12 | 160 | fire | poison | 3 · slash | **2** · sword\|dagger |
+| `$0EF` 1st Class | a guard in plate | 11 | 180 | poison | — | 3 · pierce | **2** · blunt\|spear |
+| `$0F4` Wild Rat | a rat | 12 | 160 | fire | poison | 3 · slash | **2** · dagger\|katana |
 
 Lesson: the Bio Blaster keys the guard and heals the rat beside him, which
 TERRA's Fire keys; BANON's rod dents the guard's plate.
@@ -147,17 +148,17 @@ TERRA's Fire keys; BANON's rod dents the guard's plate.
 ## 8. The plains between Narshe, Kohlingen, Jidoor and Zozo (world groups 9, 10, 11, 13)
 
 Two parties: to Zozo, LOCKE (knives: dagger), EDGAR (pike: spear; poison),
-SABIN (Kaiser: fist; fire, holy), CELES (RegalCutlass: sword), from
+SABIN (Kaiser: blunt; fire, holy), CELES (RegalCutlass: sword), from
 `zozo-outside-v1`; to Narshe after the Opera, LOCKE (knife), EDGAR
-(Blizzard: sword, ice), SABIN (Poison Claw: fist), SETZER (Cards: arcane),
+(Blizzard: sword, ice), SABIN (Poison Claw: katana), SETZER (Cards: ranged),
 from `narshe-mission-v1`.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
 | `$078` Red Fang | a wolf | 14 | 325 | (+poison) | — | 3 · slash | **2** · dagger\|katana |
-| `$02A` Vulture | a flier | 15 | 412 | wind | — | 3 · slash | **2** · spear |
-| `$090` Over-Grunk | the plains' tank | 15 | 492 | fire | — | 3 · slash | 3 · sword\|fist |
-| `$08C` Mind Candy | a magic moth | 15 | 290 | fire\|wind | — | 3 · slash | **2** · sword\|arcane |
+| `$02A` Vulture | a flier | 15 | 412 | wind | — | 3 · slash | **2** · dagger |
+| `$090` Over-Grunk | the plains' tank | 15 | 492 | fire | — | 3 · slash | 3 · sword\|ranged |
+| `$08C` Mind Candy | a magic moth | 15 | 290 | fire\|wind | — | 3 · slash | **2** · sword\|ranged |
 
 Lesson: the flier falls to the point and not the edge (weapon-classes.md's
 "pierce-weak fliers" for this stretch); the moth takes SETZER's cards, the
@@ -171,10 +172,10 @@ pierce). EDGAR and SABIN fight the same formation before the banquet.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$07B` Ralph | a beast | 17 | 620 | (+poison) | — | 4 · slash | **2** · sword\|spear |
-| `$081` Wyvern | a dragon | 18 | 892 | ice | — | 4 · pierce | **3** · dagger\|katana |
-| `$08D` WeedFeeder | a grazer | 17 | 480 | fire\|wind | — | 4 · slash | **2** · fist\|katana |
-| `$06B` Joker | a conjurer, in threes | 17 | 467 | bolt\|poison | — | 4 · slash | **2** · sword\|arcane |
+| `$07B` Ralph | a beast | 17 | 620 | (+poison) | — | 4 · slash | **2** · sword\|dagger |
+| `$081` Wyvern | a dragon | 18 | 892 | ice | — | 4 · pierce | **3** · sword\|dagger |
+| `$08D` WeedFeeder | a grazer | 17 | 480 | fire\|wind | — | 4 · slash | **2** · blunt\|katana |
+| `$06B` Joker | a conjurer, in threes | 17 | 467 | bolt\|poison | — | 4 · slash | **2** · sword\|blunt |
 
 Lesson: the blades key every body (the floor's pierce-only Wyvern did not
 key the two blades that walk here); the Wyvern is the three-shield dragon,
@@ -187,13 +188,13 @@ Group 15 also deals the ChickenLip, whose row is the side-zones branch's
 ## 10. The plains and forest round Thamasa (world groups 22, 23, 24)
 
 TERRA (Blizzard: sword, ice), LOCKE (ThunderBlade: sword, bolt), STRAGO
-(Fire Rod: arcane, fire), from `esper-mtn-save-v1`.
+(Fire Rod: blunt, fire), from `esper-mtn-save-v1`.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$096` Cephaler | a winged crawler | 21 | 420 | bolt | — | 4 · slash | **2** · katana\|spear |
-| `$01F` Chimera | a many-headed beast | 22 | 2237 | (+poison) | — | 4 · slash | 4 · sword\|spear |
-| `$01D` Baskervor | a hound | 22 | 750 | (+poison) | — | 4 · slash | **2** · sword\|spear |
+| `$096` Cephaler | a winged crawler | 21 | 420 | bolt | — | 4 · slash | **2** · sword\|dagger |
+| `$01F` Chimera | a many-headed beast | 22 | 2237 | (+poison) | — | 4 · slash | 4 · sword\|dagger |
+| `$01D` Baskervor | a hound | 22 | 750 | (+poison) | — | 4 · slash | **2** · sword\|dagger |
 
 Lesson: LOCKE's ThunderBlade keys the Cephaler twice (its blade and its
 bolt); the Chimera keeps the miniboss-grade four; the Baskervor, a hound
@@ -203,16 +204,16 @@ world groups 25 and 22; these rows are this doc's.)
 
 ## 11. Esper Mountain (maps 372, 375)
 
-TERRA, LOCKE and STRAGO as above, and RELM (Chocobo Brush: arcane) from
+TERRA, LOCKE and STRAGO as above, and RELM (Chocobo Brush: blunt) from
 `thamasa-done-v1`.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$0EE` Mandrake | a root | 23 | 1150 | fire | water | 4 · slash | **2** · arcane\|katana |
-| `$0D0` Insecare | an insect's shell | 23 | 977 | fire\|wind | — | 4 · pierce | **2** · dagger\|arcane |
+| `$0EE` Mandrake | a root | 23 | 1150 | fire | water | 4 · slash | **2** · sword\|blunt |
+| `$0D0` Insecare | an insect's shell | 23 | 977 | fire\|wind | — | 4 · pierce | **2** · dagger\|blunt |
 | `$0EB` Abolisher | a beast | 24 | 860 | — | — | 5 · slash | **2** · sword\|spear |
-| `$0D6` Adamanchyt | the mountain's wall | 24 | 1305 | — | — | 5 · bludg | 5 · arcane\|spear |
-| `$0B8` Slurm | an ooze | 23 | 505 | fire | — | 4 · bludg | **2** · fist\|arcane |
+| `$0D6` Adamanchyt | the mountain's wall | 24 | 1305 | — | — | 5 · bludg | 5 · dagger\|blunt |
+| `$0B8` Slurm | an ooze | 23 | 505 | fire | — | 4 · bludg | **2** · blunt\|ranged |
 
 Lesson: the insect, the shell and the ooze turn the blades the party
 carries and take STRAGO's rod; the ooze takes RELM's brush too, the
@@ -235,7 +236,7 @@ Epee: slash, bolt), and CELES or SHADOW, from `fc-landing-v1` and
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$169` Naughty | a demon | 24 | 3000 | fire\|bolt\|holy | ice | 5 · slash | **3** · dagger\|katana\|spear |
+| `$169` Naughty | a demon | 24 | 3000 | fire\|bolt\|holy | ice | 5 · slash | **3** · dagger\|ranged\|katana |
 
 The pool's elite at the elite's three, like the Behemoth and the Dragon;
 special like the pool's other magic bodies (Apokryphos, Misfit, Brainpan).
@@ -265,7 +266,7 @@ BANON's Punisher), `gen_narshe_battle`'s three squads, `banquet-done-v1` and
 ## 13. The Lete River's raft (event battles 7 and 8)
 
 TERRA (MithrilBlade: sword; Fire), EDGAR (Mithril Pike: spear; the Bio
-Blaster's poison), BANON (Punisher: arcane), and SABIN (fists: fist;
+Blaster's poison), BANON (Punisher: blunt), and SABIN (fists: blunt;
 AuraBolt: holy) on the upper river. The upper ride's `if_rand` fights are
 battles 7 and 8. The lower ride from the hub (`gen_rapids`) forces battle 8:
 two Pterodons three times in four, or a Nautiloid, an Exocite and a
@@ -273,9 +274,9 @@ Pterodon.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$022` Pterodon | a winged reptile | 12 | 380 | fire | — | 3 · pierce | **2** · sword\|spear |
-| `$038` Nautiloid | a shell | 11 | 236 | fire\|bolt | water | 3 · pierce | **2** · arcane\|spear |
-| `$039` Exocite | a crab | 11 | 196 | fire\|bolt | water | 3 · pierce | **2** · sword\|arcane |
+| `$022` Pterodon | a winged reptile | 12 | 380 | fire | — | 3 · pierce | **2** · katana\|spear |
+| `$038` Nautiloid | a shell | 11 | 236 | fire\|bolt | water | 3 · pierce | **2** · blunt\|spear |
+| `$039` Exocite | a crab | 11 | 196 | fire\|bolt | water | 3 · pierce | **2** · sword\|blunt |
 
 Lesson: each of the three weapon hands keys two of the three bodies, and
 TERRA's Fire keys all three. On the floor all three took only EDGAR's
@@ -290,9 +291,9 @@ never touches one.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$060` Dark Side | a spirit | 13 | 255 | fire\|holy | poison | 3 · slash | **2** · sword\|dagger |
-| `$0B6` Spectre | a phantom that casts | 13 | 235 | fire\|holy | poison | 3 · slash | **2** · fist\|arcane |
-| `$0CF` Rinn | a wisp | 11 | 110 | fire\|holy | poison | 3 · slash | **1** · arcane\|spear |
+| `$060` Dark Side | a spirit | 13 | 255 | fire\|holy | poison | 3 · slash | **2** · sword\|ranged |
+| `$0B6` Spectre | a phantom that casts | 13 | 235 | fire\|holy | poison | 3 · slash | **2** · blunt\|ranged |
+| `$0CF` Rinn | a wisp | 11 | 110 | fire\|holy | poison | 3 · slash | **1** · ranged\|spear |
 
 Lesson: each spirit takes one of the three weapon hands, TERRA's Fire takes
 them all, and the Bio Blaster heals them. Map 48 next door teaches the same
@@ -313,8 +314,8 @@ the v0.45 lab, party 1's descent fought Fidor's formation three times
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$079` Bounty Man | hired muscle | 13 | 285 | fire | — | 3 · slash | **2** · dagger\|katana |
-| `$01C` Fidor | the troopers' war hound | 13 | 355 | fire | — | 3 · slash | **2** · sword\|dagger |
+| `$079` Bounty Man | hired muscle | 13 | 285 | fire | — | 3 · slash | **2** · sword\|dagger |
+| `$01C` Fidor | the troopers' war hound | 13 | 355 | fire | — | 3 · slash | **2** · sword\|spear |
 
 Lesson: every raider takes the troopers' keys, so each squad's hands carry
 over from one wave to the next. The lab ran `gen_narshe_battle` unchanged
@@ -339,7 +340,7 @@ blade or a knife.
 The banquet runs before the roster is rewritten, so the bout is fought by
 `vector-crash-v1`'s party: TERRA (ThunderBlade: sword, bolt; Fire), LOCKE
 (MithrilKnife: dagger), EDGAR (Blizzard: sword, ice; AutoCrossbow: pierce;
-Bio Blaster: poison) and SABIN (Poison Claw: fist, poison; Fire Dance,
+Bio Blaster: poison) and SABIN (Poison Claw: katana, poison; Fire Dance,
 AuraBolt). During the banquet's free time a trooper offers a two-minute bout
 (`_cc8a47`). The canon banquet talks instead.
 
@@ -356,8 +357,8 @@ SABIN, CYAN and SHADOW, as section 6.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
-| `$00F` Over-Mind | a spirit | 13 | 390 | fire\|holy | poison | 3 · slash | **2** · sword\|dagger |
-| `$131` Siegfried | a braggart | 7 | 100 | — | — | 2 · slash | **1** · dagger\|fist\|katana |
+| `$00F` Over-Mind | a spirit | 13 | 390 | fire\|holy | poison | 3 · slash | **2** · ranged\|katana |
+| `$131` Siegfried | a braggart | 7 | 100 | — | — | 2 · slash | **1** · dagger\|blunt\|katana |
 
 Over-Mind is the vestibule car's own body (map 149, pool 71, with Hazer,
 Whisper and StillGoing), and it gets the train's spirit row. Siegfried is

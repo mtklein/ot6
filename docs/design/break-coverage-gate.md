@@ -1,9 +1,10 @@
 # Break coverage — the Sealed Gate cave (maps 382–386)
 
 > **Class names.** Written under the four weapon classes (slash, pierce, bludgeon,
-> special ¤). Since v0.51 (#566) there are six: slash became Sword or Katana, pierce
-> Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger, each species
-> keeping its number of weapon weaknesses. Each table's row column and the hands named with their weapon below are in the
+> special ¤). Since v0.51 (#566) there are six (Sword, Dagger, Spear, Katana, Blunt,
+> Ranged): slash became Sword or Katana, pierce Dagger, Spear or Ranged, bludgeon Blunt
+> or Ranged, special Ranged or Blunt, each species keeping its number of weapon
+> weaknesses. Each table's row column and the hands named with their weapon below are in the
 > six classes' names, as `ot6_hud.asm` ships them; a "floor" column and the dated
 > reasoning keep the names of the day.
 
@@ -25,11 +26,11 @@ rule.
 
 | id | body | L | HP | vanilla weak | absorbs | authored row |
 |---|---|---|---|---|---|---|
-| `$06E` | ninja | 20 | 781 | **ice\|holy** | **fire**\|poison | 2 · katana\|spear |
-| `$0E5` | spirit | 20 | 590 | **holy** | fire\|poison | 2 · sword\|fist\|arcane |
+| `$06E` | ninja | 20 | 781 | **ice\|holy** | **fire**\|poison | 2 · sword\|dagger |
+| `$0E5` | spirit | 20 | 590 | **holy** | fire\|poison | 2 · blunt\|ranged\|katana |
 | `$0B3` | soft flier | 20 | 480 | **ice** | fire | 2 · katana |
-| `$048` | shelled tank (×3 stacks) | 21 | 1100 | **holy\|water** | fire\|poison | 3 · fist\|spear |
-| `$082` | brute | 21 | 1991 | **fire\|holy** | poison | 4 · sword\|arcane |
+| `$048` | shelled tank (×3 stacks) | 21 | 1100 | **holy\|water** | fire\|poison | 3 · dagger\|blunt |
+| `$082` | brute | 21 | 1991 | **fire\|holy** | poison | 4 · sword\|ranged |
 
 - **Vanilla's element bits stay untouched ✦** and carry the area's real
   language: **holy on four of five species** — AuraBolt, which the story

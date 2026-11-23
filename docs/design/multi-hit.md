@@ -293,14 +293,14 @@ transcription of that output and go stale if nobody re-runs it.
 
 | blitz | id | hits | tgt | class/elem | pow | MP | mp/chip |
 |---|---|---|---|---|---|---|---|
-| **Pummel** | `$5d` | **2** | `$53` single | fist | 55 | 4 | **2.0** |
+| **Pummel** | `$5d` | **2** | `$53` single | blunt | 55 | 4 | **2.0** |
 | AuraBolt | `$5e` | 1 | `$53` single | holy | 68 | 10 | 10.0 |
-| Suplex | `$5f` | 1 | `$7e` one-half | fist | 180 | 13 | 13.0 |
+| Suplex | `$5f` | 1 | `$7e` one-half | blunt | 180 | 13 | 13.0 |
 | Fire Dance | `$60` | 1 | `$7a` one-side | fire | 42 | 17 | 17.0 |
 | Mantra | `$61` | 1 | `$3e` allies | — | 1 | 16 | — |
 | Air Blade | `$62` | 1 | `$7a` one-side | wind | 78 | 28 | 28.0 |
 | Spiraler | `$63` | 1 | `$3e` | — | 200 | 50 | — |
-| **Bum Rush** | `$64` | **4** | `$53` single | fist | 32 | 99 | **24.8** |
+| **Bum Rush** | `$64` | **4** | `$53` single | blunt | 32 | 99 | **24.8** |
 
 **Tools** (item ids `$a3-$aa`, `ItemProp`)
 
@@ -312,8 +312,8 @@ transcription of that output and go stale if nobody re-runs it.
 | Chain Saw | `$a6` | 1 | `$43` single | sword | 252 | 18 | 18.0 |
 | Debilitator | `$a7` | 1 | `$43` single | — | 0 | 10 | — (adds a weakness) |
 | **Drill** | `$a8` | **2** | `$43` single | spear | 96 | 16 | **8.0** |
-| Air Anchor | `$a9` | 1 | `$43` single | spear | 128 | 14 | 14.0 |
-| AutoCrossbow | `$aa` | **1/body** | `$6a` one-side | spear | 125 | 4 | 4.0 (boss) |
+| Air Anchor | `$a9` | 1 | `$43` single | ranged | 128 | 14 | 14.0 |
+| AutoCrossbow | `$aa` | **1/body** | `$6a` one-side | ranged | 125 | 4 | 4.0 (boss) |
 
 **Targeting-byte caveat.** The `INIT` decode above is read from
 `const.inc:1298-1302` plus `ChooseTarget` (`battle_main.asm:14959-14978`), not
