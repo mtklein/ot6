@@ -262,9 +262,10 @@ what keeps the rule easy to follow. Steal's tier table and the full ruling
 live in design/kits.md.
 
 **Dance carries both halves (#473).** A Dance's boost multiplies every step
-of the dance it starts, and since #473 it also loads the one die a Dance
-rolls: off its own terrain, vanilla's start stumbles on a coin (an even
-draw from the battle RNG table, exactly 1/2). That coin is the same one
+of the dance it starts, and since #473 it also loads the dice a Dance
+start rolls. The first: off its own terrain, vanilla's start stumbles on a
+coin (an even draw from the battle RNG table, exactly 1/2). That coin is
+the same one
 Rage's special rides, so Dance takes Rage's ladder unchanged: a stumble
 1/2 at 0 BP (vanilla's roll, untouched), 1/4 at 1, 1/16 at 2, never at 3.
 It is still one payoff: the boost buys the dance at that tier, and starting
@@ -273,6 +274,13 @@ bought and the roll was taken, and charges no MP, because the MP pays for
 the dance's magnitude, which never began. MP scales with magnitude; BP
 pays for certainty. The ladder and its derivation are in design/kits.md
 (Mog).
+
+The start's certainty has a second die (owner, 2026-11-23): which of the
+dance's four steps opens it. Vanilla rolls the fourth, rare step 1 turn in
+16. A boosted start opens on it 1 time in 4 at 1 BP, 1 in 2 at 2, and
+always at 3; every later step, and a dance the engine starts on its own,
+keeps vanilla's odds. The opener is danced only if the start lands, so at
+1 and 2 BP both dice are still live and the third point removes both.
 
 Sketch is neither: it takes the boost of whatever it drew. A sketched attack
 with a number multiplies; one with none drops the boost once the brush has

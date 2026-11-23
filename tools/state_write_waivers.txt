@@ -64,6 +64,8 @@ tools/tests/battle_counterboost.lua	.writeByte(	5
 tools/tests/battle_counterboost.lua	.writeWord(	2
 tools/tests/battle_counterfold.lua	.writeByte(	5
 tools/tests/battle_dancemp.lua	.writeWord(	3
+tools/tests/battle_danceopener.lua	.writeByte(	2	quarantine: the engine-start arm only (battle_waterrondo's staging): MOG Muddled on cue (and again if a hit clears it) -- no battle Muddles him on cue; the Dance the engine then starts and its roll are the engine's.  The menu arms write nothing
+tools/tests/battle_danceopener.lua	.writeWord(	1	quarantine: the engine-start arm only: MOG's HP topped up under half while Muddled, so the battle lasts until the engine starts a Dance
 tools/tests/battle_densekits.lua	.writeByte(	3	quarantine: #541 sequel, two synthetic arms -- the story never takes back a thief row nor shrinks a list under a remembered cursor, so Mug's event switch ($001E) is cleared mid-battle to give LOCKE's list a middle gap and a cursor past its end, and MOG's Dance cursor is put on the last cell before his window reopens; the property is the packing and the open clamp
 tools/tests/battle_dlgmenu.lua	.writeByte(	2	quarantine: #292 review, synthetic step -- one monster slot's shield-count upload planted pending mid-dialogue (OT6_SHWANT/OT6_SHPEND), because a count change landing while a battle dialogue is up is not a thing a fixture produces on cue; the property is that the nmi holds the upload until the dialogue and its re-lay are done
 tools/tests/battle_bumrushmimic.lua	.writeByte(	3

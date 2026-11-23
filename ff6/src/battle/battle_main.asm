@@ -13248,8 +13248,18 @@ FixPlayerAttack:
         xba
         sta     $32e1,y
         sta     $3a6f
+        ; ot6: a boosted Dance opens on its rare step.  This is the start a
+        ; player (or a Gogo carrying Dance) picked from the menu, and its
+        ; pending boost is final here, as the Rage arm below finds it.
+        ; Ot6DanceOpener rolls the opener on the boost's ladder (carry set,
+        ; A = the step's attack); unboosted it draws nothing and vanilla's
+        ; RandDance decides, to the byte.  The engine's own starts (Muddle,
+        ; the Colosseum: RandCharAction) and every locked-in step
+        ; (RandDanceAction) call RandDance directly and never come here.
+        jsl     Ot6DanceOpener
+        bcs     :+
         jsr     RandDance
-        xba
+:       xba
         pla
 @4dec:  cmp     #$10
         bne     @4dfa       ; branch if not rage
