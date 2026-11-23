@@ -16,12 +16,14 @@ path is given. Formation contents are decoded offline from
 shield/weakness data is not re-derived here — it lives in `bosses-wob.md`
 §19–22 and is cross-referenced in §7.
 
-> Weapon classes: v0.51 replaced the four classes this document was written
-> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
-> below are the present ones. Quoted logs, dated measurements and "before"
-> columns keep the words they were recorded in: slash is now Sword or Katana,
-> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Blunt, Ranged
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are the
+> present ones. Quoted logs, dated measurements and "before" columns keep
+> the words they were recorded in: slash is now Sword or Katana, pierce
+> Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged or
+> Blunt.
 
 ---
 
@@ -154,7 +156,7 @@ The two gating switches to watch live: **`$009E`** (0→1 = discovery ran) and
 **`$01A2`** (must be 1 = three aboard). The forced three-party is a **route
 decision**: one of TERRA/LOCKE/STRAGO/RELM is benched for the entire IAF+FC.
 Who to keep is a kit question for the FC break fights (AtmaWeapon needs two of
-fire/ice/bolt/Sword/Spear; §7).
+fire/ice/bolt/Sword/Dagger; §7).
 
 ---
 
@@ -183,11 +185,11 @@ see `gen_massacre.lua` on the same handler).
 
 | enemy | L | shields | weak | class |
 |---|---|---|---|---|
-| Sky Armor `$043` | 24 | 2 | **bolt**\|wind | Dagger\|Katana |
-| Spit Fire `$0e3` | 25 | 2 | **bolt**\|wind | Spear\|Katana |
-| Ultros④ `$168` | 26 | 7 | fire\|**bolt**\|poison (absorbs water) | Sword\|Spear |
-| Chupon `$12f` | 26 | 4 | ice\|water (absorbs fire) | Fist |
-| AirForce `$113` | 25 | 8 | **bolt**\|water | Spear |
+| Sky Armor `$043` | 24 | 2 | **bolt**\|wind | Sword\|Spear |
+| Spit Fire `$0e3` | 25 | 2 | **bolt**\|wind | Sword\|Spear |
+| Ultros④ `$168` | 26 | 7 | fire\|**bolt**\|poison (absorbs water) | Sword\|Ranged |
+| Chupon `$12f` | 26 | 4 | ice\|water (absorbs fire) | Ranged |
+| AirForce `$113` | 25 | 8 | **bolt**\|water | Ranged |
 
 **Bolt is the IAF key.** Sky Armor, Spit Fire, Ultros④, and AirForce are *all*
 bolt-weak — and so is AtmaWeapon (§7). A bolt-leaning party breaks every wave
@@ -345,14 +347,13 @@ weakness for four of the seven species — Bolt is a good nuke here, and TERRA
 carries Ramuh (bolt). The descent's difficulty is the Dragon's 7000 HP and
 850 MP at the party's level, not element hostility; see the descent lab note.
 
-The FC randoms carry authored `Ot6ShieldTbl` rows: Behemoth (Dagger,
-Katana) and Dragon (Spear, Katana) 3 pips; Ninja (Sword, Spear),
-WireyDrgn (Spear, Katana), Apokryphos, Misfit and Brainpan (each Sword,
-Spear, Arcane) 2 pips. All seven were slash and pierce under four
+The FC randoms carry authored `Ot6ShieldTbl` rows: Behemoth (Sword,
+Spear) and Dragon (Katana, Spear) 3 pips; Ninja (Sword, Dagger),
+WireyDrgn (Sword, Dagger), Apokryphos, Misfit and Brainpan (each Sword,
+Dagger, Blunt) 2 pips. All seven were slash and pierce under four
 classes. The three magic bodies (Apokryphos, Misfit, Brainpan: each
-holy-weak, each a caster) took special from #347 (guidelines,
-"Special (¤) is a common key") and take Arcane now, so RELM's brushes
-key them; the beasts, the dragons and the Ninja do not (`battle_breaktbl`
+holy-weak, each a caster) took special from #347 and take Blunt now, so
+RELM's brushes key them; the beasts, the dragons and the Ninja do not (`battle_breaktbl`
 checks the seven rows). Four of the
 seven species are vanilla no-run (`monster_prop` +19 bit 2: Apokryphos,
 Misfit, WireyDrgn, Brainpan), so 7 of the 12 formations cannot be fled.
@@ -370,7 +371,7 @@ two-way tunnels; (36,28)/(52,24)/(59,39)/(63,28)/(82,30) are pure
 reveals. The route: descent prefix → the (40,24) tunnel (lands (63,31))
 → step (63,28) → climb → (60,12) → (60,11) CATASTROPHE → battle 80.
 
-AtmaWeapon (form 450) has 23349 HP and an 11-pip Sword|Spear shield
+AtmaWeapon (form 450) has 23349 HP and an 11-pip Sword|Dagger shield
 that re-shields mid-fight. Post-win, `_cada30` runs
 `if_case CHAR::SHADOW → _cad9fc`, dropping the party to 3; the escape
 sequence re-handles Shadow from there.
@@ -488,7 +489,7 @@ survey only pins the formations that reach them.
 |---|---|---|---|---|
 | Ultros④ + Chupon | `battle 107` `:13540` | 477 | Ultros `$168` (Chupon `$12f` script-added) | §19: shields 7/4; Chupon's Sneeze ends by script — don't hold BP |
 | AirForce | `battle 89` `:13557` | 459 | AirForce `$113`, Laser Gun `$145`, MissileBay `$147` (Speck `$146` script-spawned) | §20: shields 8/3/3/1; break the bay to cancel Launcher; Speck absorbs spells |
-| AtmaWeapon | `battle 80` `:32681` | 450 | AtmaWeapon `$0117` | §21: shields 11, weak fire/ice/bolt+Sword/Spear (whole row added); Shadow forced; Flare-Star fuse each rotation; MP-kill preserved |
+| AtmaWeapon | `battle 80` `:32681` | 450 | AtmaWeapon `$0117` | §21: shields 11, weak fire/ice/bolt+Sword/Dagger (whole row added); Shadow forced; Flare-Star fuse each rotation; MP-kill preserved |
 | Nerapa | `battle 81` `:32693` | 451 | Nerapa `$0118` | §22: shields 5, weak ice/bolt/holy+Sword/Dagger, **absorbs fire**; Condemned ambush under the escape clock |
 
 The IAF trash (Sky Armor / Spit Fire, forms 175/176) carries no drawn gauge in
@@ -512,7 +513,7 @@ The IAF trash (Sky Armor / Spit Fire, forms 175/176) carries no drawn gauge in
 - **The forced three-party (§2/§3) is the stretch's one roster decision.** The
   fourth of TERRA·LOCKE·STRAGO·RELM is benched for the whole IAF+FC. AtmaWeapon
   (11 shields, five-axis weakness) needs a lineup holding ≥2 of fire/ice/bolt/
-  Sword/Spear; Nerapa absorbs fire (don't bring a fire-only chipper).
+  Sword/Dagger; Nerapa absorbs fire (don't bring a fire-only chipper).
 - **A lost fight is a real Game Over** everywhere on this stretch (the IAF
   `_ca5ea9` handler, the escape-clock `GameOver`), unlike the massacre's
   savestate-split theater. The route needs a save before the FC (the 394 (7,12)

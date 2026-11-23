@@ -7,11 +7,11 @@ himself is #274's.
 
 > Weapon classes: v0.51 replaced the four classes this document was written
 > under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
 > keys below are the present ones. Quoted logs, dated measurements and
 > "before" columns keep the words they were recorded in: slash is now Sword
-> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
-> or Dagger.
+> or Katana, pierce Dagger, Spear or Ranged, bludgeon Blunt or Ranged,
+> special Ranged or Blunt.
 
 The owner's direction (2026-11-05): "i usually bring my bench and mains to
 kefkas tower in mixed parties and let the bench level up naturally". So
@@ -155,55 +155,55 @@ places, and the rows say so: the empire's **factory** (292, 352, 409, 410,
 
 The lessons:
 
-- **The machines turn the blades.** Every machine takes Dagger or Spear
-  and Fist or Arcane, never Sword or Katana. The carriers' blades want
-  Bolt there; the bench's spears, knives and clubs carry (EDGAR, MOG,
-  LOCKE, GOGO, UMARO), which is where the bench shines.
-- **The statues are magic made stone.** Each takes Arcane (the brush, the
-  cards, the rods) and one other class: Doom Katana, the Goddess Dagger,
-  the Poltergeist Fist. No statue takes Sword or Spear. Which party takes
+- **The machines turn the blades.** Every machine takes Ranged and Spear,
+  never Sword or Katana. The carriers' blades want Bolt there; the bench's
+  spears and thrown or shot hands carry (EDGAR's AutoCrossbow and Drill,
+  MOG, SETZER, SHADOW's throws), which is where the bench shines.
+- **The statues are magic made stone.** Each takes Ranged (the cards, the
+  throws, the AutoCrossbow) and one other class: Doom Katana, the Goddess
+  Spear, the Poltergeist Blunt. No statue takes Sword or Dagger. Which party takes
   which lane is a choice the keys make (section 4).
 
 | species | L / HP | vanilla | shields | classes |
 |---|---|---|---|---|
-| Brontaur `$084` | 50 / 10,050 | weak ice | 3 | Dagger, Arcane |
-| Evil Oscar `$0B7` | 56 / 7,000 | weak fire; absorbs the rest | 3 | Katana, Arcane |
-| Vectaur `$080` | 59 / 2,800 | weak ice, water | 2 | Spear, Katana |
-| GtBehemoth `$0E0` | 58 / 11,000 | none; Meteor | 3 | Dagger, Arcane |
-| Dark Force `$00D` | 55 / 8,940 | weak holy | 3 | Dagger, Fist |
+| Brontaur `$084` | 50 / 10,050 | weak ice | 3 | Dagger, Blunt |
+| Evil Oscar `$0B7` | 56 / 7,000 | weak fire; absorbs the rest | 3 | Blunt, Katana |
+| Vectaur `$080` | 59 / 2,800 | weak ice, water | 2 | Katana, Spear |
+| GtBehemoth `$0E0` | 58 / 11,000 | none; Meteor | 3 | Dagger, Blunt |
+| Dark Force `$00D` | 55 / 8,940 | weak holy | 3 | Blunt, Ranged |
 | Outsider `$0BD` | 18 / 8,050 | weak holy; absorbs poison | 3 | Sword, Dagger |
-| Madam `$06A` | 53 / 8,150 | weak poison | 3 | Katana, Arcane |
-| Retainer `$007` | 59 / 7,050 | weak poison | 3 | Katana, Arcane |
-| Hemophyte `$0C1` | 56 / 6,800 | none | 2 | Dagger, Katana |
-| Veteran `$0FB` | 51 / 10,000 | none | 3 | Spear, Katana |
-| Didalos `$0F9` | 59 / 12,280 | weak fire, holy; absorbs poison | 3 | Dagger, Fist |
-| Steroidite `$016` | 54 / 25,000 | weak holy | 4 | Spear, Fist |
-| Mover `$056` | 51 / 120 | absorbs poison | 1 | Katana, Fist |
-| Doom Drgn `$025` | 54 / 18,008 | none | 4 | Dagger, Arcane |
-| Vectagoyle `$0E4` | 57 / 7,500 | none | 3 | Fist, Arcane |
+| Madam `$06A` | 53 / 8,150 | weak poison | 3 | Ranged, Katana |
+| Retainer `$007` | 59 / 7,050 | weak poison | 3 | Blunt, Katana |
+| Hemophyte `$0C1` | 56 / 6,800 | none | 2 | Ranged, Katana |
+| Veteran `$0FB` | 51 / 10,000 | none | 3 | Sword, Dagger |
+| Didalos `$0F9` | 59 / 12,280 | weak fire, holy; absorbs poison | 3 | Blunt, Ranged |
+| Steroidite `$016` | 54 / 25,000 | weak holy | 4 | Ranged, Spear |
+| Mover `$056` | 51 / 120 | absorbs poison | 1 | Ranged, Katana |
+| Doom Drgn `$025` | 54 / 18,008 | none | 4 | Blunt, Spear |
+| Vectagoyle `$0E4` | 57 / 7,500 | none | 3 | Blunt, Ranged |
 | Land Worm `$09B` | 59 / 12,000 | weak ice; absorbs earth | 3 | Dagger, Katana |
-| IronHitman `$0FD`, Junk `$0ED`, Sky Base `$0FC` | 52-53 / 2,000-6,000 | weak bolt, water | 2 | IronHitman Dagger, Arcane; Junk Dagger, Fist; Sky Base Spear, Fist |
-| Dueller `$0D9`, Innoc `$0F6` | 52-53 / 6,600-7,200 | weak bolt, water | 3 | Dueller Dagger, Fist; Innoc Dagger, Arcane |
-| Fortis `$0EA`, Prometheus `$105`, Scullion `$0A1` | 54-57 / 9,800-27,000 | weak bolt, water | 4 | Fortis Dagger, Arcane; Prometheus Spear, Fist; Scullion Dagger, Arcane |
-| Inferno `$10C` (battle 114) | 67 / 30,800 | weak bolt; absorbs fire | 6 | Dagger, Arcane |
-| Striker `$142` (Inferno's arm) | 67 / 11,000 | weak fire; absorbs ice | 3 | Sword, Spear |
-| Rough `$141` (Inferno's arm) | 69 / 8,000 | weak ice; absorbs bolt | 3 | Katana, Fist |
-| Guardian `$112` (battle 140) | 67 / 60,000 | weak bolt, water | 10 | Dagger, Fist |
-| Doom `$127` (battle 98) | 73 / 63,000 | weak holy; absorbs ice, poison | 10 | Katana, Arcane |
-| Goddess `$128` (battle 99) | 68 / 44,000 | none; absorbs bolt, holy | 8 | Dagger, Arcane |
-| Poltrgeist `$129` (battle 100) | 67 / 58,000 | weak poison; absorbs fire, wind | 8 | Fist, Arcane |
-| Atma `$17D` (battle 112) | 67 / 55,000 | none; absorbs five | 10 | Spear, Katana |
-| Gold Drgn `$150` (battle 135) | 62 / 32,400 | weak water; absorbs bolt | 6 | Sword, Spear |
-| Skull Drgn `$151` (battle 136) | 62 / 32,800 | weak fire, holy; absorbs poison | 6 | Fist, Arcane |
+| IronHitman `$0FD`, Junk `$0ED`, Sky Base `$0FC` | 52-53 / 2,000-6,000 | weak bolt, water | 2 | Ranged, Spear (each) |
+| Dueller `$0D9`, Innoc `$0F6` | 52-53 / 6,600-7,200 | weak bolt, water | 3 | Ranged, Spear (each) |
+| Fortis `$0EA`, Prometheus `$105`, Scullion `$0A1` | 54-57 / 9,800-27,000 | weak bolt, water | 4 | Ranged, Spear (each) |
+| Inferno `$10C` (battle 114) | 67 / 30,800 | weak bolt; absorbs fire | 6 | Ranged, Spear |
+| Striker `$142` (Inferno's arm) | 67 / 11,000 | weak fire; absorbs ice | 3 | Katana, Spear |
+| Rough `$141` (Inferno's arm) | 69 / 8,000 | weak ice; absorbs bolt | 3 | Ranged, Katana |
+| Guardian `$112` (battle 140) | 67 / 60,000 | weak bolt, water | 10 | Ranged, Spear |
+| Doom `$127` (battle 98) | 73 / 63,000 | weak holy; absorbs ice, poison | 10 | Ranged, Katana |
+| Goddess `$128` (battle 99) | 68 / 44,000 | none; absorbs bolt, holy | 8 | Ranged, Spear |
+| Poltrgeist `$129` (battle 100) | 67 / 58,000 | weak poison; absorbs fire, wind | 8 | Blunt, Ranged |
+| Atma `$17D` (battle 112) | 67 / 55,000 | none; absorbs five | 10 | Katana, Spear |
+| Gold Drgn `$150` (battle 135) | 62 / 32,400 | weak water; absorbs bolt | 6 | Katana, Spear |
+| Skull Drgn `$151` (battle 136) | 62 / 32,800 | weak fire, holy; absorbs poison | 6 | Blunt, Ranged |
 
-Inferno's arms are not machines: Striker takes Sword (with Spear) and
-Rough Katana (with Fist), where no machine takes Sword or Katana.
+Inferno's arms are not machines: both take Katana (Striker with Spear,
+Rough with Ranged), where no machine does.
 
 The GtBehemoth's three is the Tyranosaur's count (route-wor-side-trips.md
 finding 3): a break that comes before its second Meteor. Atma was given
 the AtmaWeapon's pair (the World of Balance's `$117`, slash and pierce):
 the rematch. The six classes split the two apart: AtmaWeapon is Sword,
-Spear and Atma Spear, Katana, so they share Spear only.
+Dagger and Atma Katana, Spear, so they share none.
 
 `battle_breakwor_tower` checks the rows in the built ROM, their vanilla
 weak and absorb bytes, that every species of pool groups 208-227 and the
@@ -237,12 +237,14 @@ cure in every party:
 | 3 | CYAN 53, SHADOW 53, SABIN 39, GOGO 44 | SABIN's (Starlet) | the factory: Inferno, the Skull Dragon; the west column, Doom |
 
 GAU (no weapon; #496's casualty) and UMARO sit out. Party 3 holds Katana
-(CYAN, SHADOW's Striker), Dagger (GOGO's knife, SHADOW's throws) and Fist
-(SABIN's claws): a key for Doom (Katana), which it takes, and for the
-Goddess (Dagger) and the Poltergeist (Fist) too. Under the four classes
-its keys were slash and pierce only, which ruled the Poltergeist out.
-Party 1 holds Sword (TERRA), Dagger (EDGAR's knife) and Arcane (RELM's
-rod, SETZER's cards); under the four it held every class.
+(CYAN, SABIN's claws), Dagger (GOGO's knife, SHADOW's Striker), Ranged
+(SHADOW's throws) and Blunt (SABIN's Blitzes): a key for Doom (Ranged,
+Katana), which it takes, and for the Goddess (Ranged) and the Poltergeist
+(Blunt, Ranged) too. Under the four classes its keys were slash and pierce
+only, which ruled the Poltergeist out. Party 1 holds Sword (TERRA), Dagger
+(EDGAR's knife), Spear and Ranged (EDGAR's Drill and AutoCrossbow,
+SETZER's cards) and Blunt (RELM's brush); under the four it held every
+class.
 
 **Measured on 334** (`tools/tests/lab_tower_split.lua`, each group seated
 as party 1, 10 battles after K encounters used up by another group):
@@ -257,7 +259,7 @@ section 7.
 | `gen_wor_kt_atma` | `wor-kt-inferno-v1` | `wor-kt-atma-v1` | party 2 north through 338 to 331, Atma (battle 112), Save on the save point behind him |
 | `gen_wor_kt_guardian` | `wor-kt-atma-v1` | `wor-kt-guardian-v1` | party 3: the sparkle, the Skull Dragon, the east plate; party 2: the hole, 409, the 292 switch and Ribbon, the Gold Dragon, the west plate (the locked door opens); party 1's lane to the chamber; the weights and the chamber's plates; party 2 to Guardian (battle 140), Save on his save point (291 (12,12)) |
 | `gen_wor_kt_doom` | `wor-kt-guardian-v1` | `wor-kt-doom-v1` | party 2 back through the chamber's south door to 337 (8,6): the cell doors open, and it stays there; party 3 down the west column and lane to 355 below Doom, its bench trained to L46 on that floor (`T.trainLap`), dressed against his ice (`H.elementDress`), Doom (battle 98), Save on his save point (355 (64,11)) |
-| `gen_wor_kt_poltergeist` | `wor-kt-doom-v1` | `wor-kt-poltergeist-v1` | party 2 from 337 (8,6) north through the chamber's middle, 291 and 287 to 334's north; the Ribbon (29,29) on LOCKE over the Back Gauge; the bench to L50 on that floor; dressed against fire, Wall Rings on STRAGO and MOG, the Pearl Rod (Arcane) for STRAGO; the Poltergeist (battle 100); the Ribbon off LOCKE into the bag for party 1; through (30,11) to 412, Save on its save point (82,47) |
+| `gen_wor_kt_poltergeist` | `wor-kt-doom-v1` | `wor-kt-poltergeist-v1` | party 2 from 337 (8,6) north through the chamber's middle, 291 and 287 to 334's north; the Ribbon (29,29) on LOCKE over the Back Gauge; the bench to L50 on that floor; dressed against fire, Wall Rings on STRAGO and MOG, the Pearl Rod (Blunt) for STRAGO; the Poltergeist (battle 100); the Ribbon off LOCKE into the bag for party 1; through (30,11) to 412, Save on its save point (82,47) |
 | `gen_wor_kt_goddess` | `wor-kt-poltergeist-v1` | `wor-kt-goddess-v1` | party 1 puts on party 2's Ribbon (its second), down the east column to 337's east cell and into 355's east lane, its bench to L46 there; on through 291's east room to 354; dressed against bolts; the Goddess (battle 99); a battle on her floor if her Overcast left a Zombie; Save on her save point (354 (12,31)) with party 1 standing |
 | `gen_wor_kt_plates` | `wor-kt-goddess-v1` | `wor-kt-plates-v1` | party 1 north to 411's right plate (115,42), party 3 up the ladder to its left plate (103,43); party 2 Saves on 412's save point: two plate bits set, Kefka's boot (#274) |
 
@@ -460,15 +462,15 @@ won 8, lost 1" (`tally_s6.txt`).
   `w2` loss (`p3/w2c_polt_k0_s4`, beA4) is attrition: Wave Cannon, Fire 3
   and Meteo. More Wall Rings lose more (`w4`): every Fire 3 counter then
   bounces back onto the statue, which absorbs fire.
-- **The shields do not decide it.** The statue keys Fist and Arcane; in
-  party 2 only LOCKE's Wing Edge (Arcane) holds one, and LOCKE mostly Mugs
+- **The shields do not decide it.** The statue keys Blunt and Ranged; in
+  party 2 only LOCKE's Wing Edge (Ranged) holds one, and LOCKE mostly Mugs
   ("LOCKE Mug at", "KEYED: Fight at 1 BP lands 2 chip(s) on slot 0's 8
   shield(s)" once or twice a fight), so the statue rarely breaks: be9C
   played the same 19,903 ticks with six shields as with eight
   ("monhp=s0:44130/sh6" near the end), and `s6` lost the same key. The
   shield count stays 8 (no ROM change).
 - **A second key settles it** (`kb`, the leg's play): STRAGO trades his
-  Imp Halberd (Spear) for the bag's Pearl Rod (Arcane), "[a bludgeon for
+  Imp Halberd (Spear) for the bag's Pearl Rod (Blunt), "[a bludgeon for
   STRAGO (gear)] slot 0 <- $39", and the party keys the statue 12-16 times
   a fight ("KEYED" lines in `p5/kb_polt_k0_s0`, `k3_s4`) where `w2` keyed
   it once or twice: "Poltrgeist: 15 runs; won 15, lost 0, not reached 0;
@@ -736,10 +738,10 @@ line's logs (`tools/tests` legs' `[key]`, `[death]` and care `fenix=` lines;
   L40 ("party 1 after 20 battles by its landing: TERRA L65, RELM L56,
   EDGAR L40, SETZER L43"). Every one of those battles was won.
 - **The Scullion's Condemned (formation 399, 355's east lane).** The
-  Scullion (27,000 HP, four shields of pierce and bludgeon then; Dagger
-  and Arcane today) opens with Condemned, about 20 counts of 128 frames.
+  Scullion (27,000 HP, four shields of pierce and bludgeon then; Ranged
+  and Spear today) opens with Condemned, about 20 counts of 128 frames.
   Party 3 kills it in 2,650-3,240 ticks and loses nobody (13 meetings, 0
-  deaths, land4's Doom leg); party 1, with one key-holder against it,
+  deaths, land4's Doom leg); party 1, with one key-holder against it then (two today: EDGAR's tools, SETZER's cards),
   takes 3,650-5,200 and the count runs
   out first: 6 deaths in its 10 meetings at 62a8b621, 11 in 13 at
   3eb65922, a Fenix Down each. The Innocs, the lane's other formation, cost

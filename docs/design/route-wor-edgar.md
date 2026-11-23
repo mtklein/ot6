@@ -11,11 +11,11 @@ it is driven.
 
 > Weapon classes: v0.51 replaced the four classes this document was written
 > under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
 > keys below are the present ones. Quoted logs, dated measurements and
 > "before" columns keep the words they were recorded in: slash is now Sword
-> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
-> or Dagger.
+> or Katana, pierce Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged
+> or Blunt.
 
 Line numbers are into `ff6/src/event/event_main.asm` unless a path is given.
 Decodes come from `tools/route_data.py` and the small analysis scripts kept
@@ -515,8 +515,7 @@ Formation 195 is the whole of group 40. CELES + SABIN at L27 against it:
   and holy: SABIN's Fire Dance and AuraBolt, the Fire Knuckles, MADUIN's
   Fire. Absorbs poison.
 - **4 shields, Sword** (authored, route-wor-sabin 8.2): CELES's swords
-  chip on every Fight. SABIN's claws, slash when this was written, are
-  Fist and do not.
+  chip on every Fight. SABIN's knuckles (Blunt) do not.
 - **BonePowder** (Zombie) on its second line, one turn in three of it:
   a zombie member attacks the party and cannot be raised by a Fenix Down.
   With two members the fight survives one zombie; it is lost only when
@@ -542,9 +541,9 @@ Special on `$13D`/`$13E`). Their absorbs punish the wrong element: fire
 heals `$11B`, ice heals `$13C`, bolt heals `$13D`.
 
 The hands at the fight: CELES (Sword; ice and bolt blades; Maduin's
-Fire/Ice/Bolt), SABIN (Fist: claws with fire, Pummel, Suplex;
+Fire/Ice/Bolt), SABIN (Blunt: Fire Knuckles, Pummel, Suplex;
 AuraBolt holy; Fire Dance), EDGAR (the Optimum's Break Blade, Sword; the
-AutoCrossbow, Spear, on every body; the Bio Blaster, poison, which none
+AutoCrossbow, Ranged, on every body; the Bio Blaster, poison, which none
 absorbs; the NoiseBlaster). Nothing in the bag cures Slow (no Haste
 spell or relic is held), so the answer to the Seize is to kill or break
 the body before it Seizes, or the one that holds a member.
@@ -587,8 +586,8 @@ byte and the absence of an `Ot6ElemAddTbl` row; that every species of every
 formation of world groups 37-44, maps 68, 90, 92, 53, 62-64 and event group
 84 has an authored row and a key for the party that meets it; and that each
 member holds a class key on at least three of the four Tentacles (true of
-the four-class rows; under the six, EDGAR keys three, SABIN two and CELES
-one, 8.5). Evidence in `build/attempts/wt/wor-edgar/rows/`: green on the
+the four-class rows; under the six, CELES and SABIN key three each and
+EDGAR three with his blade or two with his pike, 8.5). Evidence in `build/attempts/wt/wor-edgar/rows/`: green on the
 authored ROM
 (`suite.green.log`: `checked 17 designed rows`, `checked 23 formations, 36
 formation-species pairs`, `PASS (frame 31) attempts=1/1`), red on main's ROM
@@ -605,26 +604,26 @@ unchanged and grows only by play.
 
 | hand | classes | elements |
 |---|---|---|
-| CELES + SABIN (Tzen to the engine room) | Sword (CELES's swords), Fist (claws, Pummel, Suplex, bare fists) | ice, bolt (the blades), fire (the Knuckles, Fire Dance, Maduin), holy (AuraBolt) |
-| + EDGAR (the Tentacles, and the walk out) | + Spear (the AutoCrossbow, Mithril Pike), Sword (Break Blade) | + poison (Bio Blaster) |
+| CELES + SABIN (Tzen to the engine room) | Sword (CELES's swords), Blunt (knuckles, Pummel, Suplex, bare fists) | ice, bolt (the blades), fire (the Knuckles, Fire Dance, Maduin), holy (AuraBolt) |
+| + EDGAR (the Tentacles, and the walk out) | + Ranged (the AutoCrossbow), Spear (Mithril Pike), Sword (Break Blade) | + poison (Bio Blaster) |
 
 ### 8.2 North of Tzen (world groups 37-39)
 
 | id | body | HP | weak | row |
 |---|---|---|---|---|
 | `$035` Bloompire | an armored bloom (def/mdef 254) | 12 | fire | **1 · Sword** |
-| `$058` Buffalax | a bull | 2252 | fire, water | **3 · Fist** |
-| `$03C` Lizard | scaled | 1280 | ice | **3 · Sword, Dagger** |
-| `$030` Delta Bug | a shelled insect (def 220 / mdef 5) | 612 | fire | **2 · Spear, Fist** |
+| `$058` Buffalax | a bull | 2252 | fire, water | **3 · Blunt** |
+| `$03C` Lizard | scaled | 1280 | ice | **3 · Sword, Spear** |
+| `$030` Delta Bug | a shelled insect (def 220 / mdef 5) | 612 | fire | **2 · Blunt, Spear** |
 
 - **Bloompire**: 12 HP behind the best armor in the game so far. One
-  shield, Sword: CELES's first hit breaks it (SABIN's claws, slash when
-  this was written, are Fist and do not), and a broken body loses its
+  shield, Sword: CELES's first hit breaks it (SABIN's knuckles do not),
+  and a broken body loses its
   turn -- the Energy Sap that would zombify a member. Fire finishes it.
 - **Buffalax**: the plain's tank, cracked by SABIN's fists; its vanilla
   fire is both members' (Knuckles, Maduin). Its counter answers only
   Magic, so the fists are the quiet key.
-- **Lizard**: a hide a sword or a dagger opens; vanilla ice is CELES's.
+- **Lizard**: a hide a sword or a spear opens; vanilla ice is CELES's.
 - **Delta Bug**: def 220 against mdef 5 -- the spell, not the blade (the
   Scorpion's lesson reversed). The class row is SABIN's fists and a later
   party's spears; its vanilla fire is anyone's spell.
@@ -637,20 +636,19 @@ unchanged and grows only by play.
 |---|---|---|---|---|
 | `$0C3` Nohrabbit | a rabbit that heals whoever hits it | 75 | water | **1 · Sword** |
 | `$0B9` Latimeria | a fish | 1700 | bolt | **3 · Sword, Spear** |
-| `$097` Maliga | a sand crab | 952 | ice, bolt, water | **2 · Sword, Fist** |
-| `$05F` Sand Horse | an antlion | 1025 | ice, water | **2 · Spear, Katana** |
+| `$097` Maliga | a sand crab | 952 | ice, bolt, water | **2 · Sword, Blunt** |
+| `$05F` Sand Horse | an antlion | 1025 | ice, water | **2 · Sword, Spear** |
 
 - **Nohrabbit**: a pest (0 XP) that answers a Fight with a Cure on the
   party. One shield so the gauge reads right.
 - **Latimeria**: the forest's tank, filleted by a sword; vanilla bolt is
   CELES's ThunderBlade.
-- **Maliga**: the HermitCrab's row (a sword under the shell, a fist on it);
+- **Maliga**: a sword under the shell, a fist on it;
   three vanilla weaknesses, two of them CELES's blades.
 - **Sand Horse**: its jaws are the danger (Clamp, x5, and every turn once
   alone); two shields let the break land before it closes them. Its row
-  is Spear, Katana now: neither CELES nor SABIN holds either (EDGAR's
-  spears do, on the walk out), so the pair's key is its vanilla ice
-  (CELES's Ice and Blizzard).
+  is Sword, Spear: CELES's swords key it, and EDGAR's on the walk out;
+  its vanilla ice is CELES's Ice and Blizzard.
 - **Teaches:** *read the last one standing.* The Maliga and the Sand Horse
   change scripts when alone; break the last one rather than race it.
 
@@ -658,24 +656,25 @@ unchanged and grows only by play.
 
 | id | body | HP | weak | row |
 |---|---|---|---|---|
-| `$049` Humpty | an egg | 800 | fire, holy | **2 · Fist** |
-| `$04B` Cruller | a ring of dough (evade 100) | 1334 | fire, holy | **3 · Fist** |
-| `$0A9` NeckHunter | a reaper | 1334 | poison | **3 · Sword, Spear, Arcane** (8.7) |
-| `$0D7` Dante | the cave's miniboss-grade body | 1945 | poison | **4 · Dagger, Katana, Fist** (8.7) |
-| `$08B` Drop | a drop of water | 1000 | bolt, water | **2 · Spear, Fist** |
+| `$049` Humpty | an egg | 800 | fire, holy | **2 · Blunt** |
+| `$04B` Cruller | a ring of dough (evade 100) | 1334 | fire, holy | **3 · Blunt** |
+| `$0A9` NeckHunter | a reaper | 1334 | poison | **3 · Sword, Blunt, Spear** (8.7) |
+| `$0D7` Dante | the cave's miniboss-grade body | 1945 | poison | **4 · Sword, Blunt, Ranged** (8.7) |
+| `$08B` Drop | a drop of water | 1000 | bolt, water | **2 · Ranged, Spear** |
 
 - **Humpty / Cruller**: shells and dough are cracked, not cut: SABIN's
   fists. Their vanilla fire and holy are SABIN's AuraBolt and Fire Dance
   and CELES's Fire; the Cruller's evade makes those the real keys, and its
   Fire 2 is runic.
-- **NeckHunter**: a sword or a spear; its vanilla poison is EDGAR's Bio
+- **NeckHunter**: a sword, a fist or a spear; its vanilla poison is EDGAR's Bio
   Blaster on the way out.
-- **Dante**: four shields. The row was both hands' classes; it is Dagger,
-  Katana, Fist now, so SABIN's fists key it and CELES's swords do not.
+- **Dante**: four shields, and both hands' classes: CELES's swords and
+  SABIN's fists key it.
   Broken, it cannot counter (bosses-wob "the boss contract"), so the
   break silences L.3 Muddle.
-- **Drop**: a sword passes through water; a fist or a spear splashes it.
-  Vanilla bolt is CELES's ThunderBlade.
+- **Drop**: a sword passes through water and so does a fist: its row is
+  Ranged and Spear, which neither CELES nor SABIN holds. Their key is its
+  vanilla bolt (CELES's ThunderBlade, Maduin's Bolt).
 - **Teaches:** *the cave muddles; hit the right thing.* Four of its five
   bodies Muddle, and two counter the wrong command.
 
@@ -687,26 +686,25 @@ Party: CELES, SABIN and EDGAR (who joins on the spot). Formation 454.
 
 | id | L | HP | vanilla weak / absorb | shields · class |
 |---|---|---|---|---|
-| `$11B` | 31 | 7000 | ice, water / **fire** | **5 · Spear, Katana** |
-| `$13C` | 32 | 6000 | fire / **ice**, water | **5 · Katana, Fist** |
-| `$13D` | 33 | 5000 | — / **bolt**, water | **5 · Spear, Fist** |
-| `$13E` | 34 | 4000 | — / earth, water | **5 · Sword, Dagger** |
+| `$11B` | 31 | 7000 | ice, water / **fire** | **5 · Sword, Spear** |
+| `$13C` | 32 | 6000 | fire / **ice**, water | **5 · Sword, Blunt** |
+| `$13D` | 33 | 5000 | — / **bolt**, water | **5 · Blunt, Spear** |
+| `$13E` | 34 | 4000 | — / earth, water | **5 · Sword, Blunt** |
 
-- **Keys:** every body is keyed by class for the party: `$11B` by EDGAR's
-  Spear, `$13C` by SABIN's Fist, `$13D` by both, `$13E` by CELES's and
-  EDGAR's Sword. The four-class rows gave each member a class key on at
-  least three of the four (SABIN and EDGAR on all four, CELES on three);
-  the six-class rows give EDGAR three, SABIN two and CELES one. `$13D`,
-  which absorbs CELES's bolt and has no weakness, answers only SABIN's
-  fists and EDGAR's crossbow. `design_keys.txt`: `CELES + SABIN + EDGAR: designed
+- **Keys:** every body is keyed by class for the party: the swords
+  (CELES's, EDGAR's Break Blade) key `$11B`, `$13C` and `$13E`, SABIN's
+  fists `$13C`, `$13D` and `$13E`, and EDGAR's pike `$11B` and `$13D`.
+  `$13D`, which absorbs CELES's bolt and has no weakness, answers only
+  SABIN's fists and EDGAR's pike. The AutoCrossbow (Ranged) keys none of
+  the four. `design_keys.txt`: `CELES + SABIN + EDGAR: designed
   Tentacle:Y Tentacle:Y Tentacle:Y Tentacle:Y`.
 - **Telegraph:** Entwine is the wind-up: a Slowed member is Seized on
   that Tentacle's next turn. Break the Tentacle whose Entwine landed and
   it loses the turn it would Seize on.
 - **Break story:** chip with the classes (elements are a trap here: each
   absorbs one of the party's three); spend the break on the body holding
-  or about to hold a member; the AutoCrossbow (Spear) hits all four and
-  chips `$11B` and `$13D`.
+  or about to hold a member; the AutoCrossbow (Ranged) hits all four but
+  chips none (through v0.50 it chipped every body).
 - **Jank ✦:** the Seize and Discard stay as vanilla has them; the fight
   pays no XP (vanilla 0).
 
@@ -715,7 +713,8 @@ Party: CELES, SABIN and EDGAR (who joins on the spot). Formation 454.
 `design_keys.txt` lists every formation of groups 37-44, maps 68, 90, 92,
 53, 62-64 and event group 84 with the hands that meet it: every species
 is keyed for CELES + SABIN (and for the Tentacles' three) under the
-designed rows.
+designed rows. Under the six classes the Drop (Ranged, Spear) is keyed for
+CELES + SABIN only by its vanilla bolt (8.4).
 
 ### 8.7 Special as a common key (#347, owner 2026-10-01)
 
@@ -732,10 +731,9 @@ logs `special: 2 of 17 designed species take ¤ in this ROM` (0 on
 a2d49b67); every formation stays keyed for the party that meets it
 (build/attempts/wt/v026-rom/347/px13/).
 
-Under six classes the NeckHunter's special is Arcane (`3 · Sword, Spear,
-Arcane`), which Setzer's cards and dice and Relm's brushes hold. Dante's
-became Dagger (`4 · Dagger, Katana, Fist`), which they do not; Setzer's
-Darts do, and Locke's and Shadow's daggers.
+Under six classes the NeckHunter's row is `3 · Sword, Blunt, Spear`, which
+Relm's brushes key, and Dante's `4 · Sword, Blunt, Ranged`, which Setzer's
+cards, dice and darts and Relm's brushes key.
 
 ---
 

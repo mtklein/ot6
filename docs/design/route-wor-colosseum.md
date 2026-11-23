@@ -18,12 +18,14 @@ The Gem Box's wager (owner, 2026-10-26) has its own, under
 `qual/px13/`), and the line with CELES's Flame Sabres under
 `build/attempts/wt/v037-economizer-5/` (`lab/`, `scripts/`, `qual/px13/`).
 
-> Weapon classes: v0.51 replaced the four classes this document was written
-> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and keys
-> below are the present ones. Quoted logs, dated measurements and "before"
-> columns keep the words they were recorded in: slash is now Sword or Katana,
-> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Blunt, Ranged
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are the
+> present ones. Quoted logs, dated measurements and "before" columns keep
+> the words they were recorded in: slash is now Sword or Katana, pierce
+> Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged or
+> Blunt.
 
 ---
 
@@ -91,9 +93,9 @@ fighter beats:
 | Striker | SHADOW himself (no row: he fights as a character) | SHADOW joins; the Striker back | SHADOW |
 | Assassin | Test Rider (3, Spear: the Narshe arc's) | SwordBreaker | LOCKE's blade (Dagger, 164) |
 | Stunner | Test Rider | Strato | CYAN's second Strato (his pair: 199 and 199 for 199 and 162) |
-| Regal Crown | Opinicus (3, Sword/Arcane: Ebot's Rock's) | Genji Helmet | SHADOW's helmet |
+| Regal Crown | Opinicus (3, Sword/Blunt: Ebot's Rock's) | Genji Helmet | SHADOW's helmet |
 | Soul Sabre | Opinicus | Falchion | TERRA's blade (over the Enhancer) |
-| Gem Box | SrBehemoth (the Colosseum's: 6, Dagger/Arcane; weak fire, holy) | Economizer | TERRA's relic (section 5) |
+| Gem Box | SrBehemoth (the Colosseum's: 6, Ranged/Spear; weak fire, holy) | Economizer | TERRA's relic (section 5) |
 
 Measured with CELES before the leg (labs `sw_stun_celes_s*`,
 `sw_crown_celes_s*`: from one capture inside the Colosseum, seed shifts 0-29):
@@ -164,9 +166,9 @@ No species met lacks an authored row.
 
 **The lesson SHADOW brings.**  The cabin's other three hold Sword (CELES,
 TERRA) and Katana (CYAN).  On the plain by Maranda the Crawler takes Dagger
-and Arcane, which none of the three holds.  SHADOW's Striker is Katana and
-does not key it either; his thrown stars and skeans are Dagger and do
-(CELES's ice still finds it, as a spell).
+and Blunt, which none of the three holds.  SHADOW's Striker is a Dagger and
+keys it; his thrown stars and skeans are Ranged and do not (CELES's ice
+still finds it, as a spell).
 
 **The Colosseum's own bodies.**  Three of the Colosseum's opponents are dealt
 by no random or event group (`where`: every group's formations read from the
@@ -177,7 +179,7 @@ The fighter's weapon is the key a player picks by picking who fights.
 |---|---|---|---|---|---|
 | Siegfried (the impostor) `$037` | 53 / 32,760 | weak to every element | 6 | Spear, Katana | a swordsman: steel answers steel |
 | Chupon (the Colosseum's) `$040` | 53 / 50,305 | weak ice, water; absorbs fire | 0 (no gauge) | — | the wager the Colosseum will not take; it sneezes the fighter out |
-| SrBehemoth (the Colosseum's) `$07F` | 49 / 19,000 | weak fire, holy; absorbs poison | 6 | Dagger, Arcane | the dead beast: horn and bone (the Veldt cave's row is Spear, Fist now) |
+| SrBehemoth (the Colosseum's) `$07F` | 49 / 19,000 | weak fire, holy; absorbs poison | 6 | Ranged, Spear | the dead beast: horn and bone (the Veldt cave's row is Dagger, Blunt now) |
 
 The Colosseum's other 26 floor opponents (Dueller, Fortis, Innoc, Didalos,
 Vectagoyle, Veteran, Steroidite and the rest) are dealt in the World of
@@ -287,14 +289,14 @@ taken as a loss, logged, and the route goes on.
 ## 5. SHADOW's kit and the endgame gear economy
 
 **SHADOW's kit (#383)** is in kits.md "Shadow": the eight throwing items
-behind Throw, learned by acquisition; the skeans are Dagger; the smoke (Shadow
+behind Throw, learned by acquisition; the skeans are Ranged; the smoke (Shadow
 Edge, Image) and the exit (Inviz Edge, Vanish) reach one more ally per boost
 point.
 
 `battle_shadowkit` (from the leg's end state) plays one battle on the plain
 by Maranda through the real menu: a Fire Skean at 0 BP lands a class chip on
 a Dagger-keyed body (Ot6ClassChip's store under the throw, the attack class
-Dagger); the smoke at 0 BP returns the mask SHADOW alone, and nobody else
+Dagger; the skeans are Ranged since #566); the smoke at 0 BP returns the mask SHADOW alone, and nobody else
 gains Image; the exit at 1 BP SHADOW and the next ally, both vanished; the
 smoke at 2 BP SHADOW and the next two it can land on, the vanished ally
 passed over, each doubled.  Lab `sk3`: "masks 1, 3 and 13", PASS (frame
@@ -309,7 +311,7 @@ ff6-en.dbg") and on three ROM mutants: no reach (`mutTR`: "mask: got 1, want
 
 The driver kept its lines (SHADOW's Fight, and the elemental skean line).
 A sweep line, a skean whenever two or more standing bodies show pierce (the
-four-class key; Dagger or Spear today), was
+four-class key; Dagger, Spear or Ranged today), was
 A/B'd from the leg's end state over four fights a run at seed shifts 0, 3,
 7, 11, 13 and 19 (px13): the Crawler trio took a median 3101 ticks over 15
 keys with it, 2856 over 14 without (`fight_report_abon.txt`,

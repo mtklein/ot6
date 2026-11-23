@@ -3595,7 +3595,7 @@ UmaroAttack_02:
         lda     #$02
         trb     $b2
         jsl     Ot6UmaroCharge  ; ot6 #380: `lda #$23 / sta $b5`, and the
-                                ;   bludgeoning class (ot6_umaro.asm)
+                                ;   blunt class (ot6_umaro.asm)
         jmp     ExecAttack
 
 ; ------------------------------------------------------------------------------
@@ -3650,7 +3650,7 @@ UmaroAttack_00:
         lda     #$ff
 @16eb:  sta     $11a6
         jsl     Ot6UmaroThrow   ; ot6 #380: `lda #$24 / sta $b5`, and the
-                                ;   bludgeoning class (ot6_umaro.asm)
+                                ;   blunt class (ot6_umaro.asm)
         lda     #$20
         tsb     $11a2
         lda     #$02
@@ -7159,9 +7159,9 @@ LIFE3_MP_VANILLA   = 50                 ; the byte this replaces
 ; ---- override 7: Quadra Slice ($5b) element, none -> wind (#379) -----------
 ; Cyan's 2-BP row at full kit, four strikes at random targets (special $32).
 ; kits.md's chip column has carried it as wind x4 since the kits were
-; planned: Quadra Slam is his four-strike slash, and Quadra Slice the same
-; four strikes on another axis, so his late window holds a slash key and a
-; wind key rather than two slash keys.  With the element set, the skill
+; planned: Quadra Slam is his four-strike katana, and Quadra Slice the same
+; four strikes on another axis, so his late window holds a katana key and a
+; wind key rather than two katana keys.  With the element set, the skill
 ; leaves Ot6SkillClassTbl (ot6_class.asm): its element is its probe, as for
 ; AuraBolt's holy.  The element also moves its damage the way any wind
 ; attack's does (double on a wind-weak body, none on a wind-immune one,

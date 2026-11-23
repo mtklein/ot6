@@ -35,13 +35,14 @@ quoted from a retained log under `build/attempts/locke-solo-lab/` (the
 batch runner keeps every attempt; `tools/tests/sfigarolab_aggregate.py` (deleted in 8d350a73; last version at 68b1cad1)
 printed them all).
 
-> Weapon classes: v0.51 replaced the four classes this document was written
-> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
-> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
-> keys below are the present ones. Quoted logs, dated measurements and
-> "before" columns keep the words they were recorded in: slash is now Sword
-> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
-> or Dagger.
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Blunt, Ranged
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are the
+> present ones. Quoted logs, dated measurements and "before" columns keep
+> the words they were recorded in: slash is now Sword or Katana, pierce
+> Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged or
+> Blunt.
 
 **The `build/attempts/locke-solo-lab/` tree is gone** (#222): it lived in
 the agent worktree this work was done in and went with it.  Every path
@@ -87,7 +88,7 @@ map-75 reload).
 |---|---|---|
 | HeavyArmor $09F | L13, HP 495, MP 150, speed 40, atk 53, hit 100, def 150, mdef 110, mpow 11 | `monster_prop.dat` +$13E0 |
 | weakness | `$84` = bolt \| water; no absorb, no null | `monster_prop.dat` +25/+23/+24 |
-| shields | 3, Dagger\|Katana (SLASH\|PIERCE when measured; LOCKE's Dirk is Dagger: every Fight chips) | `Ot6ShieldTbl`, `ot6_hud.asm:1645` |
+| shields | 3, Dagger (SLASH\|PIERCE when measured; LOCKE's Dirk is Dagger: every Fight chips) | `Ot6ShieldTbl`, `ot6_hud.asm:1645` |
 | **run bit** | special status 2 (+19) = `$00`: bit 3 clear, the fight **can** be run from | `battle_main.asm:7647` copies +19 to `$3c80,y`; `UpdateMonsterGfxBuf` (`:15631-15635`) `lda $3c88,y / lsr / bit #$04 / tsb $b1` sets the can't-run flag from its bit 3; measured: L+R escapes in ~560 frames, 3/3 seeds |
 | formation flags | `battle_prop.dat[64]` = `43 00 00 00`: `$2f48` = `$0043 ^ $00f0` = `$00b3`, no pincer bit; `$2f4b` = 0 | `LoadBattleProp`, `battle_main.asm:8210-8220` |
 | AI, fewer than 4 characters | `attack BATTLE` / `wait` / `attack BATTLE, TEK_LASER, SPECIAL` | `ai_script.asm:341-356` |

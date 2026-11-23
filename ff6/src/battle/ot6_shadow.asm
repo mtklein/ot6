@@ -4,9 +4,9 @@
 ; kits.md "Shadow": his eight skills are the eight throwing items, learned by
 ; acquisition as Edgar's Tools are, behind Throw, his signature; his divine is
 ; Assassinate (ot6_divine.asm).  Six of the eight deal damage and carry a key:
-; the three stars by Ot6WeapClassTbl (pierce, thrown as weapons through
+; the three stars by Ot6WeapClassTbl (ranged, thrown as weapons through
 ; CalcItemEffect), the Fire Skean, Water Edge and Bolt Edge by their element
-; and, since #383, by Ot6SkillClassTbl (pierce: they resolve as the spells
+; and, since #383, by Ot6SkillClassTbl (ranged: they resolve as the spells
 ; $51-$53, ThrowToolsOffsetTbl).  A boost multiplies all six (Ot6BoostDmg).
 ;
 ; The other two are the tricks, which deal no damage, so a multiplier bought

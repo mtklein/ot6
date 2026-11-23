@@ -160,7 +160,7 @@ done:   plp
 ; [ Cleave strips four shields off each death-immune body it strikes ]
 ;
 ; #388 (the TLM's call, 2026-11-09): against a boss Cleave was one power-255
-; cut and one slash chip for a full bank, which a keyed 3-BP Fight out-earns.
+; cut and one katana chip for a full bank, which a keyed 3-BP Fight out-earns.
 ; Now each death-immune body in the record's target mask also loses four
 ; shields, Break's 3-BP ceiling (Ot6BreakChips), whatever its keys, the
 ; way Shadow's Assassinate makes a full boost pay against what it cannot
@@ -380,7 +380,7 @@ done:   ply
 ; offered at three points pending only: the list greys it under three and
 ; the A button refuses it (Ot6BushidoRowGrey's blitz arm, the same grey
 ; Master's Mark and Jackpot take).  At three it is the Blitz row at the full
-; boost: four bludgeon blows (Ot6HitCountTbl +3), each at Ot6BoostDmg's x8,
+; boost: four blunt blows (Ot6HitCountTbl +3), each at Ot6BoostDmg's x8,
 ; for 99 MP (Ot6BoostPriceFor's cap; the row's base is the 99 ceiling).
 ;
 ; A Blitz commits from the list with no target select, so SABIN's own pick
@@ -420,12 +420,12 @@ done:   ply
 ; [ Bum Rush: each blow takes a shield, whatever the body's keys ]
 ;
 ; #388's second call (the TLM's, 2026-11-10): as built, Bum Rush's four blows
-; chipped only a body that keys bludgeon, so at a boss whose shields take no
+; chipped only a body that keys blunt, so at a boss whose shields take no
 ; blow (Doom) the keyed 3-BP Fight out-earned it.  Now each landed blow takes
 ; one shield, keyless like OT6's Break: one Bum Rush strips four, so it breaks
 ; a body at four or fewer shields, and the blows after the break land Broken
 ; (Ot6BrokenDmg doubles them; the breaking blow lands shielded, #542).  A body that keys
-; bludgeon loses its shield to the class chip instead (Ot6ClassChip, which
+; blunt loses its shield to the class chip instead (Ot6ClassChip, which
 ; also reveals the key), so a blow never takes two.  The gates are the class
 ; chip's: a monster target, not Broken (Ot6TakeShields), not wounded or
 ; petrified, not a resolved heal; and the attack is Bum Rush ($3410, set at
