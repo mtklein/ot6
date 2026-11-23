@@ -10,7 +10,7 @@
 -- section: that every body in it is authored rather than falling through
 -- to the floor, that every formation is answerable by some buildable
 -- party, that the one formation which demands a blunt weapon is the one
--- the design says it is, and that slash is not the automatic answer.
+-- the design says it is, and that a blade is not the automatic answer.
 
 -- ROM addressing.  HiROM PRG file offset = SNES addr - $C00000 (school.lua
 -- documents the same mapping).  From the link map:
@@ -21,7 +21,8 @@
 --   ot6_code        F00000  -> $300000   (Ot6ShieldTbl, self-located below)
 
 local PRG = emu.memType.snesPrgRom
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local EDGE = SWORD | KATANA             -- a blade of either kind (the four classes' slash)
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
 
 local MPROP, MREC = 0x0F0000, 32
@@ -43,10 +44,12 @@ end
 local function classStr(m)
   if m == 0 then return "(none)" end
   local s = ""
-  if m & SLASH   ~= 0 then s = s .. "slash "  end
-  if m & PIERCE  ~= 0 then s = s .. "pierce " end
-  if m & BLUDG   ~= 0 then s = s .. "bludg "  end
-  if m & SPECIAL ~= 0 then s = s .. "special " end
+  if m & SWORD  ~= 0 then s = s .. "sword "  end
+  if m & DAGGER ~= 0 then s = s .. "dagger " end
+  if m & SPEAR  ~= 0 then s = s .. "spear "  end
+  if m & KATANA ~= 0 then s = s .. "katana " end
+  if m & FIST   ~= 0 then s = s .. "fist "   end
+  if m & ARCANE ~= 0 then s = s .. "arcane " end
   return (s:gsub("%s+$", ""))
 end
 
@@ -96,14 +99,14 @@ check(shieldRows >= 70, string.format(
 -- beside the row.
 local want = {
   { 0x00cb, 2, SPEAR | FIST, "garm (magitek quadruped, entrance)" },
-  { 0x00c7, 2, DAGGER,         "commando (imperial line keeps pierce)" },
+  { 0x00c7, 2, DAGGER,         "commando (imperial line keeps a point)" },
   { 0x0165, 2, FIST,           "protoarmor (sealed suit, no seam)" },
   { 0x0041, 2, SPEAR,          "pipsqueak (the x5 swarm; AutoCrossbow)" },
   { 0x0047, 2, FIST,           "flan (you cannot cut an ooze)" },
   { 0x0066, 2, DAGGER | FIST, "general (officer in plate)" },
   { 0x002d, 2, FIST,           "trapper (a device; you smash it)" },
   { 0x00a0, 2, DAGGER | FIST, "chaser (1202 hp, on the escape map)" },
-  { 0x0088, 2, DAGGER | KATANA, "gobbler (the area's deliberate slash target)" },
+  { 0x0088, 2, DAGGER | KATANA, "gobbler (the area's deliberate blade target)" },
   { 0x0075, 2, FIST,           "rhinox (THE FLAGSHIP: bludgeon alone)" },
   { 0x0006, 2, FIST,           "mag roader $006 (minecart)" },
   { 0x00af, 2, FIST,           "mag roader $0af (minecart)" },
@@ -188,18 +191,21 @@ end
 -- is not yet active and Setzer is flying the getaway).  These are the
 -- classes each brings for free, from the joining kit and abilities only,
 -- with no shop trip:
---   Locke  swords + daggers            slash|pierce
---   Celes  swords + daggers            slash|pierce
---   Edgar  spears + Tools, Chain Saw   slash|pierce
---   Sabin  claws / fists + Blitz       slash|bludg
---   Cyan   katanas + all 8 SwdTechs    slash
---   Gau    bare fists ($ff -> BLUDG)   bludg
--- Classes from ot6_class.asm:10-13, weapon bytes Ot6WeapClassTbl:46, ability
--- bytes Ot6SkillClassTbl:184-196.
-local LOCKE, CELES = SLASH | PIERCE, SLASH | PIERCE
+--   Locke  swords + daggers            sword|dagger
+--   Celes  swords + daggers            sword|dagger
+--   Edgar  spears + Tools, Chain Saw   sword|spear   (his swords and the Chain Saw; his spears,
+--                                                    the AutoCrossbow and the Drill)
+--   Sabin  claws / fists + Blitz       fist
+--   Cyan   katanas + all 8 SwdTechs    katana
+--   Gau    bare fists ($ff -> FIST)    fist
+-- Classes from ot6_class.asm's constants, weapon bytes Ot6WeapClassTbl, ability
+-- bytes Ot6SkillClassTbl.  No one of the six holds an arcane hand: the rods,
+-- brushes, cards and dice are STRAGO's, RELM's and SETZER's, and a returning arc
+-- (the Full Moon, the Boomerang) is a shop trip.
+local LOCKE, CELES = SWORD | DAGGER, SWORD | DAGGER
 local PICKS = {
-  { "Edgar", SLASH | PIERCE }, { "Sabin", SLASH | BLUDG },
-  { "Cyan",  SLASH },          { "Gau",   BLUDG },
+  { "Edgar", SWORD | SPEAR }, { "Sabin", FIST },
+  { "Cyan",  KATANA },        { "Gau",   FIST },
 }
 local parties = {}
 for a = 1, #PICKS do
@@ -222,14 +228,15 @@ local function formationKeys(f)
 end
 
 -- ------------------------------------------------- reachability, the real one
--- "No encounter chippable only by a class no party can field."  Setzer's Cards
--- are the game's only ¤ source and he is flying the getaway, so a formation
--- whose only key is ¤ would be unbreakable for this whole section.
+-- "No encounter chippable only by a class no party can field."  Arcane (¤) is
+-- the one class none of the six holds: Setzer and his Cards are flying the
+-- getaway, and no rod or brush wielder has joined.  A formation whose only key
+-- is ¤ would be unbreakable for this whole section.
 do
   local bad = 0
   local function sweep(f, where)
     local keys = formationKeys(f)
-    if keys == 0 or keys == SPECIAL then
+    if keys == 0 or keys == ARCANE then
       bad = bad + 1
       emu.log(string.format(
         "breakvector: formation $%03X (%s) keys=%s -- no fieldable class",
@@ -263,66 +270,71 @@ do
 end
 
 -- --------------------------------------------------- the one deliberate cost
--- Formation $168 (Rhinox x2) is the section's single hard demand: bludgeon or
--- nothing.  Asserted from both sides so it stays intentional:
---   * it is bludgeon-only on the class axis, and
+-- Formation $168 (Rhinox x2) is the section's single hard demand: the fist
+-- (the four classes' bludgeon, as SABIN and GAU hold it) or nothing.  Asserted
+-- from both sides so it stays intentional:
+--   * it is fist-only on the class axis, and
 --   * no element substitutes, because Rhinox has no vanilla weakness at all
 --     and absorbs bolt, the element the rest of the facility teaches.
 do
   local keys = formationKeys(0x168)
-  check(keys == BLUDG, string.format(
-    "formation $168 (Rhinox x2) is bludgeon-only on the class axis (keys=%s)",
+  check(keys == FIST, string.format(
+    "formation $168 (Rhinox x2) is fist-only on the class axis (keys=%s)",
     classStr(keys)))
   check(rb(MPROP + 0x0075 * MREC + OFF_WEAK) == 0x00,
     "rhinox $075 has NO vanilla element weakness -- the class row is its "
     .. "entire break axis")
   check(rb(MPROP + 0x0075 * MREC + OFF_ABSORB) & BOLT ~= 0,
     "rhinox $075 ABSORBS bolt -- the area's taught element would heal it, "
-    .. "which is why bludgeon alone is legitimate here")
-  -- and that a party can pay it: Sabin or Gau bring bludgeon for free.
+    .. "which is why the fist alone is legitimate here")
+  -- and that a party can pay it: Sabin or Gau bring the fist for free.
   local payable = 0
   for _, p in ipairs(parties) do
-    if p.cls & BLUDG ~= 0 then payable = payable + 1 end
+    if p.cls & FIST ~= 0 then payable = payable + 1 end
   end
   check(payable == 5, string.format(
-    "%d of the 6 free four-parties already hold bludgeon (the sixth, "
-    .. "Edgar+Cyan, buys a Flail or Full Moon in any of four towns)", payable))
+    "%d of the 6 free four-parties already hold the fist (the sixth, "
+    .. "Edgar+Cyan, buys a Flail; the Full Moon is arcane now)", payable))
 end
 
 do
+  -- the shares, like for like with the four classes: a blade of either kind
+  -- (sword or katana) for slash, a point of either kind (dagger or spear) for
+  -- pierce, and the fist alone for bludgeon (an arcane key is one this
+  -- section's parties cannot field, so it does not count toward the blow)
   local slashW, bludgW, pierceW, total = 0, 0, 0, 0
   for _, e in ipairs(randForms) do
     local keys = formationKeys(e.f)
     total = total + e.w
-    if keys & SLASH  ~= 0 then slashW  = slashW  + e.w end
-    if keys & PIERCE ~= 0 then pierceW = pierceW + e.w end
-    if keys & BLUDG  ~= 0 then bludgW  = bludgW  + e.w end
+    if keys & EDGE ~= 0 then slashW = slashW + e.w end
+    if keys & (DAGGER | SPEAR) ~= 0 then pierceW = pierceW + e.w end
+    if keys & FIST ~= 0 then bludgW = bludgW + e.w end
   end
   emu.log(string.format(
-    "breakvector: key share (equal-map) slash %.2f%% pierce %.2f%% bludg %.2f%%",
+    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% fist %.2f%%",
     100 * slashW, 100 * pierceW, 100 * bludgW))
   print(string.format(
-    "breakvector: key share (equal-map) slash %.2f%% pierce %.2f%% bludg %.2f%%",
+    "breakvector: key share (equal-map) blades %.2f%% points %.2f%% fist %.2f%%",
     100 * slashW, 100 * pierceW, 100 * bludgW))
   check(math.abs(total - 1.0) < 1e-6, string.format(
     "draw weights sum to 1.0 (got %.6f)", total))
   check(bludgW > slashW, string.format(
-    "bludgeon (%.2f%%) outranks slash (%.2f%%) as an area key -- slash is no "
+    "the fist (%.2f%%) outranks the blades (%.2f%%) as an area key -- a blade is no "
     .. "longer the automatic answer", 100 * bludgW, 100 * slashW))
   check(slashW < 0.35, string.format(
-    "slash keys only %.2f%% of draws (was 67.86%% under the generated floor)",
+    "a blade (sword or katana) keys only %.2f%% of draws (slash was 67.86%% under the generated floor)",
     100 * slashW))
 end
 
--- Group 106 specifically: the deep pool must not be uniformly slash again.
+-- Group 106 specifically: the deep pool must not be uniformly a blade's again.
 do
   local slashAll = true
   for i = 0, 3 do
     local f = rw(RANDGRP + 106 * 8 + i * 2)
-    if formationKeys(f) & SLASH == 0 then slashAll = false end
+    if formationKeys(f) & EDGE == 0 then slashAll = false end
   end
   check(not slashAll,
-    "group 106 (maps 271/273, the deep facility) is not 100% slash-keyed -- "
+    "group 106 (maps 271/273, the deep facility) is not 100% blade-keyed -- "
     .. "the exact monoculture the generated floor produced there")
 end
 
@@ -349,7 +361,7 @@ do
 end
 
 if fails == 0 then
-  emu.log("breakvector: Vector area authored, reachable and no longer slash-led - PASS")
+  emu.log("breakvector: Vector area authored, reachable and no longer blade-led - PASS")
   print("breakvector: PASS")
   emu.stop(0)
 else

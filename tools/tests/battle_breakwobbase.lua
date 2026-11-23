@@ -2,9 +2,11 @@
 -- battle_breakwobbase.lua -- the Imperial Base's guard fights' authored break rows, re-verified from the shipped
 -- ROM (the battle_breakgate discipline): the three species carry their Ot6ShieldTbl rows, and both guard
 -- formations (416, 417) are chippable by the party that first meets them, EDGAR, SABIN, LOCKE and CELES after the
--- Opera (pierce: the pikes and daggers; slash: the blades; bludg: SABIN's blitzes).  docs/design/wob-towns-boxes.md
+-- Opera (the pikes, spear; the daggers; the blades, sword; SABIN's blitzes, fist).  docs/design/wob-towns-boxes.md
 -- section 1 is the design these numbers come from.
 local H = dofile("tools/tests/lib/ot6.lua")
+
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 
 local WANT = {                    -- species -> { shields, class mask }
   [0x0C7] = { 2, DAGGER },          -- commando: dagger
@@ -12,7 +14,7 @@ local WANT = {                    -- species -> { shields, class mask }
   [0x102] = { 3, SPEAR | FIST },    -- mega armor: spear|fist
 }
 local FORMS = { 416, 417 }
-local PARTY_CLASSES = 0x01 | 0x02 | 0x04   -- slash+pierce+bludg on hand
+local PARTY_CLASSES = SWORD | DAGGER | SPEAR | FIST   -- the party's hands
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),

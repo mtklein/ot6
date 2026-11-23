@@ -15,7 +15,7 @@
 --      132 (the Ice Dragon) and 152 (the Pugs' chest) -- has an authored
 --      row, and every gauged one a key for the hands that meet it, but the
 --      one declared lesson: the Test Rider in town before MOG joins;
---   3. the lessons: MOG's spear (pierce) is the Test Rider's only key and
+--   3. the lessons: MOG's spear is the Test Rider's only key and
 --      the Ice Dragon's class key (its keys are the spear and TERRA's fire,
 --      not the blades); each of the four holds a key on Tritoch and Umaro;
 --      every boss absorbs ice and is weak to fire; the Psychot absorbs fire; Tritoch's record $144 carries a real
@@ -23,7 +23,7 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
@@ -49,13 +49,14 @@ local WANT = {
 
 -- the hands (route-wor-narshe.md 5.4, 6): the three who walk into Narshe
 -- (wor-cyan-v1's kit: TERRA knows Fire and Quake, CELES Ice, CYAN's
--- Tempest is wind), MOG's spear with them once he joins, and UMARO's club
--- and Storm on the plain at the end with MOG, TERRA and CELES
-local TERRA = { "TERRA", SLASH, FIRE | EARTH }
-local CELES = { "CELES", SLASH, ICE }
-local CYAN  = { "CYAN", SLASH, WIND }
-local MOG   = { "MOG", PIERCE, 0 }
-local UMARO = { "UMARO", BLUDG, ICE }
+-- Tempest is wind; TERRA's and CELES's blades are swords, CYAN's a katana),
+-- MOG's spear with them once he joins, and UMARO's club (fist) and Storm on
+-- the plain at the end with MOG, TERRA and CELES
+local TERRA = { "TERRA", SWORD, FIRE | EARTH }
+local CELES = { "CELES", SWORD, ICE }
+local CYAN  = { "CYAN", KATANA, WIND }
+local MOG   = { "MOG", SPEAR, 0 }
+local UMARO = { "UMARO", FIST, ICE }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
@@ -208,8 +209,8 @@ H.run({ maxFrames = 600 }, {
 
     -- 3. the lessons
     local RIDER, DRAGON, TRITOCH, UMAROSP = 0x09C, 0x149, 0x144, 0x110
-    if classOf(RIDER) ~= PIERCE then problem("$09C: the Test Rider's only class key is not pierce") end
-    if (classOf(DRAGON) & PIERCE) == 0 then problem("$149: MOG's spear (pierce) does not key the Ice Dragon") end
+    if classOf(RIDER) ~= SPEAR then problem("$09C: the Test Rider's only class key is not MOG's spear") end
+    if (classOf(DRAGON) & SPEAR) == 0 then problem("$149: MOG's spear does not key the Ice Dragon") end
     for _, sp in ipairs({ DRAGON, TRITOCH, UMAROSP }) do
       if (absorb(sp) & ICE) == 0 then problem("$%03X no longer absorbs ice", sp) end
       if (weakOf(sp) & FIRE) == 0 then problem("$%03X is not weak to fire", sp) end

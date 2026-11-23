@@ -17,7 +17,7 @@
 -- species classes, so it survives future data shifts.
 
 local PRG = emu.memType.snesPrgRom
-local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local fails = 0
 
 local function rb(off) return emu.read(off, PRG) end
@@ -39,9 +39,11 @@ local function check(cond, msg)
   emu.log(string.format("breakfloor: %s %s", cond and "OK  " or "FAIL", msg))
 end
 
--- anchor: species 0..15 classes (guard/soldier/templar pierce, ninja and
--- samurai slash, orog bludgeon, and so on), a distinctive 16-byte run
--- (verified unique in [300000,310000) at authoring time).
+-- anchor: species 0..15 classes (the guard a spear, the soldier and the
+-- templar daggers, the ninja a katana, the samurai a sword, the orog a fist,
+-- and so on: the classifier's slash, pierce and bludgeon, each split in two
+-- by six_class_split.json), a distinctive 16-byte run (unique in
+-- [300000,310000) on the six-class ROM, #566).
 local base = find(
   { SPEAR, DAGGER, DAGGER, KATANA, SWORD, FIST, KATANA, SPEAR,
     KATANA, SWORD, SWORD, FIST, KATANA, SWORD, KATANA, SWORD },
@@ -57,10 +59,10 @@ emu.log(string.format("breakfloor: OT6_FLOOR_CLASS @%06X", base))
 -- floor[species] the classifier chose: one per class bit, plus a beast
 -- default.  These are the bytes the @formula seed reads as the fallback mask.
 local want = {
-  [0]  = { SPEAR, "guard (armored -> pierce)" },
-  [36] = { SPEAR, "white drgn (pierce)" },
-  [71] = { FIST,   "flan (soft body -> bludgeon)" },
-  [19] = { SWORD,  "were-rat (beast default -> slash)" },
+  [0]  = { SPEAR, "guard (armored -> pierce: the spear)" },
+  [36] = { SPEAR, "white drgn (pierce: the spear)" },
+  [71] = { FIST,   "flan (soft body -> bludgeon: the fist)" },
+  [19] = { SWORD,  "were-rat (beast default -> slash: the sword)" },
 }
 for species, w in pairs(want) do
   local got = rb(base + species)
@@ -71,7 +73,7 @@ end
 -- every floor byte must name at least one breakable class; that is what the
 -- floor is for, so that no un-authored species is left with a zero class
 -- mask, which would make it unbreakable.  Sweep all 384 species.
-local ANY = SLASH | PIERCE | BLUDG
+local ANY = SWORD | DAGGER | FIST | ARCANE | KATANA | SPEAR
 local zeros = 0
 for species = 0, 383 do
   local got = rb(base + species)

@@ -8,16 +8,17 @@
 --      no Ot6ElemAddTbl row;
 --   2. every species of every formation the tower's twenty pool groups and eight event battles deal has an authored
 --      row, and a key for each party whose lane meets it (LANES);
---   3. the lessons: the factory's machines turn the blades (no slash) and take the point and the blow (pierce and
---      bludgeon) and bolt; the three statues each take the brush and the cards (special), and between them every
---      other hand (slash, pierce, bludgeon); the Guardian the tower fights ($112) has a gauge, and the World of
+--   3. the lessons: the factory's machines turn the blades (no sword, no katana) and take a point and a blow (a
+--      dagger or a spear, and a fist or a rod) and bolt; the three statues each take the brush and the cards
+--      (arcane), and between them a blade (sword or katana), a point (dagger or spear) and the fist, the three
+--      other hands of the four classes; the Guardian the tower fights ($112) has a gauge, and the World of
 --      Balance's ($111) still has none.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
-local PB = PIERCE | BLUDG
+local EDGE, POINT, BLOW = SWORD | KATANA, DAGGER | SPEAR, FIST | ARCANE
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
@@ -62,22 +63,24 @@ local EVENTS = { 98, 99, 100, 112, 114, 135, 136, 140 }
 -- the three parties the route seats (route-wor-kefka-tower.md section 4) and the lanes they walk (section 2): the
 -- pool groups and event battles each meets, the class keys its weapons hold and the elements its spells, skeans
 -- and lores reach at wor-desert-v1.  A species keys a party when either meets it.
---   party 1: TERRA (a blade; Fire, Ice, Bolt), RELM (a rod), EDGAR (a knife), SETZER (cards): the north-west,
+--   party 1: TERRA (a blade: sword; Fire, Ice, Bolt), RELM (a rod: arcane), EDGAR (a knife: dagger), SETZER
+--            (cards: arcane): the north-west,
 --            303, 304, 292, the machines' hall 352, 295; the chamber's east column, the Goddess (354)
---   party 2: CELES (a blade; Ice), STRAGO (a rod; Aqua Rake), LOCKE (the Wing Edge), MOG (a spear): 338, 331
+--   party 2: CELES (a blade: sword; Ice), STRAGO (a rod: arcane; Aqua Rake), LOCKE (the Wing Edge, a returning
+--            arc: arcane), MOG (a spear): 338, 331
 --            (Atma), 329, 409, 292, 294, 335 (the Gold Dragon), 354; the chamber's middle, Guardian (291), 287,
 --            the Poltergeist (334)
---   party 3: CYAN (katanas), SHADOW (the Striker; his skeans fire, water, bolt), SABIN (claws; fire, holy), GOGO (a
---            knife): 339, the factory 410 (Inferno), 296, 293, 354 (the Skull Dragon); the chamber's west
+--   party 3: CYAN (katanas), SHADOW (the Striker: katana; the stars and skeans he throws: dagger, the skeans fire,
+--            water, bolt), SABIN (claws: fist; fire, holy), GOGO (a knife: dagger): 339, the factory 410 (Inferno), 296, 293, 354 (the Skull Dragon); the chamber's west
 --            column, Doom (355)
 -- The chamber's gate switches shut each column behind the party that enters it, so the order the weights fall
 -- in sets the lanes (route-wor-kefka-tower.md section 2): party 1 east, party 3 west, party 2 the middle.
 local LANES = TOWER_LANES or {
-  { "party 1", SLASH | BLUDG | PIERCE | SPECIAL, FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
+  { "party 1", SWORD | ARCANE | DAGGER, FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
     226 }, { 99 } },
-  { "party 2", SLASH | BLUDG | PIERCE, ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
+  { "party 2", SWORD | ARCANE | SPEAR, ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
     { 112, 135, 140, 100 } },
-  { "party 3", SLASH | PIERCE, FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
+  { "party 3", KATANA | DAGGER | FIST, FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
     { 114, 136, 98 } },
 }
 
@@ -192,18 +195,20 @@ H.run({ maxFrames = 600 }, {
     -- 3. the lessons
     for _, sp in ipairs(MACHINES) do
       local nm = WANT[sp][1]
-      if (classOf(sp) & SLASH) ~= 0 then problem("$%03X %s: a machine the blades (slash) key", sp, nm) end
-      if (classOf(sp) & PB) ~= PB then problem("$%03X %s: a machine not keyed by the point and the blow", sp, nm) end
+      if (classOf(sp) & EDGE) ~= 0 then problem("$%03X %s: a machine the blades (sword, katana) key", sp, nm) end
+      if (classOf(sp) & POINT) == 0 or (classOf(sp) & BLOW) == 0 then
+        problem("$%03X %s: a machine not keyed by a point (dagger, spear) and a blow (fist, rod)", sp, nm)
+      end
       if (weakOf(sp) & BOLT) == 0 then problem("$%03X %s: a machine Bolt does not key", sp, nm) end
     end
     local hands = 0
     for _, sp in ipairs(STATUES) do
-      if (classOf(sp) & SPECIAL) == 0 then problem("$%03X %s: a statue the brush and cards (special) do not key", sp,
+      if (classOf(sp) & ARCANE) == 0 then problem("$%03X %s: a statue the brush and cards (arcane) do not key", sp,
         WANT[sp][1]) end
       hands = hands | classOf(sp)
     end
-    if (hands & (SLASH | PIERCE | BLUDG)) ~= (SLASH | PIERCE | BLUDG) then
-      problem("the three statues together key class mask $%02X, want every hand", hands)
+    if (hands & EDGE) == 0 or (hands & POINT) == 0 or (hands & FIST) == 0 then
+      problem("the three statues together key class mask $%02X, want a blade, a point and the fist beside arcane", hands)
     end
     if shield[0x111] == nil or shield[0x111][1] ~= 0 then problem("$111 Guardian (the WoB's): not shieldless") end
     H.log("the lessons: the machines turn the blades and take the point, the blow and bolt; each statue takes the "

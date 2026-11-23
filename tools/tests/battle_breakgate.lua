@@ -3,9 +3,12 @@
 -- re-verified from the shipped ROM (the battle_breakvector discipline):
 -- every cave species carries its authored Ot6ShieldTbl row, and every
 -- formation the maps 382-386 can draw is chippable by the mission
--- party's classes (slash/pierce/bludg).  docs/design/break-coverage-gate.md
+-- party's classes (TERRA's and EDGAR's blades, sword; LOCKE's daggers; EDGAR's
+-- AutoCrossbow, spear; SABIN's fists).  docs/design/break-coverage-gate.md
 -- is the survey these numbers came from.
 local H = dofile("tools/tests/lib/ot6.lua")
+
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 
 local WANT = {                    -- species -> { shields, class mask }
   -- audit_break_coverage.py's break-dark findings (kolts + zozo):
@@ -20,7 +23,7 @@ local WANT = {                    -- species -> { shields, class mask }
   [0x048] = { 3, SPEAR | FIST },    -- shelled tank: spear|fist
   [0x082] = { 4, SWORD | ARCANE },  -- brute: sword|arcane
 }
-local PARTY_CLASSES = 0x01 | 0x02 | 0x04   -- slash+pierce+bludg on hand
+local PARTY_CLASSES = SWORD | DAGGER | SPEAR | FIST   -- the mission party's hands
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),

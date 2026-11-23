@@ -18,14 +18,14 @@
 --      (CYAN, TERRA, CELES), the four on the plains (TERRA, CELES, RELM,
 --      STRAGO), and inside the tower the same four's spells only (no
 --      class: the tower is magic-only);
---   3. the lessons: the Mantodea takes RELM's brush (special); L.20 and
+--   3. the lessons: the Mantodea takes RELM's brush (arcane); L.20 and
 --      L.70 Magic start with Reflect and their key is earth (Quake, which
 --      Reflect does not bounce); the Holy Dragon has no weakness and no
 --      Reflect (OT6's Break is its key); the goddess carries no gauge.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, elements added }
@@ -59,13 +59,14 @@ local WANT = {
 
 -- the hands (route-wor-thamasa.md 4, 5.5, 6): Owzer's three (wor-narshe-v1's
 -- kit: TERRA's natural Fire and Pearl, CELES's Ice and Tritoch's Ice, Bolt
--- and Poison, CYAN's Ifrit), the four on the plains with RELM's brush and
--- STRAGO's rod, and the same four's spells in the tower (TERRA's Quake too)
-local TERRA  = { "TERRA", SLASH, FIRE | HOLY | EARTH }
-local CELES  = { "CELES", SLASH, ICE | BOLT | POISON }
-local CYAN   = { "CYAN", SLASH, FIRE }
-local RELM   = { "RELM", SPECIAL, 0 }
-local STRAGO = { "STRAGO", BLUDG, WIND | WATER }
+-- and Poison, CYAN's Ifrit; TERRA's and CELES's blades are swords, CYAN's a
+-- katana), the four on the plains with RELM's brush and STRAGO's rod (both
+-- arcane), and the same four's spells in the tower (TERRA's Quake too)
+local TERRA  = { "TERRA", SWORD, FIRE | HOLY | EARTH }
+local CELES  = { "CELES", SWORD, ICE | BOLT | POISON }
+local CYAN   = { "CYAN", KATANA, FIRE }
+local RELM   = { "RELM", ARCANE, 0 }
+local STRAGO = { "STRAGO", ARCANE, WIND | WATER }
 local function union(what, list, magicOnly)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do
@@ -205,7 +206,7 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(0x0D2) & SPECIAL) == 0 then problem("$0D2: RELM's brush (special) does not key the Mantodea") end
+    if (classOf(0x0D2) & ARCANE) == 0 then problem("$0D2: RELM's brush (arcane) does not key the Mantodea") end
     for _, sp in ipairs({ 0x130, 0x143 }) do
       local mstat = H.readRomByte(prop + sp * 32 + 29)   -- MonsterProp +29: status 3 at start (bit 7 Reflect)
       if (mstat & 0x80) == 0 then problem("$%03X no longer starts with Reflect (MonsterProp+29 $%02X)", sp, mstat) end

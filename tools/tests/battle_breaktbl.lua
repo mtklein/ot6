@@ -15,7 +15,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")   -- only for H.sym address lookups
 
 local PRG = emu.memType.snesPrgRom
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
 local fails = 0
 
@@ -101,19 +101,19 @@ local want = {
   [0x005e] = { 2, FIST,           "actaneon (trench)" },
   -- the trench trio is Sabin + Cyan + Gau and none of them pierces: Gau's
   -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
-  -- hands read $ff -> OT6_BLUDG.
+  -- hands read $ff -> OT6_FIST.
   [0x0059] = { 2, FIST,           "aspik (trench) -- #23, was a dead PIERCE" },
   -- the floating continent's random pool (map 394): the FC party carries
-  -- RELM, whose brushes are special (weapon-classes.md), and special is a
-  -- common key (guidelines, #347): the three magic bodies take it; the
-  -- beasts, the dragons and the ninja do not
+  -- RELM, whose brushes are arcane (the special's ¤, weapon-classes.md), and
+  -- it is a common key (guidelines, #347): the three magic bodies take it;
+  -- the beasts, the dragons and the ninja do not
   [0x0020] = { 3, DAGGER | KATANA,          "behemoth (FC)" },
   [0x0083] = { 3, SPEAR | KATANA,           "dragon (FC)" },
-  [0x000c] = { 2, SWORD | SPEAR | ARCANE, "apokryphos (FC): a demon, special" },
-  [0x00a4] = { 2, SWORD | SPEAR | ARCANE, "misfit (FC): conjured, special" },
+  [0x000c] = { 2, SWORD | SPEAR | ARCANE, "apokryphos (FC): a demon, arcane" },
+  [0x00a4] = { 2, SWORD | SPEAR | ARCANE, "misfit (FC): conjured, arcane" },
   [0x0003] = { 2, SWORD | SPEAR,            "ninja (FC)" },
   [0x00d8] = { 2, SPEAR | KATANA,           "wirey drgn (FC)" },
-  [0x004a] = { 2, SWORD | SPEAR | ARCANE, "brainpan (FC): a mind, special" },
+  [0x004a] = { 2, SWORD | SPEAR | ARCANE, "brainpan (FC): a mind, arcane" },
 }
 for id, w in pairs(want) do
   local r = S[id]
@@ -135,8 +135,8 @@ check(E[0x0042] ~= nil and E[0x0042][1] == POISON, "m-tekarmor $0042 keeps poiso
 check(E[0x009f] ~= nil and E[0x009f][1] == POISON, "heavyarmor $009F keeps poison")
 
 -- the rows both tables opened with
-check(S[0x0000] ~= nil and S[0x0000][2] == PIERCE, "regression: guard $0000 pierce")
-check(S[0x0134] ~= nil and S[0x0134][2] == PIERCE, "regression: whelk head $0134 pierce")
+check(S[0x0000] ~= nil and S[0x0000][2] == SPEAR, "regression: guard $0000 spear (the TekMissile's class)")
+check(S[0x0134] ~= nil and S[0x0134][2] == SPEAR, "regression: whelk head $0134 spear (the TekMissile's class)")
 check(E[0x0134] ~= nil and E[0x0134][1] == FIRE, "regression: whelk head fire add")
 
 -- ------------------------------------------------------------------------
@@ -221,8 +221,8 @@ check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,
 --   row)?
 --
 -- The Shurikens the merchant already sold are not a key: item $41 is
--- OT6_PIERCE (ot6_class.asm:120), the shield row is OT6_BLUDG, and a
--- Shuriken throw has no element, so it is damage without a chip.
+-- OT6_DAGGER (ot6_class.asm, Ot6WeapClassTbl), the shield row is OT6_FIST,
+-- and a Shuriken throw has no element, so it is damage without a chip.
 --
 -- ShopProp is `.incbin shop_prop.dat` spliced at shop.asm.  PRG offsets
 -- come from the dbg symbols (& 0x3FFFFF maps HiROM CPU -> file) so bank-C4
@@ -275,11 +275,11 @@ do
   local weak = rb(MPROP + GHOSTTRAIN * MREC + OFF_WEAK)
   local add = E[GHOSTTRAIN] and E[GHOSTTRAIN][1] or 0
   local chippable = weak | add
-  -- the premise, pinned: 4 shields (6 until #400) behind bludgeoning, which is what makes
+  -- the premise, pinned: 4 shields (6 until #400) behind the fist (Pummel, Suplex), which is what makes
   -- Sabin the only chipper in a party of Sabin, Cyan and Shadow.
   local row = S[GHOSTTRAIN]
-  check(row ~= nil and row[1] == 4 and row[2] == BLUDG, string.format(
-    "GhostTrain $%04X row is 4 shields / OT6_BLUDG (got %s) -- the premise of "
+  check(row ~= nil and row[1] == 4 and row[2] == FIST, string.format(
+    "GhostTrain $%04X row is 4 shields / OT6_FIST (got %s) -- the premise of "
     .. "#74", GHOSTTRAIN,
     row and string.format("%d/%02X", row[1], row[2]) or "MISSING"))
   check(chippable ~= 0, string.format(
