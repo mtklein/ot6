@@ -8,18 +8,24 @@ Ranged; bludgeon -> Blunt or Ranged; special -> Ranged or Blunt), so a
 species keeps the NUMBER of weapon weaknesses it had (the two "any weapon
 breaks it" rows take all six).  The rule, in order:
 
-  1. PINNED (pins.py, sources "opening" and "wob"): the opening's rows are
-     authored by hand, and where a World of Balance break story names the
-     member whose weapon or skill is the key, the weakness becomes the class
-     that weapon carries.
+  1. OPENING (pins.py OPENING, docs/design/opening.md): the species the game
+     deals from the Narshe mines through Zozo are authored by hand, the whole
+     row at once, from the hands that really meet them.  Such a row may
+     change the number of weaknesses or name a class that is no child of the
+     old one; the report lists each that does ("OPENING DEPARTS").
+     PINNED (pins.py PIN, sources "wob"): elsewhere, where a World of Balance
+     break story names the member whose weapon or skill is the key, the
+     weakness becomes the class that weapon carries.
   2. FAMILY: Ultros's four records share one row.
   3. HOLDERS (owner, 2026-11-23: "we don't want just one particular character
      to be required to get through fights"): at each stage the route meets
      the species (stages.py), count the characters the player can field there
      who really hold one of the row's classes (classes.py SIGNATURE: signature
-     weapon or command, not "could equip").  A split is refused where that is
-     nobody, or one character the story does not force into the party; the
-     report lists every row where no split can meet it ("the rule binds").
+     weapon or command, not "could equip"; through the opening, what a new
+     player's hands hold there, stages.py HELD).  A split is refused where
+     that is nobody, or one character the story does not force into the
+     party; the report lists every row where no split can meet it ("the rule
+     binds"), the opening's authored rows included.
   4. ROUTE: of the splits left, keep those under which the fewest of the
      route's own fights against the species leave the party that fought it
      with no key in hand, then with none in its kit (hands, class-bearing
@@ -82,11 +88,64 @@ def base_file(path):
                           text=True).stdout
 
 
-def names_mask(names, magitek=False):
+def names_mask(names, magitek=False, first=None):
+    """the classes the named members really hold at a stage (its first leg)"""
     m = 0
     for n in names:
-        m |= C.KIND_CLASS["tekmissile"] if (magitek and n == "TERRA") else (0 if magitek else C.signature_mask(n))
+        if magitek:
+            m |= C.KIND_CLASS["tekmissile"] if n == "TERRA" else 0
+            continue
+        kinds = stages.held_kinds(first, n)
+        if kinds is None:
+            m |= C.signature_mask(n)
+        else:
+            for k in kinds:
+                m |= C.KIND_CLASS[k]
     return m
+
+
+def opening_row(old, kinds):
+    """An opening row authored whole: (mask, {old class: six-class bits},
+    [departures]).  Each new class goes to one old weakness: its parent's
+    where it has one in the row (CHILDREN), else an old weakness left with no
+    child; a new class with neither is a weakness a four-class save never
+    revealed, and stays '?' there."""
+    mask = 0
+    for k in kinds:
+        mask |= C.KIND_CLASS[k]
+    olds = [o for o in (S, P, B, X) if old & o]
+    kids, taken = {o: 0 for o in olds}, 0
+    for o in olds:                                  # each old weakness, its first-named child in the row
+        for c in CHILDREN[o]:
+            if mask & c and not taken & c:
+                kids[o], taken = c, taken | c
+                break
+    strangers = []
+    for c in ORDER:                                 # the row's other classes
+        if not mask & c or taken & c:
+            continue
+        parents = [o for o in olds if c in CHILDREN[o]]
+        if parents:
+            o = min(parents, key=lambda o: bin(kids[o]).count("1"))
+        else:
+            strangers.append(c)
+            orphans = [o for o in olds if not kids[o]]
+            if not orphans:
+                taken |= c
+                continue
+            o = orphans[0]
+        kids[o], taken = kids[o] | c, taken | c
+    departs = []
+    n_old, n_new = len(olds), bin(mask).count("1")
+    if n_new != n_old:
+        departs.append("%d -> %d weaknesses" % (n_old, n_new))
+    if strangers:
+        departs.append("%s no child of %s" % ("/".join(NEW_NAME[c] for c in strangers),
+                                              "|".join(OLD_NAME[o] for o in olds) or "nothing"))
+    lost = [o for o in olds if not any(mask & c for c in CHILDREN[o])]
+    if lost:
+        departs.append("%s has no child in the row" % "/".join(OLD_NAME[o] for o in lost))
+    return mask, kids, departs
 
 
 def route_evidence():
@@ -156,7 +215,7 @@ def holder_check(mask, fights, stage):
             continue
         done.add(st[0])
         first, roster, forced, magitek = st
-        real = {n for n in roster if names_mask([n], magitek) & mask}
+        real = {n for n in roster if names_mask([n], magitek, first) & mask}
         if magitek and not names_mask(roster, True):
             continue                    # in armor with no TekMissile: no weapon key to hold
         if not real:
@@ -168,14 +227,38 @@ def holder_check(mask, fights, stage):
     return bad
 
 
-def assign(masks, order, count, how, ev=None, stage=None, binds=None):
+def assign(masks, order, count, how, ev=None, stage=None, binds=None, departs=None):
     """Split masks[sp] for each sp in order; count is the running tally the
     balance reads (updated only when not None).  Returns ({sp: new mask},
-    {sp: {old class: six-class bits}})."""
+    {sp: {old class: six-class bits}}).  departs: a list to fill with the
+    opening's authored rows that change a count or leave the children (None:
+    this pass does not read pins.OPENING -- the floor's)."""
     out, kids_of = {}, {}
     ev, stage = ev or {}, stage or {}
     for sp in order:
         old = masks[sp]
+        if departs is not None and sp in pins.OPENING:
+            kinds, src = pins.OPENING[sp]
+            mask, kids, dep = opening_row(old, kinds)
+            fights = ev.get(sp, ())
+            rule = holder_check(mask, fights, stage) if mask else []
+            notes = ["authored: %s" % (", ".join("%s->%s" % (OLD_NAME[o], "|".join(
+                NEW_NAME[c] for c in ORDER if k & c) or "none") for o, k in kids.items()) or "no weapon weakness")]
+            if dep:
+                notes.append("DEPARTS: " + "; ".join(dep))
+                departs.append((sp, old, mask, dep))
+            if fights:
+                notes.append("route: %d fights, %d without a key in hand, %d without one in the kit" % (
+                    len(fights), sum(1 for f in fights if not f["hands"] & mask),
+                    sum(1 for f in fights if not f["kit"] & mask)))
+            if rule and binds is not None:
+                binds.append((sp, mask, rule))
+            out[sp], kids_of[sp], how[sp] = mask, kids, ", ".join(notes)
+            if count is not None:
+                for b in NEW_NAME:
+                    if mask & b:
+                        count[b] += 1
+            continue
         if sp in pins.FAMILY and pins.FAMILY[sp] in out:
             out[sp], kids_of[sp] = out[pins.FAMILY[sp]], kids_of[pins.FAMILY[sp]]
             how[sp] = "family of $%04x" % pins.FAMILY[sp]
@@ -192,7 +275,7 @@ def assign(masks, order, count, how, ev=None, stage=None, binds=None):
                     count[b] += 1
             continue
         kinds, src = pins.PIN.get(sp, ({}, ""))
-        hard = src.startswith("wob") or src.startswith("opening")
+        hard = src.startswith("wob")
         pin = {o: C.KIND_CLASS[k] for o, k in kinds.items() if old & o and hard}
         soft = {o: C.KIND_CLASS[k] for o, k in kinds.items() if old & o and not hard}
         olds = [o for o in (S, P, B, X) if old & o]
@@ -236,14 +319,14 @@ def compute():
     gbf = _load(ROOT / "ff6/tools/gen_break_floor.py", "gbf")
     names = gbf.load_names(str(ROOT / "ff6/src/text/monster_name_en.json"))
     gauged = sorted(sp for sp in held if rows.get(sp, (0, 0))[0] > 0)
-    how, count, binds = {}, collections.Counter(), []
+    how, count, binds, departs = {}, collections.Counter(), [], []
     masks = {sp: m for sp, (sh, m) in rows.items()}
     ev, seen = route_evidence()
     stage = stages.stage_of(stages.line_order(str(ROOT / "build.ninja")), seen)
-    new, kids = assign(masks, gauged, count, how, ev, stage, binds)
+    new, kids = assign(masks, gauged, count, how, ev, stage, binds, departs)
     final_count = collections.Counter(count)
     rest = sorted(sp for sp in rows if sp not in new)
-    n2, k2 = assign(masks, rest, collections.Counter(count), how, ev, stage, binds)
+    n2, k2 = assign(masks, rest, collections.Counter(count), how, ev, stage, binds, departs)
     new.update(n2)
     kids.update(k2)
     # the floor: every species id's generated class (reached only by a species
@@ -254,7 +337,7 @@ def compute():
     # the four classes, the six-class bits its weakness became (0: it had none)
     sel = {sp: [kids.get(sp, fkids[sp]).get(o, 0) for o in (S, P, B, X)] for sp in range(gbf.CODEX_WIDTH)}
     return dict(rows=rows, held=held, gauged=gauged, new=new, how=how, count=final_count, floor=floor,
-                names=names, sel=sel, ev=ev, binds=binds, stage=stage)
+                names=names, sel=sel, ev=ev, binds=binds, stage=stage, departs=departs)
 
 
 def write_split_inc(r):
@@ -325,6 +408,15 @@ def report(r):
                    nf - nh, nh))
     pinned = sum(1 for sp in g if "pinned" in r["how"][sp])
     out.append("dealt gauged species with a pinned weakness: %d" % pinned)
+    out.append("the opening's authored rows (pins.OPENING): %d" % sum(1 for sp in rows if sp in pins.OPENING))
+    out.append("")
+    out.append("OPENING DEPARTS (an authored row that changes the number of weapon weaknesses, or names a class "
+               "that is no child of the old ones): %d rows" % len(r["departs"]))
+    for sp, old, mask, dep in r["departs"]:
+        nm = r["names"][sp] if sp < len(r["names"]) else ""
+        out.append("  $%04x %-13s %-22s -> %-24s %s  <- %s" % (
+            sp, nm, "|".join(OLD_NAME[b] for b in OLD_NAME if old & b) or "-",
+            "|".join(NEW_NAME[b] for b in ORDER if mask & b) or "-", "; ".join(dep), pins.OPENING[sp][1]))
     out.append("")
     out.append("THE HOLDER RULE BINDS (no split of the row met it; the split kept is the least bad): %d rows" % len(
         r["binds"]))
@@ -342,7 +434,8 @@ def report(r):
             sp, nm, sh, "|".join(OLD_NAME[b] for b in OLD_NAME if old & b) or "-",
             "|".join(NEW_NAME[b] for b in ORDER if new[sp] & b) or "-", r["how"][sp],
             "" if sp in r["held"] else "  [not dealt]",
-            ("  <- " + pins.PIN[sp][1]) if sp in pins.PIN else ""))
+            ("  <- " + pins.OPENING[sp][1]) if sp in pins.OPENING else (
+                ("  <- " + pins.PIN[sp][1]) if sp in pins.PIN else "")))
     return "\n".join(out) + "\n"
 
 

@@ -15,6 +15,17 @@ roster is whoever the route has recruited so far (stage_of fills it from the
 route's fights) and nobody is forced.
 Optional hires (Shadow in Kohlingen, in the WoB after Narshe) are not counted
 until the story brings him.
+
+HELD: through the opening (docs/design/opening.md) a member holds what a new
+player's hands hold there, not the class's signature: the weapon the
+character JOINS with (ff6/src/field/char_prop.asm) until a shop sells
+another, and the class-bearing skills learned by then.  TERRA wakes with a
+Mithril Knife and has a sword from South Figaro's shop; EDGAR joins with a
+Mithril Blade and the AutoCrossbow, and the first pike on sale is Narshe's,
+before the defense (the automated route strips MOG's for him in the moogle
+defense); SABIN joins with a MetalKnuckle, and the first claw on sale is
+Mobliz's.  The moogle defense fields ten moogles beside LOCKE and MOG.  A
+stage with no entry reads classes.py's signatures.
 """
 import re
 
@@ -25,7 +36,8 @@ STAGES = [
     # first leg, roster, forced, magitek
     ("battle_entry", {"TERRA"}, None, True),
     ("narshe_streets", {"TERRA"}, None, False),
-    ("moogle_cleared", {"LOCKE", "MOG"}, None, False),
+    ("moogle_cleared", {"LOCKE", "MOG", "KUPEK", "KUPOP", "KUMAMA", "KUKU", "KUTAN", "KUPAN", "KUSHU", "KURIN",
+                        "KURU", "KAMOG"}, None, False),
     ("worldmap_narshe", {"TERRA", "LOCKE"}, None, False),
     ("figaro_intro", {"TERRA", "LOCKE", "EDGAR"}, None, False),
     ("vargas_entry", {"TERRA", "LOCKE", "EDGAR", "SABIN"}, None, False),
@@ -60,6 +72,46 @@ STAGES = [
     ("wor_falcon", {"CELES", "SABIN", "EDGAR", "SETZER"}, None, False),
     ("wor_terra", None, set(), False),      # from here: everyone recruited so far
 ]
+
+_TRIO = {"TERRA": {"sword"}, "LOCKE": {"dagger"}, "EDGAR": {"sword", "crossbow"}}
+_SABIN = {"knuckle", "fist", "blitz"}
+_SHADOW = {"ninja blade", "star"}
+_CYAN = {"katana", "swdtech"}
+# first leg of the stage -> {member: the weapon kinds (classes.py KIND_CLASS) held there}
+HELD = {
+    "narshe_streets": {"TERRA": {"dagger"}},
+    # the three squads (event_main.asm's char_party lines): LOCKE's, MOG's, KUSHU's
+    "moogle_cleared": {"LOCKE": {"dagger"}, "KUPEK": {"spear"}, "KUPOP": {"flail"}, "KUMAMA": {"claw"},
+                       "MOG": {"spear"}, "KUKU": {"flail"}, "KUTAN": {"sword"}, "KUPAN": {"boomerang"},
+                       "KUSHU": {"brush"}, "KURIN": {"spear"}, "KURU": {"sword"}, "KAMOG": {"boomerang"}},
+    "worldmap_narshe": {"TERRA": {"dagger"}, "LOCKE": {"dagger"}},
+    # the knife through the cave, a sword from South Figaro's shop on (one leg plays both)
+    "figaro_intro": dict(_TRIO, TERRA={"dagger", "sword"}),
+    "vargas_entry": dict(_TRIO, SABIN=_SABIN),
+    "scenario_hub": {"TERRA": {"sword"}, "EDGAR": {"sword", "crossbow"}, "SABIN": _SABIN, "BANON": {"rod"}},
+    # Trickshot from the Lete on (switch $001A): LOCKE's kit holds Dagger whatever is in his hand
+    "locke_scenario": {"LOCKE": {"dagger", "thief hit"}},
+    "sfigaro_escape": {"LOCKE": {"dagger", "thief hit"}, "CELES": {"sword"}},
+    "sabin_world": {"SABIN": _SABIN, "SHADOW": _SHADOW},
+    "cyan_defence": {"SABIN": _SABIN, "SHADOW": _SHADOW, "CYAN": _CYAN},
+    "forest_done": {"SABIN": _SABIN, "SHADOW": _SHADOW, "CYAN": _CYAN},
+    "falls_done": {"SABIN": _SABIN, "CYAN": _CYAN},
+    # Mobliz's shop sells the Mithril Claw: SABIN may Fight with Katana from here
+    "gau_joined": {"SABIN": _SABIN | {"claw"}, "CYAN": _CYAN, "GAU": {"fang"}},
+    "rapids_start": {"TERRA": {"sword"}, "EDGAR": {"sword", "crossbow"}, "BANON": {"rod"}},
+    # Narshe's shop, open before the defense, sells the first Mithril Pike
+    "narshe_battle": {"TERRA": {"sword"}, "LOCKE": {"dagger", "thief hit"}, "EDGAR": {"sword", "spear", "crossbow"},
+                      "SABIN": _SABIN | {"claw"}, "CYAN": _CYAN, "GAU": {"fang"}, "CELES": {"sword"}},
+    # Figaro's tool merchant sells the Drill once the castle has dived
+    "figaro_submerged": {"LOCKE": {"dagger", "thief hit"}, "EDGAR": {"sword", "spear", "drill", "crossbow"},
+                         "SABIN": _SABIN | {"claw"}, "CYAN": _CYAN, "GAU": {"fang"}, "CELES": {"sword"}},
+}
+
+
+def held_kinds(first_leg, name):
+    """the weapon kinds a member holds at a stage (by its first leg): HELD's
+    where it says, else the signature's (None: read classes.SIGNATURE)."""
+    return HELD.get(first_leg, {}).get(name)
 
 
 def line_order(build_ninja="build.ninja"):
