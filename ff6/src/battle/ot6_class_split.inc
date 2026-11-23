@@ -67,7 +67,7 @@ Ot6ClassSplitTbl:
         .byte   $00, $08, $04, $00 ;  56 Nautiloid
         .byte   $01, $00, $04, $00 ;  57 Exocite
         .byte   $10, $00, $00, $00 ;  58 Anguiform
-        .byte   $00, $00, $08, $00 ;  59 Reach Frog
+        .byte   $00, $00, $04, $00 ;  59 Reach Frog
         .byte   $01, $20, $00, $00 ;  60 Lizard
         .byte   $01, $00, $04, $00 ;  61 ChickenLip
         .byte   $10, $00, $08, $00 ;  62 Hoover
@@ -94,12 +94,12 @@ Ot6ClassSplitTbl:
         .byte   $00, $00, $0c, $00 ;  83 HadesGigas
         .byte   $10, $00, $00, $08 ;  84 Pug
         .byte   $00, $00, $00, $00 ;  85 Magic Urn
-        .byte   $10, $00, $04, $00 ;  86 Mover
+        .byte   $10, $00, $08, $00 ;  86 Mover
         .byte   $10, $00, $08, $00 ;  87 Figaliz
         .byte   $00, $00, $04, $00 ;  88 Buffalax
         .byte   $00, $00, $02, $00 ;  89 Aspik
         .byte   $10, $00, $00, $04 ;  90 Ghost
-        .byte   $00, $02, $08, $00 ;  91 Crawler
+        .byte   $00, $02, $04, $00 ;  91 Crawler
         .byte   $00, $02, $00, $00 ;  92 Sand Ray
         .byte   $02, $00, $00, $00 ;  93 Areneid
         .byte   $00, $00, $04, $00 ;  94 Actaneon
@@ -143,11 +143,11 @@ Ot6ClassSplitTbl:
         .byte   $00, $20, $08, $00 ; 132 Brontaur
         .byte   $00, $20, $08, $00 ; 133 Allosaurus
         .byte   $00, $0a, $00, $00 ; 134 Cirpius
-        .byte   $01, $20, $00, $00 ; 135 Sprinter
+        .byte   $01, $02, $00, $00 ; 135 Sprinter
         .byte   $01, $02, $00, $00 ; 136 Gobbler
         .byte   $01, $20, $00, $00 ; 137 Harpiai
         .byte   $00, $20, $04, $00 ; 138 GloomShell
-        .byte   $00, $20, $04, $00 ; 139 Drop
+        .byte   $00, $20, $08, $00 ; 139 Drop
         .byte   $01, $00, $00, $08 ; 140 Mind Candy
         .byte   $01, $00, $04, $00 ; 141 WeedFeeder
         .byte   $01, $02, $00, $00 ; 142 Luridan
@@ -161,7 +161,7 @@ Ot6ClassSplitTbl:
         .byte   $01, $02, $00, $00 ; 150 Cephaler
         .byte   $01, $00, $04, $00 ; 151 Maliga
         .byte   $01, $20, $00, $00 ; 152 Gigan Toad
-        .byte   $10, $20, $00, $00 ; 153 Geckorex
+        .byte   $01, $02, $00, $00 ; 153 Geckorex
         .byte   $10, $00, $04, $00 ; 154 Cluck
         .byte   $10, $02, $00, $00 ; 155 Land Worm
         .byte   $00, $20, $00, $00 ; 156 Test Rider
@@ -184,7 +184,7 @@ Ot6ClassSplitTbl:
         .byte   $10, $00, $00, $08 ; 173 SoulDancer
         .byte   $01, $00, $08, $00 ; 174 Gigantos
         .byte   $00, $00, $04, $00 ; 175 Mag Roader
-        .byte   $10, $20, $08, $00 ; 176 Spek Tor
+        .byte   $01, $02, $04, $00 ; 176 Spek Tor
         .byte   $10, $00, $00, $00 ; 177 Parasite
         .byte   $01, $00, $00, $00 ; 178 EarthGuard
         .byte   $10, $00, $00, $00 ; 179 Coelecite
@@ -206,7 +206,7 @@ Ot6ClassSplitTbl:
         .byte   $01, $00, $00, $00 ; 195 Nohrabbit
         .byte   $10, $02, $00, $08 ; 196 Wizard
         .byte   $01, $00, $04, $00 ; 197 Scrapper
-        .byte   $00, $20, $04, $00 ; 198 Ceritops
+        .byte   $00, $20, $08, $00 ; 198 Ceritops
         .byte   $00, $02, $00, $00 ; 199 Commando
         .byte   $10, $00, $04, $00 ; 200 Opinicus
         .byte   $10, $20, $00, $00 ; 201 Poppers
@@ -218,7 +218,7 @@ Ot6ClassSplitTbl:
         .byte   $00, $08, $00, $04 ; 207 Rinn
         .byte   $00, $02, $04, $00 ; 208 Insecare
         .byte   $00, $20, $04, $00 ; 209 Vermin
-        .byte   $10, $00, $08, $04 ; 210 Mantodea
+        .byte   $01, $00, $08, $04 ; 210 Mantodea
         .byte   $01, $00, $00, $08 ; 211 Bogy
         .byte   $10, $00, $08, $00 ; 212 Prussian
         .byte   $01, $00, $00, $00 ; 213 Black Drgn
@@ -261,7 +261,7 @@ Ot6ClassSplitTbl:
         .byte   $10, $00, $00, $00 ; 250 Woolly
         .byte   $01, $02, $00, $00 ; 251 Veteran
         .byte   $00, $20, $08, $00 ; 252 Sky Base
-        .byte   $00, $02, $08, $00 ; 253 IronHitman
+        .byte   $00, $20, $08, $00 ; 253 IronHitman
         .byte   $00, $20, $08, $00 ; 254 Io
         .byte   $10, $00, $00, $08 ; 255 Pugs
         .byte   $00, $00, $00, $00 ; 256 Whelk
@@ -346,12 +346,12 @@ Ot6ClassSplitTbl:
         .byte   $10, $00, $04, $00 ; 335 Grunt
         .byte   $10, $20, $00, $00 ; 336 Gold Drgn
         .byte   $00, $00, $04, $08 ; 337 Skull Drgn
-        .byte   $10, $02, $00, $00 ; 338 Blue Drgn
+        .byte   $10, $20, $00, $00 ; 338 Blue Drgn
         .byte   $00, $20, $00, $00 ; 339 Red Dragon
         .byte   $10, $00, $04, $00 ; 340 Piranha
         .byte   $10, $00, $04, $00 ; 341 Rizopas
         .byte   $10, $00, $00, $04 ; 342 Specter
-        .byte   $00, $02, $08, $00 ; 343 Short Arm
+        .byte   $00, $20, $08, $00 ; 343 Short Arm
         .byte   $10, $20, $00, $00 ; 344 Long Arm
         .byte   $00, $00, $04, $08 ; 345 Face
         .byte   $10, $02, $00, $00 ; 346 Tiger
