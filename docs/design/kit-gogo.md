@@ -109,7 +109,9 @@ in his Status menu and played through the real battle menu -- Magic, Slot
 and Tools (no Scan without Lore, Setzer's table, Ultima, Jackpot,
 Overclock, and a Tool stopping at the Assassinate gate's command test);
 Magic, Lore and Runic (Scan and Bserk, the lore loadout, Study, RunicBlade
-and its bounce); Throw, Steal and Blitz (Locke's rows, Sabin's list and Bum
+and its bounce; since #563 the Rune Knight's list as his own spells make it,
+a blade row at each tier, a row with no line refusing the boost, his
+stance's absorbs arming his blade, and the divine's gate); Throw, Steal and Blitz (Locke's rows, Sabin's list and Bum
 Rush, Assassinate's Death mark at 3 BP and none at 2); SwdTech, Rage and
 Dance (Cyan's window and Cleave, Gau's loadout, Mog's dances); then a fifth
 from `gen_wor_leo`'s state after the reveal (Setzer's table, Overclock and

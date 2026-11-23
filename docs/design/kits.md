@@ -1096,12 +1096,15 @@ the divine in the eighth:
   MP, and Cleave four from every death-immune body at once.
 - Suites: `battle_spellblade` (the list, arming from an ally's spell,
   replacement, persistence, the weak-only rule with absorbing, nulling and
-  halving bodies, each hit of a boosted Fight, the colours and the sign,
-  Break Blade's gate, count, take and the rune's return, the switch, the
-  engine's pick), `battle_spellblade_esper` (the rows follow her esper),
+  halving bodies, each hit of a boosted Fight, the tiers' prices and
+  multipliers, the colours and the sign, the divine's gate, count, take and
+  the rune's return, the switch, the engine's pick), `battle_spellblade_esper` (the rows follow her esper),
   `battle_runicmonster` (an enemy's spell arms it), `battle_gogokits` and
-  `battle_gogomimic` (Gogo's list and copies), `battle_runic`,
-  `battle_runicblade`.
+  `battle_gogomimic` (Gogo's list and copies, the rows with no line),
+  `save_celesbreak` (an old save's Celes has Break by her level, nothing
+  written), `menu_runeknt` (the command's name in the three windows that
+  draw it), `battle_runic`, `battle_runicblade`.  Mutants, one an arm:
+  `build/attempts/wt/v051-spellblade/mutants/mutants.py`.
 
 ### Setzer — Gambler/Merchant (special ¤: cards, dice; darts = piercing)
 
