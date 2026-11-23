@@ -790,6 +790,9 @@ for f in glob("tools/tests/*.lua"):
     if attrs.split() == ["newgame"]:
         newgame_suite = f       # its own edges, below the golden saves
         continue
+    if attrs.split() == ["sixcodex"]:
+        sixcodex_suite = f      # its own edges, below the golden saves
+        continue
     # the emulator pin too: a test result is the emulator's as much as the
     # ROM's, so a new emulator re-runs every test, as it regenerates every state
     deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
@@ -897,12 +900,36 @@ MUTANTS = {
     "srcpages": ("SlotAt=ad1f02", "junk/v0.44-wor-cyan", "saveas: slot 1's codex and esper page pads"),
     # no New Game clear (battle_newgameloadouts, below)
     "noclear": ("Ot6NewGameClear", None, None),
+    # #566, the six-class codex migration (Ot6CodexSix).  Not run at all: a
+    # v0.50 save's page stays a four-class page
+    "nosix": ("Ot6CodexSix", "v0.50/wor-kt-plates-v1", "the slot's codex page is signed 'O9'"),
+    # its table read gives nothing (`lda f:Ot6ClassSplitTbl,x` becomes
+    # `lda #$00`): every revealed weakness is lost
+    "sixdrop": ("SixRead=a900eaea", "v0.50/wor-kt-plates-v1",
+                "the slot's revealed classes are the file's, migrated"),
+    # its four-bit mask gone (`and #$ff`): the $FF fixture's high bits read
+    # on into the next species' table bytes
+    "sixfour": ("SixFour=29ff", "junk/v0.46-kolts-classff",
+                "the slot's revealed classes are the file's, migrated"),
+    # every load runs it, signed or not (the load's `jsr Ot6CodexEnsure`
+    # becomes `jsr Ot6CodexSix`): the second load rewrites a six-class page
+    "loadsix": ("LoadEnsure=20{Ot6CodexSix}", "v0.50/wor-kt-plates-v1",
+                "load2: the four-to-six rewrite has run once"),
+    # an unsigned page signed without its tables zeroed (the wipe's store
+    # becomes four nops): a page with no magic keeps what it held
+    "nowipe": ("FreshWipe=eaeaeaea", "junk/v0.50-kolts-unsigned",
+               "the slot's revealed classes are the file's, migrated"),
+    # the page signed O9 with its class bytes left as the four classes wrote
+    # them (the loop jumped over): what the six-class ROM did before the
+    # migration; and the seed's row mask gone (battle_sixcodex, below)
+    "sixnoop": ("SixNext=4c{SixTail}", None, None),
+    "nomask": ("SixMask=eaeaea", None, None),
 }
 for name, (edit, fx, want) in MUTANTS.items():
     w.edge([f"build/mutants/{name}.sfc"], "sh",
            implicit=["tools/build/mutant_rom.py", "build/ot6.sfc", "ff6/rom/ff6-en.dbg"],
            cmd=f"mkdir -p build/mutants && python3 tools/build/mutant_rom.py build/ot6.sfc "
-               f"ff6/rom/ff6-en.dbg build/mutants/{name}.sfc {edit}",
+               f"ff6/rom/ff6-en.dbg build/mutants/{name}.sfc '{edit}'",
            desc=f"mutant ROM {name}")
     if fx is None:
         continue
@@ -939,6 +966,41 @@ for tag, fx, extra in (("newgame_gau", "v0.44/wor-gau-v1", ""),
     out = f"build/results/tagged/{tag}.ok"
     w.edge([out], "sh", implicit=deps,
            cmd=f"{env} nice tools/build/run_tagged_suite.sh {Path(newgame_suite).stem} {tag} {out}{tail}",
+           desc=f"suite {tag}", pool="side")
+    qual.append(out)
+    golden_outs.append(out)
+
+# battle_sixcodex (#566): a four-class save's revealed classes as the six
+# classes show them in battle.  On a release's Mt. Kolts save (revealed
+# weaknesses that kept their bit, and that moved); on that save with every
+# class byte $FF (golden-saves/junk/v0.46-kolts-classff: bits that must add
+# nothing); on that save with an O9 page of $3F bytes
+# (junk/v0.46-kolts-six3f: the seed's row mask, and no rewrite); and on five
+# mutants, each of which must turn the assertion it breaks red.
+six_common = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
+              copy_if_changed_from(sixcodex_suite), "tools/build/run_tagged_suite.sh"] + \
+    [copy_if_changed_from(h) for h in LIBS] + HARNESS
+SIX_REAL, SIX_FF, SIX_3F = "v0.46/kolts-summit-v1", "junk/v0.46-kolts-classff", "junk/v0.46-kolts-six3f"
+for tag, fx, mutant, want in (
+        ("sixcodex_real", SIX_REAL, None, None),
+        ("sixcodex_classff", SIX_FF, None, None),
+        ("sixcodex_six3f", SIX_3F, None, None),
+        ("sixcodex_nosix", SIX_REAL, "nosix", "the slot's codex page is signed 'O9' after the load"),
+        ("sixcodex_sixdrop", SIX_FF, "sixdrop", " in the page (species"),
+        ("sixcodex_sixnoop", SIX_FF, "sixnoop", "EXACT: the page's class byte"),
+        ("sixcodex_nomask", SIX_3F, "nomask", "MASK: a revealed class the body's row does not answer to is not drawn"),
+        ("sixcodex_loadsix", SIX_REAL, "loadsix", "load2: the four-to-six rewrite has run once")):
+    d = f"{GOLDEN_DIR}/{fx}"
+    deps = six_common + [f"{d}/manifest.json", f"{d}/battery.sram"]
+    env = f"OT6_SRAM_CHECKPOINT={d}"
+    tail = ""
+    if mutant:
+        deps.append(f"build/mutants/{mutant}.sfc")
+        env += f" OT6_ROM=build/mutants/{mutant}.sfc OT6_DBG=ff6/rom/ff6-en.dbg"
+        tail = f" red \"{want}\""
+    out = f"build/results/tagged/{tag}.ok"
+    w.edge([out], "sh", implicit=deps,
+           cmd=f"{env} nice tools/build/run_tagged_suite.sh {Path(sixcodex_suite).stem} {tag} {out}{tail}",
            desc=f"suite {tag}", pool="side")
     qual.append(out)
     golden_outs.append(out)

@@ -900,12 +900,17 @@ eight) and the Break spell, TERRA's and Shoat's (12.3).
 **On the line.** Won in 31,262 ticks, the longest single-body fight of
 the line, and **never broken** (lowest 1). 201 of its 225 decisions were
 a wait for the wall (`fights_states.txt`: "did={'defer': 201, 'magic':
-18, 'item': 6}"). His Ultima took all four from full HP in one frame with
-no Shell and no Life 3 standing (`wor_tower.log:56900`: "shell=0 life3=0"
-on each; :56924-56932, four `[death]` lines and a `[wipe]`); three stood
-again at an eighth of their HP within 360 frames (:57084:
-"partyhp=448,433,452,0") and the battle reads won (:57199). The labs'
-median was 60,251 ticks with the break line and a second Break (12.3).
+18, 'item': 6}"). His dying Ultima took all four from full HP at once,
+and three of them wore Life 3: the "shell=0 life3=0" this survey first
+quoted (`wor_tower.log:56900`) was read after the Ultima had spent it; the
+reading before it has `life3=1` on e0-e2 and 0 on STRAGO (e3)
+(`[end] f250800`, the 2026-11-22 log kept as
+`build/attempts/wt/v051-wipe-win/wor_tower.2026-11-22.log.gz`, line
+56756). The engine raised the three at an eighth of their HP
+("partyhp=448,433,452,0") and the battle was won: no wipe, no retry, and
+the driver's `[wipe]` line was wrong, not the verdict (#564; the driver now
+says `[allfell]` and `[raised]` there). The labs' median was 60,251 ticks
+with the break line and a second Break (12.3).
 
 ### 14. Red Dragon — the Phoenix Cave
 
@@ -2004,9 +2009,9 @@ Each can be answered in a sentence.
 11. **Atma (10) has fewer shields than the AtmaWeapon (11).**
 12. **The Presenter was won by killing its shell**, the body with no
     gauge that the fight calls the wrong answer (block 3).
-13. **MagiMaster's Ultima landed on a party with no Shell and no Life 3
-    up**, all four from full HP, and the fight still reads won (block
-    13).
+13. **MagiMaster's Ultima took all four from full HP**, and Life 3 raised
+    the three who wore it; STRAGO, without it, stayed down. The driver
+    logged it as a `[wipe]` before a won outcome (block 13; #564).
 14. **GOGO dies to Doom Gaze's opening L5 Doom in every meeting**: level
     45 (block 15).
 15. **Doom Gaze cannot flee while Broken**, today, with nothing built for

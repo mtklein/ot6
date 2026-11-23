@@ -6,6 +6,14 @@ header carries the decoded rows) and the v0.16 qualification log
 retained run log under `build/zozolab/` (the batch runner keeps every
 attempt; `tools/tests/zozolab_aggregate.py` (deleted in 8d350a73; last version at b7406e74) printed them all).
 
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Fist, Arcane
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are the
+> present ones. Quoted logs, dated measurements and "before" columns keep
+> the words they were recorded in: slash is now Sword or Katana, pierce
+> Dagger or Spear, bludgeon Fist or Arcane, special Arcane or Dagger.
+
 ## What happened in the qualification
 
 Map 225 (the crane-maze interiors), the stair-room landing (59,34), three
@@ -28,7 +36,7 @@ SlamDancer + Gabbldegak x3 6.25%).
 |---|---|---|
 | SlamDancer $052 | L15, HP 392, MP 120, speed 35, atk 13, def 115, mdef 145, **mpow 10** | `monster_prop.dat` +$0A40; byte-identical to the vanilla ROM record |
 | weakness | poison ($08) only; no absorb/null | `monster_prop.dat` +25 |
-| shields | **2, no class key** at the time of the lab (v0.16) | `Ot6ShieldTbl`, `ot6_hud.asm:1671` (first match wins, `ot6_break.asm:74-83`). Fixed for #157: that shields-only row is gone and the species now seeds its keyed row (2, SLASH\|PIERCE); the lab's numbers below were measured on the keyless ROM |
+| shields | **2, no class key** at the time of the lab (v0.16) | `Ot6ShieldTbl`, `ot6_hud.asm:1671` (first match wins, `ot6_break.asm:74-83`). Fixed for #157: that shields-only row is gone and the species now seeds its keyed row (2, SLASH\|PIERCE when fixed; Sword\|Dagger today); the lab's numbers below were measured on the keyless ROM |
 | AI | `if_one_monster_type` -> `attack FIRE_2, ICE_2, BOLT_2`; else two Battle lines | `ai_script.asm:925` |
 | Fire 2 / Ice 2 / Bolt 2 | power 60 / 62 / 61, magic, targeting $61 | `magic_prop_en.dat` |
 

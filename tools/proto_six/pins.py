@@ -135,9 +135,10 @@ OPENING = {
     0x0017: (('dagger', 'sword'), "opening 4: leafer, the first body on the world map; two daggers meet it, so it "
              "takes one (Dagger is no child of slash|bludgeon)"),
     0x0028: (('dagger', 'crossbow'), "opening 4: dark wind, a flier: the point or the bolt (the fliers' rule)"),
-    0x005c: (('dagger', 'sword'), "opening 4: sand ray; the desert has no fire weakness, so the knives are the key"),
-    0x005d: (('dagger', 'crossbow'), "opening 4: areneid; on main two daggers had no key at all on the x3 pack "
-             "(slash|bludgeon, ice|water); the point, then EDGAR's sweep"),
+    0x005c: (('dagger',), "opening 4: sand ray; the desert has no fire weakness, so the knives are the key; one "
+             "class, since its three elements leave the HUD's four cells one"),
+    0x005d: (('dagger',), "opening 4: areneid; on main two daggers had no key at all on the x3 pack "
+             "(slash|bludgeon, ice|water); Dagger is no child of those, and its three elements leave one cell"),
     # 5. Figaro: EDGAR joins with a Mithril Blade and the AutoCrossbow
     0x0042: (('dagger', 'crossbow'), "opening 5: m-tekarmor; the knives and the AutoCrossbow's sweep, his first fight"),
     # 6. the cave to South Figaro: the cell splits the hands
@@ -154,7 +155,8 @@ OPENING = {
              "pierce was LOCKE's dagger and EDGAR's bolts, two classes now"),
     0x007a: ((), "opening 8: tusker: no weapon weakness, as on main; Fire or the Bio Blaster"),
     0x0032: (('sword', 'dagger'), "opening 8: trilium: cut the stalk or stab it"),
-    0x000b: (('sword',), "opening 8: brawler: the blades (it drinks the Bio Blaster's poison)"),
+    0x000b: (('sword', 'knuckle'), "opening 8: brawler: the blades (it drinks the Bio Blaster's poison), and "
+             "SABIN's fists: the first two maps he walks deal it, and his MetalKnuckle, a slash on main, keyed it"),
     0x014d: (('sword',), "opening 8: ipooh: 'fire + slashing' (bosses-wob.md 3), TERRA's and EDGAR's swords"),
     0x0103: (('blitz',), "opening 8: vargas: 'not breakable without the monk'; SABIN's Pummel and now his "
              "MetalKnuckle too"),
@@ -162,8 +164,8 @@ OPENING = {
     0x0038: (('crossbow', 'rod'), "opening 9: nautiloid: a bolt in its mouth or a blow on the shell"),
     0x0039: (('sword', 'rod'), "opening 9: exocite: the blades, the fists, BANON's rod"),
     0x0022: (('sword', 'crossbow'), "opening 9: pterodon, a flier: the blades or the bolt"),
-    0x012c: (('sword', 'crossbow', 'dagger'), "opening 9: ultros, 'the row he keeps all game': the Lete's party "
-             "holds swords and the AutoCrossbow, the opera forces LOCKE (a dagger); the old pierce was both"),
+    0x012c: (('sword', 'crossbow'), "opening 9: ultros, 'the row he keeps all game': the Lete's party holds two "
+             "swords and the AutoCrossbow (no pike, no dagger); fire and bolt take the other two cells"),
     # 10a. TERRA, EDGAR and BANON to Narshe: the raft again, the mines, the back way and its trap
     0x00ef: (('crossbow', 'rod'), "opening 10a: 1st class, a guard in plate: the bolt or BANON's rod"),
     0x00f4: (('sword', 'dagger'), "opening 10a: wild rat: a rat's row (the were-rat's)"),
@@ -173,7 +175,8 @@ OPENING = {
     # 10b. LOCKE alone in South Figaro, then with CELES
     0x013a: (('dagger',), "opening 10b: merchant: LOCKE alone"),
     0x0175: (('dagger',), "opening 10b: officer: LOCKE alone"),
-    0x009f: (('dagger', 'katana'), "opening 10b, 11: heavyarmor: LOCKE alone (the seam), CYAN's squad at Narshe"),
+    0x009f: (('dagger',), "opening 10b, 11: heavyarmor: LOCKE alone (the seam); one class, since bolt, water "
+             "and poison leave the HUD's four cells one"),
     0x0071: (('sword', 'dagger'), "opening 10b: vector pup: LOCKE's dagger, CELES's blade"),
     0x0011: (('sword', 'dagger'), "opening 10b: commander: the same two"),
     0x0036: (('dagger', 'fist'), "opening 10b: trilobiter, a shell: LOCKE's point, or CELES's bare hands (she "
@@ -217,17 +220,16 @@ OPENING = {
     0x0059: (('fang',), "opening 10c: aspik: GAU's fangs, the trench's third key for its third member (his bare "
              "hand was bludgeon on main; Dagger is no child of bludgeon)"),
     # 11. the Narshe defense: seven in three squads
-    0x0065: (('sword', 'dagger'), "opening 11: trooper: TERRA's, CELES's and EDGAR's swords, LOCKE's dagger, GAU's "
-             "fangs"),
-    0x0079: (('dagger', 'katana'), "opening 11: bounty man: beside two troopers, the body CYAN's squad keys"),
-    0x001c: (('katana', 'spear'), "opening 11: fidor: CYAN's katana, and the Mithril Pike Narshe's shop sells "
-             "EDGAR before the defense"),
+    0x0065: (('sword', 'dagger', 'katana'), "opening 11: trooper: the player forms the three squads freely, so "
+             "a raider takes the hands of all but two of the seven: swords, daggers and fangs, the katana"),
+    0x0079: (('sword', 'dagger', 'katana'), "opening 11: bounty man: 'a raider should take the troopers' keys'"),
+    0x001c: (('sword', 'dagger', 'katana'), "opening 11: fidor: 'a raider should take the troopers' keys'"),
     0x003f: (('dagger', 'katana'), "opening 11: rider: 'slash for CYAN/SABIN, pierce for LOCKE/GAU' "
              "(bosses-wob.md, the soldier line); TERRA's Fire, EDGAR's poison"),
-    0x014a: (('sword', 'dagger', 'katana'), "opening 11: kefka: 'deliberately broad, so any squad you route to "
-             "him can break him' (bosses-wob.md 10); the old slash was five of the seven's hands, two classes now"),
+    0x014a: (('dagger', 'katana'), "opening 11: kefka: 'any squad you route to him can break him' "
+             "(bosses-wob.md 10): the rider's row; fire and poison (TERRA, EDGAR) take the other two cells"),
     # 12. Kohlingen and Zozo: any four of LOCKE, EDGAR, SABIN, CYAN, GAU, CELES
-    0x0078: (('dagger', 'katana'), "opening 12: red fang, a wolf: LOCKE's dagger and GAU's fangs, CYAN's katana"),
+    0x0078: (('katana', 'spear'), "opening 12: red fang, a wolf: CYAN's katana, EDGAR's pike or Drill"),
     0x002a: (('dagger', 'crossbow'), "opening 12: vulture, a flier: the fliers' rule; one class would have one "
              "real holder (the holder rule)"),
     0x0090: (('katana', 'knuckle'), "opening 12: over grunk, the plains' tank: the katana or a blow"),
@@ -237,9 +239,11 @@ OPENING = {
              "(bosses-wob.md 11), and SABIN's fists"),
     0x0023: (('drill', 'knuckle'), "opening 12: fossilfang, the rare tank: EDGAR's new Drill (or a pike), or a blow "
              "on the bones"),
-    0x00df: (('dagger',), "opening 12: gabbldegak, the x4 swarm: daggers and fangs; the Bio Blaster sweeps it"),
-    0x0052: (('sword', 'dagger'), "opening 12: slamdancer, the dangerous one: the widest pair of holders"),
-    0x004e: (('katana', 'drill'), "opening 12: harvester: 'by a katana or a spear'"),
+    0x00df: (('dagger', 'crossbow'), "opening 12: gabbldegak, the x4 swarm: 'AutoCrossbow sweeps it', and daggers "
+             "and fangs; Dagger alone has no real holder in the World of Ruin's Zozo (the holder rule)"),
+    0x0052: (('sword', 'katana'), "opening 12: slamdancer, the dangerous one: the blades, CELES's and CYAN's "
+             "(and SABIN's claw); both are slash's"),
+    0x004e: (('sword', 'drill'), "opening 12: harvester: a blade or a spear"),
     0x0053: (('knuckle', 'crossbow'), "opening 12: hadesgigas: Blunt alone had one real holder (SABIN: GAU's hand "
              "left bludgeon), so the giant takes the bolt too (the holder rule)"),
     0x0107: (('dagger', 'blitz'), "opening 12: dadaluma: 'every possible pick of four holds at least one of the "
@@ -254,3 +258,16 @@ EVERY = {0x00a3, 0x0146}
 
 # Ultros 2, 3, 4 take Ultros 1's row ("the row he keeps all game")
 FAMILY = {0x012d: 0x012c, 0x012e: 0x012c, 0x0168: 0x012c}
+
+# ---- the break-row suites' proofs (pins_suite.py): each binds, weakness by
+# weakness (HARD), over whatever a row comment preferred
+import pins_suite as _suite  # noqa: E402
+
+HARD = {}
+for _sp, (_kinds, _src) in _suite.SUITE.items():
+    _old = PIN.get(_sp, ({}, ""))
+    _merged = dict(_old[0])
+    _merged.update(_kinds)
+    PIN[_sp] = (_merged, _old[1] + (" || " if _old[1] else "") + _src)
+    HARD[_sp] = set(_kinds)
+EVERY |= set(_suite.EVERY)

@@ -7,6 +7,14 @@ Hidon), up after Doom Gaze in the sky, and down at the Opera House for the
 Dirt Dragon; a save beside the Falcon there (`wor-opera-v1`) is the next
 arc's boot.  Duncan's Bum Rush is left out (the issue).
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Fist, Arcane ([weapon-classes.md](weapon-classes.md)). Rows and
+> keys below are the present ones. Quoted logs, dated measurements and
+> "before" columns keep the words they were recorded in: slash is now Sword
+> or Katana, pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane
+> or Dagger.
+
 Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v034-wor-gogo/lab/` (the run logs, and
 the scripts beside them: the explore and probe bodies `x1`-`x22`; the leg
@@ -61,7 +69,7 @@ mutant builders `mkmut.py` and `rowmuts.sh`; the launchers `lab.sh`,
    `$0B04`/`$0B06`, four-tile units) are rolled at each lift-off; flying
    over one with A held starts the battle.  Its HP carries over in `$1DD3`
    and the beaten flag is `$1DD2` bit 0.  L.5 Doom fells every member whose
-   level is a multiple of 5 (TERRA and CELES at L50); RELM's brush (special)
+   level is a multiple of 5 (TERRA and CELES at L50); RELM's brush (Arcane)
    keys it.
 7. **The Opera House's Dirt Dragon** is under the stage: 237 (48,30) -> 231;
    231 (28,24) -> 232 (114,36); the stage master (118,29), spoken to facing
@@ -117,46 +125,46 @@ trials each with the lores: section 4), so one cabin stop serves both.
 Vanilla stats from `route_data.py species`; elements stay vanilla.  Rows in
 `ff6/src/battle/ot6_hud.asm`.
 
-**The belly** (field group 170; the four hold pierce (TERRA's dagger),
-slash (CELES), bludgeon (the two rods), fire, holy and ice, and no bolt or
+**The belly** (field group 170; the four hold Dagger (TERRA's dagger),
+Sword (CELES), Arcane (the two rods), fire, holy and ice, and no bolt or
 poison, so the bodies weak only to those take a class, and each row keys
 two of the four):
 
 | species | L / HP | vanilla elements | shields | classes | why |
 |---|---|---|---|---|---|
-| Karkass `$0DC` | 43 / 3,850 | weak fire, holy; absorbs poison | 3 | slash, bludgeon | a carcass: break the bones |
-| Wart Puck `$07D` | 44 / 3,559 | weak fire | 3 | pierce, bludgeon | a warty imp |
-| Ogor `$068` | 44 / 4,211 | weak bolt, poison | 3 | slash, pierce | an ogre's hide |
-| Tap Dancer `$0F0` | 43 / 4,452 | weak poison | 2 | slash, bludgeon | a dancer |
-| Covert `$067` | 44 / 4,530 | weak holy; absorbs poison | 3 | pierce, bludgeon | a ninja (evade 50): pinned or crushed |
-| Woolly `$0FA` | 43 / 3,609 | weak fire; absorbs ice, bolt, poison, wind, earth, water | 3 | slash | shear the wool |
+| Karkass `$0DC` | 43 / 3,850 | weak fire, holy; absorbs poison | 3 | Katana, Arcane | a carcass: break the bones |
+| Wart Puck `$07D` | 44 / 3,559 | weak fire | 3 | Spear, Arcane | a warty imp |
+| Ogor `$068` | 44 / 4,211 | weak bolt, poison | 3 | Sword, Dagger | an ogre's hide |
+| Tap Dancer `$0F0` | 43 / 4,452 | weak poison | 2 | Katana, Arcane | a dancer |
+| Covert `$067` | 44 / 4,530 | weak holy; absorbs poison | 3 | Spear, Arcane | a ninja (evade 50): pinned or crushed |
+| Woolly `$0FA` | 43 / 3,609 | weak fire; absorbs ice, bolt, poison, wind, earth, water | 3 | Sword | shear the wool |
 | Zone Eater `$171` | 61 / 7,700 | weak holy; absorbs ice | 0 | none | the fight is to be eaten (finding 1): no gauge |
 
 **Ebot's Rock** (field groups 193 and 194, Hidon's event 94).  STRAGO,
-RELM, GOGO and TERRA hold bludgeon (the rods), pierce, fire and holy.  It is
+RELM, GOGO and TERRA hold Arcane (the rods), Dagger, fire and holy.  It is
 STRAGO's quest, so every body takes his rod beside a key of its own:
 
 | species | L / HP | vanilla elements | shields | classes | why |
 |---|---|---|---|---|---|
-| Warlock `$069` | 38 / 1,300 | weak bolt, poison | 2 | bludgeon, special | a robed caster (mdef 225) |
-| Slatter `$074` | 37 / 2,600 | weak holy | 2 | pierce, bludgeon | a shelled crawler |
-| Cluck `$09A` | 38 / 2,366 | weak ice; absorbs poison | 2 | slash, bludgeon | a bird |
-| Eland `$0A5` | 37 / 2,470 | weak bolt | 2 | pierce, bludgeon | an antelope |
-| Hipocampus `$0B5` | 37 / 2,444 | weak fire, holy; absorbs poison | 2 | pierce, bludgeon | a sea horse |
-| Displayer `$070` | 38 / 3,826 | weak fire, holy; absorbs poison | 3 | bludgeon, special | an eye |
-| Opinicus `$0C8` | 38 / 3,210 | weak fire, holy; absorbs poison | 3 | slash, bludgeon | a griffin |
-| Hidon `$123` | 43 / 25,000 | weak fire, holy, earth; absorbs poison | 6 | pierce, bludgeon | STRAGO's old foe |
-| Hidonite `$126` | 43 / 3,500 | weak earth; absorbs poison | 2 | slash, bludgeon | a claw |
-| Hidonite `$160` | 43 / 3,500 | absorbs fire, ice, bolt, poison, wind, holy, water | 2 | slash, bludgeon | drinks every element: a weapon only |
-| Hidonite `$161` | 43 / 3,500 | weak fire, holy; absorbs poison | 2 | pierce, bludgeon | a claw |
-| Hidonite `$162` | 43 / 3,500 | weak to every element | 2 | bludgeon | a claw |
+| Warlock `$069` | 38 / 1,300 | weak bolt, poison | 2 | Fist, Arcane | a robed caster (mdef 225) |
+| Slatter `$074` | 37 / 2,600 | weak holy | 2 | Dagger, Arcane | a shelled crawler |
+| Cluck `$09A` | 38 / 2,366 | weak ice; absorbs poison | 2 | Katana, Arcane | a bird |
+| Eland `$0A5` | 37 / 2,470 | weak bolt | 2 | Dagger, Arcane | an antelope |
+| Hipocampus `$0B5` | 37 / 2,444 | weak fire, holy; absorbs poison | 2 | Dagger, Arcane | a sea horse |
+| Displayer `$070` | 38 / 3,826 | weak fire, holy; absorbs poison | 3 | Fist, Arcane | an eye |
+| Opinicus `$0C8` | 38 / 3,210 | weak fire, holy; absorbs poison | 3 | Sword, Arcane | a griffin |
+| Hidon `$123` | 43 / 25,000 | weak fire, holy, earth; absorbs poison | 6 | Dagger, Arcane | STRAGO's old foe |
+| Hidonite `$126` | 43 / 3,500 | weak earth; absorbs poison | 2 | Sword, Arcane | a claw |
+| Hidonite `$160` | 43 / 3,500 | absorbs fire, ice, bolt, poison, wind, holy, water | 2 | Katana, Arcane | drinks every element: a weapon only |
+| Hidonite `$161` | 43 / 3,500 | weak fire, holy; absorbs poison | 2 | Spear, Arcane | a claw |
+| Hidonite `$162` | 43 / 3,500 | weak to every element | 2 | Arcane | a claw |
 
 **The Opera House and the sky:**
 
 | species | L / HP | vanilla elements | shields | classes | why |
 |---|---|---|---|---|---|
-| Dirt Drgn `$14C` | 53 / 28,500 | weak wind, water | 6 | pierce, bludgeon | an earth dragon: the floor's pierce and a crushing blow; STRAGO's Aqua Rake is the elemental answer |
-| Doom Gaze `$11D` | (the Phoenix Cave arc's row, unchanged) | | 8 | pierce, special | RELM's brush |
+| Dirt Drgn `$14C` | 53 / 28,500 | weak wind, water | 6 | Dagger, Arcane | an earth dragon: Dagger (the floor's pierce) and Arcane (a crushing blow, the rods); STRAGO's Aqua Rake is the elemental answer |
+| Doom Gaze `$11D` | (the Phoenix Cave arc's row, unchanged) | | 8 | Dagger, Arcane | RELM's brush |
 
 `battle_breakwor_gogo` checks the 21 rows in the built ROM, every formation
 of the pools (world group 32, field groups 170, 171, 193 and 194, events 94,
@@ -460,8 +468,8 @@ The plain around Thamasa holds four formations no leg had fought
 (334, 62.5%) and a Prussian with a GloomShell (333, 37.5%); on the grass and
 forest inside (group 55) a Harpy (331, 62.5%) and a Harpy with a Prussian
 (332, 37.5%). All three species are L41-42 with authored rows
-(route-wor-thamasa.md 4.3: Harpy pierce and ¤, GloomShell pierce and
-bludgeon, Prussian slash and bludgeon). A player meets them walking between
+(route-wor-thamasa.md 4.3: Harpy Dagger and Arcane, GloomShell Dagger and
+Arcane, Prussian Sword and Fist). A player meets them walking between
 the Falcon and Thamasa's door, so `gen_wor_thamasa_plain` plays them from
 `gen_wor_ebot`'s own boot, `wor-gogo-v1`, with the party that holds it
 (STRAGO L47, RELM L47, GOGO L42, TERRA L50). It is a branch: nothing boots

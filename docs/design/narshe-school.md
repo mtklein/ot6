@@ -11,6 +11,15 @@ advisors rewritten, and $0274's Esper pages, which were vanilla and are
 false in OT6); $026F's first page names the Boost Point; everything
 else in the school is untouched.
 
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Fist, Arcane
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are the
+> present ones. Quoted logs, dated measurements and "before" columns
+> keep the words they were recorded in: slash is now Sword or Katana,
+> pierce Dagger or Spear, bludgeon Fist or Arcane, special Arcane or
+> Dagger.
+
 ## The vanilla school (inventory, from source)
 
 Four maps. Doors and NPCs from `ff6/src/field/trigger/short_entrance.dat`
@@ -57,9 +66,11 @@ is, what the screen shows and which button to press, in the words the
 game's own screens use (the shield and '?' cells under each monster, the
 dots after each name, the R and L Buttons, the Magic list, "slashing",
 "piercing", "bludgeoning" from the battle's own "Weak against ..."
-messages). The 2026-09-28 rewrite (#289) replaced the first version's
-lore voice ("Strike NOW!", "Greed loses", the deserter's riddle about
-the Empire's plates), which players could not follow.
+messages; those messages now read "swords", "daggers", "spears",
+"katanas", "fists" and "arcane"). The 2026-09-28 rewrite (#289)
+replaced the first version's lore voice ("Strike NOW!", "Greed loses",
+the deserter's riddle about the Empire's plates), which players could
+not follow.
 
 | Key mechanic (WoB) | Advisor | Room |
 |---|---|---|

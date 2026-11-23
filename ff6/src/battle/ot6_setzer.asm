@@ -542,7 +542,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; The class (OT6_ATKCLASS), set here because nothing on GP Rain's path loads
 ; one (no MagicProp, no weapon, no item) and the per-target chip runs after
 ; this effect:
-;   Coin Toss, and any character's GP Rain: arcane (coins, like
+;   Coin Toss, and any character's GP Rain: ranged (coins are thrown, like
 ;     Setzer's cards and dice), one chip on each body it hits;
 ;   Hired Help: the sellsword's weapon fits the target -- the first of
 ;     the six classes (bit order) in the target's weakness row, or none
@@ -685,7 +685,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;                   when Shadow could not be hired)
 ;               cc  the weapon's class (Ot6CoinPrice ors it in once the
 ;                   target is known): 0 none, 1 a blade (sword, katana),
-;                   2 a point (dagger, spear), 3 a blow (fist, arcane)
+;                   2 a point (dagger, spear, ranged), 3 a blow (blunt)
 ;               L   the action's last pass (Setzer comes back after it)
 ;               F   its first (Setzer steps out before it)
 ; The pass is k = boost - $3a70: Ot6SetzerEffect adds the boost to the count
@@ -1412,7 +1412,7 @@ OT6_HIRE_YX    = $61d4-$61c7    ; a pincer walks with X this far back
 ; here, after CalcDmg), and the MP price is flat.
 ;
 ; Null-break (kits.md: the Fixed Dice are the outliers, large numbers and no
-; chip): OT6_ATKCLASS = arcane | null-break, and the element is clear.  The
+; chip): OT6_ATKCLASS = ranged | null-break, and the element is clear.  The
 ; triple can't be dodged.  The dice faces go to $b6/$b7 and $b5 = $26, the
 ; dice-roll animation vanilla's effect queues.
 ;
