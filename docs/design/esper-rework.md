@@ -114,8 +114,9 @@ the Hyper Wrist; it still counts as an earring piece (#551).
   the caster for the bounce (`OT6_REFLCASTER`, cleared after its target
   loop): a holder's spell bounced off anyone can pass 9999, and anyone
   else's bounced off a holder cannot. A controlled monster's attack is the
-  monster's. Gogo and Umaro wear no espers, so a Mimic of a holder's action
-  stops at 9999. Every heal is the heal side, a drain's heal back to the
+  monster's. Umaro wears no espers, nor does Gogo until he is revealed as
+  Leo ([leo-reveal.md](leo-reveal.md)), so their Mimic of a holder's action
+  stops at 9999; a revealed Leo's Mimic is judged by his own bit. Every heal is the heal side, a drain's heal back to the
   drainer included (9999). A fraction-of-HP heal turned to damage on an
   undead body is damage, so a holder's can pass 9999 (intended).
 
@@ -124,7 +125,7 @@ the Hyper Wrist; it still counts as an earring piece (#551).
   | the holder's own action, any command | the holder | 42,069 |
   | the holder's spell bounced off anyone | the holder (the caster) | 42,069 |
   | anyone else's spell bounced off the holder | its caster | 9999 |
-  | a controlled monster, a Mimic by Gogo | the monster, Gogo | 9999 |
+  | a controlled monster, a Mimic by Gogo (unrevealed) | the monster, Gogo | 9999 |
   | any heal, a drain's heal back | (the heal side) | 9999 |
   | a monster's hit on the party | the monster | 9999 |
 
@@ -412,7 +413,10 @@ What this says:
   the World of Balance is the grand tour (small bonuses from many stones),
   and the World of Ruin is where a character masters a few.
 - Umaro and Gogo never wear espers (vanilla; Gau can), and the bench earns
-  nothing (vanilla pays only the battle's party).
+  nothing (vanilla pays only the battle's party).  Since v0.51 Gogo revealed
+  as Leo does while Summon is one of his picks (#552 piece F,
+  [leo-reveal.md](leo-reveal.md) "Espers"): his counters are the esper
+  pages' row 12.
 
 ## Plan A — spells while worn, a ladder for keeps (recommended)
 
