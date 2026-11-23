@@ -681,6 +681,11 @@ TEST_ENV = {
     # gen_wor_leo's state after the reveal
     "battle_gogokits": "OT6_TIMEOUT=7200 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-colosseum-v1",
+    # #559: GOGO's 3-BP Mimic of an owner's plain action buys its divine
+    # (Overclock, RunicBlade, Assassinate, Ultima, Study); the cabin seats
+    # him with each round's owners beside the Falcon by Maranda
+    "battle_gogomimic": "OT6_TIMEOUT=5400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-colosseum-v1",
     # #476: a locked-in Dance step on another dancer's background rolls on
     # its start's ladder; the cabin seats MOG beside GOGO
     "battle_dancestep": "OT6_TIMEOUT=7200 "
