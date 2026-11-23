@@ -295,15 +295,20 @@ do
   check(rb(MPROP + 0x0075 * MREC + OFF_ABSORB) & BOLT ~= 0,
     "rhinox $075 ABSORBS bolt -- the area's taught element would heal it, "
     .. "which is why one class alone is legitimate here")
-  -- and that a party can pay it: under the four classes SABIN or GAU brought
-  -- bludgeon for free, five of the six parties.
+  -- and that a party can pay it.  Under the four classes SABIN or GAU brought
+  -- bludgeon for free, five of the six parties (the sixth bought a Flail).  Under
+  -- the six GAU's own body is his fangs (dagger), so a one-class row of what
+  -- bludgeon became has one holder among the picks: SABIN's knuckle and blitzes
+  -- if it is blunt, EDGAR's AutoCrossbow if it is ranged, and either way the
+  -- three parties with him (the claim recomputed, #566; the other three buy
+  -- the class: a Flail, or a Boomerang or Full Moon).
   local payable = 0
   for _, p in ipairs(parties) do
     if p.cls & keys ~= 0 then payable = payable + 1 end
   end
-  check(payable == 5, string.format(
-    "%d of the 6 free four-parties already hold formation $168's key (want 5: "
-    .. "the sixth buys a Flail)", payable))
+  check(payable == 3, string.format(
+    "%d of the 6 free four-parties already hold formation $168's key (want 3: one "
+    .. "pick's parties; 5 held bludgeon under the four classes)", payable))
 end
 
 do
