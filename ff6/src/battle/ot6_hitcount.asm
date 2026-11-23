@@ -56,9 +56,9 @@
 ; serves both.  An absent id is one hit, which is vanilla.
 
 Ot6HitCountTbl:
-        .byte   $5d, 1          ; pummel    x2 bludgeoning
-        .byte   $64, 3          ; bum rush  x4 bludgeoning
-        .byte   $a8, 1          ; drill     x2 piercing
+        .byte   $5d, 1          ; pummel    x2 blunt
+        .byte   $64, 3          ; bum rush  x4 blunt
+        .byte   $a8, 1          ; drill     x2 spear
         .byte   $ff
 
 ; ------------------------------------------------------------------------------
