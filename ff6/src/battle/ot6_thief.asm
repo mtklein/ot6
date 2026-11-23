@@ -1059,7 +1059,8 @@ done:   plp
         longa
         clc
         stz     $ee
-        lda     f:ItemProp+1,x  ; equippable characters
+        jsl     Ot6EquipWord    ; equippable characters, with the
+                                ;   Dragoon Boots' spears (#567)
         ldx     #$0006
 @chr:   bit     $3a20,x         ; actor mask
         bne     :+

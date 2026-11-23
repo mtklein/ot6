@@ -191,6 +191,9 @@ OT6_LEO_SWITCH = $00e0
 OT6_LEO_FLAG := $7e1e80 + (OT6_LEO_SWITCH >> 3)
 OT6_LEO_BIT = 1 << (OT6_LEO_SWITCH & 7)
 .global Ot6LeoReveal, Ot6LeoBattleRow, Ot6LeoActorMask
+; #567: an item's equip word with the Dragoon Boots' spear permit
+; (battle/ot6_spear.asm), for every equippability check, menu and battle
+.global Ot6EquipWord, Ot6SpearPermit, Ot6ReequipRelics, Ot6ReequipRelicTbl
 .global Ot6EsperVictory, Ot6VictoryNext ; #552 piece F: a revealed Leo earns at
                                  ;   victory (ot6_esper.asm; the loop's next member)
 .global Ot6FieldLeoMagic         ; #552 piece F: his own stone's spells in the

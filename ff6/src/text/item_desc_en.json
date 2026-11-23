@@ -198,7 +198,7 @@
     "Casts ``Float''",
     "Casts ``Regen''",
     "Protects party memebers who{n}are low on HP",
-    "Changes ``Fight'' into ``Jump''",
+    "Changes ``Fight'' into ``Jump''{n}Any spear can be equipped",
     "Dodges attacks more easily",
     "Casts ``Safe'', ``Shell'' when HP{n}is low",
     "Is cursed",

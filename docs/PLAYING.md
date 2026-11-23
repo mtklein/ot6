@@ -69,6 +69,11 @@ Skills have a type of their own: a Blitz keeps its type whatever Sabin
 wears, and Edgar's Chain Saw is slashing. A weapon with an element hits the
 weapon's type and its element at once.
 
+The Dragoon Boots let the wearer equip any spear, Gau and Gogo included
+(not Umaro, who keeps his club). Take the boots off and the spear comes
+off with them: the menu re-equips the character, as it does for the Genji
+Glove, Gauntlet and Merit Award.
+
 ### Elements
 
 Fire, ice, lightning, wind, earth, water, holy and poison. A spell hits the
