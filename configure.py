@@ -690,6 +690,11 @@ TEST_ENV = {
     # its start's ladder; the cabin seats MOG beside GOGO
     "battle_dancestep": "OT6_TIMEOUT=7200 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
+    # a boosted Dance opens on its rare step (owner, 2026-11-23): MOG's and
+    # GOGO's starts at 0-3 BP, the stumble, later steps and an engine start,
+    # from the same cabin seating
+    "battle_danceopener": "OT6_TIMEOUT=7200 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
     # #478: Water Rondo offered, rolled and drawn like any dance, from the
     # save outside Nikeah after MOG learns it
     "battle_waterrondo": "OT6_TIMEOUT=3600 "
