@@ -8,10 +8,14 @@ and its effect. Cite evidence in the commit message.
 There are six weapon types now, where there were four: Sword, Dagger, Spear,
 Katana, Blunt and Ranged. With four, almost any party could break almost any
 enemy with its weapons; with six, who you bring and what they hold matters
-more. Every enemy has as many weapon weaknesses as before. Each old one
-became a type its own weapons went to: slashing is now Sword or Katana,
+more. Most enemies have as many weapon weaknesses as before, each old one
+now a type its own weapons went to: slashing is now Sword or Katana,
 piercing Dagger, Spear or Ranged, bludgeoning Blunt or Ranged, special
-Ranged or Blunt. The icons under an enemy, the icon on each weapon's name
+Ranged or Blunt. The enemies from the Narshe mines to Zozo were set by hand
+for the party you have when you meet them, so each new member's type
+matters soon after they join (Locke's daggers, Edgar's AutoCrossbow,
+Sabin's fists, Cyan's katana, Gau's fangs). The Narshe school's weapon
+advisor explains the six. The icons under an enemy, the icon on each weapon's name
 and the type word in the item menu show the six, and the first hit on a
 hidden weakness says which it was ("Weak against swords", daggers, spears,
 katanas, blunt or ranged).
