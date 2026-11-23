@@ -8,12 +8,12 @@
 ; Ot6UmaroRetaliate), so a full boost for him is a dump of all three points.
 ; Two things here make that a kit:
 ;
-;   * Charge and Throw are bludgeoning (Ot6UmaroCharge, Ot6UmaroThrow, just
+;   * Charge and Throw are fist class (Ot6UmaroCharge, Ot6UmaroThrow, just
 ;     before each runs ExecAttack).  Each loads the classless "battle"
 ;     record and swings no weapon, so neither chipped anything
 ;     (measured: class $00 at every Charge pass).  A body slammed or an ally
 ;     hurled is a club's blow.  His Fight takes his weapon's class (a Bone
-;     Club, or bare fists: bludgeoning) and Storm its element (ice), as they
+;     Club, or bare fists: both fist) and Storm its element (ice), as they
 ;     did.
 ;   * His divine: a full dump is always Storm.  With three points pending at
 ;     his chooser the roll is not made: he Storms, ice on every enemy at the

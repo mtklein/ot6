@@ -1910,7 +1910,7 @@ done:   rts
 ; there (MonsterProp+26) rather than an item, so their swings carry no class.
 ; (raged gau inherits the rage monster's graphics code into both hands
 ; through SetRage, so his raged fights can read a junk class: a known
-; defect until rage is retired for capture. plain gau punches bludgeon, $ff.)
+; defect until rage is retired for capture. plain gau punches fist, $ff.)
 
 .proc Ot6WeaponClass
         .a8
