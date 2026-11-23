@@ -13,6 +13,7 @@
 --        through Skills -> Espers -> its page -> A (H.equipEsper): record 12's +$1E reads E.  E is the first such
 --        stone with a spell S that none of the three others knows, nor gets from a worn stone or item, nor GOGO's
 --        Lore carry (so only his own stone can put S in the battle union);
+--        His field Magic list (Skills -> Magic) then holds S beside what the others know (Ot6FieldLeoMagic);
 --     3. random battles on the shore by Thamasa, fought through the menus (H.kitBattle: LEO's Magic -> the esper
 --        row -> the target, the others Fight): at each battle's open his Magic list (the battle union, which
 --        Gogo's slot takes whole) holds S (Ot6UnionEspers) and its esper row is E; Cmd_19 (Summon) runs for his
@@ -30,7 +31,7 @@
 -- row 12 reading as no progress, the junk saves' $FF rows included).
 -- Mutant ROMs (tools/build/mutant_rom.py) that must turn this red, one per property: Ot6LeoGenjuRow=60 (his
 -- Espers row stays grey after the reveal), Ot6LeoGenjuRow+4=A901 (white before it), Ot6UnionLeo=3860 (S not in
--- his list), VictoryLeo+4=EAEAEAEA (no earn), FoldHolder=38EAEA (no fold), LeoRowGate=EAEA (the Continue
+-- his list), FieldLeo=2900 (S not in his field list), VictoryLeo+4=EAEAEAEA (no earn), FoldHolder=38EAEA (no fold), LeoRowGate=EAEA (the Continue
 -- drops row 12).  Screenshots (build/states/shots/battle_leoespers_*).
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -105,6 +106,39 @@ local function skillsRow(tag, out)
       if ph < 4 then H.setPad(held) else H.setPad({}) end
     end),
   }, tag .. ": the Skills list for GOGO's slot"), function() ph, phase, presses = 0, "in", 0 end)
+end
+
+-- ---- his field Magic list (Skills -> Magic): the spell ids drawn ($7E9D89, field_subjob's reading) ----------
+local function fieldMagic(out)
+  local ph, phase, wait = 0, "in", 0
+  return H.withReset(H.driveUntil(function() return phase == "done" and not H.menuRunning() and ctl() end, 6000, {
+    H.call(function()
+      ph = (ph + 1) % 12
+      local s, held = st(), {}
+      if phase == "in" then
+        if s == -1 then
+          if ctl() then held = { "x" } end
+        elseif s == ST_MAIN then
+          held = H.readByte(0x4B) == 1 and { "a" } or { [H.readByte(0x4B) < 1 and "down" or "up"] = true }
+        elseif s == ST_CHAR then
+          local p = posOf(GOGO)
+          held = H.readByte(0x4B) == p and { "a" } or { [H.readByte(0x4B) < p and "down" or "up"] = true }
+        elseif s == ST_SKILLS then
+          held = H.readByte(0x4B) == 1 and { "a" } or { [H.readByte(0x4B) < 1 and "down" or "up"] = true }
+        elseif s == 0x1A then
+          wait = wait + 1
+          if wait >= 120 then
+            for i = 0, 0x35 do out[#out + 1] = H.readByte(0x7E9D89 + i) end
+            H.screenshot("battle_leoespers_fieldmagic")
+            phase = "out"
+          end
+        end
+      else
+        if s ~= -1 then held = { "b" } else phase = "done" end
+      end
+      if ph < 4 then H.setPad(held) else H.setPad({}) end
+    end),
+  }, "LEO's field Magic list"), function() ph, phase, wait = 0, "in", 0 end)
 end
 
 -- ---- Magic into one of his three rows (battle_leoshock's walk through the Status screen) --------------------
@@ -217,7 +251,7 @@ end
 local function stats(e)
   return { H.readByte(0x3B2C + e) // 2, H.readByte(0x3B19 + e), H.readByte(0x3B40 + e), H.readByte(0x3B41 + e) }
 end
-local base, nBattles, reached, afterReach = nil, 0, false, false
+local base, nBattles, reached, afterReach, cycleDone = nil, 0, false, false, false
 
 local function openBattle()
   seat = nil
@@ -285,6 +319,7 @@ local function shoreBattle()
   local wp = 1
   local pts = { SHORE, FALCON }
   return H.seqStep({
+    H.call(function() cycleDone = false end),
     H.driveUntil(function() return H.battleLoadStarted() end, 60000, {
       H.worldNavTo(function() return pts[wp][1] end, function() return pts[wp][2] end,
         { maxFrames = 6000, arrive = function() return H.battleLoadStarted() end }),
@@ -297,6 +332,7 @@ local function shoreBattle()
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the map", 2),
     H.call(closeBattle),
     H.fieldCare({ tag = "care between battles" }),
+    H.call(function() cycleDone = true end),
   })
 end
 
@@ -370,7 +406,20 @@ H.run({ maxFrames = 600000 }, {
   H.call(function()
     H.assertEq(worn(GOGO), E, string.format("LEO wears the stone (record 12's +$1E = $%02X)", E))
   end),
-  H.driveUntil(function() return afterReach end, 500000, {
+  (function()
+    local list = {}
+    return H.seqStep({
+      fieldMagic(list),
+      H.call(function()
+        local has = false
+        for _, id in ipairs(list) do if id == S then has = true end end
+        H.log(string.format("[leoespers] his field Magic list holds $%02X: %s", S, tostring(has)))
+        H.assertEq(has, true, string.format("his field Magic list holds $%02X, which only his stone grants "
+          .. "(Ot6FieldLeoMagic)", S))
+      end),
+    })
+  end)(),
+  H.driveUntil(function() return afterReach and cycleDone end, 500000, {
     H.call(function() H.assertEq(nBattles < 10, true, "rung 1 reached and a battle opened after it, within ten") end),
     shoreBattle(),
   }, "battles until his first rung is held in a battle"),
