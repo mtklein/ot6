@@ -28,13 +28,16 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
 -- crept in, and the split across bodies and the special chip stopped
 -- running): at least one toss over two or more bodies, and at least one
--- chip on a special-weak body
-local function coverage(all, tag)
+-- chip on a special-weak body (up to two more crowds, one GP Rain each, when
+-- the crowd's special-weak body is broken or dead by the time the coins land)
+local function coverage(alls, tag)
   local split, chip = 0, 0
-  for _, ps in ipairs(all) do
-    for _, p in ipairs(ps) do
-      if #p.hits >= 2 then split = split + 1 end
-      for _, h in ipairs(p.hits) do if h.chip then chip = chip + 1 end end
+  for _, all in ipairs(alls) do
+    for _, ps in ipairs(all) do
+      for _, p in ipairs(ps) do
+        if #p.hits >= 2 then split = split + 1 end
+        for _, h in ipairs(p.hits) do if h.chip then chip = chip + 1 end end
+      end
     end
   end
   H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d special chip(s)", tag, split, chip))
@@ -49,26 +52,67 @@ local function checkRain(r, i)
 end
 
 local WANT = { { cmd = 0x18, boost = 1 }, { cmd = 0x18, boost = 0 } }
-local walk, S = H.setzerCrowdBattles({
-  tag = "gprain", want = WANT, wps = { { 124, 26 }, { 120, 11 } },
-  onBattle = function()
-    local slot = nil
-    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == SETZER then slot = s end end
-    H.assertEq(slot ~= nil, true, "SETZER is seated")
-    local cmds = {}
-    for r = 0, 3 do cmds[#cmds + 1] = H.readByte(0x202E + slot * 12 + r * 3) end
-    local rain, slotCmd = false, false
-    for _, c in ipairs(cmds) do if c == 0x18 then rain = true elseif c == 0x0F then slotCmd = true end end
-    H.log(string.format("[gprain] SETZER's commands: $%02X $%02X $%02X $%02X", cmds[1], cmds[2], cmds[3], cmds[4]))
-    H.assertEq(rain, true, "the relic gives SETZER GP Rain")
-    H.assertEq(slotCmd, false, "in place of Slot")
-  end,
-  check = function(rec, i)
-    H.assertEq(rec.row, 0x18, string.format("record %d is a GP Rain", i))
-    H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
-    return checkRain(rec, i)
-  end,
-})
+local function crowdWalk(tag, want)
+  return H.setzerCrowdBattles({
+    tag = tag, want = want, wps = { { 124, 26 }, { 120, 11 } },
+    onBattle = function()
+      local slot = nil
+      for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == SETZER then slot = s end end
+      H.assertEq(slot ~= nil, true, "SETZER is seated")
+      local cmds = {}
+      for r = 0, 3 do cmds[#cmds + 1] = H.readByte(0x202E + slot * 12 + r * 3) end
+      local rain, slotCmd = false, false
+      for _, c in ipairs(cmds) do if c == 0x18 then rain = true elseif c == 0x0F then slotCmd = true end end
+      H.log(string.format("[gprain] SETZER's commands: $%02X $%02X $%02X $%02X", cmds[1], cmds[2], cmds[3], cmds[4]))
+      H.assertEq(rain, true, "the relic gives SETZER GP Rain")
+      H.assertEq(slotCmd, false, "in place of Slot")
+    end,
+    check = function(rec, i)
+      H.assertEq(rec.row, 0x18, string.format("record %d is a GP Rain", i))
+      H.assertEq(rec.boost, want[i].boost, string.format("record %d ran at its planned boost", i))
+      return checkRain(rec, i)
+    end,
+  })
+end
+local walk, S = crowdWalk("gprain", WANT)
+-- A crowd is chosen as it opens (two or more bodies, one special-weak and
+-- shielded), and the special-weak body can be Broken or dead by the time
+-- SETZER's coins land: v0.50's replay, his GP Rain confirmed at f4384 and
+-- run at f5632 on a body broken in between ('slot 0: HP 1385 -> 0, shields
+-- 0 -> 0, broken 14 -> 11, row 0B', build/attempts/wt/v050-multihit-anim/
+-- ab/gprain_windowrecheck_red.log), so no toss could chip.  As
+-- battle_cointoss does: up to two more crowds, one GP Rain each, until a
+-- toss chips one; the coverage then holds over every toss played.
+local EXTRA = 2
+local extras = {}
+for e = 1, EXTRA do
+  local w, s2 = crowdWalk("gprain extra " .. e, { { cmd = 0x18, boost = 0 } })
+  extras[e] = { walk = w, S = s2 }
+end
+local function played()
+  local alls = { S.all }
+  for _, x in ipairs(extras) do if #x.S.done > 0 then alls[#alls + 1] = x.S.all end end
+  return alls
+end
+local function chips(alls)
+  local n = 0
+  for _, all in ipairs(alls) do
+    for _, ps in ipairs(all) do
+      for _, p in ipairs(ps) do for _, h in ipairs(p.hits) do if h.chip then n = n + 1 end end end
+    end
+  end
+  return n
+end
+local extraSteps = {}
+for e = 1, EXTRA do
+  extraSteps[#extraSteps + 1] = H.cond(function() return chips(played()) == 0 end, {
+    H.call(function()
+      H.log(string.format("[gprain] no toss so far chipped a special-weak body (it was broken or dead when the "
+        .. "coins landed): crowd %d more, one GP Rain", e))
+    end),
+    extras[e].walk,
+  }, {})
+end
 
 H.run({ maxFrames = 1200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
@@ -88,9 +132,10 @@ H.run({ maxFrames = 1200000 }, {
     H.assertEq(H.readByte(0x1600 + 37 * SETZER + 0x23), COIN_TOSS_RELIC, "SETZER still wears the Coin Toss relic")
   end),
   walk,
+  H.cond(function() return true end, extraSteps),
   H.call(function()
     H.assertEq(#S.done, #WANT, "two GP Rains resolved")
-    coverage(S.all, "gprain")
+    coverage(played(), "gprain")
     H.log(string.format("[gprain] PASSED: %d GP Rains over %d battle(s), %d of them crowds", #S.done, S.battles,
       S.crowds))
   end),

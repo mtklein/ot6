@@ -23,6 +23,8 @@
 -- bludgeon, so main's ROM passes here (the class chip takes the same one); the bumrush_double mutant (two a blow)
 -- is red: build/attempts/wt/v041-divines-2/mx/mx3/.  The keyless take's behavioural red, a body that does not
 -- key bludgeon losing one shield a landed blow, is battle_bumrushmimic's (a staged body in the factory's battles).
+-- (#554) The script plays the Bum Rush animation once: each blow after the first is a folded strike (command $04,
+-- Ot6GfxCmdFold: no animation, a beat), and each landed blow has its numeral; v0.49's ROM plays it once a blow.
 -- MP is a soft precondition, topped up the way a player would (field care between battles), and asserted at each
 -- battle's start.  A battle SABIN cannot act in, or one that ends before the action resolves, is fought out and
 -- not counted.
@@ -81,6 +83,23 @@ local function arm()
         keyed = (H.readByte(BP_CLASS + e) & BLUDGEON) ~= 0 }
     end
   end, emu.callbackType.exec, join, join)
+  -- #554: the battle script the action queued, read as BtlGfx_04 starts to play it (the first after the
+  -- command ran: ExecCmd plays it once the attack loop is done)
+  local b4 = H.sym("BtlGfx_04")
+  emu.addMemoryCallback(function()
+    if rec == nil or rec.ran == nil or rec.script ~= nil then return end
+    local n = { name = 0, anim = 0, fold = 0, num = 0, codes = {} }
+    for i = 0, 63 do
+      local c, b1 = H.readByte(0x2D6E + i * 4), H.readByte(0x2D6F + i * 4)
+      if c == 0xFF then break end
+      n.codes[#n.codes + 1] = string.format("%02X", c)
+      if c == 0x01 then n.name = n.name + 1
+      elseif c == 0x06 and b1 == CMD_BLITZ then n.anim = n.anim + 1
+      elseif c == 0x04 then n.fold = n.fold + 1
+      elseif c == 0x0B then n.num = n.num + 1 end
+    end
+    rec.script = n
+  end, emu.callbackType.exec, b4, b4)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if rec == nil or rec.ended or seat == nil or not sabinX() or rec.ran == nil then return end
@@ -141,6 +160,16 @@ local function judge()
       (e - 8) // 2, w.keyed and "it keys bludgeon" or "it does not key bludgeon"))
     H.assertEq(got.br, w.br, string.format("slot %d: Broken exactly when the blows took its last shield", (e - 8) // 2))
   end
+  -- #554: one animation per use.  Every blow stays a pass (the takes above); the script plays the Bum Rush
+  -- animation once, each later blow as a folded strike (command $04: no animation, a beat), with a numeral each.
+  -- One body, so each landed blow is one pass's numeral.
+  local n = r.script
+  H.assertEq(n ~= nil, true, "the action's battle script was read as BtlGfx_04 played it")
+  H.log(string.format("[bumrush] stage %d: script [%s]: %d name, %d Blitz animation(s), %d folded strike(s), "
+    .. "%d numeral(s), %d blow(s) landed", stage, table.concat(n.codes, " "), n.name, n.anim, n.fold, n.num, r.hits))
+  H.assertEq(n.anim, 1, "the script plays the Bum Rush animation ONCE (#554: once per blow before)")
+  H.assertEq(n.fold, r.hits - 1, "each blow after the first is a folded strike: no animation")
+  H.assertEq(n.num, r.hits, "and each landed blow has its numeral")
   H.assertEq(r.mp0 - r.mp1, BUMRUSH_MP, "Bum Rush cost 99 MP")
   H.assertEq(r.bank1, r.bank0 - 3, "the bank paid the full boost")
   return true

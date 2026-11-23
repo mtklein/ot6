@@ -35,9 +35,9 @@
 ; Ot6ActionEnd, the same tick that decides the blocker's own regen, and is
 ; set only when a pip is actually banked.
 ;
-; The pip lands on the damage frame, not this one: this proc arms
-; OT6_PIPSLOT/OT6_PIPTAIL right here, but painting defers via OT6_PIPPEND —
-; Ot6PipPending (ot6_hud.asm) moves it into the live cell — because what a
+; The pip lands on the damage frame, not this one: this proc banks the
+; point right here, but its paint defers via OT6_PIPPEND (Ot6PipFace holds
+; the row a pip short until Ot6PipPending, ot6_hud.asm, clears it), because what a
 ; player perceives as "the block" is the hit landing on the blocker, not this
 ; earlier commit. A missed cover still paints, on the "Miss" frame; see that
 ; proc for the Ot6ActionEnd backstop.

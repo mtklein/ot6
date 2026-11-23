@@ -160,13 +160,7 @@ OT6_SLOTTIER         := $57ba   ; Slot's stored boost tier:
                                 ;   OT6_BOOST_REVEALED by Ot6SlotCommit so
                                 ;   Ot6ActionEnd charges what the reels
                                 ;   delivered (ot6_slot.asm, the Slot strip)
-OT6_PIPTAIL          := $57bb   ; frames of live pip painting left after
-                                ;   an ActionEnd with the battle menu closed.
-                                ;   keeps the charge visible on its own
-                                ;   frame.  set by Ot6ActionEnd (characters),
-                                ;   decremented by Ot6PipStage, cleared by
-                                ;   InitBP (init-exempt strip: power-on junk
-                                ;   would paint pips over the intro).
+; $57bb held OT6_PIPTAIL until v0.50 (written, never read since #540); free.
 OT6_RANDPEND         := $57bc
 OT6_RANDBTL          := $57bd
 OT6_HUDVEIL          := $57be
@@ -211,20 +205,28 @@ OT6_WALLET_W         = 5        ; [M][P][hundreds][tens][ones]
 OT6_WALLETCELLS      := $ed61   ; OT6_WALLET_W words
 OT6_WALLETSIG        := $ed6d   ; staged MP value; the flush repaints only
 OT6_WALLETSIGP       := $ed6f   ;   when CUR or SIG moves (see the flush)
-OT6_PIPSLOT          := $ed6b   ; the character slot the live pip cell
-                                ;   follows while OT6_PIPTAIL runs, the
-                                ;   one who just spent BP (Ot6ActionEnd sets
-                                ;   both)
+OT6_FOLDN            := $ed6b   ; #554: a fixed multi-hit's strikes per
+                                ;   animation (Ot6HitCountTbl's extra + 1;
+                                ;   0 = every pass animates).  set by
+                                ;   Ot6HitCount, cleared by Ot6PassesAdded
+                                ;   (any other adder) and Ot6PassesDone (the
+                                ;   action's end); read by Ot6FoldAnim only
+                                ;   while OT6_PASSRETARGET marks the action.
+                                ;   (held OT6_PIPSLOT until v0.50.)
 ; The wallet's five glyph|attr words are written unrolled (OT6_WALLETCELLS+0
 ; through +9, ot6_hud.asm:1474-1516), so no code mentions the
 ; width.  That is why OT6_WALLET_W is a comment-only symbol,
 ; and why a sixth cell could be added there without anyone noticing that the
-; run ends flush against OT6_PIPSLOT with no slack.  The assert below catches
-; that.  Equality is the current, intended fit ($ed61 + 10 =
-; $ed6b), so the bound is <=, not <.
-.assert OT6_WALLETCELLS + OT6_WALLET_W * 2 <= OT6_PIPSLOT, error, "OT6 wallet cells run into OT6_PIPSLOT"
-; $ed73 held the one-byte OT6_RAGETIER until v0.45; it is free now (the tier is
-; per character, at the end of the shadow tail below).
+; run ends flush against OT6_FOLDN with no slack.  The assert below catches
+; that.  Equality is the current, intended fit ($ed61 + 10 = $ed6b), so the
+; bound is <=, not <.
+.assert OT6_WALLETCELLS + OT6_WALLET_W * 2 <= OT6_FOLDN, error, "OT6 wallet cells run into OT6_FOLDN"
+OT6_FOLDPASS         := $ed73   ; #554: animated passes still to fold in
+                                ;   the current strike group (Ot6FoldAnim's
+                                ;   countdown; 0 = the next pass animates).
+                                ;   (held the one-byte OT6_RAGETIER until
+                                ;   v0.45; the tier is per character now, at
+                                ;   the end of the shadow tail below.)
 OT6_NUMCTR           := $ed71   ; last-seen damage-numeral thread counter
                                 ;   ($632e).  a change means GfxCmd_0b has
                                 ;   allocated a numeral (the damage frame)
@@ -243,17 +245,15 @@ OT6_COVERPAID        := $ed72   ; per-character bitmask (----1234, the
 OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
                                 ;   + 1 (0 = nothing pending).  Ot6CoverBP
                                 ;   banks the blocker here at the cover commit
-                                ;   instead of arming OT6_PIPSLOT/OT6_PIPTAIL
-                                ;   directly, because that commit precedes the
-                                ;   damage numeral by many frames while the
-                                ;   tail is short, so the pip would flash and
-                                ;   fade before the block visibly landed.
-                                ;   Ot6PipPending (ot6_hud.asm) moves
-                                ;   it into the live cell on the numeral frame,
-                                ;   as Ot6RevealCommit/Ot6RevealPoll do
-                                ;   for weakness reveals.  A stale value would
-                                ;   paint a spurious pip on the first numeral
-                                ;   of the next battle, so InitBP clears it.
+                                ;   and Ot6PipFace shows his row a pip short
+                                ;   until Ot6PipPending clears it on the
+                                ;   damage numeral, because that commit
+                                ;   precedes the numeral by many frames.
+                                ;   Ot6PipPending (ot6_hud.asm) clears it on
+                                ;   the numeral frame, as Ot6RevealCommit/
+                                ;   Ot6RevealPoll commit weakness reveals.  A
+                                ;   stale value would hold a row a pip short
+                                ;   into the next battle, so InitBP clears it.
 ; the break flash.  One byte per monster slot, stride 2 and indexed by
 ; the slot offset 0,2..10 like OT6_RVPEND_* (so a chip holding the
 ; entity offset in y writes OT6_BRKTICK-8,y and the walkers read

@@ -64,14 +64,18 @@ OT6_PASSES_STAY = 1
 ; jsl right after an adder's `sta $3a70`: OT6_PASSRETARGET = $3a70 as it now
 ; stands, the count the first pass will run at (nothing between the adders
 ; and that pass's ChooseTarget writes $3a70).  0 = no passes added, which is
-; also InitGfxScript's reset.  Preserves A, X, Y and every flag (Ot6HitCount
-; promises its caller the carry).  a8, either index width, any data bank.
+; also InitGfxScript's reset.  And no strike folding (#554, OT6_FOLDN) unless
+; Ot6HitCount sets it after its adders.  Preserves A, X, Y and every flag
+; (Ot6HitCount promises its caller the carry).  a8, either index width, any
+; data bank.
 .proc Ot6PassesAdded
         .a8
         php
         pha
         lda     f:$7e0000+$3a70
         sta     f:$7e0000+OT6_PASSRETARGET
+        lda     #$00
+        sta     f:$7e0000+OT6_FOLDN
         pla
         plp
         rtl
@@ -129,6 +133,7 @@ OT6_PASSES_STAY = 1
         pha
         lda     #$00
         sta     f:$7e0000+OT6_PASSRETARGET
+        sta     f:$7e0000+OT6_FOLDN     ; #554: and its strike folding
         pla
         plp
         rtl

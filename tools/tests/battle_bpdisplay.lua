@@ -30,7 +30,8 @@
 -- cell never makes a run of six, and its frames are too few to stand out of
 -- the lag in a total (the old bound of 60 such frames passed with c1122cce
 -- reverted as on main, #548), but it reverts every few frames: a row may
--- revert at most REV_EPISODES times.  Coverage is asserted too: the
+-- revert at most REV_EPISODES times, and never back to a withheld regen
+-- point's face once the earned point showed.  Coverage is asserted too: the
 -- battle shows a confirmed boost's arrows with that character's window shut,
 -- a withheld regen point, and boosted actions beginning and spending.
 --
@@ -53,14 +54,20 @@ local function bank(c) return H.readByte(0x3E9C + c * 2) end
 local function pend(c) return H.readByte(0x3E9D + c * 2) end
 
 local W = { viol = {}, queuedArrows = 0, withheld = 0, begins = 0, spent = 0, kept = 0, frames = 0, mismRow = {},
-  revRow = {}, revMax = {}, revs = {} }
--- reversions a row may make in the battle.  Not zero: a window's open still
--- flickers the cell of the character it opens for (its withheld face back
--- for up to five frames after the earned one showed; 1-5 a row in 24 draws
--- on v0.50, the frame trace in build/attempts/wt/v050-tooling/548-5/), a
--- display bug of c1122cce's class left to the ROM; an alternating cell, a
--- second writer fighting the flush, makes one every few frames
-local REV_EPISODES = 8
+  revRow = {}, revMax = {}, revs = {}, revWithheld = 0 }
+-- reversions a row may make in the battle.  Not zero: the menu's staged copy
+-- of the party window can land over the flush's cell for up to three frames
+-- as a boost is raised, spent or begun.  Measured with Ot6WindowOpenNames:
+-- at most 2 a row in 24 draws on the graph's ultros-won-v1 capture
+-- (PACE_BURN 0-7 x shift 0,4,9, build/attempts/wt/v050-multihit-anim/bpd/
+-- fix24/), at most 3 in 12 on the tracked battery (bpd/fix2/); the bound is
+-- the worst seen.  Before it, the withheld point's face came back after the
+-- earned one showed (a window's open staged the names before $7bca was set):
+-- every one of the same 24 draws is red, on that assertion (22) or the
+-- six-frame violation (2), and rows reverted up to 4 times (bpd/nofix24/).
+-- An alternating cell, a second writer fighting the flush, makes one every
+-- few frames
+local REV_EPISODES = 3
 local st = {}
 for c = 0, 3 do st[c] = { begun = false, owed = false, mism = 0, seen = false } end
 
@@ -230,6 +237,10 @@ local function sample()
           end
           if s.shown then
             W.revRow[r] = (W.revRow[r] or 0) + 1
+            -- the earned point shown, then the withheld face again (#548)
+            if not s.begun and p == 0 and want == "p" .. b and got == "p" .. (b - 1) then
+              W.revWithheld = W.revWithheld + 1
+            end
             if #W.revs < 20 then
               W.revs[#W.revs + 1] = string.format("f%d row %d (slot %d): showed %s, now %s, the rule still %s%s "
                 .. "(bank %d, pending %d, begun %s, regen not yet shown %s)", H.frame, r, c, s.lastGot, got, want,
@@ -289,6 +300,8 @@ H.run({ maxFrames = 200000 }, {
     for r = 0, 3 do revWorst = math.max(revWorst, W.revRow[r] or 0) end
     H.assertEq(revWorst <= REV_EPISODES, true, string.format("no pip cell left the rule's face before the rule "
       .. "moved more than %d times (worst row %d; the first: %s)", REV_EPISODES, revWorst, W.revs[1] or "none"))
+    H.assertEq(W.revWithheld, 0, "no cell went back to a withheld regen point's face after the earned point "
+      .. "showed (#548: a window's open staged the names before the point was shown)")
     H.assertEq(W.begins >= 2 and W.spent >= 2, true,
       "coverage: at least two boosted actions began and spent their points")
     H.assertEq(W.queuedArrows > 0, true,

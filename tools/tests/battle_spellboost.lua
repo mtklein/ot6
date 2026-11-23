@@ -55,8 +55,12 @@ local CASES = {
   { name = "Cure 2 picked on an ally, R at the target", entry = { who = TERRA, cmd = CMD_MAGIC, spell = CURE,
       boost = 1, bank = 2, raiseTo = 2, tgtPresses = 1, ally = true }, list = CURE, pend = 1, cast = CURE2,
       spent = 1 },
+  -- (up to three R taps, stopping at 2: the target select's first frames can pass before the hud builder runs
+  -- Ot6Boost, and a tap there is never read -- v0.50's replay held R six frames with OT6_LASTLR unmoved, 'f10734
+  -- tgt actor 00 bank 2 pend 1 held 10 ... lastlr 00', and the second tap raised it,
+  -- build/attempts/wt/v050-multihit-anim/ab/spellboost_dbg2.log)
   { name = "Fight at 1 point, R at its target", entry = { who = TERRA, cmd = CMD_FIGHT, boost = 1, bank = 2,
-      raiseTo = 2, tgtPresses = 1 }, pend = 2, fight = true, spent = 2 },
+      raiseTo = 2, tgtPresses = 3 }, pend = 2, fight = true, spent = 2 },
 }
 
 local case, ci, rec = nil, 1, nil

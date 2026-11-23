@@ -26,7 +26,6 @@
         sta     f:$7e0000+OT6_RANDPEND
         sta     f:$7e0000+OT6_HUDVEIL   ; a stale veil never survives init
         sta     f:$7e0000+OT6_SCRIPTBUSY ; nor a stuck anchor-adopt gate
-        sta     f:$7e0000+OT6_PIPTAIL   ; nor a stale pip-paint tail
         sta     f:$7e0000+OT6_COVERPAID ; nor a stale cover-earn flag: a
                                 ;   stale bit would eat the first cover of
                                 ;   the battle instead of costing a no-op
@@ -252,12 +251,6 @@
         sta     f:$7e0000+OT6_HPMARK,x  ;   measured against.  Drawn on both
         shorta0                 ;   arms and on every character turn, so the
                                 ;   retaliation tally is always "since I last swung"
-        txa                     ; the live pip cell follows this actor
-        lsr                     ;   entity offset -> character slot
-        sta     f:$7e0000+OT6_PIPSLOT
-        lda     #32             ;   for ~half a second past this charge, so
-        sta     f:$7e0000+OT6_PIPTAIL   ;   the drop lands on screen even
-                                ;   when no battle menu is open at resolution
         lda     $3018,x         ; the round boundary for the True Knight
         eor     #$ff            ;   cover earn.  this actor's turn is ending,
         and     f:$7e0000+OT6_COVERPAID  ;   so his next cover pays again:

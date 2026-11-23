@@ -297,6 +297,10 @@ local function install()
           cur.staged = cur.staged | (1 << m)
         end
       end
+      if cur.staged == 0 then
+        H.log(string.format("[gogokits] f%d GOGO's %d-BP throw: no standing monster without a Death ward to "
+          .. "stage: not counted, played again next battle", H.frame, cur.pend))
+      end
     end
     if cur.cmd == CMD.MAGIC then
       -- the model's prices, read while the seat's relics are the battle's
@@ -505,8 +509,16 @@ local ROUNDS = {
         H.assertEq(a.atk, BUMRUSH, "R3: GOGO's Blitz at 3 BP ran Bum Rush")
         H.assertEq(a.mp0 - a.mp1, 99, "R3: for 99 MP")
       end },
+    -- a throw where no standing monster could be staged (every one wards
+    -- Death, $3AA1 bit 2: v0.50's replay drew formation 00D2 0087 00B0 00B0,
+    -- 'R3 staging: a standing non-boss monster was Broken as the throw began:
+    -- got false', build/attempts/wt/v050-multihit-anim/
+    -- qual8_battle_gogokits_red.log) is not counted: the entry is played
+    -- again in the round's next battle
     { tag = "assassinate", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 3 },
-      done = function() return lastAct(CMD.THROW, nil, 3) ~= nil end, check = function()
+      done = function() local a = lastAct(CMD.THROW, nil, 3); return a ~= nil and a.staged ~= 0 end,
+      playedHere = function() local a = lastAct(CMD.THROW, nil, 3); return a ~= nil and a.f >= got.battleF0 end,
+      check = function()
         local a = lastAct(CMD.THROW, nil, 3)
         H.assertEq(a.staged ~= 0, true, "R3 staging: a standing non-boss monster was Broken as the throw began")
         H.assertEq(a.gate > 0, true, "R3: GOGO's 3-BP Throw passes Ot6AssassinateGate's actor and command test "
@@ -515,7 +527,9 @@ local ROUNDS = {
           .. "staged $%02X)", a.marks, a.staged))
       end },
     { tag = "assassinate2", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 2 },
-      done = function() return lastAct(CMD.THROW, nil, 2) ~= nil end, check = function()
+      done = function() local a = lastAct(CMD.THROW, nil, 2); return a ~= nil and a.staged ~= 0 end,
+      playedHere = function() local a = lastAct(CMD.THROW, nil, 2); return a ~= nil and a.f >= got.battleF0 end,
+      check = function()
         local a = lastAct(CMD.THROW, nil, 2)
         H.assertEq(a.staged ~= 0, true, "R3 staging: a standing non-boss monster was Broken as the 2-BP throw began")
         H.assertEq(a.gate > 0, true, "R3: the 2-BP throw reaches the gate's boost test too")
@@ -637,6 +651,7 @@ local function decide()
   end
   findSeats()
   handed, plan, entryOf = nil, {}, {}
+  got.battleF0 = H.frame
   H.assertEq(gseat() ~= nil, true, "GOGO is seated")
   local s = gseat()
   local fw = H.formationWords()
@@ -718,7 +733,8 @@ end
 local function planDone()
   if got.bounce == nil and bounceSeen() then got.bounce = true end
   for _, p in ipairs(plan) do
-    if not entryDone(entryOf[p]) then return false end
+    local en = entryOf[p]
+    if not entryDone(en) and not (en.playedHere and en.playedHere()) then return false end
   end
   return cur == nil
 end

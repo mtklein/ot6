@@ -1373,21 +1373,20 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 
 ; ------------------------------------------------------------------------------
 
-; [ commit a deferred pip paint onto the live cell ]
+; [ deliver a deferred pip paint: the cover's point shows ]
 ;
 ; Why the paint defers and the bank does not.  Ot6CoverBP banks the True
 ; Knight's BP at SetCoverTarget's commit: that instruction is the block
 ; as the engine understands it.  But the engine's decision to retarget
-; precedes the damage numeral by many frames, and OT6_PIPTAIL is only 32,
-; so arming the cell at the commit would make the pip flash and fade
-; before the blow visibly lands on the knight; a pip is meant to move
-; when the thing it represents happens, and what a player perceives as
-; "the block" is the hit landing on the blocker rather than the retarget.
+; precedes the damage numeral by many frames, and a pip is meant to move
+; when the thing it represents happens: what a player perceives as "the
+; block" is the hit landing on the blocker rather than the retarget.
 ;
-; So Ot6CoverBP banks the blocker's slot into OT6_PIPPEND and this proc moves
-; it into OT6_PIPSLOT/OT6_PIPTAIL, the same bank-then-commit shape
-; Ot6RvPend*/Ot6RevealCommit use for weakness reveals, driven off the
-; same trigger (Ot6RevealPoll's numeral-counter change, ot6_break.asm).
+; So Ot6CoverBP banks the blocker's slot + 1 into OT6_PIPPEND, Ot6PipFace
+; shows his row one pip short while it stands, and this proc clears it, the
+; same bank-then-commit shape Ot6RvPend*/Ot6RevealCommit use for weakness
+; reveals, driven off the same trigger (Ot6RevealPoll's numeral-counter
+; change, ot6_break.asm).
 ;
 ; A miss paints too, and lands on the right frame without extra work.  FF6
 ; draws "Miss" through GfxCmd_0b, and the miss arm branches into the same tail
@@ -1400,10 +1399,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; counter when the numeral value is $ffff ("hide numerals", :24707-24710), and
 ; some scripts issue no numeral at all, so Ot6ActionEnd calls this at the end
 ; of every action for the reason it already calls Ot6RevealCommit: a
-; pending paint must never outlive the action that banked it.  It runs there
-; after that proc's own charge arm, so the rarer out-of-turn cover takes the one
-; live cell; the actor's own bank is restaged at the next window open anyway
-; (Ot6PipGlyph_ext), while a cover earn has no other moment.
+; pending paint must never outlive the action that banked it.
 ;
 ; a8/i16, db=$7e.  clobbers a; preserves x/y.
 .proc Ot6PipPending
@@ -1411,12 +1407,9 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         .i16
         lda     f:$7e0000+OT6_PIPPEND
         beq     @none                   ; 0 = nothing deferred
-        dec     a                       ; stored as slot + 1
-        sta     f:$7e0000+OT6_PIPSLOT
-        lda     #32                     ; OT6_PIPTAIL: ~half a second of live
-        sta     f:$7e0000+OT6_PIPTAIL   ;   painting, Ot6ActionEnd's own value
-        lda     #$00
-        sta     f:$7e0000+OT6_PIPPEND   ; consumed (stz has no long mode)
+        lda     #$00                    ; the cover's point shows: Ot6PipFace
+        sta     f:$7e0000+OT6_PIPPEND   ;   stops holding it back (stz has
+                                        ;   no long mode)
 @none:  lda     #$00                    ; and a runic absorb's point shows
         sta     f:$7e0000+OT6_BPDEFER   ;   on the same numeral (#540)
         rts
@@ -1513,7 +1506,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; [ a window open: its character is active, so its earned point shows ]
 ;
 ; Clears the open window's character's high nibble of OT6_BPMARK (its regen
-; point not yet shown).  Called by Ot6PipFace, so the menu engine's own
+; point not yet shown).  Called once a frame by Ot6PipStage and once a row by
+; Ot6PipGlyph_ext, before each reads Ot6PipFace, so the menu engine's own
 ; staging of a row at the window's open (Ot6PipGlyph_ext, through the text
 ; engine) reads the same face as Ot6PipStage: before, the text engine could
 ; stage the row in the frame the window opened, before Ot6PipStage's clear,
@@ -1525,7 +1519,20 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         .a8
         .i16
         lda     f:$7e7bca
-        beq     @out
+        bne     Ot6BpWindowOpen
+        rts
+.endproc
+
+; [ #548: a window is opening for $62ca's character ]  the same clear,
+; without asking $7bca: window_open stages the names (Ot6WindowOpenNames_ext)
+; before it sets $7bca, and a row staged then with the point still withheld
+; was copied over the flush's for a few frames (battle_bpdisplay's
+; reversions: `f2702 PipGlyph 7bca=00 62ca=03 mark=E0` stages row 3 at p1,
+; then the flush's p2, then p1 again; build/attempts/wt/v050-multihit-anim/).
+; a8/i16, any db.  preserves x/y; clobbers a (b = 0).
+.proc Ot6BpWindowOpen
+        .a8
+        .i16
         phx
         lda     f:$7e62ca
         and     #$03
@@ -1543,16 +1550,14 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         and     f:$7e0000+OT6_BPMARK
         sta     f:$7e0000+OT6_BPMARK
         plx
-@out:   rts
+        rts
 .endproc
+
 
 .proc Ot6PipFace
         .a8
         .i16
         phx
-        pha
-        jsr     Ot6BpWindowSeen
-        pla
         and     #$03
         asl
         longa
@@ -1939,6 +1944,7 @@ Ot6PipRowAddr:
         cmp     #$ff
         beq     @blank
         pha                     ; [$01,s] the slot
+        jsr     Ot6BpWindowSeen ; a window open: its earned point shows
         longa
         txa
         asl
@@ -3726,3 +3732,16 @@ Ot6MarkWordTbl:
         .word   $01ee
         .word   (OT6_GAUGE_ATTR << 8) | $d8
         .word   (OT6_GAUGE_ATTR << 8) | OT6_KNIFE
+
+; ------------------------------------------------------------------------------
+
+; window_open's DrawCharNames, through Ot6WindowOpenNames (ot6_c1), inside
+; its jsr: the opening character's point shows, then the names are staged,
+; and back through a C1 rts.  a8/i16 (btlgfx).
+.proc Ot6WindowOpenNames_ext
+        .a8
+        .i16
+        jsr     Ot6BpWindowOpen
+        jsr_c1  DrawCharNames
+        jml     f:GfxCmd_00     ; a C1 rts: back to window_open
+.endproc

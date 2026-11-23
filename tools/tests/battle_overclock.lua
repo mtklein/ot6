@@ -153,6 +153,12 @@ local function encounter(e)
     -- or Tinctures); after a handed-over battle the same care again
     H.fieldCare({ tag = "overclock: rest for two overclocks (encounter " .. e .. ")", threshold = 0.95,
       mpBand = 0.9 }),
+    -- away from the save point (after a handed-over battle) there is no Tent,
+    -- and a party worn far down spends the care's 49 tries on Tonics before
+    -- its MP band is reached (v0.50's replay: EDGAR left at 178 MP, "giving
+    -- up after 49 attempts", build/attempts/wt/v050-multihit-anim/); the same
+    -- care again starts from the HP the first left and reaches the band
+    H.fieldCare({ tag = "overclock: rest, the rest (encounter " .. e .. ")", threshold = 0.95, mpBand = 0.9 }),
     e == 1 and H.fcAlcoveToBattle("overclock") or H.fcPace("overclock"),
     H.call(function()
       seat = nil

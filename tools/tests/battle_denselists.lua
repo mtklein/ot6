@@ -386,7 +386,7 @@ local function checkBattle(tag)
   for _, s in ipairs(seen) do H.log("[dense] " .. tag .. " " .. s) end
 end
 
-local function walks(tag)
+local function walks(tag, first)
   -- a member out of control (Death, Petrify, Zombie) or whose row cannot be opened is skipped, said and counted;
   -- the fixture's own list must still be walked by someone (asserted per fixture)
   local function ready(slot, kindName, cmd)
@@ -400,33 +400,56 @@ local function walks(tag)
     end
     return true
   end
+  local function walkMagic(slot, actor)
+    if ready(slot, "magic", CMD_MAGIC) then
+      local want = expectedMagic(slot)
+      if #want > 0 then
+        local c = walk("magic", slot, want, tag)
+        if c ~= nil then
+          H.log(string.format("[dense] %s slot %d magic: %d cells walked, %d confirmed", tag, slot, #want, c))
+        end
+      end
+    end
+  end
+  local function walkLore(slot)
+    if ready(slot, "lore", CMD_LORE) then
+      local want = expectedLores()
+      local c = walk("lore", slot, want, tag)
+      if c ~= nil then
+        H.log(string.format("[dense] %s slot %d lore: %d rows walked, %d confirmed", tag, slot, #want, c))
+      end
+    end
+  end
+  local function walkRage(slot)
+    if ready(slot, "rage", CMD_RAGE) then
+      local want = expectedRages()
+      H.assertEq(H.readByte(0x3A9A), #want, tag .. ": the rage count is the packed list's length")
+      local c = walk("rage", slot, want, tag)
+      if c ~= nil then
+        H.log(string.format("[dense] %s slot %d rage: %d cells walked, %d confirmed", tag, slot, #want, c))
+      end
+    end
+  end
+  local by = { magic = walkMagic, lore = walkLore, rage = walkRage }
+  -- the fixture's own list first, every seat, then the rest seat by seat: the
+  -- battle's clock runs while lists are walked, and the member the fixture is
+  -- for can fall before his turn comes (v0.50's replay: GAU at 0 HP by the time
+  -- the rage fixture reached him, 'rage slot 1: its rage walk is skipped (out of
+  -- control, status1 $80)', build/attempts/wt/v050-multihit-anim/
+  -- qual8_battle_denselists_red.log)
+  local done = {}
+  if first and by[first] then
+    for slot = 0, 3 do
+      local actor = H.readByte(0x3ED8 + slot * 2)
+      if actor < 0x10 then by[first](slot, actor); done[slot] = true end
+    end
+  end
   for slot = 0, 3 do
     local actor = H.readByte(0x3ED8 + slot * 2)
     if actor < 0x10 then
-      if ready(slot, "magic", CMD_MAGIC) then
-        local want = expectedMagic(slot)
-        if #want > 0 then
-          local c = walk("magic", slot, want, tag)
-          if c ~= nil then
-            H.log(string.format("[dense] %s slot %d magic: %d cells walked, %d confirmed", tag, slot, #want, c))
-          end
-        end
-      end
-      -- (read again after the magic walk: a member petrified during it has no lore window)
-      if ready(slot, "lore", CMD_LORE) then
-        local want = expectedLores()
-        local c = walk("lore", slot, want, tag)
-        if c ~= nil then
-          H.log(string.format("[dense] %s slot %d lore: %d rows walked, %d confirmed", tag, slot, #want, c))
-        end
-      end
-      if ready(slot, "rage", CMD_RAGE) then
-        local want = expectedRages()
-        H.assertEq(H.readByte(0x3A9A), #want, tag .. ": the rage count is the packed list's length")
-        local c = walk("rage", slot, want, tag)
-        if c ~= nil then
-          H.log(string.format("[dense] %s slot %d rage: %d cells walked, %d confirmed", tag, slot, #want, c))
-        end
+      -- (each read again after the walk before it: a member petrified during one has no window for the next)
+      for _, kind in ipairs({ "magic", "lore", "rage" }) do
+        if not (done[slot] and kind == first) then by[kind](slot, actor) end
       end
     end
   end
@@ -472,7 +495,7 @@ for _, f in ipairs(FIXTURES) do
   steps[#steps + 1] = H.call(function() checkBattle(f.tag) end)
   steps[#steps + 1] = H.driveUntil(function() return co ~= nil and coroutine.status(co) == "dead" end, 200000, {
     H.call(function()
-      if co == nil then co = coroutine.create(function() walks(f.tag) end) end
+      if co == nil then co = coroutine.create(function() walks(f.tag, f.kind) end) end
       local ok, pad = coroutine.resume(co)
       if not ok then error(pad, 0) end
       H.setPad(pad or {})

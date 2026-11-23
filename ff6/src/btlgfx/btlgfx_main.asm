@@ -9521,7 +9521,7 @@ _c144a2:
 window_open:
 @44a2:  lda     w7e7bca       ; ot6: on a closed->open transition, no
         bne     @44ac         ; text render is in flight, so bp pips can
-        jsr     DrawCharNames ; re-stage with the names (nested opens have
+        jsr     Ot6WindowOpenNames ; re-stage with the names (nested opens have
 @44ac:  lda     #$01          ; live text state - never touch those)
         sta     w7e7b98
         jsr     _c14445       ; update inventory with obtained items
@@ -22059,7 +22059,8 @@ GfxCmdTbl:
         .addr   GfxCmd_01
         .addr   GfxCmd_02
         .addr   GfxCmd_03
-        .addr   GfxCmd_04
+        .addr   Ot6GfxCmdFold   ; ot6 #554: vanilla's no-op $04, never queued,
+                                ;   is a fixed multi-hit's later strike
         .addr   GfxCmd_05
         .addr   GfxCmd_06
         .addr   GfxCmd_07
@@ -49222,3 +49223,20 @@ Ot6BtlGfx04_c1:
         jsl     BtlGfx_04
         jsl     Ot6ScriptEnd_ext
         rtl
+
+; [ ot6 #554: battle script command $04, a folded strike ]
+
+; GfxCmdTbl's $04 (a same-size .addr edit; vanilla's no-op, never queued):
+; a fixed multi-hit's strike after the first shows no animation, only a
+; beat (Ot6GfxCmdFold_ext, ot6_hitcount.asm), and its data block is stepped
+; past as GfxCmd_06 would.
+Ot6GfxCmdFold:
+        jml     Ot6GfxCmdFold_ext       ; (ends with NextGfxCmdData, then rts)
+
+; [ ot6 #548: a window's open stages the names ]
+
+; window_open's DrawCharNames (a same-size jsr edit) comes here: the window's
+; character's withheld regen point shows before the names (and their pips)
+; are staged, since $7bca is still 0 then (Ot6WindowOpenNames_ext, ot6_hud).
+Ot6WindowOpenNames:
+        jml     Ot6WindowOpenNames_ext  ; (ends with DrawCharNames, then rts)

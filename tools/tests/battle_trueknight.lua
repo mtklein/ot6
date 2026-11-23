@@ -96,12 +96,15 @@ local function armBank()
   end, emu.callbackType.write, 0x7E3E9C + knight * 2, 0x7E3E9C + knight * 2)
 end
 
-local PIPTAIL, PIPSLOT, PIPPEND = 0x57BB, 0xED6B, 0xED74
+local PIPPEND = 0xED74
 local COVERPAID = 0xED72         -- the once-per-round cover-earn flag
 local NUMCTR_SRC = 0x632E         -- the damage-numeral thread counter itself
 
-local pipArms = {}    -- { f = frame, slot = who } per OT6_PIPTAIL arm
+local pipArms = {}    -- { f = frame, slot = who } per OT6_PIPPEND delivery:
+                      --   a write of 0 over slot + 1 (Ot6PipPending), the
+                      --   frame the row stops holding the point back
 local pendWrites = {} -- { f = frame, v = value } per OT6_PIPPEND write
+local pendLast = 0    -- OT6_PIPPEND as last written (the delivery's slot)
 local numerals = {}   -- frames on which $632e changed -- the damage frames
 
 -- The numeral suppressor (arm 6b). Ot6RevealPoll fires on a change in $632e
@@ -116,13 +119,13 @@ local function armPip()
   emu.addMemoryCallback(function(_, v)
     if numSuppress then H.writeByte(NUMCTR_SHADOW, v) end
   end, emu.callbackType.write, 0x7E0000 + NUMCTR_SRC, 0x7E0000 + NUMCTR_SRC)
-  emu.addMemoryCallback(function(_, v)
-    if v == 32 then
-      pipArms[#pipArms + 1] = { f = H.frame, slot = H.readByte(PIPSLOT) }
-    end
-  end, emu.callbackType.write, 0x7E0000 + PIPTAIL, 0x7E0000 + PIPTAIL)
+  pendLast = H.readByte(PIPPEND)
   emu.addMemoryCallback(function(_, v)
     pendWrites[#pendWrites + 1] = { f = H.frame, v = v }
+    if v == 0 and pendLast ~= 0 then
+      pipArms[#pipArms + 1] = { f = H.frame, slot = pendLast - 1 }
+    end
+    pendLast = v
   end, emu.callbackType.write, 0x7E0000 + PIPPEND, 0x7E0000 + PIPPEND)
 end
 
@@ -222,10 +225,27 @@ local function pipCells()
 end
 
 local watchGlyph, glyphFirstF, glyphMenu = nil, nil, nil
+-- the knight's row as Ot6PipStage stages it (OT6_PIPROWW, the word the nmi
+-- flush lays in both bands), with his bank and the display marks, per frame:
+-- the face a delivery changes, observed apart from OT6_PIPPEND itself
+local PIPIDX = {}
+for n, t in pairs(PIP) do PIPIDX[t] = n end
+local faces = {}
+local function sampleFace()
+  if not knight then return end
+  for r = 0, 3 do
+    if H.readByte(0x64D6 + r) == knight then
+      faces[H.frame] = { idx = PIPIDX[H.readByte(0xEEF3 + r * 2)], bank = bp(knight),
+        mark = H.readByte(0xEEF1), pend = pend(knight) }
+    end
+  end
+end
+
 local function sample()
   pinField()
   sampleNumeral()
   if knight then lastBp = bp(knight) end
+  sampleFace()
   if watchGlyph and not glyphFirstF then
     local lo, hi = pipCells()
     if lo and ((lo & 0xFF) == watchGlyph or (hi & 0xFF) == watchGlyph) then
@@ -320,6 +340,7 @@ H.run({ maxFrames = 60000 }, {
         H.readByte(PIPPEND), H.readByte(COVERPAID)))
     end
     H.writeByte(PIPPEND, 0)
+    pendLast = 0
     H.writeByte(COVERPAID, 0)
     H.writeByte(0x3E9C + knight * 2, 1)          -- a bank with room to grow
     H.writeByte(0x3E9D + knight * 2, 0)
@@ -353,7 +374,7 @@ H.run({ maxFrames = 60000 }, {
 
     -- With a battle menu open, the party window paints every row's true bank
     -- (Ot6PipGlyph_ext), so the glyph is logged as corroboration; the frames
-    -- are asserted on OT6_PIPPEND and OT6_PIPTAIL.
+    -- are asserted on OT6_PIPPEND's banking and its delivery.
     local nf = firstAtOrAfter(numerals, c.f)
     H.assertEq(nf ~= nil, true, "a damage numeral followed the covered hit")
     H.log(string.format(
@@ -380,14 +401,18 @@ H.run({ maxFrames = 60000 }, {
       "and it is consumed on the numeral frame, not before")
 
     H.assertEq(#armsFor(knight, c.f, c.f), 0,
-      "the pip is NOT armed on the commit frame any more (it was, and faded "
+      "the pip is NOT delivered on the commit frame (it once was, and faded "
       .. "83-147 frames before the hit landed)")
     H.assertEq(#armsFor(knight, nf, nf) >= 1, true,
-      string.format("it is armed on the numeral frame f%d -- the frame the "
-        .. "player sees the blow land on the blocker", nf))
-    H.assertEq(nf - c.f > 32, true,
-      string.format("and the gap the deferral closes is real: %d frames, "
-        .. "against an OT6_PIPTAIL of 32", nf - c.f))
+      string.format("it is delivered to the blocker on the numeral frame f%d "
+        .. "-- the frame the player sees the blow land on him", nf))
+    -- (was `> 32`, OT6_PIPTAIL's length: the live cell then faded after 32
+    -- frames, so an arm at the commit was gone before a numeral 33+ frames
+    -- later.  Since #540 the cell has no tail; the deferral matters for any
+    -- numeral after the commit, which is what this bound asks)
+    H.assertEq(nf - c.f > 0, true,
+      string.format("and the gap the deferral closes is real: %d frames "
+        .. "from the commit to the numeral", nf - c.f))
 
     H.assertEq(glyphFirstF ~= nil, true,
       "the party-window pip cell showed the new bank")
@@ -539,44 +564,52 @@ H.run({ maxFrames = 60000 }, {
   H.call(function()
     H.vars.pipMark = #pipArms
     H.vars.stagedF = H.frame
-    H.writeByte(PIPTAIL, 0)                      -- no live tail to confuse it
     H.writeByte(PIPPEND, knight + 1)             -- a paint owed to the knight
-    H.log("staged a pending pip for the knight with no live tail")
+    pendLast = knight + 1
+    H.log("staged a pending pip for the knight")
   end),
   H.driveUntil(function() return H.readByte(PIPPEND) == 0 end, 6000, DRIVE,
     "the pending pip is delivered (numeral frame, or Ot6ActionEnd's backstop)"),
+  H.waitFrames(6),                               -- the row's staging after it
   H.call(function()
     local arms = armsFor(knight, H.vars.stagedF, H.frame)
     H.assertEq(#arms >= 1, true,
-      "delivering the pending paint ARMED the live cell on the blocker -- a "
-      .. "scheduled pip is never dropped, hit or miss")
+      "the pending paint was DELIVERED to the blocker -- a scheduled pip is "
+      .. "never dropped, hit or miss")
     local at = arms[#arms]
     local viaNumeral = false
     for _, n in ipairs(numerals) do if n == at then viaNumeral = true end end
-    -- the arm itself pointed at the blocker (armsFor filters by the slot the
-    -- arming write found).  Since #540 the battle script's end delivers the
-    -- pending point (Ot6ScriptEnd_ext) before Ot6ActionEnd's own charge arm,
-    -- which then points the cell at the actor; and Ot6PipStage draws every
-    -- row from the rule, so OT6_PIPSLOT has no reader left to show either
-    -- (battle_bpdisplay asserts what the cells show).
-    -- (the arm on the blocker is the assert above: armsFor(knight) counts
-    -- only arms whose write found the blocker's slot)
+    -- the delivery was the blocker's (armsFor filters by the slot + 1 the
+    -- clear replaced).  Since #540 Ot6PipStage draws every row from the
+    -- rule, so what the cells show is battle_bpdisplay's to assert.
     H.assertEq(H.readByte(PIPPEND), 0, "with nothing left pending")
     H.log(string.format("6a: delivered at f%d (staged f%d, +%d) via %s",
       at, H.vars.stagedF, at - H.vars.stagedF,
       viaNumeral and "the numeral frame (the damage/'Miss' path)"
                   or "Ot6ActionEnd's backstop (a numeral-less action)"))
 
-    -- whichever path pays the pip, the pending byte must be cleared on the
-    -- frame the live cell is armed.
-    local clearedAt = nil
-    for _, w in ipairs(pendWrites) do
-      if w.v == 0 and w.f >= H.vars.stagedF then clearedAt = w.f; break end
+    -- the delivery, seen on screen's source rather than in OT6_PIPPEND: the
+    -- knight's staged row shows one pip fewer than his bank allows the frame
+    -- before it, and one more within three frames of it (the staging runs
+    -- once a main-loop frame), with his bank, pending and marks unmoved
+    -- (the staging write lands at stagedF; the row is held from the next
+    -- staging, so the frame before the delivery shows the held face)
+    local b4, af, aff = faces[at - 1], nil, nil
+    for f = at, at + 3 do
+      if faces[f] and b4 and faces[f].idx ~= b4.idx then af = faces[f]; aff = f; break end
     end
-    H.assertEq(clearedAt, at,
-      "6a: OT6_PIPPEND is consumed on the very frame the live cell is armed "
-      .. "-- the paint spent it, nothing else cleared it (a clear with no arm "
-      .. "is a BP that was earned and never shown)")
+    local tl = {}
+    for f = at - 2, at + 40 do
+      if faces[f] then tl[#tl + 1] = string.format("f%d:p%s/b%d/m%02X/q%d", f, tostring(faces[f].idx), faces[f].bank,
+        faces[f].mark, faces[f].pend) end
+    end
+    H.log(string.format("6a: the knight's row face %s at f%d, then %s; %s",
+      b4 and ("p" .. tostring(b4.idx)) or "?", at - 1, af and ("p" .. tostring(af.idx) .. " at f" .. aff) or "unchanged",
+      table.concat(tl, " ")))
+    H.assertEq(b4 ~= nil and af ~= nil and af.idx == (b4.idx or -9) + 1, true,
+      "6a: the knight's row gained its pip within three frames of the delivery (OT6_PIPROWW)")
+    H.assertEq(af.bank == b4.bank and af.pend == b4.pend and af.mark == b4.mark, true,
+      "6a: and nothing else moved the face: bank, pending and marks the same either side")
   end),
 
   -- 6b. the backstop, isolated: switch the numeral trigger off and stage
@@ -586,8 +619,8 @@ H.run({ maxFrames = 60000 }, {
     H.writeByte(NUMCTR_SHADOW, H.readByte(NUMCTR_SRC))
     H.vars.pipMark2 = #pipArms
     H.vars.stagedF2 = H.frame
-    H.writeByte(PIPTAIL, 0)
     H.writeByte(PIPPEND, knight + 1)
+    pendLast = knight + 1
     H.log("numeral trigger suppressed; staged a second pending pip")
   end),
   H.driveUntil(function() return H.readByte(PIPPEND) == 0 end, 6000, DRIVE,
@@ -596,7 +629,7 @@ H.run({ maxFrames = 60000 }, {
     local at = H.frame
     local arms = armsFor(knight, H.vars.stagedF2, at)
     H.assertEq(#arms >= 1, true,
-      "6b: Ot6ActionEnd's backstop armed the live cell on the blocker")
+      "6b: Ot6ActionEnd's backstop delivered the paint to the blocker")
     -- The suppressor mirrors every write to $632e straight into the poll's
     -- own last-seen copy, synchronously at the write, so Ot6RevealPoll
     -- cannot see an edge however many numerals the monsters happen to
@@ -617,8 +650,7 @@ H.run({ maxFrames = 60000 }, {
     end
     H.log(string.format("6b: %d numeral(s) happened in the window and none "
       .. "of them could reach the poll", inWindow))
-    -- (pointing at the blocker: armsFor(knight) counts only arms on his slot;
-    -- OT6_PIPSLOT itself has no reader since #540, see 6a)
+    -- (the blocker's: armsFor(knight) counts only deliveries of his slot)
     H.log(string.format("6b: backstop delivered at f%d (staged f%d, +%d) -- a "
       .. "pending paint never outlives the action that banked it",
       arms[#arms], H.vars.stagedF2, arms[#arms] - H.vars.stagedF2))

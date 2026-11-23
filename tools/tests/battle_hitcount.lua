@@ -35,6 +35,12 @@
 --      = 96 (was 191) with $a6 Chain Saw at 252 as its control.
 --   4. Ot6HitCountTbl itself, read out of the ROM, is the three rows
 --      docs/design/multi-hit.md documents and no others.
+--   5. (#554) one animation per use: the measured Pummel's battle script,
+--      read as BtlGfx_04 plays it, names it once, plays the Blitz animation
+--      once, carries the second hit as a folded strike (command $04,
+--      Ot6GfxCmdFold: no animation) and a numeral for each hit; AuraBolt's
+--      plays its animation once and folds nothing.  v0.49's ROM plays the
+--      animation twice and folds nothing (red).
 --
 -- The hit counts are exact rather than lucky.  Both blitzes carry $20 in
 -- MagicProp +$04 ($11a4, "can't dodge"), and CheckHit's `bit #$20` arm takes
@@ -93,6 +99,17 @@ local function arm()
   refs.spell = emu.addMemoryCallback(function(_, v)
     log[#log + 1] = { k = "spell", frame = H.frame, v = v }
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
+  -- #554: the battle script an action queued, read as BtlGfx_04 starts to
+  -- play it: each 4-byte command from $2d6e to the $ff terminator
+  refs.script = emu.addMemoryCallback(function()
+    local q = {}
+    for i = 0, 63 do
+      local c = H.readByte(0x2D6E + i * 4)
+      if c == 0xFF then break end
+      q[#q + 1] = { c = c, b1 = H.readByte(0x2D6F + i * 4) }
+    end
+    log[#log + 1] = { k = "script", frame = H.frame, q = q }
+  end, emu.callbackType.exec, H.sym("BtlGfx_04"), H.sym("BtlGfx_04"))
 end
 
 local function castsOf(id)
@@ -122,6 +139,8 @@ local function disarm()
     H.sym("Ot6ClassChip"), H.sym("Ot6ClassChip"))
   emu.removeMemoryCallback(refs.n, emu.callbackType.write, 0x7E3A70, 0x7E3A70)
   emu.removeMemoryCallback(refs.spell, emu.callbackType.write, 0x7E3410, 0x7E3410)
+  emu.removeMemoryCallback(refs.script, emu.callbackType.exec,
+    H.sym("BtlGfx_04"), H.sym("BtlGfx_04"))
 end
 
 -- Cut this ability's actions out of the timeline: each runs from the
@@ -139,7 +158,15 @@ local function actionsFor(id)
         local e = log[i]
         if e.k == "hook" then break end      -- next action began: unterminated
         if e.k == "n" then
-          if e.v == 0xFF then a.closed = true break end
+          if e.v == 0xFF then
+            a.closed = true
+            -- the script ExecCmd plays once the attack loop is done (#554)
+            for j = i + 1, #log do
+              if log[j].k == "hook" then break end
+              if log[j].k == "script" then a.script = log[j].q break end
+            end
+            break
+          end
           a.sets[#a.sets + 1] = e.v
         elseif e.k == "hit" then a.hits = a.hits + 1
         elseif e.k == "chip" then a.chips = a.chips + 1 end
@@ -167,11 +194,29 @@ local function bestFor(id)
   return best
 end
 
+-- #554: what the action's battle script shows, by command: $01 the name,
+-- $06 an animation (b1 = the attack command, Blitz $0a), $04 a folded
+-- strike (Ot6GfxCmdFold), $0b a single-target numeral
+local function shows(a)
+  local n = { name = 0, anim = 0, fold = 0, num = 0, codes = {} }
+  for _, e in ipairs(a.script or {}) do
+    n.codes[#n.codes + 1] = string.format("%02X", e.c)
+    if e.c == 0x01 then n.name = n.name + 1
+    elseif e.c == 0x06 and e.b1 == CMD_BLITZ then n.anim = n.anim + 1
+    elseif e.c == 0x04 then n.fold = n.fold + 1
+    elseif e.c == 0x0B then n.num = n.num + 1 end
+  end
+  return n
+end
+
 local function describe(tag, a)
+  local n = shows(a)
   H.log(string.format("%s: entered with $3a70=%d, writes [%s], "
     .. "%d Ot6HitJoin pass(es), %d class-chip hook entr(ies), closed=%s "
-    .. "(frame %d)", tag, a.before, table.concat(a.sets, " "), a.hits,
-    a.chips, tostring(a.closed), a.at))
+    .. "(frame %d); script [%s]: %d name, %d Blitz animation(s), %d folded "
+    .. "strike(s), %d numeral(s)", tag, a.before, table.concat(a.sets, " "),
+    a.hits, a.chips, tostring(a.closed), a.at, table.concat(n.codes, " "),
+    n.name, n.anim, n.fold, n.num))
 end
 
 
@@ -428,10 +473,27 @@ H.run({ maxFrames = 120000 }, {
       "one Pummel action made two Ot6HitJoin passes -- two landed hits on one "
       .. "body, and therefore two chip opportunities")
 
+    -- #554: one animation per use.  The two hits stay two passes (above);
+    -- the battle script plays the Blitz animation once, the second strike
+    -- as a folded command (no animation, a beat), and a numeral for each.
+    -- AuraBolt, one pass, is the control: one animation, nothing folded.
+    local ns, na = shows(pu), shows(ab)
+    H.assertEq(pu.script ~= nil and ab.script ~= nil, true,
+      "both actions' battle scripts were read as BtlGfx_04 played them")
+    H.assertEq(na.anim, 1, "AuraBolt's script plays its animation once")
+    H.assertEq(na.fold, 0, "and folds nothing (no table row)")
+    H.assertEq(ns.name, 1, "the Pummel's script names it once")
+    H.assertEq(ns.anim, 1,
+      "and plays the Pummel animation ONCE for its two hits (#554: it played "
+      .. "once per hit, and read as the move used twice)")
+    H.assertEq(ns.fold, 1, "the second hit is a folded strike: no animation")
+    H.assertEq(ns.num, 2, "and each hit lands its own numeral")
+
     H.log(string.format("%d Pummel(s) cast; chips seen: AuraBolt %d, best "
       .. "Pummel %d (chips are not asserted -- the ledge draw decides whether "
       .. "the target is bludgeon-weak)", #pummels, ab.chips, pu.chips))
     H.log("PASSED: Pummel strikes twice, AuraBolt once, the hook fires once "
-      .. "per action, and the power split is in the shipped tables")
+      .. "per action, the power split is in the shipped tables, and the "
+      .. "Pummel animation plays once for its two hits")
   end),
 })

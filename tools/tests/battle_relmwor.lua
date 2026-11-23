@@ -579,7 +579,25 @@ H.run({ maxFrames = 2500000 }, {
     H.call(decide),
     H.cond(function() return mode == "play" end, {
       H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, onList = onList,
-        planDone = function() return stage == 7 and broken() or closed() end }),
+        planDone = function() return stage == 7 and broken() or closed() end,
+        -- stage 5's RELM holds her window until GOGO's Defend has ended and
+        -- his gauge is filling again.  v0.50's replay on the wor-gogo-v1
+        -- capture: his Defend ran and ended ('f34373 ExecCmd x=04 b5=15',
+        -- 'f34380 ActionEnd x=04'), her window opened at f34896 with his
+        -- gauge nearly full ('f34800 gogo ... gauge3219=EB'), and from
+        -- f35100 his turn sat full behind her held window ('gauge3219=00
+        -- 3aa0=8F 7bca=01 62ca=01 7bc2=05') until he fell at f48396 and the
+        -- kit ran out its 60000 frames (build/attempts/wt/v050-multihit-anim/
+        -- qual2_battle_relmwor_red.log, ab/relmwor_dbg.log).  A GOGO who has
+        -- fallen gives no turn to Gesture: not counted.  (Giving up on his
+        -- full gauge instead fired in every stage-5 battle, 40 of 40:
+        -- ab/relmwor_fullarm_v2_red.log.)
+        giveUp = function()
+          if stage ~= 5 or rec.giveUp or gogo == nil or up(gogo) then return false end
+          H.log("[relmwor] GOGO fell while RELM held her window: not counted")
+          rec.giveUp = true
+          return true
+        end }),
       stillTail(),
       H.call(function()
         if not closed() then

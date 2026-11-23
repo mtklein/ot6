@@ -5,6 +5,14 @@ and its effect. Cite evidence in the commit message.
 
 ## What's changed
 
+Pummel, Bum Rush and Drill play their animation once per use. Each hit
+still lands on its own, with its own damage number and shield chip, one
+after another once the animation ends; before, the whole animation played
+again for every hit, which looked like the move being used twice.
+
+The boost pips beside a character's name no longer flicker back to the old
+count for a moment when that character's command window opens.
+
 Each command you give Gogo now brings its owner's whole kit. Slot opens
 Setzer's list (Coin Toss, Hired Help and Jackpot) instead of the bare reels.
 With 3 BP his Tools fire twice (Overclock), his Runic sends spells back

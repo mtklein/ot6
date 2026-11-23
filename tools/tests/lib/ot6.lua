@@ -4864,22 +4864,15 @@ end
 -- party-window bp pip glyph word for menu row 0 (first party member)
 function M.pipWord() return M.pipWordRow(0) end
 
--- THE LIVE pip cell: which row the HUD is actually painting pips in, and
--- the word standing in it.  Returns nil when the pseudo-line is off.
+-- The pip cell the NMI flush painted last: its row and the word standing in
+-- it.  Returns nil before the flush has painted one.
 --
--- The party window has exactly ONE pip cell (ot6_hud.asm, Ot6PipStage:
--- "one cell can only show one row").  It follows the active character
--- while a battle menu is open and the character who just spent or gained
--- BP for OT6_PIPTAIL frames after their action resolved, and the flush
--- BLANKS the row it left to $21ff on the way.  So "row 0 shows pips" is a
--- fact about where the line happens to be parked on the frame you looked,
--- not a fact about the HUD: M.pipWord() reads row 0 whether or not the
--- line is there, and can read a stale glyph nothing has blanked yet.
--- Read the line where the ROM put it instead.
---
--- OT6_PIPPREV ($57ce) rather than OT6_PIPCUR ($57cc): PREV is the cell the
--- NMI flush last actually wrote, CUR is the one it will write next, so
--- PREV is the one whose VRAM word is already the painted one.
+-- Since #540 every name row has its own cell, staged by Ot6PipStage from
+-- the rule and painted by the flush one dirty row a frame (ot6_hud.asm);
+-- the flush records the row it painted in OT6_PIPPREV ($57ce), so the
+-- word read here is one the flush has just written, not a glyph some other
+-- writer left.  (Before #540 the window had one live cell that moved
+-- between rows; this reader and its callers come from then.)
 function M.livePipCell()
   local prev = M.readWord(0x57ce)
   if prev == 0 then return nil end

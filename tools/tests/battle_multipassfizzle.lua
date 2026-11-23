@@ -324,8 +324,14 @@ body[#body + 1] = H.call(function()
           .. "counted yet: the property is not exercised)", tag, f.passes))
       end
       check((r.after or 0) == 0, string.format("%s: %d pass(es) targeted after the refusal", tag, r.after or 0))
-      check(l.hp == f.hp, string.format("%s: the monsters' HP went %s -> %s after the refusal", tag, f.hps,
-        l.hps))
+      -- at the action's own end (Ot6ActionEnd): the damage a pass deals is
+      -- applied before it, and 20 frames later another actor may already
+      -- have struck (v0.50's replay: '2900/1200/0/0/0/0 -> 2900/0/0/0/0/0'
+      -- at +20f, the refused Overclock's turn ended at f9903 and the next
+      -- action began by f9918, build/attempts/wt/v050-multihit-anim/
+      -- qual5_battle_multipassfizzle_red.log)
+      check(d.hp == f.hp, string.format("%s: the monsters' HP went %s -> %s between the refusal and the "
+        .. "action's end", tag, f.hps, d.hps))
     end
     check(d.mp == 1, string.format("%s: the pool read %d at the turn's end (want the drained 1)", tag, d.mp))
     check(d.pend == 0, string.format("%s: the pending boost was kept for spending (it read %d at the turn's "

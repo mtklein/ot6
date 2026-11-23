@@ -3,13 +3,11 @@
 -- visual canary for fight 2 (second formation): same checks as fight 1,
 -- run again after an attack round since effect art loads mid-fight.
 --
--- WHAT THE PIP HALF ASKS, AND WHY IT IS NOT "ROW 0".  The party window has
--- exactly ONE bp-pip cell.  Ot6PipStage moves it -- to the active character
--- while a menu is open, to whoever just spent or gained bp for OT6_PIPTAIL
--- frames after their action resolves -- and the flush blanks the row it
--- leaves to $21ff on the way ("one cell can only show one row",
--- ot6_hud.asm).  So which row holds pips on any one frame is where the line
--- happened to be parked, not a property of the HUD, and this file used to
+-- WHAT THE PIP HALF ASKS, AND WHY IT IS NOT "ROW 0".  Before #540 the
+-- party window had ONE bp-pip cell that moved between rows, so which row
+-- held pips on any one frame was where the line happened to be parked
+-- (since #540 every row has its own cell, and this file reads the row the
+-- flush painted last, OT6_PIPPREV), and this file used to
 -- read row 0: it passed on a glyph nothing had blanked yet, and went red
 -- the day #236 moved the fight by a hair and WEDGE's pip gain pulled the
 -- cell to row 2 four frames before the sample (measured:

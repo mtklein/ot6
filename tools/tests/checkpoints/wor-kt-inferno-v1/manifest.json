@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "fc1eda6f9f4263f5a56b3129a8e0ee2f58b19079c18e3bd67ff2128b1faea8a0",
+  "sha256": "e935a101ecc84d6605f3a1f6c60d67fa120ca2be64c145d4b24228ddce64e4d3",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "fc1eda6f9f4263f5a56b3129a8e0ee2f58b19079c18e3bd67ff2128b1faea8a0",
-    "generator_sig": "5f19c0b1e3488acca90ab62157bdfcd17c3093057725f6bc97eed5cec32c5520 gen_wor_kt_inferno build/checkpoints/wor-kt-factory-v1/manifest.json build/checkpoints/wor-kt-factory-v1/wor-kt-factory.sram",
+    "payload_sha256": "e935a101ecc84d6605f3a1f6c60d67fa120ca2be64c145d4b24228ddce64e4d3",
+    "generator_sig": "73be48cda42eba231ff7489b6f3319fbd567ba8f8d1835436f49dc2f51ca80ba gen_wor_kt_inferno build/checkpoints/wor-kt-factory-v1/manifest.json build/checkpoints/wor-kt-factory-v1/wor-kt-factory.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-kt-factory-v1/manifest.json",
-        "sha256": "54486db84b959afdfccea97c188a749124ee46e37fc93adece04157825a83b67"
+        "sha256": "7138ef247d9cf1b2161ee6ac76972ae453758b95f2416f60e7a8463d1f37d9af"
       }
     ]
   }
