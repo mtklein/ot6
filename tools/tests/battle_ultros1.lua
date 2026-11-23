@@ -72,11 +72,28 @@ end
 --   * otherwise a dead member is raised with a Fenix Down, TERRA first (no
 --     TERRA, no Fire), one raise in flight at a time.
 -- TERRA's Fire on a Broken Ultros outranks both: the Broken window is the
--- point of the fight.  The Fighters stay unboosted: a boosted volley's
+-- point of the fight.  EDGAR's turn is the AutoCrossbow (Tools, unboosted)
+-- while it keys Ultros and his hand does not and his MP pays for it (#566:
+-- Ultros is Sword|Ranged, so of the four hands only TERRA's sword keys him,
+-- and TERRA's Fight alone did not break him before the party fell: "the
+-- party is down at f5032; last live read f5031: Ultros brk=0 shields=1",
+-- build/attempts/wt/v051-six-classes/suites/ultros1-gate1.log); else he
+-- Fights.  The Fighters stay unboosted: a boosted volley's
 -- swings past the last chip land Broken (x4) and can kill him before
 -- TERRA's turn comes.
 local CARE_PCT = 60
-local CMD_ITEM, CMD_HEALTH = 0x01, 0x1A
+local CMD_ITEM, CMD_HEALTH, CMD_TOOLS, ST_TOOLS = 0x01, 0x1A, 0x09, 0x30
+local EDGAR = 0x04
+-- EDGAR's crossbow turn: the AutoCrossbow keys Ultros's row and EDGAR's hand
+-- does not, and his MP pays it unboosted (H.boostPlan, the lib's price check)
+local function crossbowTurn(a)
+  if H.readByte(0x3ED8 + a * 2) ~= EDGAR or H.toolCell(H.AUTOCROSSBOW) == nil then return false end
+  local row = H.speciesClassRow(ULTROS1)
+  local hand = H.handClass(EDGAR, H.readByte(0x1600 + 37 * EDGAR + 0x1F), false)
+  if (row & H.weaponClass(H.AUTOCROSSBOW)) == 0 or (row & hand) ~= 0 then return false end
+  local _, ok = H.boostPlan({ slot = a, id = H.AUTOCROSSBOW, want = 0, tag = "ultros1" })
+  return ok
+end
 local ST_ITEM = 0x0A
 local FENIX = 0xF0
 local BATTINV, ITEMSCR, ITEMROW = 0x2686, 0x8947, 0x894F
@@ -155,6 +172,7 @@ local function pulse()
   if M.actor ~= a then
     M.actor, M.n, M.via = a, 0, nil
     M.care, M.tgt, M.idx = carePlan(a, caster, broken)
+    M.tool = M.care == nil and not broken and not fire and crossbowTurn(a)
     H.log(string.format("[ultros1] f%d turn: actor %d (%02X) %s | Ultros brk=%d " ..
       "hp=%d | party %s", H.frame, a, chid(a),
       M.care == "raise" and string.format("raise slot %d", M.tgt)
@@ -165,7 +183,7 @@ local function pulse()
   local st = H.readByte(MSTATE)
   -- the plan: care first (above); else Fight until he breaks; then TERRA's
   -- Fire, the others Defend; after the Fire, everyone Defends
-  local plan = M.care or "fight"
+  local plan = M.care or (M.tool and "tool") or "fight"
   if M.care == nil and (fire or broken) then
     plan = (caster and not fire) and "fire" or "defend"
   end
@@ -174,7 +192,7 @@ local function pulse()
       H.setPad(ph < 5 and { "right" } or {})      -- the Def. side window
       return
     end
-    local want = ({ fire = CMD_MAGIC, health = CMD_HEALTH, raise = CMD_ITEM })[plan]
+    local want = ({ fire = CMD_MAGIC, health = CMD_HEALTH, raise = CMD_ITEM, tool = CMD_TOOLS })[plan]
       or CMD_FIGHT
     local cell = cmdCell(a, want)
     if cell == nil then
@@ -193,6 +211,10 @@ local function pulse()
     if pend ~= boost then
       H.setPad(ph < 5 and { pend < boost and "r" or "l" } or {})
       return
+    end
+    if M.via ~= plan and plan == "tool" then
+      H.log(string.format("[ultros1] f%d AutoCrossbow | Ultros shields=%d | party %s", H.frame, shields(),
+        partyLine()))
     end
     if M.via ~= plan and plan == "health" then
       cared.health = cared.health + 1
@@ -266,6 +288,15 @@ local function pulse()
           "(#%d) | party %s", H.frame, M.tgt, chid(M.tgt), a, cared.raise, partyLine()))
       end
     end
+    H.setPad(ph < 5 and { "a" } or {})
+    return
+  end
+  if st == ST_TOOLS and plan == "tool" then
+    local cell = H.toolCell(H.AUTOCROSSBOW)
+    local cc, cr = H.readByte(0x8963 + a), H.readByte(0x8967 + a)
+    if cr ~= cell // 2 then H.setPad(ph < 5 and { cr < cell // 2 and "down" or "up" } or {}); return end
+    if cc ~= cell % 2 then H.setPad(ph < 5 and { cc < cell % 2 and "right" or "left" } or {}); return end
+    M.via = "tool"
     H.setPad(ph < 5 and { "a" } or {})
     return
   end
