@@ -65,7 +65,7 @@ local ELEMS, CLASSES, TABLES_END, SPECIES = 0x010, 0x190, 0x310, 384
 local ROW, REVEALED = 0x3EA4, 0x3EA5               -- OT6_BP_CLASS, OT6_BOOST_REVEALED, monster 0
 local KOLTS_SAVE, KOLTS_CLIFF = 103, 98            -- the summit's save room, the cliff east of it
 local DOOR = { 59, 9 }                             -- the tile west of the room's east exit (60,9)
-local LANE = { { 14, 9 }, { 17, 9 } }              -- a stretch of the cliff's ledge, clear of the door
+local CLIFF_DOOR = { 10, 10 }                      -- the cliff's way back into the room: never paced onto
 local NAMES = { [0x01] = "Sword", [0x02] = "Dagger", [0x04] = "Fist", [0x08] = "Arcane", [0x10] = "Katana",
                 [0x20] = "Spear" }
 local OLD = { [0] = "slash", "pierce", "bludgeon", "special" }
@@ -267,7 +267,7 @@ end
 -- from the save room onto the cliff, along it into a random battle, the
 -- bodies read, and out again by running
 local function cliffBattle(tag)
-  local t, a, b = 0, LANE[1], LANE[2]
+  local t, a, b = 0, nil, nil
   return H.seqStep({
     H.cond(function() return (H.mapId() & 0x1ff) == KOLTS_SAVE end, {
       H.navTo(DOOR[1], DOOR[2], { maxFrames = 3000 }),
@@ -280,9 +280,21 @@ local function cliffBattle(tag)
       H.release(),
       H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 900, tag .. ": control on the cliff", 10),
     }, {}),
+    H.waitFrames(20),
+    -- a lane to pace: from where the party stands to a tile two or three
+    -- off that the walk reaches, away from the door back into the room
     H.call(function()
       H.assertEq(H.mapId() & 0x1ff, KOLTS_CLIFF, tag .. ": the party is on the cliff (map 98)")
-      H.assertEq(H.bfsPath(LANE[1][1], LANE[1][2]) ~= nil, true, tag .. ": the cliff's ledge is walkable from here")
+      local x0, y0 = H.fieldX(), H.fieldY()
+      a, b = { x0, y0 }, nil
+      for _, d in ipairs({ { 3, 0 }, { 2, 0 }, { 0, 3 }, { 0, -3 }, { 0, 2 }, { 0, -2 }, { 3, -1 }, { 2, -1 },
+                           { 3, 1 }, { 2, 1 }, { 4, -1 }, { 4, 0 } }) do
+        local x, y = x0 + d[1], y0 + d[2]
+        if b == nil and not (x == CLIFF_DOOR[1] and y == CLIFF_DOOR[2]) and H.bfsPath(x, y) then b = { x, y } end
+      end
+      H.log(string.format("[sixcodex] %s: on the cliff at (%d,%d); pacing to %s", tag, x0, y0,
+        b and string.format("(%d,%d)", b[1], b[2]) or "nowhere"))
+      H.assertEq(b ~= nil, true, string.format("%s: a tile to pace to from (%d,%d) on the cliff", tag, x0, y0))
     end),
     H.driveUntil(function() return H.battleLoadStarted() end, 60000, {
       H.navTo(function() return b[1] end, function() return b[2] end,
