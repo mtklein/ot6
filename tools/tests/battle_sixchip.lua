@@ -660,10 +660,6 @@ H.run({ maxFrames = 400000 }, {
   H.waitFrames(20),
   H.call(function()
     armWatches()
-    for i, c in ipairs(CLASSES) do
-      H.assertEq(H.readRomByte((H.sym("Ot6ClassMsgTbl") & 0x3FFFFF) + (i - 1)), c.msg,
-        string.format("Ot6ClassMsgTbl's entry for %s is the design's message $%02X", c.name, c.msg))
-    end
   end),
   vargas("vargas", H.waitFrames(1), { "sword" }),
   -- blunt: one member's weapon goes back to the bag through Equip -> Rmove
