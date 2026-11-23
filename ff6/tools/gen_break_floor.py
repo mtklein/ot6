@@ -34,7 +34,7 @@ CLASS_CONST = {OT6_SLASH: "OT6_SLASH", OT6_PIERCE: "OT6_PIERCE", OT6_BLUDG: "OT6
 # v0.50's three classes; tools/proto_six/split.py splits it in two and writes
 # six_class_split.json ("floor": species id -> one of these bits) before this
 # runs.
-SIX_CONST = {0x01: "OT6_SWORD", 0x02: "OT6_DAGGER", 0x04: "OT6_FIST", 0x08: "OT6_ARCANE",
+SIX_CONST = {0x01: "OT6_SWORD", 0x02: "OT6_DAGGER", 0x04: "OT6_BLUNT", 0x08: "OT6_RANGED",
              0x10: "OT6_KATANA", 0x20: "OT6_SPEAR"}
 
 # ------------------------------------------------------------------------------
