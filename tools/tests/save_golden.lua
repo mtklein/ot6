@@ -23,14 +23,17 @@
 --      slot's bytes, the
 --      codex page is the one the battery held, and the live esper page is
 --      the slot's (a signed page) or empty (an unsigned one: a save from
---      before v0.44);
+--      before v0.44), its row 12 (actor 12) the slot's only for a block of
+--      layout version 2 or more and no progress for any older one;
 --   4. the game is saved into the same slot through the Save menu (a save
 --      point or the world map, where the battery was saved), and the slot's
 --      esper page now carries the live page, signed; the saved block is
 --      the block the save was handed (read at CopyGameDataToSRAM's entry)
 --      but for play time, timers and checksum, and, when that block was
 --      unsigned (a save from before v0.45), the signature and the zeroed
---      reserve and tail; the loadouts, junk ones included, are untouched;
+--      reserve and tail, or when it was signed at version 1 (v0.45-v0.50),
+--      the version raised to 2; the loadouts, junk ones included, are
+--      untouched;
 --   5. the console's Reset, the title, Continue again: the reload is the
 --      saved block, and the live esper page is what was saved;
 --   6. saved again: a signed block, so only play time, timers and checksum
@@ -50,7 +53,8 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local SLOT_PTR = { [1] = 0x0000, [2] = 0x0A00, [3] = 0x1400 }
 local CODEX, ESPER, LIVE = 0x2000, 0x3000, 0x3C00   -- battery offsets
 local ESPER_MAGIC, CODEX_MAGIC = 0x3145, 0x384F
-local CTR, CTR_END = 0x0010, 0x0280               -- esper page: 12 actors x 26 words
+local CTR, CTR_END = 0x0010, 0x02B4               -- esper page: 13 actors x 26 words
+local LEO = 0x0280                                -- row 12 (actor 12), read from a version-2 block only
 -- The loaded block is read where the Continue's confirm hands the game to
 -- the field (Ot6EsperContinue, field_menu.asm MenuState_23): the menu has
 -- copied the slot into $1600-$1FFF and nothing has run on it yet.  From
@@ -78,7 +82,7 @@ local function hook()
     for a = 0x1600, 0x1FFF do presave[a] = H.readByte(a) end
   end, emu.callbackType.exec, sv, sv)
 end
-local SIG, SIGWORD, VER = 0x1E2C, 0x5653, 1
+local SIG, SIGWORD, VER = 0x1E2C, 0x5653, 2
 local function inRange(a, lo, hi) return a >= lo and a <= hi end
 local function saveSets(a) -- what CopyGameDataToSRAM itself writes into the block
   return inRange(a, 0x1863, 0x1865) or inRange(a, 0x1FA8, 0x1FBF) or inRange(a, 0x1FFE, 0x1FFF)
@@ -171,20 +175,37 @@ local function esperPage(B, base)
   for o = CTR, CTR_END - 1 do t[o] = B and B[base + o] or sram(base + o) end
   return t
 end
+-- Row 12 (actor 12, Gogo's slot revealed as Leo; #552 piece F) is the slot's only when the slot's block is
+-- signed with layout version 2 or more (Ot6EsperLeoRow); an older block's page held reserve there (junk in a
+-- junk/ fixture), which must load as no progress.
+local function blockVer(B)
+  local function g(a) return slotByte(B, a) end
+  if (g(SIG) | (g(SIG + 1) << 8)) ~= SIGWORD or g(SIG + 2) < 1 or g(SIG + 2) > VER then return 0 end
+  return g(SIG + 2)
+end
 local function assertLive(tag, B)
   local page = ESPER + (slot - 1) * 0x400
   local signed = bw(B, page) == ESPER_MAGIC
+  local leoHeld = signed and blockVer(B) >= 2
   H.assertEq(sramW(LIVE), ESPER_MAGIC, tag .. ": the live esper page is signed")
-  local sum, bad = 0, 0
+  local sum, bad, leoSum, leoPage, leoBad = 0, 0, 0, 0, 0
   for o = CTR, CTR_END - 1 do
-    local want = signed and B[page + o] or 0
+    local held = o < LEO and signed or o >= LEO and leoHeld
+    local want = held and B[page + o] or 0
     local got = sram(LIVE + o)
     sum = sum + got
-    if want ~= got then bad = bad + 1 end
+    if o >= LEO then
+      leoSum, leoPage = leoSum + got, leoPage + B[page + o]
+      if want ~= got then leoBad = leoBad + 1 end
+    elseif want ~= got then bad = bad + 1 end
   end
   H.log(string.format("[golden] %s: slot %d's esper page is %s; the live page sums %d", tag, slot,
     signed and "signed" or "unsigned (reads as no progress)", sum))
+  H.log(string.format("[golden] %s: the block is layout version %d, so row 12 is %s: the slot's row sums %d, the "
+    .. "live row %d", tag, blockVer(B), leoHeld and "the slot's" or "no progress", leoPage, leoSum))
   H.assertEq(bad, 0, tag .. ": the live esper page is " .. (signed and "the slot's page" or "empty"))
+  H.assertEq(leoBad, 0, tag .. ": the live row 12 is " .. (leoHeld and "the slot's row 12" or
+    "no progress (a block older than version 2)"))
 end
 
 local function assertCodex(tag, B)
@@ -200,7 +221,7 @@ local function assertCodex(tag, B)
   H.assertEq(bad, 0, tag .. ": the slot's codex page is the one the battery held")
 end
 
--- Signed, as Ot6SaveSign decides it: the signature and a version 1..1.
+-- Signed, as Ot6SaveSign decides it: the signature and a version 1..VER.
 local function signedBlock(get)
   return (get(SIG) | (get(SIG + 1) << 8)) == SIGWORD and get(SIG + 2) >= 1 and get(SIG + 2) <= VER
 end
@@ -209,16 +230,19 @@ end
 -- CopyGameDataToSRAM's entry): byte for byte what Ot6SaveSign makes of it,
 -- but for what the save itself writes (play time, timers, checksum).  A
 -- first signing sets the signature and version and zeroes the reserve and
--- the tail; a signed block keeps all of them.  The loadouts are never edited
+-- the tail; a signed block keeps all of them but a lower version, which the
+-- save raises to VER (#552: version 1 -> 2).  The loadouts are never edited
 -- (owner, 2026-11-15: no repair by inference), junk ones included.
 local function assertSaved(tag, B, firstSign, s)
   s = s or slot
   local function sb(a) return B[SLOT_PTR[s] + (a - 0x1600)] end
   H.assertEq(presave ~= nil, true, tag .. ": the save ran CopyGameDataToSRAM")
   H.assertEq(sb(SIG) | (sb(SIG + 1) << 8), SIGWORD, tag .. ": the saved block is signed ($5653)")
-  H.assertEq(sb(SIG + 2), VER, tag .. ": ... with layout version 1")
+  H.assertEq(sb(SIG + 2), VER, tag .. ": ... with layout version " .. VER)
   local want = {}
   for a = 0x1600, 0x1FFF do want[a] = presave[a] end
+  local raise = not firstSign and presave[SIG + 2] < VER
+  if raise then want[SIG + 2] = VER end
   if firstSign then
     want[SIG], want[SIG + 1], want[SIG + 2] = SIGWORD & 0xFF, SIGWORD >> 8, VER
     for a = 0x1E2F, 0x1E3F do want[a] = 0 end
@@ -238,11 +262,12 @@ local function assertSaved(tag, B, firstSign, s)
     end
   end
   H.log(string.format("[golden] %s: %s; %d byte(s) changed beyond the save's own and the documented zeroing", tag,
-    firstSign and "the save signed an unsigned block" or "the block was signed already", bad))
+    firstSign and "the save signed an unsigned block" or raise and string.format("the block was signed at "
+      .. "version %d and the save raised it to %d", presave[SIG + 2], VER) or "the block was signed already", bad))
   H.assertEq(junk, 0, tag .. ": the reserve $1E2F-$1E3F and the tail $1FF7-$1FFD are zero")
   H.assertEq(loadout, 0, tag .. ": the loadouts are as they were")
   H.assertEq(bad, 0, tag .. ": the save changed nothing in the block but play time, timers, checksum"
-    .. (firstSign and ", the signature, the reserve and the tail" or ""))
+    .. (firstSign and ", the signature, the reserve and the tail" or raise and ", the version" or ""))
   presave = nil
 end
 
@@ -254,7 +279,7 @@ local B2
 local function pageReserve(page, esper)
   local r = {}
   for o = 2, 0xF do r[#r + 1] = page + o end
-  for o = esper and 0x280 or 0x310, 0x3FF do r[#r + 1] = page + o end
+  for o = esper and CTR_END or 0x310, 0x3FF do r[#r + 1] = page + o end
   return r
 end
 local function assertSaveAs(B3)

@@ -59,6 +59,8 @@
         pha
         phx
         phy
+        jsr     Ot6LeoInertStone ; #552 piece F: his stone is his only while
+                                ;   Summon is picked (ot6_esper.asm)
         sep     #$20
         .a8
         rep     #$20

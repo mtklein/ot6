@@ -78,7 +78,7 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
         rts
 .endproc
 
-; A (a16) = actor 0..11 -> A (a16) = actor * 52, that actor's first counter's
+; A (a16) = actor 0..12 -> A (a16) = actor * 52, that actor's first counter's
 ; offset past OT6_ESPER_CTR.  Clobbers nothing else.
 .proc Ot6EsperRowOff
         .a16
@@ -96,6 +96,120 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
         pla
         pla
         rts
+.endproc
+
+; [ who holds espers ]
+;
+; A (its low byte, either m width) = actor -> C clear when that actor wears
+; stones and keeps esper counters: actors 0..11, and actor 12, Gogo's slot,
+; once he has been revealed as General Leo (switch $00E0, OT6_LEO_FLAG; #552
+; piece F, docs/design/leo-reveal.md "Espers") and only while Summon is one
+; of his picks (Ot6LeoPicked: the owner, 2026-11-23, the esper is one of his
+; picked abilities, swapped like the others; unpicked, a stone he wore stays
+; in his record but does nothing).  Before the reveal, Umaro, guests and an
+; empty slot: C set, as every gate here read it before (`cmp
+; #OT6_ESPER_CHARS / bcs`).  Preserves A, X, Y and every flag but C.
+.proc Ot6EsperHolder
+        php
+        longa
+        pha
+        and     #$00ff
+        cmp     #OT6_ESPER_CHARS
+        bcc     yes
+        cmp     #OT6_ESPER_LEOACTOR
+        bne     no
+        lda     f:OT6_LEO_FLAG
+LeoGate:                        ; (mutant_rom.py's seam: the reveal's test)
+        and     #OT6_LEO_BIT
+        beq     no
+        jsr     Ot6LeoPicked
+PickGate:                       ; (mutant_rom.py's seam: the pick's test)
+        bcc     no
+yes:   pla
+        plp
+        clc
+        rts
+no:    pla
+        plp
+        sec
+        rts
+.endproc
+
+; C set when Summon ($19) is one of the four commands in Gogo's record
+; ($7e1616 + 12 * $25: Mimic, then his three picks from the Status screen;
+; no symbol, as it is a vanilla record field).  The
+; record, not the battle's list, so a field menu and a battle agree.
+; Preserves A, X, Y and every flag but C.
+.proc Ot6LeoPicked
+        php
+        sep     #$20
+        .a8
+        pha
+        lda     f:$7e1616+OT6_ESPER_LEOACTOR*$25
+        cmp     #BATTLE_CMD::SUMMON
+        beq     yes
+        lda     f:$7e1616+OT6_ESPER_LEOACTOR*$25+1
+        cmp     #BATTLE_CMD::SUMMON
+        beq     yes
+        lda     f:$7e1616+OT6_ESPER_LEOACTOR*$25+2
+        cmp     #BATTLE_CMD::SUMMON
+        beq     yes
+        lda     f:$7e1616+OT6_ESPER_LEOACTOR*$25+3
+        cmp     #BATTLE_CMD::SUMMON
+        beq     yes
+        pla
+        plp
+        clc
+        rts
+yes:    pla
+        plp
+        sec
+        rts
+.endproc
+
+; [ an unpicked stone is inert in battle ]
+;
+; From Ot6PackSpellList, at the end of ValidateSpellList, once per caster:
+; vanilla put the record's worn stone ($161e) at the top of the caster's
+; Magic list (row 0) and in $3344, whoever the caster is.  Gogo's slot
+; revealed as Leo keeps the stone he wore when he unpicks Summon (the owner,
+; 2026-11-23: re-picking brings it back), but it does nothing then: no
+; summon from the Magic list or anywhere, so row 0 and $3344 go back to
+; "none" ($ff; btlgfx CheckHasGenju reads row 0's second byte).  Only when a
+; stone was loaded, so an unrevealed Gogo (who wears none) is untouched.
+; in: X = the caster's entity offset (i16), db=$7e, either m width.
+; Preserves A, X, Y and P.
+.proc Ot6LeoInertStone
+        php
+        sep     #$20
+        .a8
+        pha
+        lda     $3ed8,x
+        cmp     #OT6_ESPER_LEOACTOR
+        bne     out
+        lda     $3344,x
+        cmp     #$ff
+        beq     out             ; no stone: nothing to hide
+        lda     #OT6_ESPER_LEOACTOR
+        jsr     Ot6EsperHolder
+InertGate:                      ; (mutant_rom.py's seam: 2 bytes)
+        bcc     out             ; Summon picked: the stone is his
+        lda     #$ff
+        sta     $3344,x
+        phy
+        ldy     $302c,x         ; his list's row 0
+        sta     a:$0000,y
+        sta     a:$0001,y
+        ply
+out:    pla
+        plp
+        rts
+.endproc
+
+; The same for a caller in another bank (the menu's Skills list).  rtl.
+.proc Ot6EsperHolderFar
+        jsr     Ot6EsperHolder
+        rtl
 .endproc
 
 ; Clear the live page's counters and sign it.  a/x widths saved.
@@ -162,12 +276,44 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
         bra     @done
 @copy:  lda     3,s             ; the slot (under the phx)
         jsr     Ot6EsperCopySlotToLive
+        jsr     Ot6EsperLeoRow
         lda     #OT6_ESPER_MAGIC_WORD
         sta     f:OT6_ESPER_LIVE+OT6_ESPER_MAGIC
 @done:  plx
         pla
         plp
         rts
+.endproc
+
+; After a load's copy: the live page's row 12 (Gogo's slot, revealed as Leo)
+; is the slot's only when the block the load put in WRAM $1600 was signed
+; with layout version 2 or more (#552 piece F, save-layout.md "Reserve and
+; the layout version"): signed ($5653 at OT6_SAVESIG) and a version from
+; OT6_ESPER_LEOVER through OT6_SAVEVER_CUR.  Anything older (version 1, an
+; unsigned block, a version past ours) had reserve there, zero from a
+; signing build (v0.45 on) and junk possible from v0.44's, so it reads as no
+; progress: the row is cleared.  a16 i16; clobbers A and X.
+.proc Ot6EsperLeoRow
+        .a16
+        .i16
+        lda     f:OT6_SAVESIG
+        cmp     #OT6_SAVESIG_WORD
+        bne     clear
+        lda     f:OT6_SAVEVER
+        and     #$00ff
+        cmp     #OT6_ESPER_LEOVER
+        bcc     clear
+        cmp     #OT6_SAVEVER_CUR+1
+LeoRowGate:                     ; (mutant_rom.py's seam: the version test)
+        bcc     keep
+clear: ldx     #OT6_ESPER_LEO
+        lda     #$0000
+clr:   sta     f:OT6_ESPER_LIVE,x
+        inx
+        inx
+        cpx     #OT6_ESPER_COPY
+        bcc     clr
+keep:  rts
 .endproc
 
 ; The title screen's Continue (field_menu.asm MenuState_23, on the confirm):
@@ -180,8 +326,9 @@ OT6_REC = 14                    ; bytes per rung record (Ot6LadderTbl)
         rtl
 .endproc
 
-; A (a16) = slot 1..3.  Copy that slot page's counters into the live page.
-; The three slots get their own loops so no scratch cell is needed.
+; A (a16) = slot 1..3.  Copy that slot page's counters into the live page,
+; row 12 included (Ot6EsperLeoRow then clears it for an older block).  The
+; three slots get their own loops so no scratch cell is needed.
 .proc Ot6EsperCopySlotToLive
         .a16
         .i16
@@ -288,9 +435,9 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
         bmi     @quit           ; none
         pha
         lda     $1600,x         ; actor
-        cmp     #OT6_ESPER_CHARS
+        jsr     Ot6EsperHolder
         pla
-        bcs     @quit           ; a guest: no counters
+        bcs     @quit           ; a guest, or Gogo unrevealed: no counters
         jsr     Ot6EsperSlot
         sta     OT6_SCR_IDX     ; the counter slot (OT6_SCR_*: victory-time
                                 ;   scratch, as Ot6RewardScale_ext uses it)
@@ -366,6 +513,38 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
         plx
         plp
         rtl
+.endproc
+
+; [ the victory loop's actor gate: a revealed Leo earns too ]
+;
+; jsl from WinBattle's per-character loop (battle_main.asm @5e59), in place
+; of vanilla's `cmp #CHAR::GOGO / bcs @5e73` (the same four bytes), with A
+; (a8) = the member's actor and Y = its battle slot * 2 (i16, db=$7e, the
+; loop's own state).  Actors 0..11 return at once into the loop's
+; learn-and-earn tail: LearnItemMagic, then Ot6EsperEarn.  Anything else is
+; dropped from the jsl and resumes at Ot6VictoryNext, the loop's next member,
+; as the branch did; but Gogo's slot, once revealed as Leo (#552 piece F),
+; first earns his worn stone's Magic Points (Ot6EsperEarn, with the frame it
+; reads: X = the record, the loop's Y pushed under the return address).  He
+; skips LearnItemMagic as Gogo always has: he has no spell table of his own
+; ($1a6e holds twelve).  X is the loop's scratch (it reloads $3010,y).
+.proc Ot6EsperVictory
+        .a8
+        .i16
+        cmp     #CHAR::GOGO
+        bcs     other
+        rtl                     ; 0..11: vanilla's path
+other: jsr     Ot6EsperHolder
+        pla                     ; drop the jsl's return (three bytes, a8;
+        pla                     ;   pulls leave C alone)
+        pla
+        bcs     next           ; Umaro and up, or Gogo unrevealed
+VictoryLeo:                     ; (mutant_rom.py's seam: 4 bytes)
+        ldx     $3010,y         ; the record
+        phy
+        jsl     Ot6EsperEarn
+        ply
+next:  jml     Ot6VictoryNext
 .endproc
 
 ; [ the victory screen's Magic Points and rank lines ]
@@ -466,21 +645,22 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
         phy
         lda     f:OT6_ESPER_LIVE+OT6_ESPER_MAGIC
         cmp     #OT6_ESPER_MAGIC_WORD
-        bne     @out            ; no progress page: nothing kept
+        bne     out            ; no progress page: nothing kept
         lda     $15dd,x         ; the actor
         and     #$00ff
-        cmp     #OT6_ESPER_CHARS
-        bcs     @out
+FoldHolder:                     ; (mutant_rom.py's seam: 3 bytes)
+        jsr     Ot6EsperHolder
+        bcs     out
         jsr     Ot6EsperRowOff
         tax                     ; X = this actor's first counter
         ldy     #$0000          ; Y = this esper's first rung record
-@esper: lda     f:OT6_ESPER_LIVE+OT6_ESPER_CTR,x
+esper: lda     f:OT6_ESPER_LIVE+OT6_ESPER_CTR,x
         jsr     Ot6EsperRankA
-        beq     @next
+        beq     next
         phx
         pha                     ; rungs left to apply
         tyx
-@rung:  jsr     Ot6EsperApply
+rung:  jsr     Ot6EsperApply
         txa
         clc
         adc     #OT6_REC
@@ -488,18 +668,18 @@ OT6_EARN_SEAT = 9               ; 1,s.. after php/phx/phy: Y 1-2, X 3-4, P 5,
         lda     1,s
         dec
         sta     1,s
-        bne     @rung
+        bne     rung
         pla
         plx
-@next:  inx
+next:  inx
         inx
         tya
         clc
         adc     #OT6_REC * 5
         tay
         cpy     #OT6_REC * 5 * OT6_ESPER_SLOTS
-        bcc     @esper
-@out:   ply
+        bcc     esper
+out:   ply
         plx
         pla
         plp
@@ -694,7 +874,7 @@ OT6_SLOT_BAHAMUT  = 12
         bne     @no
         lda     1,s
         and     #$00ff
-        cmp     #OT6_ESPER_CHARS
+        jsr     Ot6EsperHolder
         bcs     @no
         jsr     Ot6EsperRowOff
         pha                     ; [row] [actor | slot << 8]
@@ -802,7 +982,7 @@ OT6_SLOT_BAHAMUT  = 12
 ; it bounced off, so there the caster is OT6_REFLCASTER's (Ot6ReflectBegin),
 ; and a holder's spell bounced off anyone can pass 9999 while anyone else's
 ; bounced off a holder cannot.  The drained side of a drain swapped round for
-; the attacker's heal is the heal side (9999).  Gogo and Umaro hold no espers (OT6_ESPER_CHARS),
+; the attacker's heal is the heal side (9999).  Gogo (unrevealed) and Umaro hold no espers (Ot6EsperHolder),
 ; so their copies of a holder's action cap at 9999.  docs/design/esper-rework.md
 ; "Limit Break" has the list.
 OT6_LIMIT = 42069
@@ -1155,7 +1335,7 @@ OT6_LIMIT = 42069
         phx
         phy
         and     #$00ff
-        cmp     #OT6_ESPER_CHARS
+        jsr     Ot6EsperHolder
         bcs     @none
         pha
         lda     f:OT6_ESPER_LIVE+OT6_ESPER_MAGIC
@@ -1275,7 +1455,7 @@ RD_ESPER = RD_FRAME + 4 ;   and the esper
         cmp     #OT6_ESPER_MAGIC_WORD
         jne     @end
         lda     RD_ACTOR
-        cmp     #OT6_ESPER_CHARS
+        jsr     Ot6EsperHolder
         jcs     @end
         jsr     Ot6EsperRowOff
         sta     RD_ROW
