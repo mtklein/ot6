@@ -39,7 +39,7 @@ H.run({ maxFrames = 45000 }, {
       if n == 1 then
         H.assertEq(sram(base), 0x4f, "slot "..n.." codex magic 'O' " ..
           "(re-magicked from the planted 0x37)")
-        H.assertEq(sram(base+1), 0x38, "slot "..n.." codex magic '8'")
+        H.assertEq(sram(base+1), 0x39, "slot "..n.." codex magic '9'")
       end
       H.assertEq(sram(base+0x10) & 0x08, 0x08,
         "legacy knowledge migrated into slot "..n)

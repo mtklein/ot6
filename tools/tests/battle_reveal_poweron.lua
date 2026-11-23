@@ -58,9 +58,9 @@ H.run({ maxFrames = 70000 }, {
     armSeedSnapshot()
     -- The checkpoint's content, read and latched.
     H.assertEq(sram(SLOT3), 0x4f, "checkpoint slot-3 codex magic 'O'")
-    H.assertEq(sram(SLOT3 + 1), 0x38, "checkpoint slot-3 codex magic '8'")
+    H.assertEq(sram(SLOT3 + 1), 0x39, "checkpoint slot-3 codex magic '9'")
     H.assertEq(sram(TEMP), 0x4f, "checkpoint transient codex magic 'O' (VALID)")
-    H.assertEq(sram(TEMP + 1), 0x38, "checkpoint transient codex magic '8'")
+    H.assertEq(sram(TEMP + 1), 0x39, "checkpoint transient codex magic '9'")
     local s3n, tn = 0, 0
     slot3Boot = {}
     for off = 0, PAGE_USED - 1 do
@@ -101,9 +101,9 @@ H.run({ maxFrames = 70000 }, {
           off))
     end
     -- (b) the stale valid transient page was wiped rather than inherited:
-    -- Ot6CodexNewGame's signature is magic 'O8' over all-zero content
+    -- Ot6CodexNewGame's signature is magic 'O9' over all-zero content
     H.assertEq(sram(TEMP), 0x4f, "New Game re-stamped transient magic 'O'")
-    H.assertEq(sram(TEMP + 1), 0x38, "New Game re-stamped transient magic '8'")
+    H.assertEq(sram(TEMP + 1), 0x39, "New Game re-stamped transient magic '9'")
     for off = 0x10, PAGE_USED - 1 do
       H.assertEq(sram(TEMP + off), 0, string.format(
         "New Game WIPED the stale transient knowledge (+%03X)", off))

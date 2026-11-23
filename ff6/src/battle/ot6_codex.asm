@@ -1,5 +1,6 @@
 ; Per-save weakness codex.  Each save owns a $400-byte page in SRAM bank
-; $31; only $310 bytes are currently used (magic + two 384-species tables).
+; $31; only $310 bytes are currently used (magic + two 384-species tables:
+; revealed weak elements, then revealed weapon classes, six since v0.51).
 ; A fourth page is transient knowledge for an unsaved New Game, so it never
 ; inherits slot 1. The active page is 0 for transient or 1..3 for a saved
 ; game, read from wSaveSlotToLoad ($7e021f).
@@ -163,10 +164,14 @@ OT6_CODEX_SPECIES = 384         ; species a table holds, one byte each
 ; and every other bit is dropped.  A first child keeps its parent's bit, so
 ; those bits stay where they are; Ot6ClassSecondTbl maps the rest.  The
 ; element table is untouched.  The page then takes the six-class magic, so
-; this runs once a page: the rewrite is not its own inverse (a Katana bit
-; read again as four-class would be dropped), and the magic is the only
+; this runs once a page: run again it would not give the same bytes (a
+; Katana bit read as four-class is dropped), and the magic is the only
 ; record that it has been done.  The magic is written last, and only its
-; high byte differs from O8's.
+; high byte differs from O8's, so the signing is one byte's write.  A
+; console that loses power inside the 384-byte rewrite keeps O8 over a
+; part-rewritten table, and the next touch rewrites all of it: a reveal
+; already moved to Katana or Spear can be lost and has to be found again.
+; Nothing false is drawn either way (below).
 ;
 ; A revealed bit the species' six-class row does not answer to (a row that
 ; changed since the save was written) is kept here and never drawn:
