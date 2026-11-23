@@ -110,6 +110,7 @@ Locke's Filch, Sabin's Bum Rush and Cyan's Cleave on a boss.
 | Damage or healing | Blitz, Tools, Lores, Dances, Esper summons, Drain, Pearl, Quake, Merton, Ultima, items that heal a number | double damage for 1 point, 4x for 2, 8x for 3 |
 | Chance | Steal, Slot, Rage, a Dance's start | better odds; the third point removes the gamble |
 | Duration | Runic, Morph | more of the character's own turns, or more time |
+| None | Celes's blade rows, and anything else a boost would do nothing for | R is refused, and points raised earlier are kept |
 | Reach | Safe, Shell, Rflect, Vanish (on your party), Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle, Stop, Imp, Dispel; Shadow's smoke and exit | one more target per point |
 | Shields | the Break spell, Filch | one more shield per point |
 | Steps | Dismantle, Debilitator | one more application per point |
@@ -271,12 +272,31 @@ that can die, dies. A boss loses four shields and takes a very heavy cut.
 
 - **Spells by level.** Ice from the start; Cure at 4, Imp at 13, Scan at 18,
   Safe at 22, Haste at 32.
-- **Runic** is hers from the start. It absorbs the next spell as MP and gives
-  Celes 1 BP. As in FF6 it also absorbs spells her allies cast. Boosted, it
-  stays up for 1, 2 or 3 of her turns, and she acts normally in them. The BP
-  from absorbing is limited to one per round.
-- **Ultimate: RunicBlade**, learned in the Magitek factory when Celes turns on
-  Kefka. Runic with 3 BP also sends each absorbed spell back at its caster.
+- **RuneKnt** is her command, and it opens a list.
+- **Runic**, its first row, is hers from the start. It absorbs the next spell
+  as MP and gives Celes 1 BP. As in FF6 it also absorbs spells her allies
+  cast. Boosted, it stays up for 1, 2 or 3 of her turns, and she acts
+  normally in them. The BP from absorbing is limited to one per round. Once
+  she has turned on Kefka in the Magitek factory, Runic with 3 BP also sends
+  each absorbed spell back at its caster (RunicBlade).
+- **The rune.** When Runic absorbs a spell with an element, that element
+  stays on her blade for the rest of the battle; a later one replaces it.
+  Her weapon's hits then carry it onto any enemy that is weak to it: double
+  damage, and a shield with every hit. On an enemy that is not weak to it
+  the rune does nothing, so it never heals an enemy or wastes a hit. An
+  ally's spell works as well as an enemy's: cast Fire at a monster while
+  her Runic is up and her blade takes the fire.
+- **Blade rows** (Fire Blade, Ice Blade, Bolt Blade and so on) put an
+  element on her blade directly. She has one for each element she can cast:
+  Ice by herself, and whatever her Esper lends her. A blade costs her turn
+  and the MP of her cheapest spell of that element, and takes no boost.
+- **What you see.** The element's icon stands beside her name while her
+  blade holds it, and her swing is drawn in the element's colour when it
+  bites.
+- **Ultimate: Break Blade**, learned on the Floating Continent when Celes
+  turns her sword on Kefka. At 3 BP, for 99 MP: for three of her turns every
+  hit of her weapon takes a shield, whatever the enemy's weaknesses. Her
+  rune comes back when it ends.
 
 ### Gau, Beast Tamer (fangs)
 
@@ -425,7 +445,8 @@ owner has learned:
 
 - Slot opens Setzer's list: Coin Toss, Hired Help and Jackpot.
 - Tools: a 3 BP Tool fires twice (Overclock).
-- Runic: a 3 BP Runic sends spells back (RunicBlade).
+- RuneKnt opens Celes's list: Runic (at 3 BP it sends spells back), a blade
+  row for each element Gogo can cast, and Break Blade.
 - Throw: a 3 BP Throw kills the enemy it breaks (Assassinate).
 - Magic: Fire at 3 BP is Ultima once Terra has rejoined.
 - Lore: Strago's lores. With Magic among his commands too, he also has

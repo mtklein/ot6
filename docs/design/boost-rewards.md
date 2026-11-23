@@ -126,7 +126,9 @@ guidelines, a bug.
 | Row | refused (`Ot6CmdNoBoost`) |
 | Morph | duration; Trance at 3 (Terra) |
 | Revert | refused (`Ot6RevertTake`) |
-| Runic | duration; RunicBlade at 3 (Celes) |
+| Runic (the RuneKnt list's first row) | duration; RunicBlade at 3 (Celes; a fold since #563) |
+| A blade row of the RuneKnt list | refused (R on the row, `Ot6RuneNoBoost`; a boost raised on the command window first is dropped, `Ot6KeepBoost`) |
+| Break Blade | its gate: three points, like every list divine |
 | Steal | certainty |
 | Filch | a shield a point (#469) |
 | Bestow | the pips pending (#469) |
@@ -245,7 +247,7 @@ The real cost of each is its suite and the regeneration it forces.
   boost bought this Runic a`; `sites.txt` lines 541 and 545), so the hook
   is the same one.
 - **Price:** free (Def. is on the free floor); the points are the price.
-- **Divines.** RunicBlade is the 3-BP Runic and bounces spells; a 3-BP
+- **Divines.** RunicBlade (a fold since #563) is the 3-BP Runic and bounces spells; a 3-BP
   guard bounces nothing and blocks nothing magical. No overlap.
 - **Esper rework.** Golem's signature (cover allies at low HP) makes a
   boosted guard the tank's turn: the cover-er halves what it covers for.

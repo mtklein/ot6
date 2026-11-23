@@ -42,7 +42,7 @@ touches vanilla behavior where a pillar requires it.
 | Edgar | Machinist | Spear | — | seven Tools, learned by acquisition; divine: Overclock. Air Anchor is a findable extra |
 | Sabin | Monk | Claw | Fire/Holy/Wind | the 8 Blitzes, selected from a menu |
 | Cyan | Samurai | Katana | Wind | the 8 SwdTech, priced in BP (see below) |
-| Celes | Rune Knight | Sword | Ice | Runic from the start (signature) + spells (see below) |
+| Celes | Rune Knight | Sword | Ice | RuneKnt, a list like Locke's: Runic (signature; a spell it absorbs leaves its element on her blade for the battle; RunicBlade at a full boost, a fold), a blade row for each element she can cast (her own spells and her esper's), and her weapon's hits carry that element onto enemies weak to it; divine: Break Blade (three turns of hits that each take a shield); + spells. Built ([kits.md](design/kits.md) "Celes", #563) |
 | Gau | Beast Tamer | Fangs (innate) | varies by rage | Rage learned without limit on the Veldt, 8 equipped (see below); no divine (a varied set needs none; owner, 2026-11-15) |
 | Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
 | Strago | Scholar | Rod | varies by lore | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; divine: Study, his Scan at a full boost, which learns every lore the monsters present could cast; Bserk, learned by watching a monster inflict Berserk (kits.md) |
