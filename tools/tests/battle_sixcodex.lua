@@ -390,8 +390,8 @@ H.run({ maxFrames = 200000 }, {
     end
     high = four and hi > 0
     H.log(string.format("[sixcodex] the file: slot %d on map %d at (%d,%d); a %s-class page ($%04X); %d species with "
-      .. "revealed classes, %d with bits past the four", slot, target.map, target.x, target.y,
-      four and "four" or "six", magic, n, hi))
+      .. "revealed classes%s", slot, target.map, target.x, target.y, four and "four" or "six", magic, n,
+      four and string.format(", %d with bits past the four", hi) or ""))
     H.assertEq(sixRuns, 0, "nothing has run the rewrite before the title")
   end),
   continue("load1"),
