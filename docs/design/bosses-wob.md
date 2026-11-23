@@ -141,7 +141,7 @@ beams; Terra adds TekMissile and Bio Blast).
 
 | part | shields | weak |
 |---|---|---|
-| Head | 4 | fire + piercing |
+| Head | 4 | fire + ranged |
 | Shell | — (no gauge) | — |
 
 - **Telegraph:** the Whelk draws into its shell and the shell charges
@@ -168,16 +168,19 @@ scene.
 
 Party: Locke, Mog, and ten moogles in three squads.
 
-**Shields:** 4 · **Weak:** poison + piercing. Lobos: 3 · fire +
-piercing.
+**Shields:** 4 · **Weak:** poison + spear. Lobos: 3 · fire +
+spear.
 
 - **Telegraph:** the Marshal levels his blade and calls the Lobos in
   → next turn he and both Lobos attack one target. Break him and the
   Lobos attack without coordination.
 - **Break story:** twelve bodies generate BP quickly and damage
   slowly. Moogle spears chip him steadily, and the break protects
-  whichever squad he is attacking. Piercing is the featured class,
-  matching the gear the moogles carry.
+  whichever squad he is attacking. Spear is the featured class,
+  matching the pikes Mog, Kupek and Kurin carry (`char_prop.asm`; the
+  other moogles swing flails, a claw, blades, a brush and returning arcs).
+  LOCKE's dirk is a Dagger: under the four classes it pierced the Marshal
+  and the Lobos, and under six it chips neither.
 - **Jank:** the three-squad control scheme stays byte-for-byte,
   including vanilla's unusual moogle gear; losing all squads is still
   a game over.
@@ -204,7 +207,7 @@ and, at vanilla level 6, AuraBolt, so the fight is planned assuming
 holy chip is available.
 
 MEASURED, in `battle_vargas.lua` off the tier-2 fixtures: he seeds
-**5/5 with class row $04 (bludgeoning)**, the Ipoohs 2/2 slash-weak,
+**5/5 with class row $04 (Blunt; bludgeoning through v0.50)**, the Ipoohs 2/2 Sword-weak (slash then),
 and his weak byte reads **$28 — poison|holy**, the holy bit being
 `Ot6ElemAddTbl`'s add on top of vanilla's poison. Sabin's arrival is
 structural rather than descriptive: he gets **no turns at all** until
@@ -212,7 +215,7 @@ Vargas's own reaction script fires `battle_event $07/$08`
 (hp ≤ 10880, then ≤ 10368, `ai_script.asm:4392-4404`) and knocks the
 trio out of the fight. He joins at level 9 on this route, so AuraBolt
 is present as planned. AuraBolt takes a shield and reveals holy,
-Pummel takes another and reveals the bludgeon class, and the same
+Pummel takes another and reveals the Blunt class, and the same
 Pummel kills him.
 
 Edgar's BioBlaster is measured now as well, and the measurement
@@ -230,8 +233,8 @@ over one fight: seven consecutive BioBlasters went into the Ipoohs'
 group ($06, then $04 once the first died) before the eighth reached
 him ($01), about 9500 frames in.
 
-**Shields:** 5 · **Weak:** poison, holy + bludgeoning. Ipoohs: 2 ·
-fire + slashing.
+**Shields:** 5 · **Weak:** poison, holy + blunt. Ipoohs: 2 ·
+fire + sword.
 
 - **Telegraph:** he drops into his wind stance → **Gale Cut** hits
   the party. This is the same move the script later uses to knock the
@@ -240,7 +243,7 @@ fire + slashing.
 - **Break story:** phase one gives the trio very little chip.
   BioBlaster's poison is their only key and takes Vargas down 1 while
   the script has the fight going against you. Sabin then arrives with
-  Pummel ×2 for bludgeoning and AuraBolt for holy, which supplies the
+  Pummel ×2 for Blunt and AuraBolt for holy, which supplies the
   chip; Vargas cannot be broken before Sabin joins. **The escorts
   block the key** (measured, above): the spray goes to the Ipoohs'
   target group until both are down, so phase one is clear the adds
@@ -270,9 +273,13 @@ fire + slashing.
   counter blocks that bring SABIN in (`battle_event $07`, under 10,880
   HP) and the one after it (`battle_event $08`, under 10,368) would play
   while Vargas is Broken, but the route's play reaches both lines
-  unbroken. In phase two, `$08` is not reachable Broken: SABIN's
-  MetalKnuckle is a claw (slashing) and chips nothing on Vargas's
-  bludgeoning row, AuraBolt's one chip cost 393 and 406 HP (10,850 ->
+  unbroken. In phase two, under the four classes (through v0.50), `$08`
+  was not reachable Broken: SABIN's MetalKnuckle was a claw (slashing) and
+  chipped nothing on Vargas's bludgeoning row. **Under six classes the
+  MetalKnuckle is a knuckle, Blunt, and chips his Blunt row**, so SABIN's Fights now take shields
+  in phase two, and whether `$08` can play Broken has not been measured
+  since. The measurements that follow are v0.50's:
+  AuraBolt's one chip cost 393 and 406 HP (10,850 ->
   10,457 and 10,879 -> 10,473) against the ~480 above the line, and
   Pummel ends the fight. MEASURED: SABIN's Fights took him from 10,850
   to 10,230 HP with his shields at 4 throughout, and `$08` ran unbroken
@@ -290,7 +297,7 @@ fire + slashing.
 Party: Terra, Locke, Edgar, Sabin, Banon (Health is a free party
 heal; his death is a game over).
 
-**Shields:** 5 · **Weak:** fire, bolt + slashing, piercing — the row
+**Shields:** 5 · **Weak:** fire, bolt + sword, spear — the row
 he keeps all game.
 
 - **Telegraph:** two tentacles rise → **Tentacle** hits Banon. Break
@@ -313,7 +320,7 @@ tested at the Narshe defense instead. Per-party notes below.
 
 ### 5. TunnelArmor — South Figaro escape (Locke + Celes)
 
-**Shields:** 5 · **Weak:** bolt, water, ice + piercing. (Decoded, not
+**Shields:** 5 · **Weak:** bolt, water, ice + dagger. (Decoded, not
 recalled: `$104` weak = **bolt|water** — `monster_prop.dat` +25 reads
 `$84` — and +23/+24 are both `$00`, so it absorbs nothing and nulls
 nothing.) Bolt *and* water are
@@ -324,7 +331,7 @@ elements (kits.md) — so both bits are codex trivia today, payoff
 later. Ice is the add: Celes's join spell needs a socket, and "frozen
 coolant lines" reads fine on a digging machine. **The ice row is
 authored** (`Ot6ElemAddTbl` `$0104` + `$02`, weak byte resolves
-`$84` → `$86`); the 5 shields and piercing were already in
+`$84` → `$86`); the 5 shields and the class (Dagger; piercing through v0.50) were already in
 `Ot6ShieldTbl`. Inert to the suite until a Locke+Celes fixture reaches
 `battle 67` (event_main.asm:21005).
 
@@ -334,10 +341,10 @@ authored** (`Ot6ElemAddTbl` `$0104` + `$02`, weak byte resolves
   machine first (ours), and doing both is best, since Runic converts
   the telegraph into +1 BP ✦ (kits.md), so the boss's biggest move
   pays for the break.
-- **Break story:** Mug and daggers chip with piercing, Ice chips as an
+- **Break story:** Mug and daggers chip with Dagger, Ice chips as an
   element, and 5 shields across two bodies puts the break at about the
   first fuse. It is a small fight that uses every part of the system.
-  The coverage rule here rests on the added Ice and the piercing
+  The coverage rule here rests on the added Ice and the Dagger
   class, because both vanilla element bits are unreachable for this
   duo. Narrowing either one leaves the fight with no way to chip at
   all.
@@ -379,8 +386,8 @@ scripted. He takes a few hits and flees, twice, with the waiter line
 unchanged, and the empty HUD says so from the start, which is the same
 rule as Tritoch one scenario earlier.
 
-**Telstar:** 4 shields · bolt, water + bludgeoning (Dobermans 2 · fire +
-piercing). (Decoded, not recalled: `$044` weak = **bolt|water** —
+**Telstar:** 4 shields · bolt, water + blunt (Dobermans 2 · fire +
+ranged). (Decoded, not recalled: `$044` weak = **bolt|water** —
 `monster_prop.dat` +25 reads `$84`, the same byte TunnelArmor and the whole
 AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
 - **Telegraph:** its antenna sparks and it radios for backup → a
@@ -392,7 +399,7 @@ AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
 
 ### 8. GhostTrain — the Phantom Train (Sabin, Cyan, Shadow)
 
-**Shields:** 4 (6 until #400) · **HP:** 2600 (vanilla 1900, #400) · **Weak:** fire, bolt, holy + bludgeoning ·
+**Shields:** 4 (6 until #400) · **HP:** 2600 (vanilla 1900, #400) · **Weak:** fire, bolt, holy + blunt ·
 **absorbs poison.** (Decoded, not recalled: `$106` weak =
 **fire|bolt|holy** — `monster_prop.dat` +25 reads `$25` — and +23
 reads **`$08`, poison absorbed**; +24 is `$00`.)
@@ -464,7 +471,7 @@ Party: SABIN and CYAN, jumping the falls from the top of map 156
 `max_mp` on every slot — so the party enters at **full HP and MP**
 whatever the walk cost it.
 
-**Shields:** 4 (Piranhas 1) · **Weak:** bolt + slashing, bludgeoning ·
+**Shields:** 4 (Piranhas 1) · **Weak:** bolt + katana, blunt ·
 **Absorbs:** water.
 
 Decoded, not recalled (`monster_prop.dat` row `$155`, 32 bytes at
@@ -477,10 +484,10 @@ special attack (`LoadRageProp` → `$322d`; `battle_main.asm:8443-8480`):
 bits 6 and 7 clear, `$20 − $20 = +0` to the multiplier — a plain
 physical hit under its own animation. Bytes 28-31 `00 01 00 20`: the
 status 3&4 word `$0001` is the flying flag (Float). `Ot6ShieldTbl`
-(`ot6_hud.asm:1601`): 4 shields, class-weak `SLASH|BLUDG`; no
+(`ot6_hud.asm:1601`): 4 shields, class-weak `KATANA|BLUNT` (`SLASH|BLUDG` through v0.50); no
 `Ot6ElemAddTbl` row; `Ot6HpMulTbl` ships `$10` (1×), so 775 is the HP the
 fight sees. Piranha `$154`: HP 10, level 9, attack 13, weak bolt, 1 shield
-`SLASH|BLUDG`.
+`KATANA|BLUNT`.
 
 **AI** (`ai_script.asm:7328-7337`), one entry of each triple at random:
 *Battle/Special/Mega Volt · Battle/Ice/Ice · wait · El Nino/Battle/Battle*,
@@ -494,10 +501,10 @@ fixed-length tax**, ~4,450-5,500 frames in every attempt logged
 (`t_surface` in the `[result]` lines), whatever the party does.
 
 **What the party carries** (`lab_rizopas_bake.lua` (deleted in 8d350a73; last version at 182bc361), read at the falls):
-CYAN L14, 358 HP, Ashura `$2B` (katana: slash), Heavy Shld, Leather Hat,
+CYAN L14, 358 HP, Ashura `$2B` (a katana: Katana), Heavy Shld, Leather Hat,
 LeatherArmor, no relics, SwdTech `$07` = Dispatch/Retort/Slash. SABIN
-L14, 363 HP, MetalKnuckle `$53` (claw: slash on Fight; Pummel and Suplex
-bludgeon regardless), Buckler, Leather Hat, Kung Fu Suit, Star Pendant
+L14, 363 HP, MetalKnuckle `$53` (a knuckle: Blunt on Fight, as Pummel and Suplex
+are; every claw slashed through v0.50), Buckler, Leather Hat, Kung Fu Suit, Star Pendant
 and Jewel Ring, Blitz `$07` = Pummel/AuraBolt/Suplex. Bag: **Tonic 91,
 Potion 2, Fenix Down 15**. Both weapons match the row, so every Fight
 hit that lands chips — but each of the two carries one weapon, and half
@@ -526,8 +533,8 @@ the key: SABIN's and CYAN's swings both chip. A 1-BP Fight from either is
 2- or 3-BP Fight land broken. `bankboss_i25.log` (seed `$D0`): CYAN
 Fight at 5 BP → `[hit] t=5083 rizopas hp=552 (-146) sh=1 (-2)`, `t=5084
 hp=0 (-552) sh=0 (-1) brk=16` — **dead in one action, 645 frames after
-surfacing**. Pummel (2 bludgeoning hits) chips less than a boosted Fight
-and costs Blitz MP; Dispatch is one slash and is not in the driver.
+surfacing**. Pummel (2 Blunt hits) chips less than a boosted Fight
+and costs Blitz MP; Dispatch is one Katana hit and is not in the driver.
 
 **Policy × seed** (`tools/tests/rizopaslab_batch.sh` (deleted in 8d350a73; last version at 338328ee), aggregate by
 `rizopaslab_aggregate.py` (deleted in 8d350a73; last version at 2e305abc), per-run digests by `rizopaslab_actions.py` (deleted in 8d350a73; last version at 432944a7);
@@ -600,13 +607,13 @@ wiped.
 **Recommendation.** What a person does here: fight the school with
 plain, unboosted Fights (a Piranha has 10 HP; a boosted swing on one is
 thrown away), arrive at Rizopas with the bank full, and unload — a 3-BP
-Fight from either member is seven slashing swings, the break lands in
+Fight from either member is seven swings of a class he is weak to (CYAN's Katana, SABIN's Blunt), the break lands in
 the first two and the rest land ×4, and Rizopas, broken, loses the turn
 that would have been El Nino. Ten seeds, ten wins, no deaths, no Fenix,
 one Potion, the boss dead a mean 860 frames after surfacing and 824 on
 the seed that wiped the old fighter. That is what `gen_sabin_falls.lua`
 now plays (the lib driver with `bank = 99`, flipped to 0 when slot 5
-surfaces). Pummel is the second-best verb (two bludgeoning chips a use,
+surfaces). Pummel is the second-best verb (two Blunt chips a use,
 ~100 a hit, ten clean wins) and is what a person who opens the Blitz menu
 gets; Dispatch is not in the driver (an unknown-menu TODO). The driver
 rules above are for lib/ot6.lua's owner; with them in place `care` is
@@ -651,7 +658,7 @@ stand between this party and the Fenix signal.
 
 Party: all seven, three squads on the snowfield.
 
-**Shields:** 6 · **Weak:** poison, fire + piercing, slashing.
+**Shields:** 6 · **Weak:** poison, fire + sword, spear.
 
 **Authored: the whole row is an add.** `$014a`'s vanilla weak byte
 (`monster_prop.dat` +$2959) is `$00`, so the arc's final boss shipped
@@ -659,18 +666,22 @@ with no weakness of any kind, and `Ot6ElemAddTbl` carries `$09`
 (poison|fire) outright. +$2957/+$2958 are both `$00`, so nothing is
 absorbed or nulled. The 6 shields and the two classes were already in
 `Ot6ShieldTbl`. Kefka's own row is deliberately broad (poison|fire +
-piercing, slashing), so any squad you route to him can break him. His
-waves (Trooper, HeavyArmor, Rider) carry slash\|pierce class rows so
-every player-assigned squad has a key (see "The imperial soldier line"
-below).
+sword, spear): a squad with a sword or a spear in it (TERRA, CELES,
+EDGAR), or one that brings fire or poison, can break him.
+His waves (Trooper, HeavyArmor, Rider) carry two-class rows (see "The
+imperial soldier line" below). **Under the four classes any squad held
+a key** (CYAN's katana and SABIN's claws both slashed, LOCKE's dagger pierced him); under six a
+squad of LOCKE, CYAN, SABIN and GAU holds daggers, a Katana and Blunt, and none
+is on Kefka's row.
 
 - **Telegraph:** he giggles and frost crawls the ground → **Ice 2**
   across the engaged squad.
 - **Break story:** the waves drain resources before Kefka himself, so
   the fight teaches banking across a sequence of fights: earn BP on
   the waves, arrive holding 4–5 BP, and break him on the first fuse.
-  The broad row means any squad you route to him can break him, and
-  the squad layer makes the routing the player's decision.
+  The broad row means most squads you route to him can break him (one
+  needs a sword, a spear, fire or poison), and the squad layer makes the
+  routing the player's decision.
 - **Jank:** the strategy layer is untouched, and his spell list stays
   low-tier, matching where he is in the story.
 
@@ -686,27 +697,28 @@ it* can reach:
 
 | species | id | shields · class | forced party → its key | thematic |
 |---|---|---|---|---|
-| Soldier | `$0001` | 2 · slash\|pierce | Cyan duel (slash) · Sabin+Shadow camp `b44` (Shadow pierce) | cut, or seam |
-| Templar | `$0002` | 3 · pierce (+bolt) | Sabin+Shadow camp `b44` (Shadow throw / Bolt Edge) | elite plate; blade in the gap, metal conducts |
-| Leader | `$014E` | 3 · slash | Cyan SOLO Doma duel `b46` | the samurai out-cuts the commander |
-| Grunt | `$014F` | 2 · slash\|bludg | Doma defense `b13` (Cyan slash + Sabin bludg) | two heroes overwhelm a footman |
-| Cadet | `$0176` | 3 · slash\|bludg | Doma defense `b14` (same two) | ditto, a bigger body |
-| Officer | `$0175` | 2 · pierce | Locke SOLO S.Figaro `b9` | the thief's dagger finds the seam |
-| Trooper | `$0065` | 2 · slash\|pierce | Narshe waves — any squad | slash for Cyan/Sabin, pierce for Locke/Gau |
-| Rider | `$003F` | 3 · slash\|pierce | Narshe waves — any squad | ditto (fire still breaks it on the train) |
-| HeavyArmor | `$009F` | 3 · slash\|pierce | Locke SOLO `b11` (pierce) + Narshe wave (slash) | heavy plate; a blade at the seams |
+| Soldier | `$0001` | 2 · ranged\|katana | Cyan duel (katana) · Sabin+Shadow camp `b44` (Shadow's thrown edges: ranged) | cut, or seam |
+| Templar | `$0002` | 3 · ranged (+bolt) | Sabin+Shadow camp `b44` (Shadow throw / Bolt Edge) | elite plate; blade in the gap, metal conducts |
+| Leader | `$014E` | 3 · katana | Cyan SOLO Doma duel `b46` | the samurai out-cuts the commander |
+| Grunt | `$014F` | 2 · blunt\|katana | Doma defense `b13` (Cyan's katana + Sabin's knuckles and Blitz) | two heroes overwhelm a footman |
+| Cadet | `$0176` | 3 · blunt\|katana | Doma defense `b14` (same two) | ditto, a bigger body |
+| Officer | `$0175` | 2 · dagger | Locke SOLO S.Figaro `b9` | the thief's dagger finds the seam |
+| Trooper | `$0065` | 2 · sword\|dagger | Narshe waves — a squad with a sword or a dagger | sword for Terra/Celes/Edgar's blade, dagger for Locke and for Gau's fangs; Cyan's katana and Sabin's knuckles hold neither (both slashed through v0.50) |
+| Rider | `$003F` | 3 · sword\|dagger | Narshe waves — a squad with a sword or a dagger | ditto (fire still breaks it on the train) |
+| HeavyArmor | `$009F` | 3 · dagger\|katana | Locke SOLO `b11` (dagger) + Narshe wave (Cyan's katana, Locke's dagger) | heavy plate; a blade at the seams |
 
 Shields track the early-war stretch (2 basic infantry, 3 for the elite /
 heavier / duel bodies). **Class chips ignore absorb/null**, so
 HeavyArmor's vanilla water-absorb and everyone's stray element bits
 never interfere with the break; the class is always a legal key.
 
-**The palette.** Armored soldiers are **pierce**, on
+**The palette.** Armored soldiers take a point (**dagger**, or **ranged** where Shadow's
+thrown edges are the party's point; pierce through v0.50), on
 the reading that a blade finds the gaps in armor, with **bolt** where a
 party can cast it: the machines (M-TekArmor, HeavyArmor) are natively
 bolt-weak in vanilla, and Templar gains bolt (`$04`) here for Shadow's
-Bolt Edge at the camp. The Cyan solo duel is **slash**, so it plays as
-a swordfight. Sabin's fights add **bludg**. The rows are varied rather
+Bolt Edge at the camp. The Cyan solo duel is **katana**, so it plays as
+a swordfight. Sabin's fights add **blunt**. The rows are varied rather
 than uniform: the key is whichever character is fighting the enemy.
 
 **Element table.** M-TekArmor and HeavyArmor keep their poison adds, on
@@ -717,11 +729,13 @@ forced fights (a solo duel; a Cyan+Sabin defense), and the class row
 already answers them. Templar's row is `$00`/`$00` at +$17/+$18 (no
 absorb, no null).
 
-**Trooper and Rider.** Both carry a slash\|pierce class row: vanilla
-poison stays the Edgar squad's key, and the class is every other
-squad's. Formation 88 (Trooper+HeavyArmor, `battle 23`,
-event_main.asm:108505) is breakable by whatever a squad holds, not by
-Edgar alone.
+**Trooper and Rider.** Both carry a sword\|dagger class row: vanilla
+poison stays the Edgar squad's key, and the class is the key of any
+squad with a sword or a dagger in it. Formation 88 (Trooper+HeavyArmor, `battle 23`,
+event_main.asm:108505) is breakable by those squads, and by CYAN's
+katana through the HeavyArmor, not by Edgar alone. A squad of SABIN and
+GAU alone holds Blunt and a Dagger (GAU's fangs): the dagger keys every
+wave body, SABIN's knuckles none (under four classes his claws slashed).
 
 **M-TekArmor.** It is breakable by the party that fights it (Shadow's
 Bolt Edge, or the Magitek bolt beam at the camp); it carries the bolt
@@ -730,35 +744,38 @@ half of the palette in vanilla.
 **The school seed.** The tier-2 dialog ($0276) teaches: armor turns a
 careless blow aside, but every plate has a seam, and no two are the
 same, so bring the weapon that fits. A precise blade is an answer
-(pierce/slash), and there are several tools rather than one. The class
+(a dagger, a sword, a katana), and there are several tools rather than one. The class
 rows are the mechanic; `school.lua` pins the dialog bytes, so text and
 data fail separately if either drifts.
 
 **The one place coverage overrode the theme.** The palette's default for
-armored soldiers is pierce+bolt, but the Doma courtyard defense party
-(Sabin bludg + Cyan slash) can field neither pierce nor bolt. Grunt and
-Cadet therefore take slash\|bludg rather than the default, using the
-rule that Sabin's fights are bludgeon.
+armored soldiers is dagger+bolt, but the Doma courtyard defense party
+(Sabin's knuckles + Cyan's katana) can field neither a point nor bolt. Grunt and
+Cadet therefore take blunt\|katana rather than the default, using the
+rule that Sabin's fights are Blunt.
 
 ## The Serpent Trench — three aquatics, three keys
 
 Sabin + Cyan + Gau ride the trench (`battle 19`/`20`/`21`, UNDERWATER,
 event_main.asm:21194+; the party is placed together at the ride's entry
-`_ca8ae3`). The classes they can field are **bludg** (Sabin's fists and
-Blitz, Gau's bare hands) and **slash** (Cyan's katana and SwdTech,
-Sabin's claws once he owns a pair), and nothing else. Every trench
+`_ca8ae3`). The classes they can field are **blunt** (Sabin's knuckles,
+fists and Blitz), **katana** (Cyan's katana and SwdTech, Sabin's edged
+claws once he owns a pair) and **dagger** (Gau's fangs: his bare hand),
+and nothing else. Every trench
 aquatic was a formula species whose vanilla element the party cannot
 reach: Anguiform is bolt-only and the party has no bolt, and
 Actaneon/Aspik are fire-weak but Sabin's Fire Dance needs level 15. All
 three **absorb water**, so an element add would heal them. Class rows
 are the answer, and the two keys are split across the three creatures
-to match the party, which has two bludgeon users and one slash user:
+to match the party, which had two bludgeon users and one slash user under the four classes;
+under six SABIN is the one Blunt user, CYAN the Katana user, and GAU's
+fangs (a Dagger) key none of the three:
 
 | species | id | shields · class | thematic |
 |---|---|---|---|
-| Anguiform | `$003A` | 2 · slash | a slippery eel, cut by Cyan's blade |
-| Actaneon | `$005E` | 2 · bludg | a shelled crustacean, cracked by Sabin's fists |
-| Aspik | `$0059` | 2 · bludg | a constrictor, crushed by a monk's fists |
+| Anguiform | `$003A` | 2 · katana | a slippery eel, cut by Cyan's blade |
+| Actaneon | `$005E` | 2 · blunt | a shelled crustacean, cracked by Sabin's fists |
+| Aspik | `$0059` | 2 · blunt | a constrictor, crushed by a monk's fists |
 
 Vanilla bits are kept (dead or level-locked for this party, live for a
 later party that carries the element); class chips ignore the
@@ -772,8 +789,10 @@ water-absorb.
   `ff6/tools/gen_break_floor.py` from the monster names, so every
   un-authored body is breakable by some weapon class. The palette
   follows the authored rows: armored/mechanical/dragon/insect →
-  **pierce**, brute/ooze/golem/monk → **bludgeon**, and
-  beasts/humanoids/casters → **slash** (the remainder). Authored
+  **dagger, spear or ranged**, brute/ooze/golem/monk → **blunt or ranged**, and
+  beasts/humanoids/casters → **sword or katana** (the remainder); the
+  generator deals each family's species to its classes in turn, in
+  species-id order. Authored
   `Ot6ShieldTbl` rows still take precedence (the `@hit` path overwrites
   the mask); the floor only fills the gap. `battle_breakfloor` is the
   regression test, and it asserts that all 384 species carry a
@@ -787,15 +806,17 @@ water-absorb.
 
 Party: any four of the seven.
 
-**Shields:** 6 (Iron Fists 2) · **Weak:** poison + piercing,
-bludgeoning — every possible pick of four holds at least one of the
-two classes; most hold both.
+**Shields:** 6 (Iron Fists 2) · **Weak:** poison + spear,
+blunt. Under the four classes every possible pick of four held at least
+one of his two classes. Under six a pick holds one only with EDGAR in it
+(his pike) or SABIN (his knuckles and Blitz): LOCKE, CELES, CYAN and GAU
+together hold neither, and their key is poison.
 
 - **Telegraph:** he crouches to jump → **Jump**, which is
   untargetable and lands on one character. Break him during the
   crouch and he does not leave the ground.
 - **Break story:** he calls in Iron Fists at half health and uses his
-  own potions. Chip through the adds with AoE piercing
+  own potions. Chip through the adds with AoE Ranged
   (AutoCrossbow), bank BP, and break him during the crouch.
 - **Jank:** the mid-fight item use stays, and it suits Zozo. Jump's
   airborne phase stays as vanilla has it.
@@ -806,8 +827,8 @@ two classes; most hold both.
 
 Party: Locke + three (Celes is mid-aria).
 
-**Shields:** 6 · **Weak:** the row ✦ (fire, bolt, slashing,
-piercing — revealed at the Lete, still revealed; the codex working
+**Shields:** 6 · **Weak:** the row ✦ (fire, bolt, sword,
+spear — revealed at the Lete, still revealed; the codex working
 as designed).
 
 - **Telegraph:** the same tentacle wind-up as before. He is a
@@ -825,8 +846,8 @@ Party: Locke, Celes + two.
 
 | part | shields | weak |
 |---|---|---|
-| Ifrit | 6 | ice + piercing |
-| Shiva | 6 | fire + slashing |
+| Ifrit | 6 | ice + dagger |
+| Shiva | 6 | fire + sword |
 
 - This is vanilla's tag fight: they swap in and out. Each keeps its
   own gauge across swaps, and a swapped-out sibling's break timer
@@ -856,7 +877,7 @@ Party: Locke, Celes + two.
 
 **Shields:** 7 · **Weak:** *rotating* — WallChange re-rolls the
 elemental wall every few turns and re-hides the element row when it
-does. Classes fixed: slashing + piercing, the handhold while the
+does. Classes fixed: sword + dagger, the handhold while the
 wall spins.
 
 - **Telegraph:** the wall changes to a color → the matching tier-2
@@ -879,8 +900,8 @@ the party that walked in.
 
 | part | shields | weak |
 |---|---|---|
-| body | 7 | bolt, water + piercing |
-| Left/Right blades | 3 each | bolt + slashing |
+| body | 7 | bolt, water + dagger |
+| Left/Right blades | 3 each | bolt + sword |
 
 - Blades regenerate a few turns after dying (vanilla ✦), and regrown
   blades return at full shields. Their weakness row stays revealed.
@@ -912,8 +933,8 @@ Party: the factory four (Setzer is flying the airship).
 
 | part | shields | weak |
 |---|---|---|
-| Left Crane ($10D) | 6 | water + piercing |
-| Right Crane ($10E) | 6 | bolt, water + piercing |
+| Left Crane ($10D) | 6 | water + dagger |
+| Right Crane ($10E) | 6 | bolt, water + dagger |
 
 (Decoded from `monster_prop.dat` +25, not recalled: `$10D` weak = water, absorbs bolt.
 `$10E` weak = bolt|water, absorbs fire. Vanilla's shared weakness is water.)
@@ -957,7 +978,7 @@ Party: Terra + three.
 
 Party: Terra, Locke, Strago (Shadow keeps the dog outside).
 
-**Shields:** 7 (Balloons 1 each) · **Weak:** ice, water + piercing.
+**Shields:** 7 (Balloons 1 each) · **Weak:** ice, water + dagger.
 Balloons: 1 · ice, water.
 
 (Decoded, not recalled: in vanilla `$116` weak = **ice only** —
@@ -986,8 +1007,8 @@ Party: your chosen three (Shadow is waiting on the continent).
 
 | part | shields | weak |
 |---|---|---|
-| Ultros ④ | 7 | fire, bolt, **poison** + slashing, piercing — the row, one bit *added* |
-| Chupon | 4 | ice, water + bludgeoning |
+| Ultros ④ | 7 | fire, bolt, **poison** + sword, spear — the row, one bit *added* |
+| Chupon | 4 | ice, water + blunt |
 
 (Decoded, not recalled: Ultros ④ is a **different species** from the
 first three — `$168`, where the Lete/opera/gate fights are `$12c`/`$12d`/
@@ -995,7 +1016,7 @@ first three — `$168`, where the Lete/opera/gate fights are `$12c`/`$12d`/
 reads `$09` = **fire|poison**, not the `$05` = fire|bolt the other three
 carry; +23 still `$80`, water absorbed. So "the row, one last time" was
 true of the classes, which `Ot6ShieldTbl` authors identically at
-slash|pierce, and false of the elements: the bolt half of the family row
+sword|spear (slash|pierce through v0.50), and false of the elements: the bolt half of the family row
 is an `Ot6ElemAddTbl` row, `$0168` `.byte $04`. Water is NOT added and
 must not be — `$168` absorbs water, as does every Ultros record
 (`+23 = $80`, all four). `$12f` Chupon weak = `$82` = ice|water.)
@@ -1020,7 +1041,7 @@ must not be — `$168` absorbs water, as does every Ultros record
   Ultros before the first Sneeze if you can (7 shields across three
   bodies, which is tight) and dump everything. Chupon's 4-shield gauge
   is optional, and not every lineup can break it, because it needs
-  bludgeon.
+  Blunt (SABIN, UMARO, STRAGO's rod, RELM's brush, or an emptied hand).
 - **Jank:** Sneeze still removes a character with no lasting penalty,
   and Chupon still has no dialogue.
 
@@ -1030,18 +1051,19 @@ Same three, straight from the deck.
 
 | part | shields | weak |
 |---|---|---|
-| AirForce | 8 | bolt, water + piercing |
-| Laser Gun | 3 | bolt, water + piercing |
-| MissileBay | 3 | bolt, water + piercing |
-| Speck | 1 | bolt, water + any physical class |
+| AirForce | 8 | bolt, water + ranged |
+| Laser Gun | 3 | bolt, water + ranged |
+| MissileBay | 3 | bolt, water + ranged |
+| Speck | 1 | bolt, water + any weapon class |
 
 (Decoded, not recalled: all four parts share one vanilla byte —
 `monster_prop.dat` +25 = **`$84` = bolt|water** on `$113`, `$145`, `$147`
 and `$146` alike, with +23/+24 both `$00`, so the assembly absorbs and
 nulls nothing. The Speck's row is the one that differs: it is
 bolt|water-weak like the rest, but the authored answer is still one
-shield and any physical class, because the Speck's purpose is to
-absorb spells.)
+shield and any weapon class (all six: with Intangir, the one row
+whose count of weapon weaknesses the six-class split changed), because
+the Speck's purpose is to absorb spells.)
 
 - **Telegraph:** the missile bay racks and locks → **Launcher**
   barrage. Breaking the *bay* cancels it; breaking the body does not.
@@ -1051,7 +1073,8 @@ absorb spells.)
   preserved whole ✦. The answer is the Speck's single shield: any
   weapon in the game breaks it instantly, and the ×2 window then kills
   it. Bolt is the key throughout (Ramuh, or anyone who kept a bolt
-  line), with piercing for lineups that did not.
+  line), with Ranged (EDGAR's AutoCrossbow, SETZER's cards and darts,
+  SHADOW's thrown stars) for lineups that did not.
 - **Jank:** the IAF shooter sequence before it is unchanged.
 
 ## The Floating Continent
@@ -1060,7 +1083,7 @@ absorb spells.)
 
 Party: three + Shadow (forced).
 
-**Shields:** 11 · **Weak:** fire, ice, bolt + slashing, piercing.
+**Shields:** 11 · **Weak:** fire, ice, bolt + katana, spear.
 Vanilla has *no* weaknesses here; the whole row is added, and wide on
 purpose — the FC party is a free pick plus Shadow, and any lineup must
 hold at least two of these five axes. The capstone examines rhythm, not
@@ -1086,7 +1109,7 @@ Party: your three plus CELES, who arrives from the statue scene with
 every equipment slot empty (route doc §9), during the continent's
 collapse, under the 6:00 escape clock.
 
-**Shields:** 5 · **Weak:** ice, bolt, holy + slashing, piercing ·
+**Shields:** 5 · **Weak:** ice, bolt, holy + sword, dagger ·
 **Absorbs:** fire · **Opens with REFLECT and FLOAT.**
 
 Decoded, not recalled (`monster_prop.dat` row `$118`, 32 bytes at
@@ -1094,7 +1117,7 @@ Decoded, not recalled (`monster_prop.dat` row `$118`, 32 bytes at
 speed 48, attack 11, hit 100, evade 0, m.block 0, defense 105, m.def 150,
 m.pow 10, **HP 2800**, MP 280, level 26; absorb `$01` fire; null `$D8`
 poison|wind|earth|water; weak `$26` ice|bolt|holy. `Ot6ShieldTbl`
-(`ot6_hud.asm:1837`): 5 shields, class-weak `SLASH|PIERCE`. Row bytes
+(`ot6_hud.asm:1837`): 5 shields, class-weak `SWORD|DAGGER` (`SLASH|PIERCE` through v0.50). Row bytes
 28-31 `00 81 00 20`: the 16-bit "status 3 & 4" word `$0081` that
 `LoadRageProp` seeds into `$3de8` (`battle_main.asm:7764-7773`; bit 0 is
 the flying flag, folded into Float) sets **status 3 bit 7 = Reflect**.
@@ -1138,8 +1161,8 @@ its own `ExecCmd`; read that way, the ledgers say:
   "win" at 0:09). Nobody dies to Doom before t≈5,400.
 
 **Break story, corrected.** Reflect makes this a *physical* break, and
-the party has the tool: LOCKE's Genji pair (ThunderBlade, slash + bolt;
-Assassin, pierce). A base Fight is one swing per hand and each BP adds
+the party has the tool: LOCKE's Genji pair (ThunderBlade, Sword + bolt;
+Assassin, Dagger). A base Fight is one swing per hand and each BP adds
 two swings, landed alternately (`multi-hit.md` §1), so LOCKE's **1-BP
 Fight is four class-weak hits = four chips**; with CELES's two, the gauge
 breaks inside the party's first round and the surplus swings land on a

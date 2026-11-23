@@ -229,10 +229,16 @@ def assign(masks, order, count, how, ev=None, stage=None, binds=None):
         if rule and binds is not None:
             binds.append((sp, sum(combo), rule))
         out[sp], kids_of[sp] = sum(combo), dict(zip(olds, combo))
+        for kind in getattr(pins, "ADD", {}).get(sp, ()):
+            extra = C.KIND_CLASS[kind]
+            if not out[sp] & extra:
+                out[sp] |= extra
+                notes.append("+%s added" % NEW_NAME[extra])
         how[sp] = ", ".join(notes) or "none"
         if count is not None:
-            for k in combo:
-                count[k] += 1
+            for k in NEW_NAME:
+                if out[sp] & k:
+                    count[k] += 1
     return out, kids_of
 
 

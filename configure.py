@@ -1108,20 +1108,39 @@ check("publish_selftest", "sh tools/tests/run.sh --publish-selftest",
 # the lab levers (the generic sh rule and the suite rule among them)
 check("lever_fence", "python3 tools/tests/lib/savestate_ninja.py --lever-fence build.ninja",
       ["build.ninja", "tools/tests/lib/savestate_ninja.py"])
+# The weapon classes' names and bits are ot6_class.asm's, and every Python
+# tool that reads a class byte takes them from tools/ot6_class.py (#566: the
+# four-class literals four tools carried, and a ROM signature spelled in
+# them, all broke at once when the classes became six).
+CLASS_SRC = ["tools/ot6_class.py", "ff6/src/battle/ot6_class.asm"]
+check("ot6_class_selftest", "python3 tools/ot6_class.py --selftest",
+      CLASS_SRC + ["ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break_floor.inc"])
+# The break floor is generated (ff6/tools/gen_break_floor.py): the table and
+# its review on disk are what the generator writes from the monster names and
+# its own child rule, with no other input (#566: the six-class migration fed
+# it the split's json; it stands on its own again).
+check("break_floor", "python3 ff6/tools/gen_break_floor.py --check",
+      ["ff6/tools/gen_break_floor.py", "ff6/tools/break_floor_review.txt",
+       "ff6/src/battle/ot6_break_floor.inc", "ff6/src/battle/ot6_hud.asm",
+       "ff6/src/text/monster_name_en.json"] + CLASS_SRC)
 check("boss_rows", "python3 tools/check_boss_rows.py",
       ["tools/check_boss_rows.py", "docs/design/bosses-wob.md",
-       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm"])
+       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm",
+       "ff6/src/battle/ot6_break_floor.inc", "ff6/src/battle/monster_prop.dat"] + CLASS_SRC)
 # THE RATCHET (owner, 2026-09-01): zero no-key formations anywhere, as a
 # hard build gate -- an encounter nobody can chip cannot ship, so a
 # claimed-tuned area deterministically cannot hide one.  The audit's
-# party-hands model may only tighten.
+# party-hands model may only tighten (the audit's header says what it holds
+# under six classes, and its --selftest holds the gate to its mutants).
 # The gate's verdict is ROM data only; the tuning claim (#287), read from
 # the generator logs, is a report, so the gate runs with --gate, reads no
 # log and depends on no state: `ninja build/checks/break_coverage_ratchet.ok`
 # alone builds the ROM, not the line (#536).  The claim:
 # `python3 tools/audit_break_coverage.py` after the line has played.
-check("break_coverage_ratchet", "python3 tools/audit_break_coverage.py --gate",
-      ["tools/audit_break_coverage.py", "build/ot6.sfc",
+check("break_coverage_ratchet",
+      "python3 tools/audit_break_coverage.py --selftest"
+      " && python3 tools/audit_break_coverage.py --gate",
+      ["tools/audit_break_coverage.py", "build/ot6.sfc"] + CLASS_SRC + [
        "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break_floor.inc",
        "ff6/src/field/map_prop.dat",
        "ff6/src/field/sub_battle_group.dat",
@@ -1141,7 +1160,7 @@ check("break_coverage_ratchet", "python3 tools/audit_break_coverage.py --gate",
 check("shield_rows",
       "python3 tools/check_shield_rows.py --selftest"
       " && python3 tools/check_shield_rows.py",
-      ["tools/check_shield_rows.py", "build/ot6.sfc",
+      ["tools/check_shield_rows.py", "build/ot6.sfc"] + CLASS_SRC + [
        "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm",
        "ff6/src/field/map_prop.dat", "ff6/src/field/sub_battle_group.dat",
        "ff6/src/field/rand_battle_group.dat",
@@ -1155,7 +1174,9 @@ check("shield_rows",
        "ff6/src/battle/battle_main.asm"] + sorted(glob("ff6/src/event/*.asm"))
       + glob("src/event/*.asm", "ff6"))
 check("break_reach", "python3 tools/check_break_reach.py",
-      ["tools/check_break_reach.py", "ff6/src/battle/battle_main.asm"]
+      ["tools/check_break_reach.py", "tools/check_boss_rows.py", "tools/ot6_class.py",
+       "ff6/src/battle/battle_main.asm", "ff6/src/battle/ot6_break_floor.inc",
+       "ff6/src/menu/item_prop_en.dat", "ff6/src/field/char_prop.asm"]
       + glob("src/battle/ot6_*.asm", "ff6"))
 # The $1600-$1FFF save block is a compatibility contract
 # (docs/design/save-layout.md): every OT6 symbol in it is documented at the

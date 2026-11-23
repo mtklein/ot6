@@ -111,7 +111,11 @@ def symbols():
 
 
 ELEMS = ("fire", "ice", "bolt", "poison", "wind", "holy", "earth", "water")
-CLASSES = ((0x01, "slash"), (0x02, "pierce"), (0x04, "bludg"), (0x08, "special"))
+# the weapon classes, as ot6_class.asm names them (tools/ot6_class.py): six
+# since v0.51 (#566)
+import ot6_class  # noqa: E402
+_C = ot6_class.read(ROOT)
+CLASSES = tuple((bit, name) for name, bit in _C.bit.items())
 SLOT_ODDS = (80, 80, 80, 16)          # /256: field/battle.asm draw thresholds $50/$a0/$f0
 STATUS = (("Dark", "Zombie", "Poison", "Magitek", "Clear", "Imp", "Petrify", "Death"),
           ("Condemned", "Near Fatal", "Image", "Mute", "Berserk", "Muddle", "Sap", "Sleep"),
@@ -155,7 +159,7 @@ def elems(b):
 
 def classes(b):
     s = "|".join(n for bit, n in CLASSES if b & bit)
-    if b & 0x80:
+    if b & _C.nullbrk:
         s += "+nullbrk"
     return s or "-"
 

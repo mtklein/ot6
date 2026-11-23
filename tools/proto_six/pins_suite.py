@@ -1,94 +1,150 @@
-"""pins_suite.py -- the break-row suites' proofs as pins (the battle_break* suites agent's proposal-2,
-build/attempts/wt/v051-six-classes/breaksuites/proposal-2/pins-suite.py, taken as it stands)."""
+"""pins_suite.py -- the break-row suites' proofs as pins (the battle_break* suites agent's proposal,
+build/attempts/wt/v051-six-classes/breaksuites/tools/stabilize.py).  SUITE: a kind given here replaces
+pins.PIN's for that weakness and binds (source "suite ..."); the first block is written by hand from a
+proof that was red (a party that lost its key, a named hand), the second (HOLD) was found by mutation: each
+weakness there, changed to another class it may become, turns a suite's proof red, so it is held where the
+split put it (its kind is the class's own name-giver: no hand is named).  EVERY: the "every hand" rows.
+DEPARTURE: the pins outside classes.py CHILDREN, and why."""
 S, P, B, X = 1, 2, 4, 8
-# the break-row suites' proofs as pins (propose.py): SUITE entries are merged over pins.PIN (a kind given
-# here replaces PIN's for that weakness; source "suite ..." binds), EVERY's keys join pins.EVERY (all six;
-# Siegfried's four-class row is three classes, so split.assign's `old == 15` test must go), DEPARTURE lists
-# the pins outside classes.py CHILDREN
 EVERY = {
-    0x0131: "break-coverage-wob.md 17, battle_breakwob_events 'Siegfried: every weapon hand should break him' (his "
-            "four-class row was the three weapon hands, slash|pierce|bludgeon, without special)",
     0x012a: "route-wor-the-end.md, battle_breakwor_end 'Kefka: class mask, want every hand'",
+    0x0131: "break-coverage-wob.md 17, battle_breakwob_events 'Siegfried: every weapon hand should break him' (his four-class row was the three weapon hands, slash|pierce|bludgeon, without special)",
 }
 SUITE = {
-    # the opening (input to the opening's hand-authoring)
-    0x0023: ({P: 'spear'}, "suite battle_breakwob_desert: EDGAR's pike keys every body (FossilFang)"),
+    # ---- written by hand: a red proof and the row that answers it
+    0x0004: ({S: 'katana', P: 'sword'}, "suite battle_breakwor_dreams: CYAN alone keys every body of the Ancient Castle, and the dream's three (TERRA, CELES, RELM) hold a key in the dream's Doma"),
+    0x0007: ({S: 'katana', B: 'rod'}, "suite battle_breakwor_tower: a key for each party whose lane meets it (parties 1 and 2 a rod, party 3 CYAN's katanas)"),
     0x0015: ({P: 'spear'}, "suite battle_breakwob_desert: EDGAR's pike keys every body (Rhinotaur)"),
-    0x0022: ({S: 'sword', P: 'spear'}, "suite battle_breakwob_events: on the raft each of TERRA's blade, EDGAR's pike "
-             "and BANON's rod keys two of the three"),
-    0x0038: ({P: 'spear', B: 'rod'}, "suite battle_breakwob_events: on the raft each of TERRA's blade, EDGAR's pike "
-             "and BANON's rod keys two of the three"),
-    0x0039: ({S: 'sword', B: 'rod'}, "suite battle_breakwob_events: on the raft each of TERRA's blade, EDGAR's pike "
-             "and BANON's rod keys two of the three"),
-    # the Narshe defense: party 1 (TERRA, EDGAR, CELES: swords, pike, AutoCrossbow), the one the route fights the
-    # raiders with (battle_breakwob_raiders plays it: a keyed hand's Fight), and LOCKE + GAU (knife, fangs) keep a
-    # key in hand on every raider; CYAN + SABIN (katana, bare fists) keep one on Fidor and Bounty Man by fire and go
-    # without on the Trooper and the HeavyArmor (two weaknesses cannot serve sword, katana and dagger)
-    0x0065: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_events: the raiders' key for TERRA, EDGAR, CELES "
-             "(their swords) and for LOCKE, GAU (knife, fangs)"),
-    0x001c: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_events: a raider should take the troopers' keys; "
-             "battle_breakwob_raiders: a standing member of party 1 holds a hand the body's keys take"),
-    0x0079: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_events: a raider should take the troopers' keys; "
-             "battle_breakwob_raiders: a standing member of party 1 holds a hand the body's keys take"),
-    0x009f: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_events: the HeavyArmor's key for TERRA, EDGAR, CELES "
-             "(their swords) and for LOCKE, GAU"),
-    # the World of Balance past the opening
-    0x007b: ({S: 'sword'}, "suite battle_breakwob_south: the blades (TERRA's Break Blade, LOCKE's ThunderBlade) key every body"),
-    0x0081: ({S: 'sword'}, "suite battle_breakwob_south: the blades (TERRA's Break Blade, LOCKE's ThunderBlade) key every body"),
-    0x008d: ({S: 'sword'}, "suite battle_breakwob_south: the blades (TERRA's Break Blade, LOCKE's ThunderBlade) key every body"),
-    # the World of Ruin
-    0x005b: ({P: 'ninja blade'}, "suite battle_breakwor_colosseum: among the four's blades, SHADOW's (the Striker) "
-             "alone keys the Crawler"),
-    0x0027: ({P: 'ninja blade'}, "suite battle_breakwor_sidetrips: SHADOW's point (the Striker) keys both dinosaurs"),
+    0x001c: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_events: a raider should take the troopers' keys; battle_breakwob_raiders: a standing member of party 1 holds a hand the body's keys take"),
+    0x0022: ({S: 'sword', P: 'spear'}, "suite battle_breakwob_events: on the raft each of TERRA's blade, EDGAR's pike and BANON's rod keys two of the three"),
+    0x0023: ({P: 'spear'}, "suite battle_breakwob_desert: EDGAR's pike keys every body (FossilFang)"),
     0x0026: ({P: 'ninja blade'}, "suite battle_breakwor_sidetrips: SHADOW's point (the Striker) keys both dinosaurs"),
-    0x014b: ({S: 'katana', P: 'sword'}, "suite battle_breakwor_cyan: CYAN's katana keys the Storm Dragon, and each of "
-             "the four who fight it holds a key (TERRA's Enhancer)"),
-    0x0004: ({S: 'katana', P: 'sword'}, "suite battle_breakwor_dreams: CYAN alone keys every body of the Ancient "
-             "Castle, and the dream's three (TERRA, CELES, RELM) hold a key in the dream's Doma"),
-    0x00be: ({S: 'sword', X: 'katana'}, "suite battle_breakwor_dreams: TERRA alone keys every body of the dreamscape, "
-             "and CYAN alone every body of the Ancient Castle"),
-    0x00c3: ({S: 'sword'}, "suite battle_breakwor_edgar: a key for CELES + SABIN (her swords)"),
-    0x011b: ({S: 'sword'}, "suite battle_breakwor_edgar: each member holds a class key on three of the four Tentacles"),
-    0x013c: ({S: 'sword', B: 'knuckle'}, "suite battle_breakwor_edgar: each member holds a class key on three of the "
-             "four Tentacles"),
-    0x013d: ({P: 'spear', B: 'knuckle'}, "suite battle_breakwor_edgar: each member holds a class key on three of the "
-             "four Tentacles (CELES's swords miss this one, the design's one)"),
-    0x013e: ({S: 'sword', P: 'knuckle'}, "suite battle_breakwor_edgar: each member holds a class key on three of the "
-             "four Tentacles"),
-    0x007e: ({B: 'fang'}, "suite battle_breakwor_gau: GAU alone holds a key to every body of the Veldt cave"),
-    0x008f: ({P: 'fang'}, "suite battle_breakwor_gau: GAU alone holds a key to every body of the Veldt cave"),
-    0x00bb: ({B: 'fang'}, "suite battle_breakwor_gau: GAU alone holds a key to every body of the Veldt cave"),
-    0x0119: ({P: 'fang'}, "suite battle_breakwor_gau: GAU alone holds a key to every body of the Veldt cave"),
-    0x00f0: ({S: 'sword', B: 'rod'}, "suite battle_breakwor_gogo: every belly body is keyed by two of the four who walk it"),
-    0x0068: ({S: 'sword', P: 'dagger'}, "suite battle_breakwor_gogo: every belly body is keyed by two of the four who "
-             "walk it"),
-    0x00f1: ({S: 'sword', X: 'rod'}, "suite battle_breakwor_locke: a key for party 2 (CELES's Falchion; RELM's rod, "
-             "UMARO's club)"),
-    0x00e2: ({B: 'rod'}, "suite battle_breakwor_locke: ice-weak, and party 1 (no ice) has a key (STRAGO's rod, SABIN's "
-             "blitzes)"),
-    0x009e: ({P: 'spear'}, "suite battle_breakwor_narshe: a key for the four with MOG (his spear)"),
-    0x00e7: ({P: 'spear'}, "suite battle_breakwor_narshe: a key for the four with MOG (his spear)"),
-    0x00f3: ({P: 'spear'}, "suite battle_breakwor_narshe: a key for the four with MOG (his spear)"),
+    0x0027: ({P: 'ninja blade'}, "suite battle_breakwor_sidetrips: SHADOW's point (the Striker) keys both dinosaurs"),
+    0x0038: ({P: 'spear', B: 'rod'}, "suite battle_breakwob_events: on the raft each of TERRA's blade, EDGAR's pike and BANON's rod keys two of the three"),
+    0x0039: ({S: 'sword', B: 'rod'}, "suite battle_breakwob_events: on the raft each of TERRA's blade, EDGAR's pike and BANON's rod keys two of the three"),
+    0x005b: ({P: 'ninja blade'}, "suite battle_breakwor_colosseum: among the four's blades, SHADOW's (the Striker) alone keys the Crawler"),
+    0x0065: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_events: the raiders' key for TERRA, EDGAR, CELES (their swords) and for LOCKE, GAU (knife, fangs)"),
+    0x0068: ({S: 'sword', P: 'dagger'}, 'suite battle_breakwor_gogo: every belly body is keyed by two of the four who walk it'),
+    0x0079: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_events: a raider should take the troopers' keys; battle_breakwob_raiders: a standing member of party 1 holds a hand the body's keys take"),
+    0x007b: ({S: 'sword'}, "suite battle_breakwob_south: the blades (TERRA's Break Blade, LOCKE's ThunderBlade) key every body"),
+    0x007d: ({B: 'rod'}, "suite battle_breakwor_gogo: every belly body is keyed by two of the four who walk it (the Wart Puck: TERRA's Fire and the rods)"),
+    0x007e: ({B: 'fang'}, 'suite battle_breakwor_gau: GAU alone holds a key to every body of the Veldt cave'),
+    0x0081: ({S: 'sword'}, "suite battle_breakwob_south: the blades (TERRA's Break Blade, LOCKE's ThunderBlade) key every body"),
+    0x0084: ({P: 'dagger', B: 'rod'}, "suite battle_breakwor_tower: a key for each party whose lane meets it (parties 1 and 2 a rod, party 3 SHADOW's and GOGO's blades) on the Brontaur"),
     0x0087: ({S: 'sword'}, "suite battle_breakwor_narshe: a key for the four with UMARO (TERRA's and CELES's blades)"),
-    0x00fb: ({S: 'sword', P: 'dagger'}, "suite battle_breakwor_tower: a key for each party whose lane meets it "
-             "(parties 1 and 2 a sword, party 3 SHADOW's and GOGO's blades)"),
-    0x00e0: ({P: 'dagger', B: 'rod'}, "suite battle_breakwor_tower: a key for each party whose lane meets it (parties "
-             "1 and 2 a rod, party 3 SHADOW's and GOGO's blades)"),
-    0x009b: ({S: 'katana', P: 'dagger'}, "suite battle_breakwor_tower: a key for party 3 (CYAN's katanas, SHADOW's "
-             "Striker)"),
-    0x0007: ({S: 'katana', B: 'rod'}, "suite battle_breakwor_tower: a key for each party whose lane meets it (parties "
-             "1 and 2 a rod, party 3 CYAN's katanas)"),
+    0x008d: ({S: 'sword'}, "suite battle_breakwob_south: the blades (TERRA's Break Blade, LOCKE's ThunderBlade) key every body"),
+    0x008e: ({S: 'swdtech'}, "suite battle_breakwor_cyan: a Luridan herd is keyed by CYAN's Stunner (a SwdTech) and by the Tempest's wind"),
+    0x008f: ({P: 'fang'}, 'suite battle_breakwor_gau: GAU alone holds a key to every body of the Veldt cave'),
+    0x009b: ({S: 'katana', P: 'dagger'}, "suite battle_breakwor_tower: a key for party 3 (CYAN's katanas, SHADOW's Striker)"),
+    0x009e: ({P: 'spear'}, 'suite battle_breakwor_narshe: a key for the four with MOG (his spear)'),
+    0x009f: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_events: the HeavyArmor's key for TERRA, EDGAR, CELES (their swords) and for LOCKE, GAU"),
+    0x00ab: ({S: 'sword'}, 'suite battle_breakwor_dreams: TERRA alone keys every body of the dreamscape (the Critic)'),
+    0x00bb: ({B: 'fang'}, 'suite battle_breakwor_gau: GAU alone holds a key to every body of the Veldt cave'),
+    0x00bd: ({S: 'sword', P: 'dagger'}, "suite battle_breakwor_tower: a key for each party whose lane meets it (parties 1 and 2 a sword, party 3 SHADOW's and GOGO's blades) on the Outsider"),
+    0x00be: ({S: 'sword', X: 'katana'}, 'suite battle_breakwor_dreams: TERRA alone keys every body of the dreamscape, and CYAN alone every body of the Ancient Castle'),
+    0x00c3: ({S: 'sword'}, 'suite battle_breakwor_edgar: a key for CELES + SABIN (her swords)'),
+    0x00d4: ({S: 'sword', B: 'rod'}, "suite battle_breakwor_thamasa: a key for the four on the plains (TERRA's and CELES's blades, RELM's brush, STRAGO's rod) on the Prussian"),
+    0x00e0: ({P: 'dagger', B: 'rod'}, "suite battle_breakwor_tower: a key for each party whose lane meets it (parties 1 and 2 a rod, party 3 SHADOW's and GOGO's blades)"),
+    0x00e2: ({B: 'rod'}, "suite battle_breakwor_locke: ice-weak, and party 1 (no ice) has a key (STRAGO's rod, SABIN's blitzes)"),
+    0x00e7: ({P: 'spear'}, 'suite battle_breakwor_narshe: a key for the four with MOG (his spear)'),
+    0x00f0: ({S: 'sword', B: 'rod'}, 'suite battle_breakwor_gogo: every belly body is keyed by two of the four who walk it'),
+    0x00f1: ({S: 'sword', X: 'rod'}, "suite battle_breakwor_locke: a key for party 2 (CELES's Falchion; RELM's rod, UMARO's club)"),
+    0x00f3: ({P: 'spear'}, 'suite battle_breakwor_narshe: a key for the four with MOG (his spear)'),
+    0x00fa: ({S: 'sword'}, "suite battle_breakwor_gogo: every belly body is keyed by two of the four who walk it (the Woolly: TERRA's Fire and CELES's blade)"),
+    0x00fb: ({S: 'sword', P: 'dagger'}, "suite battle_breakwor_tower: a key for each party whose lane meets it (parties 1 and 2 a sword, party 3 SHADOW's and GOGO's blades)"),
+    0x0119: ({P: 'fang'}, 'suite battle_breakwor_gau: GAU alone holds a key to every body of the Veldt cave'),
+    0x011b: ({S: 'sword'}, 'suite battle_breakwor_edgar: each member holds a class key on three of the four Tentacles'),
+    0x0121: ({S: 'sword', B: 'rod'}, "suite battle_breakwor_dreams: a key for the dream's three (TERRA's and CELES's blades, RELM's rod) on Moe"),
+    0x013c: ({S: 'sword', B: 'knuckle'}, 'suite battle_breakwor_edgar: each member holds a class key on three of the four Tentacles'),
+    0x013d: ({P: 'spear', B: 'knuckle'}, "suite battle_breakwor_edgar: each member holds a class key on three of the four Tentacles (CELES's swords miss this one, the design's one)"),
+    0x013e: ({S: 'sword', P: 'knuckle'}, 'suite battle_breakwor_edgar: each member holds a class key on three of the four Tentacles'),
+    0x014b: ({S: 'katana', P: 'sword'}, "suite battle_breakwor_cyan: CYAN's katana keys the Storm Dragon, and each of the four who fight it holds a key (TERRA's Enhancer)"),
+    0x015a: ({S: 'katana', P: 'dagger'}, "suite battle_breakwor_end: tier 2's bodies between them take every hand"),
+    0x015b: ({P: 'spear', B: 'crossbow'}, "suite battle_breakwor_end: tier 2's bodies between them take every hand"),
+    0x015c: ({X: 'card'}, "suite battle_breakwor_end: tier 2's bodies between them take every hand"),
+    0x015d: ({S: 'sword', B: 'fist'}, "suite battle_breakwor_end: tier 2's bodies between them take every hand"),
+    # ---- HOLD, found by mutation: changed, this weakness turns the named proof red
+    0x0000: ({P: 'tekmissile'}, "suite battle_breaktbl: were its pierce Dagger, not Ranged: breaktbl: FAIL regression: guard $0000 takes the TekMissile's class alone ($08)"),
+    0x0006: ({B: 'boomerang'}, 'suite battle_breakvector: were its bludgeon Blunt, not Ranged: breakvector: FAIL both mag roaders carry the SAME class row -- the element is what distinguishes the pair, and the class axis must not flatten it'),
+    0x0008: ({S: 'katana'}, "suite battle_breakwob_train: were its slash Sword, not Katana: $008 Hazer: CYAN's katana holds no key"),
+    0x000e: ({S: 'katana'}, "suite battle_breakwob_train: were its slash Sword, not Katana: $00E Whisper: CYAN's katana holds no key"),
+    0x0011: ({S: 'sword', P: 'dagger'}, 'suite battle_breakwob_escape: were its slash Katana, not Sword: formation 373 (the South Figaro basement): species $011 (class $12, weak $08) has no key for CELES, EDGAR, SABIN (the World of Ruin sweep)'),
+    0x0012: ({P: 'spear'}, "suite battle_breakwob_desert: were its pierce Dagger, not Spear: $012 Rhodox: EDGAR's pike holds no key"),
+    0x001d: ({S: 'sword'}, 'suite battle_breakwob_thamasa: were its slash Katana, not Sword: formation 160 (the forest round Thamasa): species $01D (class $12, weak $08) has no key for TERRA, LOCKE, STRAGO'),
+    0x001e: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $01E Suriander: CYAN alone (the Ancient Castle) holds no key'),
+    0x001f: ({S: 'sword'}, 'suite battle_breakwob_thamasa: were its slash Katana, not Sword: formation 190 (the plains round Thamasa): species $01F (class $12, weak $08) has no key for TERRA, LOCKE, STRAGO'),
+    0x002a: ({P: 'dagger'}, 'suite battle_breakwob_plains: were its pierce Spear, not Dagger: formation 97 (the plains): species $02A (class $20, weak $10) has no key for LOCKE, EDGAR, SABIN, SETZER (to Narshe)'),
+    0x002b: ({X: 'brush'}, 'suite battle_breakwor_thamasa: were its special Ranged, not Blunt: formation 331 (world group 55): species $02B (class $28, weak $00) has no key for the four on the plains (TERRA, CELES, RELM, STRAGO)'),
+    0x0032: ({S: 'sword'}, 'suite battle_breakwob_kolts: were its slash Katana, not Sword: $032 Trilium: the Mithril Blades hold no key'),
+    0x0036: ({P: 'dagger'}, 'suite battle_breakwob_escape: were its pierce Spear, not Dagger: formation 375 (the cave out of South Figaro): species $036 (class $28, weak $00) has no key for LOCKE, CELES'),
+    0x0045: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $045 Lethal Wpn: CYAN alone (the Ancient Castle) holds no key'),
+    0x0046: ({P: 'dagger'}, "suite battle_breakwob_mines: were its pierce Spear, not Dagger: $046 Vaporite: TERRA's knife holds no key"),
+    0x004d: ({P: 'dagger'}, 'suite battle_breakwob_mines: were its pierce Spear, not Dagger: formation 26 (the Narshe mines): species $04D (class $30, weak $08) has no key for TERRA alone'),
+    0x004f: ({S: 'katana'}, 'suite battle_breakwob_train: were its slash Sword, not Katana: formation 77 (the train): species $04F (class $09, weak $82) has no key for SABIN, CYAN, SHADOW'),
+    0x0051: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $051 Boxed Set: CYAN alone (the Ancient Castle) holds no key'),
+    0x0057: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $057 Figaliz: CYAN alone (the Ancient Castle) holds no key'),
+    0x005c: ({P: 'spear'}, "suite battle_breakwob_desert: were its pierce Dagger, not Spear: $05C Sand Ray: EDGAR's pike holds no key"),
+    0x0060: ({S: 'sword', X: 'card'}, "suite battle_breakwob_events: were its slash Katana, not Sword: the trap: $060's keys among the three hands are $00, want the one $01"),
+    0x0062: ({S: 'sword'}, 'suite battle_breakwob_sfcave: were its slash Katana, not Sword: $062 Crawly: the worm should take the edge and not the point'),
+    0x0063: ({P: 'spear'}, 'suite battle_breakwob_sfcave: were its pierce Ranged, not Spear: $063 Bleary: the eye should take the point and not the edge'),
+    0x006c: ({P: 'crossbow'}, 'suite battle_breakwob_plains: were its pierce Spear, not Ranged: formation 100 (the plains): species $06C (class $24, weak $00) has no key for LOCKE, EDGAR, SABIN, SETZER (to Narshe)'),
+    0x006d: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $06D Goblin: CYAN alone (the Ancient Castle) holds no key'),
+    0x006f: ({P: 'crossbow'}, 'suite battle_breakwor_falcon: were its pierce Dagger, not Ranged: special: SETZER (Cards) holds no key on $06F PowerDemon (class $07, weak $21)'),
+    0x0071: ({S: 'sword', P: 'dagger'}, "suite battle_breakwob_escape: were its slash Katana, not Sword: $071 Vector Pup: the basement's soldiers should take both hands"),
+    0x0076: ({B: 'fist'}, "suite battle_breakwor_gau: were its bludgeon Ranged, not Blunt: $076 Rhobite: no key for the Veldt's three (TERRA, CELES, RELM)"),
+    0x008c: ({X: 'card'}, "suite battle_breakwob_plains: were its special Blunt, not Ranged: $08C Mind Candy: SETZER's cards hold no key"),
+    0x0093: ({B: 'fist'}, 'suite battle_breakwor_locke: were its bludgeon Ranged, not Blunt: formation 341 (field group 175): species $093 (class $08, weak $02) has no key for party 1 (TERRA, STRAGO, SABIN, CYAN)'),
+    0x0094: ({S: 'sword'}, 'suite battle_breakwob_escape: were its slash Katana, not Sword: formation 375 (the cave out of South Figaro): species $094 (class $18, weak $04) has no key for LOCKE, CELES'),
+    0x009a: ({B: 'rod'}, "suite battle_breakwor_gogo: were its bludgeon Ranged, not Blunt: formation 295 (field group 194): species $09A (class $18, weak $02) has no key for Ebot's four (STRAGO, RELM, GOGO, TERRA)"),
+    0x009c: ({P: 'spear'}, 'suite battle_breakwor_narshe: were its pierce Dagger, not Spear: formation 274 (field group 189): species $09C (class $02, weak $08) has no key for the four with MOG (CYAN, TERRA, CELES, MOG)'),
+    0x00a5: ({B: 'rod'}, "suite battle_breakwor_gogo: were its bludgeon Ranged, not Blunt: formation 293 (field group 193): species $0A5 (class $28, weak $04) has no key for Ebot's four (STRAGO, RELM, GOGO, TERRA)"),
+    0x00a6: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $0A6 Enuo: CYAN alone (the Ancient Castle) holds no key'),
+    0x00a7: ({P: 'crossbow'}, 'suite battle_breakwor_falcon: were its pierce Dagger, not Ranged: special: SETZER (Cards) holds no key on $0A7 Deep Eye (class $06, weak $01)'),
+    0x00a8: ({P: 'spear'}, "suite battle_breakwob_desert: were its pierce Dagger, not Spear: $0A8 GreaseMonk: EDGAR's pike holds no key"),
+    0x00aa: ({P: 'crossbow'}, "suite battle_breakwob_sidetrips: were its pierce Spear, not Ranged: $0AA Grenade: neither LOCKE's point (his knife) nor EDGAR's tools (the AutoCrossbow) holds a key"),
+    0x00ae: ({S: 'sword'}, "suite battle_breakwobfc: were its slash Katana, not Sword: ASSERT FAIL: formation 170 is chippable by the party's classes: got false, want true"),
+    0x00af: ({B: 'boomerang'}, 'suite battle_breakvector: were its bludgeon Blunt, not Ranged: breakvector: FAIL both mag roaders carry the SAME class row -- the element is what distinguishes the pair, and the class axis must not flatten it'),
+    0x00b2: ({S: 'sword'}, 'suite battle_breakwor_terra: were its slash Katana, not Sword: formation 194 (world group 30): species $0B2 (class $10, weak $80) has no key for the four'),
+    0x00ba: ({S: 'katana', B: 'fist'}, "suite battle_breakwob_train: were its slash Sword, not Katana: $0BA StillGoing: CYAN's katana holds no key"),
+    0x00bf: ({S: 'katana'}, 'suite battle_breakwor_locke: were its slash Sword, not Katana: formation 338 (field group 174): species $0BF (class $21, weak $02) has no key for party 1 (TERRA, STRAGO, SABIN, CYAN)'),
+    0x00c0: ({S: 'sword'}, "suite battle_breakwor_sabin: were its slash Katana, not Sword: formation 211 (event group 150: $0C0 $0C0 $0C0 $0C0) has no key for Celes's sword or Ice"),
+    0x00c7: ({P: 'dagger'}, "suite battle_breakwobbase: were its pierce Ranged, not Dagger: ASSERT FAIL: formation 416 is chippable by the party's classes: got false, want true"),
+    0x00ca: ({S: 'sword'}, "suite battle_breakwor_sabin: were its slash Katana, not Sword: formation 203 (world group 33: $0CA $0CA) has no key for Celes's sword or Ice"),
+    0x00cf: ({P: 'spear', X: 'card'}, "suite battle_breakwob_events: were its pierce Dagger, not Spear: the trap: $0CF's keys among the three hands are $00, want the one $20"),
+    0x00d0: ({B: 'rod'}, "suite battle_breakwob_espermtn: were its bludgeon Ranged, not Blunt: $0D0 Insecare: STRAGO's rod holds no key"),
+    0x00d3: ({S: 'sword', X: 'card'}, 'suite battle_breakwor_falcon: were its slash Katana, not Sword: the Bogy: CELES holds no key (class $18, weak $00)'),
+    0x00d5: ({S: 'sword'}, "suite battle_breakwor_sabin: were its slash Katana, not Sword: formation 195 (world group 30: $0D5) has no key for Celes's sword or Ice"),
+    0x00d6: ({B: 'fist'}, 'suite battle_breakwob_espermtn: were its bludgeon Ranged, not Blunt: formation 164 (Esper Mountain): species $0D6 (class $0A, weak $00) has no key for TERRA, LOCKE, STRAGO'),
+    0x00e1: ({S: 'sword'}, "suite battle_breakwor_sabin: were its slash Katana, not Sword: formation 209 (map 311 (group 128): $0E1 $0E1 $0E1) has no key for Celes's sword or Ice"),
+    0x00e9: ({S: 'katana'}, 'suite battle_breakwor_locke: were its slash Sword, not Katana: formation 340 (field group 175): species $0E9 (class $01, weak $06) has no key for party 1 (TERRA, STRAGO, SABIN, CYAN)'),
+    0x00eb: ({S: 'sword'}, 'suite battle_breakwob_espermtn: were its slash Katana, not Sword: formation 169 (Esper Mountain): species $0EB (class $12, weak $00) has no key for TERRA, LOCKE, STRAGO'),
+    0x00ec: ({S: 'katana'}, 'suite battle_breakwor_locke: were its slash Sword, not Katana: formation 343 (field group 174): species $0EC (class $21, weak $02) has no key for party 1 (TERRA, STRAGO, SABIN, CYAN)'),
+    0x00ef: ({P: 'spear', B: 'fist'}, "suite battle_breakwob_narshe: were its pierce Ranged, not Spear: formation 381 (Narshe's back way): species $0EF (class $0C, weak $08) has no key for LOCKE, EDGAR, SABIN, MOG"),
+    0x00f5: ({S: 'sword'}, 'suite battle_breakwob_escape: were its slash Katana, not Sword: formation 376 (the cave out of South Figaro): species $0F5 (class $18, weak $00) has no key for LOCKE, CELES'),
+    0x00f7: ({P: 'spear'}, 'suite battle_breakwor_locke: were its pierce Dagger, not Spear: formation 337 (field group 175): species $0F7 (class $0A, weak $20) has no key for party 2 (CELES, RELM, MOG, UMARO)'),
+    0x0106: ({B: 'blitz'}, "suite battle_breaktbl: were its bludgeon Ranged, not Blunt: breaktbl: FAIL GhostTrain $0106 row is 4 shields / the Suplex's class alone (got 4/08) -- the premise of #74"),
+    0x0110: ({S: 'katana', P: 'spear'}, 'suite battle_breakwor_narshe: were its slash Sword, not Katana: $110: CYAN holds no key'),
+    0x011f: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $121 Moe takes the class pair $05 another stooge takes'),
+    0x0124: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $124 KatanaSoul: CYAN alone (the Ancient Castle) holds no key'),
+    0x0126: ({B: 'rod'}, "suite battle_breakwor_gogo: were its bludgeon Ranged, not Blunt: formation 464 (event group 94): species $126 (class $18, weak $40) has no key for Ebot's four (STRAGO, RELM, GOGO, TERRA)"),
+    0x0134: ({P: 'tekmissile'}, "suite battle_breaktbl: were its pierce Dagger, not Ranged: breaktbl: FAIL regression: whelk head $0134 takes the TekMissile's class alone ($08)"),
+    0x0138: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $138 Master Pug: CYAN alone (the Ancient Castle) holds no key'),
+    0x0144: ({S: 'katana', P: 'spear'}, 'suite battle_breakwor_narshe: were its slash Sword, not Katana: $144: CYAN holds no key'),
+    0x0149: ({P: 'spear'}, "suite battle_breakwor_narshe: were its pierce Dagger, not Spear: $149: MOG's spear does not key the Ice Dragon"),
+    0x0152: ({S: 'katana'}, 'suite battle_breakwor_dreams: were its slash Sword, not Katana: $152 Blue Drgn: CYAN alone (the Ancient Castle) holds no key'),
+    0x0157: ({P: 'dagger'}, 'suite battle_breakwor_end: were its pierce Spear, not Dagger: formation 471 (tier 1): its bodies together key class mask $3E, want every hand ($3F)'),
+    0x0158: ({S: 'katana', P: 'dagger'}, 'suite battle_breakwor_end: were its slash Sword, not Katana: formation 471 (tier 1): its bodies together key class mask $0F, want every hand ($3F)'),
+    0x015e: ({S: 'katana', P: 'spear'}, 'suite battle_breakwor_end: were its slash Sword, not Katana: formation 513 (tier 3): its bodies together key class mask $2D, want every hand ($3F)'),
+    0x0160: ({B: 'rod'}, "suite battle_breakwor_gogo: were its bludgeon Ranged, not Blunt: formation 464 (event group 94): species $160 (class $18, weak $00) has no key for Ebot's four (STRAGO, RELM, GOGO, TERRA)"),
+    0x0167: ({X: 'brush'}, 'suite battle_breakwor_dreams: were its special Ranged, not Blunt: $167 SoulSaver: class $08, want the brush alone ($04)'),
+    0x016d: ({S: 'sword'}, 'suite battle_breakwor_terra: were its slash Katana, not Sword: formation 423 (event group 131): species $16D (class $1C, weak $08) has no key for TERRA alone'),
+    0x017d: ({P: 'spear'}, 'suite battle_breakwor_tower: were its pierce Dagger, not Spear: formation 482 (event battle 112): species $17D (class $12, weak $00) has no key for party 2'),
 }
-# pins that name a class outside what the four-class weakness's own weapons went to (classes.py CHILDREN), and why
 DEPARTURE = {
-    0x014b: "pierce -> Sword: slash was TERRA's blade and CYAN's katana at once; the katana keeps slash (the lesson), "
-            "so TERRA's sword takes the row's other weakness",
-    0x0004: "pierce -> Sword: slash was TERRA's and CELES's blades (the dream's Doma) and CYAN's katana (alone at "
-            "the Ancient Castle) at once",
-    0x00be: "special -> Katana: slash was TERRA's blade (alone in the dreamscape) and CYAN's katana (alone at the "
-            "Ancient Castle) at once",
-    0x013e: "pierce -> Blunt: SABIN's knuckles were slash and keyed the three slash Tentacles; Blunt is a child of "
-            "bludgeon only, which two of the four Tentacles have",
+    0x0004: "pierce -> Sword: slash was TERRA's and CELES's blades (the dream's Doma) and CYAN's katana (alone at the Ancient Castle) at once",
     0x007e: "bludgeon -> Dagger: the Veldt cave's rows keyed bludgeon for GAU's fists, and his own body is his fangs now",
     0x00bb: "bludgeon -> Dagger: the Veldt cave's rows keyed bludgeon for GAU's fists, and his own body is his fangs now",
+    0x00be: "special -> Katana: slash was TERRA's blade (alone in the dreamscape) and CYAN's katana (alone at the Ancient Castle) at once",
+    0x013e: "pierce -> Blunt: SABIN's knuckles were slash and keyed the three slash Tentacles; Blunt is a child of bludgeon only, which two of the four Tentacles have",
+    0x014b: "pierce -> Sword: slash was TERRA's blade and CYAN's katana at once; the katana keeps slash (the lesson), so TERRA's sword takes the row's other weakness",
 }
