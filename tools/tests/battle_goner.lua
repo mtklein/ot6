@@ -26,7 +26,10 @@
 -- killed him ("after the break: ... HP 0", build/attempts/wt/v051-fuse/failed/gonerlow.log).  Its row is checked
 -- against the script by battle_fuse, and the cancel it gets is this one's.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers": there Goner
--- came on his first turn back with no new line (build/attempts/wt/v051-fuse/measure/goner.log).
+-- came on his first turn back with no new line (build/attempts/wt/v051-fuse/measure/goner.log).  Mutants
+-- (build/attempts/wt/v051-fuse/mutants/): fuse_never is red at "the break during the fuse cancels it",
+-- fuse_no_trigger at "battle switches 0 and 1 are clear after the cancel", fuse_no_mark at "the lit-fuse mark
+-- stands before the shield emblem".
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)

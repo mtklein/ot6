@@ -23,7 +23,9 @@
 --   outside   a break two turns into the rotation, before any line: nothing is cancelled, the script resumes where
 --             it waited, and the fuse lights and fires as in the first case.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers": there Flare Star
--- came on its second turn back with no new line (build/attempts/wt/v051-fuse/measure/atmaweapon.log).
+-- came on its second turn back with no new line (build/attempts/wt/v051-fuse/measure/atmaweapon.log).  Mutants
+-- (build/attempts/wt/v051-fuse/mutants/): fuse_never is red at "the break during the fuse cancels it",
+-- fuse_no_trigger at "monster switches 0 and 1 are clear after the cancel".
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)

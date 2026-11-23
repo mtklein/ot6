@@ -35,10 +35,14 @@
 --      outside   a break before the clock has run: nothing is cancelled, and the fuse lights and fires after.
 -- DECLARED SYNTHETIC SETUP (tools/state_write_waivers.txt): the formation word ($11E0) at LoadBattleProp, and
 -- M.fuseCases' staging (the row, the gauge, HP held).  A mechanism test, not play.
--- Mutants: fuse_never (Ot6FuseCancel never cancels) is red at "the break during the fuse cancels it";
--- fuse_no_trigger (the cancel skips the row's clears) at "the clock was restarted"; fuse_always (a break cancels
--- whether or not the fuse is lit) at "a break outside the fuse cancels nothing"; fuse_no_mark (the mark's word is
--- the fill word) at "the lit-fuse mark stands before the shield emblem".
+-- Mutants (tools/build/mutant_rom.py; each run's log in build/attempts/wt/v051-fuse/mutants/, the edits in its
+-- *.mutant.txt): fuse_never (Ot6FuseCancel+3=80: no break cancels) is red at "the break during the fuse cancels
+-- it"; fuse_no_trigger (Ot6FuseSnuff+5=60: the cancel skips the row's clears) at "monster switch 0 is clear after
+-- the cancel"; fuse_always (Ot6FuseCancel+12=EAEA: a break cancels whether or not the fuse is lit) at "a break
+-- outside the fuse cancels nothing"; fuse_no_mark (Ot6MarkWordTbl+6=EE01: the mark's word is the fill word) at
+-- "the lit-fuse mark stands before the shield emblem"; fuse_story (Ot6FuseLineTbl=FF: no announce is listed) at
+-- "its counter's line ... is in Ot6FuseLineTbl"; roll_always (Ot6AICondRoll+6=3860EA: every roll continues) at
+-- "a roll under the chance came between the cancel and the second line".
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }

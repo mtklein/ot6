@@ -22,7 +22,10 @@
 --             Fights on the Broken Atma add nothing to it, and the fuse then lights and fires as in the first case.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers": there Ultima
 -- came on his second turn back with no new line (build/attempts/wt/v051-fuse/measure/atma.log).  Mutants
--- fuse_never (no break cancels) and fuse_no_trigger (the cancel forgets the row's clears) are red here too.
+-- (build/attempts/wt/v051-fuse/mutants/): fuse_never (no break cancels) is red at "the break during the fuse
+-- cancels it", fuse_no_trigger (the cancel forgets the row's clears) at "monster switch 0 is clear after the
+-- cancel", fuse_always (a break cancels whether or not a fuse is lit) at "a break outside the fuse cancels
+-- nothing".
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)

@@ -24,7 +24,10 @@
 --             Fights on the Broken dragon add nothing to it, and the charge then lights and fires as in the first
 --             case.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers" and at "Fights
--- on the Broken boss wound nothing" (build/attempts/wt/v051-fuse/measure/golddrgn.log).  A mechanism test, not
+-- on the Broken boss wound nothing" (build/attempts/wt/v051-fuse/measure/golddrgn.log).  Mutants
+-- (build/attempts/wt/v051-fuse/mutants/): fuse_never is red at "the break during the fuse cancels it",
+-- fuse_no_trigger at "the mark is gone after the breaking hit" (the switch still set, the fuse still lit),
+-- fuse_story (no announce listed in Ot6FuseLineTbl) at "Fights on the Broken boss wound nothing".  A mechanism test, not
 -- play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
