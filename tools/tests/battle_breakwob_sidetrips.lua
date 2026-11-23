@@ -18,15 +18,15 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x0E8] = { "Bug", 2, DAGGER | KATANA, ICE | WATER, 0 },
-  [0x03D] = { "ChickenLip", 2, KATANA | FIST, ICE, 0 },
-  [0x0AA] = { "Grenade", 3, DAGGER | FIST, ICE | WATER, FIRE },
-  [0x0A3] = { "Intangir", 2, SWORD | DAGGER | FIST | ARCANE, 0, 0xFF },
+  [0x0E8] = { "Bug", 2, SWORD | SPEAR, ICE | WATER, 0 },
+  [0x03D] = { "ChickenLip", 2, SWORD | BLUNT, ICE, 0 },
+  [0x0AA] = { "Grenade", 3, BLUNT | RANGED, ICE | WATER, FIRE },
+  [0x0A3] = { "Intangir", 2, SWORD | DAGGER | SPEAR | KATANA | BLUNT | RANGED, 0, 0xFF },
 }
 local BUG, CHICKENLIP, GRENADE, INTANGIR = 0x0E8, 0x03D, 0x0AA, 0x0A3
 -- the world groups (RandBattleGroup index = WorldBattleGroup byte) and the species each must deal

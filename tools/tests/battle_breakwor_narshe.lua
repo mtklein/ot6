@@ -23,28 +23,28 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
   [0x0F8] = { "Red Wolf", 2, DAGGER | KATANA, 0, 0 },
-  [0x0CE] = { "Nastidon", 2, SWORD | FIST, FIRE, 0 },
+  [0x0CE] = { "Nastidon", 2, KATANA | RANGED, FIRE, 0 },
   [0x09C] = { "Test Rider", 3, SPEAR, POISON, 0 },
-  [0x0C4] = { "Wizard", 2, DAGGER | SPEAR | KATANA, BOLT | POISON, 0 },
-  [0x0DA] = { "Psychot", 1, SPEAR | ARCANE, ICE, FIRE },
-  [0x0E7] = { "Mag Roader (ice)", 2, SPEAR | FIST, 0, 0 },
-  [0x0F3] = { "Mag Roader (fire)", 2, SPEAR | FIST, 0, 0 },
+  [0x0C4] = { "Wizard", 2, SWORD | DAGGER | RANGED, BOLT | POISON, 0 },
+  [0x0DA] = { "Psychot", 1, SPEAR | RANGED, ICE, FIRE },
+  [0x0E7] = { "Mag Roader (ice)", 2, DAGGER | BLUNT, 0, 0 },
+  [0x0F3] = { "Mag Roader (fire)", 2, DAGGER | BLUNT, 0, 0 },
   [0x0C9] = { "Poppers", 1, SPEAR | KATANA, FIRE, 0 },
-  [0x0CD] = { "Kiwok", 2, SPEAR | KATANA, ICE, 0 },
-  [0x0C6] = { "Ceritops", 3, SPEAR | FIST, FIRE, BOLT },
+  [0x0CD] = { "Kiwok", 2, SWORD | SPEAR, ICE, 0 },
+  [0x0C6] = { "Ceritops", 3, SPEAR | BLUNT, FIRE, BOLT },
   [0x0B4] = { "Anemone", 2, KATANA, FIRE | BOLT, BOLT | WATER },
-  [0x09E] = { "Tomb Thumb", 2, SPEAR | ARCANE, BOLT | WATER, 0 },
-  [0x054] = { "Pug", 4, SWORD | ARCANE, FIRE | BOLT, WATER },
-  [0x0FF] = { "Pugs", 4, DAGGER | KATANA, FIRE, WATER },
+  [0x09E] = { "Tomb Thumb", 2, DAGGER | RANGED, BOLT | WATER, 0 },
+  [0x054] = { "Pug", 4, SWORD | RANGED, FIRE | BOLT, WATER },
+  [0x0FF] = { "Pugs", 4, SWORD | RANGED, FIRE, WATER },
   [0x110] = { "Umaro", 6, SPEAR | KATANA, FIRE | POISON, ICE },
-  [0x144] = { "Tritoch", 10, SPEAR | KATANA, FIRE, ICE },
-  [0x149] = { "Ice Dragon", 6, SPEAR | FIST, FIRE, ICE },
+  [0x144] = { "Tritoch", 10, SWORD | SPEAR, FIRE, ICE },
+  [0x149] = { "Ice Dragon", 6, SPEAR | BLUNT, FIRE, ICE },
 }
 
 -- the hands (route-wor-narshe.md 5.4, 6): the three who walk into Narshe

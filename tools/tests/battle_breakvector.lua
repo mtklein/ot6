@@ -21,7 +21,7 @@
 --   ot6_code        F00000  -> $300000   (Ot6ShieldTbl, self-located below)
 
 local PRG = emu.memType.snesPrgRom
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local EDGE = SWORD | KATANA             -- a blade of either kind (the four classes' slash)
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
 
@@ -69,7 +69,7 @@ local function find(seq, lo, hi)
 end
 
 local shieldBase = find(
-  { 0x00, 0x00, 0x02, 0x20, 0x19, 0x00, 0x03, 0x20, 0x00, 0x01, 0x00, 0x00 },
+  { 0x00, 0x00, 0x02, 0x08, 0x19, 0x00, 0x03, 0x20, 0x00, 0x01, 0x00, 0x00 },
   0x300000, 0x310000)
 if not shieldBase then
   emu.log("breakvector: FAIL Ot6ShieldTbl not located")
@@ -98,18 +98,18 @@ check(shieldRows >= 70, string.format(
 -- different byte, and both fail.  The reason for each is in ot6_hud.asm
 -- beside the row.
 local want = {
-  { 0x00cb, 2, SPEAR | FIST, "garm (magitek quadruped, entrance)" },
+  { 0x00cb, 2, SPEAR | RANGED, "garm (magitek quadruped, entrance)" },
   { 0x00c7, 2, DAGGER,         "commando (imperial line keeps a point)" },
-  { 0x0165, 2, FIST,           "protoarmor (sealed suit, no seam)" },
-  { 0x0041, 2, SPEAR,          "pipsqueak (the x5 swarm; AutoCrossbow)" },
-  { 0x0047, 2, FIST,           "flan (you cannot cut an ooze)" },
-  { 0x0066, 2, DAGGER | FIST, "general (officer in plate)" },
-  { 0x002d, 2, FIST,           "trapper (a device; you smash it)" },
-  { 0x00a0, 2, DAGGER | FIST, "chaser (1202 hp, on the escape map)" },
-  { 0x0088, 2, DAGGER | KATANA, "gobbler (the area's deliberate blade target)" },
-  { 0x0075, 2, FIST,           "rhinox (THE FLAGSHIP: bludgeon alone)" },
-  { 0x0006, 2, FIST,           "mag roader $006 (minecart)" },
-  { 0x00af, 2, FIST,           "mag roader $0af (minecart)" },
+  { 0x0165, 2, RANGED,         "protoarmor (sealed suit, no seam)" },
+  { 0x0041, 2, DAGGER,         "pipsqueak (the x5 swarm; AutoCrossbow)" },
+  { 0x0047, 2, RANGED,         "flan (you cannot cut an ooze)" },
+  { 0x0066, 2, DAGGER | RANGED, "general (officer in plate)" },
+  { 0x002d, 2, RANGED,         "trapper (a device; you smash it)" },
+  { 0x00a0, 2, DAGGER | BLUNT, "chaser (1202 hp, on the escape map)" },
+  { 0x0088, 2, SWORD | DAGGER, "gobbler (the area's deliberate blade target)" },
+  { 0x0075, 2, RANGED,         "rhinox (THE FLAGSHIP: bludgeon alone)" },
+  { 0x0006, 2, RANGED,         "mag roader $006 (minecart)" },
+  { 0x00af, 2, RANGED,         "mag roader $0af (minecart)" },
 }
 for _, w in ipairs(want) do
   local r = S[w[1]]

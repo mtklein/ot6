@@ -11,16 +11,16 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x0EE] = { "Mandrake", 2, KATANA | ARCANE, FIRE, WATER, 0 },
-  [0x0D0] = { "Insecare", 2, DAGGER | ARCANE, FIRE | WIND, 0, 0 },
+  [0x0EE] = { "Mandrake", 2, SWORD | BLUNT, FIRE, WATER, 0 },
+  [0x0D0] = { "Insecare", 2, DAGGER | BLUNT, FIRE | WIND, 0, 0 },
   [0x0EB] = { "Abolisher", 2, SWORD | SPEAR, 0, 0, 0 },
-  [0x0D6] = { "Adamanchyt", 5, SPEAR | ARCANE, 0, 0, 0 },
-  [0x0B8] = { "Slurm", 2, FIST | ARCANE, FIRE, 0, 0 },
+  [0x0D6] = { "Adamanchyt", 5, DAGGER | BLUNT, 0, 0, 0 },
+  [0x0B8] = { "Slurm", 2, BLUNT | RANGED, FIRE, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal

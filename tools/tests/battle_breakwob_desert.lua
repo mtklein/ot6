@@ -11,16 +11,16 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
   [0x05C] = { "Sand Ray", 2, SWORD | SPEAR, ICE | WATER, 0, POISON },
-  [0x023] = { "FossilFang", 3, DAGGER | FIST, FIRE | ICE | HOLY | WATER, POISON, 0 },
-  [0x015] = { "Rhinotaur", 2, SPEAR | FIST, 0, BOLT, POISON },
-  [0x012] = { "Rhodox", 2, SPEAR | KATANA, 0, 0, POISON },
-  [0x0A8] = { "GreaseMonk", 2, DAGGER | FIST, POISON, 0, 0 },
+  [0x023] = { "FossilFang", 3, DAGGER | BLUNT, FIRE | ICE | HOLY | WATER, POISON, 0 },
+  [0x015] = { "Rhinotaur", 2, DAGGER | BLUNT, 0, BOLT, POISON },
+  [0x012] = { "Rhodox", 2, SWORD | SPEAR, 0, 0, POISON },
+  [0x0A8] = { "GreaseMonk", 2, SPEAR | RANGED, POISON, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal

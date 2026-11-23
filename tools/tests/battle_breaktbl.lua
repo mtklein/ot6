@@ -15,7 +15,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")   -- only for H.sym address lookups
 
 local PRG = emu.memType.snesPrgRom
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
 local fails = 0
 
@@ -67,7 +67,7 @@ end
 -- anchors: ShieldTbl opens guard/lobo/whelk(shell); ElemAddTbl opens
 -- whelk-head(fire)/vargas(holy). both are distinctive multi-record runs.
 local shieldBase = find(
-  { 0x00, 0x00, 0x02, 0x20, 0x19, 0x00, 0x03, 0x20, 0x00, 0x01, 0x00, 0x00 },
+  { 0x00, 0x00, 0x02, 0x08, 0x19, 0x00, 0x03, 0x20, 0x00, 0x01, 0x00, 0x00 },
   0x300000, 0x310000)
 local elemBase = find(
   { 0x34, 0x01, 0x01, 0x00, 0x03, 0x01, 0x20, 0x00 },
@@ -87,33 +87,33 @@ local E = walk(elemBase)
 
 -- the v0.6 class rows: id -> {shields, class, name}
 local want = {
-  [0x0001] = { 2, DAGGER | KATANA, "soldier" },
-  [0x0002] = { 3, DAGGER,         "templar" },
+  [0x0001] = { 2, KATANA | RANGED, "soldier" },
+  [0x0002] = { 3, RANGED,         "templar" },
   [0x014e] = { 3, KATANA,         "leader (Cyan duel)" },
-  [0x014f] = { 2, KATANA | FIST,  "grunt" },
-  [0x0176] = { 3, KATANA | FIST,  "cadet" },
+  [0x014f] = { 2, KATANA | BLUNT, "grunt" },
+  [0x0176] = { 3, KATANA | BLUNT, "cadet" },
   [0x0175] = { 2, DAGGER,         "officer" },
   [0x0065] = { 2, SWORD | DAGGER, "trooper" },
   [0x003f] = { 3, SWORD | DAGGER, "rider" },
   [0x009f] = { 3, DAGGER | KATANA, "heavyarmor" },
   [0x013a] = { 2, DAGGER,         "merchant" },
   [0x003a] = { 2, KATANA,         "anguiform (trench)" },
-  [0x005e] = { 2, FIST,           "actaneon (trench)" },
+  [0x005e] = { 2, BLUNT,          "actaneon (trench)" },
   -- the trench trio is Sabin + Cyan + Gau and none of them pierces: Gau's
   -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
   -- hands read $ff -> OT6_FIST.
-  [0x0059] = { 2, FIST,           "aspik (trench) -- #23, was a dead PIERCE" },
+  [0x0059] = { 2, BLUNT,          "aspik (trench) -- #23, was a dead PIERCE" },
   -- the floating continent's random pool (map 394): the FC party carries
   -- RELM, whose brushes are arcane (the special's ¤, weapon-classes.md), and
   -- it is a common key (guidelines, #347): the three magic bodies take it;
   -- the beasts, the dragons and the ninja do not
-  [0x0020] = { 3, DAGGER | KATANA,          "behemoth (FC)" },
+  [0x0020] = { 3, SWORD | SPEAR,            "behemoth (FC)" },
   [0x0083] = { 3, SPEAR | KATANA,           "dragon (FC)" },
-  [0x000c] = { 2, SWORD | SPEAR | ARCANE, "apokryphos (FC): a demon, arcane" },
-  [0x00a4] = { 2, SWORD | SPEAR | ARCANE, "misfit (FC): conjured, arcane" },
-  [0x0003] = { 2, SWORD | SPEAR,            "ninja (FC)" },
-  [0x00d8] = { 2, SPEAR | KATANA,           "wirey drgn (FC)" },
-  [0x004a] = { 2, SWORD | SPEAR | ARCANE, "brainpan (FC): a mind, arcane" },
+  [0x000c] = { 2, SWORD | DAGGER | BLUNT, "apokryphos (FC): a demon, arcane" },
+  [0x00a4] = { 2, SWORD | DAGGER | BLUNT, "misfit (FC): conjured, arcane" },
+  [0x0003] = { 2, SWORD | DAGGER,           "ninja (FC)" },
+  [0x00d8] = { 2, SWORD | DAGGER,           "wirey drgn (FC)" },
+  [0x004a] = { 2, SWORD | DAGGER | BLUNT, "brainpan (FC): a mind, arcane" },
 }
 for id, w in pairs(want) do
   local r = S[id]

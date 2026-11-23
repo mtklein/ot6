@@ -14,23 +14,23 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 local HANDS = SWORD | DAGGER | SPEAR | KATANA | FIST | ARCANE
 local ALL = 0xFF
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x157] = { "Short Arm", 6, DAGGER | ARCANE, WATER, 0 },
-  [0x158] = { "Long Arm", 6, SWORD | SPEAR, WIND, 0 },
-  [0x159] = { "Face", 8, FIST | ARCANE, FIRE, 0 },
-  [0x15D] = { "Hit", 6, SWORD | FIST, POISON, 0 },
-  [0x15A] = { "Tiger", 6, SWORD | DAGGER, ICE, EARTH },
-  [0x15B] = { "Tools", 6, SPEAR | ARCANE, BOLT, 0 },
-  [0x15C] = { "Magic", 8, SWORD | ARCANE, EARTH, 0 },
-  [0x15E] = { "Girl", 3, SWORD | DAGGER, ALL, ALL },
-  [0x15F] = { "Sleep", 8, FIST | ARCANE, 0, 0 },
-  [0x12A] = { "Kefka", 16, SWORD | DAGGER | SPEAR | FIST, 0, 0 },
+  [0x157] = { "Short Arm", 6, DAGGER | RANGED, WATER, 0 },
+  [0x158] = { "Long Arm", 6, SWORD | DAGGER, WIND, 0 },
+  [0x159] = { "Face", 8, BLUNT | RANGED, FIRE, 0 },
+  [0x15D] = { "Hit", 6, KATANA | BLUNT, POISON, 0 },
+  [0x15A] = { "Tiger", 6, SWORD | SPEAR, ICE, EARTH },
+  [0x15B] = { "Tools", 6, DAGGER | RANGED, BOLT, 0 },
+  [0x15C] = { "Magic", 8, SWORD | RANGED, EARTH, 0 },
+  [0x15E] = { "Girl", 3, SWORD | SPEAR, ALL, ALL },
+  [0x15F] = { "Sleep", 8, BLUNT | RANGED, 0, 0 },
+  [0x12A] = { "Kefka", 16, SWORD | SPEAR | BLUNT | RANGED, 0, 0 },
 }
 local TIERS = { 0x1D7, 0x200, 0x201, 0x202 }
 

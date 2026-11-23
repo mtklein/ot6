@@ -29,32 +29,32 @@
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, HOLY, WATER = 0x01, 0x02, 0x04, 0x08, 0x20, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   -- north of Tzen to Nikeah (world groups 37-39)
-  [0x035] = { "Bloompire",  1, SWORD,          FIRE },
-  [0x058] = { "Buffalax",   3, FIST,           FIRE | WATER },
-  [0x03C] = { "Lizard",     3, SWORD | DAGGER, ICE },
-  [0x030] = { "Delta Bug",  2, SPEAR | FIST, FIRE },
+  [0x035] = { "Bloompire",  1, KATANA,         FIRE },
+  [0x058] = { "Buffalax",   3, BLUNT,          FIRE | WATER },
+  [0x03C] = { "Lizard",     3, DAGGER | KATANA, ICE },
+  [0x030] = { "Delta Bug",  2, SPEAR | BLUNT, FIRE },
   -- the South Figaro continent (world groups 41-44)
-  [0x0C3] = { "Nohrabbit",  1, SWORD,          WATER },
-  [0x0B9] = { "Latimeria",  3, SWORD | SPEAR, BOLT },
-  [0x097] = { "Maliga",     2, SWORD | FIST,   ICE | BOLT | WATER },
-  [0x05F] = { "Sand Horse", 2, SPEAR | KATANA, ICE | WATER },
+  [0x0C3] = { "Nohrabbit",  1, KATANA,         WATER },
+  [0x0B9] = { "Latimeria",  3, DAGGER | KATANA, BOLT },
+  [0x097] = { "Maliga",     2, KATANA | BLUNT, ICE | BOLT | WATER },
+  [0x05F] = { "Sand Horse", 2, SWORD | SPEAR, ICE | WATER },
   -- the Figaro cave and the castle's basements (groups 137-140)
-  [0x049] = { "Humpty",     2, FIST,           FIRE | HOLY },
-  [0x04B] = { "Cruller",    3, FIST,           FIRE | HOLY },
-  [0x0A9] = { "NeckHunter", 3, SWORD | SPEAR | ARCANE, POISON },  -- a reaper: ¤ (#347)
-  [0x0D7] = { "Dante",      4, DAGGER | KATANA | FIST,   POISON },  -- a demon: ¤ (#347)
-  [0x08B] = { "Drop",       2, SPEAR | FIST, BOLT | WATER },
+  [0x049] = { "Humpty",     2, RANGED,         FIRE | HOLY },
+  [0x04B] = { "Cruller",    3, RANGED,         FIRE | HOLY },
+  [0x0A9] = { "NeckHunter", 3, SWORD | SPEAR | RANGED, POISON },  -- a reaper: ¤ (#347)
+  [0x0D7] = { "Dante",      4, KATANA | BLUNT | RANGED,  POISON },  -- a demon: ¤ (#347)
+  [0x08B] = { "Drop",       2, SPEAR | RANGED, BOLT | WATER },
   -- the engine room's Tentacles (event group 84)
   [0x11B] = { "Tentacle",   5, SPEAR | KATANA, ICE | WATER },
-  [0x13C] = { "Tentacle",   5, KATANA | FIST,  FIRE },
-  [0x13D] = { "Tentacle",   5, SPEAR | FIST, 0 },
-  [0x13E] = { "Tentacle",   5, SWORD | DAGGER, 0 },
+  [0x13C] = { "Tentacle",   5, KATANA | BLUNT, FIRE },
+  [0x13D] = { "Tentacle",   5, DAGGER | BLUNT, 0 },
+  [0x13E] = { "Tentacle",   5, SPEAR | KATANA, 0 },
 }
 
 -- the hands (route-wor-edgar.md 8.1): CELES's swords; SABIN's claws, Pummel,

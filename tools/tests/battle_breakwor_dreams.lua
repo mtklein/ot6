@@ -28,36 +28,36 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x034] = { "TumbleWeed", 3, KATANA | ARCANE, FIRE, WATER },
-  [0x0BE] = { "Barb-e", 3, KATANA | ARCANE, POISON, 0 },
-  [0x0AB] = { "Critic", 2, SWORD | FIST, 0, 0 },
-  [0x085] = { "Allosaurus", 3, SPEAR | ARCANE, FIRE | HOLY, 0 },
+  [0x034] = { "TumbleWeed", 3, KATANA | BLUNT, FIRE, WATER },
+  [0x0BE] = { "Barb-e", 3, SWORD | BLUNT, POISON, 0 },
+  [0x0AB] = { "Critic", 2, SWORD | BLUNT, 0, 0 },
+  [0x085] = { "Allosaurus", 3, SPEAR | RANGED, FIRE | HOLY, 0 },
   [0x0B1] = { "Parasite", 2, SWORD, FIRE, 0 },
-  [0x0AC] = { "Pan Dora", 3, FIST | ARCANE, FIRE | HOLY, POISON },
-  [0x00A] = { "Rain Man", 2, FIST | ARCANE, ICE | HOLY | WATER, 0 },
-  [0x004] = { "Samurai", 3, SWORD | DAGGER, POISON, 0 },
-  [0x01E] = { "Suriander", 3, KATANA | ARCANE, HOLY, 0 },
-  [0x09D] = { "PlutoArmor", 3, SPEAR, BOLT | WATER, 0 },
-  [0x095] = { "Sky Cap", 2, DAGGER | ARCANE, BOLT | WIND | WATER, 0 },
-  [0x0FE] = { "Io", 4, SPEAR | ARCANE, BOLT | HOLY | WATER, 0 },
-  [0x11F] = { "Curley", 4, KATANA | ARCANE, ICE | WATER, FIRE },
-  [0x120] = { "Larry", 4, SPEAR | ARCANE, FIRE, ICE | WIND },
-  [0x121] = { "Moe", 4, SWORD | FIST, 0, BOLT },
-  [0x122] = { "Wrexsoul", 6, KATANA | ARCANE, ICE, FIRE | HOLY },
-  [0x167] = { "SoulSaver", 2, ARCANE, ICE, FIRE | HOLY },
-  [0x0A6] = { "Enuo", 2, KATANA | FIST, HOLY, 0 },
-  [0x06D] = { "Goblin", 3, DAGGER | KATANA, HOLY, 0 },
-  [0x057] = { "Figaliz", 3, KATANA | ARCANE, ICE, 0 },
-  [0x045] = { "Lethal Wpn", 4, KATANA | ARCANE, BOLT | WATER, 0 },
-  [0x051] = { "Boxed Set", 3, KATANA | ARCANE, HOLY, 0 },
-  [0x152] = { "Blue Drgn", 6, DAGGER | KATANA, BOLT, WATER },
+  [0x0AC] = { "Pan Dora", 3, BLUNT | RANGED, FIRE | HOLY, POISON },
+  [0x00A] = { "Rain Man", 2, BLUNT | RANGED, ICE | HOLY | WATER, 0 },
+  [0x004] = { "Samurai", 3, SWORD | SPEAR, POISON, 0 },
+  [0x01E] = { "Suriander", 3, KATANA | BLUNT, HOLY, 0 },
+  [0x09D] = { "PlutoArmor", 3, RANGED, BOLT | WATER, 0 },
+  [0x095] = { "Sky Cap", 2, SPEAR | RANGED, BOLT | WIND | WATER, 0 },
+  [0x0FE] = { "Io", 4, SPEAR | BLUNT, BOLT | HOLY | WATER, 0 },
+  [0x11F] = { "Curley", 4, SWORD | RANGED, ICE | WATER, FIRE },
+  [0x120] = { "Larry", 4, SPEAR | BLUNT, FIRE, ICE | WIND },
+  [0x121] = { "Moe", 4, KATANA | BLUNT, 0, BOLT },
+  [0x122] = { "Wrexsoul", 6, SWORD | BLUNT, ICE, FIRE | HOLY },
+  [0x167] = { "SoulSaver", 2, BLUNT, ICE, FIRE | HOLY },
+  [0x0A6] = { "Enuo", 2, KATANA | RANGED, HOLY, 0 },
+  [0x06D] = { "Goblin", 3, SPEAR | KATANA, HOLY, 0 },
+  [0x057] = { "Figaliz", 3, KATANA | RANGED, ICE, 0 },
+  [0x045] = { "Lethal Wpn", 4, KATANA | RANGED, BOLT | WATER, 0 },
+  [0x051] = { "Boxed Set", 3, KATANA | BLUNT, HOLY, 0 },
+  [0x152] = { "Blue Drgn", 6, SPEAR | KATANA, BOLT, WATER },
   -- the two monster boxes (#487): the cave's Master Pug (event group 113) and the castle's KatanaSoul (95)
-  [0x138] = { "Master Pug", 6, DAGGER | KATANA, 0, WATER },
+  [0x138] = { "Master Pug", 6, KATANA | BLUNT, 0, WATER },
   [0x124] = { "KatanaSoul", 6, SPEAR | KATANA, POISON, 0 },
 }
 

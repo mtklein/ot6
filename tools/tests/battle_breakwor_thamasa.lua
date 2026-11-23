@@ -25,36 +25,36 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, elements added }
 local WANT = {
   [0x0CC] = { "Vindr", 1, DAGGER | KATANA, FIRE, 0, 0 },
-  [0x0AD] = { "SoulDancer", 2, KATANA | ARCANE, POISON, 0, 0 },
-  [0x092] = { "Crusher", 3, DAGGER | FIST, FIRE, 0, 0 },
+  [0x0AD] = { "SoulDancer", 2, KATANA | RANGED, POISON, 0, 0 },
+  [0x092] = { "Crusher", 3, DAGGER | BLUNT, FIRE, 0, 0 },
   [0x077] = { "Wild Cat", 1, SPEAR | KATANA, FIRE | WATER, 0, 0 },
-  [0x009] = { "Dahling", 2, SWORD | ARCANE, POISON, 0, 0 },
+  [0x009] = { "Dahling", 2, SWORD | BLUNT, POISON, 0, 0 },
   [0x033] = { "Nightshade", 2, KATANA, FIRE, WATER, 0 },
-  [0x050] = { "Still Life", 4, SWORD | ARCANE, FIRE, 0, 0 },
+  [0x050] = { "Still Life", 4, KATANA | BLUNT, FIRE, 0, 0 },
   [0x11E] = { "Chadarnook (goddess)", 0, 0, FIRE, HOLY | WATER, 0 },
-  [0x148] = { "Chadarnook (demon)", 6, SWORD | SPEAR, FIRE | HOLY, BOLT, 0 },
-  [0x0D2] = { "Mantodea", 3, KATANA | FIST | ARCANE, FIRE, 0, 0 },
-  [0x02B] = { "Harpy", 2, DAGGER | ARCANE, 0, 0, 0 },
-  [0x08A] = { "GloomShell", 3, DAGGER | ARCANE, ICE, 0, 0 },
-  [0x0D4] = { "Prussian", 3, SWORD | FIST, 0, 0, 0 },
-  [0x132] = { "L.10 Magic", 1, ARCANE, FIRE | HOLY, POISON, 0 },
-  [0x130] = { "L.20 Magic", 2, ARCANE, 0, POISON, EARTH },
-  [0x125] = { "L.30 Magic", 2, ARCANE, POISON, HOLY, 0 },
-  [0x12B] = { "L.40 Magic", 2, ARCANE, BOLT, POISON, 0 },
-  [0x133] = { "L.50 Magic", 2, ARCANE, FIRE | HOLY, POISON, 0 },
-  [0x139] = { "L.60 Magic", 3, ARCANE, FIRE, ICE, 0 },
-  [0x143] = { "L.70 Magic", 3, ARCANE, ICE | WATER, FIRE, EARTH },
-  [0x163] = { "L.80 Magic", 3, ARCANE, POISON, 0, 0 },
+  [0x148] = { "Chadarnook (demon)", 6, SPEAR | KATANA, FIRE | HOLY, BOLT, 0 },
+  [0x0D2] = { "Mantodea", 3, SWORD | BLUNT | RANGED, FIRE, 0, 0 },
+  [0x02B] = { "Harpy", 2, SPEAR | BLUNT, 0, 0, 0 },
+  [0x08A] = { "GloomShell", 3, DAGGER | BLUNT, ICE, 0, 0 },
+  [0x0D4] = { "Prussian", 3, KATANA | BLUNT, 0, 0, 0 },
+  [0x132] = { "L.10 Magic", 1, RANGED, FIRE | HOLY, POISON, 0 },
+  [0x130] = { "L.20 Magic", 2, RANGED, 0, POISON, EARTH },
+  [0x125] = { "L.30 Magic", 2, RANGED, POISON, HOLY, 0 },
+  [0x12B] = { "L.40 Magic", 2, RANGED, BOLT, POISON, 0 },
+  [0x133] = { "L.50 Magic", 2, BLUNT, FIRE | HOLY, POISON, 0 },
+  [0x139] = { "L.60 Magic", 3, RANGED, FIRE, ICE, 0 },
+  [0x143] = { "L.70 Magic", 3, RANGED, ICE | WATER, FIRE, EARTH },
+  [0x163] = { "L.80 Magic", 3, RANGED, POISON, 0, 0 },
   [0x164] = { "L.90 Magic", 0, 0, 0, WIND, 0 },
   [0x055] = { "Magic Urn", 0, 0, 0, 0xFF, 0 },
-  [0x024] = { "White Drgn", 6, ARCANE, 0, HOLY, 0 },
-  [0x166] = { "MagiMaster", 8, ARCANE, nil, nil, 0 },   -- WallChange rewrites his bytes in battle
+  [0x024] = { "White Drgn", 6, RANGED, 0, HOLY, 0 },
+  [0x166] = { "MagiMaster", 8, RANGED, nil, nil, 0 },   -- WallChange rewrites his bytes in battle
 }
 
 -- the hands (route-wor-thamasa.md 4, 5.5, 6): Owzer's three (wor-narshe-v1's

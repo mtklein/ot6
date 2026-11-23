@@ -20,15 +20,15 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   [0x16A] = { "Phunbaba 1 (TERRA alone)", 0, 0, POISON },
-  [0x16B] = { "Phunbaba 2 (the first visit)", 4, DAGGER | FIST, POISON },
-  [0x16C] = { "Phunbaba 3 (the return)", 5, DAGGER | FIST, POISON },
-  [0x16D] = { "Phunbaba 4 (TERRA morphed)", 12, SWORD | DAGGER | FIST, POISON },
+  [0x16B] = { "Phunbaba 2 (the first visit)", 4, BLUNT | RANGED, POISON },
+  [0x16C] = { "Phunbaba 3 (the return)", 5, BLUNT | RANGED, POISON },
+  [0x16D] = { "Phunbaba 4 (TERRA morphed)", 12, SWORD | BLUNT | RANGED, POISON },
 }
 
 -- the hands (route-wor-terra.md 6): the four as they reach Mobliz

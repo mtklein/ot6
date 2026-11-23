@@ -6,12 +6,12 @@
 -- section 1 is the design these numbers come from.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 
 local WANT = {                    -- species -> { shields, class mask }
   [0x0C7] = { 2, DAGGER },          -- commando: dagger
-  [0x165] = { 2, FIST },            -- protoarmor: fist
-  [0x102] = { 3, SPEAR | FIST },    -- mega armor: spear|fist
+  [0x165] = { 2, RANGED },          -- protoarmor: ranged
+  [0x102] = { 3, DAGGER | BLUNT },  -- mega armor: dagger|blunt
 }
 local FORMS = { 416, 417 }
 local PARTY_CLASSES = SWORD | DAGGER | SPEAR | FIST   -- the party's hands

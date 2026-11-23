@@ -11,14 +11,14 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x008] = { "Hazer", 2, KATANA | ARCANE, HOLY, 0, 0 },
-  [0x00E] = { "Whisper", 2, DAGGER | KATANA, FIRE | HOLY, POISON, 0 },
-  [0x0BA] = { "StillGoing", 2, KATANA | FIST, FIRE | HOLY, POISON, 0 },
+  [0x008] = { "Hazer", 2, KATANA | BLUNT, HOLY, 0, 0 },
+  [0x00E] = { "Whisper", 2, KATANA | BLUNT, FIRE | HOLY, POISON, 0 },
+  [0x0BA] = { "StillGoing", 2, KATANA | BLUNT, FIRE | HOLY, POISON, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal

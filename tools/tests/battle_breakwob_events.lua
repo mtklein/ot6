@@ -15,22 +15,22 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x022] = { "Pterodon", 2, SWORD | SPEAR, FIRE, 0 },
-  [0x038] = { "Nautiloid", 2, SPEAR | ARCANE, FIRE | BOLT, WATER },
-  [0x039] = { "Exocite", 2, SWORD | ARCANE, FIRE | BOLT, WATER },
-  [0x060] = { "Dark Side", 2, SWORD | DAGGER, FIRE | HOLY, POISON },
-  [0x0B6] = { "Spectre", 2, FIST | ARCANE, FIRE | HOLY, POISON },
-  [0x0CF] = { "Rinn", 1, SPEAR | ARCANE, FIRE | HOLY, POISON },
-  [0x079] = { "Bounty Man", 2, DAGGER | KATANA, FIRE, 0 },
-  [0x01C] = { "Fidor", 2, SWORD | DAGGER, FIRE, 0 },
+  [0x022] = { "Pterodon", 2, SPEAR | KATANA, FIRE, 0 },
+  [0x038] = { "Nautiloid", 2, SPEAR | BLUNT, FIRE | BOLT, WATER },
+  [0x039] = { "Exocite", 2, SWORD | BLUNT, FIRE | BOLT, WATER },
+  [0x060] = { "Dark Side", 2, SWORD | RANGED, FIRE | HOLY, POISON },
+  [0x0B6] = { "Spectre", 2, BLUNT | RANGED, FIRE | HOLY, POISON },
+  [0x0CF] = { "Rinn", 1, SPEAR | RANGED, FIRE | HOLY, POISON },
+  [0x079] = { "Bounty Man", 2, SWORD | DAGGER, FIRE, 0 },
+  [0x01C] = { "Fidor", 2, SWORD | SPEAR, FIRE, 0 },
   [0x0C2] = { "Sp.Forces", 3, SWORD | SPEAR, POISON, 0 },
-  [0x00F] = { "Over-Mind", 2, SWORD | DAGGER, FIRE | HOLY, POISON },
-  [0x131] = { "Siegfried", 1, DAGGER | KATANA | FIST, 0, 0 },
+  [0x00F] = { "Over-Mind", 2, KATANA | RANGED, FIRE | HOLY, POISON },
+  [0x131] = { "Siegfried", 1, DAGGER | KATANA | BLUNT, 0, 0 },
 }
 -- 0-shield rows: the cutscene bodies a called battle deals, and the markers for bodies no reachable formation holds
 -- (tools/check_shield_rows.py proves the second list unreached; break-coverage-wob.md section 18 has the evidence)

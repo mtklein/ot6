@@ -16,15 +16,15 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x03E] = { "Hoover", 2, KATANA | FIST, ICE | WATER, 0 },
-  [0x04C] = { "Cactrot", 1, DAGGER, ICE | WATER, 0 },
-  [0x027] = { "Tyranosaur", 3, DAGGER | FIST, ICE, 0 },
-  [0x026] = { "Brachosaur", 6, SPEAR | FIST, ICE, 0 },
+  [0x03E] = { "Hoover", 2, KATANA | RANGED, ICE | WATER, 0 },
+  [0x04C] = { "Cactrot", 1, RANGED, ICE | WATER, 0 },
+  [0x027] = { "Tyranosaur", 3, SPEAR | RANGED, ICE, 0 },
+  [0x026] = { "Brachosaur", 6, DAGGER | BLUNT, ICE, 0 },
 }
 local HOOVER, CACTROT, TYRANOSAUR, BRACHOSAUR = 0x03E, 0x04C, 0x027, 0x026
 -- the world groups (RandBattleGroup index = WorldBattleGroup byte) and the species each must deal

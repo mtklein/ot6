@@ -17,7 +17,7 @@
 -- species classes, so it survives future data shifts.
 
 local PRG = emu.memType.snesPrgRom
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local fails = 0
 
 local function rb(off) return emu.read(off, PRG) end
@@ -49,8 +49,8 @@ end
 -- by six_class_split.json), a distinctive 16-byte run (unique in
 -- [300000,310000) on the six-class ROM, #566).
 local base = find(
-  { SPEAR, DAGGER, DAGGER, KATANA, SWORD, FIST, KATANA, SPEAR,
-    KATANA, SWORD, SWORD, FIST, KATANA, SWORD, KATANA, SWORD },
+  { RANGED, RANGED, RANGED, SWORD, KATANA, BLUNT, SWORD, SPEAR,
+    KATANA, SWORD, KATANA, BLUNT, SWORD, KATANA, KATANA, SWORD },
   0x300000, 0x310000)
 
 if not base then
@@ -64,10 +64,10 @@ emu.log(string.format("breakfloor: OT6_FLOOR_CLASS @%06X", base))
 -- floor[species] the classifier chose: one per class bit, plus a beast
 -- default.  These are the bytes the @formula seed reads as the fallback mask.
 local want = {
-  [0]  = { SPEAR, "guard (armored -> pierce: the spear)" },
+  [0]  = { RANGED, "guard (armored -> pierce: the spear)" },
   [36] = { SPEAR, "white drgn (pierce: the spear)" },
-  [71] = { FIST,   "flan (soft body -> bludgeon: the fist)" },
-  [19] = { SWORD,  "were-rat (beast default -> slash: the sword)" },
+  [71] = { BLUNT,  "flan (soft body -> bludgeon: the fist)" },
+  [19] = { KATANA, "were-rat (beast default -> slash: the sword)" },
 }
 for species, w in pairs(want) do
   local got = rb(base + species)

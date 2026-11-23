@@ -30,24 +30,24 @@
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   -- the Kohlingen continent (world groups 45-47)
-  [0x089] = { "Harpiai",    3, SWORD | SPEAR,    WIND },
-  [0x0DB] = { "Muus",       2, SWORD | FIST,     0 },
-  [0x0A7] = { "Deep Eye",   2, SPEAR | ARCANE, FIRE },
-  [0x0D3] = { "Bogy",       3, SWORD | ARCANE,   0 },
+  [0x089] = { "Harpiai",    3, SPEAR | KATANA,   WIND },
+  [0x0DB] = { "Muus",       2, SWORD | BLUNT,    0 },
+  [0x0A7] = { "Deep Eye",   2, BLUNT | RANGED, FIRE },
+  [0x0D3] = { "Bogy",       3, SWORD | RANGED,   0 },
   -- Darill's Tomb (groups 149-151)
-  [0x005] = { "Orog",       3, KATANA | FIST | ARCANE,   FIRE | HOLY },
-  [0x010] = { "Osteosaur",  3, FIST | ARCANE,            FIRE | HOLY },
-  [0x06F] = { "PowerDemon", 3, DAGGER | SPEAR | KATANA, FIRE | HOLY },
-  [0x061] = { "Mad Oscar",  4, SWORD,            FIRE },
-  [0x091] = { "Exoray",     2, SPEAR | KATANA,   FIRE | HOLY },
+  [0x005] = { "Orog",       3, KATANA | BLUNT | RANGED,  FIRE | HOLY },
+  [0x010] = { "Osteosaur",  3, BLUNT | RANGED,           FIRE | HOLY },
+  [0x06F] = { "PowerDemon", 3, SPEAR | KATANA | RANGED, FIRE | HOLY },
+  [0x061] = { "Mad Oscar",  4, KATANA,           FIRE },
+  [0x091] = { "Exoray",     2, KATANA | RANGED,  FIRE | HOLY },
   -- the grave (event group 85)
-  [0x11C] = { "Dullahan",  10, DAGGER | FIST | ARCANE, FIRE },
+  [0x11C] = { "Dullahan",  10, SPEAR | BLUNT | RANGED, FIRE },
   -- the monster chest beside the save point (event group 116)
   [0x101] = { "Presenter",  0, 0,                FIRE },
   [0x135] = { "Whelk Head", 6, DAGGER,           FIRE },
@@ -242,7 +242,7 @@ H.run({ maxFrames = 600 }, {
       problem("Dullahan absorb byte $%02X has lost vanilla ice", absorb(0x11C))
     end
     local narshe = { [0x100] = { "Whelk (Narshe shell)", 0, 0 },
-                     [0x134] = { "Head (Narshe Whelk)", 4, SPEAR } }
+                     [0x134] = { "Head (Narshe Whelk)", 4, RANGED } }
     for sp, w in pairs(narshe) do
       local got = shield[sp]
       if got == nil or got[1] ~= w[2] or got[2] ~= w[3] then

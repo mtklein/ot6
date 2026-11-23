@@ -6,10 +6,10 @@
 -- docs/design/wob-towns-boxes.md section 4 is the design these numbers come from.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 
 local WANT = {                    -- species -> { shields, class mask }
-  [0x0AE] = { 5, KATANA | FIST },   -- gigantos: katana|fist
+  [0x0AE] = { 5, SWORD | BLUNT },   -- gigantos: sword|blunt
 }
 local FORMS = { 170 }
 local PARTY_CLASSES = SWORD | KATANA       -- the three blades, and SHADOW's

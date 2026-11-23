@@ -8,20 +8,20 @@
 -- is the survey these numbers came from.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 
 local WANT = {                    -- species -> { shields, class mask }
   -- audit_break_coverage.py's break-dark findings (kolts + zozo):
-  [0x086] = { 2, DAGGER },          -- cirpius: dagger
-  [0x053] = { 2, FIST },            -- hadesgigas: fist
-  [0x052] = { 2, SWORD | DAGGER },  -- slamdancer: sword|dagger
-  [0x04E] = { 2, SPEAR | KATANA },  -- harvester: spear|katana
-  [0x0DF] = { 2, SPEAR },           -- gabbldegak: spear
-  [0x06E] = { 2, SPEAR | KATANA },  -- ninja: spear|katana
-  [0x0E5] = { 2, SWORD | FIST | ARCANE }, -- spirit: sword|fist|arcane (#347)
+  [0x086] = { 2, SPEAR },           -- cirpius: spear
+  [0x053] = { 2, BLUNT },           -- hadesgigas: blunt
+  [0x052] = { 2, SWORD | SPEAR },   -- slamdancer: sword|spear
+  [0x04E] = { 2, SWORD | SPEAR },   -- harvester: sword|spear
+  [0x0DF] = { 2, DAGGER },          -- gabbldegak: dagger
+  [0x06E] = { 2, SWORD | DAGGER },  -- ninja: sword|dagger
+  [0x0E5] = { 2, KATANA | BLUNT | RANGED }, -- spirit: katana|blunt|ranged (#347)
   [0x0B3] = { 2, KATANA },          -- soft flier: katana
-  [0x048] = { 3, SPEAR | FIST },    -- shelled tank: spear|fist
-  [0x082] = { 4, SWORD | ARCANE },  -- brute: sword|arcane
+  [0x048] = { 3, DAGGER | BLUNT },  -- shelled tank: dagger|blunt
+  [0x082] = { 4, SWORD | RANGED },  -- brute: sword|ranged
 }
 local PARTY_CLASSES = SWORD | DAGGER | SPEAR | FIST   -- the mission party's hands
 
