@@ -111,6 +111,9 @@ class Data:
         self.shield_tbl = self._parse_shield_tbl()
         self.elem_add = self._parse_elem_add()
         self.floor = self._parse_floor()
+        if ULTROS_ROW_SPECIES not in self.shield_tbl:
+            raise SystemExit("check_boss_rows: no Ot6ShieldTbl row for Ultros $%03x" % ULTROS_ROW_SPECIES)
+        _ULTROS_ROW[0] = self.shield_tbl[ULTROS_ROW_SPECIES]["class"]
 
     # -- io ------------------------------------------------------------
     def _read(self, rel: str) -> bytes:
@@ -311,11 +314,17 @@ CURVE_ADDS = {
 # say "the row" are claiming that row, so resolve them to it rather than
 # skipping them.
 ULTROS_ROW_ELEMS = ELEMENT_BIT["fire"] | ELEMENT_BIT["bolt"]
-ULTROS_ROW_CLASS_NAMES = ("sword", "spear")     # slash|pierce through v0.50
+ULTROS_ROW_SPECIES = 0x12C      # Ultros (1): his prose spells the row in full
+_ULTROS_ROW = [None]            # the classes of that row, set by Data()
 
 
 def ultros_row_classes():
-    return sum(CLASS_BIT[n] for n in ULTROS_ROW_CLASS_NAMES)
+    """The classes "the row" claims: Ultros (1)'s authored row, which his
+    own prose claims word for word, so a later Ultros that says "the row"
+    is held to the first one's classes whatever the split made them."""
+    if _ULTROS_ROW[0] is None:
+        raise SystemExit("check_boss_rows: \"the row\" read before the data was loaded")
+    return _ULTROS_ROW[0]
 
 
 # --------------------------------------------------------------------------
@@ -692,9 +701,9 @@ def _table_row(hdr, cells, lineno, section, claims, shapes):
             cl.retired = retired_words(weak)
             if weak in ("—", "-", ""):
                 cl.note = "no gauge"
-            elif "any physical class" in weak:
+            elif "any physical class" in weak or "any weapon class" in weak:
                 cl.classes = ALL_CLASSES
-                cl.note = "any physical class"
+                cl.note = "any weapon class"
                 e, _c, ok = parse_masks(weak)
                 cl.elems = e if ok and e else None
             elif "the row" in weak and not ELEM_TOKEN.search(weak):

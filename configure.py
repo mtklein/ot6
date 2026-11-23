@@ -1024,6 +1024,14 @@ check("lever_fence", "python3 tools/tests/lib/savestate_ninja.py --lever-fence b
 CLASS_SRC = ["tools/ot6_class.py", "ff6/src/battle/ot6_class.asm"]
 check("ot6_class_selftest", "python3 tools/ot6_class.py --selftest",
       CLASS_SRC + ["ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break_floor.inc"])
+# The break floor is generated (ff6/tools/gen_break_floor.py): the table and
+# its review on disk are what the generator writes from the monster names and
+# its own child rule, with no other input (#566: the six-class migration fed
+# it the split's json; it stands on its own again).
+check("break_floor", "python3 ff6/tools/gen_break_floor.py --check",
+      ["ff6/tools/gen_break_floor.py", "ff6/tools/break_floor_review.txt",
+       "ff6/src/battle/ot6_break_floor.inc", "ff6/src/battle/ot6_hud.asm",
+       "ff6/src/text/monster_name_en.json"] + CLASS_SRC)
 check("boss_rows", "python3 tools/check_boss_rows.py",
       ["tools/check_boss_rows.py", "docs/design/bosses-wob.md",
        "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm",
