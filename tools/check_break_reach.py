@@ -11,7 +11,10 @@ deliver.
 
 "Can field" reads equippability and command ownership from item_prop_en.dat
 and ff6/src/field/char_prop.asm; SwdTech/Blitz/Tools classes go to whoever
-owns those commands.  "Can deliver" mirrors it for elements: weapon elements
+owns those commands.  The classes are ot6_class.asm's six (sword, dagger,
+fist, arcane, katana, spear; tools/ot6_class.py), and a member holds the
+class of every weapon the equip masks allow, the imp gear excepted, plus the
+empty hand's (fist).  "Can deliver" mirrors it for elements: weapon elements
 (item_prop +$0F), tool attack elements (Tools ownership), and kit-ability
 elements (SwdTech/Blitz ownership).  Spell elements are runtime state and are
 not credited.  Weapons carrying OT6_NULLBRK grant no class or element.
@@ -98,6 +101,14 @@ COMMAND_ABILITIES = {
 # Tools are type-0 items resolved through the Tools command; their class bytes
 # live in Ot6WeapClassTbl at the item id (ot6_class.asm, "tools $a3-$aa").
 TOOLS_RANGE = range(0xA3, 0xAB)
+
+# The imp gear's flag in an item's equip word (item_prop +1/+2 bit 14; set
+# on $24 Imp Halberd alone among the weapons, mask $dfff: everyone but
+# Umaro).  The Imp Halberd is a World of Ruin find and every declared area is
+# a World of Balance one, so it is credited to nobody: under four classes it
+# handed twelve of the fourteen "pierce", which most of them held anyway;
+# under six it would hand them Spear, which is Edgar's and Mog's class.
+IMP_GEAR = 0x4000
 
 # the command that swings an equipped weapon (and an empty hand).  JUMP is
 # Fight under Dragoon Boots (RelicCmdTbl1/2, battle_main.asm:14095-14102) and
@@ -326,61 +337,11 @@ class Data:
     # -- table parsers ---------------------------------------------------
     def _parse_weap_tbl(self):
         """Ot6WeapClassTbl: 256 class bytes, item-id indexed (.byte / .res)."""
-        src = self._text(CLASS_ASM).splitlines()
-        start = next(i for i, l in enumerate(src)
-                     if l.strip().startswith("Ot6WeapClassTbl:"))
-        out = []
-        for i in range(start + 1, len(src)):
-            code = src[i].split(";", 1)[0].strip()
-            if not code:
-                continue
-            m = re.match(r"\.byte\s+(.+)$", code)
-            if m:
-                v = 0
-                for tok in m.group(1).split("|"):
-                    tok = tok.strip()
-                    v |= CLASS_TOKEN.get(tok) if tok in CLASS_TOKEN else \
-                        _eval_expr(tok, "%s:%d" % (CLASS_ASM, i + 1))
-                if v & ~(CLASS_MASK | NULLBRK):
-                    raise SystemExit("check_break_reach: Ot6WeapClassTbl byte $%02x at "
-                                     "%s:%d leaves OT6_CLASSES|OT6_NULLBRK"
-                                     % (v, CLASS_ASM, i + 1))
-                out.append(v)
-            elif code.startswith(".res"):
-                m = re.match(r"\.res\s+(.+?),\s*(\S+)$", code)
-                n = _eval_expr(m.group(1), "%s:%d" % (CLASS_ASM, i + 1))
-                fill = _eval_expr(m.group(2), "%s:%d" % (CLASS_ASM, i + 1))
-                out.extend([fill] * n)
-            else:
-                break  # next label / directive: table ended
-            if len(out) >= 256:
-                break
-        if len(out) != 256:
-            raise SystemExit("check_break_reach: Ot6WeapClassTbl parsed %d "
-                             "bytes, want 256 (%s)" % (len(out), CLASS_ASM))
-        return out
+        return ot6_class.weapon_classes(self._text(CLASS_ASM), C)
 
     def _parse_skill_tbl(self):
         """Ot6SkillClassTbl: (ability id, class) pairs, $ff-terminated."""
-        src = self._text(CLASS_ASM).splitlines()
-        start = next(i for i, l in enumerate(src)
-                     if l.strip().startswith("Ot6SkillClassTbl:"))
-        out = {}
-        for i in range(start + 1, len(src)):
-            code = src[i].split(";", 1)[0].strip()
-            if not code:
-                continue
-            m = re.match(r"\.byte\s+\$([0-9a-fA-F]{2})\s*,\s*(\S+)$", code)
-            if m:
-                out[int(m.group(1), 16)] = CLASS_TOKEN[m.group(2).strip()]
-                continue
-            if re.match(r"\.byte\s+\$ff\s*$", code):
-                break
-            break
-        if len(out) < 9:
-            raise SystemExit("check_break_reach: Ot6SkillClassTbl parsed %d "
-                             "entries, want >= 9 (%s)" % (len(out), CLASS_ASM))
-        return out
+        return ot6_class.skill_classes(self._text(CLASS_ASM), C)
 
     def _parse_shield_tbl(self):
         """Ot6ShieldTbl: .word species / .byte shields, classes ($ffff-term)."""
@@ -523,6 +484,8 @@ class Data:
                     continue
                 if not (int.from_bytes(rec[1:3], "little") >> a) & 1:
                     continue
+                if int.from_bytes(rec[1:3], "little") & IMP_GEAR:
+                    continue
                 cls = self.weap_class[it]
                 if cls & NULLBRK:
                     continue
@@ -557,6 +520,8 @@ class Data:
                 if rec[0] & 0x07 != 1:          # not a weapon
                     continue
                 if not (int.from_bytes(rec[1:3], "little") >> a) & 1:
+                    continue
+                if int.from_bytes(rec[1:3], "little") & IMP_GEAR:
                     continue
                 if self.weap_class[it] & NULLBRK:
                     continue

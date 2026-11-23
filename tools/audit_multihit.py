@@ -83,13 +83,14 @@ EXPECTED_WRITERS = {
 
 
 def class_names(mask):
+    """A class byte in ot6_class.asm's own names (check_break_reach reads
+    them through tools/ot6_class.py: six since v0.51, #566)."""
+    reach = sys.modules["check_break_reach"]      # loaded by load_reach()
     if mask is None:
         return "-"
-    if mask & 0x80:
+    if mask & reach.NULLBRK:
         return "null-break"
-    bits = [n for n, b in (("slash", 1), ("pierce", 2), ("bludg", 4),
-                           ("special", 8)) if mask & b]
-    return "|".join(bits) if bits else "-"
+    return reach.C.names(mask & reach.CLASS_MASK, none="-")
 
 
 def elem_names(b):
@@ -388,21 +389,21 @@ def main():
                 c = data.weap_class[it]
                 if c & reach.NULLBRK:
                     continue
-                wmask |= c & 0x0F
-            wmask |= data.weap_class[0xFF] & 0x0F
+                wmask |= c & reach.CLASS_MASK
+            wmask |= data.weap_class[0xFF] & reach.CLASS_MASK
         amask = 0
         multis = []
         for cmd, sids in reach.COMMAND_ABILITIES.items():
             if cmd not in cmds:
                 continue
             for sid in sids:
-                amask |= data.skill_class.get(sid, 0) & 0x0F
+                amask |= data.skill_class.get(sid, 0) & reach.CLASS_MASK
         # "multi-hit" is anything that strikes the same body more than once:
         # vanilla's quadra ($32) and empowerer ($36) effects, plus every
         # Ot6HitCountTbl row.  Breadth is not counted here.
         if "TOOLS" in cmds:
             for it in reach.TOOLS_RANGE:
-                amask |= data.weap_class[it] & 0x0F
+                amask |= data.weap_class[it] & reach.CLASS_MASK
                 n = hits_for(it, ip[it * ITEM_REC + 27])
                 if n > 1:
                     multis.append("%s x%d" %
@@ -412,7 +413,7 @@ def main():
             n = hits_for(sid, rec(sid)[9])
             if owner in cmds and n > 1:
                 multis.append("%s x%d" % (magic_name(sid), n))
-        extra = amask & ~wmask & 0x0F
+        extra = amask & ~wmask & reach.CLASS_MASK
         print("  %-6s weapon[%-22s] ability[%-22s] ability-only[%-14s] "
               "multi-hit: %s" %
               (who, class_names(wmask), class_names(amask),

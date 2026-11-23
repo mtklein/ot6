@@ -115,6 +115,65 @@ def read(root: str) -> Classes:
         return Classes(parse_consts(f.read()))
 
 
+# ------------------------------------------------- the weapon and skill tables --
+
+def _expr(expr: str, where: str) -> int:
+    """A tiny asm constant expression like '$a3 - $5a'."""
+    t = expr.replace("$", "0x")
+    if not re.fullmatch(r"[0-9a-fA-Fx+\-*() ]+", t):
+        raise SystemExit("ot6_class: unparseable expression %r at %s" % (expr, where))
+    return eval(t, {"__builtins__": {}})  # noqa: S307 -- vetted charset above
+
+
+def weapon_classes(text: str, C: Classes):
+    """Ot6WeapClassTbl: 256 class bytes, item-id indexed (.byte / .res)."""
+    src = text.splitlines()
+    start = next(i for i, l in enumerate(src) if l.strip().startswith("Ot6WeapClassTbl:"))
+    out = []
+    for i in range(start + 1, len(src)):
+        code = src[i].split(";", 1)[0].strip()
+        where = "%s:%d" % (CLASS_ASM, i + 1)
+        if not code:
+            continue
+        m = re.match(r"\.byte\s+(.+)$", code)
+        if m:
+            v = C.value(m.group(1), where)
+            if v & ~(C.mask | C.nullbrk):
+                raise SystemExit("ot6_class: Ot6WeapClassTbl byte $%02x at %s leaves "
+                                 "OT6_CLASSES|OT6_NULLBRK" % (v, where))
+            out.append(v)
+        elif code.startswith(".res"):
+            m = re.match(r"\.res\s+(.+?),\s*(\S+)$", code)
+            out.extend([_expr(m.group(2), where)] * _expr(m.group(1), where))
+        else:
+            break  # next label / directive: table ended
+        if len(out) >= 256:
+            break
+    if len(out) != 256:
+        raise SystemExit("ot6_class: Ot6WeapClassTbl parsed %d bytes, want 256 (%s)"
+                         % (len(out), CLASS_ASM))
+    return out
+
+
+def skill_classes(text: str, C: Classes):
+    """Ot6SkillClassTbl: {ability id: class byte}, $ff-terminated pairs."""
+    src = text.splitlines()
+    start = next(i for i, l in enumerate(src) if l.strip().startswith("Ot6SkillClassTbl:"))
+    out = {}
+    for i in range(start + 1, len(src)):
+        code = src[i].split(";", 1)[0].strip()
+        if not code:
+            continue
+        m = re.match(r"\.byte\s+\$([0-9a-fA-F]{2})\s*,\s*(\S+)$", code)
+        if not m:
+            break
+        out[int(m.group(1), 16)] = C.value(m.group(2), "%s:%d" % (CLASS_ASM, i + 1))
+    if len(out) < 9:
+        raise SystemExit("ot6_class: Ot6SkillClassTbl parsed %d entries, want >= 9 (%s)"
+                         % (len(out), CLASS_ASM))
+    return out
+
+
 # ------------------------------------------------------------ Ot6ShieldTbl --
 
 def shield_rows(text: str, C: Classes, label: str = "Ot6ShieldTbl"):
