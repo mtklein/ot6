@@ -7800,6 +7800,31 @@ function M.partyHandMask()
   return hands
 end
 
+-- EDGAR's AutoCrossbow, for a leg's own fighter whose Tools turn would otherwise confirm whatever cell the cursor
+-- rests on (#566): the crossbow's id and the cursor moves from the Tools window's resting cell to its cell, when it
+-- brings a key -- an event battle with a standing, shielded body weak to its class, or a random one where such a
+-- body is keyed by no living hand (M.partyHandMask) -- else nil, and the fighter keeps his MP.  Reads only.
+function M.crossbowPlan(slot)
+  local cell = M.toolCell(M.AUTOCROSSBOW)
+  if cell == nil then return nil end
+  local cls, hands = M.weaponClass(M.AUTOCROSSBOW), M.partyHandMask()
+  local event = M.readByte(M.RANDBTL) == 0
+  local pays = false
+  for s = 0, 5 do
+    if M.monStanding(s) and M.readByte(0x3E41 + s * 2) > 0 then
+      local row = M.readByte(0x3EA4 + s * 2) & 0x7F
+      if (row & cls) ~= 0 and (event or (row & hands) == 0) then pays = true end
+    end
+  end
+  if not pays then return nil end
+  local cc, cr = M.readByte(0x8963 + slot), M.readByte(0x8967 + slot)
+  local tr, tc = cell // 2, cell % 2
+  local moves = {}
+  for _ = 1, math.abs(tr - cr) do moves[#moves + 1] = tr > cr and "down" or "up" end
+  for _ = 1, math.abs(tc - cc) do moves[#moves + 1] = tc > cc and "right" or "left" end
+  return M.AUTOCROSSBOW, moves
+end
+
 -- The one monster an untargeted attack lands on: the focus list's first
 -- living entry, else the only living monster on the field.  With
 -- several and no focus the engine's default cursor decides, and the

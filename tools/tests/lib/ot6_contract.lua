@@ -273,7 +273,7 @@ M.contracts["post-opera-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex row (ULTROS2; measured EMPTY, unseeded)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex row (ULTROS2; the fighting run revealed both classes of his row at the Lete: the ROM's row, #566)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex row (ULTROS2; the opera's fight revealed what its party chips him with: of his Sword|Ranged row (#566) only EDGAR's AutoCrossbow keys him -- LOCKE's daggers, EDGAR's pike and SABIN's knuckles do not; through v0.50 slash|pierce, 0x03)" },
   },
 }
 
@@ -322,7 +322,7 @@ M.contracts["mrf-save-room-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -353,7 +353,7 @@ M.contracts["n024-entry-save-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -382,7 +382,7 @@ M.contracts["minecart-platform-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -411,7 +411,7 @@ M.contracts["vector-escape-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -456,7 +456,7 @@ M.contracts["terra-returned-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -521,7 +521,7 @@ M.contracts["narshe-mission-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -610,7 +610,7 @@ M.contracts["gate-cave-save-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -663,7 +663,7 @@ M.contracts["vector-crash-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -732,7 +732,7 @@ M.contracts["banquet-done-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -792,7 +792,7 @@ M.contracts["crescent-landing-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -854,7 +854,7 @@ M.contracts["thamasa-night-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -910,7 +910,7 @@ M.contracts["fire-out-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -965,7 +965,7 @@ M.contracts["esper-mtn-save-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -1030,7 +1030,7 @@ M.contracts["ultros-won-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -1084,7 +1084,7 @@ M.contracts["thamasa-done-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) end, "bank-31 class-codex witness (ULTROS2; both classes of his row, the ROM's, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 

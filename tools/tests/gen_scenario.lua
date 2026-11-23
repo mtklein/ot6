@@ -261,28 +261,8 @@ local u1Cand, u1CandF = nil, nil
 -- and fists may not hold (bosses-wob.md 4), and the Bio Blaster keys none of them.  It is spent where it brings
 -- a key: an event battle (ULTROS) with a standing body weak to it, or a random one with a standing body weak to
 -- it that no living hand keys; else EDGAR Fights and keeps his MP for the boss.  Reads only: the live Tools
--- list and cursor, the bodies' class rows ($3EA4) and shields, and the hands (H.partyHandMask).
-local function crossbowPlan(slot)
-  local cell = H.toolCell(H.AUTOCROSSBOW)
-  if cell == nil then return nil end
-  local ranged = H.weaponClass(H.AUTOCROSSBOW)
-  local hands = H.partyHandMask()
-  local event = H.readByte(H.RANDBTL) == 0
-  local pays = false
-  for s = 0, 5 do
-    if H.monStanding(s) and H.readByte(0x3E41 + s * 2) > 0 then
-      local row = H.readByte(0x3EA4 + s * 2) & 0x7F
-      if (row & ranged) ~= 0 and (event or (row & hands) == 0) then pays = true end
-    end
-  end
-  if not pays then return nil end
-  local cc, cr = H.readByte(0x8963 + slot), H.readByte(0x8967 + slot)
-  local tr, tc = cell // 2, cell % 2
-  local moves = {}
-  for _ = 1, math.abs(tr - cr) do moves[#moves + 1] = tr > cr and "down" or "up" end
-  for _ = 1, math.abs(tc - cc) do moves[#moves + 1] = tc > cc and "right" or "left" end
-  return H.AUTOCROSSBOW, moves
-end
+-- list and cursor, the bodies' class rows ($3EA4) and shields, and the hands (H.crossbowPlan, the lib's).
+local crossbowPlan = H.crossbowPlan
 local function seqFor(id, tier, slot)
   local bp = H.readByte(BP + slot * 2)
   local boost = bp >= 2 and math.min(bp, 3) or 0
