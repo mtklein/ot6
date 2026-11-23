@@ -12,16 +12,17 @@
 -- line's cells are what is under test, not how the bytes got there
 -- (battle_sixchip reveals each class by a real hit and reads its cell).
 --
---   1. hidden.  Guard A's row := sword|dagger|fist|arcane, Guard B's :=
+--   1. hidden.  Guard A's row := sword|dagger|blunt|ranged, Guard B's :=
 --      katana|spear, no elements, nothing revealed: A's line draws four grey
 --      '?', B's two and two blanks.
 --   2. revealed.  Both rows revealed: A's four cells are the sword, dagger,
---      fist and arcane glyphs and B's first two the katana and spear glyphs,
+--      blunt and ranged glyphs and B's first two the katana and spear glyphs,
 --      each the design's cell (GLYPH below), each white; the six cells are
 --      six different tiles; each tile's pixels in VRAM (the battle font,
 --      byte $B000 + cell*16) are the ROM font's, differ from the other
---      five's, and the dagger, katana and spear are the redrawn art (ART:
---      the dagger level, the katana vanilla's mirrored, the spear upright).
+--      five's, and the dagger, blunt, katana and spear are the redrawn art
+--      (ART: the dagger level, blunt a mallet, the katana vanilla's mirrored,
+--      the spear upright; the sword and ranged's thrown star are vanilla's).
 --      Screenshot sixhud_six: the six icons, on two bodies.
 --   3. every class in every cell it can take.  For each class c, a row of c
 --      and the classes below it (c alone; c and one below; ...): the class
@@ -44,8 +45,8 @@ local STATE = "build/states/battle_entry.mss.lua"
 local CLASSES = {
   { bit = 0x01, name = "sword",  glyph = 0xD9 },
   { bit = 0x02, name = "dagger", glyph = 0xD8 },
-  { bit = 0x04, name = "fist",   glyph = 0xE1 },
-  { bit = 0x08, name = "arcane", glyph = 0xDF },
+  { bit = 0x04, name = "blunt",  glyph = 0xDC },
+  { bit = 0x08, name = "ranged", glyph = 0xDE },
   { bit = 0x10, name = "katana", glyph = 0xDB },
   { bit = 0x20, name = "spear",  glyph = 0xDA },
 }
@@ -59,6 +60,14 @@ local ART = {
              " ....#..",
              "     #. ",
              "      . " },
+  blunt  = { " #####  ",
+             " #####. ",
+             " #####. ",
+             "  .o... ",
+             "   o.   ",
+             "   o.   ",
+             "   o.   ",
+             "   o.   " },
   katana = { "       #",
              "      o#",
              "     o#.",

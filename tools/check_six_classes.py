@@ -6,10 +6,11 @@
     python3 tools/check_six_classes.py --rom build/mutants/sixpike.sfc --red weapon
 
 The design is written once, below (DESIGN, FAMILIES, SKILLS, KIT, ART), from
-the issue and the owner's ruling, not copied from the tables: six classes,
-Sword $01, Dagger $02, Fist $04, Arcane $08, Katana $10, Spear $20, and a
-null-break property $80.  Read from the ROM through ff6-en.dbg's symbols and
-held to it, rule by rule:
+the issue and the owner's grouping of 2026-11-23 (tools/proto_six/REGROUP.md),
+not copied from the tables or from tools/proto_six/classes.py, which writes
+them: six classes, Sword $01, Dagger $02, Blunt $04, Ranged $08, Katana $10,
+Spear $20, and a null-break property $80.  Read from the ROM through
+ff6-en.dbg's symbols and held to it, rule by rule:
 
   weapon  every item id's byte in Ot6WeapClassTbl (256 of them: a weapon's
           family, the four classed Tools, the empty hand, and $00 for
@@ -22,9 +23,14 @@ held to it, rule by rule:
   glyph   Ot6ClassGlyphTbl, the HUD's cell for each class bit, is the same
           six cells, all different, and all white (Ot6ElemPalTbl 8..13)
   font    those six cells' art in the ROM's small font differs pairwise, and
-          the dagger, katana and spear are the redrawn art (ART)
+          the dagger, blunt, katana and spear are the redrawn art (ART)
   skill   Ot6SkillClassTbl holds exactly the design's (ability, class) rows
-  kit     Ot6KitClassTbl: a thief's hit, the coins, Umaro's club, a hire
+  kit     Ot6KitClassTbl: a thief's hit, the coins, Umaro's club, a hire,
+          Gau's fangs
+  fang    Ot6WeaponClass gives Gau's own body the fangs' class: it tests
+          the swinging character against Gau, and loads the fangs' class
+          byte (the routine's bytes; its behaviour in a battle is
+          tools/tests/battle_sixgau.lua)
   msg     Ot6ClassMsgTbl names each class's attack message, and that
           message's text in the ROM is "Weak against <the class>"
 
@@ -47,15 +53,15 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-SWORD, DAGGER, FIST, ARCANE, KATANA, SPEAR, NULLBRK = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x80
+SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR, NULLBRK = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x80
 
 # class bit -> (name, the font cell its glyph is, the item menu's type word,
 # its attack message, that message's text), in bit order
 DESIGN = [
     (SWORD, "sword", 0xD9, "SWORD", 0x45, "Weak against swords"),
     (DAGGER, "dagger", 0xD8, "DAGGER", 0x46, "Weak against daggers"),
-    (FIST, "fist", 0xE1, "FIST", 0x47, "Weak against fists"),
-    (ARCANE, "arcane", 0xDF, "ARCANE", 0x48, "Weak against arcane"),
+    (BLUNT, "blunt", 0xDC, "BLUNT", 0x47, "Weak against blunt"),
+    (RANGED, "ranged", 0xDE, "RANGED", 0x48, "Weak against ranged"),
     (KATANA, "katana", 0xDB, "KATANA", 0x4A, "Weak against katanas"),
     (SPEAR, "spear", 0xDA, "SPEAR", 0x4B, "Weak against spears"),
 ]
@@ -75,37 +81,44 @@ def ids(*parts):
 
 # the families: every item id that carries a class (everything else is $00)
 FAMILIES = {
-    # daggers; the thrown stars; the Hawk Eye; darts
-    DAGGER: ids((0x00, 0x09), (0x41, 0x43), 0x49, 0x4E, 0x4F),
+    # daggers; ninja blades
+    DAGGER: ids((0x00, 0x09), (0x25, 0x2A)),
     # swords
     SWORD: ids((0x0A, 0x1C)),
     # spears
     SPEAR: ids((0x1D, 0x24)),
-    # ninja blades and katanas
-    KATANA: ids((0x25, 0x32)),
-    # rods (not the Heal Rod), brushes, the boomerang family, cards, Trump, dice
-    ARCANE: ids((0x34, 0x40), 0x45, 0x47, 0x48, 0x4B, 0x4C, 0x4D, 0x50, 0x51),
-    # the Flail, Morning Star and Bone Club; claws
-    FIST: ids(0x44, 0x46, 0x4A, (0x53, 0x59)),
+    # katanas; the edged claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs)
+    KATANA: ids((0x2B, 0x32), 0x54, 0x56, 0x58, 0x59),
+    # rods (not the Heal Rod), brushes; the Flail, Morning Star, Bone Club;
+    # the knuckles (MetalKnuckle, Kaiser, Fire Knuckle)
+    BLUNT: ids((0x34, 0x40), 0x44, 0x46, 0x4A, 0x53, 0x55, 0x57),
+    # the thrown stars; the boomerang family and the Hawk Eye; cards, Trump,
+    # dice; darts
+    RANGED: ids((0x41, 0x43), 0x45, 0x47, 0x48, 0x49, 0x4B, 0x4C, 0x4D, 0x50, 0x51, 0x4E, 0x4F),
 }
 FIXED_DICE, HEAL_ROD, EMPTY_HAND = 0x52, 0x33, 0xFF
-TOOLS = {0xA6: SWORD, 0xA8: SPEAR, 0xA9: SPEAR, 0xAA: SPEAR}      # Chain Saw; Drill, Air Anchor, AutoCrossbow
+# the classed Tools: Chain Saw; Drill; Air Anchor, AutoCrossbow
+TOOLS = {0xA6: SWORD, 0xA8: SPEAR, 0xA9: RANGED, 0xAA: RANGED}
 LAST_HAND_WEAPON = 0x59
 
 # ability id -> class (Ot6SkillClassTbl's rows, all of them)
 SKILLS = {
     0x55: KATANA, 0x57: KATANA, 0x58: KATANA, 0x5A: KATANA, 0x5C: KATANA,   # SwdTech
-    0x5D: FIST, 0x5F: FIST, 0x64: FIST,                                     # Pummel, Suplex, Bum Rush
-    0x8A: SPEAR,                                                            # TekMissile
-    0x51: DAGGER, 0x52: DAGGER, 0x53: DAGGER,                               # the skeans
+    0x5D: BLUNT, 0x5F: BLUNT, 0x64: BLUNT,                                  # Pummel, Suplex, Bum Rush
+    0x8A: RANGED,                                                           # TekMissile
+    0x51: RANGED, 0x52: RANGED, 0x53: RANGED,                               # the three damaging skeans
 }
-# Ot6KitClassTbl: a thief's hit, the coins, Umaro's club, what a hire may swing
-KIT = [("a thief's hit", DAGGER), ("the coins", ARCANE), ("Umaro's club", FIST),
-       ("a hire's swing", SWORD | DAGGER | FIST | ARCANE | KATANA | SPEAR)]
+# Ot6KitClassTbl: a thief's hit, the coins, Umaro's club, what a hire may
+# swing, Gau's fangs (his empty hand, and either hand while he rages)
+KIT = [("a thief's hit", DAGGER), ("the coins", RANGED), ("Umaro's club", BLUNT),
+       ("a hire's swing", SWORD | DAGGER | BLUNT | RANGED | KATANA | SPEAR), ("Gau's fangs", DAGGER)]
+GAU = 0x0B
 
 # the redrawn icons (' ' 0 clear, '.' 1 shadow, 'o' 2 grey, '#' 3 white), as
-# the owner was shown them: the spear upright, the dagger level with its point
-# to the left, the katana vanilla's mirrored (a thin blade up to the right)
+# the owner was shown them (build/attempts/wt/v051-six-classes/glyphs-v3.png):
+# the spear upright, the dagger level with its point to the left, blunt a
+# mallet, the katana vanilla's mirrored (a thin blade up to the right).  The
+# sword and ranged (the thrown star) are vanilla's own cells.
 ART = {
     SPEAR: ["   #    ",
             "  ###.  ",
@@ -123,6 +136,14 @@ ART = {
              " ....#..",
              "     #. ",
              "      . "],
+    BLUNT: [" #####  ",
+            " #####. ",
+            " #####. ",
+            "  .o... ",
+            "   o.   ",
+            "   o.   ",
+            "   o.   ",
+            "   o.   "],
 }
 # vanilla's katana icon, a thin blade up to the left; the build's is this, mirrored
 VANILLA_KATANA = ["#       ",
@@ -134,6 +155,23 @@ VANILLA_KATANA = ["#       ",
                   "    #.o ",
                   "    . .#"]
 ART[KATANA] = [r[::-1] for r in VANILLA_KATANA]
+# vanilla's own art for the two cells the build keeps
+ART[SWORD] = ["#o      ",
+              "#oo     ",
+              ".#oo    ",
+              " .#oo # ",
+              "  .#oo #",
+              "   .#o# ",
+              "   #.## ",
+              "   .# .#"]
+ART[RANGED] = ["#oo.  #.",
+               ".#o. #o.",
+               " .###oo.",
+               "  # #...",
+               "oo###   ",
+               "o#..o#  ",
+               "#.  oo# ",
+               ".   ...."]
 
 
 def load_syms(dbg_path):
@@ -173,9 +211,9 @@ def want_weapon_byte(item):
         if item in members:
             return cls
     if item == FIXED_DICE:
-        return ARCANE | NULLBRK
+        return RANGED | NULLBRK
     if item == EMPTY_HAND:
-        return FIST
+        return BLUNT
     return TOOLS.get(item, 0x00)
 
 
@@ -238,7 +276,7 @@ def check(rom, sym, table):
             fail("font", "the %s glyph is blank" % an)
     for bit, rows in ART.items():
         if art[bit] != rows:
-            fail("font", "the %s glyph (cell $%02X) is not the redrawn art:\n%s"
+            fail("font", "the %s glyph (cell $%02X) is not the design's art:\n%s"
                  % (NAME[bit], GLYPH[bit], "\n".join("      |%s|  want |%s|" % (g, w) for g, w in zip(art[bit], rows))))
 
     # skill: exactly the design's rows
@@ -262,6 +300,19 @@ def check(rom, sym, table):
     for i, (what, want) in enumerate(KIT):
         if rom[kt + i] != want:
             fail("kit", "Ot6KitClassTbl[%d] (%s) is $%02X, the design $%02X" % (i, what, rom[kt + i], want))
+
+    # fang: Ot6WeaponClass tests the swinging character against Gau (cmp #GAU
+    # after lda $3ed8,x) and loads the fangs' class (lda #class) on that path
+    wc = sym["Ot6WeaponClass"]
+    body = bytes(rom[wc: wc + 0x50])
+    at = body.find(bytes([0xBD, 0xD8, 0x3E, 0xC9]))
+    if at < 0 or body[at + 4] != GAU:
+        fail("fang", "Ot6WeaponClass does not compare the swinging character ($3ED8,x) with Gau ($%02X): %s"
+             % (GAU, "the compare is against $%02X" % body[at + 4] if at >= 0 else "no such compare"))
+    fang = body.find(bytes([0x68, 0xFA, 0xA9]))            # pla / plx / lda #class: the @fang arm
+    if fang < 0 or body[fang + 3] != KIT[4][1]:
+        fail("fang", "Ot6WeaponClass's fang arm loads %s, the design $%02X (Dagger)"
+             % ("$%02X" % body[fang + 3] if fang >= 0 else "nothing found", KIT[4][1]))
 
     # msg: the table, and the text of the message it names
     mt, ptrs, base = sym["Ot6ClassMsgTbl"], sym["AttackMsgPtrs"], sym["AttackMsg"] & 0xFF0000
@@ -290,25 +341,38 @@ def selftest(rom_path, dbg_path):
     font = sym["SmallFontGfx"]
     sword = bytes(rom[font + 0xD9 * 16: font + 0xD9 * 16 + 16])
     # one byte (or one tile) changed per mutant: (what, offset, new bytes, the rule that must go red)
+    wc = sym["Ot6WeaponClass"]
+    gau_cmp = bytes(rom[wc: wc + 0x50]).find(bytes([0xBD, 0xD8, 0x3E, 0xC9])) + 4
+    fang_lda = bytes(rom[wc: wc + 0x50]).find(bytes([0x68, 0xFA, 0xA9])) + 3
     mutants = [
         ("the Mithril Pike a sword", sym["Ot6WeapClassTbl"] + 0x1D, [SWORD], "weapon"),
-        ("the Imperial (a ninja blade) a dagger", sym["Ot6WeapClassTbl"] + 0x25, [DAGGER], "weapon"),
-        ("the Heal Rod arcane", sym["Ot6WeapClassTbl"] + HEAL_ROD, [ARCANE], "weapon"),
-        ("the Fixed Dice without null-break", sym["Ot6WeapClassTbl"] + FIXED_DICE, [ARCANE], "weapon"),
-        ("a helmet with a class", sym["Ot6WeapClassTbl"] + 0x6A, [FIST], "weapon"),
+        ("the Imperial (a ninja blade) a katana", sym["Ot6WeapClassTbl"] + 0x25, [KATANA], "weapon"),
+        ("the Mithril Claw (an edged claw) blunt", sym["Ot6WeapClassTbl"] + 0x54, [BLUNT], "weapon"),
+        ("the MetalKnuckle a katana", sym["Ot6WeapClassTbl"] + 0x53, [KATANA], "weapon"),
+        ("the Mithril Rod ranged", sym["Ot6WeapClassTbl"] + 0x34, [RANGED], "weapon"),
+        ("the Hawk Eye a dagger", sym["Ot6WeapClassTbl"] + 0x49, [DAGGER], "weapon"),
+        ("the AutoCrossbow a spear", sym["Ot6WeapClassTbl"] + 0xAA, [SPEAR], "weapon"),
+        ("the Heal Rod blunt", sym["Ot6WeapClassTbl"] + HEAL_ROD, [BLUNT], "weapon"),
+        ("the Fixed Dice without null-break", sym["Ot6WeapClassTbl"] + FIXED_DICE, [RANGED], "weapon"),
+        ("a helmet with a class", sym["Ot6WeapClassTbl"] + 0x6A, [BLUNT], "weapon"),
         ("the empty hand classless", sym["Ot6WeapClassTbl"] + EMPTY_HAND, [0x00], "weapon"),
         ("the Ashura's name wearing the sword", sym["ItemName"] + 0x2B * 13, [0xD9], "icon"),
         ("the Dirk's name wearing the spear", sym["ItemName"] + 0x00 * 13, [0xDA], "icon"),
-        ("the katana icon's word misspelt", sym["ItemTypeName"] + 3 * 7, [0x80], "type"),
+        ("the Shuriken's name wearing the dagger", sym["ItemName"] + 0x41 * 13, [0xD8], "icon"),
+        ("the blunt icon's word misspelt", sym["ItemTypeName"] + 4 * 7, [0x80], "type"),
         ("katana drawing the sword's cell", sym["Ot6ClassGlyphTbl"] + 4, [0xD9], "glyph"),
         ("spear in a colour", sym["Ot6ElemPalTbl"] + 13, [0x04], "glyph"),
         ("the katana cell holding the sword's picture", font + 0xDB * 16, list(sword), "font"),
-        ("one pixel of the spear", font + 0xDA * 16, [rom[font + 0xDA * 16] ^ 0x01], "font"),
+        ("one pixel of the mallet", font + 0xDC * 16, [rom[font + 0xDC * 16] ^ 0x01], "font"),
         ("SwdTech Dispatch a sword", sym["Ot6SkillClassTbl"] + 1, [SWORD], "skill"),
+        ("TekMissile a spear", sym["Ot6SkillClassTbl"] + 17, [SPEAR], "skill"),
         ("a skill row's ability moved", sym["Ot6SkillClassTbl"] + 16, [0x8B], "skill"),
         ("the table ended early", sym["Ot6SkillClassTbl"] + 22, [0xFF], "skill"),
         ("a thief's hit a spear", sym["Ot6KitClassTbl"], [SPEAR], "kit"),
         ("a hire four classes wide", sym["Ot6KitClassTbl"] + 3, [0x0F], "kit"),
+        ("Gau's fangs blunt, in the kit table", sym["Ot6KitClassTbl"] + 4, [BLUNT], "kit"),
+        ("the fang test against Sabin", wc + gau_cmp, [0x05], "fang"),
+        ("the fang arm loading blunt", wc + fang_lda, [BLUNT], "fang"),
         ("katana showing the sword's line", sym["Ot6ClassMsgTbl"] + 4, [0x45], "msg"),
         ("the spears' line one letter off", (sym["AttackMsg"] & 0xFF0000)
          | rom[sym["AttackMsgPtrs"] + 0x4B * 2] | (rom[sym["AttackMsgPtrs"] + 0x4B * 2 + 1] << 8), [0x80], "msg"),

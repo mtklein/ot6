@@ -2,11 +2,11 @@
 -- battle_sixchip.lua -- each of the six weapon classes chips and reveals, and
 -- shows its own "Weak against ..." line (#566).
 --
--- For each class -- Sword $01, Dagger $02, Fist $04, Arcane $08, Katana $10,
+-- For each class -- Sword $01, Dagger $02, Blunt $04, Ranged $08, Katana $10,
 -- Spear $20 -- a member of a party the line really fields makes one real
--- attack of that class through the battle menu (H.kitBattle: a Fight with the
--- weapon in the hand, unboosted, aimed at one body), twice, each time from
--- the same whole-machine snapshot taken as the battle opens:
+-- attack of that class through the battle menu (H.kitBattle: an unboosted
+-- Fight with the weapon in the hand, or a Tools row), twice, each time from a
+-- whole-machine snapshot of the battle:
 --
 --   weak   at a body whose class row ($3EA4 + 2*slot) holds the class.  Each
 --          landed hit takes exactly one shield, written by Ot6ClassChip; the
@@ -15,35 +15,37 @@
 --          byte keeps the pin mark in bits 6-7: the mark shown stays 0); the
 --          save's codex byte for the species gains exactly that bit;
 --          Ot6ClassMsg loads the class's message ($45 swords, $46 daggers,
---          $47 fists, $48 arcane, $4A katanas, $4B spears), the battle script
+--          $47 blunt, $48 ranged, $4A katanas, $4B spears), the battle script
 --          shows that message (GfxCmd_02's GetAttackMsgPtr), its text in the
 --          ROM is "Weak against <class>", and no other class's line shows;
 --          and the body's HUD line turns the class's '?' into the class's
---          glyph (sword $D9, dagger $D8, fist $E1, arcane $DF, katana $DB,
+--          glyph (sword $D9, dagger $D8, blunt $DC, ranged $DE, katana $DB,
 --          spear $DA), read from the BG3 tilemap in VRAM.
 --   cold   the same attack at a body whose row lacks the class: a hit of
 --          that class lands (so the control is not an empty run), no shield
 --          moves, no revealed byte and no codex byte changes, Ot6ClassMsg
 --          loads nothing and no "Weak against" line shows.
 --
--- The design's numbers (the class bits, messages, glyph cells, words) are
+-- The design's numbers (the class bits, messages, glyph cells, lines) are
 -- written once, in CLASSES below; everything else is read from the built ROM
 -- and the live battle: who holds a weapon of the class (Ot6WeapClassTbl over
--- the hands), which body is weak to it (the row the seed gave it), the
--- formation.  Fixtures and what they give by the ROM's rows (not pinned; the
--- log says which each run had):
---   sword   vargas_entry    LOCKE's sword; an Ipooh weak, VARGAS not
---   fist    vargas_entry    a member whose weapon went back to the bag
---                           through Equip -> Rmove (an empty hand is a fist);
---                           VARGAS weak, an Ipooh not
---                           (VARGAS cannot be aimed at while an Ipooh stands:
---                           his side is played from a second snapshot, taken
---                           once the party has fought the Ipoohs down)
+-- the hands, H.handClass; else a Tools owner with a tool of the class in the
+-- bag), which body is weak to it (the row the seed gave it), the formation.
+-- No species row is pinned: the visits below are where the line fields each
+-- class, and the log says what each run's rows gave.
+--   sword   vargas_entry    a sword in a hand, at VARGAS's fight
+--   blunt   vargas_entry    a member whose weapon went back to the bag
+--                           through Equip -> Rmove: an empty hand is Blunt
+--                           (Ot6WeapClassTbl[$FF]; GAU's is not: battle_sixgau)
 --   dagger  kolts_cave      a dagger in a hand (or put there from the bag,
 --                           through Equip); the cave's first encounter
---   spear   ultros1_entry   EDGAR's spear at ULTROS
---   arcane  ultros1_entry   BANON's Punisher at ULTROS
+--   spear   ultros1_entry   a spear in a hand, at ULTROS
+--   ranged  ultros1_entry   EDGAR's AutoCrossbow (Tools), at ULTROS
 --   katana  cyan_defence    CYAN's katana at the Doma soldiers
+-- At VARGAS's fight the target select does not reach him while an Ipooh
+-- stands, so a side that needs him is played from a second snapshot, taken
+-- once the party has fought both Ipoohs down; which side that is follows the
+-- two species' rows as the battle seeded them.
 --
 -- Staging, declared (tools/state_write_waivers.txt).  A formation does not
 -- always hold both bodies: one ULTROS cannot be weak and not weak to the same
@@ -73,15 +75,15 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local CLASSES = {
   { bit = 0x01, name = "sword",  msg = 0x45, text = "Weak against swords",  glyph = 0xD9 },
   { bit = 0x02, name = "dagger", msg = 0x46, text = "Weak against daggers", glyph = 0xD8 },
-  { bit = 0x04, name = "fist",   msg = 0x47, text = "Weak against fists",   glyph = 0xE1 },
-  { bit = 0x08, name = "arcane", msg = 0x48, text = "Weak against arcane",  glyph = 0xDF },
+  { bit = 0x04, name = "blunt",  msg = 0x47, text = "Weak against blunt",   glyph = 0xDC },
+  { bit = 0x08, name = "ranged", msg = 0x48, text = "Weak against ranged",  glyph = 0xDE },
   { bit = 0x10, name = "katana", msg = 0x4A, text = "Weak against katanas", glyph = 0xDB },
   { bit = 0x20, name = "spear",  msg = 0x4B, text = "Weak against spears",  glyph = 0xDA },
 }
 local BY_NAME, CLASS_MSG = {}, {}
 for _, c in ipairs(CLASSES) do BY_NAME[c.name] = c; CLASS_MSG[c.msg] = c.name end
-local TERRA, LOCKE, CYAN, EDGAR, BANON = 0, 1, 2, 4, 14
-local CMD_FIGHT = 0x00
+local TERRA, LOCKE, CYAN, EDGAR = 0, 1, 2, 4
+local CMD_FIGHT, CMD_TOOLS = 0x00, 0x09
 local QMARK, WHITE = 0xBF, H.HUD_GAUGE_ATTR
 
 local only = {}
@@ -233,22 +235,50 @@ local function formationText()
   end
   return table.concat(p, ", ")
 end
--- the seated member whose main hand holds a weapon of the class (an empty
--- hand is the fist's), nil when nobody does
-local function holder(bit)
+local function bagHas(id)
+  for q = 0, 255 do
+    if H.readByte(0x1869 + q) == id and H.readByte(0x1969 + q) > 0 then return true end
+  end
+  return false
+end
+local function cmdRow(e, cmd)
+  for r = 0, 3 do if H.readByte(0x202E + e * 12 + r * 3) == cmd then return r end end
+  return nil
+end
+local function seated(e)
+  return H.readByte(0x3ED8 + e * 2) < 16 and (H.readByte(0x3AA0 + e * 2) & 1) == 1
+    and (H.readByte(0x3EE4 + e * 2) & 0xC2) == 0
+end
+-- an attack of the class this party can make now: a seated member's Fight
+-- with a main hand of the class (an empty hand has the fist's, GAU's the
+-- fangs': H.handClass), else a Tools owner's row for a tool of the class in
+-- the bag.  nil when the party has neither.
+local function attackFor(bit)
   for e = 0, 3 do
-    local c = H.readByte(0x3ED8 + e * 2)
-    if c < 16 and (H.readByte(0x3AA0 + e * 2) & 1) == 1 and (H.readByte(0x3EE4 + e * 2) & 0xC2) == 0 then
-      local r = H.readByte(0x3CA8 + e * 2)
-      if H.weaponClass(r) == bit then return e, c, r end
+    if seated(e) and cmdRow(e, CMD_FIGHT) then
+      local c, r = H.readByte(0x3ED8 + e * 2), H.readByte(0x3CA8 + e * 2)
+      if H.handClass(c, r, (H.readByte(0x3EF9 + e * 2) & 1) ~= 0) == bit then
+        return { e = e, c = c, cmd = CMD_FIGHT, item = r, what = string.format("Fights with hand $%02X", r) }
+      end
+    end
+  end
+  for e = 0, 3 do
+    if seated(e) and cmdRow(e, CMD_TOOLS) then
+      for id = 0xA3, 0xAA do
+        if H.weaponClass(id) == bit and bagHas(id) then
+          return { e = e, c = H.readByte(0x3ED8 + e * 2), cmd = CMD_TOOLS, row = id, item = id,
+            what = string.format("uses Tools row $%02X", id) }
+        end
+      end
     end
   end
   return nil
 end
-local function pickBody(bit, wantWeak, avoid)
+local function canAim(s) return B.canAim == nil or B.canAim(s) end
+local function pickBody(bit, wantWeak)
   local best = nil
   for s = 0, 5 do
-    if standing(s) and shields(s) > 0 and not broken(s) and s ~= avoid
+    if standing(s) and canAim(s) and shields(s) > 0 and not broken(s)
        and ((row(s) & bit) ~= 0) == wantWeak and (best == nil or mhp(s) > mhp(best)) then
       best = s
     end
@@ -259,30 +289,34 @@ end
 local SETTLE, TRIES = 200, 5
 -- one branch: restore the opening, stage what the formation lacks, attack,
 -- and hold the result to `side`'s rule
-local function branch(cls, side, when)
-  when = when or "blob"
+local function branch(cls, side)
   local plan = { { who = 0, cmd = CMD_FIGHT, boost = 0, slot = 0 } }
   local r = nil
   local steps = {
-    H.call(function() B.load = H.requestLoadState(B[when]) end),
+    H.call(function()
+      -- (a visit with two snapshots says which one this side is played from)
+      local when = B.whenFor and B.whenFor(cls.bit, side == "weak") or "blob"
+      B.load = H.requestLoadState(B[when])
+    end),
     H.waitFrames(3),
     H.call(function() H.checkReq(B.load, cls.name .. " " .. side .. ": the opening restored") end),
     H.waitUntil(function() return H.battleActive() end, 900, "the battle is up again", 5),
     H.waitFrames(20),
     H.call(function()
       local bit = cls.bit
-      local e, c, item = holder(bit)
-      H.assertEq(e ~= nil, true, string.format("a seated member holds a %s-class weapon in the main hand "
-        .. "(hands: %s)", cls.name, (function()
+      local atk = attackFor(bit)
+      H.assertEq(atk ~= nil, true, string.format("the party can make a %s attack: a main hand of the class, or a "
+        .. "Tools owner with a tool of it (hands: %s)", cls.name, (function()
           local p = {}
           for q = 0, 3 do p[#p + 1] = string.format("c%d:$%02X", H.readByte(0x3ED8 + q * 2), H.readByte(0x3CA8 + q * 2)) end
           return table.concat(p, " ")
         end)()))
+      local e, c, item = atk.e, atk.c, atk.item
       local wantWeak = side == "weak"
-      local s, how = pickBody(bit, wantWeak, nil), "natural"
+      local s, how = pickBody(bit, wantWeak), "natural"
       if s == nil then
         -- staged: the live formation has no body on this side
-        s = pickBody(bit, not wantWeak, nil)
+        s = pickBody(bit, not wantWeak)
         H.assertEq(s ~= nil, true, "a shielded, unbroken body stands to stage the class row on")
         local was = row(s)
         H.writeByte(ROW + s * 2, wantWeak and (was | bit) or (was & ~bit & 0xFF))
@@ -300,13 +334,19 @@ local function branch(cls, side, when)
         H.log(string.format("[six] %s weak: species $%03X's %s was already in the codex -- forgotten (declared "
           .. "writes: revealed bytes, codex byte) so the reveal is a first one", cls.name, sp, cls.name))
       end
-      H.log(string.format("[six] %s %s: %s -- c%d (seat %d, hand $%02X) Fights slot %d ($%03X row $%02X rev $%02X "
-        .. "shields %d hp %d); formation: %s", cls.name, side, how, c, e, item, s, sp, row(s), rev(s), shields(s),
+      H.log(string.format("[six] %s %s: %s -- c%d (seat %d) %s at slot %d ($%03X row $%02X rev $%02X "
+        .. "shields %d hp %d); formation: %s", cls.name, side, how, c, e, atk.what, s, sp, row(s), rev(s), shields(s),
         mhp(s), formationText()))
       H.assertEq((row(s) & bit) ~= 0, wantWeak, string.format("the body's class row %s the %s bit", wantWeak
         and "holds" or "lacks", cls.name))
-      H.assertEq(H.weaponClass(item), bit, "the hand's weapon is of the class (Ot6WeapClassTbl)")
-      plan[1].who, plan[1].slot = c, s
+      plan[1].who, plan[1].cmd, plan[1].row, plan[1].slot = c, atk.cmd, atk.row, s
+      if atk.cmd == CMD_TOOLS then
+        -- a tool's reach is its own (the AutoCrossbow's is every monster): played where one body stands
+        local n = 0
+        for q = 0, 5 do if standing(q) then n = n + 1 end end
+        H.assertEq(n, 1, "a Tools row is played where one body stands")
+        plan[1].slot = nil
+      end
       r = { class = cls, side = side, actor = e, slot = s, sp = sp, passes = {}, chips = {}, otherShield = {},
         loaded = {}, shown = {}, mark = 0, sh0 = shields(s), codex0 = {}, rev0 = {}, shAll0 = {} }
       for q = 0, 5 do r.rev0[q], r.shAll0[q], r.codex0[q] = rev(q), shields(q), codex(species(q)) end
@@ -448,40 +488,32 @@ local function openBattle(tag)
     H.call(function() H.checkReq(B.req, tag .. ": the opening snapshot"); B.blob = B.req.blob end),
   })
 end
--- names: a class name (both sides from the opening snapshot), or { name,
--- weak = "late" } / { name, cold = "late" } for a side played from the
--- visit's later snapshot (B.late)
-local function nameOf(n) return type(n) == "table" and n[1] or n end
 local function cases(names)
   local t = {}
   for _, n in ipairs(names) do
-    if wanted(nameOf(n)) then
-      local o = type(n) == "table" and n or {}
-      t[#t + 1] = branch(BY_NAME[nameOf(n)], "weak", o.weak)
-      t[#t + 1] = branch(BY_NAME[nameOf(n)], "cold", o.cold)
+    if wanted(n) then
+      t[#t + 1] = branch(BY_NAME[n], "weak")
+      t[#t + 1] = branch(BY_NAME[n], "cold")
     end
   end
   return H.seqStep(t)
 end
 local function any(names)
-  for _, n in ipairs(names) do if wanted(nameOf(n)) then return true end end
+  for _, n in ipairs(names) do if wanted(n) then return true end end
   return false
 end
 local function hand(c) return H.readByte(0x1600 + 37 * c + 0x1F) end
-local function bagHas(id)
-  for s = 0, 255 do
-    if H.readByte(0x1869 + s) == id and H.readByte(0x1969 + s) > 0 then return true end
-  end
-  return false
-end
 local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) == H.readByte(0x1A6D) and (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 
 -- VARGAS's ledge: one A at him, the scene, battle 66 (a fixed formation).
 -- The target select does not reach VARGAS while an Ipooh stands (measured:
--- "the target select never reached monster 0 (15 presses)", chip2.log; and
--- battle_vargas's control waits for both Ipoohs down), so the side that
--- needs him is played from a second snapshot, B.late, taken once the party
--- has fought both Ipoohs down (the library's fight driver, Tools off).
+-- "the target select never reached monster 0 (15 presses)",
+-- build/attempts/wt/v051-six-classes/newsuites/dev/chip2.log; and
+-- battle_vargas's control waits for both Ipoohs down), so a side that needs
+-- him is played from a second snapshot, B.late, taken once the party has
+-- fought both Ipoohs down (the library's fight driver, Tools off).  Which
+-- snapshot a side takes follows the rows the battle seeded: the opening's
+-- when an Ipooh is on that side, the later one when only VARGAS is.
 local VARGAS = 0x103
 local function vargasAlone()
   local n, v = 0, false
@@ -489,6 +521,21 @@ local function vargasAlone()
     if standing(s) then n = n + 1; v = v or species(s) == VARGAS end
   end
   return n == 1 and v
+end
+local function vargasSides()
+  local others, vrow = {}, nil
+  for s = 0, 5 do
+    if standing(s) then
+      if species(s) == VARGAS then vrow = row(s) else others[#others + 1] = row(s) end
+    end
+  end
+  H.assertEq(vrow ~= nil and #others > 0, true, "VARGAS and his Ipoohs stand as the battle opens")
+  B.canAim = function(s) return species(s) ~= VARGAS or vargasAlone() end
+  B.whenFor = function(bit, wantWeak)
+    for _, r in ipairs(others) do if ((r & bit) ~= 0) == wantWeak then return "blob" end end
+    if ((vrow & bit) ~= 0) == wantWeak then return "late" end
+    return "blob"
+  end
 end
 local function vargas(tag, prep, names)
   local aPh = 0
@@ -501,6 +548,7 @@ local function vargas(tag, prep, names)
       H.call(function() aPh = (aPh + 1) % 8; H.setPad(aPh < 4 and { "a" } or {}) end),
     }, tag .. ": the VARGAS scene reaches its battle"),
     openBattle(tag),
+    H.call(vargasSides),
     (function()
       -- the ordinary fight driver, Tools off so nothing but a hand reaches VARGAS's gauge
       local F = H.newFightDriver(tag, { tactical = true, boost = true, items = true, bank = 0, healPercent = 55,
@@ -521,6 +569,7 @@ local function vargas(tag, prep, names)
     H.waitFrames(5),
     H.call(function() H.checkReq(B.lreq, tag .. ": the later snapshot"); B.late = B.lreq.blob end),
     cases(names),
+    H.call(function() B.canAim, B.whenFor = nil, nil end),
   }, {})
 end
 
@@ -616,22 +665,22 @@ H.run({ maxFrames = 400000 }, {
         string.format("Ot6ClassMsgTbl's entry for %s is the design's message $%02X", c.name, c.msg))
     end
   end),
-  vargas("vargas", H.waitFrames(1), { { "sword", cold = "late" } }),
-  -- the fist: one member's weapon goes back to the bag through Equip -> Rmove
+  vargas("vargas", H.waitFrames(1), { "sword" }),
+  -- blunt: one member's weapon goes back to the bag through Equip -> Rmove
   vargas("vargas, a hand emptied", H.seqStep({
     H.call(function()
       strip.who = inParty(LOCKE) and LOCKE or TERRA
-      H.log(string.format("[six] fist: c%d's weapon ($%02X) goes back to the bag through Equip -> Rmove", strip.who,
+      H.log(string.format("[six] blunt: c%d's weapon ($%02X) goes back to the bag through Equip -> Rmove", strip.who,
         hand(strip.who)))
     end),
     { tick = function(self)
-        self.inner = self.inner or H.removeEquip(strip.who, 0, { tag = "fist: the hand emptied" })
+        self.inner = self.inner or H.removeEquip(strip.who, 0, { tag = "blunt: the hand emptied" })
         return self.inner:tick()
       end, reset = function(self) self.inner = nil end },
-    H.call(function() H.assertEq(hand(strip.who), 0xFF, "fist: the main hand is empty") end),
-  }), { { "fist", weak = "late" } }),
+    H.call(function() H.assertEq(hand(strip.who), 0xFF, "blunt: the main hand is empty") end),
+  }), { "blunt" }),
   kolts({ "dagger" }),
-  ultros({ "spear", "arcane" }),
+  ultros({ "spear", "ranged" }),
   doma({ "katana" }),
   H.call(function()
     local said, n = {}, 0

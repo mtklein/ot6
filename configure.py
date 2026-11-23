@@ -899,10 +899,12 @@ MUTANTS = {
     "noclear": ("Ot6NewGameClear", None, None),
     # #566, the six classes' negatives (below, and the six_classes check):
     # the Mithril Pike's class byte a sword's; katana drawing the sword's
-    # glyph cell; a sword's reveal showing the daggers' line
+    # glyph cell; a sword's reveal showing the daggers' line; Ot6WeaponClass's
+    # test for GAU (cmp #CHAR::GAU, its operand) comparing against SABIN
     "sixpike": ("Ot6WeapClassTbl+29=01", None, None),
     "sixglyph": ("Ot6ClassGlyphTbl+4=d9", None, None),
     "sixmsg": ("Ot6ClassMsgTbl=46", None, None),
+    "sixgau": ("Ot6WeaponClass+27=05", None, None),
 }
 for name, (edit, fx, want) in MUTANTS.items():
     w.edge([f"build/mutants/{name}.sfc"], "sh",
@@ -949,13 +951,15 @@ for tag, fx, extra in (("newgame_gau", "v0.44/wor-gau-v1", ""),
     qual.append(out)
     golden_outs.append(out)
 
-# #566: the two six-class suites on their mutants, each red for the reason
+# #566: the six-class suites on their mutants, each red for the reason
 # named: battle_sixhud where katana draws the sword's cell, battle_sixchip
-# where a sword's first reveal loads the daggers' line.  Screenshots and
+# where a sword's first reveal loads the daggers' line, battle_sixgau where
+# the fangs are SABIN's.  Screenshots and
 # states go to the run's own directory, not over the real suites' shots.
 for tag, t, mutant, want in (
         ("sixhud_sixglyph", "battle_sixhud", "sixglyph", "the six classes draw six different tiles"),
-        ("sixchip_sixmsg", "battle_sixchip", "sixmsg", "it is the class's")):
+        ("sixchip_sixmsg", "battle_sixchip", "sixmsg", "it is the class's"),
+        ("sixgau_sixgau", "battle_sixgau", "sixgau", "GAU's bare-handed Fight carries Dagger")):
     f = f"tools/tests/{t}.lua"
     deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
             copy_if_changed_from(f), "tools/build/run_tagged_suite.sh",
