@@ -203,6 +203,8 @@ DrawStatusGogoWindow:
         inx
         cpx     #$0040
         bne     @5e42
+        jsr     Ot6LeoSummonList        ; ot6 #552 piece F: and Summon, his esper
+                                        ;   pick (ot6_painter_page.asm)
 Ot6LeoShockList = *                     ; (a seam for the negative's mutant)
         lda     f:OT6_LEO_FLAG          ; ot6 #552: the revealed Leo offers
         and     #OT6_LEO_BIT            ;   his own Shock, last in the list
@@ -836,11 +838,11 @@ InitStatusBG3ScrollHDMA:
         sta     hDMA5::CTRL
         lda     #<hBG3VOFS
         sta     hDMA5::HREG
-        ldy     #near StatusBG3ScrollHDMA
+        ldy     #near Ot6StatusBG3ScrollHDMA ; ot6 #552: a 17th row's band
         sty     hDMA5::ADDR
-        lda     #^StatusBG3ScrollHDMA
+        lda     #^Ot6StatusBG3ScrollHDMA
         sta     hDMA5::ADDR_B
-        lda     #^StatusBG3ScrollHDMA
+        lda     #^Ot6StatusBG3ScrollHDMA
         sta     hDMA5::HDMA_B
         lda     #BIT_5
         tsb     zEnableHDMA
@@ -1124,7 +1126,7 @@ MenuState_6a:
 ; [ load cursor for gogo command list select ]
 
 LoadGogoCmdListCursor:
-@6403:  ldy     #near GogoCmdListProp
+@6403:  ldy     #near Ot6GogoCmdListProp     ; ot6 #552: 17 rows (ot6_painter_page.asm)
         jmp     LoadCursor
 
 ; ------------------------------------------------------------------------------
@@ -1135,7 +1137,7 @@ UpdateGogoCmdListCursor:
 @6409:  jsr     MoveCursor
 
 InitGogoCmdListCursor:
-@640c:  ldy     #near GogoCmdListPos
+@640c:  ldy     #near Ot6GogoCmdListPos      ; ot6 #552: 17 rows
         jmp     UpdateCursorPos
 
 ; ------------------------------------------------------------------------------

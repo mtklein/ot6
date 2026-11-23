@@ -96,7 +96,8 @@ Ot6SkillsCmdRow:
 ; opens no list in battle (ot6_thief.asm's header: command $06 keeps vanilla
 ; Capture), so the Treasure Hunter row greys as the Painter row does under
 ; the Fake Mustache.  out: A = the actor byte, as `lda 0,y` left it (flags
-; too).  a8/i16.  clobbers X.
+; too), but $ff for Gogo revealed as Leo, whose Espers row this makes white
+; (#552 piece F).  a8/i16.  clobbers X.
 Ot6SkillsPainterColor:
         lda     zSkillsTextColor::Thief
         cmp     #$20
@@ -123,9 +124,90 @@ Ot6SkillsPainterColor:
         bne     @done                   ; Control in battle: stays grey
         lda     #$20                    ; Sketch, and Sketch in battle: white
         sta     zSkillsTextColor::Painter
-@done:  jmp     Ot6SkillsRuneColor      ; the tenth row's colour, which ends
+@done:  jsr     Ot6SkillsRuneColor      ; the tenth row's colour, which ends
                                         ;   in the `lda 0,y` the hook replaced
-                                        ;   (ot6_runeknt_page.asm)
+                                        ;   (ot6_runeknt_page.asm, #563)
+        cmp     #CHAR_PROP::GOGO
+        bne     @out
+        jsr     Ot6LeoGenjuRow          ; #552 piece F
+@out:   rts
+
+; Gogo's Espers row (A = CHAR_PROP::GOGO in, Y = his record).  Revealed as
+; Leo, the esper is one of his picks (the owner, 2026-11-23): with Summon
+; among his commands the row is white (he wears, earns and keeps ranks as
+; anyone does, and Summon casts his stone) and A comes back $ff, so the
+; caller's Gogo test greys nothing.  Unrevealed, or Summon not picked: A
+; stays Gogo's and the caller greys the row, as vanilla.  (mutant_rom.py's
+; seam: an rts first.)
+Ot6LeoGenjuRow:
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     @no
+        lda     a:$0016,y               ; his four commands (record +$16)
+        cmp     #BATTLE_CMD::SUMMON
+        beq     @yes
+        lda     a:$0017,y
+        cmp     #BATTLE_CMD::SUMMON
+        beq     @yes
+        lda     a:$0018,y
+        cmp     #BATTLE_CMD::SUMMON
+        beq     @yes
+        lda     a:$0019,y
+        cmp     #BATTLE_CMD::SUMMON
+        beq     @yes
+@no:    lda     #CHAR_PROP::GOGO
+        rts
+@yes:   lda     #$20
+        sta     zSkillsTextColor::Genju
+        lda     #$ff
+        rts
+
+; [ the revealed Leo's esper pick: Summon in Gogo's Status-screen list ]
+;
+; #552 piece F (the owner, 2026-11-23): once revealed, Leo picks his esper
+; like any other ability.  The pick is Summon ($19, BattleCmdName "Summon",
+; the command that casts the stone he wears: vanilla already lets Gogo use
+; it, but no record holds it, so vanilla never offered it).  From
+; DrawStatusGogoWindow after its record scan: with the switch set and no
+; record's command already Summon (his own, once picked: the scan lists it
+; there, BattleCmdProp's Gogo flag being set), Summon is written as the next
+; row.  Y (i16) = the rows written so far, WMADD at the next; a8.  X
+; clobbered (the caller reloads it).
+Ot6LeoSummonList:
+        lda     f:OT6_LEO_FLAG
+        and     #OT6_LEO_BIT
+        beq     @out
+        ldx     #$0000
+@scan:  lda     f:$7e9e09,x             ; the scan's 64 commands, duplicates $ff
+        cmp     #BATTLE_CMD::SUMMON
+        beq     @out                    ; a record holds it: listed already
+        inx
+        cpx     #$0040
+        bne     @scan
+        lda     #BATTLE_CMD::SUMMON
+        sta     hWMDATA
+        iny
+@out:   rts
+
+; Gogo's command list holds up to 17 rows once he is revealed (the blank,
+; the 14 commands a full roster's records hold, Shock and Summon); vanilla's
+; cursor and the status menu's BG3 scroll stop at 16 (status.asm
+; GogoCmdListProp/Pos, StatusBG3ScrollHDMA, kept there unread).  These are
+; their copies with one more row, the readers repointed (same-size operands).
+Ot6GogoCmdListProp:
+        cursor_prop {0, 0}, {1, 17}, NO_X_WRAP
+
+Ot6GogoCmdListPos:
+        .repeat 17, i
+        cursor_pos {240, 16 + i * 12}
+        .endrep
+
+Ot6StatusBG3ScrollHDMA:
+        .byte   $27,$00,$00
+        .repeat 16, i
+        .byte   $0c, 4 * (i + 1), $00
+        .endrep
+        .byte   $00
 
 ; [ does a worn piece carry this relic command rewrite? ]
 ; in: A = the $11d6 bit (OT6_RELIC_*), Y = the character's record.  out: Z

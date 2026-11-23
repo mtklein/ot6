@@ -1050,9 +1050,16 @@ _c34fc4:
 _c350a2:
 @50a2:  sta     $e0
         jsr     _c34edd
+.if LANG_EN
+        jsl     Ot6FieldLeoMagic        ; ot6 #552 piece F: vanilla's `lda 0,y /
+        bcs     _50c5                   ;   cmp #CHAR_PROP::GOGO / beq _50c5` (7
+        rts                             ;   bytes); a revealed Leo's own stone
+                                        ;   grants (ot6_progression.asm)
+.else
         lda     0,y
         cmp     #CHAR_PROP::GOGO
         beq     _50c5
+.endif
 
 _c350ae:
 ; OT6: ask the shared-bank helper for the effective learned status.  The
