@@ -36,7 +36,8 @@ AWKWARD = {
     "skean": "the three damaging skeans are thrown, so Ranged with the stars, though they resolve as spells and "
              "their elements do most of their chipping",
     "umaro": "Umaro's Throw hurls an ally: literally a thrown thing, kept Blunt as his Charge is (a body's blow)",
-    "thief hit": "Trickshot throws a coin but carries Locke's own class whatever he holds, as Mug does: Dagger",
+    "thief hit": "Trickshot throws a coin but carries Locke's own class whatever he holds (as Dismantle does; Mug swings "
+                 "the weapon in hand and takes its class): Dagger",
     "brush": "a brush is no bludgeon; it goes with the rods, the other caster's weapon ('rods and fists could "
              "group')",
     "claw": "the four edged claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) cut, so Katana; the three "

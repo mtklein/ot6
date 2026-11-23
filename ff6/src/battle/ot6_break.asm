@@ -917,8 +917,8 @@ done:   rts
 
 ; ------------------------------------------------------------------------------
 
-; class bit index -> attack message (attack_msg_en.json): sword, dagger, fist,
-; arcane ($45-$48, the four v0.50 lines' slots), katana, spear ($4a, $4b;
+; class bit index -> attack message (attack_msg_en.json): sword, dagger, blunt,
+; ranged ($45-$48, the four v0.50 lines' slots), katana, spear ($4a, $4b;
 ; $49 is the esper rank line)
 Ot6ClassMsgTbl:
         .byte   $45, $46, $47, $48, $4a, $4b

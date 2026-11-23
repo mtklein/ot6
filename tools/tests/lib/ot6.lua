@@ -7704,7 +7704,7 @@ end
 --   kit    hands, plus the class-bearing skills they could use now: Pummel
 --          (Blitz), Dispatch (SwdTech), TERRA's TekMissile (Magitek), the
 --          Tools and thrown stars and skeans in the bag (Tools, Throw), and
---          LOCKE's Mug or Trickshot once he knows one
+--          LOCKE's Trickshot or Dismantle once he knows one (Mug swings his weapon)
 -- and each standing gauged body's class row (the ROM's, $3EA4), with whether
 -- hands and kit hold one of its classes.  A body with no class row at all
 -- counts in neither tally.
@@ -7751,7 +7751,7 @@ function M.keyLine(tag)
         s = s .. ":throw"
       end
       if c == 1 and cmdRow(e, BATTLE.LOCKE.CMD)
-         and (M.lockeKnows(BATTLE.LOCKE.MUG) or M.lockeKnows(BATTLE.LOCKE.TRICK)) then
+         and (M.lockeKnows(BATTLE.LOCKE.TRICK) or M.lockeKnows(BATTLE.LOCKE.DISMANTLE)) then
         k = k | M.kitClass("thief"); s = s .. ":T"
       end
       hands, kit = hands | h, kit | h | k
