@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "ddf3e573dbdd0f94f4e0594105b2762d5757845c77988dee2a71f1f1d9787978",
+  "sha256": "8b2165ef8deb678e59772fed02d937ddae95070a876b371169dc8610ef442d1e",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "ddf3e573dbdd0f94f4e0594105b2762d5757845c77988dee2a71f1f1d9787978",
-    "generator_sig": "9576eb63c1ec78b4c86769ce2e76a503795f80a8b4ab5ac99a96e7e057ff64ec gen_wor_relm build/checkpoints/wor-owzer-v1/manifest.json build/checkpoints/wor-owzer-v1/wor-owzer.sram",
+    "payload_sha256": "8b2165ef8deb678e59772fed02d937ddae95070a876b371169dc8610ef442d1e",
+    "generator_sig": "9cfd4d87094a5e4a178d5274890fed8c17046b5f2b41eb538764cc998287cdeb gen_wor_relm build/checkpoints/wor-owzer-v1/manifest.json build/checkpoints/wor-owzer-v1/wor-owzer.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-owzer-v1/manifest.json",
-        "sha256": "029cdc253b7310e64f87e21903438762dc5b0f6c1e29400b97bce47052ad02b4"
+        "sha256": "a9b186b770b9848d6e18af34ed6918d062253225efe53300854a4d920f465694"
       }
     ]
   }
