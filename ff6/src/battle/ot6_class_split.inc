@@ -3,8 +3,10 @@
 ; bytes a species id (0..383), byte k the six-class bits the species' weakness
 ; of four-class bit k (slash $01, pierce $02, bludgeon $04, special $08) became;
 ; $00 where it had none.  Written by tools/six_classes/split.py when the six
-; classes replaced the four (#566); it describes the saves of the releases
-; before that, so it does not change when a row does.
+; classes replaced the four (#566), with each row: a four-class save's
+; revealed weakness lands on a class the species' current row holds, so it
+; is rewritten when a row moves, and frozen with the rows at release
+; (check_save_layout pins its hash then).
 ; ----------------------------------------------------------------------------
 
 Ot6ClassSplitTbl:
