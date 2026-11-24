@@ -113,7 +113,7 @@ Locke's Filch, Sabin's Bum Rush and Cyan's Cleave on a boss.
 | Fight | Fight, Mug, Capture | one more hit with a weapon in hand. With the Genji Glove and two weapons, both hands swing again. No MP. |
 | Spell families | Fire, Ice, Bolt, Poison, Cure, Life, Slow, Haste | the next spell of the line: one point casts Fire 2, two points Fire 3. A third point adds nothing. You pay the MP of the spell cast. |
 | Damage or healing | Blitz, Tools, Lores, Dances, Esper summons, Drain, Pearl, Quake, Merton, Ultima, items that heal a number | double damage for 1 point, 4x for 2, 8x for 3 |
-| Chance | Steal, Slot, Rage, a Dance's start | better odds; the third point removes the gamble |
+| Chance | Steal, Slot, Rage, a Dance's start (the stumble and the first step) | better odds; the third point removes the gamble |
 | Duration | Runic, Morph | more of the character's own turns, or more time |
 | Reach | Safe, Shell, Rflect, Vanish (on your party), Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle, Stop, Imp, Dispel; Shadow's smoke and exit | one more target per point |
 | Shields | the Break spell, Filch | one more shield per point |
@@ -393,22 +393,27 @@ Mog learns his eight Dances by fighting on each dance's terrain, as in FF6.
 His Dance list in battle shows the ones he knows, packed from the top in this
 table's order.
 
-| Dance | Terrain |
-|---|---|
-| Wind Song | plains and the Veldt |
-| Forest Suite | forests |
-| Desert Aria | deserts |
-| Love Sonata | towns and buildings |
-| Earth Blues | mountains |
-| Water Rondo | underwater |
-| Dusk Requium | caves |
-| Snowman Jazz | snowfields |
+| Dance | Terrain | Rare step |
+|---|---|---|
+| Wind Song | plains and the Veldt | Cokatrice |
+| Forest Suite | forests | Wombat |
+| Desert Aria | deserts | Kitty |
+| Love Sonata | towns and buildings | Tapir |
+| Earth Blues | mountains | Whump |
+| Water Rondo | underwater | Wild Bear |
+| Dusk Requium | caves | Pois. Frog |
+| Snowman Jazz | snowfields | Ice Rabbit |
 
 Dances cost 8 MP, 20 with 1 point, 50 with 2 and 99 with 3, and a boost
 multiplies every step. Off its own terrain a Dance may stumble, as in FF6: it
 fails half the time. 1 point cuts that to one in four, 2 points to one in 16,
-and 3 points to never. A stumble costs no MP, but the points are spent. Mog
-has no ultimate.
+and 3 points to never. A stumble costs no MP, but the points are spent.
+
+Each Dance has four steps, and Mog dances one of them each turn. The rare
+step comes one turn in 16, as in FF6. A boosted Dance is more likely to open
+on it: the first step is the rare one 1 time in 4 with 1 point, 1 in 2 with
+2, and always with 3. The steps after the first keep the usual odds. Mog has
+no ultimate.
 
 ### Umaro, Berserker (club, fists)
 
