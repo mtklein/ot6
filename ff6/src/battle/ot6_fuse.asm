@@ -151,8 +151,12 @@ Ot6FuseTbl:
         ; ---- wt/v051-tg-wob1: World of Balance bosses 1-5 (bosses-wob.md) ----
         ; Each fuse block is its script's first, lit by a monster switch an
         ; ordinary turn sets; a break clears what the move's turn clears.
-        ; the Whelk's head: its count and switch 7, one byte (the count again)
-        ot6_fuse $0134, Ot6FuseWhelk, Ot6FuseWhelk, $00, $ff, 0
+        ; the Whelk's head: its count and switch 7, one byte (the count
+        ; again; switch 6, "it has charged", kept, as its move keeps it).
+        ; Battle switch 0, the shell's hold on the head, is kept: a Broken
+        ; head stays out of its shell until its next Mega Volt clears the
+        ; hold, so the break's window can be spent on it
+        ot6_fuse $0134, Ot6FuseWhelk, Ot6FuseWhelk, $40, $ff, 0
         ; the Marshal: switch 0 (his rotation again)
         ot6_fuse $0064, Ot6FuseMarshal, Ot6FuseMarshal, $fe, $ff, 0
         ; Vargas: switch 0 (his rotation again)

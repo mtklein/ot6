@@ -18604,6 +18604,7 @@ end
 --                      takes it to the target select
 --     row = id         a Tools-shell list's cell holding this id (state $30),
 --                      or the Throw list's (state $2D, the same shell)
+--     mtek = n         the MagiTek list's entry n (state $2A; 0 = Fire Beam)
 --     direct = true    the list's A commits the action itself, with no target
 --                      select (SwdTech, Blitz)
 --     slot = s         aim at monster slot s (else any live monster)
@@ -18978,6 +18979,13 @@ function M.kitBattle(plan, opts)
       pulse("a")
     elseif (st == 0x0E or st == 0x30 or st == 0x2D) and not p.opened then
       pulse("b")   -- a window this entry did not open (an earlier entry's, closing)
+    elseif st == 0x2A and p.mtek ~= nil then
+      -- the MagiTek list (#373, BATTLE.ST_MTEK: two columns, entry = row * 2 + column, the column at $893F and the
+      -- row at $8943 per actor): p.mtek is the entry (0 = Fire Beam, the attack $83 + entry)
+      local cc, cr = M.readByte(0x893F + a), M.readByte(0x8943 + a)
+      if cc ~= p.mtek % 2 then pulse(p.mtek % 2 > cc and "right" or "left"); return end
+      if cr ~= p.mtek // 2 then pulse(p.mtek // 2 > cr and "down" or "up"); return end
+      pulse("a")
     elseif st == 0x0E and p.summon then
       pulse("up")      -- up off the grid's top row opens the esper window ($16, CheckHasGenju)
     elseif st == 0x16 and p.summon then
@@ -19291,7 +19299,7 @@ function M.fuseWatch(species, write)
     if not W.on then return end
     local x = x8()
     if x < 8 then
-      if M.readByte(0xB5) == 0x00 then W.party[#W.party + 1] = { f = M.frame } end
+      if M.readByte(0xB5) == (W.partyCmd or 0x00) then W.party[#W.party + 1] = { f = M.frame } end
       return
     end
     if x ~= W.ent() then return end
@@ -19403,7 +19411,22 @@ end
 --   cfg.partway(W)          true once the trigger is part earned and no fuse is lit (the "outside" case's break)
 --   cfg.earned(c)           the "broken" case's boss-specific asserts: c = the case's record (below)
 --   cfg.outside(c)          the "outside" case's, likewise (optional)
+--   cfg.fired(c, W, n)      (optional) a step played as each move has been recorded and its mark has gone, after the
+--                           n-th announce of the case (the party Defends meanwhile)
 --   cfg.onOpen(name)        called as each case opens (optional)
+--   cfg.aim                 (optional) the breaking action is aimed at the boss's slot, in the "outside" case too (a
+--                           formation with other bodies: Vargas's Ipoohs, the Marshal's Lobos)
+--   cfg.openHold            (optional) the breaking Fight waits on the command window, not the target select (whose
+--                           window stops the battle's clock in Wait mode, the Config the opening keeps)
+--   cfg.breaker = { name, cmd, row or mtek, open }   (optional; open: as openHold) the breaking action and the outside window's two, in place of a
+--                           Fight, aimed at the boss (a Magitek rider has no Fight: the Whelk's Fire Beam); W.party
+--                           then counts that command
+--   cfg.hides               (optional) the boss leaves the field and returns by its own script (the Whelk's head):
+--                           a case's waits ride that out, and only the battle's end counts as the boss gone
+--   cfg.prelude(W)          (optional) a step each case plays right after its open (Vargas's: the Ipoohs Fought
+--                           down, so that the cursor can reach him); the boss's turns run meanwhile
+--   cfg.lineShot            (optional) a screenshot "fuse_<tag>_line" this many frames after the first announce
+--                           is dispatched (the line in its window), beside the "_lit" one (the mark)
 -- The cases:
 --   unbroken   the party arms the fuse; the line shows, the HUD mark shows, and the move is dispatched on the
 --              boss's cfg.turns-th turn after the announce; the mark is gone after it.
@@ -19420,6 +19443,7 @@ end
 -- of asserting the cancel.
 function M.fuseCases(cfg)
   local W = M.fuseWatch(cfg.species, cfg.write)
+  if cfg.breaker then W.partyCmd = cfg.breaker.cmd end
   local measure = rawget(_G, "FUSE_MEASURE") == true
   local snap, req = nil, nil
   local C = nil                 -- the case in play
@@ -19460,7 +19484,12 @@ function M.fuseCases(cfg)
     return idle(pred, max, what)
   end
   local function markOn() return W.vramMark() == W.FUSE_WORD end
-  local function gone() return W.ent() == nil or not M.battleLoadStarted() end
+  -- (cfg.hides: the boss leaves the field and comes back on its own -- the Whelk's shell draws the head in -- so
+  -- only the battle's end is "gone"; a case's waits ride the hide out)
+  local function gone()
+    if cfg.hides then return not M.battleLoadStarted() end
+    return W.ent() == nil or not M.battleLoadStarted()
+  end
   local function recovered()
     local c = W.cells()
     return c ~= nil and c.ticks == 0
@@ -19497,6 +19526,11 @@ function M.fuseCases(cfg)
         end
         say("at the open: " .. W.cellsLine(W.cells()))
       end),
+      -- (cfg.prelude: the play each case opens with, before its own; the boss's turns run meanwhile)
+      M.cond(function() return cfg.prelude ~= nil end, {
+        M.lazy(function() return cfg.prelude(W) end),
+        M.call(function() say("after the prelude: " .. W.cellsLine(W.cells())) end),
+      }, {}),
     })
   end
   -- the announce: the line dispatched, and (the cancel's ROM) the mark in VRAM and the lit bit
@@ -19516,6 +19550,14 @@ function M.fuseCases(cfg)
         say(string.format("the announce (dlg $%02X) on the boss's turn %d%s: %s", cfg.line, c.turn,
           c.retal and " (its counter's)" or "", W.cellsLine(W.cells())))
       end),
+      M.cond(function() return cfg.lineShot ~= nil and not cfg.lineShotTaken end, {
+        M.lazy(function()
+          local l = C.lines[#C.lines]
+          local wait = math.max(0, l.f + cfg.lineShot - M.frame)
+          return M.waitFrames(wait)
+        end),
+        M.call(function() cfg.lineShotTaken = true; M.screenshot("fuse_" .. tag .. "_line") end),
+      }, {}),
       M.cond(function() return W.fixed and not measure end, {
         idle(function() return gone() or markOn() end, 1200, "the HUD mark after the announce"),
         M.call(function()
@@ -19559,6 +19601,7 @@ function M.fuseCases(cfg)
           say("the mark is gone after the move")
         end),
       }, {}),
+      M.lazy(function() return cfg.fired and cfg.fired(C, W, n) or M.waitFrames(0) end),
     })
   end
   -- The breaking Fight.  The gauge goes to 1 and the row takes every class (so whichever hand swings is a key);
@@ -19573,6 +19616,8 @@ function M.fuseCases(cfg)
   -- of a Fight (cfg.via's cases), boost 0
   local function breakIt(why, when, max, via)
     local plan, staged = {}, false
+    -- (an aimed break, or the suite's breaker, takes the plan path in the "outside" case too)
+    if when == nil and (cfg.aim or cfg.breaker) and via == nil then when = function() return true end end
     return M.seqStep({
       M.call(function()
         standing()
@@ -19591,9 +19636,20 @@ function M.fuseCases(cfg)
               plan[1] = { who = id, cmd = via.cmd, row = via.row, spell = via.spell, boost = 0,
                 confirmWhen = confirmWhen }
               say(string.format("character %d (seat %d) aims the breaking %s", id, i, via.name))
+            elseif cfg.breaker then
+              -- (breaker.open: the member waits on the command window, not the target select, whose window
+              -- stops the battle's clock in Wait mode, the Config the opening's battles keep: there the boss
+              -- would take no turn and never announce)
+              plan[1] = { who = id, cmd = cfg.breaker.cmd, row = cfg.breaker.row, mtek = cfg.breaker.mtek, boost = 0,
+                slot = W.slot(), confirmWhen = not cfg.breaker.open and confirmWhen or nil,
+                openWhen = cfg.breaker.open and confirmWhen or nil }
+              say(string.format("character %d (seat %d) aims the breaking %s at slot %d", id, i, cfg.breaker.name,
+                W.slot()))
             else
-              plan[1] = { who = id, cmd = 0x00, confirmWhen = confirmWhen }
-              say(string.format("character %d (seat %d) aims the breaking Fight", id, i))
+              plan[1] = { who = id, cmd = 0x00, slot = cfg.aim and W.slot() or nil,
+                confirmWhen = not cfg.openHold and confirmWhen or nil, openWhen = cfg.openHold and confirmWhen or nil }
+              say(string.format("character %d (seat %d) aims the breaking Fight%s", id, i,
+                cfg.aim and string.format(" at slot %d", W.slot()) or ""))
             end
             break
           end
@@ -19609,7 +19665,7 @@ function M.fuseCases(cfg)
       M.call(function()
         standing()
         M.assertEq(#W.breaks > C.nBreaks, true, string.format("%s: a %s took the boss's last shield (%s)", tag,
-          via and via.name or "Fight", why))
+          via and via.name or (cfg.breaker and cfg.breaker.name) or "Fight", why))
         C.brk = W.breaks[#W.breaks]
         C.brk.cmdsAt = #W.cmds
       end),
@@ -19803,7 +19859,12 @@ function M.fuseCases(cfg)
     arm(function() return gone() or cfg.partway(W) end, 30000, "the trigger part earned"),
     M.call(function()
       standing()
-      M.assertEq(lineAfter(1) == nil, true, tag .. ": no fuse is lit yet (the case's precondition)")
+      -- (a prelude's play can run a whole fuse first, Vargas's: the case counts from its last move, if any)
+      local li = lineAfter(1)
+      while li ~= nil and moveAfter(li) ~= nil and lineAfter(moveAfter(li)) ~= nil do li = lineAfter(moveAfter(li)) end
+      C.from = (li ~= nil and moveAfter(li) ~= nil) and moveAfter(li) + 1 or 1
+      M.assertEq(lineAfter(C.from) == nil and not W.litBit(), true, tag .. ": no fuse is lit yet (the case's "
+        .. "precondition: no announce since the case's open or its last move)")
     end),
     breakIt("a break outside the fuse"),
     M.call(function()
@@ -19816,8 +19877,20 @@ function M.fuseCases(cfg)
         .. "monster variable, battle switches, battle variable 3)")
       C.partyAt = #W.party
     end),
-    -- two more Fights land in the window
-    fight(function() return gone() or #W.party >= C.partyAt + 2 or recovered() end, 3000),
+    -- two more Fights land in the window (the suite's breaker, aimed at the boss, where it names one)
+    M.lazy(function()
+      local pred = function() return gone() or #W.party >= C.partyAt + 2 or recovered() end
+      if not cfg.breaker then return fight(pred, 3000) end
+      local plan = {}
+      for i = 0, 3 do
+        local id = M.readByte(0x3ED8 + 2 * i)
+        if id ~= 0xFF and M.readWord(0x3BF4 + 2 * i) > 0 and #plan < 2 then
+          plan[#plan + 1] = { who = id, cmd = cfg.breaker.cmd, row = cfg.breaker.row, mtek = cfg.breaker.mtek,
+            boost = 0, slot = W.slot() }
+        end
+      end
+      return M.kitBattle(plan, { idle = "defend", care = false, maxFrames = 3600, giveUp = pred })
+    end),
     untilRecovered(),
     M.call(function()
       local a, b = C.brk.post, C.rec.cells
@@ -19830,7 +19903,7 @@ function M.fuseCases(cfg)
       M.assertEq(C.window, C.windowWant, tag .. ": Fights on the Broken boss wound nothing (the cells at recovery "
         .. "are the cells at the break)")
     end),
-    announce(function() return 1 end, 40000, "the fuse arms after a break outside it"),
+    announce(function() return C.from end, 40000, "the fuse arms after a break outside it"),
     M.call(function() if cfg.outside then cfg.outside(C, W) end end),
     fires(1, "after a break outside the fuse"),
     M.call(function()

@@ -618,9 +618,12 @@ end
 -- The cap (#336).  Battle 66 is a scripted fight (the formation is fixed;
 -- the seed is the axis): over seed shifts 0, 3, 7, 11, 19, 23, 29 and 37 the
 -- run ended at f20,062 to f22,321 (build/attempts/wt/v026-suites/r/vargas/),
--- so 45,000 is 2.0x the longest.  It was 150,000, then 200,000 (#314), with
--- no derivation.
-H.run({ maxFrames = 45000 }, {
+-- so 45,000 was 2.0x the longest.  It was 150,000, then 200,000 (#314), with
+-- no derivation.  Section 9 (#561) adds a second battle played three times:
+-- on wt/v051-tg-wob1 its cases ran from f21,436 to f43,761, 22,325 frames
+-- (build/attempts/wt/v051-tg-wob1/suites/), so 90,000 is 2.0x the longest
+-- before plus that.
+H.run({ maxFrames = 90000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -911,4 +914,58 @@ H.run({ maxFrames = 45000 }, {
   -- ===================================================================== --
   H.cond(function() return true end, brokenBranch("breaking-pummel", 2, false), {}),
   H.cond(function() return true end, brokenBranch("broken-pummel", 0, true), {}),
+
+  -- ===================================================================== --
+  -- 9: the telegraph (#561, bosses-wob.md block 3).  The fuse block is the
+  -- first of his turn script: his rotation's second Battle sets monster
+  -- switch 0, the next turn says "Feel the wind!" (dlg $90) and glows, and
+  -- the turn after it clears the switch and fires Gale Cut.  A break in
+  -- between cancels it (Ot6FuseTbl's row $0103): the rotation starts over.
+  -- A fresh battle from the door, played three times from a snapshot at its
+  -- open (M.fuseCases: the gauge, the row's classes and HP held are its
+  -- DECLARED staging -- VARGAS at 11,500, above the 10,880 line his counter
+  -- brings SABIN in at, so the trio fights it).  The trio Defends; the
+  -- breaking Fight is aimed at him (the Ipoohs stand in front).
+  -- ===================================================================== --
+  H.call(function() TW.on = false; mode = "hold" end),
+  H.loadState(DOOR),
+  H.waitFrames(30),
+  H.fuseEngage(function()
+    H.assertEq(H.mapId() & 0x1ff, 98, "booted on map 98, VARGAS's ledge (the telegraph's battle)")
+    local ph = 0
+    return H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        H.setPad(ph < 4 and { "a" } or {})
+      end),
+    }, "the VARGAS scene reaches battle 66 (the telegraph's battle)")
+  end, VARGAS, "VARGAS"),
+  H.fuseCases({
+    tag = "vargas", species = VARGAS, write = { byte = function(a, v) H.writeByte(a, v) end,
+      word = function(a, v) H.writeWord(a, v) end },
+    line = 0x90, move = { cmd = 0x0C, atk = 0xE6 }, turns = 1, glows = 1,
+    arm = "idle", aim = true, openHold = true,
+    bossHp = 11500,
+    lineShot = 30,
+    -- each case opens with the Ipoohs Fought down (VARGAS's HP held meanwhile): the target cursor reaches him
+    -- only once they are (kitBattle's steer refused him with both standing, 15 presses)
+    prelude = function(W)
+      return H.kitBattle({}, { care = false, maxFrames = 20000, giveUp = function() return ipoohsDown() end })
+    end,
+    -- his rotation's first Battle just taken (his last command a Battle, $00/$EE), no fuse armed: the prelude's
+    -- Fights can run a whole fuse first, so this waits for the rotation's first turn after it
+    partway = function(W)
+      local c, last = W.cells(), W.cmds[#W.cmds]
+      return c ~= nil and (c.mvar & 0x01) == 0 and last ~= nil and last.cmd == 0x00 and last.arg == 0xEE
+    end,
+    earned = function(C, W)
+      local pre, post, l2 = C.brk.pre, C.brk.post, C.lines[2]
+      H.assertEq(pre.mvar & 0x01, 1, "vargas: monster switch 0 stood at the break (the fuse was armed)")
+      H.assertEq(post.mvar & 0x01, 0, "vargas: monster switch 0 is clear after the cancel")
+      local back = l2.turn - C.rec.turn
+      H.assertEq(back >= 3, true, string.format("vargas: the trigger was earned again in full: the line returned "
+        .. "on his turn %d back, after his rotation's two Battles", back))
+    end,
+  }),
+  H.logStep("[vargas] PASS 9: the announce, the schedule, the cancel and the trigger earned again"),
 })

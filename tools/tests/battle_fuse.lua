@@ -22,7 +22,8 @@
 --      conditions of every block before the fuse block (one whose conditions hold on the move's turn takes that
 --      turn) and the fuse block's own (tested again on the move's turn: an HP line a heal crosses back would drop
 --      an announced move).  A row whose blocks differ from the reading fails until its unit reads them again.
---    The rows expected are the four fights of unit A and the worked example; a row for any other species is a
+--    The rows expected are the four fights of unit A, the worked example, and World of Balance bosses 1-5
+--    (wt/v051-tg-wob1); a row for any other species is a
 --    change the unit that makes it adds here.
 -- 3. The worked example of an authored fuse, played: the CzarDragon's script (AIScript::_311) is the fuse block
 --    in vanilla's idiom -- `if_monster_switch_set 0 / dlg $8D / short_glow / wait / clr_monster_switch 0 /
@@ -73,7 +74,12 @@ local function rw(a) return rb(a) | (rb(a + 1) << 8) end
 local SIZE = { [0] = 4, 2, 4, 3, 4, 4, 4, 2, 3, 4, 4, 3, 4, 1, 1, 1 }   -- AICmdSizeTbl (battle_main.asm)
 local function opSize(b) return b >= 0xF0 and SIZE[b - 0xF0] or 1 end
 local WANT = { [0x117] = "AtmaWeapon", [0x17D] = "Atma", [0x12A] = "Kefka", [0x150] = "the Gold Dragon",
-  [0x137] = "the CzarDragon (the worked example)" }
+  [0x137] = "the CzarDragon (the worked example)",
+  -- ---- wt/v051-tg-wob1: World of Balance bosses 1-5 (bosses-wob.md) ----
+  [0x134] = "the Whelk's head", [0x064] = "the Marshal", [0x103] = "Vargas", [0x12C] = "the Lete River Ultros",
+  [0x104] = "TunnelArmr",
+  -- ---- end wt/v051-tg-wob1 ----
+}
 
 -- every command of the block at x from `from` (nil: its start) to `to` (nil: its end) that picks among three is one
 -- certain pick, and none of the block's conditions is a roll: returns the offences as text
@@ -149,6 +155,29 @@ local HAND = {
   ["137@0012"] = { blocks = "earlier [0B 08 00 / 15 24 00 / 0A 80 00]; own [14 24 00]",
     why = "the CzarDragon: the earlier block is the arming block, shut while switch 0 is set (if_monster_switch_clr "
       .. "0); its own condition is switch 0, cleared only by the move's turn or the cancel" },
+  -- ---- wt/v051-tg-wob1: World of Balance bosses 1-5 (bosses-wob.md).  Each fuse block is its script's first, so no
+  -- block comes before it; its one condition is a monster switch that only an ordinary turn of its own script sets
+  -- and only the move's turn or the cancel clears (no counter of these five touches it).
+  ["134@0000"] = { blocks = "earlier none; own [14 24 07]",
+    why = "the Whelk's head: the fuse block is the script's first; switch 7 (bit 7 of the byte its turn count "
+      .. "shares), set by its arming block only, cleared by the move's turn (set_monster_var 0) or the cancel; its "
+      .. "counter (if_self_dead) touches nothing" },
+  ["064@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "the Marshal: the fuse block is the script's first; switch 0, set by his rotation's second turn and his "
+      .. "alone block, cleared by the move's turn or the cancel; he has no counter" },
+  ["103@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "Vargas: the fuse block is the script's first, ahead of his SABIN lines and 50-count block; switch 0, set "
+      .. "by his rotation's second Battle, cleared by the move's turn or the cancel; his counters set battle "
+      .. "switches only" },
+  ["12C@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "the Lete River Ultros: the fuse block is the script's first, ahead of his opening and one-time lines; "
+      .. "switch 0, set by his rotation's second turn, cleared by the move's turn or the cancel; his counters "
+      .. "touch no switch" },
+  ["104@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "TunnelArmr: the fuse block is the script's first, ahead of the Runic tutorial and the low-HP block; "
+      .. "switch 0, set by its rotation's second turn, cleared by the move's turn or the cancel; its counter "
+      .. "touches no switch" },
+  -- ---- end wt/v051-tg-wob1 ----
 }
 local function staticChecks()
   local AI, PTRS, TBL, LINES = H.sym("AIScript"), H.sym("AIScriptPtrs"), H.sym("Ot6FuseTbl"), H.sym("Ot6FuseLineTbl")
@@ -193,7 +222,7 @@ local function staticChecks()
     rows = rows + 1
     seen[sp] = (seen[sp] or 0) + 1
     H.assertEq(WANT[sp] ~= nil, true, string.format("row %d's species $%03X is one of the fuses built (unit A's "
-      .. "four fights and the worked example)", rows, sp))
+      .. "four fights, the worked example, and the units since)", rows, sp))
     -- the species' two scripts: its turns' to the first $FF, its counter's to the next
     local start = rw(PTRS + 2 * sp)
     local cmds, blockOf, block = {}, {}, start

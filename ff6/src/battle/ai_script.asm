@@ -116,15 +116,18 @@ AIScript::_77:
 ; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 2): his telegraph.
 ; The fuse block comes first, so that no other block can take the move's turn
 ; (ot6_fuse.asm, the idiom; bosses-wor.md 1.4): his rotation's second turn
-; arms it (monster switch 0), the next says "Lobos, at 'em!" and glows, and
-; the turn after it fills both Lobos' gauges and strikes twice.  A break in
+; arms it (monster switch 0), and so does each of his turns once the Lobos
+; are down (vanilla's `if_num_monsters 1` block); the next says "Strike as
+; one!" and glows, and the turn after it fills both Lobos' gauges (they come
+; in with him; a dead Lobo's fill does nothing) and strikes twice.  A break in
 ; between clears the switch: the rotation starts over from its first turn.
-; Everything below the fuse block is vanilla's, but for the arming switch on
-; the second turn.
+; Everything below the fuse block is vanilla's, but for the arming switches.
+; His rotation's last two turns (Net/Net/Battle, Battle) no longer come: the
+; fuse's end_if starts the script over.
 AIScript::_100:
         if_monster_switch_set 0
                 dlg $8f
-; Lobos, at 'em!
+; Strike as one!
                 short_glow MONSTER_3
                 wait
 Ot6FuseMarshal:                 ; the fuse is lit here (Ot6FuseTbl's row)
@@ -136,6 +139,7 @@ Ot6FuseMarshal:                 ; the fuse is lit here (Ot6FuseTbl's row)
                 end_if
         if_num_monsters 1
                 attack BATTLE, SPECIAL, SPECIAL
+                set_monster_switch 0    ; ot6: arms the fuse block (above)
                 end_if
         set_target RAND_CHAR
         attack BATTLE, NET, BATTLE
@@ -4340,7 +4344,8 @@ AIScript::_256:
                 end_if
         if_monster_timer 10
         if_monsters_alive MONSTER_2
-                dlg $05
+        if_battle_switch_clr 0, 0       ; ot6: not while the head's fuse is
+                dlg $05                 ;   armed or lit (its block, _308)
 ; Gruuu……
                 kill_monsters MONSTER_2, FADE_DOWN
                 reset_monster_timer
@@ -6497,12 +6502,18 @@ AIScript::_305:
 ; head
 ; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 1): the Narshe
 ; Whelk's head (the WoR Presenter's is _309) carries the Whelk's telegraph, on
-; the body that holds the gauge: its turns count in its monster variable
-; (bits 0-6), the second one arms the fuse (monster switch 7), the next says
-; "Static builds!" and glows, and the turn after it is Mega Volt on the party.
-; A break in between clears the byte: the count starts over.  The fuse block
-; comes first, so that no other block can take the move's turn (ot6_fuse.asm,
-; the idiom).  Vanilla's turn was `attack BATTLE, BATTLE, SPECIAL / end`.
+; the body that holds the gauge.  Its first turn arms the fuse (monster
+; switches 6, "it has charged", and 7, the fuse); the next says "Static
+; builds!" and glows; the turn after it is Mega Volt on the party.  After
+; that its turns count in its monster variable (bits 0-5) and the second one
+; arms it again.  A break in between clears switch 7 and the count, as the
+; move's own turn does: the count starts over (one plain turn, then the
+; arming).  From its first turn to the Mega Volt the head holds battle switch
+; 0, which keeps the shell from hiding it (the shell's _256): the head stays
+; out for its whole charge, a break's window included, and the shell can
+; draw it in after the move.  The fuse block comes first, so that no other
+; block can take the move's turn (ot6_fuse.asm, the idiom).  Vanilla's turn
+; was `attack BATTLE, BATTLE, SPECIAL / end`.
 AIScript::_308:
         if_monster_switch_set 7
                 dlg $8e
@@ -6510,19 +6521,29 @@ AIScript::_308:
                 short_glow MONSTER_2
                 wait
 Ot6FuseWhelk:                   ; the fuse is lit here (Ot6FuseTbl's row)
-                set_monster_var 0       ; the trigger's clear first (the count
-                                        ;   and switch 7: one byte), then the move
+                set_monster_var 0       ; the trigger's clears first: the count
+                set_monster_switch 6    ;   and switch 7 (one byte; switch 6
+                clr_battle_switch 0, 0  ;   back), the shell's hold; the move
                 set_target NOTHING
                 attack MEGA_VOLT
                 end_if
-        if_monster_switch_clr 7
-        if_battle_var_greater 36, 1     ; (the byte: bit 7 is clear here)
+        if_monster_switch_clr 6         ; its first turn
                 attack BATTLE, BATTLE, SPECIAL
-                set_monster_var 0
+                set_monster_switch 6
                 set_monster_switch 7
+                set_battle_switch 0, 0
+                end_if
+        if_monster_switch_clr 7
+        if_battle_var_greater 36, $41   ; a turn counted since the last move
+                attack BATTLE, BATTLE, SPECIAL  ;   (the byte: switch 6 set, 7 clear)
+                set_monster_var 0
+                set_monster_switch 6
+                set_monster_switch 7
+                set_battle_switch 0, 0
                 end_if
         attack BATTLE, BATTLE, SPECIAL
         add_monster_var 1
+        set_battle_switch 0, 0  ; ot6: the shell's hold
         end
 
         if_self_dead
