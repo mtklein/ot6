@@ -130,6 +130,10 @@ local FUSE = {
   tag = "kefka", species = KEFKA, write = WRITE,
   line = 0x9B, move = { cmd = 0x02, atk = 0x06 }, turns = 1, glows = 1,
   arm = "idle",
+  -- (wt/v051-tg-wob1's review) Ice 2 is queued on the whole squad, and a fifth case: CELES's Runic, confirmed after
+  -- the line, takes the announced cast
+  allTargets = true,
+  runic = { who = 0x06 },
   bossHp = nil,                 -- his own maximum, read at the open
   partway = function(W)
     local c = W.cells()

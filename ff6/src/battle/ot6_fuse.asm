@@ -100,7 +100,13 @@ OT6_FUSE_ATTR   = $21 | (2 << 2)        ; text palette 2: navy, grey, yellow
 OT6_FUSE_VAR3   = $01           ; a break clears battle variable 3
 OT6_FUSE_TIMER  = $02           ;   and the monster's timer
 OT6_FUSE_SWITCH = $80           ; lit by a battle switch, not by a `wait`
-; Flags $04-$40 are free.  The contract's other break rule (the owner,
+OT6_FUSE_HOLD   = $04           ; every break of this body, lit or not, SETS
+                                ;   the battle switches the row's +6 mask
+                                ;   clears (Ot6FuseHold): the Whelk's head,
+                                ;   whose battle switch 0 keeps the shell
+                                ;   from hiding it, so a Broken head stays
+                                ;   out for its whole window
+; Flags $08-$40 are free.  The contract's other break rule (the owner,
 ; 2026-11-23: "a break releases whatever the broken body holds", unit B's
 ; Tentacles) fits here as a flag and a row that applies at every break, lit
 ; or not: the release itself is Discard's target effect (TargetEffect_44,
@@ -153,10 +159,12 @@ Ot6FuseTbl:
         ; ordinary turn sets; a break clears what the move's turn clears.
         ; the Whelk's head: its count and switch 7, one byte (the count
         ; again; switch 6, "it has charged", kept, as its move keeps it).
-        ; Battle switch 0, the shell's hold on the head, is kept: a Broken
-        ; head stays out of its shell until its next Mega Volt clears the
-        ; hold, so the break's window can be spent on it
-        ot6_fuse $0134, Ot6FuseWhelk, Ot6FuseWhelk, $40, $ff, 0
+        ; Battle switch 0 is the shell's hold on the head: every break of
+        ; the head, lit or not, sets it (OT6_FUSE_HOLD on the +6 mask), so a
+        ; Broken head stays out of its shell for its whole window, a break
+        ; just after its Mega Volt (which clears the hold) included, until
+        ; its next Mega Volt clears it again
+        ot6_fuse $0134, Ot6FuseWhelk, Ot6FuseWhelk, $40, $fe, OT6_FUSE_HOLD
         ; the Marshal: switch 0 (his rotation again)
         ot6_fuse $0064, Ot6FuseMarshal, Ot6FuseMarshal, $fe, $ff, 0
         ; Vargas: switch 0 (his rotation again)
@@ -308,11 +316,44 @@ Ot6FuseLineTbl:
         php
         longi
         jsr     Ot6FuseLit
-        bcc     @done
+        bcc     @hold
         jsr     Ot6FuseSnuff
+@hold:  jsr     Ot6FuseHold     ; (after the cancel's clears: a hold wins)
 @done:  plp
         plx
 @out:   rts
+.endproc
+
+; [ a break holds what the body's rows say it holds ]
+; Its own proc so the suites can watch it.  y = the monster.  a8/i16, db=$7e.
+; For each of the body's rows with OT6_FUSE_HOLD, the battle switches its +6
+; mask clears are set.  preserves y; clobbers a/x (b passes through the
+; table's words, as in Ot6FuseLit).
+.proc Ot6FuseHold
+        .a8
+        .i16
+        ldx     #$0000
+@row:   longa
+        lda     f:Ot6FuseTbl,x
+        cmp     #$ffff
+        beq     @out
+        cmp     OT6_SPECIES-8,y
+        shorta                  ; (plain sep: z is the compare's)
+        bne     @next
+        lda     f:Ot6FuseTbl+7,x
+        and     #OT6_FUSE_HOLD
+        beq     @next
+        lda     f:Ot6FuseTbl+6,x
+        eor     #$ff
+        tsb     $3eb0           ; battle switches 0-7
+@next:  longa
+        txa
+        clc
+        adc     #$0008
+        tax
+        bra     @row
+@out:   shorta
+        rts
 .endproc
 
 ; [ the cancel itself ]

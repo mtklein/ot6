@@ -32,6 +32,14 @@ local MARSHAL, LOBO = 0x064, 0x019
 local MX, MY = 15, 40                    -- the Marshal's post: npc_prop.asm map 51 NPC_3, static
 local LEADER_OFF = { [1] = 0x0029, [2] = 0x019A, [3] = 0x0148 }
 local aPhase = 0
+-- every command a Lobo dispatches (ExecCmd with x a Lobo's entity), for "the Lobos come in with him"
+LOBO_ACTS = {}
+emu.addMemoryCallback(function()
+  local x = emu.getState()["cpu.x"] & 0xFF
+  if x >= 8 and x < 20 and H.readWord(0x57C0 + (x - 8)) == 0x019 then
+    LOBO_ACTS[#LOBO_ACTS + 1] = { f = H.frame, cmd = H.readByte(0xB5) }
+  end
+end, emu.callbackType.exec, H.sym("_dispatcher"), H.sym("_dispatcher"))
 
 local function defenseWon() return (H.readByte(0x1f46) & 0x02) == 0 end
 local function calm(n)
@@ -145,11 +153,27 @@ H.run({ maxFrames = 400000 }, {
         end
         return k
       end
+      local mv = C.lines[n].move
+      local function lobosActed()
+        local n2 = 0
+        for _, a in ipairs(LOBO_ACTS) do if a.f > mv.f then n2 = n2 + 1 end end
+        return n2
+      end
+      local want = 0
+      for s = 0, 5 do
+        if H.readWord(0x57C0 + s * 2) == LOBO and H.monStanding(s) then want = want + 1 end
+      end
       return H.seqStep({
         H.waitUntil(function() return battles() >= 2 end, 1200, "marshal: his two Battles after the Lobos' gauges"),
         H.call(function()
           H.assertEq(battles(), 2, string.format("marshal: two Battles ($00/$EE) follow the Lobos' gauges in the fire "
             .. "turn (case %s)", C.name))
+        end),
+        H.waitUntil(function() return lobosActed() >= want or #W.turns > mv.turn end, 1500,
+          "marshal: the Lobos act, or his next turn"),
+        H.call(function()
+          H.assertEq(lobosActed() >= want, true, string.format("marshal: each standing Lobo (%d) acted after its gauge "
+            .. "was filled and before his next turn (%d did; case %s)", want, lobosActed(), C.name))
         end),
       })
     end,

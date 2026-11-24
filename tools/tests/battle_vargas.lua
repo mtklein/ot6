@@ -965,8 +965,11 @@ H.run({ maxFrames = 90000 }, {
       H.assertEq(pre.mvar & 0x01, 1, "vargas: monster switch 0 stood at the break (the fuse was armed)")
       H.assertEq(post.mvar & 0x01, 0, "vargas: monster switch 0 is clear after the cancel")
       local back = l2.turn - C.rec.turn
-      H.assertEq(back >= 3, true, string.format("vargas: the trigger was earned again in full: the line returned "
-        .. "on his turn %d back, after his rotation's two Battles", back))
+      -- exactly four: his 50-count block (its clock, 1,600 frames, runs through the 2,139-frame break and was reset
+      -- no later than the break) takes his first turn back, "Come on. What's the matter?" and two Battles; then
+      -- the rotation's two Battles, the second arming; then the line
+      H.assertEq(back, 4, string.format("vargas: the trigger was earned again in full: the line returned on his "
+        .. "turn %d back (the 50-count block's turn, the rotation's two Battles, then the line)", back))
     end,
   }),
   H.logStep("[vargas] PASS 9: the announce, the schedule, the cancel and the trigger earned again"),

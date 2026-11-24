@@ -19215,8 +19215,12 @@ end
 --   W.turns   each of the boss's own turns (ExecMonsterAction): { f, blk, at }
 --             the script cells as the turn begins ($3240, $3D0C)
 --   W.cmds    each command the boss dispatches (ExecCmd): { f, cmd, arg,
---             turn, retal }; a `dlg` is cmd $21 with its line in arg, a glow
---             cmd $2B, an attack its command with the attack id in arg
+--             turn, retal, tchars, tmons, hp }; a `dlg` is cmd $21 with its
+--             line in arg, a glow cmd $2B, an attack its command with the
+--             attack id in arg; tchars/tmons the target bits it was queued
+--             with ($B8: the characters, $B9: the monsters); hp the four
+--             party HP words as it is dispatched
+--   W.standingMask()  the party seats standing now (bits 0-3)
 --   W.breaks  each time its last shield is taken (Ot6HitBroke): { f, pre }
 --             pre = W.cells() before the cancel ran
 --   W.snuffs  each cancel (Ot6FuseSnuff): { f }
@@ -19272,6 +19276,14 @@ function M.fuseWatch(species, write)
     if cur == 0 or (cur & 0x1F) < 2 then return nil end
     return emu.readWord((cur - 2) * 2, emu.memType.snesVideoRam)
   end
+  function W.standingMask()
+    local m = 0
+    for i = 0, 3 do
+      if M.readByte(0x3ED8 + 2 * i) ~= 0xFF and M.readWord(0x3BF4 + 2 * i) > 0
+         and (M.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then m = m | (1 << i) end
+    end
+    return m
+  end
   function W.reset()
     W.turns, W.cmds, W.breaks, W.snuffs, W.marks, W.party = {}, {}, {}, {}, {}, {}
     W.lastMark, W.lastLit = nil, nil
@@ -19304,7 +19316,10 @@ function M.fuseWatch(species, write)
     end
     if x ~= W.ent() then return end
     local cmd, arg = M.readByte(0xB5), M.readByte(0xB6)
-    W.cmds[#W.cmds + 1] = { f = M.frame, cmd = cmd, arg = arg, turn = #W.turns, retal = M.readByte(0xB1) & 1 == 1 }
+    local hp = {}
+    for i = 0, 3 do hp[i] = M.readWord(0x3BF4 + 2 * i) end
+    W.cmds[#W.cmds + 1] = { f = M.frame, cmd = cmd, arg = arg, turn = #W.turns, retal = M.readByte(0xB1) & 1 == 1,
+      tchars = M.readByte(0xB8), tmons = M.readByte(0xB9), hp = hp }
     -- (a line closes a tally: the maxima up to it ride on its record, and are counted afresh)
     if cmd == 0x21 then
       W.cmds[#W.cmds].max = W.max
@@ -19426,6 +19441,15 @@ end
 --                           a case's waits ride that out, and only the battle's end counts as the boss gone
 --   cfg.prelude(W)          (optional) a step each case plays right after its open (Vargas's: the Ipoohs Fought
 --                           down, so that the cursor can reach him); the boss's turns run meanwhile
+--   cfg.allTargets          (optional) the move is queued on every standing member: its $B8 at dispatch covers
+--                           the standing party (Mega Volt, TekLaser on both, Kefka's Ice 2)
+--   cfg.afterMove           (optional) a fourth case: the boss broken right after its move (the turn that fired has
+--                           cleared its trigger), asserted to stay on the field for its whole window (cfg.hides:
+--                           the Whelk's head, which the shell could otherwise draw in)
+--   cfg.runic = { who }     (optional) a fifth case: that member's Runic, confirmed in the fuse, takes the move: the
+--                           absorb is seen (RunicEffect's target), and every member's HP is logged before and after
+--   FUSE_DMG (a lab's global): the "unbroken" case alone, with the party's HP not held: the move's damage on each
+--                           member, as a share of its maximum, logged as a [fuse] damage line
 --   cfg.lineShot            (optional) a screenshot "fuse_<tag>_line" this many frames after the first announce
 --                           is dispatched (the line in its window), beside the "_lit" one (the mark)
 -- The cases:
@@ -19511,7 +19535,8 @@ function M.fuseCases(cfg)
         req = req or false
         W.reset()
         W.on = true
-        W.pin = { boss = (name == "outside" and cfg.outsideHp) or cfg.bossHp, party = true }
+        W.pin = { boss = (name == "outside" and cfg.outsideHp) or cfg.bossHp,
+          party = rawget(_G, "FUSE_DMG") ~= true }
         C = { name = name }
         if cfg.onOpen then cfg.onOpen(name) end
         say(string.format("case %s, from the battle's open", name))
@@ -19590,6 +19615,12 @@ function M.fuseCases(cfg)
           .. "announce, vanilla's count (announce on turn %d, move on turn %d) -- %s", tag, cfg.turns, l.turn,
           c.turn, what))
         l.move = { i = i, f = c.f, turn = c.turn }
+        if cfg.allTargets then
+          local want = W.standingMask()
+          M.assertEq(c.tchars & 0x0F, want, string.format("%s: the move is queued on every standing member (its "
+            .. "targets $%02X at dispatch, the standing seats $%02X)", tag, c.tchars & 0x0F, want))
+        end
+        if rawget(_G, "FUSE_DMG") == true then C.dmgFrom = { f = c.f, hp = c.hp } end
         say(string.format("the move is dispatched on turn %d, %d turn(s) after the announce", c.turn,
           c.turn - l.turn))
       end),
@@ -19603,6 +19634,23 @@ function M.fuseCases(cfg)
         end),
       }, {}),
       M.lazy(function() return (cfg.fired and cfg.fired(C, W, n)) or M.waitFrames(0) end),
+      M.cond(function() return C.dmgFrom ~= nil end, {
+        idle(function() return gone() or M.frame - C.dmgFrom.f >= 300 end, 400, "the move's damage settles"),
+        M.call(function()
+          local t = {}
+          for i = 0, 3 do
+            local id, mx = M.readByte(0x3ED8 + 2 * i), M.readWord(0x3C1C + 2 * i)
+            if id ~= 0xFF and mx > 0 then
+              local before, after = C.dmgFrom.hp[i], M.readWord(0x3BF4 + 2 * i)
+              t[#t + 1] = string.format("char $%02X %d -> %d of %d (%d, %d%% of max)", id, before, after, mx,
+                before - after, (before - after) * 100 // mx)
+            end
+          end
+          M.log(string.format("[fuse] damage: %s's move ($%02X/$%02X) on the party: %s", tag, cfg.move.cmd,
+            cfg.move.atk, table.concat(t, "; ")))
+          C.dmgFrom = nil
+        end),
+      }, {}),
     })
   end
   -- The breaking Fight.  The gauge goes to 1 and the row takes every class (so whichever hand swings is a key);
@@ -19913,6 +19961,105 @@ function M.fuseCases(cfg)
     end),
   })
 
+  -- (the fourth case: broken right after the move)
+  local afterMove = M.seqStep({
+    open("after the move"),
+    idle(function()
+      local li = lineAfter(1)
+      return gone() or (li ~= nil and moveAfter(li) ~= nil)
+    end, 30000, "a move fired"),
+    M.call(function()
+      standing()
+      local li = lineAfter(1)
+      M.assertEq(li ~= nil and moveAfter(li) ~= nil, true, tag .. ": the move fired (the case's precondition)")
+      C.mv = W.cmds[moveAfter(li)]
+    end),
+    breakIt("a break right after the move", function() return true end, 6000),
+    M.call(function()
+      M.assertEq(#W.snuffs, 0, tag .. ": a break after the move cancels nothing (no fuse was lit)")
+      C.absent, C.seen = 0, 0
+      say(string.format("broken %d frames after the move was dispatched: %s", C.brk.f - C.mv.f,
+        W.cellsLine(C.brk.post)))
+    end),
+    idle(function()
+      C.seen = C.seen + 1
+      if W.ent() == nil then C.absent = C.absent + 1 end
+      return not M.battleLoadStarted() or recovered()
+    end, 4000, "the break ends"),
+    M.call(function()
+      M.assertEq(M.battleLoadStarted(), true, tag .. ": the battle is still up when the break ends")
+      M.assertEq(C.absent, 0, string.format("%s: the Broken boss stayed on the field for its whole window (absent %d "
+        .. "of %d frames)", tag, C.absent, C.seen))
+      say("PASS after the move")
+    end),
+  })
+  -- (the fifth case: the member's Runic takes the move)
+  local runicCase = nil
+  if cfg.runic then
+    local absorbed = {}
+    runicCase = M.seqStep({
+      open("runic"),
+      M.call(function()
+        W.pin.party = false     -- (the party's own HP, so what the move does to each member is seen)
+        if not C.runicArmed then
+          emu.addMemoryCallback(function()
+            if W.on then absorbed[#absorbed + 1] = { f = M.frame } end
+          end, emu.callbackType.exec, M.sym("Ot6RunicBP"), M.sym("Ot6RunicBP"))
+        end
+        absorbed = {}
+      end),
+      idle(function() return gone() or lineAfter(1) ~= nil end, 30000, "the announce (the Runic's cue)"),
+      M.lazy(function()
+        local plan = { { who = cfg.runic.who, cmd = 0x0B, self = true, boost = 0 } }
+        return M.kitBattle(plan, { idle = "defend", care = false, maxFrames = 6000, untilPlanDone = true,
+          giveUp = function() return gone() or moveAfter(lineAfter(1)) ~= nil end })
+      end),
+      M.call(function()
+        standing()
+        M.assertEq(moveAfter(lineAfter(1)) == nil, true, tag .. ": the Runic was confirmed before the move (the "
+          .. "case's precondition)")
+      end),
+      idle(function()
+        local li = lineAfter(1)
+        return gone() or (moveAfter(li) ~= nil and M.frame - W.cmds[moveAfter(li)].f >= 300)
+      end, 6000, "the move, and 300 frames"),
+      M.call(function()
+        local li = lineAfter(1)
+        local mi = moveAfter(li)
+        M.assertEq(mi ~= nil, true, tag .. ": the move fired into the Runic")
+        local mv = W.cmds[mi]
+        local hit = 0
+        for _, a in ipairs(absorbed) do if a.f >= mv.f then hit = hit + 1 end end
+        local t = {}
+        for i = 0, 3 do
+          local id = M.readByte(0x3ED8 + 2 * i)
+          if id ~= 0xFF then
+            t[#t + 1] = string.format("char $%02X %d -> %d", id, mv.hp[i], M.readWord(0x3BF4 + 2 * i))
+          end
+        end
+        say(string.format("the Runic: %d absorb(s) after the move (targets $%02X); the party: %s", hit, mv.tchars,
+          table.concat(t, "; ")))
+        M.assertEq(hit >= 1, true, string.format("%s: the member's Runic absorbed the announced move (an absorb "
+          .. "after its dispatch)", tag))
+        for i = 0, 3 do
+          if M.readByte(0x3ED8 + 2 * i) ~= 0xFF and mv.tchars & (1 << i) ~= 0 then
+            M.assertEq(M.readWord(0x3BF4 + 2 * i) >= mv.hp[i], true, string.format("%s: seat %d, a target of the move, "
+              .. "lost no HP to it (%d -> %d): the one Runic took the whole cast", tag, i, mv.hp[i],
+              M.readWord(0x3BF4 + 2 * i)))
+          end
+        end
+        C.runic = { hit = hit, party = t }
+        say("PASS runic")
+      end),
+    })
+  end
+  if rawget(_G, "FUSE_DMG") == true then
+    return M.seqStep({
+      M.waitUntil(function() return M.battleActive() end, 3000, tag .. ": the battle is up", 2),
+      unbroken,
+      M.call(function() W.on = false; W.pin = nil; say("FUSE_DMG: the unbroken case alone") end),
+    })
+  end
   return M.seqStep({
     M.waitUntil(function() return M.battleActive() end, 3000, tag .. ": the battle is up", 2),
     M.call(function()
@@ -19923,6 +20070,8 @@ function M.fuseCases(cfg)
         .. "measurement of the ROM before it)")
     end),
     unbroken, M.seqStep(vias), broken, outside,
+    M.cond(function() return cfg.afterMove == true end, { afterMove }, {}),
+    M.cond(function() return runicCase ~= nil end, { runicCase or M.waitFrames(0) }, {}),
     M.call(function() W.on = false; W.pin = nil
       say(#vias > 0 and string.format("PASS: the three cases, and %d other route(s) to the break", #vias)
         or "PASS: the three cases") end),

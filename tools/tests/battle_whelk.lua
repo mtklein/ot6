@@ -65,6 +65,11 @@ H.run({ maxFrames = 400000 }, {
     tag = "whelk", species = HEAD, write = WRITE,
     line = 0x8E, move = { cmd = 0x0C, atk = 0xB8 }, turns = 1, glows = 1,
     arm = "idle", hides = true,
+    -- Mega Volt is queued on every standing member (set_target ALL_CHARS: its damage split)
+    allTargets = true,
+    -- a fourth case: the head broken right after its Mega Volt, whose turn cleared the shell's hold: the break sets
+    -- it again (Ot6FuseTbl's OT6_FUSE_HOLD), so the Broken head stays out for its whole window
+    afterMove = true,
     -- (HP held: two Fire Beams on the Broken head in the "outside" window took its last 1,406 on the merged ROM's draw)
     bossHp = 1600,
     breaker = { name = "Fire Beam", cmd = MAGITEK, mtek = FIRE_BEAM, open = true },

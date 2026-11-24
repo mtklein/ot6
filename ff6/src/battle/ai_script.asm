@@ -4368,8 +4368,9 @@ AIScript::_256:
                 end_if
         if_monster_timer 10
         if_monsters_alive MONSTER_2
-        if_battle_switch_clr 0, 0       ; ot6: not while the head's fuse is
-                dlg $05                 ;   armed or lit (its block, _308)
+        if_battle_switch_clr 0, 0       ; ot6: not while the head holds it
+                dlg $05                 ;   (_308: its first turn to its Mega
+                                        ;   Volt, and every break: OT6_FUSE_HOLD)
 ; Gruuu……
                 kill_monsters MONSTER_2, FADE_DOWN
                 reset_monster_timer
@@ -4488,7 +4489,7 @@ Ot6FuseVargas:                  ; the fuse is lit here (Ot6FuseTbl's row)
 ; telegraph, the one Celes's Runic answers.  The fuse block comes first, so
 ; that no other block (the low-HP rotation) can take the move's turn
 ; (ot6_fuse.asm, the idiom): its rotation's second turn arms it (monster
-; switch 0), the next says "Laser charging" and glows, and the turn after it
+; switch 0), the next says "Laser charges!" and glows, and the turn after it
 ; is TekLaser on the whole party (its own laser, Runic-absorbable).  A break
 ; in between clears the switch: the rotation starts over from its first turn.
 ; Below the fuse block everything is vanilla's, the Runic tutorial
@@ -4496,7 +4497,7 @@ Ot6FuseVargas:                  ; the fuse is lit here (Ot6FuseTbl's row)
 AIScript::_260:
         if_monster_switch_set 0
                 dlg $92
-; Laser charging
+; Laser charges!
                 short_glow MONSTER_1
                 wait
 Ot6FuseTunnelArmr:              ; the fuse is lit here (Ot6FuseTbl's row)

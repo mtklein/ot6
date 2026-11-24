@@ -169,8 +169,10 @@ local HAND = {
   -- and only the move's turn or the cancel clears (no counter of these five touches it).
   ["134@0000"] = { blocks = "earlier none; own [14 24 07]",
     why = "the Whelk's head: the fuse block is the script's first; switch 7 (bit 7 of the byte its turn count "
-      .. "shares), set by its arming block only, cleared by the move's turn (set_monster_var 0) or the cancel; its "
-      .. "counter (if_self_dead) touches nothing" },
+      .. "shares), set by its arming blocks only, cleared by the move's turn (set_monster_var 0) or the cancel; its "
+      .. "counter (if_self_dead) touches nothing.  The other body's script can take the head off the field: the "
+      .. "shell's (_256) `kill_monsters MONSTER_2`, which stands behind `if_battle_switch_clr 0, 0`, the head's hold "
+      .. "(SHELL_GUARD below checks it)" },
   ["064@0000"] = { blocks = "earlier none; own [14 24 00]",
     why = "the Marshal: the fuse block is the script's first; switch 0, set by his rotation's second turn and his "
       .. "alone block, cleared by the move's turn or the cancel; he has no counter" },
@@ -362,6 +364,28 @@ local function staticChecks()
   end
   H.assertEq(seen[0x12A], 2, "Kefka has two rows (the line under 7,680 HP and the line under 32,640)")
   H.assertEq(seen[0x044], 3, "Telstar has three rows (its calls at 25, 80 and 200; wt/v051-tg-wob2)")
+  -- ---- wt/v051-tg-wob1: the Whelk's shell hides the head (`kill_monsters MONSTER_2`, $F5 $08 $01 $02) only behind
+  -- the head's hold, `if_battle_switch_clr 0, 0` ($FC $15 $00 $00), in the same block: else a lit or Broken head
+  -- can be drawn in mid-race (bosses-wob.md block 1)
+  do
+    local start = rw(PTRS + 2 * 0x100)
+    local x, bstart, guard, kills, guarded = start, start, false, 0, 0
+    while rb(AI + x) ~= 0xFF do
+      local b = rb(AI + x)
+      if b == 0xFC and rb(AI + x + 1) == 0x15 and rb(AI + x + 2) == 0x00 and rb(AI + x + 3) == 0x00 then guard = true end
+      if b == 0xF5 and rb(AI + x + 1) == 0x08 and rb(AI + x + 2) == 0x01 and rb(AI + x + 3) == 0x02 then
+        kills = kills + 1
+        if guard then guarded = guarded + 1 end
+      end
+      x = x + opSize(b)
+      if b == 0xFE then bstart, guard = x, false end
+    end
+    H.log(string.format("[fuse] SHELL_GUARD: the shell's script draws the head in %d time(s), %d behind the hold",
+      kills, guarded))
+    H.assertEq(kills >= 1 and guarded == kills, true, "the Whelk's shell draws the head in only behind the head's "
+      .. "hold (if_battle_switch_clr 0, 0 in the same block)")
+  end
+  -- ---- end wt/v051-tg-wob1 ----
   H.log(string.format("[fuse] PASS static: %d rows", rows))
 end
 

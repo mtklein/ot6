@@ -56,6 +56,10 @@ H.run({ maxFrames = 400000 }, {
     tag = "tunnelarmr", species = ARMR, write = WRITE,
     line = 0x92, move = { cmd = 0x0C, atk = 0xB5 }, turns = 1, glows = 1,
     arm = "idle", openHold = true,
+    -- TekLaser is queued on both (set_target ALL_CHARS)
+    allTargets = true,
+    -- a fifth case: CELES's Runic, confirmed after the line, takes the announced TekLaser
+    runic = { who = 0x06 },
     bossHp = 1200,
     lineShot = 30,
     -- the rotation's first turn taken (the tutorial's turn before it), no fuse armed yet
