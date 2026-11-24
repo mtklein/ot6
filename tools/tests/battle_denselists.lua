@@ -31,6 +31,9 @@
 --   * A on each enabled row stages that row's spell (or lore, or rage) as the
 --     action ($7a85), backed out with B (a row that commits at once, with
 --     nothing to target, ends the walk for that member).
+-- A member who falls, or is petrified or zombied, while his list's cells are walked has the walk started over once
+-- the others' care (H.newSpinnerCare: a Fenix Down, the cure for his status) has given him his window back, at most
+-- three times over; until then the other windows are passed on, or taken by that care.
 -- Mutants: the v0.45 ROM (lists unpacked) fails the first rows check; a ROM
 -- whose Ot6ListClamp returns at once fails the walk past the last entry.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -183,6 +186,20 @@ local function frame(pad) coroutine.yield(pad or {}) end
 local function idle(n) for _ = 1, n do frame({}) end end
 local function press(btn) for _ = 1, 4 do frame({ [btn] = true }) end idle(10) end
 
+-- the other members' windows while a walk waits for its member: passed on (X), unless care has work for one -- a
+-- Fenix Down for the walk's member when he has fallen, a cure for his taken control, a Potion under half HP
+-- (H.newSpinnerCare, the Slot suites' party) -- so a member who falls before or during his walk is raised and gets
+-- his window back (the v0.51 landing's rage draw: two Mantodea, GAU at 0 HP from 1799 with his Rage window open,
+-- build/attempts/wt/v051-land/)
+local walkSlot = nil
+local care = H.newSpinnerCare({ spinner = function() return walkSlot end, name = "the walk's member" })
+local careActor = nil
+local function careFrame(act)
+  careActor = act
+  care.window()
+  coroutine.yield(false)        -- the pad is care's this frame
+end
+
 -- per kind: list state, command, cursor cells, columns, step button
 local KIND = {
   magic = { st = ST_MAGIC, cmd = CMD_MAGIC, scroll = 0x8913, cols = 2, step = "right" },
@@ -206,8 +223,12 @@ local function openWindow(k, slot, tag)
     if H.readByte(MENU) ~= 0 and s ~= ST_TRANS then
       local act = H.readByte(ACTOR) & 3
       if act ~= slot then
-        press(s == ST_CMD and "x" or "b")
+        if careActor ~= act then careActor = nil; care.reset() end
+        if careActor == act or (s == ST_CMD and care.wants(act)) then careFrame(act)
+        else press(s == ST_CMD and "x" or "b") end
       elseif s == k.st then
+        careActor = nil
+        care.reset()
         idle(30)
         return true
       elseif s == ST_CMD then
@@ -230,6 +251,7 @@ local function openWindow(k, slot, tag)
         press("b")
       end
     else
+      if H.readByte(MENU) == 0 then careActor = nil; care.reset() end
       frame({})
     end
   end
@@ -246,40 +268,62 @@ local function closeWindow(k, slot)
   end
 end
 
+local MAX_REOPEN = 3
 local function walk(kindName, slot, want, tag)
   local k = KIND[kindName]
   local n = #want
-  local opened, why = openWindow(k, slot, tag)
-  if opened == false then
-    H.log(string.format("[dense] %s slot %d: its %s window cannot be opened (%s): the walk is skipped", tag, slot,
-      kindName, why))
-    skipped[tag] = (skipped[tag] or 0) + 1
-    return nil
+  walkSlot = slot
+  -- the member's control, read before each cell is judged: a member who falls (or is petrified or zombied) with
+  -- his window open keeps it for a few presses before the engine closes it (#510), and what it shows then is not
+  -- his list's walk.  The walk starts over once care has given him his window back, at most MAX_REOPEN times
+  local function lost() return (H.readByte(0x3EE4 + slot * 2) & 0xC2) ~= 0 end
+  local i
+  for try = 1, MAX_REOPEN + 1 do
+    local opened, why = openWindow(k, slot, tag)
+    if opened == false then
+      H.log(string.format("[dense] %s slot %d: its %s window cannot be opened (%s): the walk is skipped", tag, slot,
+        kindName, why))
+      skipped[tag] = (skipped[tag] or 0) + 1
+      walkSlot = nil
+      return nil
+    end
+    H.screenshot(string.format("battle_denselists_%s_%s_slot%d", tag, kindName, slot))
+    -- every cell in order, from the first
+    for _ = 1, 64 do
+      local j, sc = cursorIndex(k, slot)
+      if (j == 0 and sc == 0) or lost() then break end
+      press(k.cols == 2 and "left" or "up")
+    end
+    local fell = nil
+    if lost() then fell = -1 else
+      i = cursorIndex(k, slot)
+      H.assertEq(i, 0, tag .. ": the cursor reaches the first cell")
+      for step = 0, n - 1 do
+        if lost() then fell = step break end
+        i = cursorIndex(k, slot)
+        H.assertEq(i, step, string.format("%s: step %d lands on cell %d", tag, step, step))
+        if kindName == "magic" then
+          local r = step // 2
+          H.assertEq(magicLineShown(want[2 * r + 1], want[2 * r + 2]), true,
+            string.format("%s: the window shows row %d as %s / %s", tag, r, hx({ want[2 * r + 1] }),
+              want[2 * r + 2] and hx({ want[2 * r + 2] }) or "blank"))
+        elseif kindName == "lore" then
+          H.assertEq(textShown({ table.unpack(nameBytes(ATTACKNAME, 10, want[step + 1] + 0x8B - 0x51), 1, 6) }),
+            true, string.format("%s: the window shows lore %d's name on its row", tag, want[step + 1]))
+        end
+        if step < n - 1 then press(k.step) end
+      end
+    end
+    if fell == nil then break end
+    H.log(string.format("[dense] %s slot %d lost control during its %s walk's cells (%s; status1 $%02X, "
+      .. "HP %d, menu state $%02X): try %d of %d; the walk starts over once he has his window back", tag, slot,
+      kindName, fell < 0 and "before the first cell" or ("at cell " .. fell), H.readByte(0x3EE4 + slot * 2), H.readWord(0x3BF4 + slot * 2), st(), try, MAX_REOPEN + 1))
+    lostMid[tag] = (lostMid[tag] or 0) + 1
+    closeWindow(k, slot)
+    H.assertEq(try <= MAX_REOPEN, true, string.format("%s slot %d: the %s walk's cells were walked with the member "
+      .. "in control within %d tries", tag, slot, kindName, MAX_REOPEN + 1))
   end
   walked[tag .. ":" .. kindName] = (walked[tag .. ":" .. kindName] or 0) + 1
-  H.screenshot(string.format("battle_denselists_%s_%s_slot%d", tag, kindName, slot))
-  -- every cell in order, from the first
-  for _ = 1, 64 do
-    local i, sc = cursorIndex(k, slot)
-    if i == 0 and sc == 0 then break end
-    press(k.cols == 2 and "left" or "up")
-  end
-  local i = cursorIndex(k, slot)
-  H.assertEq(i, 0, tag .. ": the cursor reaches the first cell")
-  for step = 0, n - 1 do
-    i = cursorIndex(k, slot)
-    H.assertEq(i, step, string.format("%s: step %d lands on cell %d", tag, step, step))
-    if kindName == "magic" then
-      local r = step // 2
-      H.assertEq(magicLineShown(want[2 * r + 1], want[2 * r + 2]), true,
-        string.format("%s: the window shows row %d as %s / %s", tag, r, hx({ want[2 * r + 1] }),
-          want[2 * r + 2] and hx({ want[2 * r + 2] }) or "blank"))
-    elseif kindName == "lore" then
-      H.assertEq(textShown({ table.unpack(nameBytes(ATTACKNAME, 10, want[step + 1] + 0x8B - 0x51), 1, 6) }), true,
-        string.format("%s: the window shows lore %d's name on its row", tag, want[step + 1]))
-    end
-    if step < n - 1 then press(k.step) end
-  end
   -- past the last entry nothing moves, and the scroll stays inside the list
   for _, b in ipairs({ k.step, "right", "down", "down", "right" }) do
     press(b)
@@ -505,7 +549,7 @@ for _, f in ipairs(FIXTURES) do
       if co == nil then co = coroutine.create(function() walks(f.tag, f.kind) end) end
       local ok, pad = coroutine.resume(co)
       if not ok then error(pad, 0) end
-      H.setPad(pad or {})
+      if pad ~= false then H.setPad(pad or {}) end      -- false: care set this frame's pad
     end),
   }, f.tag .. ": the windows walked")
   steps[#steps + 1] = H.call(function()

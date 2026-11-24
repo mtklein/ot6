@@ -8,7 +8,8 @@
 -- InitStatusVars masks what Ot6Pin queues with the body's allowed statuses, $3330).  The fixture is
 -- train_b68_entry, the corridor before the smokestack switch (gen_sabin_train's capture: SABIN, CYAN and SHADOW,
 -- the bag holding Shuriken).  The suite walks to the switch and pulls it, as battle_suplextrain does, and in
--- battle 68 SHADOW throws a Shuriken at the train twice through the real menu (H.kitBattle; the others Defend).
+-- battle 68 SHADOW throws Shuriken at the train through the real menu until two have landed (H.kitBattle: a throw
+-- the battle takes from him is thrown again, as many as the bag holds, at most four; the others Fight and care).
 -- Asserted, for both throws: Ot6Pin saw SHADOW's Throw land on the train, and the train holds neither Slow nor
 -- Stop after it (the second throw finds it free, so it is a hobble refused again, not a pin); the train's
 -- allowed statuses lack both; and its shield line's mark cell (two before the anchor) never shows a mark.
@@ -53,16 +54,25 @@ emu.addEventCallback(function()
   end
 end, emu.eventType.endFrame)
 
-local plan = {
-  { who = SHADOW, cmd = 0x08, row = SHURIKEN, boost = 0, slotFn = function() return gSlot end },
-  { who = SHADOW, cmd = 0x08, row = SHURIKEN, boost = 0, slotFn = function() return gSlot end },
-}
+-- SHADOW's throws: one an entry, as many as the bag's Shuriken (at most MAX_THROWS), so a throw the battle takes
+-- from him is thrown again.  The step ends once two have landed on the train and the second's result is read
+-- (the v0.51 landing's draw: the train's Evil Toot Muddled him with his first throw queued, SABIN's care hit felled
+-- him, and that throw never landed; with two entries the second was the only one, "2 entr(ies) played of 2
+-- planned" and one "a throw lands on the train", build/attempts/wt/v051-land/)
+local MAX_THROWS = 4
+local plan = {}
+local function twoLanded() return #throws >= 2 and throws[2].post ~= nil end
 H.run({ maxFrames = 80000 }, {
   H.loadState("build/states/train_b68_entry.mss.lua"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.readByte(0x1850 + SHADOW) & 7 ~= 0, true, "SHADOW is in the party (gen_sabin_train's capture)")
     H.assertEq(H.invCountOf(SHURIKEN) >= 2, true, "the bag holds two Shuriken")
+    for _ = 1, math.min(H.invCountOf(SHURIKEN), MAX_THROWS) do
+      plan[#plan + 1] = { who = SHADOW, cmd = 0x08, row = SHURIKEN, boost = 0, slotFn = function() return gSlot end }
+    end
+    H.log(string.format("[immune] %d Shuriken in the bag: %d throw(s) planned, until two land", H.invCountOf(SHURIKEN),
+      #plan))
   end),
   H.navTo(32, 7, { maxFrames = 8000, playBattles = "tactical" }),
   (function()
@@ -93,8 +103,9 @@ H.run({ maxFrames = 80000 }, {
   -- train's Evil Toot can open the battle by Muddling SABIN and SHADOW and Berserking CYAN, and on the v0.50
   -- line's capture the Defending party wiped before SHADOW's first window ("05:350/0020 03:282/0020 02:349/0010"
   -- at f1271, a wipe at f5386: build/attempts/wt/v050-line-deaths/suites/).
-  H.kitBattle(plan, { maxFrames = 30000, untilPlanDone = true, others = "fight", cureAllies = true }),
-  H.driveUntil(function() return #throws >= 2 and throws[2].post ~= nil end, 3000,
+  H.kitBattle(plan, { maxFrames = 30000, untilPlanDone = true, others = "fight", cureAllies = true,
+    giveUp = twoLanded }),
+  H.driveUntil(twoLanded, 3000,
     { { tick = function() H.setPad({}); return "frame" end, reset = function() end } }, "the second throw lands"),
   H.call(function()
     watching = false

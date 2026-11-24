@@ -358,6 +358,16 @@ local function confirmCell(what)
   }, what)
 end
 
+-- MOG's record is free of Imp (status1 $20), the Dance's precondition, said with the line's save in the message
+local function assertMogFree(when)
+  local c = nil
+  for r = 0, 15 do if c == nil and H.readByte(0x1600 + 37 * r) == MOG then c = r end end
+  H.assertEq(c ~= nil, true, "MOG has a character record")
+  H.assertEq(H.charStatus1(c) & 0x20, 0, string.format("MOG is not an Imp %s (status1 $%02X): an Imp's Dance row "
+    .. "is greyed and skipped; a Tent clears it (water-rondo-v1 can be saved with MOG an Imp)", when,
+    H.charStatus1(c)))
+end
+
 -- ---- the run ----------------------------------------------------------------
 local snap0, snapB, reqB = nil, nil, nil
 local recsB, recsC = {}, {}
@@ -375,6 +385,13 @@ local body = {
     H.assertEq(ctlId ~= nil, true, "MOG knows a dance besides Water Rondo (the menu's control)")
     riverBg = H.readRomByte((H.sym("DanceBG") & 0x3FFFFF) + RONDO)
   end),
+  -- MOG must take his own turns: an Imp's command rows other than Fight and Item are greyed (UpdateCmdList),
+  -- the Dance among them, and the cursor skips a greyed row.  Imp outlasts a battle, and the save can carry it:
+  -- the line saved water-rondo-v1 with MOG an Imp and no cure in the bag ("status1=20 ... remedy=0", Green
+  -- Cherry 0).  A player pitches a Tent here (the world map offers it; its rest clears Imp), so the suite does
+  H.fieldCare({ tag = "a Tent for MOG's Imp", statusTent = true }),
+  worldControl("world control after the care"),
+  H.call(function() assertMogFree("before the walk") end),
   pickWalk(),
 }
 for i = 1, BURN do
@@ -388,8 +405,9 @@ for i = 1, BURN do
   })
 end
 if BURN > 0 then
-  body[#body + 1] = H.fieldCare({ tag = "care after the BURN", threshold = H.CARE_BEFORE_FIGHTS })
+  body[#body + 1] = H.fieldCare({ tag = "care after the BURN", threshold = H.CARE_BEFORE_FIGHTS, statusTent = true })
   body[#body + 1] = worldControl("world control after the care")
+  body[#body + 1] = H.call(function() assertMogFree("after the BURN's care") end)
 end
 for _, st in ipairs({
   H.call(function() installObservers() end),

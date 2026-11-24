@@ -4055,6 +4055,9 @@ end
 --                 would spend on the party's HP hole cost at least a
 --                 Tent's own price, or the bag cannot lift a member under
 --                 the threshold (#278)
+-- opts.statusTent true also pitches one for a status1 bit (Petrify, Imp,
+--                 Poison, Zombie, Dark) the bag holds no cure for: the
+--                 Tent's rest clears it (default off)
 -- opts.maxFrames  budget for the whole visit (default 24000)
 -- opts.maxTries   plans to attempt before giving up (default 48)
 -- opts.tag        log prefix
@@ -5083,6 +5086,18 @@ local function careKernel(opts)
     end
     for _, c in ipairs(careParty()) do
       if why == nil and mpShort(c) then why = "a Tincture would be due" end
+    end
+    -- opts.statusTent (off by default, so the line's care is unchanged): the Tent's rest clears every status1
+    -- bit but Magitek (_cacfbd's and_status), so it also answers a status the bag holds no cure for.  The
+    -- status pass runs first, so a member whose status reaches here has nothing in the bag for it
+    -- (water-rondo-v1 saved MOG an Imp: "status1=20 ... remedy=0", no Green Cherry)
+    if why == nil and opts.statusTent then
+      for _, c in ipairs(careParty()) do
+        local s1 = M.charStatus1(c)
+        if why == nil and (s1 & 0x80) == 0 and (s1 & 0x67) ~= 0 then
+          why = string.format("char %d carries status1 $%02X and the bag has no cure for it", c, s1)
+        end
+      end
     end
     tentWhy = why
     return why and w or nil

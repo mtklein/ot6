@@ -42,7 +42,11 @@ Ot6SpearPermit:
 ; blocks' first byte, not assumed from the block's place: before the
 ; recruits arrive, blocks hold guests (block 2 holds actor $12 at
 ; banon_joined).  Callers run a16/i16; any data bank (the char blocks are
-; read long).  Preserves X and Y.
+; read long).  Preserves X and Y, and returns carry clear, as vanilla's load
+; left it: LoadItemProp and the thief's stolen-item grant `rol` the carry in
+; as the first seat's bit (seat 3), so the fast path's compares must not hand
+; it back set (#567 follow-up: every weapon and shield past the spears read
+; "cannot" for seat 3 in the battle bag).
 .proc Ot6EquipWord
         .a16
         .i16
@@ -51,6 +55,7 @@ Ot6SpearPermit:
         cpx     #(OT6_SPEAR_LAST + 1) * 30
         bcc     @slow
 @plain: lda     f:ItemProp+1,x
+        clc                             ; the past-the-spears compare set it
         rtl
 @slow:  php
         longai

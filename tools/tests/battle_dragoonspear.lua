@@ -8,7 +8,8 @@
 --   1. his command row 0 is Jump (the boots' Fight -> Jump, vanilla);
 --   2. the battle inventory's equippability ($2686, five bytes an item, +4: bit n set = seat n cannot equip,
 --      LoadItemProp, the Ot6EquipWord site) lets his seat take the bag's other spear and refuses it to a seat
---      without the boots and without a spear bit of its own (TERRA);
+--      without the boots and without a spear bit of its own (TERRA); and every weapon and shield row's byte is
+--      the rule for each seat (the plain loads, not only the permit's);
 --   3. if a live, unbroken body holds a shield and a pierce class weakness ($3E9C+e & OT6_PIERCE), he Jumps at it
 --      through the real menu (H.kitBattle; the others Defend).  His landing swing loads OT6_ATKCLASS from
 --      Ot6WeapClassTbl for the spear in his hand ($3CA8+seat*2) and that class is pierce ($02) and only
@@ -139,6 +140,39 @@ local function battleEquipBits(id)
   end
 end
 
+-- every weapon and shield row of the battle bag against each seat, by the rule LoadItemProp states: a seat can
+-- equip the item when its actor mask ($3A20 + seat*2) meets the item's equip word, the boots' spear bits added (every
+-- record wearing the boots whose actor is GOGO's or before; Ot6SpearPermit).  Returns the rows compared and the
+-- first that differs.  The other spear above reads the permit; this reads the plain loads around it, the fast path
+-- every non-spear takes (the v0.51 landing: the fast path returned with carry set past the spear range, and
+-- LoadItemProp's first `rol` took it as seat 3's "cannot": "item 5a type 3 word 9fff: equip byte 08, vanilla's rule
+-- 00", build/attempts/wt/v051-land/)
+local function bootsBits()
+  local w = 0
+  for c = 0, 15 do
+    local b = 0x1600 + 37 * c
+    local actor = H.readByte(b)
+    if (H.readByte(b + 0x23) == BOOTS or H.readByte(b + 0x24) == BOOTS) and actor <= 12 then w = w | (1 << actor) end
+  end
+  return w
+end
+local function bagRule()
+  local rows, bad = 0, nil
+  for i = 0, 251 do
+    local id = H.readByte(0x2686 + i * 5)
+    local ty = id ~= 0xFF and (itemProp(id, 0) & 7) or nil
+    if ty == 1 or ty == 3 then
+      local word = baseWord(id) | (isSpear(id) and bootsBits() or 0)
+      local want = 0
+      for st = 0, 3 do if (word & H.readWord(0x3A20 + st * 2)) == 0 then want = want | (1 << st) end end
+      local got = H.readByte(0x2686 + i * 5 + 4) & 0x0F
+      rows = rows + 1
+      if got ~= want and bad == nil then bad = { id = id, got = got, want = want, word = word } end
+    end
+  end
+  return rows, bad
+end
+
 local JUMPS = 8
 -- PACE_BURN (a global a lab sets ahead of the lib; 0 in the suite): fight out that many battles first, to vary
 -- the encounter history the measured Jump comes from (TESTING.md: the draw moves with encounters used up)
@@ -164,6 +198,14 @@ local function decide()
     H.assertEq((bits >> ts) & 1, 1, string.format("and refuses it to TERRA's, who wears no boots", OTHER))
     invChecked = invChecked + 1
   end
+  local rows, bad = bagRule()
+  H.log(string.format("[spear] battle %d: %d weapon and shield row(s) of the battle bag compared with each seat's "
+    .. "equip bit%s", battles, rows, bad and string.format(" -- $%02X differs: $%02X, the rule $%02X (word $%04X)",
+    bad.id, bad.got, bad.want, bad.word) or ""))
+  H.assertEq(bad == nil, true, string.format("every weapon and shield row of the battle bag lets exactly the seats "
+    .. "whose actor its equip word (and the boots' spears) names equip it (%s)", bad and string.format("$%02X: $%02X, "
+    .. "want $%02X", bad.id, bad.got, bad.want) or "all agree"))
+  H.assertEq(rows > 0, true, "the battle bag holds a weapon or shield to compare")
   local e = seat * 2
   if battles <= BURN then
     mode = "fightout"

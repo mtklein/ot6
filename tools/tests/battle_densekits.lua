@@ -413,6 +413,23 @@ local co
 H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
   H.bootCheckpoint("water-rondo-v1"),
+  -- MOG must take his own turns: an Imp's command rows other than Fight and Item are greyed (UpdateCmdList),
+  -- Dance among them, and the cursor skips a greyed row, so his window never comes up.  Imp outlasts a battle and
+  -- the save can carry it: the line saved water-rondo-v1 with MOG an Imp and no cure in the bag ("status1=20 ...
+  -- remedy=0", Green Cherry 0).  A player pitches a Tent here (the world map offers it; its rest clears Imp)
+  H.waitUntil(function() return H.worldMode() and H.worldHasControl() and H.worldAligned() end, 6000,
+    "world control at Nikeah"),
+  H.fieldCare({ tag = "a Tent for MOG's Imp", statusTent = true }),
+  H.waitUntil(function() return H.worldMode() and H.worldHasControl() and H.worldAligned() end, 6000,
+    "world control after the care"),
+  H.call(function()
+    local c = nil
+    for r = 0, 15 do if c == nil and H.readByte(0x1600 + 37 * r) == MOG then c = r end end
+    H.assertEq(c ~= nil, true, "MOG has a character record")
+    H.assertEq(H.charStatus1(c) & 0x20, 0, string.format("MOG is not an Imp before the walk (status1 $%02X): an "
+      .. "Imp's Dance row is greyed and skipped; a Tent clears it (water-rondo-v1 can be saved with MOG an Imp)",
+      H.charStatus1(c)))
+  end),
   walkIn(),
   H.driveUntil(function() return co ~= nil and coroutine.status(co) == "dead" end, 150000, {
     H.call(function()
