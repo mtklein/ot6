@@ -50,7 +50,7 @@ SUITE = {
     0x00e2: ({B: 'rod'}, "suite battle_breakwor_locke: ice-weak, and party 1 (no ice) has a key (STRAGO's rod, SABIN's blitzes)"),
     0x00e7: ({P: 'spear'}, 'suite battle_breakwor_narshe: a key for the four with MOG (his spear)'),
     0x00f0: ({S: 'sword', B: 'rod'}, 'suite battle_breakwor_gogo: every belly body is keyed by two of the four who walk it'),
-    0x00f1: ({S: 'sword', X: 'rod'}, "suite battle_breakwor_locke: a key for party 2 (CELES's Falchion; RELM's rod, UMARO's club)"),
+    0x00f1: ({S: 'sword', X: 'rod'}, "suite battle_breakwor_locke: a key for party 2 (CELES's sword -- her Falchion is Katana since 2026-11-24; RELM's rod, UMARO's club)"),
     0x00f3: ({P: 'spear'}, 'suite battle_breakwor_narshe: a key for the four with MOG (his spear)'),
     0x00fa: ({S: 'sword'}, "suite battle_breakwor_gogo: every belly body is keyed by two of the four who walk it (the Woolly: TERRA's Fire and CELES's blade)"),
     0x00fb: ({S: 'sword', P: 'dagger'}, "suite battle_breakwor_tower: a key for each party whose lane meets it (parties 1 and 2 a sword, party 3 SHADOW's and GOGO's blades)"),

@@ -32,7 +32,7 @@ import stages  # noqa: E402
 S, P, B, X = 1, 2, 4, 8
 N4 = {S: "slash", P: "pierce", B: "bludgeon", X: "special"}
 # the same signature kinds under the four classes (origin/main's tables)
-KIND4 = {"sword": S, "chainsaw": S, "katana": S, "claw": S, "swdtech": S, "dagger": P, "ninja blade": P,
+KIND4 = {"sword": S, "chainsaw": S, "katana": S, "sabre": S, "claw": S, "swdtech": S, "dagger": P, "ninja blade": P,
          "thief hit": P, "spear": P, "drill": P, "crossbow": P, "air anchor": P, "tekmissile": P, "star": P,
          "skean": P, "dart": P, "rod": B, "fist": B, "fang": B, "knuckle": S, "flail": B, "club": B, "blitz": B,
          "umaro": B, "boomerang": B, "brush": X, "card": X, "dice": X, "coin": X}

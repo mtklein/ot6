@@ -242,7 +242,7 @@ OPENING = {
     0x00df: (('dagger', 'crossbow'), "opening 12: gabbldegak, the x4 swarm: 'AutoCrossbow sweeps it', and daggers "
              "and fangs; Dagger alone has no real holder in the World of Ruin's Zozo (the holder rule)"),
     0x0052: (('sword', 'katana'), "opening 12: slamdancer, the dangerous one: the blades, CELES's and CYAN's "
-             "(and SABIN's claw); both are slash's"),
+             "(and a curved sword's: Katana since 2026-11-24; SABIN's claw is Dagger now); both are slash's"),
     0x004e: (('sword', 'drill'), "opening 12: harvester: a blade or a spear"),
     0x0053: (('knuckle', 'crossbow'), "opening 12: hadesgigas: Blunt alone had one real holder (SABIN: GAU's hand "
              "left bludgeon), so the giant takes the bolt too (the holder rule)"),
