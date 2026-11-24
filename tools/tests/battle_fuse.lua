@@ -167,15 +167,17 @@ local HAND = {
   -- ---- wt/v051-tg-wob1: World of Balance bosses 1-5 (bosses-wob.md).  Each fuse block is its script's first, so no
   -- block comes before it; its one condition is a monster switch that only an ordinary turn of its own script sets
   -- and only the move's turn or the cancel clears (no counter of these five touches it).
-  ["134@0000"] = { blocks = "earlier none; own [14 24 07]",
-    why = "the Whelk's head: the fuse block is the script's first; switch 7 (bit 7 of the byte its turn count "
-      .. "shares), set by its arming blocks only, cleared by the move's turn (set_monster_var 0) or the cancel; its "
-      .. "counter (if_self_dead) touches nothing.  The other body's script can take the head off the field: the "
-      .. "shell's (_256) `kill_monsters MONSTER_2`, which stands behind `if_battle_switch_clr 0, 0`, the head's hold "
-      .. "(SHELL_GUARD below checks it)" },
-  ["064@0000"] = { blocks = "earlier none; own [14 24 00]",
-    why = "the Marshal: the fuse block is the script's first; switch 0, set by his rotation's second turn and his "
-      .. "alone block, cleared by the move's turn or the cancel; he has no counter" },
+  ["134@0000"] = { blocks = "earlier none; own [14 00 01]",
+    why = "the Whelk's head: the fuse block is the script's first; battle switch 1, the shell's call, set only by "
+      .. "the shell's call block (_256), which stands behind battle switches 0 and 1 clear, so it cannot be set "
+      .. "again while lit; cleared by the move's turn or the cancel.  The head leaves the field only by its own "
+      .. "move: the shell's script no longer draws it in (SHELL_GUARD below checks it), and its show block acts "
+      .. "only on a head that is gone" },
+  ["064@0000"] = { blocks = "earlier [13 01 01 / 15 24 01]; own [14 24 00]",
+    why = "the Marshal: the earlier block is vanilla's alone block (one monster left), which now also drops an "
+      .. "armed fuse; switch 1, set by the announce, shuts it from the announce to the move, and only the move's "
+      .. "turn or the cancel clears it.  His own condition is switch 0, set by his rotation's second turn, cleared "
+      .. "by the move's turn, the cancel, or the alone block before an announce; he has no counter" },
   ["103@0000"] = { blocks = "earlier none; own [14 24 00]",
     why = "Vargas: the fuse block is the script's first, ahead of his SABIN lines and 50-count block; switch 0, set "
       .. "by his rotation's second Battle, cleared by the move's turn or the cancel; his counters set battle "
@@ -285,8 +287,11 @@ local function staticChecks()
         if x >= hi and move == nil and (b < 0xF0 or (b == 0xF0 and rb(AI + x + 1) ~= 0xFE)) then
           move, moveAt = b < 0xF0 and b or rb(AI + x + 1), x
         end
-        -- (a call for backup is a move too: restore_monsters, $F5 with op 0 -- Telstar's waves, wt/v051-tg-wob2)
-        if x >= hi and move == nil and b == 0xF5 and rb(AI + x + 2) == 0x00 then move, moveAt = b, x end
+        -- (a call for backup is a move too: restore_monsters, $F5 with op 0 -- Telstar's waves, wt/v051-tg-wob2;
+        -- and so is a withdrawal, kill_monsters, op 1 -- the Whelk's head drawing into its shell, wt/v051-tg-wob1)
+        if x >= hi and move == nil and b == 0xF5 and (rb(AI + x + 2) == 0x00 or rb(AI + x + 2) == 0x01) then
+          move, moveAt = b, x
+        end
         x = x + opSize(b)
       end
       H.assertEq(line ~= nil and move ~= nil, true, string.format("%s: the block announces (a dlg before the fuse) "
@@ -364,26 +369,28 @@ local function staticChecks()
   end
   H.assertEq(seen[0x12A], 2, "Kefka has two rows (the line under 7,680 HP and the line under 32,640)")
   H.assertEq(seen[0x044], 3, "Telstar has three rows (its calls at 25, 80 and 200; wt/v051-tg-wob2)")
-  -- ---- wt/v051-tg-wob1: the Whelk's shell hides the head (`kill_monsters MONSTER_2`, $F5 $08 $01 $02) only behind
-  -- the head's hold, `if_battle_switch_clr 0, 0` ($FC $15 $00 $00), in the same block: else a lit or Broken head
-  -- can be drawn in mid-race (bosses-wob.md block 1)
+  -- ---- wt/v051-tg-wob1: the Whelk's shell no longer draws the head in (no `kill_monsters MONSTER_2`, $F5 $08 $01
+  -- $02, in its script): it calls the head in (set_battle_switch 0, 1: $F9 $01 $00 $01), and only behind the head's
+  -- hold, `if_battle_switch_clr 0, 0` ($FC $15 $00 $00), in the same block: else a Broken head could be called in
+  -- (bosses-wob.md block 1)
   do
     local start = rw(PTRS + 2 * 0x100)
-    local x, bstart, guard, kills, guarded = start, start, false, 0, 0
+    local x, guard, kills, calls, guarded = start, false, 0, 0, 0
     while rb(AI + x) ~= 0xFF do
       local b = rb(AI + x)
       if b == 0xFC and rb(AI + x + 1) == 0x15 and rb(AI + x + 2) == 0x00 and rb(AI + x + 3) == 0x00 then guard = true end
-      if b == 0xF5 and rb(AI + x + 1) == 0x08 and rb(AI + x + 2) == 0x01 and rb(AI + x + 3) == 0x02 then
-        kills = kills + 1
+      if b == 0xF5 and rb(AI + x + 2) == 0x01 and rb(AI + x + 3) == 0x02 then kills = kills + 1 end
+      if b == 0xF9 and rb(AI + x + 1) == 0x01 and rb(AI + x + 2) == 0x00 and rb(AI + x + 3) == 0x01 then
+        calls = calls + 1
         if guard then guarded = guarded + 1 end
       end
       x = x + opSize(b)
-      if b == 0xFE then bstart, guard = x, false end
+      if b == 0xFE then guard = false end
     end
-    H.log(string.format("[fuse] SHELL_GUARD: the shell's script draws the head in %d time(s), %d behind the hold",
-      kills, guarded))
-    H.assertEq(kills >= 1 and guarded == kills, true, "the Whelk's shell draws the head in only behind the head's "
-      .. "hold (if_battle_switch_clr 0, 0 in the same block)")
+    H.log(string.format("[fuse] SHELL_GUARD: the shell's script draws the head in %d time(s); calls it in %d "
+      .. "time(s), %d behind the hold", kills, calls, guarded))
+    H.assertEq(kills == 0 and calls >= 1 and guarded == calls, true, "the Whelk's shell does not draw the head in, "
+      .. "and calls it in only behind the head's hold (if_battle_switch_clr 0, 0 in the same block)")
   end
   -- ---- end wt/v051-tg-wob1 ----
   H.log(string.format("[fuse] PASS static: %d rows", rows))

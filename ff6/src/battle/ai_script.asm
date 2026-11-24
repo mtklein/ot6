@@ -113,33 +113,38 @@ AIScript::_77:
 ; ------------------------------------------------------------------------------
 
 ; marshal
-; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 2): his telegraph.
-; The fuse block comes first, so that no other block can take the move's turn
-; (ot6_fuse.asm, the idiom; bosses-wor.md 1.4): his rotation's second turn
-; arms it (monster switch 0), and so does each of his turns once the Lobos
-; are down (vanilla's `if_num_monsters 1` block); the next says "Strike as
-; one!" and glows, and the turn after it fills both Lobos' gauges (they come
-; in with him; a dead Lobo's fill does nothing) and strikes twice.  A break in
-; between clears the switch: the rotation starts over from its first turn.
-; Everything below the fuse block is vanilla's, but for the arming switches.
-; His rotation's last two turns (Net/Net/Battle, Battle) no longer come: the
-; fuse's end_if starts the script over.
+; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 2): his telegraph,
+; while a Lobo stands.  His rotation's second turn arms it (monster switch 0);
+; the next says "Strike as one!", glows and marks it announced (switch 1), and
+; the turn after it fills both Lobos' gauges (they come in with him; a dead
+; Lobo's fill does nothing) and strikes twice.  A break in between clears both
+; switches: the rotation starts over from its first turn.  Alone, he does not
+; announce: vanilla's alone block (`attack BATTLE, SPECIAL, SPECIAL`), first,
+; drops an armed fuse not yet announced; an announced one fires whatever
+; stands (switch 1 shuts the alone block), so no other block can take the
+; move's turn (ot6_fuse.asm, the idiom; bosses-wor.md 1.4).  Everything else
+; is vanilla's, but for the arming switch.  His rotation's last two turns
+; (Net/Net/Battle, Battle) no longer come: the fuse's end_if starts the
+; script over.
 AIScript::_100:
+        if_num_monsters 1
+        if_monster_switch_clr 1         ; ot6: not once he has announced
+                clr_monster_switch 0    ; ot6: alone he does not announce
+                attack BATTLE, SPECIAL, SPECIAL
+                end_if
         if_monster_switch_set 0
                 dlg $8f
 ; Strike as one!
                 short_glow MONSTER_3
+                set_monster_switch 1    ; announced: the move comes
                 wait
 Ot6FuseMarshal:                 ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 0    ; the trigger's clear first, then the move
+                clr_monster_switch 0    ; the trigger's clears first, then the move
+                clr_monster_switch 1
                 fill_atb MONSTER_SLOT_1 ; the Lobos come in with him
                 fill_atb MONSTER_SLOT_2
                 attack BATTLE
                 attack BATTLE
-                end_if
-        if_num_monsters 1
-                attack BATTLE, SPECIAL, SPECIAL
-                set_monster_switch 0    ; ot6: arms the fuse block (above)
                 end_if
         set_target RAND_CHAR
         attack BATTLE, NET, BATTLE
@@ -4368,13 +4373,13 @@ AIScript::_256:
                 end_if
         if_monster_timer 10
         if_monsters_alive MONSTER_2
-        if_battle_switch_clr 0, 0       ; ot6: not while the head holds it
-                dlg $05                 ;   (_308: its first turn to its Mega
-                                        ;   Volt, and every break: OT6_FUSE_HOLD)
-; Gruuu……
-                kill_monsters MONSTER_2, FADE_DOWN
-                reset_monster_timer
-                end
+        if_battle_switch_clr 0, 0       ; ot6: not while the head is held out
+        if_battle_switch_clr 0, 1       ;   (a break), nor while it is called
+                set_battle_switch 0, 1  ; ot6: vanilla drew the head in here
+                reset_monster_timer     ;   ("Gruuu", kill_monsters MONSTER_2);
+                end                     ;   now it calls the head in, and the
+                                        ;   head announces it and draws in on
+                                        ;   its own turns (_308, its fuse)
 
         if_self_dead
                 boss_death
@@ -6552,51 +6557,34 @@ AIScript::_305:
 ; head
 ; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 1): the Narshe
 ; Whelk's head (the WoR Presenter's is _309) carries the Whelk's telegraph, on
-; the body that holds the gauge.  Its first turn arms the fuse (monster
-; switches 6, "it has charged", and 7, the fuse); the next says "Static
-; builds!" and glows; the turn after it is Mega Volt on the party.  After
-; that its turns count in its monster variable (bits 0-5) and the second one
-; arms it again.  A break in between clears switch 7 and the count, as the
-; move's own turn does: the count starts over (one plain turn, then the
-; arming).  From its first turn to the Mega Volt the head holds battle switch
-; 0, which keeps the shell from hiding it (the shell's _256): the head stays
-; out for its whole charge, a break's window included, and the shell can
-; draw it in after the move.  The fuse block comes first, so that no other
-; block can take the move's turn (ot6_fuse.asm, the idiom).  Vanilla's turn
-; was `attack BATTLE, BATTLE, SPECIAL / end`.
+; the body that holds the gauge, and the telegraph is the fight's own rhythm:
+; when the shell's clock calls the head in (battle switch 1, set by the
+; shell's _256 where vanilla's shell drew it in), the head says "It draws
+; in!" and glows, glows again on its next turn, and on the turn after that
+; draws into the shell, vanilla's "Gruuu" and FADE_DOWN.  A break in between
+; cancels the hide: the call is cleared (Ot6FuseTbl's row), and every break of
+; the head sets battle switch 0 (OT6_FUSE_HOLD), which keeps the shell from
+; calling it in again, so the Broken head stays out for its whole window; its
+; first turn back clears the hold.  No new damage: the head attacks as
+; vanilla's did on its other turns (`attack BATTLE, BATTLE, SPECIAL`), and the
+; shell's Mega Volt counter is vanilla's.
 AIScript::_308:
-        if_monster_switch_set 7
+        if_battle_switch_set 0, 1
                 dlg $8e
-; Static builds!
+; It draws in!
                 short_glow MONSTER_2
                 wait
-Ot6FuseWhelk:                   ; the fuse is lit here (Ot6FuseTbl's row)
-                set_monster_var 0       ; the trigger's clears first: the count
-                set_monster_switch 6    ;   and switch 7 (one byte; switch 6
-                clr_battle_switch 0, 0  ;   back), the shell's hold; the move
-                set_target ALL_CHARS    ; the whole party, its damage split: with
-                                        ;   no target it fell on one member at a
-                                        ;   time, unsplit, and killed TERRA from
-                                        ;   77/77 (the merged line's arvis_wake)
-                attack MEGA_VOLT
-                end_if
-        if_monster_switch_clr 6         ; its first turn
-                attack BATTLE, BATTLE, SPECIAL
-                set_monster_switch 6
-                set_monster_switch 7
-                set_battle_switch 0, 0
-                end_if
-        if_monster_switch_clr 7
-        if_battle_var_greater 36, $41   ; a turn counted since the last move
-                attack BATTLE, BATTLE, SPECIAL  ;   (the byte: switch 6 set, 7 clear)
-                set_monster_var 0
-                set_monster_switch 6
-                set_monster_switch 7
-                set_battle_switch 0, 0
+Ot6FuseWhelk:                   ; the fuse is lit from here (Ot6FuseTbl's row)
+                short_glow MONSTER_2
+                wait
+Ot6FuseWhelkFire:               ; ... to here, the turn that fires it
+                clr_battle_switch 0, 1  ; the call's clear first, then the hide
+                dlg $05
+; Gruuu……
+                kill_monsters MONSTER_2, FADE_DOWN
                 end_if
         attack BATTLE, BATTLE, SPECIAL
-        add_monster_var 1
-        set_battle_switch 0, 0  ; ot6: the shell's hold
+        clr_battle_switch 0, 0  ; ot6: a break's hold ends at its first turn back
         end
 
         if_self_dead
@@ -7162,8 +7150,8 @@ AIScript::_329:
 ; kefka at narshe
 ; OT6 (bosses-wob.md block 10, wt/v051-tg-wob2): his telegraph, after the giggle and the frost of the design.
 ; A clock arms it (the monster timer at 40, about 1,300 frames), on one of his turns that is vanilla's opening
-; Battle; "Frost creeps!" (battle dialogue $9B) and a glow announce it on his next turn, and Ice 2 on every
-; member of the squad in front of him follows on the turn after.  A break between the line and the cast cancels
+; Battle; "Frost creeps!" (battle dialogue $9B) and a glow announce it on his next turn, and Ice on every
+; member of the squad in front of him follows on the turn after (Ice 2 until wt/v051-tg-wob1: the lead).  A break between the line and the cast cancels
 ; it: switch 0 goes and the clock restarts (Ot6FuseTbl), so it is earned again from zero.  The clock's reset and
 ; the switch come before the cast (ot6_fuse.asm, the idiom).  His four-turn rotation, its own one-in-three Ice
 ; 2 on one member included, and his parting line and flight are vanilla's.
@@ -7176,9 +7164,9 @@ AIScript::_330:
 Ot6FuseKefkaNarshe:             ; the fuse is lit here (Ot6FuseTbl's row)
                 clr_monster_switch 0    ; the trigger's clears first, then the
                 reset_monster_timer     ;   move (ot6_fuse.asm, the idiom)
-                set_target ALL_CHARS
-                attack ICE_2
-                end_if
+                set_target ALL_CHARS    ; (wt/v051-tg-wob1, the lead: Ice, tier
+                attack ICE              ;   1, on the squad; his rolled Ice 2 on
+                end_if                  ;   one member stays vanilla's)
         if_monster_timer 40
         if_monster_switch_clr 0
                 attack BATTLE

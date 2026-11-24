@@ -1,38 +1,35 @@
 -- @suite savestate=whelk_entry slow
 -- battle_whelk.lua -- the Whelk under the boss contract (#561; docs/design/bosses-wob.md block 1): the game's first
--- telegraph, "Static builds!" -> Mega Volt, and the break that cancels it.
+-- telegraph is the fight's own rhythm, "It draws in!" -> the head draws into its shell, and the break that cancels
+-- it keeps the Broken head out.
 --
--- The Whelk is two bodies: the shell (AIScript::_256, no gauge) and the head (_308, 4 shields, the gauge), which
--- the shell hides and shows on its own clock.  The telegraph rides on the head, the body a break lands on.  Its
--- first turn arms the fuse (monster switches 6, "it has charged", and 7, the fuse), the next says "Static builds!"
--- (dlg $8E) and glows, and the one after it is Mega Volt on the party; after that its turns count in its monster
--- variable and the second arms it again.  From its first turn to its Mega Volt it holds battle switch 0, which
--- keeps the shell from hiding it.  Under the contract (ot6_fuse.asm, Ot6FuseTbl's row $0134) a break while the
--- fuse is lit cancels it: switch 7 and the count are cleared as the move's own turn clears them (switch 6 and the
--- shell's hold stand), so the head takes a plain turn and its arming turn again before the next announce, and the
--- Broken head stays out of its shell for the break's window.
+-- The Whelk is two bodies: the shell (AIScript::_256, no gauge) and the head (_308, 4 shields, the gauge).  Where
+-- vanilla's shell drew the head in on its clock, it now calls the head in (battle switch 1); the head announces it,
+-- "It draws in!" (dlg $8E) and a glow, glows again on its next turn, and on the turn after that draws in itself:
+-- vanilla's "Gruuu" (dlg $05) and FADE_DOWN (kill_monsters MONSTER_2, dispatched as command $24 with the animation
+-- $08).  Under the contract (ot6_fuse.asm, Ot6FuseTbl's row $0134) a break while the fuse is lit cancels the hide:
+-- the call is cleared, and every break of the head sets battle switch 0 (OT6_FUSE_HOLD), which keeps the shell from
+-- calling it in again until the head's first turn back.  No new damage: on its other turns the head attacks as
+-- vanilla's did, and the shell's Mega Volt counter is vanilla's.
 --
 -- Boots whelk_entry (gen_whelk_poweron: one tile south of the Whelk's trigger in the mines), steps onto the trigger
--- and pages the guards' lines into the battle, and plays it three times from a snapshot at its open (M.fuseCases,
--- lib/ot6.lua, where the cases and the DECLARED staging are written out: the gauge, the row's classes for the
--- breaking hit, and HP held).  A Magitek rider has no Fight (InitCmdList turns it into Magitek), so the breaking
--- action, and the two in the "outside" window, are TERRA's or a soldier's Fire Beam aimed at the head:
---   unbroken  the party Defends; the line shows on the head's second turn; the lit-fuse mark stands before its
---             shield emblem; Mega Volt is dispatched on its next turn, with one glow between; the mark goes.
---   broken    a Fire Beam confirmed once the mark is up breaks the head: the cancel fires, the mark goes with the
---             hit, its first turns back hold no Mega Volt, its byte reads $40 (switch 6 alone), the shell's hold
---             stands, and the line returns on its third turn back (a plain turn, the arming, the line); Mega Volt
---             follows that.
---   outside   a break after its first Mega Volt and a plain turn, before the next line: nothing is cancelled, and
---             the fuse lights and fires as in the first case.
--- And the shell stays vanilla but for the one guard: while battle switch 0 is set the shell does not hide the
--- head (the shell's hide block, if_battle_switch_clr 0, 0).
--- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v051-tg-wob1/merged/mutants-merged/): whelk_no_clear (Ot6FuseTbl+53=FF: the cancel keeps the head's byte) is
--- red at "the head's byte reads $40 after the cancel"; whelk_no_break_hold (Ot6FuseTbl+54=FF, +55=00: no
--- OT6_FUSE_HOLD, the cancel keeping the hold) at "the Broken boss stayed on the field for its whole window" (the
--- break right after Mega Volt); whelk_untargeted (Ot6FuseWhelk+12=47: set_target NOTHING) at "the head's fire turn
--- sets its target to ALL_CHARS".  (whelk_no_hold, the cancel clearing the hold, no longer changes anything: every
--- break sets it again.)
+-- and pages the guards' lines into the battle, and plays it from a snapshot at its open (M.fuseCases, lib/ot6.lua,
+-- where the cases and the DECLARED staging are written out: the gauge, the row's classes for the breaking hit,
+-- and HP held).  A Magitek rider has no Fight (InitCmdList turns it into Magitek), so the breaking action, and the
+-- two in the "outside" window, are TERRA's or a soldier's Fire Beam aimed at the head:
+--   unbroken  the party Defends; the shell calls the head in; the line shows; the lit-fuse mark stands before its
+--             shield emblem; the head draws in on its second turn after the line, two glows between; the mark goes.
+--   broken    a Fire Beam confirmed once the mark is up breaks the head: the cancel fires, the call is cleared and
+--             the hold set, the mark goes with the hit, its first turns back hold no hide, and the line returns only
+--             after the head's first turn back has ended the hold and the shell has called it again; the hide
+--             follows.
+--   outside   a break with no call pending: nothing is cancelled (the hold aside), and the fuse lights and fires as
+--             in the first case.
+--   after the hide  the head broken as soon as it is back out of its shell: it stays on the field for its whole
+--             window, and the shell does not call it in during it (battle switch 1 stays clear).
+-- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v051-tg-wob1/): whelk_no_hold (Ot6FuseTbl+55=00: no
+-- OT6_FUSE_HOLD) is red at "the shell's call stays clear held for the whole window"; whelk_no_clear (Ot6FuseTbl+54=FF:
+-- the cancel keeps the call) at "battle switch 1 (the shell's call) is clear after the cancel".
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
@@ -42,7 +39,7 @@ local STATE = "build/states/whelk_entry.mss.lua"
 local WHELK, HEAD = 0x100, 0x134
 local MAGITEK, FIRE_BEAM = 0x1D, 0          -- the command, and the MagiTek list's entry (attack $83 + entry)
 
--- The cap: its four cases ran to f23,485 (wt/v051-tg-wob1, the afterMove case included), so 50,000 is about 2x the longest.
+-- The cap: its four cases ran to f23,485 on the Mega Volt build (wt/v051-tg-wob1), so 50,000 is about 2x that.
 H.run({ maxFrames = 50000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
@@ -64,51 +61,37 @@ H.run({ maxFrames = 50000 }, {
   end, HEAD, "the Whelk"),
   H.call(function()
     H.assertEq(H.formationHas({ [WHELK] = true }), true, "the battle is the Whelk's (shell $100 and head $134)")
-    -- the fire turn aims Mega Volt at the whole party (`set_target ALL_CHARS`, $F1 $43, before the move): aimed at no
-    -- target the engine picks one member or all by its own roll, so the queued targets alone (allTargets, below)
-    -- read $07 on most draws either way; an unsplit Mega Volt on one member killed TERRA from 77/77 in the line
-    local a = H.sym("Ot6FuseWhelk") & 0x3FFFFF
-    local x, tgt = a, nil
-    while H.readRomByte(x) ~= 0xB8 and x < a + 32 do
-      local b = H.readRomByte(x)
-      if b == 0xF1 then tgt = H.readRomByte(x + 1) end
-      local SIZE = { [0] = 4, 2, 4, 3, 4, 4, 4, 2, 3, 4, 4, 3, 4, 1, 1, 1 }   -- AICmdSizeTbl
-      x = x + (b >= 0xF0 and SIZE[b - 0xF0] or 1)
-    end
-    H.assertEq(tgt, 0x43, string.format("the head's fire turn sets its target to ALL_CHARS ($43) before Mega Volt "
-      .. "(read $%02X)", tgt or 0))
   end),
   H.fuseCases({
     tag = "whelk", species = HEAD, write = WRITE,
-    line = 0x8E, move = { cmd = 0x0C, atk = 0xB8 }, turns = 1, glows = 1,
+    line = 0x8E, move = { cmd = 0x24, atk = 0x08 }, turns = 2, glows = 2,
     arm = "idle", hides = true,
-    -- Mega Volt is queued on every standing member (set_target ALL_CHARS: its damage split)
-    allTargets = true,
-    -- a fourth case: the head broken right after its Mega Volt, whose turn cleared the shell's hold: the break sets
-    -- it again (Ot6FuseTbl's OT6_FUSE_HOLD), so the Broken head stays out for its whole window
-    afterMove = true,
-    -- (HP held: two Fire Beams on the Broken head in the "outside" window took its last 1,406 on the merged ROM's draw)
     bossHp = 1600,
     breaker = { name = "Fire Beam", cmd = MAGITEK, mtek = FIRE_BEAM, open = true },
     lineShot = 30,
-    -- a Mega Volt fired and a plain turn counted since (switch 6 set, 7 clear, the count 1, the shell's hold set):
-    -- no fuse lit, and the shell holds the Broken head out through the window
+    bswIgnore = 0x01,             -- (the hold every break sets)
+    -- no call pending and no hold, the head out and a turn of its taken
     partway = function(W)
       local c = W.cells()
-      return c ~= nil and (c.mvar & 0xC0) == 0x40 and (c.mvar & 0x3F) >= 1 and (c.bsw & 0x01) ~= 0
+      return c ~= nil and #W.turns >= 1 and (c.bsw & 0x03) == 0
     end,
     earned = function(C, W)
-      local pre, post, l1, l2 = C.brk.pre, C.brk.post, C.lines[1], C.lines[2]
-      H.assertEq(l1.turn, 2, "whelk: the first announce came on the head's second turn (its first armed the fuse)")
-      H.assertEq(pre.mvar & 0xC0, 0xC0, "whelk: monster switches 6 and 7 stood at the break (the fuse was armed)")
-      H.assertEq(post.mvar, 0x40, "whelk: the head's byte reads $40 after the cancel: switch 7 and the count clear, "
-        .. "switch 6 kept, as its move's own turn leaves them")
-      H.assertEq(post.bsw & 0x01, 1, "whelk: battle switch 0 (the shell's hold on the head) still stands after the "
-        .. "cancel: the Broken head stays out of its shell until its next Mega Volt")
+      local pre, post, l2 = C.brk.pre, C.brk.post, C.lines[2]
+      H.assertEq(pre.bsw & 0x02, 0x02, "whelk: battle switch 1 (the shell's call) stood at the break")
+      H.assertEq(post.bsw & 0x02, 0, "whelk: battle switch 1 (the shell's call) is clear after the cancel")
+      H.assertEq(post.bsw & 0x01, 0x01, "whelk: battle switch 0 (the hold) is set by the break")
       local back = l2.turn - C.rec.turn
-      H.assertEq(back, 3, string.format("whelk: the trigger was earned again in full: the line returned on the "
-        .. "head's turn %d back (a plain turn, the arming turn, then the line)", back))
+      H.assertEq(back >= 2, true, string.format("whelk: the call was earned again: the line returned on the head's "
+        .. "turn %d back (its first turn back ends the hold, then the shell calls)", back))
     end,
+    -- a fourth case: the head broken as soon as it is back out of its shell after the hide
+    afterMove = true,
+    afterMoveWhen = function(W, C)
+      local c = W.cells()
+      return c ~= nil and (c.bsw & 0x02) == 0 and #W.turns > C.mv.turn
+    end,
+    windowBad = function(W) return (H.readByte(0x3EB0) & 0x02) ~= 0 end,
+    windowWhat = "the shell's call stays clear (battle switch 1)",
   }),
   H.logStep("[whelk] PASS: the announce, the schedule, the cancel and the trigger earned again"),
 })

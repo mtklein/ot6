@@ -128,7 +128,7 @@ local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, 
 local CLOCK = 2 * 40            -- if_monster_timer 40 reads half the timer word
 local FUSE = {
   tag = "kefka", species = KEFKA, write = WRITE,
-  line = 0x9B, move = { cmd = 0x02, atk = 0x06 }, turns = 1, glows = 1,
+  line = 0x9B, move = { cmd = 0x02, atk = 0x01 }, turns = 1, glows = 1,
   arm = "idle",
   -- (wt/v051-tg-wob1's review) Ice 2 is queued on the whole squad, and a fifth case: CELES's Runic, confirmed after
   -- the line, takes the announced cast

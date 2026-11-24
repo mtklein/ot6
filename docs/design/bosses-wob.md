@@ -54,8 +54,8 @@ Stated once, assumed by every block:
 
   | # | Boss | Fuse | Race or warning |
   |---|---|---|---|
-  | 1 | Whelk | 1 turn | Race: chipping from the open breaks the head in the fuse, 3 of 3 keys |
-  | 2 | Marshal | 1 turn | Race: broken in the fuse 3 of 3 chipping from the open, 2 of 3 from the announce |
+  | 1 | Whelk | 2 turns | Race: unboosted beams from the announce break the head in the fuse, 5 of 5 keys; the prize is the head kept out |
+  | 2 | Marshal | 1 turn | Race (while a Lobo stands): broken in the fuse 3 of 3 chipping from the open, 2 of 3 from the announce |
   | 3 | Vargas | 1 turn | Warning: the trio holds no key while an Ipooh stands, and SABIN's Pummel ends the fight |
   | 4 | Ultros ① | 1 turn | Warning: a party chipping from the open breaks him before his first announce (3 of 3); a race only for a party that banks to the announce |
   | 5 | TunnelArmr | 1 turn | Warning: LOCKE's boosted Fight breaks it before it announces (3 of 3); at the announce the answer is CELES's Runic |
@@ -200,31 +200,29 @@ beams; Terra adds TekMissile and Bio Blast).
 - **Telegraph:** the Whelk draws into its shell and the shell charges
   → **MegaVolt** hits the party. Break the head during the fuse to
   cancel it.
-- **Built** (wt/v051-tg-wob1, `battle_whelk`). Not as written: a head
-  drawn into its shell cannot be hit, so the head, the body with the
-  gauge, carries the telegraph. Its first turn arms it (a normal attack),
-  its second says **"Static builds!"** and glows, its third is Mega Volt
-  on the whole party, its damage split (about 45 to each member, measured
-  in the line: 77/91/93 to 29/46/50). Aimed at no target it sometimes fell
-  on one member unsplit and killed TERRA from 77/77 (the merged line's
-  `arvis_wake`, build/attempts/wt/v051-tg-wob1/merged/legs/), so it is aimed
-  at all of them. After a Mega Volt it takes one plain turn before arming
-  again. From its first turn to the Mega Volt the head holds a battle
-  switch that keeps the shell from hiding it (the shell's one change), and
-  every break of the head sets that switch again (`Ot6FuseTbl`'s
-  `OT6_FUSE_HOLD`), so the race can be run and a Broken head stays out for
-  its whole window, a break just after its Mega Volt included
-  (`battle_whelk`'s fourth case; the `whelk_no_break_hold` mutant is red
-  there). Lab
-  (`race` lab, build/attempts/wt/v051-tg-wob1/lab/, keys $15/$39/$51): a party that beams the head from the
-  open (Fire Beam, boost at its bank) breaks it with its 4th beam, the 1st
-  after the announce, and the cancel fires, 3 of 3; a party that Defends
-  to the announce and then dumps its bank kills the head (1,600 HP, a
-  boost-3 beam takes 1,150-1,480) before both the break and the move, 3 of
-  3; from the announce to the move the party gets 3 actions against 4
-  shields, so unboosted chipping from the announce does not break it in
-  time. Fuse: one turn; shields kept at 4. **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): Mega Volt
-  took 46 of TERRA's 77 (59%), 43 of 91 (47%) and 42 of 93 (45%).
+- **Built** (wt/v051-tg-wob1, `battle_whelk`; the lead's ruling,
+  2026-11-24: the opening teaches and does not punish, and "not every move
+  needs to be announced"). The telegraph is the fight's own rhythm, the
+  head drawing into its shell, with no new damage. Where vanilla's shell
+  drew the head in on its clock, it now calls the head in (a battle
+  switch); the head says **"It draws in!"** and glows, glows again on its
+  next turn, and on the turn after that draws in itself, vanilla's "Gruuu"
+  and fade. A break of the head in between cancels the hide, and every
+  break of the head sets a hold (`Ot6FuseTbl`'s `OT6_FUSE_HOLD`) that keeps
+  the shell from calling it in until the head's first turn back: the
+  Broken head stays out for its whole window, which is the reward. The
+  shell's Mega Volt counter and its show turns are vanilla's; on its other
+  turns the head attacks as vanilla's did (an earlier cut of this branch
+  had the head cast an announced Mega Volt, about half each member's HP).
+  **A two-turn fuse, 4 shields kept** (the lab, `build/attempts/wt/v051-tg-wob1/lab2/`,
+  keys $FD $11 $39 $51 $69): a party that Defends until the line and then
+  beams the head unboosted (one Fire Beam a member, one shield each) breaks
+  it in the fuse 5 of 5, 4 actions after the line ("BROKEN IN THE FUSE (4
+  action(s) from the announce; cancel fired)"); with a one-turn fuse the
+  window held 3 actions against 4 shields. A party that dumps a banked
+  boost kills the head in the fuse instead (5 of 5), and one that beams
+  from the open breaks it in the fuse or before the line, 4 beams in (3
+  draws). The line's own fight (`arvis_wake`) takes no new damage.
 - **Break story:** the guards warn you away from the shell, and Fire
   Beam is the probe the game points you at. Three beams and a
   TekMissile break the game's first boss within two rounds, which
@@ -253,12 +251,14 @@ piercing.
   → next turn he and both Lobos attack one target. Break him and the
   Lobos attack without coordination.
 - **Built** (wt/v051-tg-wob1, `battle_marshal`). His rotation's second
-  turn arms it (with the Lobos down, every turn of his alone block does);
-  the next says **"Strike as one!"** and glows; the turn after it fills
+  turn arms it; the next says **"Strike as one!"** and glows; the turn after it fills
   both Lobos' ATB gauges and he strikes twice. Not as written: a monster's
   script cannot aim another monster's attack, so the Lobos act at once on
   their own targets rather than on his. His rotation's last two turns
-  (Net/Net/Battle, Battle) no longer come. Lab (build/attempts/wt/v051-tg-wob1/lab/, LOCKE's squad at full
+  (Net/Net/Battle, Battle) no longer come. The line plays only while a
+  Lobo stands (the lead, 2026-11-24): alone, his turns are vanilla's alone
+  block, `attack BATTLE, SPECIAL, SPECIAL` (it had no Net), which now also
+  drops a fuse armed but not yet announced; one already announced fires. Lab (build/attempts/wt/v051-tg-wob1/lab/, LOCKE's squad at full
   HP after gen_moogle's waves, keys $A0/$E0/$30): chipping from the open
   (Fights at the bank) breaks him in the fuse 3 of 3, 7-8 actions from the
   open, 2-3 after the announce (one of those breaks landed after his fire
@@ -915,7 +915,11 @@ below).
   on 3 of 4 keys, 2-3 actions after the line, and on `$87` took the cast
   2 actions after it (`lab-b-KEFKA-CHIP-*`). The line's own fighter
   breaks him in 6-7 actions, about 1,800 frames in, before any announce
-  (`lab-a-KEFKA-LINE-*`). **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): Ice 2 on the squad took 221 of
+  (`lab-a-KEFKA-LINE-*`). **The cast is Ice (tier 1), not Ice 2** (the
+  lead, 2026-11-24): Ice on the squad took 79 of TERRA's 306 (25%), 80 of
+  CELES's 310 (25%) and none of EDGAR's 315 on that draw
+  (`build/attempts/wt/v051-tg-wob1/lab2/dmg_kefka2.log`); his rolled Ice 2 on
+  one member stays vanilla's. Before that change, **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): Ice 2 on the squad took 221 of
   TERRA's 306 (72%), 225 of CELES's 310 (72%) and none of EDGAR's 315
   on that draw. **Runic, played** (`battle_kefka`'s fifth case): CELES's
   Runic, confirmed after the line and boosted, took the cast aimed at all
