@@ -1,4 +1,4 @@
--- @suite savestate=kefka_entry
+-- @suite savestate=kefka_entry slow
 -- battle_kefka.lua -- the generated-savestate test for the Battle for
 -- Narshe's KEFKA, fought for real from kefka_entry.mss (party 1 =
 -- TERRA+EDGAR+CELES at (19,36), KEFKA one tile below; gen_narshe_battle
@@ -21,6 +21,25 @@
 --      The fight is played to its own end (if_b_switch $40 -> _ccbcb1): the
 --      party is not warped to the {25,5} lose-path save point and the win
 --      scene runs.
+--
+--   5. (wt/v051-tg-wob2, bosses-wob.md block 10) his telegraph, under the boss contract, played first from the same
+--      entry as a mechanism test (M.fuseCases, lib/ot6.lua, where the cases and the DECLARED staging are written
+--      out: the gauge, the row's classes for the breaking Fight, and HP held).  His script (ai_script.asm
+--      AIScript::_330) now arms a fuse on his clock (the monster timer at 40) on a turn that is vanilla's opening
+--      Battle; "Frost creeps!" (battle dialogue $9B) and a glow announce it on his next turn, and Ice on the
+--      whole squad (attack $01, command $02) follows on the turn after.  A break while it is lit cancels it
+--      (Ot6FuseTbl's row $014A): switch 0 goes and his clock restarts.
+--        unbroken  the party Defends; the line shows once his clock has run; the lit-fuse mark stands before his
+--                  shield emblem; Ice on the squad is dispatched on his next turn, a glow between; the mark goes.
+--        broken    one member's aimed Fight is confirmed once the mark is up and breaks him: the cancel fires, the
+--                  mark goes with the hit, switch 0 is clear and the clock reads 0, no Ice on his first turns
+--                  back, and the line returns only once his clock has climbed to 40 again; the cast follows.
+--        outside   a break before his clock has run: nothing is cancelled and the cells stand, two Fights in the
+--                  window wind nothing, and the fuse then lights and fires as in the first case.
+--      Then the entry is restored and the real fight below is played: the cases are staged, the fight is not.
+--      Mutants (build/attempts/wt/v051-tg-wob2/mutants/): fuse_never (Ot6FuseCancel+3=80) is red at "the break
+--      during the fuse cancels it"; kefka_no_trigger (his row keeps every bit and restarts no clock:
+--      Ot6FuseTbl+133=FF, +135=00 on the merged table; +93/+95 before) at "monster switch 0 is clear after the cancel".
 --
 -- The fight is the one both generators play (gen_narshe_battle,
 -- gen_kefka_won): the library's fight driver with FIGHT below
@@ -95,7 +114,61 @@ end
 
 local chippedTwice, winSceneObserved = false, false
 
+-- the activation: face him once (a held DOWN that cannot step), release, then edge-A only, because a held
+-- direction starves CheckNPCs
+local function engage()
+  return H.seqStep({
+    H.hold({ "down" }), H.waitFrames(4), H.release(), H.waitFrames(8),
+    H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
+      H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
+    }, "clean A into KEFKA -> battle 57"),
+  })
+end
+
+-- the telegraph's cases (5. above): the suite's declared writers, through which M.fuseCases stages the gauge, the
+-- row's classes and held HP, and nothing else
+local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }
+local CLOCK = 2 * 40            -- if_monster_timer 40 reads half the timer word
+local FUSE = {
+  tag = "kefka", species = KEFKA, write = WRITE,
+  line = 0x9B, move = { cmd = 0x02, atk = 0x01 }, turns = 1, glows = 1,
+  arm = "idle",
+  -- (wt/v051-tg-wob1's review) Ice is queued on the whole squad, and a fifth case: CELES's Runic, confirmed after
+  -- the line, takes the announced cast
+  allTargets = true,
+  runic = { who = 0x06 },
+  bossHp = nil,                 -- his own maximum, read at the open
+  partway = function(W)
+    local c = W.cells()
+    return c ~= nil and c.timer >= 20 and c.timer < CLOCK - 20 and c.mvar & 0x01 == 0
+  end,
+  earned = function(C, W)
+    local pre, post, l2 = C.brk.pre, C.brk.post, C.lines[2]
+    H.assertEq(post.mvar & 0x01, 0, "kefka: monster switch 0 is clear after the cancel")
+    H.assertEq(pre.timer >= CLOCK and post.timer <= 1, true, string.format("kefka: his clock was restarted by the "
+      .. "cancel (the monster's timer read %d at the break and %d after it)", pre.timer, post.timer))
+    H.assertEq(l2.cells.timer >= CLOCK, true, string.format("kefka: the line returned only once his clock had "
+      .. "climbed to 40 again (timer %d at the second line)", l2.cells.timer))
+  end,
+}
+
+-- The cap: back to the 120,000 it was before the telegraph's cases: the whole run, cases (the Runic case included)
+-- and the real fight, ended at f24,380 on the merged ROM before the Runic case, about 8,000 more with it
+-- (wt/v051-tg-wob1), well inside the fight's own budget.
 H.run({ maxFrames = 120000 }, {
+  H.loadState(ENTRY),
+  H.waitFrames(30),
+  engage(),
+  H.waitUntil(function() return H.battleActive() end, 3000, "fight up (the telegraph's cases)", 10),
+  H.call(function()
+    local s = findKefka()
+    H.assertEq(s >= 0, true, "KEFKA_NARSHE $014A on the field (formation 505)")
+    FUSE.bossHp = H.readWord(0x3C1C + 8 + 2 * s)
+    H.log(string.format("[kefka] the telegraph's cases: Kefka in slot %d, HP %d", s, FUSE.bossHp))
+  end),
+  H.fuseCases(FUSE),
+  H.logStep("[kefka] PASS: the telegraph's announce, schedule, cancel and clock earned again; the real fight next"),
+
   H.loadState(ENTRY),
   H.waitFrames(30),
   H.call(function()
@@ -104,12 +177,7 @@ H.run({ maxFrames = 120000 }, {
       "at (19,36), KEFKA's entry point")
     H.assertEq(H.readByte(0x1a6d), 1, "party 1 (TERRA+EDGAR+CELES) active")
   end),
-  -- activation: face him once (a held DOWN that cannot step), release,
-  -- then edge-A only, because a held direction starves CheckNPCs
-  H.hold({ "down" }), H.waitFrames(4), H.release(), H.waitFrames(8),
-  H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
-    H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
-  }, "clean A into KEFKA -> battle 57"),
+  engage(),
   H.waitUntil(function() return H.battleActive() end, 3000, "fight up", 10),
   -- Played to the scripted verdict: the generators' discriminator (both
   -- endings run events, so the save-point warp is the tell).  A wipe never

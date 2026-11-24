@@ -150,7 +150,7 @@ line's party already spends its gil at Jidoor's shops on this leg.
 | box | species | row | leg |
 |---|---|---|---|
 | Narshe school 107 (54,28) | Lobo `$019` | 3 Dagger\|Spear (authored) | none (below) |
-| Imperial Camp 117 (17,18) | Telstar `$044` | 4 Blunt (authored) | `wob_camp_telstar` |
+| Imperial Camp 117 (17,18) | Telstar `$044` | 4 Dagger\|Blunt (authored; main's telegraph branch cut it to 2, back to 4 with SHADOW's blade as a key) | `wob_camp_telstar` |
 | Phantom Train 153 (22,24) | Specter `$156` | **3 Blunt\|Katana** (new) | `wob_train_specter` |
 | Floating Continent 394 (48,15) | Gigantos `$0AE` | **5 Sword\|Ranged** (new) | `wob_fc_gigantos` |
 

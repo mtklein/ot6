@@ -104,6 +104,11 @@ end
 
 local relmS, tgtMon
 local armed
+-- bodies the target cursor could not reach (H.targetCursor bailed: every direction from every state it reached was
+-- tried and the slot never lit).  wt/v051-tg-wob1's gate drew one, formation $0F1's m2, the cursor held on the
+-- party's side (build/attempts/wt/v051-tg-wob1/gate2/): that window gives no try, as when the target falls first,
+-- and later windows aim at another body
+local unreachable = {}
 local Tm = H.targetCursor()
 local mf, tapNo, tapAt = 0, -1, 0
 local function aim(T, want)
@@ -167,7 +172,20 @@ local function runTry(t)
         if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_TGT and (H.readByte(ACTOR) & 3) == relmS
            and not t.sent then
           if waited < t.delay then waited = waited + 1; H.setPad({}); return end
-          local btn = aim(Tm, tgtMon)
+          local ok, btn = pcall(aim, Tm, tgtMon)
+          -- (only the target cursor's bail -- its own "target cursor: " message -- voids the window; anything else is a
+          -- fault, raised as it was)
+          if not ok and not tostring(btn):find("^target cursor: ") then
+            error(btn, 0)
+          end
+          if not ok then
+            unreachable[tgtMon] = true
+            t.void = H.frame
+            t.voidWhy = string.format("the cursor could not reach the target m%d (%s)", tgtMon,
+              tostring(btn):sub(1, 160))
+            H.setPad({})
+            return
+          end
           if next(btn) == "a" then t.sent, t.pendAtConfirm = true, pend(relmS) end
           H.setPad(btn)
           return
@@ -280,7 +298,7 @@ end
 -- it stands, else the first such body
 local function pickTarget()
   local function quiet(m)
-    if not live(m) then return false end
+    if not live(m) or unreachable[m] then return false end
     local a, b = sketches(m)
     return noNumber(a) or noNumber(b)
   end

@@ -62,6 +62,24 @@ delayed the move. This applies to AtmaWeapon's Flare Star, Atma's Ultima,
 the Gold Dragon's Bolt 3 and Kefka's Goner. Hitting the Gold Dragon with
 Fight while it is broken no longer counts toward its stored Bolt 3.
 
+**Early bosses announce their big move.** The Whelk ("It draws in!",
+then it draws into its shell), the Marshal ("Strike as one!", then two
+strikes with both Lobos acting at once), Vargas ("Feel the wind!", then
+Gale Cut), Ultros at the Lete River ("Squirm, BANON!", then his Tentacle
+on Banon), TunnelArmr ("Laser charges!", then TekLaser on both), Telstar
+("It radios in!", then its backup), the GhostTrain ("Whistle blows!",
+then Evil Toot two turns later), Rizopas ("Waters swell!", then El Nino)
+and Kefka at Narshe ("Frost creeps!", then Ice on the squad) say what is
+coming ahead of time, with the yellow **!** in front of the shield icon.
+Break the boss before the move and it is cancelled. Against some of them
+you will usually win the race; against Vargas, Ultros and TunnelArmr the
+line is mostly a cue to brace. Break the Whelk's head while it is
+drawing in and it stays out, broken, for the whole break. The Marshal
+announces only while a Lobo stands. Celes's Runic takes TekLaser or
+Kefka's Ice whole, aimed at everyone, if her stance is still up when it
+lands: it ends when she next acts unless you boost it. Telstar has 2
+shields instead of 4.
+
 Celes is a spellblade. Her command, now RuneKnt, opens a list. Runic is its
 first row and works as before, and a spell with an element that it absorbs,
 an enemy's or an ally's, leaves that element on her blade for the rest of

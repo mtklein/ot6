@@ -258,8 +258,10 @@ STATES = [
     S("wob_train_specter", gen="gen_wob_train_specter", prev="train_b68_entry"),
     # gen_sabin_falls: Baren Falls -- the jump, battle 18 mid-fall (RIZOPAS
     # surfaces in slot 5 off the piranhas' death script), SHADOW's exit, GAU
-    # named on the Veldt shore.
-    S("falls_done", gen="gen_sabin_falls", prev="train_done", timeout=1800),
+    # named on the Veldt shore.  falls_jump: the falls' top after the
+    # arrival scene, one walk from the jump (battle_rizopas, wt/v051-tg-wob2).
+    S("falls_done", gen="gen_sabin_falls", prev="train_done", timeout=1800,
+      also=["falls_jump"]),
     # gen_sabin_gau: Mobliz's Dried Meat, the Veldt grind (GAU appears on a
     # 5/8 end-of-battle roll, 160/256, after a normal battle won with two
     # standing), the meat fed to him through the battle Item menu, and his

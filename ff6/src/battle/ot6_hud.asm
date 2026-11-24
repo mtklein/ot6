@@ -2120,7 +2120,10 @@ Ot6ShieldTbl:
                                 ;   block comment)
         .word   $0044
         .byte   4, OT6_DAGGER|OT6_BLUNT ; telstar: 'bolt, water + bludgeoning' (bosses-wob.md 6-7)
-                                ;   (opening.md 10c).  bolt|water vanilla
+                                ;   (opening.md 10c).  bolt|water vanilla.
+                                ;   4 shields: main's telegraph branch cut it to 2
+                                ;   (SABIN alone could not break 4 under the call);
+                                ;   SHADOW's blade (Dagger) keys it too now, so 4 is a race
         .word   $001a
         .byte   2, OT6_DAGGER|OT6_BLUNT ; doberman: as the templar; a x3 pack of 465 HP with no
                                 ;   key for SABIN alone was the camp's slog (opening.md 10c).

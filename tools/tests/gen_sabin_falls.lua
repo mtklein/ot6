@@ -309,6 +309,8 @@ H.run({ maxFrames = 250000, allowGameOver = true }, {
   end),
 
   walkToFalls(),
+  -- the falls' top after the arrival scene, one walk from the jump: the entry battle_rizopas boots
+  H.saveState("falls_jump.mss"),
 
   jumpAttempt(1),
   jumpAttempt(2),
