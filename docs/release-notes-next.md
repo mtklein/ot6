@@ -5,6 +5,16 @@ and its effect. Cite evidence in the commit message.
 
 ## What's changed
 
+**A break cancels a boss's announced move.** A boss that announces a big
+move loses it if you break the boss first. While the move is pending a
+yellow **!** stands in front of the boss's shield icon; a break while it is
+up cancels the move, and after it recovers the boss has to earn the move
+again the way it did the first time (Kefka, whose move comes from how hurt
+he is, announces it again on his first turn back). Before, a break only
+delayed the move. This applies to AtmaWeapon's Flare Star, Atma's Ultima,
+the Gold Dragon's Bolt 3 and Kefka's Goner. Hitting the Gold Dragon with
+Fight while it is broken no longer counts toward its stored Bolt 3.
+
 **Boosted Dances open on their rare step.** Each of Mog's Dances has four
 steps, and the rarest (Cokatrice, Wombat, Kitty, Tapir, Whump, Wild Bear,
 Pois. Frog or Ice Rabbit) comes one turn in 16. A boosted Dance now starts

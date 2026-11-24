@@ -3,9 +3,23 @@
 Scope: every boss and event fight of the World of Ruin, from the Figaro
 Tentacles to Kefka, in the order the automated line meets them. It is the
 World of Ruin counterpart of [bosses-wob.md](bosses-wob.md) and assumes
-that document's boss contract. Issue #561. This is a survey: it changes no
-ROM byte. Each block says what is built, what the vanilla script offers as
-a wind-up, and what is proposed.
+that document's boss contract. Issue #561. It began as a survey that
+changed no ROM byte; **unit A of its build order is now built** (section
+1.3: the cancel, the lit-fuse mark, and the fuses of Atma, the Gold Dragon
+and Kefka, with the World of Balance's AtmaWeapon). Every other telegraph
+here is design text. Each block says what is built, what the vanilla script
+offers as a wind-up, and what is proposed.
+
+The owner's rulings on the contract (2026-11-23), written into
+bosses-wob.md's contract and assumed below: after a cancel the trigger is
+earned again; an announced move always fires unless a break cancels it,
+and any roll is made before the announce ("don't announce anything that
+won't happen. however, okay to make a roll before that to determine
+whether or not to do the whole sequence"); Kefka's telegraph is Goner
+("sounds well integrated with the game"); and a break releases whatever
+the broken body holds ("definitely breaking a tentacle should free a party
+member. if possible same for enemies that swallow party members
+temporarily").
 
 Owner's direction for the survey (2026-11-23): "carefully designed boss
 fights sounds like the right place to focus. every boss should be
@@ -40,9 +54,10 @@ Read from the source before anything was proposed.
   `ai_script.asm` has one commit, the flatten that brought the disassembly
   in (`git log -- ff6/src/battle/ai_script.asm`: `fba50e7f`), and no line
   of it mentions OT6.
-- **No telegraph is built, in either world.** The word appears in the ROM
+- **No telegraph was built, in either world, when this was surveyed**
+  (section 1.3 says what is built since). The word appeared in the ROM
   source once, in a comment about Diamond Dust (`battle_main.asm:7084`),
-  and in no test or tool (`grep -ril telegraph tools/` is empty).
+  and in no test or tool.
   bosses-wob.md's telegraph lines ("he giggles and frost crawls the
   ground") are design text; two of its blocks already say so (Rizopas:
   "Nothing about it is a telegraph the AI script honours",
@@ -57,7 +72,18 @@ Read from the source before anything was proposed.
   `battle_brokendeath`, `battle_vargas`, `battle_ultros1`,
   `battle_ultros4`, `battle_stophead` and `battle_kefka`.
 
-### 1.1 What a break does to a vanilla fuse today
+### 1.1 What a break did to a vanilla fuse (before unit A)
+
+Measured since, on the ROM the survey read (f3f644c7), by the fuse suites
+run as labs with the cancel's asserts off
+(`build/attempts/wt/v051-fuse/measure/`): in all four fights the break
+delayed the move and no more. AtmaWeapon's Flare Star and Atma's Ultima
+came on the boss's second turn back, the Gold Dragon's Bolt 3 and Kefka's
+Goner on the first, none with a new line ("the break DELAYED the fuse",
+one line a log). Three Fights on a Broken Gold Dragon took its count from
+2 to 5 and lit the charge inside the break (golddrgn.log: "the cells at
+recovery: 07 313B 05 01 0 (at the break: 07 313B 02 00 0)"). The reading
+below stands, with the one correction marked.
 
 A monster's turn runs its script from the top (`ExecMonsterAction`,
 `battle_main.asm:489-509`). `wait` ends the turn and saves where the next
@@ -93,18 +119,26 @@ the source and **not measured live**:
 One reading correction that moves several counts by one:
 `if_battle_var_greater v, n` is true at **n or more**, not above n
 (`AICond_0d`, `battle_main.asm:4884-4889`: `lda $ee / cmp $3a2f`, carry set
-at or above). Dullahan's combo is armed by the eighth counter
-(route-wor-falcon.md:786-787 says nine), the demon Chadarnook leaves on
-the fourth (route-wor-thamasa.md section 5.2 says five), Atma charges at
-the twelfth. Not measured live.
+at or above). **Measured since, and the count is one more than that
+reading gave**: a script's variable commands are queued like its attacks
+and run after the script has been read, so a condition in the same block
+reads the variable before that run's own `add`. A tally that says "n or
+more" after an add is met by the run after the nth: Atma charges on the
+**thirteenth** counted hit (`battle_atma`: "the tally climbed from 0 to
+13"), the Gold Dragon on the **fifth** Fight (`battle_golddrgn`: "the
+count climbed from 0 to 5"). By the same reading Dullahan's combo is armed
+by the ninth counter and the demon Chadarnook leaves on the fifth, as the
+route documents said; those two are not measured.
 
-### 1.2 How a telegraph would be built
+### 1.2 How a telegraph is built
 
-Four pieces, all small, none built.
+Four pieces, all built by unit A (section 1.3); this is the survey's plan
+for them, kept for the reasons.
 
 1. **The fuse block, in the boss's own script, in vanilla's idiom.**
    AtmaWeapon's block is the pattern: a condition, a `dlg`, a glow,
-   `wait`, the move, the trigger cleared, `end_if`. Six WoR scripts already
+   `wait`, the trigger cleared, the move, `end_if` (vanilla cleared it
+   after the move; unit A put the clears first, section 1.4). Six WoR scripts already
    hold one (section 2's "vanilla" telegraphs). The announce rides on a
    turn the boss already takes, so its number of attacks does not change
    (open question 3).
@@ -132,13 +166,135 @@ Four pieces, all small, none built.
    battle variable, the monster timer). Whether the trigger is cleared is
    open question 1.
 
-The HUD takes no part: the per-frame hook has no cycles to spare
-("Telegraph must be data-authored", floating-continent-route.md:499-502),
-so the announce is a line and a glow, drawn by vanilla's own commands.
+The survey expected the HUD to take no part ("Telegraph must be
+data-authored", floating-continent-route.md:499-502: the per-frame hook
+had no cycles to spare). The lead asked for a sign on the shield line, and
+it costs one byte test a frame in a battle with no fuse boss (section 1.3).
 
-The first unit of the build order proves these on the three fuses vanilla
-already has (Atma, the Gold Dragon, Kefka's Goner) before any script is
-written. The same store fixes the WoB's AtmaWeapon.
+### 1.3 What unit A built
+
+`ff6/src/battle/ot6_fuse.asm` (#561); DESIGN.md "Break system" has the
+rule in one paragraph.
+
+- **The cancel.** `Ot6FuseTbl` holds one row a fuse: the species, where
+  its script resumes while the fuse is lit (or, for a fuse a counter arms,
+  the battle switch that is set), and what a break clears. Every take that
+  empties a last shield ends in `Ot6HitBroke` (the element and class
+  chips, OT6's Break, Filch, Bum Rush, Cleave's strip), and that calls
+  `Ot6FuseCancel`: for a lit fuse, `$ff` into `$3240,y` and the row's
+  clears. A break while no fuse is lit changes nothing.
+- **Earned again.** Each row leaves the script where its own move's last
+  commands would: Atma's switch and tally cleared (thirteen hits again),
+  the Gold Dragon's switch, turn count and Fight count (five Fights
+  again), AtmaWeapon's two switches (its rotation's four turns again),
+  Kefka's two battle switches (his HP arms him, so he says the line again
+  on his first turn back and Goner needs the turn after it).
+- **Hits on a Broken boss wind no fuse.** A counter that only counts was
+  already skipped while its monster is Broken; the Gold Dragon's was not,
+  because its block speaks a line and a `dlg` made it a story block. A
+  fuse's announce is no story now (`Ot6FuseLineTbl`).
+- **An announced move always fires.** None of the four vanilla fuses rolls
+  between its announce and its move (each move is one attack); `battle_fuse`
+  checks every row for it. For telegraphs still to be written there is a
+  roll condition, `if_roll <chance in 256>` (AI conditional `$0a`,
+  vanilla's unused second "never"). It belongs on the block that arms a
+  fuse, a turn before the announce, never on the fuse block: a block's
+  conditions are tested again on the turn it resumes.
+- **The sign.** While a fuse is lit a yellow **!** stands in the cell
+  before the boss's shield emblem, the cell Shadow's dagger and knife use
+  (by turns with them, about half a second each, when the boss is also
+  Slowed or Stopped). It appears with the announce and goes when the move
+  is queued or with the hit that breaks the boss. Screenshots:
+  `build/attempts/wt/v051-fuse/shots/`.
+- **Room.** The AI script block and its pointer table load in bank `$F1`,
+  the block `$6000` bytes (vanilla's `$3950` had under ten free); about
+  9,900 are free. `build/attempts/wt/v051-fuse/move/what_moved.txt` shows
+  the move byte for byte.
+- **The idiom and its worked example.** The fuse block in vanilla's idiom
+  is written out at the top of `ot6_fuse.asm`. The CzarDragon's script,
+  which no battle deals, carries the example: a clock and a roll arm it on
+  an ordinary turn, "CzarDragon draws breath!" (battle dialogue `$8D`, the
+  first free slot) announces it on the next, Flare Star follows, and a
+  break in between clears the switch and restarts the clock. A new
+  telegraph is that block in the boss's script, a label after its `wait`,
+  a line in a free slot, and a row in `Ot6FuseTbl`.
+- **A release fits the table.** The row's flags have room for "a break
+  frees what this body holds", applied at every break, lit or not. The
+  release itself is what Discard does (`TargetEffect_44`,
+  `battle_main.asm`): four stores on the holder and the member its `$3358`
+  names. Not built; block 1.
+- **The suites.** `battle_fuse` (the table against the built scripts, the
+  block's home, no roll after an announce, the worked example on a staged
+  formation), `battle_atmaweapon`, `battle_atma`, `battle_golddrgn`,
+  `battle_goner`. Each boss suite plays its battle three times from one
+  snapshot: unbroken (the line, the **!**, the move on vanilla's turn),
+  broken in the fuse (the cancel, the **!** gone with the hit, no move on
+  the turns back, the trigger earned again in full, then the move after
+  the second announce), and broken outside it (nothing cancelled, the
+  trigger's cells untouched, Fights in the window counting for nothing).
+  `battle_fuse` also breaks the CzarDragon in its fuse with LOCKE's
+  Filch, and `battle_atmaweapon` breaks AtmaWeapon in its fuse with
+  TERRA's Break spell: both take the last shield through
+  `Ot6TakeShields`, entered with 8-bit index registers. They are
+  mechanism tests: the gauge is staged for the breaking action and HP is
+  held.
+- **The driver.** The fight driver reads the same lit bit the **!** is
+  drawn from and, when the member whose turn it is can take the boss's
+  last shields with a Fight, makes its planned attack that Fight
+  (`Driver:fusePlan`). It does not yet hold a last shield for an
+  announce, or work a full gauge down inside a fuse. On the line played
+  on unit A's ROM (the gate at c44f23b2, `build/attempts/wt/v051-fuse/gate-c44f/`)
+  no fuse lit in any of the four fights: the legs' logs hold no `[fuse]`
+  line, and the party won each before its boss announced (AtmaWeapon 7,610
+  ticks, Atma 7,087, the Gold Dragon 3,727, Kefka 14,506; 6,907, 6,611,
+  4,019 and 17,138 on the survey's line, whose play upstream differed). So
+  the line does not exercise the cancel; the suites do. Whether a party
+  that meets the announce breaks the boss in time is each unit's lab
+  (turns to break against the fuse's length).
+
+### 1.4 For the next units
+
+What unit A's review (#561) found that every authored telegraph has to
+respect:
+
+- **The clears come before the move.** In the turn that fires, the
+  trigger's clears (switches, variables, `reset_monster_timer`) are
+  queued before the attack, as the Gold Dragon's vanilla block has them.
+  The fuse stops being lit once the firing turn's script has been read;
+  a break that lands after the move and before a clear queued behind it
+  (a party member's counter to a physical finisher) purges the clear with
+  the rest of the turn (`Ot6BrokenTurn`) and no cancel runs, so the boss
+  would announce again with nothing earned: the move twice.
+  AtmaWeapon's and Atma's vanilla fire turns had their clears after the
+  move and were reordered; `battle_fuse` checks the order for every row,
+  and the `fuse_old_order` mutant is red there.
+- **Lit ends when the firing turn's script is read**, not when the move
+  lands. A break during the move's own animation cancels nothing.
+- **A row's masks are battle-wide where the cells are.** The battle-switch
+  mask (`$3eb0`) and the battle variable 3 flag clear cells every body
+  shares, and a switch row (lit by a battle switch) lights every body of
+  its species. A species that comes in twos, or shares battle switches
+  with its partners, needs its own reading before it gets a row.
+- **`mkeep` ANDs the whole `$3dac` byte**: the monster variable and the
+  monster switches are one byte, so a row that clears a variable clears
+  the switches with it, and one that keeps a switch must keep its bit.
+- **Read the earlier blocks and the fuse block's conditions by hand.** An
+  earlier block of the turn script whose conditions hold on the move's
+  turn takes that turn instead of the resume; a non-roll condition on the
+  fuse block (an HP line a heal can cross back) is tested again on the
+  move's turn and can drop an announced move. `battle_fuse` pins each
+  row's blocks to a reading written beside them (`HAND`), so a new row
+  fails until its unit reads its own. Kefka's two HP lines are the known
+  case: they flip back only if the party heals him across the line
+  between the announce and Goner, and that is not guarded.
+- **Guardian's "Vast energy focused" and its Wave Cannon count are not
+  fuses as written**: each announces and fires in one turn
+  (`ai_script.asm`, the Guardian's switch 3 and 4 blocks), so there is
+  nothing to break between them. A telegraph for him needs a `wait`
+  between the line and the move.
+- **Anything called from `Ot6BgHud_ext` must leave B (the high byte of
+  A) zero.** A dirty B there crashed the battle (`Ot6FusePoll` clears it
+  after `Ot6FuseLit`'s word loads).
 
 ## 2. Hooks at a glance
 
@@ -171,15 +327,15 @@ script. Shields are today's; an arrow is a proposal (section 3).
 | 22 | KatanaSoul (the castle's chest) | The mirror duelist: steel is answered with steel, magic with thrown blades and coin | "KatanaSoul's power up!" (vanilla) | 6 |
 | 23 | Master Pug (the cave's chest) | The spell is the tell: its wall turns every 15 counts and the spell it casts names the weakness it wears | WallChange (vanilla) -> the matching tier-3 spell | 6 |
 | 24 | Inferno, Striker, Rough | Proposed (Octopath): the arms guard the engine, whose gauge is shut while an arm stands; the arms regrow on a clock | "Inferno's coils whine" -> Giga Volt | 6 (arms 3) |
-| 25 | Atma | The charge the party arms: twelve blows and he stops to gather light for two turns, then Ultima | "Unknown light surrounded Atma!" (vanilla) -> Ultima | 10 -> 12 |
-| 26 | Gold Drgn | Fights wind it, spells do not: four Fights and it stores energy for two turns | "Gold Dragon begins to store energy!" (vanilla) -> Bolt 3 on all | 6 -> 8 |
+| 25 | Atma | The charge the party arms: thirteen blows and he stops to gather light for two turns, then Ultima | "Unknown light surrounded Atma!" (vanilla) -> Ultima. **Built** | 10 -> 12 |
+| 26 | Gold Drgn | Fights wind it, spells do not: five Fights and it stores energy for two turns | "Gold Dragon begins to store energy!" (vanilla) -> Bolt 3 on all. **Built** | 6 -> 8 |
 | 27 | Skull Drgn | A four-beat bar: three beats of Condemned and fire, then Disaster on the fourth, every time | "The Skull Dragon's jaw unhinges" -> Disaster | 6 -> 8 |
 | 28 | Guardian | A boss rush in one body: it runs Ultros's, Dadaluma's, the Air Force's and Atma's programs in turn, each ending in that boss's finisher | "Ran ...'s battle program!" (vanilla) -> Wave Cannon, Flare Star | 10 |
 | 29 | Doom | The field closes: each Force Field nulls one more element for both sides, and only the classes stay open | Targetting (vanilla) -> Demon Rage on the marked member | 10 |
 | 30 | Goddess | She borrows the party: Love Token makes a member take her hits, Charm turns one | "The sky splits" -> Quasar | 8 -> 10 |
 | 31 | Poltrgeist | The executioner: Stop, then Blaster on whoever is Stopped; every hit is answered with Fire 3 | Stop (vanilla) -> Blaster | 8 -> 10 |
 | 32 | The final battle, tiers 1-3 | Kill order: each body's death or last stand is an attack (the Face's Quake, the Hit's ten blows, the Sleep's two deaths), and the Girl raises the Sleep | none; open question 4 | 6-8, the Girl 3 |
-| 33 | Kefka | The whole roster's fight: the fallen are replaced in the order the player set | "The end comes...beyond chaos." (vanilla) -> Goner | 16 |
+| 33 | Kefka | The whole roster's fight: the fallen are replaced in the order the player set | "The end comes...beyond chaos." (vanilla) -> Goner. **Built** | 16 |
 
 Not fights: Phunbaba's first record (TERRA's scripted loss) and the Zone
 Eater draw no gauge and get no contract (section 5).
@@ -368,11 +524,14 @@ takes a member out of the party's hands and gives them back.
 **Telegraph.** Vanilla's, unchanged: Entwine Slows, and that body Seizes
 on its next turn. The Slow is the announce; no line is needed. Under the
 contract a break costs the body the turn it would Seize on, and the ×2
-window is long enough to kill a 4,000-7,000 HP body. Proposed addition,
-new code: **a break on a holder releases its captive**, the release
-Discard performs. Without it a Broken holder cannot Discard either, so the
-member stays held for the whole break (read from the turn rule; not
-measured). Stays verbatim: Seize, the drain, Discard's 30 counts, the
+window is long enough to kill a 4,000-7,000 HP body. **A break on a
+holder releases its captive** (the owner, 2026-11-23: "definitely breaking
+a tentacle should free a party member"; a contract rule now, to be built
+with this block, unit B), the release Discard performs
+(`TargetEffect_44`: the holder's switch 7 and `$3358`, the member's
+`$3359` and its bit in `$3403`). Without it a Broken holder cannot Discard
+either, so the member stays held for the whole break (read from the turn
+rule; not measured). Unit A's table has room for the row (section 1.3). Stays verbatim: Seize, the drain, Discard's 30 counts, the
 counters, the absorbs, 0 XP.
 
 **Shields.** 5 each, 20 across four gauges: the WoR's opening multi-body
@@ -1426,19 +1585,25 @@ the party's hits:
 ```
 
 `dlg $83` is "Unknown light surrounded Atma!". The switch is set by the
-twelfth counter (:8147-8154), and while it is set he does not counter.
+thirteenth counter (:8147-8154; measured, section 1.1), and while it is
+set he does not counter.
 
-**Hook.** The charge the party arms. Twelve blows and he stops attacking
+**Hook.** The charge the party arms. Thirteen blows and he stops attacking
 for two whole turns to gather light, then Ultima. The AtmaWeapon's fuse
 came on his schedule; this one comes on the party's, and it pays two free
 turns to whoever is ready for it. Hits in a break window do not count
 (section 1.1).
 
-**Telegraph.** Vanilla's, unchanged. What is missing is the cancel: today
-a break between the glows delays Ultima by the length of the break and no
-more. With the cancel store the block restarts at its line; with the
-species table clearing monster switch 0 and battle variable 3, the twelve
-must be earned again. Nothing in the script changes.
+**Telegraph.** Vanilla's, unchanged, and **built** (#561, section 1.3;
+`battle_atma`). The **!** stands from the line to Ultima, which comes on
+his second turn after it. A break in between cancels it: the script waits
+nowhere, monster switch 0 and battle variable 3 read clear, his first
+turns back hold no Ultima, and the line returns only after thirteen more
+counted hits ("the tally climbed from 0 to 13 before the second line, as
+before the first"). Hits on him while he is Broken count for nothing.
+Before, a break delayed Ultima to his second turn back
+(build/attempts/wt/v051-fuse/measure/atma.log). Nothing in the script
+changed.
 
 **Shields.** 10, one under the AtmaWeapon's 11; proposed 12.
 
@@ -1458,7 +1623,8 @@ Party 2 (`wor_kt_guardian.log:10446`). Event battle 135.
 water, absorbs bolt.
 
 **Script** (`ai_script.asm:7047-7118`). **The telegraph already exists in
-vanilla, line and all.** Four Fights arm it, in the counter:
+vanilla, line and all.** Five Fights arm it (measured, section 1.1), in
+the counter:
 
 ```
 7105:         if_cmd FIGHT
@@ -1476,15 +1642,19 @@ Magic is answered with Bolt instead (:7115-7117), and it wraps itself in
 Reflect when a member wears it (:7059-7078).
 
 **Hook.** Fights wind it, spells do not. The player chooses how to hit:
-steel is safe four times and then starts the clock, magic is answered at
-once and never starts it.
+steel is safe four times and the fifth starts the clock, magic is answered
+at once and never starts it.
 
-**Telegraph.** Vanilla's, unchanged, and at three turns it is longer than
-the contract's one. Its arming block holds a `dlg`, so it runs while the
-dragon is Broken (section 1.1): Fights in the window count, and can arm
-the charge on a Broken dragon. Whether that is right is part of open
-question 1. With the species table clearing battle switch 0 and variable
-3 at the break, the charge is cancelled.
+**Telegraph.** Vanilla's, unchanged, and **built** (#561, section 1.3;
+`battle_golddrgn`). At three turns it is longer than the contract's one.
+The **!** stands from the line (its counter's, on the fifth Fight) to
+Bolt 3. A break in between cancels the charge: battle switch 0, the turn
+count and the Fight count read clear, its first turns back hold no Bolt 3,
+and the line returns only after five more Fights. Its arming block holds a
+`dlg`, so before this it ran while the dragon was Broken and Fights in the
+window could light the charge on a Broken dragon (section 1.1); a fuse's
+announce is no story now, so Fights on a Broken dragon count for nothing,
+as hits on a Broken Atma never did.
 
 **Shields.** 6, the floor's number; proposed 8. "It may be too easy for an
 eighth dragon" (route-wor-kefka-tower.md section 6).
@@ -1816,11 +1986,16 @@ set.
 player chose, and the fallen are replaced from it. And the last boss is
 the one vanilla already wrote to the contract.
 
-**Telegraph.** Goner, vanilla's, unchanged. Today a break in the fuse
-delays it; with the cancel store he says the line again when he
-recovers. Fallen One, the move that costs the line its fights
-(route-wor-the-end.md 5.2-5.4), has no announce; open question 6 asks
-which of the two is his telegraph.
+**Telegraph.** Goner, vanilla's, unchanged (the owner, 2026-11-23: it
+"sounds well integrated with the game"), and **built** (#561, section 1.3;
+`battle_goner`). The **!** stands from the line to Goner, his next turn.
+A break in between cancels it: battle switches 0 and 1 read clear, so his
+counters stand again, and since his HP is what arms him he says the line
+again on his first turn back; Goner needs the full turn after that. Before,
+a break delayed Goner to his first turn back with no new line
+(build/attempts/wt/v051-fuse/measure/goner.log). Fallen One, the move that
+costs the line its fights (route-wor-the-end.md 5.2-5.4), has no announce
+and is not his telegraph.
 
 **Shields.** 16, decided.
 
@@ -1911,7 +2086,7 @@ key, before and after.
 
 | unit | bosses | what it builds | suites |
 |---|---|---|---|
-| A | Atma, Gold Drgn, Kefka (and the WoB's AtmaWeapon) | the machinery of 1.2 on fuses vanilla already wrote: the script block moved, the cancel store, the species table. No script changes | `battle_fuse` (the cancel, on a fixture), `battle_atma`, `battle_golddrgn`, `battle_goner`, `battle_atmaweapon` |
+| A (**built**, section 1.3) | Atma, Gold Drgn, Kefka (and the WoB's AtmaWeapon) | the machinery of 1.2 on fuses vanilla already wrote: the script block moved, the cancel store, the species table, the lit-fuse mark, the roll condition. No change to those scripts | `battle_fuse` (the table, the block, the worked example), `battle_atma`, `battle_golddrgn`, `battle_goner`, `battle_atmaweapon` |
 | B | Tentacles, Dullahan, Phunbaba | the first authored lines; the hostage release; the hit counter cleared by a break | `battle_tentacles`, `battle_dullahan`, `battle_phunbaba` |
 | C | Chadarnook, Umaro, Tritoch | a window fight, a buff denied, a command-keyed boss | `battle_chadarnook`, `battle_umaro`, `battle_tritoch` |
 | D | Storm, Ice and Red Dragons | the growing gauge; a rotation fuse; a clock reset by the break | `battle_stormdrgn`, `battle_icedragon`, `battle_reddragon` |
@@ -1937,9 +2112,16 @@ Each can be answered in a sentence.
    Either the boss announces again on its first turn back (one store, no
    table), or the break also clears what armed it: eight more hits on
    Dullahan, a fresh clock for the Red Dragon, Umaro's cherry gone.
+   **Answered: earned again** (built, section 1.3). A clock a break
+   restarts keeps running through the break, so a clock shorter than a
+   break (2,159 frames) is due again on the boss's first turn back; if a
+   fresh clock after recovery is wanted for the Red Dragon, unit D resets
+   it at the break's end instead.
 2. **May a telegraphed move become certain on its turn** where vanilla
    rolled it one time in three or two in three (Absolute 0, Cyclonic,
-   Quasar, Doom Gaze's Escape)?
+   Quasar, Doom Gaze's Escape)? **Answered: it must be.** An announced
+   move always fires; the roll, if kept, is made before the announce and
+   decides whether the sequence starts (`if_roll`, section 1.3).
 3. **Does the boss still attack on the turn it announces?** Proposed yes:
    the line rides on a turn it already takes, so vanilla's count of
    attacks is unchanged. Octopath's bosses spend the turn.
@@ -1951,7 +2133,7 @@ Each can be answered in a sentence.
 5. **One telegraph a boss, or one a phase** where vanilla wrote several
    (Guardian's four programs)?
 6. **Kefka's telegraph: Goner, which vanilla announces, or Fallen One,**
-   which is what the line loses to?
+   which is what the line loses to? **Answered: Goner** (built).
 7. **The eight dragons: one shield count or a ladder?** And is the Storm
    Dragon's 14 the dragons' number, or its own hook (the gauge that
    grows)?
@@ -1965,7 +2147,9 @@ Each can be answered in a sentence.
     so STRAGO learns it?
 12. **The CzarDragon:** wanted? If so, where does it wait, and what does
     it pay, now that Crusader is the eighth dragon's prize?
-13. **Should a break free a member a Tentacle holds?**
+13. **Should a break free a member a Tentacle holds?** **Answered: yes,**
+    and the same for any body that holds or swallows a member for a
+    while; a contract rule, built with unit B.
 
 ## 9. Surprises
 
@@ -1973,9 +2157,9 @@ Each can be answered in a sentence.
    telegraph lines are prose; `ai_script.asm` is untouched since the
    disassembly was absorbed. The contract's built half is the break's
    effect on turns and counters (section 1).
-2. **A break delays a vanilla fuse and does not cancel it** (section
-   1.1): the script resumes where its `wait` left it. Read from the
-   source; not measured.
+2. **A break delayed a vanilla fuse and did not cancel it** (section
+   1.1): the script resumed where its `wait` left it. Measured since on
+   all four fuses, and fixed by unit A (section 1.3).
 3. **Vanilla already wrote fuses for six WoR bosses, five with a line:**
    the Gold Dragon's "begins to store energy!", Atma's "Unknown light",
    Kefka's "The end comes...beyond chaos.", Guardian's countdown, the
@@ -1999,10 +2183,12 @@ Each can be answered in a sentence.
    "met nowhere else" (`ot6_hud.asm:3301-3317`). The row's values are
    right for it. The comment is wrong, and it explains the formation
    mismatch route-wor-gau.md finding 6 left open.
-8. **`if_battle_var_greater` is "at least".** Counts in two route
-   documents are one high (section 1.1).
-9. **The script block is full:** under ten free bytes. Any authored fuse
-   needs the block moved first (section 1.2).
+8. **`if_battle_var_greater` is "at least", and a tally still needs one
+   more hit than its number**, because the block's own add runs after its
+   conditions are read: measured on Atma (13) and the Gold Dragon (5).
+   The two route documents' counts were right (section 1.1).
+9. **The script block was full:** under ten free bytes. Unit A moved it
+   to bank `$F1` with about 9,900 free (section 1.3).
 10. **Seven dragons carry 6, the fallback's number**, one of them by
     measurement, and three of the late ones are the line's shortest boss
     fights (section 3.2, 1).

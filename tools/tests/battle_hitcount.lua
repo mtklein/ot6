@@ -427,10 +427,14 @@ H.run({ maxFrames = 120000 }, {
   -- Which formation the ledge draws is random, so this is a bounded ladder
   -- rather than one attempt.
   H.call(function() want = PUMMEL end),
+  -- (and until BtlGfx_04 has read that action's script: it plays a frame or more after the attack loop closes,
+  -- and the step below reads it.  The drive used to end on the close alone, and on wt/v051-fuse's line the close
+  -- came at f2649 and the verdict at f2651, before the script: "Pummel #1: ... closed=true (frame 2649); script
+  -- []", build/attempts/wt/v051-fuse/failed/battle_hitcount-race.log)
   drive(function()
     local a = bestFor(PUMMEL)
-    return a ~= nil and a.hits >= 2
-  end, 40000, "a Pummel whose target survives its first hit"),
+    return a ~= nil and a.hits >= 2 and a.script ~= nil
+  end, 40000, "a Pummel whose target survives its first hit, its script played"),
 
   H.call(function()
     disarm()

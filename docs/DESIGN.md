@@ -105,6 +105,34 @@ A body that returns from death is fresh: a monster the AI restores
 with full shields, not Broken and with no marks, keeping only its revealed
 weaknesses (#557).
 
+**A break cancels a lit fuse** (#561, `ot6_fuse.asm`;
+[bosses-wob.md](design/bosses-wob.md) "The boss contract"). A boss that
+announces its big move a turn ahead loses the move if it is broken before it
+fires. A fuse is lit while the boss's turn script waits at one of the resume
+addresses its `Ot6FuseTbl` row names, from the announce's turn to the turn
+that queues the move (or, for the Gold Dragon, whose counter arms it, while
+its battle switch is set). Every take that empties the last shield ends in
+`Ot6HitBroke`, which calls `Ot6FuseCancel`: for a lit fuse it stores `$ff` in
+`$3240,y`, what `end_if` stores, so the boss's next turn starts its script
+from the top, and clears what armed the fuse (the row's monster switches,
+battle switches, battle variable 3, the monster's timer), each row leaving
+the state its own move's last commands would have. The trigger then has to
+be earned again: Atma's hits and the Gold Dragon's Fights are counted from
+zero, AtmaWeapon's rotation runs its four turns again, Kefka says his line
+again. A break while no fuse is lit changes nothing about it, and hits on a
+Broken boss wind no fuse (a counter that only counts is skipped while its
+monster is Broken, and a fuse's announce is not story: `Ot6FuseLineTbl`).
+An announced move always fires unless a break cancels it or the boss dies:
+nothing rolls between the announce and the move, and a roll, where there is
+one, sits on the turn that arms the fuse (`if_roll`, AI conditional `$0a`).
+While a fuse is lit the cell before the boss's shield emblem shows a yellow
+**!** (`OT6_MARK_FUSE`, by turns with Shadow's dagger or knife when the body
+is also Slowed or Stopped); the HUD re-reads one monster slot a frame
+(`Ot6FusePoll`) and only in a battle where a body with a row stands. Built
+on the four fuses vanilla wrote (AtmaWeapon's Flare Star, Atma's Ultima, the
+Gold Dragon's Bolt 3, Kefka's Goner); the AI script block loads in bank
+`$F1` with `$6000` bytes so later telegraphs have room.
+
 **Shielded resistance.** Every hit is judged on the enemy's state before it
 lands. While an enemy still has shields it takes reduced damage (×0.5), and
 the hit that takes its last shield is one of those hits: it lands on a

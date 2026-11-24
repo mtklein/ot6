@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "611b1c2a2086ab68c0cc6d0c28c2ca368b62b13206f43c44ea6aa428b4fa539b",
-  "generator_sig": "1d354595f78977e5ab8c8f688bf2a8e57e8dc17f85126506dd94e988c7f0bf00 gen_wor_edgar build/checkpoints/wor-south-figaro-v1/manifest.json build/checkpoints/wor-south-figaro-v1/wor-south-figaro.sram",
+  "payload_sha256": "7fed1210b3dc43f7561d1aaf2a8f16630341885b006916c6fe40dce997d2e13b",
+  "generator_sig": "fc0bd59b7adfe68188ecaa739400bdf43d255910d118c7a0b0727da399a2c0d4 gen_wor_edgar build/checkpoints/wor-south-figaro-v1/manifest.json build/checkpoints/wor-south-figaro-v1/wor-south-figaro.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-south-figaro-v1/manifest.json",
-      "sha256": "b68d6e2ae2f2029c09f4cae017233fe226b5efff551c4822f2dbc4accf2c27b4"
+      "sha256": "84d60ecc43fa8cabc445f4ed93134c005994d1c01465f4a2683143c247b3c974"
     }
   ]
 }

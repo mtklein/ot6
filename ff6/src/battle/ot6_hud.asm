@@ -226,6 +226,10 @@
         jsr     Ot6PipPending   ;   a deferred cover pip paints on it too
 :       jsr     Ot6PipStage     ; stage the four live pip-row words
         jsr     Ot6WalletStage  ; stage the costed-list MP wallet
+        lda     OT6_FUSEPOLL    ; #561: a body with a fuse stands in this
+        beq     :+              ;   battle?  then one slot's lit bit a frame
+        jsr     Ot6FusePoll     ;   (ot6_fuse.asm; inline gate, as below)
+:
         ; drive any live break flash.  after the poll above on purpose: a
         ; break armed by this tick's numeral gets its first white frame on
         ; that same frame rather than the next one.  The gate is inline rather
@@ -3724,7 +3728,7 @@ Ot6BgGlyphData:
 ; (gen_shield_glyphs.py draws it, beside the emblem)
         .byte   OT6_KNIFE_TILE
 
-; the trap's mark before the shield emblem (#546), by OT6_MARKCELL: free
+; the mark before the shield emblem (#546, #561), by OT6_MARKCELL: free
 ; (never drawn: Ot6BgHudFlush_ext writes nothing for it), hobbled (the
 ; battle font's own dagger, $d8, the item icon beside the class icons
 ; Ot6ClassGlyphTbl uses), pinned (the knife).  Text palette 0, the gauge's.
@@ -3732,6 +3736,9 @@ Ot6MarkWordTbl:
         .word   $01ee
         .word   (OT6_GAUGE_ATTR << 8) | $d8
         .word   (OT6_GAUGE_ATTR << 8) | OT6_KNIFE
+        ; #561: a lit fuse (OT6_MARK_FUSE, ot6_fuse.asm): the font's own "!"
+        ; ($be), yellow
+        .word   (OT6_FUSE_ATTR << 8) | $be
 
 ; ------------------------------------------------------------------------------
 

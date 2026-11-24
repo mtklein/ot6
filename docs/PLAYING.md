@@ -54,6 +54,19 @@ battles and in your save. Scan reveals all of a kind's weaknesses at once.
 
 A few enemies have no shields and show no line.
 
+### A boss's big move
+
+Some bosses announce their biggest move before they use it with a line of
+text, and some also glow. From then until the move a yellow **!** stands
+in front of the boss's shield icon. Break the boss while the **!** is up and
+the move is cancelled. When the boss recovers it does not pick the move up
+where it left off: it has to earn it again the way it did the first time.
+For most bosses that means several more turns or hits. Kefka's move comes
+from how hurt he is, so he announces it again on his first turn back and
+uses it on the turn after. A move that has been announced always comes unless
+you break the boss first. AtmaWeapon's Flare Star, Atma's Ultima, the Gold
+Dragon's Bolt 3 and Kefka's Goner work this way.
+
 ### Weapon types
 
 A weapon's icon shows its type. Fight uses the type of the weapon in hand.
@@ -362,7 +375,8 @@ a stopped enemy only does damage. A broken enemy is slowed but never stopped.
 Enemies that ignore Slow or Stop still do. A dagger before an enemy's shield
 means it is slowed, by a throw or a spell; a knife in the same place means it
 is stopped. Each appears with the hit that causes it and goes when the status
-ends. Gogo's Throw and a Mimic of a throw work the same way, so Shadow can
+ends. (A boss with a big move pending shows a yellow **!** there; if it is
+also slowed or stopped the two take turns.) Gogo's Throw and a Mimic of a throw work the same way, so Shadow can
 slow an enemy and Gogo can stop it.
 
 | Item | Where | Effect |

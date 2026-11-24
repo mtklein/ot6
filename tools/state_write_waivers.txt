@@ -36,6 +36,10 @@
 # documentation, not a gate; a line without one is no less sanctioned.
 tools/tests/battle_assassinate.lua	.writeByte(	1
 tools/tests/battle_assassinate.lua	.writeWord(	1	quarantine: the isolation arm's staged HP: no PIERCE-weak body the camp pool deals outlives its doubled break, so the hook point's Broken-boss read is unreachable by play (#296)
+tools/tests/battle_atma.lua	.writeByte(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: the gauge (63 while the arming Fights land, 1 for the breaking Fight) and the row's classes for that Fight; a break timed inside a two-turn fuse is not on cue by play
+tools/tests/battle_atma.lua	.writeWord(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: HP held (the boss's above its low rotation's line, the party's at 9,999) so no draw ends a case
+tools/tests/battle_atmaweapon.lua	.writeByte(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: the gauge to 1 and the row's classes for the breaking Fight; a break timed inside a two-turn fuse is not on cue by play
+tools/tests/battle_atmaweapon.lua	.writeWord(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: HP held (the boss's at 12,000, inside its rotation's band; the party's at 9,999) so no draw ends a case
 tools/tests/battle_breakflash.lua	.writeByte(	13
 tools/tests/battle_breakflash.lua	.writeWord(	2
 tools/tests/battle_boostcap.lua	.writeByte(	1	quarantine: #359 mechanism test -- the actor's bank set to 3 pips per case so R can raise pending to the case's boost through the menu
@@ -69,6 +73,12 @@ tools/tests/battle_bumrushmimic.lua	.writeWord(	1
 tools/tests/battle_folddrill.lua	.writeByte(	1	quarantine: #554 presentation test -- no battery on the route holds a Drill (its shop refuses this party), so the bag's Debilitator cell is made one
 tools/tests/battle_folddrill.lua	.writeWord(	2	quarantine: #554 presentation test -- every monster staged to 60000 HP so all four Overclocked strikes land on a standing body
 tools/tests/battle_foldbumrush.lua	.writeWord(	2	quarantine: #554 presentation test -- every monster staged to 60000 HP so all four Bum Rush blows land (the route's draws are one-blow kills)
+tools/tests/battle_fuse.lua	.writeByte(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: the CzarDragon's shield row (no battle deals it, so it has none), the gauge to 1 and the row's classes for the breaking Fight
+tools/tests/battle_fuse.lua	.writeWord(	2	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: HP held, and the formation word ($11E0) at LoadBattleProp: no battle deals formation 561, the worked example's body
+tools/tests/battle_golddrgn.lua	.writeByte(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: the gauge (63 while the arming Fights land, 1 for the breaking Fight) and the row's classes for that Fight
+tools/tests/battle_golddrgn.lua	.writeWord(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: HP held (the boss's at 30,000, the party's at 9,999) so no draw ends a case
+tools/tests/battle_goner.lua	.writeByte(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: the gauge to 1 and the row's classes for the breaking Fight; a break timed inside a one-turn fuse is not on cue by play
+tools/tests/battle_goner.lua	.writeWord(	1	quarantine: #561 mechanism test of a boss's fuse -- M.fuseCases' declared staging through the suite's two writers: HP held (Kefka's under or over his line, 32,640; the party's at 9,999) so no draw ends a case
 tools/tests/battle_leoespers.lua	emu.reset	1	quarantine: #552 piece F the console's Reset between the save after LEO's battles and the Continue, a person's input the pad cannot carry; the run then Continues from the title through the menus, and nothing in emulated state is edited
 tools/tests/battle_leoshock.lua	.writeByte(	2	quarantine: #552 mechanism staging -- each present monster's shields staged six of six, unbroken, at the battle's open, so each Shock's take on them (none) can be read; the property is Shock's, not play
 tools/tests/battle_leoshock.lua	.writeWord(	1	quarantine: #552 mechanism staging -- each present monster's HP raised to 30,000 at the battle's open so the battle outlasts three Shocks and the copy runs; the property is Shock's, not play

@@ -5100,7 +5100,9 @@ AICondTbl:
         .addr   AICond_07
         .addr   AICond_08
         .addr   AICond_09
-        .addr   AICond_0a
+        .addr   Ot6AICondRoll   ; ot6 #561: if_roll (ot6_fuse.asm).  Was
+                                ;   AICond_0a, vanilla's second "never",
+                                ;   which no script uses
         .addr   AICond_0b
         .addr   AICond_0c
         .addr   AICond_0d
