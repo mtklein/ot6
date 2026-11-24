@@ -216,15 +216,41 @@ local function optimum(tag, out)
 end
 
 local SPEAR, OTHER = nil, nil
+-- the boots' relic slot, staged from the live save (TESTING.md: who wears which relic is the play's luck): a
+-- Merit Award (relic +12 bit 5, bit 15 of the equip word) lends every spear by itself, so one comes off first and
+-- its slot takes the boots; else an empty slot; else slot 4, whose relic the boots replace
+local BSLOT, MERIT = nil, nil
+local function relicAt(s) return H.readByte(0x1600 + 37 * 7 + 0x1F + s) end
+local function isMerit(r) return r ~= 0xFF and (H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) + r * 30 + 12) & 0x20) ~= 0 end
+local function stageBootsSlot()
+  return H.seqStep({
+    H.call(function()
+      MERIT = nil
+      for s = 4, 5 do if MERIT == nil and isMerit(relicAt(s)) then MERIT = s end end
+      BSLOT = MERIT or (relicAt(4) == 0xFF and 4) or (relicAt(5) == 0xFF and 5) or 4
+      H.log(string.format("[spear] STRAGO's relics $%02X $%02X: the boots go in slot %d%s", relicAt(4), relicAt(5),
+        BSLOT, MERIT and " (a Merit Award comes off first)" or ""))
+    end),
+    H.lazy(function()
+      if MERIT == nil then return H.seqStep({}) end
+      return H.unequipRelics(7, { MERIT }, { tag = "the Merit Award off STRAGO" })
+    end),
+    H.call(function()
+      H.assertEq(isMerit(relicAt(4)) or isMerit(relicAt(5)), false,
+        "precondition: STRAGO wears no Merit Award (it would lend the spears without the boots)")
+    end),
+  })
+end
 local ROD = 0x3A          -- the Gravity Rod: shop 72 sells it and it is STRAGO's own (asserted below)
 local pre, post = {}, {}
 local preWho, postWho = {}, {}
 local preShop, postShop = {}, {}
 local opt = {}
-local onBest, spearsBefore = nil, 0
+local onBest, spearsBefore, heldSpears = nil, 0, 0
 H.run({ maxFrames = 200000 }, {
   H.loadState("build/states/wor_leo_pre.mss.lua"),
   H.waitFrames(30),
+  stageBootsSlot(),
   H.call(function()
     H.assertEq(pos() ~= nil, true, "precondition: STRAGO in the active party (gen_wor_leo seats him)")
     H.assertEq(H.invCountOf(BOOTS) > 0, true,
@@ -234,7 +260,6 @@ H.run({ maxFrames = 200000 }, {
       H.assertEq(H.readByte(r + 0x23) ~= BOOTS and H.readByte(r + 0x24) ~= BOOTS, true,
         string.format("precondition: nobody wears the Dragoon Boots yet (block %d)", c))
     end
-    H.assertEq(H.readByte(REC + 0x23), 0xFF, "precondition: STRAGO's first relic slot is empty (the boots' slot)")
     -- the bag's spears he cannot hold by his own bit, strongest first
     local sp = {}
     for slot = 0, 255 do
@@ -274,10 +299,12 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- B. the boots on ----------------------------------------------------------------------------------------
-  H.equipWeapon(function() return pos() end, BOOTS, { slot = 4, tag = "the Dragoon Boots on STRAGO" }),
+  H.lazy(function()
+    return H.equipWeapon(function() return pos() end, BOOTS, { slot = BSLOT, tag = "the Dragoon Boots on STRAGO" })
+  end),
   H.waitFrames(30),
   H.call(function()
-    H.assertEq(H.readByte(REC + 0x23), BOOTS, "STRAGO wears the Dragoon Boots")
+    H.assertEq(relicAt(BSLOT), BOOTS, "STRAGO wears the Dragoon Boots")
     local a, b = hands()
     H.log(string.format("[spear] after the Relic menu's re-equip: hands $%02X $%02X", a, b))
     H.assertEq(a, onBest, string.format("the boots on: the Relic menu's re-equip (Optimum) gave him $%02X, the "
@@ -304,8 +331,14 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- C. the boots off ---------------------------------------------------------------------------------------
-  H.call(function() spearsBefore = 0; for _, id in ipairs({ SPEAR, OTHER }) do spearsBefore = spearsBefore + H.invCountOf(id) end end),
-  H.unequipRelics(STRAGO, { 4 }, { tag = "the Dragoon Boots off STRAGO" }),
+  H.call(function()
+    spearsBefore = 0
+    for _, id in ipairs({ SPEAR, OTHER }) do spearsBefore = spearsBefore + H.invCountOf(id) end
+    local a, b = hands()
+    heldSpears = 0
+    for _, id in ipairs({ a, b }) do if id == SPEAR or id == OTHER then heldSpears = heldSpears + 1 end end
+  end),
+  H.lazy(function() return H.unequipRelics(STRAGO, { BSLOT }, { tag = "the Dragoon Boots off STRAGO" }) end),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(wearsBoots(), false, "STRAGO no longer wears the Dragoon Boots")
@@ -319,7 +352,8 @@ H.run({ maxFrames = 200000 }, {
     end
     local now = 0
     for _, id in ipairs({ SPEAR, OTHER }) do now = now + H.invCountOf(id) end
-    H.assertEq(now, spearsBefore + 1, "the boots off: the spear he held is back in the bag")
+    H.assertEq(heldSpears > 0 and now == spearsBefore + heldSpears, true,
+      string.format("the boots off: the %d spear(s) he held are back in the bag (%d -> %d)", heldSpears, spearsBefore, now))
     H.log("[spear] PASS: the boots lend a spear in the Equip menu, Optimum, the Item menu and the shop, and take "
       .. "it back when they come off")
   end),

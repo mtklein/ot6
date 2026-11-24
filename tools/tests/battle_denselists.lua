@@ -283,6 +283,13 @@ local function walk(kindName, slot, want, tag)
   -- past the last entry nothing moves, and the scroll stays inside the list
   for _, b in ipairs({ k.step, "right", "down", "down", "right" }) do
     press(b)
+    -- a member who lost control here leaves the walk to the check below (#567's replay: LOCKE's magic walk on
+    -- wob_esper_mtn_hunt, a monster's action between two presses, and the next Right read cell 0)
+    if (H.readByte(0x3EE4 + slot * 2) & 0xC2) ~= 0 then
+      H.log(string.format("[dense] %s slot %d lost control past its last entry (status1 $%02X, menu state $%02X)",
+        tag, slot, H.readByte(0x3EE4 + slot * 2), st()))
+      break
+    end
     local j, sc = cursorIndex(k, slot)
     H.assertEq(j, n - 1, string.format("%s: %s past the last entry stays on it (cell %d of %d)", tag, b, j, n))
     H.assertEq(sc <= topOf(k, n), true, string.format("%s: scroll %d within the top %d", tag, sc, topOf(k, n)))
