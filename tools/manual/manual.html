@@ -20,7 +20,7 @@
     <div class="band">A Final Fantasy III adventure &middot; Super NES</div>
     <div class="title">OT6</div>
     <div class="subtitle">The world of Final Fantasy III<br>with the battles of Octopath Traveler</div>
-    <div class="art"><img src="img/cover.png" alt="Ultros at the opera: a piercing hit finds his second weakness"></div>
+    <div class="art"><img src="img/cover.png" alt="Ultros at the opera: a hit finds his second weakness"></div>
     <div class="tagline">Every monster has a weak spot.<br>Find it, knock its shields down,<br>and strike while it&rsquo;s broken.</div>
     <div class="ornament cover-orn">&#9670; &#9670; &#9670;</div>
     <div class="booklet">INSTRUCTION BOOKLET</div>
@@ -339,16 +339,19 @@
   <div class="runhead"><span>How OT6 plays</span><span class="mark">Weapons &amp; Break</span></div>
   <div class="body">
     <h2>Weapon types</h2>
-    <p>A weapon's icon shows its type, and Fight uses the type of the weapon in hand.</p>
-    <table>
-      <tr><th style="width:1.05in">Type</th><th>Weapons</th></tr>
-      <tr><td class="k">Slashing</td><td>swords, katanas, claws</td></tr>
-      <tr><td class="k">Piercing</td><td>spears, daggers, thrown blades, bolts, darts, fangs</td></tr>
-      <tr><td class="k">Bludgeoning</td><td>fists, staves, rods, flails, boomerangs</td></tr>
-      <tr><td class="k">Special</td><td>dice, cards, brushes</td></tr>
+    <p>A weapon's icon shows its type, and the item menu names it. Fight uses the type of the weapon in hand; an
+    empty hand is a fist, which is Blunt.</p>
+    <table class="compact">
+      <tr><th style="width:0.75in">Type</th><th>Weapons and skills</th></tr>
+      <tr><td class="k">Sword</td><td>swords but the curved ones; Edgar's Chain Saw</td></tr>
+      <tr><td class="k">Dagger</td><td>daggers, ninja blades, claws, Gau's fangs; Locke's Trickshot and Dismantle</td></tr>
+      <tr><td class="k">Spear</td><td>spears; Edgar's Drill</td></tr>
+      <tr><td class="k">Katana</td><td>katanas and the curved swords (RegalCutlass, Flame Sabre, Falchion, Soul Sabre, Scimitar); Cyan's SwdTech</td></tr>
+      <tr><td class="k">Blunt</td><td>fists, knuckles, rods, brushes, flails, clubs; Pummel, Suplex, Bum Rush; Umaro's Charge and Throw</td></tr>
+      <tr><td class="k">Ranged</td><td>thrown stars, skeans, darts, cards, dice, boomerangs; the AutoCrossbow; Coin Toss</td></tr>
     </table>
-    <p>Skills have a type of their own: a Blitz keeps its type whatever Sabin wears, and Edgar's Chain Saw is
-    slashing. A weapon with an element hits the weapon's type and its element at once.</p>
+    <p>Skills have a type of their own: Pummel is Blunt whatever Sabin wears, and Edgar's Chain Saw is a Sword hit.
+    A weapon with an element hits the weapon's type and its element at once.</p>
     <h2>Elements</h2>
     <p>Fire, ice, lightning, wind, earth, water, holy and poison. A spell hits the weakness of its element, and the
     Magic list shows each spell's element as an icon. A hit on an elemental weakness also does the usual extra
@@ -362,8 +365,8 @@
     down.</p>
     <div class="clear"></div>
     <div class="tip" data-label="TIP">
-      <p>Bring a spread of weapon types. Each hero's weapon is a key for some lock, and a party that holds slashing,
-      piercing and bludgeoning, plus a spell or two, rarely meets a monster it can't break.</p>
+      <p>Bring a spread of weapon types. Each hero's weapon is a key for some lock. No party holds all six, so when
+      nobody holds a monster's, use a spell of its element, Filch, the Break spell or Hired Help.</p>
     </div>
   </div>
 </section>
@@ -530,13 +533,15 @@
     MP. Every character's first skill is theirs from the day they join. A <span style="color:var(--blue)">&#9733;</span>
     marks an ultimate, offered only at 3 BP.</p>
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_terra.png" alt=""><span class="name">Terra</span><span class="job">Mage</span><span class="arms">sword &middot; fire</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_terra.png" alt=""><span class="name">Terra</span><span class="job">Mage</span><span class="arms">Sword &middot; Katana &middot; fire</span></div>
       <ul>
         <li><b>Spells by level.</b> Fire and Cure from the start; Drain at 12, Life at 18, Break at 24, Pearl at 30,
           Merton at 33. Boost turns Fire into Fire 2 and Fire 3, Cure into Cure 2 and 3, and Life into Life 2 and
           3.</li>
         <li><b>Break</b> takes no damage and sets no status. It removes one shield, plus one per point (four at 3 BP),
           ignoring weakness. It costs 25 MP at any boost.</li>
+        <li><b>Sword or Katana.</b> A curved sword (RegalCutlass, Flame Sabre, Falchion, Soul Sabre, Scimitar) makes
+          her Fight Katana. The first is the RegalCutlass in South Figaro's weapon shop.</li>
         <li><b>Morph</b> is learned in Zozo. Each point adds time to it.</li>
         <li><b>&#9733; Trance.</b> Morph at 3 BP lasts until the battle ends or she reverts.</li>
         <li><b>Ultima.</b> After Terra returns in the World of Ruin (Mobliz), casting Fire with 3 BP casts Ultima, for
@@ -554,10 +559,11 @@
   <div class="runhead"><span>The characters</span><span class="mark">Celes</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_celes.png" alt=""><span class="name">Celes</span><span class="job">Rune Knight</span><span class="arms">sword &middot; ice</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_celes.png" alt=""><span class="name">Celes</span><span class="job">Rune Knight</span><span class="arms">Sword &middot; Katana &middot; ice</span></div>
       <figure class="fig-right" style="width:2.2in"><img class="shot" src="img/celes.png" alt="">
         <figcaption>Runic sits right under Fight in Celes&rsquo;s commands.</figcaption></figure>
       <ul>
+        <li><b>Sword or Katana.</b> As with Terra, a curved sword makes her Fight Katana.</li>
         <li><b>Spells by level.</b> Ice from the start; Cure at 4, Imp at 13, Scan at 18, Safe at 22, Haste at 32.</li>
         <li><b>Runic</b> is hers from the start. It absorbs the next spell as MP and gives Celes 1 BP. As always, it
           also absorbs spells her allies cast. Boosted, it stays up for 1, 2 or 3 of her turns, and she acts normally
@@ -579,13 +585,14 @@
   <div class="runhead"><span>The characters</span><span class="mark">Locke</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_locke.png" alt=""><span class="name">Locke</span><span class="job"><del>Thief</del> &mdash; <i class="ahem">ahem!</i> &mdash; Treasure Hunter</span><span class="arms">dagger</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_locke.png" alt=""><span class="name">Locke</span><span class="job"><del>Thief</del> &mdash; <i class="ahem">ahem!</i> &mdash; Treasure Hunter</span><span class="arms">Dagger</span></div>
       <figure class="fig-right"><img class="shot" src="img/locke.png" alt="">
         <figcaption>Locke's kit lives behind Steal. Rows open as the story goes on; battle lists only those.</figcaption></figure>
       <p>Steal by boost: with 0 points it is the Steal you know. One point makes the steal likelier and the rare item
       likelier. Two points make both a lot likelier. Three points always succeed and take the rare item if there is
       one, the common item if not. A boost never makes up an item the enemy lacks.</p>
-      <p>Only the first shield Filch takes becomes a point for Locke.</p>
+      <p>Only the first shield Filch takes becomes a point for Locke. Trickshot and Dismantle are Dagger hits; Mug
+      uses his weapon's type.</p>
       <div class="clear"></div>
       <table class="compact">
         <tr><th style="width:0.85in">Skill</th><th class="n" style="width:0.55in">MP</th><th>Effect</th><th style="width:1.2in">Learned</th></tr>
@@ -612,7 +619,7 @@
   <div class="runhead"><span>The characters</span><span class="mark">Edgar</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_edgar.png" alt=""><span class="name">Edgar</span><span class="job">Machinist</span><span class="arms">spear</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_edgar.png" alt=""><span class="name">Edgar</span><span class="job">Machinist</span><span class="arms">Spear</span></div>
       <figure class="fig-right"><img class="shot" src="img/edgar.png" alt="">
         <figcaption>The Tools list shows each Tool's price in MP.</figcaption></figure>
       <p>Tools are found or bought, as they always were, and cost MP each use. Each has a weapon type or an
@@ -621,19 +628,19 @@
       <div class="clear"></div>
       <table class="compact">
         <tr><th style="width:1.0in">Tool</th><th class="n" style="width:0.5in">MP</th><th>Where</th></tr>
-        <tr><td class="k">AutoCrossbow</td><td class="n">4</td><td>from the start. Pierces every enemy once.</td></tr>
+        <tr><td class="k">AutoCrossbow</td><td class="n">4</td><td>from the start. Hits every enemy once. Ranged.</td></tr>
         <tr><td class="k">NoiseBlaster</td><td class="n">6</td><td>Figaro shop. Takes no boost.</td></tr>
         <tr><td class="k">Bio Blaster</td><td class="n">8</td><td>Figaro shop. Poison.</td></tr>
         <tr><td class="k">Flash</td><td class="n">6</td><td>Figaro's tool merchant and South Figaro's shop</td></tr>
-        <tr><td class="k">Drill</td><td class="n">16</td><td>Figaro Castle, after the sand dive. Two hits, piercing.</td></tr>
-        <tr><td class="k">Chain Saw</td><td class="n">18</td><td>a chest in Zozo. Slashing.</td></tr>
+        <tr><td class="k">Drill</td><td class="n">16</td><td>Figaro Castle, after the sand dive. Two hits, Spear.</td></tr>
+        <tr><td class="k">Chain Saw</td><td class="n">18</td><td>a chest in Zozo. Sword.</td></tr>
         <tr><td class="k">Debilitator</td><td class="n">10</td><td>Vector's weapon shop, during the banquet</td></tr>
         <tr class="ult"><td class="k">Overclock</td><td class="n">to 99</td><td>Magitek factory, after the Espers' scene</td></tr>
       </table>
       <p><b>&#9733; Overclock:</b> a Tool boosted with 3 BP fires twice, each time at 8&times;. It costs both firings,
       up to 99 MP.</p>
       <div class="tip" data-label="TIP">
-        <p>The AutoCrossbow strikes every enemy once, so against a pack that is weak to piercing it takes a shield from
+        <p>The AutoCrossbow strikes every enemy once, so against a pack that is weak to Ranged it takes a shield from
         each of them. And when nobody holds the key to a monster, the Debilitator makes one: give it a weakness your
         party can hit, then hit it.</p>
       </div>
@@ -645,11 +652,12 @@
   <div class="runhead"><span>The characters</span><span class="mark">Sabin</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_sabin.png" alt=""><span class="name">Sabin</span><span class="job">Monk</span><span class="arms">fists</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_sabin.png" alt=""><span class="name">Sabin</span><span class="job">Monk</span><span class="arms">Blunt &middot; Dagger</span></div>
       <figure class="fig-right"><img class="shot" src="img/sabin.png" alt="">
         <figcaption>Every Blitz with its element or type icon and its price.</figcaption></figure>
       <p>Blitzes are chosen from a list; there are no button codes to enter. Sabin learns them by level.</p>
-      <p>Fists are bludgeoning. Claws make his Fight slashing; his Blitzes keep their own type.</p>
+      <p>Fists and knuckles are Blunt, and so are Pummel, Suplex and Bum Rush whatever he wears. A claw makes his
+      Fight Dagger.</p>
       <div class="clear"></div>
       <table class="compact">
         <tr><th style="width:1.1in">Blitz</th><th class="n" style="width:0.5in">MP</th><th>Level</th></tr>
@@ -665,8 +673,8 @@
       <p><b>&#9733; Bum Rush</b> is offered only at 3 BP. It is four blows, each at 8&times;. Each blow removes a
       shield whatever the enemy is weak to.</p>
       <div class="tip" data-label="TIP">
-        <p>A Blitz keeps its own element and type, so Sabin carries several keys at once: holy in Aura Bolt, fire in
-        Fire Dance, wind in Air Blade. Learn which monsters fear which, and pick the Blitz to match.</p>
+        <p>A Blitz keeps its own element and type, so Sabin carries several keys at once: Blunt in Pummel, holy in
+        Aura Bolt, fire in Fire Dance, wind in Air Blade, and Dagger with a claw on. Learn which monsters fear which, and pick the Blitz to match.</p>
       </div>
     </div>
   </div>
@@ -676,12 +684,12 @@
   <div class="runhead"><span>The characters</span><span class="mark">Cyan</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_cyan.png" alt=""><span class="name">Cyan</span><span class="job">Samurai</span><span class="arms">katana</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_cyan.png" alt=""><span class="name">Cyan</span><span class="job">Samurai</span><span class="arms">Katana</span></div>
       <figure class="fig-right"><img class="shot" src="img/cyan.png" alt="">
         <figcaption>The SwdTech page: which techs sit in the 1, 2 and 3 BP slots.</figcaption></figure>
       <p>The charge gauge is gone. SwdTech opens a list of three techs, for 1, 2 and 3 BP. The three are Cyan's best
       learned techs, weakest first, so the list moves up as he learns more.</p>
-      <p>In the field menu, Skills, then SwdTech, lets you pick which techs sit in the three slots, or return them to
+      <p>Dispatch, Slash, Quadra Slam, Stunner and Cleave are Katana hits. In the field menu, Skills, then SwdTech, lets you pick which techs sit in the three slots, or return them to
       automatic.</p>
       <div class="clear"></div>
       <table class="compact">
@@ -689,7 +697,7 @@
         <tr><td class="k">Dispatch</td><td class="n">4</td><td>from the start</td></tr>
         <tr><td class="k">Retort</td><td class="n">10</td><td>6. A counter stance.</td></tr>
         <tr><td class="k">Slash</td><td class="n">13</td><td>12</td></tr>
-        <tr><td class="k">Quadra Slam</td><td class="n">16</td><td>15. Four slashing hits.</td></tr>
+        <tr><td class="k">Quadra Slam</td><td class="n">16</td><td>15. Four Katana hits.</td></tr>
         <tr><td class="k">Empowerer</td><td class="n">18</td><td>24. Drains; two hits.</td></tr>
         <tr><td class="k">Stunner</td><td class="n">28</td><td>34. Hits all enemies.</td></tr>
         <tr><td class="k">Quadra Slice</td><td class="n">50</td><td>44. Four wind hits.</td></tr>
@@ -709,13 +717,13 @@
   <div class="runhead"><span>The characters</span><span class="mark">Setzer &middot; Gau</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_setzer.png" alt=""><span class="name">Setzer</span><span class="job">Gambler</span><span class="arms">cards &middot; dice</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_setzer.png" alt=""><span class="name">Setzer</span><span class="job">Gambler</span><span class="arms">Ranged</span></div>
       <figure class="fig-right" style="width:1.7in"><img class="shot" src="img/setzer.png" alt="">
         <figcaption>Slot opens a short list of Setzer's games.</figcaption></figure>
       <p>Slot opens a short list. Coin Toss and Hired Help take Gil, not MP. Each hire walks in as a different
       figure.</p>
-      <p>Cards and dice hit the special type. Spirits, cursed and magical bodies and some bosses can be weak to it, so
-      Setzer is worth bringing where they gather.</p>
+      <p>Cards, dice, darts and Coin Toss are Ranged. Many machines, spirits and casters are weak to it, so Setzer is
+      worth bringing where they gather.</p>
       <div class="clear"></div>
       <table class="compact">
         <tr><th style="width:0.85in">Skill</th><th style="width:0.85in">Cost</th><th>Effect</th></tr>
@@ -726,7 +734,7 @@
       </table>
     </div>
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_gau.png" alt=""><span class="name">Gau</span><span class="job">Beast Tamer</span><span class="arms">fangs</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_gau.png" alt=""><span class="name">Gau</span><span class="job">Beast Tamer</span><span class="arms">Dagger</span></div>
       <figure class="fig-right" style="width:1.7in"><img class="shot" src="img/gau.png" alt="">
         <figcaption>Skills, then Rage: the eight rages Gau takes into battle.</figcaption></figure>
       <ul>
@@ -736,6 +744,7 @@
           attacks or uses its special, half the time each.</li>
         <li><b>Boost</b> changes the odds of the special: 3 in 4 with 1 point, 15 in 16 with 2, every turn with 3. It
           adds no damage.</li>
+        <li><b>Fangs.</b> His bare hands, and his Fight in a rage, are Dagger.</li>
         <li><b>Leap.</b> On the Veldt, Leap replaces Fight. It is free and takes no boost.</li>
         <li>Gau can wear Espers. He has no ultimate.</li>
       </ul>
@@ -747,7 +756,7 @@
   <div class="runhead"><span>The characters</span><span class="mark">Strago &middot; Relm</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_strago.png" alt=""><span class="name">Strago</span><span class="job">Scholar</span><span class="arms">rod</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_strago.png" alt=""><span class="name">Strago</span><span class="job">Scholar</span><span class="arms">Blunt</span></div>
       <figure class="fig-right" style="width:1.6in"><img class="shot" src="img/strago.png" alt="">
         <figcaption>Strago&rsquo;s Lore list in battle, with each lore&rsquo;s price.</figcaption></figure>
       <ul>
@@ -765,9 +774,9 @@
       </ul>
     </div>
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_relm.png" alt=""><span class="name">Relm</span><span class="job">Painter</span><span class="arms">brush</span></div>
-      <p>Her Painter command opens a list, Sketch first; a boost on Sketch applies to what it draws. Brushes hit the
-      special type. <b>Portrait</b> (12 MP): an ally's next boosted action gets a free point. <b>Tint</b> (10, level
+      <div class="charhead"><img class="portrait" src="img/portrait_relm.png" alt=""><span class="name">Relm</span><span class="job">Painter</span><span class="arms">Blunt</span></div>
+      <p>Her Painter command opens a list, Sketch first; a boost on Sketch applies to what it draws. Brushes are
+      Blunt. <b>Portrait</b> (12 MP): an ally's next boosted action gets a free point. <b>Tint</b> (10, level
       18): the ally's weapon carries the element you pick for four turns. <b>Varnish</b> (14, level 24): the next
       enemy hit on the ally misses. <b>Still Life</b> (24, Owzer's mansion): a break lasts twice as long.
       <b>Underpainting</b> (28, level 36): the next weakness hit takes two shields. <b>Gesture</b> (30, level 42):
@@ -784,11 +793,11 @@
   <div class="runhead"><span>The characters</span><span class="mark">Shadow</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_shadow.png" alt=""><span class="name">Shadow</span><span class="job">Assassin</span><span class="arms">thrown blades</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_shadow.png" alt=""><span class="name">Shadow</span><span class="job">Assassin</span><span class="arms">Dagger &middot; Ranged</span></div>
       <figure class="fig-right"><img class="shot" src="img/shadow.png" alt="">
         <figcaption>Assassinate: the hit that breaks an enemy kills it.</figcaption></figure>
       <p>Shadow's skill is Throw. He throws the item you pick, and it is used up. A boost multiplies a damaging
-      throw.</p>
+      throw. His ninja blades are Dagger; stars and skeans are Ranged, and a thrown weapon keeps its type.</p>
       <p><b>Shadow pins your shadow.</b> Every throw that hits an enemy slows it, and a dagger appears before its
       shield. The next throw lands in its shadow: the enemy is stopped for about two of its turns, a knife stands
       where the dagger was, and the slow is used up. Any slow counts, so a Slow spell and one throw do it too. A
@@ -799,10 +808,10 @@
       <div class="clear"></div>
       <table class="compact">
         <tr><th style="width:1.35in">Item</th><th style="width:1.3in">Where</th><th>Effect</th></tr>
-        <tr><td class="k">Shuriken</td><td>where Shadow joins, Kohlingen, Albrook, the Phantom Train; Thamasa</td><td>piercing</td></tr>
-        <tr><td class="k">Ninja Star</td><td>Thamasa, World of Ruin</td><td>piercing</td></tr>
-        <tr><td class="k">Tack Star</td><td>Colosseum</td><td>piercing</td></tr>
-        <tr><td class="k">Fire Skean, Water Edge, Bolt Edge</td><td>Kohlingen, Jidoor, Albrook; Maranda</td><td>piercing and the element, to every enemy</td></tr>
+        <tr><td class="k">Shuriken</td><td>where Shadow joins, Kohlingen, Albrook, the Phantom Train; Thamasa</td><td>Ranged</td></tr>
+        <tr><td class="k">Ninja Star</td><td>Thamasa, World of Ruin</td><td>Ranged</td></tr>
+        <tr><td class="k">Tack Star</td><td>Colosseum</td><td>Ranged</td></tr>
+        <tr><td class="k">Fire Skean, Water Edge, Bolt Edge</td><td>Kohlingen, Jidoor, Albrook; Maranda</td><td>Ranged and the element, to every enemy</td></tr>
         <tr><td class="k">Shadow Edge</td><td>where Shadow joins, Jidoor; Maranda</td><td>casts Image on the thrower</td></tr>
         <tr><td class="k">Inviz Edge</td><td>where Shadow joins, Kohlingen; Maranda</td><td>casts Vanish on the thrower</td></tr>
       </table>
@@ -817,7 +826,7 @@
   <div class="runhead"><span>The characters</span><span class="mark">Mog &middot; Umaro &middot; Gogo</span></div>
   <div class="body">
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_mog.png" alt=""><span class="name">Mog</span><span class="job">Dancer</span><span class="arms">spear</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_mog.png" alt=""><span class="name">Mog</span><span class="job">Dancer</span><span class="arms">Spear</span></div>
       <figure class="fig-right" style="width:1.6in"><img class="shot" src="img/mog.png" alt="">
         <figcaption>Mog&rsquo;s Dance list: the Dances he knows, from the top, each at 8 MP unboosted.</figcaption></figure>
       <p class="small">Mog learns his eight Dances by fighting on each dance's terrain. Dances cost 8 MP, 20 with 1
@@ -835,9 +844,9 @@
       </table>
     </div>
     <div class="char">
-      <div class="charhead"><img class="portrait" src="img/portrait_umaro.png" alt=""><span class="name">Umaro</span><span class="job">Berserker</span><span class="arms">club &middot; fists</span></div>
+      <div class="charhead"><img class="portrait" src="img/portrait_umaro.png" alt=""><span class="name">Umaro</span><span class="job">Berserker</span><span class="arms">Blunt</span></div>
       <p class="small">Umaro takes no orders. Each turn he picks Fight, Charge, Throw (with the Rage Ring) or Storm (with
-      the Blizzard Orb). His Fight, Charge and Throw are bludgeoning, and Storm is ice on every enemy. Umaro banks a
+      the Blizzard Orb). His Fight, Charge and Throw are Blunt, and Storm is ice on every enemy. Umaro banks a
       point each turn, and when he has been hurt, he spends the bank on his next action. With 3 points he always
       Storms, with or without the Blizzard Orb, at 8&times;. He has no MP and cannot wear Espers.</p>
     </div>
@@ -866,23 +875,23 @@
     <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_narshe.png" alt="">
       <figcaption>Narshe, the mining town in the snow.</figcaption></figure>
     <div class="area"><h3>Narshe</h3>
-      <p>Guards and Lobos break to piercing, and Lobos also to fire. In the mines, Were-Rats and Repo Men break to slashing or piercing (fire for Were-Rats, poison for Repo Men). A Vaporite has one shield and breaks to fire, holy, piercing or bludgeoning.</p>
+      <p>Guards break to Ranged; Lobos to Dagger, Spear or fire. In the mines, Were-Rats and Repo Men break to Sword or Dagger (fire for Were-Rats, poison for Repo Men). A Vaporite has one shield and breaks to fire, holy, Dagger or Blunt.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2002, ff6/src/battle/ot6_hud.asm:2004, ff6/src/battle/ot6_hud.asm:3088, ff6/src/battle/ot6_hud.asm:3101, ff6/src/battle/ot6_hud.asm:2411; sub_battle_group.dat maps 42 and 50 (group 58); docs/design/break-coverage-wob.md:33-42 -->
-      <p class="boss"><b>Whelk.</b> Hit the head, never the shell. The head has four shields and breaks to piercing or fire; the shell shows no shield line and answers with MegaVolt.</p>
+      <p class="boss"><b>Whelk.</b> Hit the head, never the shell. The head has four shields and breaks to Ranged or fire; the shell shows no shield line and answers with MegaVolt.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2006, ff6/src/battle/ot6_hud.asm:2008, ff6/src/battle/ot6_break.asm:216 (head + fire), ff6/src/battle/monster_prop.dat species $134; docs/design/bosses-wob.md:137-156 -->
-      <p class="boss"><b>Marshal.</b> Four shields; piercing or poison breaks him, and his Lobos (three shields) break to piercing or fire. The moogles' spears pierce too. Send in a healthy squad, Mog's if you can.</p>
+      <p class="boss"><b>Marshal.</b> Four shields; Dagger, Spear or poison breaks him, and his Lobos (three shields) break to Dagger, Spear or fire. The moogles' spears are keys too. Send in a healthy squad, Mog's if you can.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2014, ff6/src/battle/ot6_hud.asm:2004, ff6/src/battle/monster_prop.dat species $064; docs/design/bosses-wob.md:167-175 -->
-      <p class="boss"><b>Kefka (the Narshe defense).</b> Six shields; slashing, piercing, fire or poison breaks him. Arrive holding Boost Points and break him first. His Troopers and Riders break to slashing or piercing.</p>
+      <p class="boss"><b>Kefka (the Narshe defense).</b> Six shields; Sword, Dagger, fire or poison breaks him. Arrive holding Boost Points and break him first. His Troopers break to Sword, Dagger or Katana, his Riders to Dagger or Katana.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2050, ff6/src/battle/ot6_break.asm:226 (poison|fire add), ff6/src/battle/ot6_hud.asm:2097, ff6/src/battle/ot6_hud.asm:2101; docs/design/bosses-wob.md:650-676; the Ice 2 wind-up is from the doc only: UNVERIFIED in source -->
     </div>
     <div class="area"><h3>Figaro Castle and the South Figaro cave</h3>
-      <p>In the cave, Bleary, Crawly and Hornet are all weak to fire, so Terra's Fire breaks any of them; Bleary also takes piercing, Crawly slashing or bludgeoning, Hornet (one shield) slashing or piercing. On the plains, Rhinotaurs, Rhodoxes and Grease Monks take poison and piercing.</p>
+      <p>In the cave, Bleary, Crawly and Hornet are all weak to fire, so Terra's Fire breaks any of them; Bleary also takes Dagger, Crawly Sword or Blunt, Hornet (one shield) Dagger or Ranged. On the plains, Rhinotaurs (Blunt, Ranged), Rhodoxes (Sword, Dagger) and Grease Monks (Dagger, Blunt) all take poison.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2439, ff6/src/battle/ot6_hud.asm:2441, ff6/src/battle/ot6_hud.asm:2443, sub_battle_group.dat map 72 (group 59); ff6/src/battle/ot6_hud.asm:2426, ff6/src/battle/ot6_hud.asm:2430, ff6/src/battle/ot6_hud.asm:2433, world_battle_group.dat groups 3 and 5; ff6/src/battle/ot6_break.asm:238-240 -->
     </div>
     <div class="area"><h3>South Figaro</h3>
-      <p>Commanders and Vector Pups take slashing or piercing (poison for Commanders, fire for Pups). In the cave, Trilobiters take piercing or bludgeoning and Primordites slashing, bludgeoning or lightning. A Gold Bear has three shields and takes slashing or bludgeoning.</p>
+      <p>Commanders and Vector Pups take Sword or Dagger (poison for Commanders, fire for Pups). In the cave, Trilobiters take Dagger or Blunt and Primordites Sword, Blunt or lightning. A Gold Bear has three shields and takes Sword or Blunt.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2452, ff6/src/battle/ot6_hud.asm:2456, ff6/src/battle/ot6_hud.asm:2462, ff6/src/battle/ot6_hud.asm:2459, ff6/src/battle/ot6_hud.asm:2465; sub_battle_group.dat map 87 (group 65), maps 69 and 70 (group 122); docs/design/break-coverage-wob.md:90-106 -->
-      <p class="boss"><b>TunnelArmr.</b> Five shields; piercing (Locke's daggers, Mug), ice, lightning and water break it.</p>
+      <p class="boss"><b>TunnelArmr.</b> Five shields; Dagger (Locke's daggers, Mug), ice, lightning and water break it.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2048, ff6/src/battle/ot6_break.asm:228 (ice add), ff6/src/battle/monster_prop.dat species $104 (weak bolt|water); docs/design/bosses-wob.md:314-343; "Runic absorbs Magnitude8" is from the doc only: UNVERIFIED in source -->
     </div>
   </div>
@@ -893,27 +902,27 @@
     <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_lete.png" alt="">
       <figcaption>The Lete River.</figcaption></figure>
     <div class="area"><h3>Mt. Kolts</h3>
-      <p>Tuskers show no weapon weakness; break them with fire or poison. Triliums take slashing, piercing or fire; Cirpiuses piercing or poison; Brawlers slashing or ice.</p>
+      <p>Tuskers show no weapon weakness; break them with fire or poison. Triliums take Sword, Dagger or fire; Cirpiuses Dagger, Ranged or poison; Brawlers Sword, Blunt or ice.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2033, ff6/src/battle/ot6_break.asm:232 (Tusker poison add), ff6/src/battle/ot6_hud.asm:2446, ff6/src/battle/ot6_hud.asm:2311, ff6/src/battle/ot6_break.asm:230, ff6/src/battle/ot6_hud.asm:2022; sub_battle_group.dat maps 96-102 (groups 61-64); docs/design/break-coverage-wob.md:78-88 -->
-      <p class="boss"><b>Vargas.</b> Five shields; bludgeoning, holy and poison break him. Sabin's Pummel and Aura Bolt are the keys. His two Ipoohs break to slashing or fire.</p>
+      <p class="boss"><b>Vargas.</b> Five shields; Blunt, holy and poison break him. Sabin's Pummel and Aura Bolt are the keys. His two Ipoohs break to Sword or fire.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2042, ff6/src/battle/ot6_break.asm:218 (holy add), ff6/src/battle/ot6_hud.asm:2044 (Ipooh), ff6/src/battle/monster_prop.dat species $103; docs/design/bosses-wob.md:200-285 (the Bio Blaster targeting is a doc measurement: UNVERIFIED in source) -->
     </div>
     <div class="area"><h3>The Lete River</h3>
-      <p>On the raft, fire breaks Pterodons, Nautiloids and Exocites alike; Pterodons also take slashing or piercing, Nautiloids piercing or bludgeoning, Exocites slashing or bludgeoning. The passage toward Narshe holds 1st Class guards (piercing, bludgeoning, poison) and Wild Rats (slashing, piercing, fire).</p>
+      <p>On the raft, fire breaks Pterodons, Nautiloids and Exocites alike; Pterodons also take Sword or Ranged, Nautiloids Blunt or Ranged, Exocites Sword or Blunt. The passage toward Narshe holds 1st Class guards (Blunt, Ranged, poison) and Wild Rats (Sword, Dagger, fire).</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3517, ff6/src/battle/ot6_hud.asm:3520, ff6/src/battle/ot6_hud.asm:3524, ff6/src/battle/ot6_hud.asm:2480, ff6/src/battle/ot6_hud.asm:2483; docs/design/break-coverage-wob.md:125-138, 258-275; the mapping of map 48 to this area is UNVERIFIED (the doc calls it "Narshe's back way with Banon") -->
-      <p class="boss"><b>Ultros (Lete River).</b> Five shields; fire, lightning, slashing and piercing break him, and he absorbs water.</p>
+      <p class="boss"><b>Ultros (Lete River).</b> Five shields; fire, lightning, Sword and Ranged break him, and he absorbs water.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2046, ff6/src/battle/monster_prop.dat species $12c (weak fire|bolt, absorbs water); docs/design/bosses-wob.md:288-306 -->
     </div>
     <div class="area"><h3>The Imperial Camp and Doma</h3>
-      <p>Soldiers break to slashing or piercing; Templars to piercing or lightning. At Doma, Leaders take slashing, and Grunts and Cadets slashing or bludgeoning.</p>
+      <p>Soldiers break to Katana or Blunt; Templars to Dagger, Blunt or lightning. At Doma, Leaders take Katana, and Grunts and Cadets Katana or Blunt.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2078, ff6/src/battle/ot6_hud.asm:2082, ff6/src/battle/ot6_break.asm:224, ff6/src/battle/ot6_hud.asm:2085, ff6/src/battle/ot6_hud.asm:2088, ff6/src/battle/ot6_hud.asm:2091; docs/design/bosses-wob.md:677-740 -->
-      <p class="boss"><b>Telstar.</b> Four shields; bludgeoning, lightning and water (Bolt Edge) break it. Its Dobermans have two shields (piercing, fire). Break Telstar early and keep it down.</p>
+      <p class="boss"><b>Telstar.</b> Four shields; Blunt, lightning and water (Bolt Edge) break it. Its Dobermans have two shields (Dagger, Blunt, fire). Break Telstar early and keep it down.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2055, ff6/src/battle/ot6_hud.asm:2057, ff6/src/battle/monster_prop.dat species $044 (weak bolt|water); docs/design/bosses-wob.md:380-391 (the radio call is from the doc only: UNVERIFIED in source) -->
     </div>
     <div class="area"><h3>The Phantom Forest and Train</h3>
-      <p>In the forest, Ghosts take slashing or special and Poplium slashing or piercing; both fear fire and holy. On the train, Hazers, Whispers and Over-Minds take slashing or special, StillGoing slashing or bludgeoning, Bombs slashing, bludgeoning, ice or water. Holy breaks all but the Bombs.</p>
+      <p>Katana breaks every body here. In the forest, Ghosts also take Blunt and Poplium Dagger; both fear fire and holy. On the train, Hazers, Whispers and StillGoing also take Blunt, Over-Minds Ranged, Bombs Ranged, ice or water. Holy breaks all but the Bombs.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3117, ff6/src/battle/ot6_hud.asm:3122, ff6/src/battle/ot6_hud.asm:2470, ff6/src/battle/ot6_hud.asm:2472, ff6/src/battle/ot6_hud.asm:3565, ff6/src/battle/ot6_hud.asm:2475, ff6/src/battle/ot6_hud.asm:3114; sub_battle_group.dat maps 130-135 (groups 68, 69), maps 141-152 (groups 70-76) -->
-      <p class="boss"><b>Ghost Train.</b> Four shields; bludgeoning, fire, lightning and holy break it, and it absorbs poison, so leave Bio Blaster alone. A Suplex that lands ends the fight outright.</p>
+      <p class="boss"><b>Ghost Train.</b> Four shields; Blunt, fire, lightning and holy break it, and it absorbs poison, so leave Bio Blaster alone. A Suplex that lands ends the fight outright.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2059, ff6/src/battle/monster_prop.dat species $106 (weak fire|bolt|holy, absorbs poison), ff6/src/battle/ot6_break.asm:698-740 (Ot6SuplexTrain); docs/design/bosses-wob.md:393-440 -->
     </div>
   </div>
@@ -924,37 +933,37 @@
     <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_zozo.png" alt="">
       <figcaption>Zozo, where it always rains.</figcaption></figure>
     <div class="area"><h3>Baren Falls and the Veldt</h3>
-      <p>Piranhas have one shield (slashing, bludgeoning, lightning). On the Veldt, early monsters such as Stray Cats and Beakors take slashing or piercing, Rhobites slashing or bludgeoning, CrassHoppers piercing or bludgeoning.</p>
+      <p>Piranhas have one shield (Katana, Blunt, lightning). On the Veldt, early monsters such as Stray Cats take Dagger or Blunt, Beakors Katana or Ranged, Rhobites Katana or Blunt, CrassHoppers Dagger or Blunt.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2063, ff6/src/battle/ot6_hud.asm:3106, ff6/src/battle/ot6_hud.asm:3109, ff6/src/battle/ot6_hud.asm:3120, ff6/src/battle/ot6_hud.asm:3111; docs/design/route-wor-gau.md:132-155. UNVERIFIED which monsters the World of Balance Veldt deals: it draws from Gau's rage list, not a pool; these are the bodies the doc lists for the early Veldt -->
-      <p class="boss"><b>Rizopas.</b> Four shields; slashing, bludgeoning and lightning break it, and it absorbs water.</p>
+      <p class="boss"><b>Rizopas.</b> Four shields; Katana, Blunt and lightning break it, and it absorbs water.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2061, ff6/src/battle/monster_prop.dat species $155 (weak bolt, absorbs water); docs/design/bosses-wob.md:459-520 (El Nino damage is a doc measurement) -->
     </div>
     <div class="area"><h3>The Serpent Trench</h3>
-      <p>Anguiforms take slashing (or lightning); Actaneons and Aspiks take bludgeoning or fire. All three absorb water.</p>
+      <p>Anguiforms take Katana (or lightning); Actaneons Blunt or fire, Aspiks Dagger or fire. All three absorb water.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2120, ff6/src/battle/ot6_hud.asm:2122, ff6/src/battle/ot6_hud.asm:2124, ff6/src/battle/monster_prop.dat species $03a, $05e, $059 (absorb water); docs/design/bosses-wob.md:743-765; "Nikeah has no fights": no pool found for it in sub_battle_group.dat, UNVERIFIED by name -->
     </div>
     <div class="area"><h3>Zozo</h3>
-      <p>Poison (Bio Blaster) breaks every common body here. HadesGigas take bludgeoning, Gabbldegaks piercing, Harvesters and SlamDancers slashing or piercing. A lone SlamDancer casts a tier-2 spell every turn, so break it first.</p>
+      <p>Poison (Bio Blaster) breaks every common body here. HadesGigas take Blunt or Ranged, Gabbldegaks Dagger or Ranged, Harvesters Sword or Spear, SlamDancers Sword or Katana. A lone SlamDancer casts a tier-2 spell every turn, so break it first.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2315, ff6/src/battle/ot6_hud.asm:2320, ff6/src/battle/ot6_hud.asm:2323, ff6/src/battle/ot6_hud.asm:2325; sub_battle_group.dat maps 221 and 225; docs/design/zozo-street.md:21-47 (the lone SlamDancer's spell loop is from the doc, not re-read in the AI script) -->
-      <p class="boss"><b>Dadaluma.</b> Six shields; piercing, bludgeoning and poison break him. His Iron Fists (two shields) join at half health: clear them with the AutoCrossbow, and break him while he crouches to jump.</p>
+      <p class="boss"><b>Dadaluma.</b> Six shields; Dagger, Blunt and poison break him. His Iron Fists (two shields; Blunt, Ranged) join at half health: clear them with the AutoCrossbow, and break him while he crouches to jump.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2138, ff6/src/battle/ot6_hud.asm:2140, ff6/src/battle/monster_prop.dat species $107 (weak poison); docs/design/bosses-wob.md:786-801 -->
     </div>
     <div class="area"><h3>The Opera House</h3>
-      <p>In the rafters, Sewer Rats and Vermin have two shields and break to piercing or bludgeoning.</p>
+      <p>In the rafters, Sewer Rats and Vermin have two shields and break to Spear or Blunt.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2147, ff6/src/battle/ot6_hud.asm:2149, comment ff6/src/battle/ot6_hud.asm:2142-2146 -->
-      <p class="boss"><b>Ultros (opera stage).</b> Six shields; fire, lightning, slashing and piercing break him, and he absorbs water.</p>
+      <p class="boss"><b>Ultros (opera stage).</b> Six shields; fire, lightning, Sword and Ranged break him, and he absorbs water.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2151, ff6/src/battle/monster_prop.dat species $12d (weak fire|bolt, absorbs water); docs/design/bosses-wob.md:805-820 -->
     </div>
     <div class="area"><h3>Vector: the Magitek Research Facility</h3>
-      <p>The machines (Garm, Commando, ProtoArmor, Pipsqueak, Trapper, Chaser) mostly break to piercing or bludgeoning and to lightning or water. Flan takes bludgeoning or fire. Rhinox takes only bludgeoning; Gobbler slashing or piercing.</p>
+      <p>The machines (Garm, Commando, ProtoArmor, Pipsqueak, Trapper, Chaser) mostly break to Dagger or Ranged and to lightning or water. Flan takes Ranged or fire. Rhinox takes only Ranged; Gobbler Dagger or Katana.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2178, ff6/src/battle/ot6_hud.asm:2185, ff6/src/battle/ot6_hud.asm:2190, ff6/src/battle/ot6_hud.asm:2194, ff6/src/battle/ot6_hud.asm:2206, ff6/src/battle/ot6_hud.asm:2210, ff6/src/battle/ot6_hud.asm:2198, ff6/src/battle/ot6_hud.asm:2218, ff6/src/battle/ot6_hud.asm:2214; docs/design/break-coverage-vector.md:237-258, 475-500 -->
-      <p class="boss"><b>Ifrit and Shiva.</b> Ifrit: six shields, weak to ice and piercing, absorbs fire. Shiva: six shields, weak to fire and slashing, absorbs ice. Change elements when they swap.</p>
+      <p class="boss"><b>Ifrit and Shiva.</b> Ifrit: six shields, weak to ice and Dagger, absorbs fire. Shiva: six shields, weak to fire and Sword, absorbs ice. Change elements when they swap.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2153, ff6/src/battle/ot6_hud.asm:2155, ff6/src/battle/monster_prop.dat species $108, $109; docs/design/bosses-wob.md:822-851 -->
-      <p class="boss"><b>Number 024.</b> Seven shields; slashing or piercing always breaks it. Its elemental wall keeps changing, so rely on weapons rather than spells.</p>
+      <p class="boss"><b>Number 024.</b> Seven shields; Sword or Dagger always breaks it. Its elemental wall keeps changing, so rely on weapons rather than spells.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2157, ff6/src/battle/monster_prop.dat species $10a (no fixed weakness); docs/design/bosses-wob.md:853-872 -->
-      <p class="boss"><b>Number 128.</b> Seven shields; piercing, lightning and water break it, and it absorbs ice. Its two blades have three shields each (slashing, lightning) and grow back.</p>
+      <p class="boss"><b>Number 128.</b> Seven shields; Dagger, lightning and water break it, and it absorbs ice. Its two blades have three shields each (Katana, lightning) and grow back.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2160, ff6/src/battle/ot6_break.asm:254 (bolt|water add), ff6/src/battle/ot6_hud.asm:2162, ff6/src/battle/ot6_hud.asm:2164, ff6/src/battle/monster_prop.dat species $10b (absorbs ice); docs/design/bosses-wob.md:874-907 -->
-      <p class="boss"><b>Left and Right Cranes.</b> Six shields each; both break to piercing and water. The Right Crane also takes lightning and absorbs fire; the Left absorbs lightning. A wrong element heals the one you hit.</p>
+      <p class="boss"><b>Left and Right Cranes.</b> Six shields each; both break to Dagger and water. The Right Crane also takes lightning and absorbs fire; the Left absorbs lightning. A wrong element heals the one you hit.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2166, ff6/src/battle/ot6_hud.asm:2168, ff6/src/battle/monster_prop.dat species $10d, $10e; docs/design/bosses-wob.md:909-937 -->
     </div>
   </div>
@@ -965,27 +974,27 @@
     <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_fc.png" alt="">
       <figcaption>The Floating Continent.</figcaption></figure>
     <div class="area"><h3>Esper Mountain and Thamasa</h3>
-      <p>On the mountain, Mandrakes and Slurms take fire, Insecares fire or wind; Adamanchyts have five shields (piercing, bludgeoning). Near Thamasa, Cephalers take lightning, Chimeras and Baskervors poison.</p>
+      <p>On the mountain, Mandrakes and Slurms take fire, Insecares fire or wind; Adamanchyts have five shields (Dagger, Blunt). Near Thamasa, Cephalers take lightning, Chimeras and Baskervors poison.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2526, ff6/src/battle/ot6_hud.asm:2541, ff6/src/battle/ot6_hud.asm:2529, ff6/src/battle/ot6_hud.asm:2534, ff6/src/battle/ot6_hud.asm:2514, ff6/src/battle/ot6_hud.asm:2517, ff6/src/battle/ot6_hud.asm:2520, ff6/src/battle/ot6_break.asm:244-246; docs/design/break-coverage-wob.md:180-221, docs/design/wob-side-trips.md:105-113 (the Adamanchyt sneeze is a lab finding in the doc: UNVERIFIED in source) -->
-      <p class="boss"><b>Ultros (Esper Mountain).</b> Seven shields; fire, lightning, slashing and piercing break him. The fight ends by script, so a break does not change the outcome; do not burn Boost Points on it.</p>
+      <p class="boss"><b>Ultros (Esper Mountain).</b> Seven shields; fire, lightning, Sword and Ranged break him. The fight ends by script, so a break does not change the outcome; do not burn Boost Points on it.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2249, ff6/src/battle/monster_prop.dat species $12e; docs/design/bosses-wob.md:941-952 -->
-      <p class="boss"><b>FlameEater.</b> Seven shields; ice, water and piercing break it, and it absorbs fire, so keep Fire off it. Its Balloons have one shield and explode: clear them with a spell that hits all.</p>
+      <p class="boss"><b>FlameEater.</b> Seven shields; ice, water and Dagger break it, and it absorbs fire, so keep Fire off it. Its Balloons have one shield and explode: clear them with a spell that hits all.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2251, ff6/src/battle/ot6_hud.asm:2253, ff6/src/battle/ot6_break.asm:260 (water add), ff6/src/battle/monster_prop.dat species $116 (weak ice, absorbs fire); docs/design/bosses-wob.md:956-980 -->
     </div>
     <div class="area"><h3>The Cave to the Sealed Gate</h3>
-      <p>Holy breaks every body here but the Coelecite, and ice breaks Apparites and Coelecites. Fire breaks only the Zombone and is absorbed by the others, so do not open with it. Ing (three shields) take piercing or bludgeoning.</p>
+      <p>Holy breaks every body here but the Coelecite, and ice breaks Apparites and Coelecites. Fire breaks only the Zombone and is absorbed by the others, so do not open with it. Ing (three shields) take Dagger or Blunt.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2340, ff6/src/battle/ot6_hud.asm:2344, ff6/src/battle/ot6_hud.asm:2349, ff6/src/battle/ot6_hud.asm:2351, ff6/src/battle/ot6_hud.asm:2355; ff6/src/battle/monster_prop.dat species $06e, $0e5, $0b3, $048, $082 (weak and absorb bytes); docs/design/break-coverage-gate.md:15-24 -->
     </div>
     <div class="area"><h3>The Floating Continent</h3>
-      <p>Behemoths and Dragons take slashing or piercing (Behemoth ice, Dragon lightning). Apokryphoses, Misfits and Brainpans also take special. A Naughty has three shields and breaks to fire, lightning, holy, slashing, piercing or special.</p>
+      <p>Behemoths take Sword, Spear or ice; Dragons Spear, Katana or lightning. Apokryphoses, Misfits and Brainpans take Sword, Dagger or Blunt. A Naughty has three shields and breaks to fire, lightning, holy, Sword, Spear or Ranged.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2257, ff6/src/battle/ot6_hud.asm:2259, ff6/src/battle/ot6_hud.asm:2265, ff6/src/battle/ot6_hud.asm:2267, ff6/src/battle/ot6_hud.asm:2274, ff6/src/battle/ot6_hud.asm:2545; sub_battle_group.dat maps 393 and 394 (groups 123, 112); docs/design/break-coverage-wob.md:223-236 -->
-      <p class="boss"><b>Air Force.</b> Eight shields; piercing, lightning and water break it. Once both pods fall, a Speck absorbs spells: any weapon breaks its one shield.</p>
+      <p class="boss"><b>Air Force.</b> Eight shields; Ranged (the AutoCrossbow), lightning and water break it. Once both pods fall, a Speck absorbs spells: any weapon breaks its one shield.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2286, ff6/src/battle/ot6_hud.asm:2288, ff6/src/battle/ot6_hud.asm:2290, ff6/src/battle/ot6_hud.asm:2292, ff6/src/battle/monster_prop.dat species $113; docs/design/bosses-wob.md:1027-1056 (the Launcher cancel is from the doc only: UNVERIFIED in source) -->
-      <p class="boss"><b>AtmaWeapon.</b> Eleven shields; fire, ice, lightning, slashing and piercing all work. Bank Boost Points, break it, then spend them while it is down.</p>
+      <p class="boss"><b>AtmaWeapon.</b> Eleven shields; fire, ice, lightning, Sword and Dagger all work. Bank Boost Points, break it, then spend them while it is down.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2295, ff6/src/battle/ot6_break.asm:252 (fire|ice|bolt add), docs/design/bosses-wob.md:1059-1081 (the Flare Star wind-up is from the doc only: UNVERIFIED in source) -->
-      <p class="boss"><b>Ultros and Chupon (airship deck).</b> Ultros has seven shields (fire, lightning, poison, slashing, piercing), Chupon four (ice, water, bludgeoning). Spend banked Boost Points early: Chupon's Sneeze removes a character.</p>
+      <p class="boss"><b>Ultros and Chupon (airship deck).</b> Ultros has seven shields (fire, lightning, poison, Sword, Ranged), Chupon four (ice, water, Ranged). Spend banked Boost Points early: Chupon's Sneeze removes a character.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2282, ff6/src/battle/ot6_break.asm:262, ff6/src/battle/ot6_hud.asm:2284, ff6/src/battle/monster_prop.dat species $168, $12f; docs/design/bosses-wob.md:983-1025 -->
-      <p class="boss"><b>Nerapa.</b> Five shields; ice, lightning, holy, slashing and piercing break it. It absorbs fire.</p>
+      <p class="boss"><b>Nerapa.</b> Five shields; ice, lightning, holy, Sword and Dagger break it. It absorbs fire.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2298, ff6/src/battle/monster_prop.dat species $118 (absorbs fire); docs/design/bosses-wob.md:1083-1130 (Reflect is a doc measurement) -->
     </div>
   </div>
@@ -998,31 +1007,31 @@
     <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_tomb.png" alt="">
       <figcaption>Inside Darill's Tomb.</figcaption></figure>
     <div class="area"><h3>Solitary Island</h3>
-      <p>Peepers and EarthGuards have one shield and break to slashing; Peepers also to ice or water, EarthGuards to water. A Black Drgn has four shields and breaks to slashing, fire or holy.</p>
+      <p>Peepers and EarthGuards have one shield and break to Sword; Peepers also to ice or water, EarthGuards to water. A Black Drgn has four shields and breaks to Sword, fire or holy.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2581, ff6/src/battle/ot6_hud.asm:2585, ff6/src/battle/ot6_hud.asm:2589; world_battle_group.dat groups 29 and 30; docs/design/wor-coverage.md:105-107 -->
     </div>
     <div class="area"><h3>Albrook, Tzen and Mobliz</h3>
-      <p>Tzen's desert deals EarthGuards, Peepers and Black Drgns as on the island. On Mobliz's plain, Buffalax take bludgeoning; Delta Bugs piercing or bludgeoning; Bloompires slashing or fire; Lizards slashing, piercing or ice.</p>
+      <p>Tzen's desert deals EarthGuards, Peepers and Black Drgns as on the island. On Mobliz's plain, Buffalax take Blunt; Delta Bugs Spear or Blunt; Bloompires Sword or fire; Lizards Sword, Spear or ice.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2585, ff6/src/battle/ot6_hud.asm:2650, ff6/src/battle/ot6_hud.asm:2657, ff6/src/battle/ot6_hud.asm:2642, ff6/src/battle/ot6_hud.asm:2654; world_battle_group.dat groups 36-39; docs/design/wor-coverage.md:105-142. Albrook's own pool is UNVERIFIED (not identified) -->
-      <p class="boss"><b>Phunbaba.</b> Weak to poison; absorbs lightning, so Bolt only heals him. Bludgeoning and special break him; the last meeting also takes slashing.</p>
+      <p class="boss"><b>Phunbaba.</b> Weak to poison; absorbs lightning, so Bolt only heals him. Blunt and Ranged break him; the last meeting also takes Sword.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2799, ff6/src/battle/ot6_hud.asm:2805, ff6/src/battle/ot6_hud.asm:2810, ff6/src/battle/monster_prop.dat species $16b, $16d (weak poison, absorbs bolt); ff6/src/battle/ot6_hud.asm:2785-2794 comments -->
     </div>
     <div class="area"><h3>Nikeah, South Figaro and Figaro Castle</h3>
-      <p>The South Figaro cellar deals Commanders and Vector Pups as before. In the castle, Humptys and Crullers take bludgeoning (fire, holy); NeckHunters slashing, piercing or special; Drops piercing or bludgeoning.</p>
+      <p>The South Figaro cellar deals Commanders and Vector Pups as before. In the castle, Humptys and Crullers take Blunt (fire, holy); NeckHunters Sword, Spear or Blunt; Drops Spear or Ranged.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2452, ff6/src/battle/ot6_hud.asm:2456, ff6/src/battle/ot6_hud.asm:2677, ff6/src/battle/ot6_hud.asm:2680, ff6/src/battle/ot6_hud.asm:2684, ff6/src/battle/ot6_hud.asm:2689, ff6/src/battle/ot6_hud.asm:2695; sub_battle_group.dat maps 53, 62-64, 90, 92 (groups 137-140); docs/design/wor-coverage.md:289-292 -->
-      <p class="boss"><b>The four Tentacles.</b> Five shields each, and each absorbs different elements (fire; ice and water; lightning and water; earth and water), so use weapons: each breaks to two of slashing, piercing and bludgeoning.</p>
+      <p class="boss"><b>The four Tentacles.</b> Five shields each, and each absorbs different elements (fire; ice and water; lightning and water; earth and water), so use weapons: each breaks to two of Sword, Spear and Blunt.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2702, ff6/src/battle/ot6_hud.asm:2705, ff6/src/battle/ot6_hud.asm:2708, ff6/src/battle/ot6_hud.asm:2711, ff6/src/battle/monster_prop.dat species $11b, $13c, $13d, $13e (absorb bytes: fire; ice|water; bolt|water; earth|water); formation 454 in battle_monsters.dat; docs/design/wor-coverage.md:396 -->
     </div>
     <div class="area"><h3>Zozo and Mt. Zozo</h3>
-      <p>Zozo's town pool is as in the World of Balance (poison breaks it). On Mt. Zozo, slashing breaks all five bodies: Punisher, Scrapper, Borras (four shields), Luridan, Ursus. Cyan's Stunner hits the whole pack.</p>
+      <p>Zozo's town pool is as in the World of Balance (poison breaks it). On Mt. Zozo, Katana breaks all five bodies: Punisher, Scrapper, Borras (four shields), Luridan, Ursus. Cyan's Stunner hits the whole pack.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2850, ff6/src/battle/ot6_hud.asm:2852, ff6/src/battle/ot6_hud.asm:2847, ff6/src/battle/ot6_hud.asm:2843, ff6/src/battle/ot6_hud.asm:2856; sub_battle_group.dat maps 176, 177, 179; ff6/src/battle/ot6_hud.asm:2830-2835 comment -->
-      <p class="boss"><b>Storm Drgn (optional).</b> Fourteen shields; slashing, piercing and lightning break it. It absorbs wind, so skip Air Blade and Quadra Slice.</p>
+      <p class="boss"><b>Storm Drgn (optional).</b> Fourteen shields; Sword, Dagger, Katana and lightning break it. It absorbs wind, so skip Air Blade and Quadra Slice.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2859, ff6/src/battle/monster_prop.dat species $14b (weak bolt, absorbs wind) -->
     </div>
     <div class="area"><h3>Kohlingen and Darill's Tomb</h3>
-      <p>Kohlingen has no fights. In the tomb, Orogs, Power Demons and Osteosaurs break to fire, holy or special; Exorays to slashing or piercing; Mad Oscars to slashing or fire.</p>
+      <p>Kohlingen has no fights. In the tomb, Orogs, Power Demons and Osteosaurs break to fire, holy, Blunt or Ranged (Orogs and Power Demons also Sword); Exorays to Sword or Ranged; Mad Oscars to Sword or fire.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2751, ff6/src/battle/ot6_hud.asm:2761, ff6/src/battle/ot6_hud.asm:2756, ff6/src/battle/ot6_hud.asm:2769, ff6/src/battle/ot6_hud.asm:2765; sub_battle_group.dat maps 298-300; docs/design/wor-coverage.md:225, 289-290 -->
-      <p class="boss"><b>Dullahan.</b> Ten shields; piercing, bludgeoning, special and fire break it, and it absorbs ice. Setzer's cards and dice count as special.</p>
+      <p class="boss"><b>Dullahan.</b> Ten shields; Dagger, Blunt, Ranged and fire break it, and it absorbs ice. Setzer's cards and dice are Ranged.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2774, ff6/src/battle/monster_prop.dat species $11c (weak fire, absorbs ice); ff6/src/battle/ot6_hud.asm:2760-2780 comment -->
     </div>
   </div>
@@ -1033,25 +1042,25 @@
     <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_owzer.png" alt="">
       <figcaption>Owzer's House, by night.</figcaption></figure>
     <div class="area"><h3>Owzer's House, Jidoor</h3>
-      <p>Vindr have one shield and dodge blades; use fire. Wild Cats (one shield, in fours) take slashing, piercing or fire. SoulDancers take slashing, special or poison; Crushers take fire, piercing or bludgeoning, not blades.</p>
+      <p>Vindr have one shield and dodge blades; use fire. Wild Cats (one shield, in fours) take Dagger, Katana or fire. SoulDancers take Katana, Blunt or poison; Crushers fire, Dagger or Ranged.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2939, ff6/src/battle/ot6_hud.asm:2949, ff6/src/battle/ot6_hud.asm:2943, ff6/src/battle/ot6_hud.asm:2946; sub_battle_group.dat map 207 (group 157) -->
-      <p class="boss"><b>Chadarnook.</b> One half of the fight shows no shield line; do not attack it. The other half has six shields and breaks to slashing, piercing, fire or holy; it absorbs lightning.</p>
+      <p class="boss"><b>Chadarnook.</b> One half of the fight shows no shield line; do not attack it. The other half has six shields and breaks to Spear, Katana, fire or holy; it absorbs lightning.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2962, ff6/src/battle/ot6_hud.asm:2965, ff6/src/battle/monster_prop.dat species $148 (weak fire|holy, absorbs bolt) -->
-      <p class="boss"><b>Still Life.</b> Four shields; slashing, special and fire break it. The Dahling paintings cast Ice 2 and Bolt 2, which Celes's Runic can absorb.</p>
+      <p class="boss"><b>Still Life.</b> Four shields; Katana, Blunt and fire break it. The Dahling paintings cast Ice 2 and Bolt 2, which Celes's Runic can absorb.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2959, ff6/src/battle/ot6_hud.asm:2952, ff6/src/battle/ot6_hud.asm:2950-2956 comments (Runic note is a source comment, not re-measured) -->
     </div>
     <div class="area"><h3>Doma Castle</h3>
-      <p>Rain Men take bludgeoning or special; Pan Doras bludgeoning, special, fire or holy; Samurai slashing or piercing; Barb-e slashing or special; Suriander slashing, bludgeoning or holy; Parasites slashing or fire. Holy breaks Rain Men, Pan Doras and Suriander.</p>
+      <p>Rain Men take Blunt or Ranged; Pan Doras Blunt, Ranged, fire or holy; Samurai and Barb-e Sword or Katana; Suriander Katana, Ranged or holy; Parasites Katana or fire. Holy breaks Rain Men, Pan Doras and Suriander.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3228, ff6/src/battle/ot6_hud.asm:3225, ff6/src/battle/ot6_hud.asm:3231, ff6/src/battle/ot6_hud.asm:3215, ff6/src/battle/ot6_hud.asm:3235, ff6/src/battle/ot6_hud.asm:3223; sub_battle_group.dat maps 125, 126, 144, 317-322; docs/design/wor-coverage.md:312-316 -->
-      <p class="boss"><b>Curley, Larry and Moe.</b> Four shields each. Curley: slashing, special, ice, water; absorbs fire. Larry: piercing, bludgeoning, fire; absorbs ice. Moe: slashing, bludgeoning; absorbs lightning.</p>
+      <p class="boss"><b>Curley, Larry and Moe.</b> Four shields each. Curley: Katana, Ranged, ice, water; absorbs fire. Larry: Spear, Ranged, fire; absorbs ice. Moe: Sword, Blunt; absorbs lightning.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3253, ff6/src/battle/ot6_hud.asm:3256, ff6/src/battle/ot6_hud.asm:3259, ff6/src/battle/monster_prop.dat species $11f, $120, $121 -->
-      <p class="boss"><b>Wrexsoul.</b> Six shields; slashing, special and ice break it. It absorbs fire and holy. Its SoulSavers (two shields) take special or ice.</p>
+      <p class="boss"><b>Wrexsoul.</b> Six shields; Katana, Blunt and ice break it. It absorbs fire and holy. Its SoulSavers (two shields) take Blunt or ice.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3262, ff6/src/battle/ot6_hud.asm:3265, ff6/src/battle/monster_prop.dat species $122 (weak ice, absorbs fire|holy) -->
     </div>
     <div class="area"><h3>Ebot's Rock</h3>
-      <p>Every body here breaks to bludgeoning, so Strago's rod always works. Opinicus, Displayer and Hipocampus also take fire or holy; Eland lightning; Cluck ice; Slatter holy; Warlock lightning or poison.</p>
+      <p>Every body here breaks to Blunt, so Strago's rod always works. Opinicus, Displayer and Hipocampus also take fire or holy; Eland lightning; Cluck ice; Slatter holy; Warlock lightning or poison.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3179, ff6/src/battle/ot6_hud.asm:3176, ff6/src/battle/ot6_hud.asm:3173, ff6/src/battle/ot6_hud.asm:3171, ff6/src/battle/ot6_hud.asm:3168, ff6/src/battle/ot6_hud.asm:3165, ff6/src/battle/ot6_hud.asm:3162; sub_battle_group.dat maps 404 and 405 -->
-      <p class="boss"><b>Hidon.</b> Six shields; piercing, bludgeoning, fire, holy and earth break it, and it absorbs poison. Among its Hidonites, one drinks every element (use weapons) and one is weak to all of them.</p>
+      <p class="boss"><b>Hidon.</b> Six shields; Dagger, Blunt, fire, holy and earth break it, and it absorbs poison. Among its Hidonites, one drinks every element (use weapons) and one is weak to all of them.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3182, ff6/src/battle/ot6_hud.asm:3185, ff6/src/battle/ot6_hud.asm:3188, ff6/src/battle/ot6_hud.asm:3191, ff6/src/battle/ot6_hud.asm:3194, ff6/src/battle/monster_prop.dat species $123 -->
     </div>
   </div>
@@ -1062,13 +1071,13 @@
     <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_wor_narshe.png" alt="">
       <figcaption>Narshe, years later.</figcaption></figure>
     <div class="area"><h3>Narshe and its cliffs</h3>
-      <p>In the mines and on the cliffs, Wizards break to slashing, piercing, special, lightning or poison; Psychots to piercing, special or ice; Red Wolves to slashing or piercing. In Umaro's cave, Ceritops take piercing or bludgeoning, Anemones slashing, Kiwoks slashing, piercing or ice.</p>
+      <p>In the mines and on the cliffs, Wizards break to Dagger, Katana, Ranged, lightning or poison; Psychots to Dagger, Ranged or ice; Red Wolves to Dagger or Katana. In Umaro's cave, Ceritops take Spear or Ranged, Anemones Katana, Kiwoks Spear, Katana or ice.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2879, ff6/src/battle/ot6_hud.asm:2885, ff6/src/battle/ot6_hud.asm:2870, ff6/src/battle/ot6_hud.asm:2898, ff6/src/battle/ot6_hud.asm:2901, ff6/src/battle/ot6_hud.asm:2896; sub_battle_group.dat maps 34-38 and 281-283; docs/design/wor-coverage.md:305-312. Maps 32, 33, 36 are not named by wor-coverage.md: UNVERIFIED -->
-      <p class="boss"><b>Umaro.</b> Six shields; slashing or piercing breaks him; fire and poison hit his weakness and ice heals him.</p>
+      <p class="boss"><b>Umaro.</b> Six shields; Sword or Spear breaks him; fire and poison hit his weakness and ice heals him.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2914, ff6/src/battle/monster_prop.dat species $110 (weak fire|poison, absorbs ice) -->
-      <p class="boss"><b>Tritoch.</b> Ten shields; slashing and piercing chip it despite its defense, and fire burns it. Ice heals it.</p>
+      <p class="boss"><b>Tritoch.</b> Ten shields; Sword, Spear and Katana chip it despite its defense, and fire burns it. Ice heals it.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2918, ff6/src/battle/monster_prop.dat species $144 (weak fire, absorbs ice) -->
-      <p class="boss"><b>Ice Dragon (optional).</b> Six shields; piercing, bludgeoning and fire break it, and ice heals it. Mog's spear is the piercing key.</p>
+      <p class="boss"><b>Ice Dragon (optional).</b> Six shields; Spear, Ranged and fire break it, and ice heals it. Mog's spear is a key.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:2925, ff6/src/battle/monster_prop.dat species $149 -->
     </div>
     <div class="area"><h3>The Fanatics' Tower</h3>
@@ -1091,29 +1100,29 @@
     <figure class="fig-right" style="width:1.75in"><img class="shot" src="img/area_phoenix.png" alt="">
       <figcaption>Phoenix Cave.</figcaption></figure>
     <div class="area"><h3>Phoenix Cave</h3>
-      <p>Most of the cave is weak to ice and absorbs fire. Without ice, use holy on Trixters, Phase and Necromancrs, piercing on Aquilas and Parasouls, bludgeoning on Uroburos and Chaos Drgns.</p>
+      <p>Most of the cave is weak to ice and absorbs fire. Without ice, use Blunt or holy on Trixters, Phase and Necromancrs, Katana on Aquilas and Parasouls, Blunt on Uroburos and Chaos Drgns.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3022, ff6/src/battle/ot6_hud.asm:3026, ff6/src/battle/ot6_hud.asm:3029, ff6/src/battle/ot6_hud.asm:3033, ff6/src/battle/ot6_hud.asm:3036, ff6/src/battle/ot6_hud.asm:3039, ff6/src/battle/ot6_hud.asm:3042, ff6/src/battle/ot6_hud.asm:3045, ff6/src/battle/ot6_break.asm:212 (Phase + holy); ff6/src/battle/ot6_hud.asm:3011-3020 comments; sub_battle_group.dat maps 313 and 315 -->
-      <p class="boss"><b>Red Dragon (optional).</b> Six shields; piercing, ice and water break it, and it absorbs fire. Mog's spear is the piercing key.</p>
+      <p class="boss"><b>Red Dragon (optional).</b> Six shields; Spear, ice and water break it, and it absorbs fire. Mog's spear is the key.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3048, ff6/src/battle/monster_prop.dat species $153 (weak ice|water, absorbs fire) -->
     </div>
     <div class="area"><h3>Ancient Castle</h3>
-      <p>A katana (slashing) breaks every body: Goblin, Figaliz, Enuo, Boxed Set and Lethal Wpn. Holy hits Goblins, Enuo and Boxed Sets.</p>
+      <p>A katana breaks every body: Goblin, Figaliz, Enuo, Boxed Set and Lethal Wpn. Holy hits Goblins, Enuo and Boxed Sets.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3273-3282, sub_battle_group.dat maps 401, 406, 407; ff6/src/battle/ot6_hud.asm:3268-3272 comment (reflect and high magic defense: a source comment, not re-measured: UNVERIFIED) -->
-      <p class="boss"><b>Blue Drgn (optional).</b> Six shields; slashing, piercing and lightning break it, and it absorbs water.</p>
+      <p class="boss"><b>Blue Drgn (optional).</b> Six shields; Spear, Katana and lightning break it, and it absorbs water.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3285, ff6/src/battle/monster_prop.dat species $152 (weak bolt, absorbs water) -->
     </div>
     <div class="area"><h3>Kefka's Tower</h3>
-      <p>Machines (Dueller, Fortis, Junk, IronHitman, Innoc, Scullion, Prometheus, Sky Base) break to piercing or bludgeoning and to lightning or water. Ghosts and casters (Dark Force, Didalos, Madam, Hemophyte, Vectagoyle) break to special; most also to holy.</p>
+      <p>Machines (Dueller, Fortis, Junk, IronHitman, Innoc, Scullion, Prometheus, Sky Base) break to Spear or Ranged and to lightning or water. Ghosts and casters (Dark Force, Didalos, Madam, Hemophyte, Vectagoyle) break to Ranged; most also to holy.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3360-3425 (the tower's rows); sub_battle_group.dat maps 287-355, 409, 410 -->
-      <p class="boss"><b>Doom, Goddess and Poltrgeist (statues).</b> Ten, eight and eight shields. Doom: slashing, special, holy; absorbs ice and poison. Goddess: piercing, special; absorbs lightning and holy. Poltrgeist: bludgeoning, special, poison; absorbs fire and wind.</p>
+      <p class="boss"><b>Doom, Goddess and Poltrgeist (statues).</b> Ten, eight and eight shields. Doom: Katana, Ranged, holy; absorbs ice and poison. Goddess: Spear, Ranged; absorbs lightning and holy. Poltrgeist: Blunt, Ranged, poison; absorbs fire and wind.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3443, ff6/src/battle/ot6_hud.asm:3447, ff6/src/battle/ot6_hud.asm:3450, ff6/src/battle/monster_prop.dat species $127, $128, $129 -->
-      <p class="boss"><b>Guardian.</b> Ten shields; piercing, bludgeoning, lightning and water break it.</p>
+      <p class="boss"><b>Guardian.</b> Ten shields; Spear, Ranged, lightning and water break it.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3438, ff6/src/battle/monster_prop.dat species $112 (weak bolt|water) -->
-      <p class="boss"><b>Inferno, Striker and Rough.</b> Inferno: six shields; lightning, piercing, bludgeoning; absorbs fire. Striker: fire, slashing, piercing; absorbs ice. Rough: ice, slashing, bludgeoning; absorbs lightning.</p>
+      <p class="boss"><b>Inferno, Striker and Rough.</b> Inferno: six shields; lightning, Spear, Ranged; absorbs fire. Striker: fire, Spear, Katana; absorbs ice. Rough: ice, Katana, Ranged; absorbs lightning.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3428, ff6/src/battle/ot6_hud.asm:3432, ff6/src/battle/ot6_hud.asm:3435, ff6/src/battle/monster_prop.dat species $10c, $142, $141 -->
-      <p class="boss"><b>Atma.</b> Ten shields; slashing or piercing breaks it. It absorbs poison, wind, holy, earth and water.</p>
+      <p class="boss"><b>Atma.</b> Ten shields; Spear or Katana breaks it. It absorbs poison, wind, holy, earth and water.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3454, ff6/src/battle/monster_prop.dat species $17d (absorb byte) -->
-      <p class="boss"><b>Gold Drgn and Skull Drgn.</b> Six shields each. Gold: slashing, piercing, water; absorbs lightning. Skull: bludgeoning, special, fire, holy; absorbs poison.</p>
+      <p class="boss"><b>Gold Drgn and Skull Drgn.</b> Six shields each. Gold: Spear, Katana, water; absorbs lightning. Skull: Blunt, Ranged, fire, holy; absorbs poison.</p>
       <!-- src: ff6/src/battle/ot6_hud.asm:3458, ff6/src/battle/ot6_hud.asm:3462, ff6/src/battle/monster_prop.dat species $150, $151 -->
     </div>
   </div>
