@@ -41,7 +41,7 @@ local STATE = "build/states/whelk_entry.mss.lua"
 local WHELK, HEAD = 0x100, 0x134
 local MAGITEK, FIRE_BEAM = 0x1D, 0          -- the command, and the MagiTek list's entry (attack $83 + entry)
 
--- The cap: its four cases ran to f23,485 on the Mega Volt build (wt/v051-tg-wob1), so 50,000 is about 2x that.
+-- The cap: its four cases ran to f26,658 (wt/v051-tg-wob1, the hide build, the gate's draw), so 50,000 is about 2x that.
 H.run({ maxFrames = 50000 }, {
   H.waitFrames(20),
   H.loadState(STATE),

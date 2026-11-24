@@ -173,6 +173,11 @@ local function runTry(t)
            and not t.sent then
           if waited < t.delay then waited = waited + 1; H.setPad({}); return end
           local ok, btn = pcall(aim, Tm, tgtMon)
+          -- (only the target cursor's bail -- its own "target cursor: " message -- voids the window; anything else is a
+          -- fault, raised as it was)
+          if not ok and not tostring(btn):find("^target cursor: ") then
+            error(btn, 0)
+          end
           if not ok then
             unreachable[tgtMon] = true
             t.void = H.frame

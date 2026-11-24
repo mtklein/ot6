@@ -197,9 +197,11 @@ beams; Terra adds TekMissile and Bio Blast).
 | Head | 4 | fire + piercing |
 | Shell | — (no gauge) | — |
 
-- **Telegraph:** the Whelk draws into its shell and the shell charges
-  → **MegaVolt** hits the party. Break the head during the fuse to
-  cancel it.
+- **Telegraph:** the head announces that it is drawing into its shell
+  → two turns later it draws in. Break the head during the fuse to cancel
+  the hide: it stays out, Broken, for the whole window. (This block's
+  first design had the shell charge a Mega Volt; the lead's ruling below
+  replaced it.)
 - **Built** (wt/v051-tg-wob1, `battle_whelk`; the lead's ruling,
   2026-11-24: the opening teaches and does not punish, and "not every move
   needs to be announced"). The telegraph is the fight's own rhythm, the
@@ -207,7 +209,12 @@ beams; Terra adds TekMissile and Bio Blast).
   drew the head in on its clock, it now calls the head in (a battle
   switch); the head says **"It draws in!"** and glows, glows again on its
   next turn, and on the turn after that draws in itself, vanilla's "Gruuu"
-  and fade. A break of the head in between cancels the hide, and every
+  and fade. **The rhythm is not vanilla's:** the call comes on vanilla's
+  clock (the shell's ten-count), but the hide lands about two of the
+  head's turns after it; the shell's clock, restarted at the call, has
+  run its count by then, so the shell shows the head again on its next
+  turn and the head stays in for less than one shell interval; and it
+  hides about half as often as vanilla's head. A break of the head in between cancels the hide, and every
   break of the head sets a hold (`Ot6FuseTbl`'s `OT6_FUSE_HOLD`) that keeps
   the shell from calling it in until the head's first turn back: the
   Broken head stays out for its whole window, which is the reward. The
@@ -896,13 +903,15 @@ waves (Trooper, HeavyArmor, Rider) carry slash\|pierce class rows so
 every player-assigned squad has a key (see "The imperial soldier line"
 below).
 
-- **Telegraph:** he giggles and frost crawls the ground → **Ice 2**
-  across the engaged squad.
+- **Telegraph:** he giggles and frost crawls the ground → **Ice**
+  across the engaged squad (Ice 2 in this block's first design; the
+  lead's ruling, below).
 - **Built (wt/v051-tg-wob2, `battle_kefka`).** His clock arms it (the
   monster timer at 40, about 1,300 frames) on one of his turns that is
   vanilla's opening Battle; "Frost creeps!" (dialogue `$9B`) and a glow
-  announce it on his next turn; Ice 2 on every member of the squad
-  (`set_target ALL_CHARS`) follows on the turn after. A break between
+  announce it on his next turn; Ice on every member of the squad
+  (`set_target ALL_CHARS`) follows on the turn after (Ice 2 until the
+  lead's ruling, below). A break between
   cancels it and restarts his clock (`Ot6FuseTbl` row `$014A`). His
   four-turn rotation, its own one-in-three Ice 2 on one member, his
   parting line and his flight are vanilla's; after the cast his rotation

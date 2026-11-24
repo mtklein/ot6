@@ -189,7 +189,7 @@ Ot6FuseTbl:
         ; Rizopas: "Waters swell!", El Nino; armed by a roll on its turn A,
         ; monster switch 0 (switch 1, its turn B, is clear while lit)
         ot6_fuse $0155, Ot6FuseRizopas, Ot6FuseRizopas, $fc, $ff, 0
-        ; Kefka at Narshe: "Frost creeps!", Ice 2 on the squad; armed by his
+        ; Kefka at Narshe: "Frost creeps!", Ice on the squad; armed by his
         ; clock, monster switch 0
         ot6_fuse $014a, Ot6FuseKefkaNarshe, Ot6FuseKefkaNarshe, $fe, $ff, OT6_FUSE_TIMER
         ; ---- end wt/v051-tg-wob2 ----

@@ -32,6 +32,154 @@ local MARSHAL, LOBO = 0x064, 0x019
 local MX, MY = 15, 40                    -- the Marshal's post: npc_prop.asm map 51 NPC_3, static
 local LEADER_OFF = { [1] = 0x0029, [2] = 0x019A, [3] = 0x0148 }
 local aPhase = 0
+local battleSnap, aloneW = nil, nil
+local MENT = 8 + 2 * 2                   -- the Marshal's entity (formation slot 2)
+local function marshalMvar() return H.readByte(0x3DAC + MENT) end
+local function lobosStanding()
+  local t = {}
+  for s = 0, 5 do
+    if H.readWord(0x57C0 + s * 2) == 0x019 and H.monStanding(s) then t[#t + 1] = s end
+  end
+  return t
+end
+-- one aimed Fight on a Lobo, by the first standing member, once `when` says so (the member waits on its command
+-- window meanwhile; the others Defend)
+local LOCKE = 0x01
+-- Fights on the Lobo in `slot` until it is down.  Without `when`, by each standing member in turn (one Fight does
+-- not always kill an unbroken Lobo).  With it, LOCKE banks a point (a Defend) and then waits on his command window,
+-- his turn up and the battle running, until when() says so, and Fights it at 2 BP (three swings), so the hit comes
+-- at that moment; the others Defend.  A moment his window missed comes round again with the Marshal's next
+-- rotation.
+local function fightLobo(slot, when, what)
+  return H.lazy(function()
+    local plan = {}
+    if when then
+      plan = { { who = LOCKE, defend = true }, { who = LOCKE, cmd = 0x00, slot = slot, boost = 2, openWhen = when } }
+    else
+      for round = 1, 3 do
+        for i = 0, 3 do
+          local id = H.readByte(0x3ED8 + 2 * i)
+          if id ~= 0xFF and H.readWord(0x3BF4 + 2 * i) > 0 then
+            plan[#plan + 1] = { who = id, cmd = 0x00, slot = slot }
+          end
+        end
+      end
+    end
+    H.assertEq(#plan >= 1, true, "marshal (" .. what .. "): a member stands to Fight a Lobo")
+    local function down()
+      for _, s in ipairs(lobosStanding()) do if s == slot then return false end end
+      return true
+    end
+    return H.seqStep({
+      H.kitBattle(plan, { idle = "defend", care = false, maxFrames = 20000, giveUp = down }),
+      H.call(function()
+        H.assertEq(down(), true, string.format("marshal (%s): the Lobo in slot %d fell", what, slot))
+      end),
+    })
+  end)
+end
+function aloneCase(kind)
+  local W, t0
+  local function lineAfter(i) return W.find(0x21, 0x8F, i) end
+  local steps = {
+    H.call(function()
+      W = aloneW
+      H.setPad({})
+      W.req = H.requestLoadState(battleSnap.blob)
+    end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(W.req, "the battle's open restored (" .. kind .. ")")
+      H.rearmInputInjection()
+      W.reset()
+      W.on = true
+      H.log(string.format("[marshal] f%d alone case %s, from the battle's open", H.frame, kind))
+    end),
+  }
+  if kind == "alone" then
+    steps[#steps + 1] = fightLobo(0, nil, kind)
+    steps[#steps + 1] = fightLobo(1, nil, kind)
+    steps[#steps + 1] = H.call(function()
+      t0 = { turn = #W.turns, i = #W.cmds + 1, f = H.frame, announced = (marshalMvar() & 0x02) ~= 0 }
+      H.log(string.format("[marshal] f%d both Lobos down at his turn %d%s", H.frame, t0.turn,
+        t0.announced and " (already announced: the move comes first, the announced case's rule)" or ""))
+    end)
+    -- (an announce made before the last Lobo fell fires first; the count starts after it)
+    steps[#steps + 1] = H.cond(function() return t0.announced end, {
+      H.kitBattle({}, { idle = "defend", care = true, maxFrames = 6000,
+        giveUp = function() return W.find(0x30, 0x08, t0.i) ~= nil end }),
+      H.call(function()
+        H.assertEq(W.find(0x30, 0x08, t0.i) ~= nil, true, "marshal (alone): the move announced before the last Lobo "
+          .. "fell came")
+        t0 = { turn = #W.turns, i = #W.cmds + 1, f = H.frame }
+      end),
+    }, {})
+    steps[#steps + 1] = H.kitBattle({}, { idle = "defend", care = true, maxFrames = 12000,
+      giveUp = function() return #W.turns >= t0.turn + 4 end })
+    steps[#steps + 1] = H.call(function()
+      H.assertEq(#W.turns >= t0.turn + 4, true, "marshal (alone): four more of his turns came")
+      H.assertEq(lineAfter(t0.i) == nil, true, "marshal (alone): no announce in four of his turns alone")
+      local bad = {}
+      for j = t0.i, #W.cmds do
+        local c = W.cmds[j]
+        if c.turn > t0.turn and not (c.cmd == 0x00 and (c.arg == 0xEE or c.arg == 0xEF)) and c.cmd ~= 0x2F then
+          bad[#bad + 1] = string.format("$%02X/$%02X", c.cmd, c.arg)
+        end
+      end
+      H.assertEq(table.concat(bad, " "), "", "marshal (alone): his turns are vanilla's alone block (Battle or "
+        .. "Special, the switch's clear aside)")
+      H.log("[marshal] PASS alone")
+    end)
+  else
+    local armedAt, lined
+    steps[#steps + 1] = fightLobo(0, nil, kind)
+    if kind == "dropped" then
+      -- armed (switch 0) and not yet announced (switch 1, set by the announce)
+      steps[#steps + 1] = fightLobo(1, function()
+        if (marshalMvar() & 0x03) == 0x01 then
+          armedAt = { turn = #W.turns, f = H.frame, i = #W.cmds + 1 }
+          return true
+        end
+        return false
+      end, kind)
+      steps[#steps + 1] = H.call(function()
+        H.assertEq(#W.turns, armedAt.turn, "marshal (dropped): the last Lobo fell before his next turn (the "
+          .. "case's precondition)")
+        H.assertEq(lineAfter(armedAt.i), nil, "marshal (dropped): no announce since he armed when the last Lobo fell")
+      end)
+      steps[#steps + 1] = H.kitBattle({}, { idle = "defend", care = true, maxFrames = 6000,
+        giveUp = function() return #W.turns >= armedAt.turn + 2 end })
+      steps[#steps + 1] = H.call(function()
+        H.assertEq(lineAfter(armedAt.i), nil, "marshal (dropped): no announce on his turns alone")
+        H.assertEq(marshalMvar() & 0x03, 0, "marshal (dropped): his armed fuse was dropped (switches 0 and 1 clear)")
+        H.log("[marshal] PASS dropped")
+      end)
+    else
+      -- announced (switch 1): the line said, the move to come
+      steps[#steps + 1] = fightLobo(1, function()
+        if (marshalMvar() & 0x02) ~= 0 then
+          lined = { turn = #W.turns, i = #W.cmds + 1 }
+          return true
+        end
+        return false
+      end, kind)
+      steps[#steps + 1] = H.call(function()
+        H.assertEq(#W.turns, lined.turn, "marshal (announced): the last Lobo fell before his move's turn (the "
+          .. "case's precondition)")
+      end)
+      steps[#steps + 1] = H.kitBattle({}, { idle = "defend", care = true, maxFrames = 6000,
+        giveUp = function() return #W.turns >= lined.turn + 1 and W.find(0x30, 0x08, lined.i) ~= nil end })
+      steps[#steps + 1] = H.call(function()
+        local i = W.find(0x30, 0x08, lined.i)
+        H.assertEq(i ~= nil and W.cmds[i].turn == lined.turn + 1, true, "marshal (announced): the move (fill_atb, "
+          .. "$30/$08) came on his next turn, alone")
+        H.log("[marshal] PASS announced")
+      end)
+    end
+  end
+  steps[#steps + 1] = H.call(function() W.on = false end)
+  return H.seqStep(steps)
+end
 -- every command a Lobo dispatches (ExecCmd with x a Lobo's entity), for "the Lobos come in with him"
 LOBO_ACTS = {}
 emu.addMemoryCallback(function()
@@ -77,8 +225,9 @@ local function ySwitchTo(p)
   }, "Y-switch to party " .. p), function() n, own = 0, 0 end)
 end
 
--- The cap: the waves and its three cases ran to f30,874 (wt/v051-tg-wob1), so 65,000 is about 2x the longest.
-H.run({ maxFrames = 65000 }, {
+-- The cap: the waves, its three cases and the three alone cases ran to f42,801 (wt/v051-tg-wob1), so 90,000 is about
+-- 2x the longest.
+H.run({ maxFrames = 90000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),
@@ -130,7 +279,10 @@ H.run({ maxFrames = 65000 }, {
       if H.readWord(0x57C0 + s * 2) == LOBO and (H.readByte(0x3AA8 + s * 2) & 1) == 1 then lobos = lobos + 1 end
     end
     H.assertEq(lobos, 2, "the Marshal's battle opens with two Lobos (the fuse's move fills their gauges)")
+    battleSnap = H.requestSaveState()
   end),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(battleSnap, "the battle's open (the alone cases' snapshot)") end),
   H.fuseCases({
     tag = "marshal", species = MARSHAL, write = WRITE,
     -- the move is marked by its first command, fill_atb on the Lobos (AI $FB $08, dispatched as $30/$08), which only
@@ -182,17 +334,27 @@ H.run({ maxFrames = 65000 }, {
       local pre, post, l2 = C.brk.pre, C.brk.post, C.lines[2]
       H.assertEq(pre.mvar & 0x01, 1, "marshal: monster switch 0 stood at the break (the fuse was armed)")
       H.assertEq(post.mvar & 0x01, 0, "marshal: monster switch 0 is clear after the cancel")
-      -- his rotation from its first turn: two turns before the line with a Lobo standing, one (the alone block's,
-      -- which arms on every turn) once both are down
-      local lobos = 0
-      for s = 0, 5 do
-        if H.readWord(0x57C0 + s * 2) == LOBO and H.monStanding(s) then lobos = lobos + 1 end
-      end
-      local back, want = l2.turn - C.rec.turn, lobos > 0 and 3 or 2
-      H.assertEq(back, want, string.format("marshal: the trigger was earned again in full: the line returned on "
-        .. "his turn %d back (%d Lobo(s) standing: his rotation's %s)", back, lobos,
-        lobos > 0 and "two turns, then the line" or "alone block arms, then the line"))
+      H.assertEq(post.mvar & 0x02, 0, "marshal: monster switch 1 (announced) is clear after the cancel")
+      -- his rotation from its first turn: two turns, then the line (he announces only while a Lobo stands, and the
+      -- case's Lobos stand: the others Defend)
+      local back = l2.turn - C.rec.turn
+      H.assertEq(back, 3, string.format("marshal: the trigger was earned again in full: the line returned on his "
+        .. "turn %d back (his rotation's two turns, then the line)", back))
     end,
   }),
   H.logStep("[marshal] PASS: the announce, the schedule, the cancel and the trigger earned again"),
+  -- The alone cases (the lead, 2026-11-24: the line plays only while a Lobo stands), each from the battle's open,
+  -- played through the menu (the Lobos Fought down by aimed Fights; nothing written):
+  --   alone      both Lobos down at once: for four of his turns no line, and each turn vanilla's alone block
+  --              (one of Battle or Special, $00/$EE or $00/$EF);
+  --   dropped    one Lobo down, then the other as soon as his rotation arms the fuse (monster switch 0) and before
+  --              his next turn: that turn is the alone block, no line, and switch 0 is clear after it;
+  --   announced  one Lobo down, then the other once he has said "Strike as one!": the move (fill_atb, $30/$08)
+  --              comes on his next turn all the same.
+  -- Mutant: marshal_never_alone (his alone block's `if_num_monsters 1` made 0) is red at "alone: no announce".
+  H.call(function() aloneW = H.fuseWatch(MARSHAL, WRITE) end),
+  aloneCase("alone"),
+  aloneCase("dropped"),
+  aloneCase("announced"),
+  H.logStep("[marshal] PASS: the alone cases"),
 })

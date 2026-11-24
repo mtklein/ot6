@@ -25,13 +25,13 @@
 --      entry as a mechanism test (M.fuseCases, lib/ot6.lua, where the cases and the DECLARED staging are written
 --      out: the gauge, the row's classes for the breaking Fight, and HP held).  His script (ai_script.asm
 --      AIScript::_330) now arms a fuse on his clock (the monster timer at 40) on a turn that is vanilla's opening
---      Battle; "Frost creeps!" (battle dialogue $9B) and a glow announce it on his next turn, and Ice 2 on the
---      whole squad (attack $06, command $02) follows on the turn after.  A break while it is lit cancels it
+--      Battle; "Frost creeps!" (battle dialogue $9B) and a glow announce it on his next turn, and Ice on the
+--      whole squad (attack $01, command $02) follows on the turn after.  A break while it is lit cancels it
 --      (Ot6FuseTbl's row $014A): switch 0 goes and his clock restarts.
 --        unbroken  the party Defends; the line shows once his clock has run; the lit-fuse mark stands before his
---                  shield emblem; Ice 2 on the squad is dispatched on his next turn, a glow between; the mark goes.
+--                  shield emblem; Ice on the squad is dispatched on his next turn, a glow between; the mark goes.
 --        broken    one member's aimed Fight is confirmed once the mark is up and breaks him: the cancel fires, the
---                  mark goes with the hit, switch 0 is clear and the clock reads 0, no Ice 2 on his first turns
+--                  mark goes with the hit, switch 0 is clear and the clock reads 0, no Ice on his first turns
 --                  back, and the line returns only once his clock has climbed to 40 again; the cast follows.
 --        outside   a break before his clock has run: nothing is cancelled and the cells stand, two Fights in the
 --                  window wind nothing, and the fuse then lights and fires as in the first case.
@@ -130,7 +130,7 @@ local FUSE = {
   tag = "kefka", species = KEFKA, write = WRITE,
   line = 0x9B, move = { cmd = 0x02, atk = 0x01 }, turns = 1, glows = 1,
   arm = "idle",
-  -- (wt/v051-tg-wob1's review) Ice 2 is queued on the whole squad, and a fifth case: CELES's Runic, confirmed after
+  -- (wt/v051-tg-wob1's review) Ice is queued on the whole squad, and a fifth case: CELES's Runic, confirmed after
   -- the line, takes the announced cast
   allTargets = true,
   runic = { who = 0x06 },
