@@ -148,6 +148,9 @@
 ; her field Rune Knight page's row leaf and help lines (#563), after it
         .include "ot6_runepage.asm"
 
+; the Dragoon Boots' spear permit (#567), appended for the same reason.
+        .include "ot6_spear.asm"
+
 ; v0.49 appended three modules here (the Painter page's leaf, the numerals,
 ; Leo's reveal); the bank's code is reached by jsl with 16-bit operands
 ; inside it, so all of it must stay in bank $f0.

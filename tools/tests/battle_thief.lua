@@ -8,6 +8,9 @@
 -- $2bb0 + slot*8 is NOT where a write callback sees that byte land: phase 5
 -- measured a confirmed, paid-for Bestow with the watch silent.  Nothing
 -- below drives on it.
+-- Phase 5's capped Bestow follows #556's live verdict: with another standing
+-- member under the cap it is taken and paid for as a no-op; with every other
+-- member at the cap the confirm refuses it and nothing is paid.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local P = H.newPacer({ tag = "desert" })   -- one pool's row (#306)
@@ -431,6 +434,18 @@ H.run({ maxFrames = 120000 }, {
     target = ally
     modeOf[locke] = "kit:2"
     H.vars.bC = bp(locke)
+    -- #556 (Ot6BestowAnyAlly): Bestow is taken only while some other standing member's bank has room; with every
+    -- one of them at the cap the confirm refuses it.  Whether a third member is under the cap here is the draw's
+    -- (the line's play moved under #567 and EDGAR reached it: build/attempts/wt/v051-dragoon-spear/qual2/
+    -- suite_battle_thief.log, 4894 refused confirms on "pool 9/31, bank 5"), so the verdict is read live.
+    local room = false
+    local stand = H.readWord(0x3A74)
+    for s = 0, 3 do
+      if s ~= locke and (H.readWord(0x3018 + s * 2) & stand) ~= 0 and bp(s) < 5 then room = true end
+    end
+    H.vars.bestowRoom = room
+    H.vars.ref0 = H.refusals.n
+    H.log(string.format("capped bestow: another standing member has room: %s", tostring(room)))
   end),
   -- The no-op bestow: none of the numbers this phase asserts on is supposed
   -- to move, so the drive needs a signal of its own.  It used to wait on a
@@ -458,8 +473,10 @@ H.run({ maxFrames = 120000 }, {
           sawQ = true
         end, emu.callbackType.write, q, q + 5)
       end),
-      driveTo(function() return sawQ or mp() <= mp0 - COST_BESTOW end, 20000,
-        "the capped bestow is queued and paid for"),
+      driveTo(function()
+        if not H.vars.bestowRoom then return H.refusals.n > H.vars.ref0 end
+        return sawQ or mp() <= mp0 - COST_BESTOW
+      end, 20000, "the capped bestow is queued and paid for (or, with nobody under the cap, refused)"),
       H.call(function()
         H.log(string.format("capped bestow signal: queue=%s pool %d -> %d",
           tostring(sawQ), mp0, mp()))
@@ -467,8 +484,12 @@ H.run({ maxFrames = 120000 }, {
       end),
       H.waitFrames(400),
       H.call(function()
-        H.assertEq(mp() <= mp0 - COST_BESTOW, true,
-          "the capped bestow really was confirmed: the pool paid its 5 MP")
+        if H.vars.bestowRoom then
+          H.assertEq(mp() <= mp0 - COST_BESTOW, true,
+            "the capped bestow really was confirmed: the pool paid its 5 MP")
+        else
+          H.assertEq(mp(), mp0, "with every other member at the cap the confirm refused Bestow (#556): no MP paid")
+        end
       end),
     })
   end)(),

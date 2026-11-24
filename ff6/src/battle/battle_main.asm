@@ -14643,8 +14643,8 @@ LoadItemProp:
         bcs     @5546
         longa_clc
         stz     $ee
-        lda     f:ItemProp+1,x   ; equippable characters
-        ldx     #$0006
+        jsl     Ot6EquipWord     ; equippable characters (ot6 #567: with
+        ldx     #$0006           ;   the Dragoon Boots' spears)
 @5533:  bit     $3a20,x     ; actor mask
         bne     @5539       ; branch if character can equip this item
         sec

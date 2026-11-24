@@ -1412,8 +1412,8 @@ _c3bcc9:
         jsr     GetItemPropPtr
         ldx     hMPYL
         longa
-        lda     f:ItemProp+1,x   ; equippable characters
-        and     $e7
+        jsl     Ot6EquipWord     ; ot6 #567: equippable characters, with
+        and     $e7              ;   the Dragoon Boots' spears
         shorta
         beq     @bcfa
         plb
@@ -2077,7 +2077,7 @@ _c3c19c:
         jsr     GetItemPropPtr
         ldx     hMPYL
         longa
-        lda     f:ItemProp+1,x
+        jsl     Ot6EquipWord     ; ot6 #567: with the Dragoon Boots' spears
         and     $e7
         shorta
         beq     @c1c9

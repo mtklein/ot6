@@ -1596,8 +1596,8 @@ GetValidWeapons:
         cmp     #$01
         bne     @97c8       ; branch if not a weapon
         longa
-        lda     f:ItemProp+1,x
-        bit     ze7
+        jsl     Ot6EquipWord            ; ot6 #567: ItemProp+1,x, with the
+        bit     ze7                     ;   Dragoon Boots' spears
         beq     @97c8       ; branch if not equippable
         shorta
         tya
@@ -2189,8 +2189,8 @@ GetValidEquip:
         cmp     #$03
         bne     @9ba3       ; skip if not shield
 @9b91:  longa
-        lda     f:ItemProp+1,x   ; equippable characters
-        bit     ze7
+        jsl     Ot6EquipWord     ; ot6 #567: equippable characters, with
+        bit     ze7              ;   the Dragoon Boots' spears
         beq     @9ba3       ; branch if not equippable
         shorta
         tya
@@ -2876,46 +2876,12 @@ DrawReequipMsg:
 
 CheckReequipRelics:
 @9f5c:  jsr     GetSelCharPropPtr
-        lda     $0023,y
-        cmp     zb0
-        bne     @9f6f
-        lda     $0024,y
-        cmp     zb1
-        bne     @9f6f
-        bra     @9fa9
-@9f6f:  lda     zb0
-        cmp     #ITEM::GENJI_GLOVE
-        beq     @9fac
-        cmp     #ITEM::GAUNTLET
-        beq     @9fac
-        cmp     #ITEM::MERIT_AWARD
-        beq     @9fac
-        lda     zb1
-        cmp     #ITEM::GENJI_GLOVE
-        beq     @9fac
-        cmp     #ITEM::GAUNTLET
-        beq     @9fac
-        cmp     #ITEM::MERIT_AWARD
-        beq     @9fac
-        lda     $0023,y
-        cmp     #ITEM::GENJI_GLOVE
-        beq     @9fac
-        cmp     #ITEM::GAUNTLET
-        beq     @9fac
-        cmp     #ITEM::MERIT_AWARD
-        beq     @9fac
-        lda     $0024,y
-        cmp     #ITEM::GENJI_GLOVE
-        beq     @9fac
-        cmp     #ITEM::GAUNTLET
-        beq     @9fac
-        cmp     #ITEM::MERIT_AWARD
-        beq     @9fac
-@9fa9:  stz     z99
-        rts
-@9fac:  lda     #1
-        sta     z99
-        rts
+        jsl     Ot6ReequipRelics        ; ot6 #567: vanilla's check, moved to
+        sta     z99                     ;   bank $f0 with the Dragoon Boots
+        rts                             ;   added to its relics (ot6_spear.asm)
+        .res    $55 - (* - CheckReequipRelics)  ; the routine's vanilla size, so
+                                        ;   the bank's later code keeps its
+                                        ;   addresses
 
 ; ------------------------------------------------------------------------------
 
