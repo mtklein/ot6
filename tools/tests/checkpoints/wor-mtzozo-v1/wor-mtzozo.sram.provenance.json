@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "344236a9d3a1fba4ff08db3a827fd1912121097e838408ccf1e03240e0d16745",
-  "generator_sig": "3b67429fe5f386abadfbebdafd7b2e5900b6490059e6f92c7e6b95030dbd781c gen_wor_cyan build/checkpoints/wor-terra-v1/manifest.json build/checkpoints/wor-terra-v1/wor-terra.sram",
+  "payload_sha256": "8560ccdc16bc23d395495e390eb06bb9b8187a5eea77a1b20ef02e50c9ac8bf3",
+  "generator_sig": "e671617af547ecb62960f85340e7c40ca59ffbc0c036fcb9b6621f9190be014d gen_wor_cyan build/checkpoints/wor-terra-v1/manifest.json build/checkpoints/wor-terra-v1/wor-terra.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-terra-v1/manifest.json",
-      "sha256": "1d0742ec07b8784e539a655ccd658013cf97189563b34ae83adb97dae73e8c41"
+      "sha256": "1a64840655312fb86ea70d72153bbca937fe1ed8256b3e8c2963a4c8b5c1f493"
     }
   ]
 }
