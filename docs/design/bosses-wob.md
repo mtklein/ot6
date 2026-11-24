@@ -223,7 +223,8 @@ beams; Terra adds TekMissile and Bio Blast).
   boost-3 beam takes 1,150-1,480) before both the break and the move, 3 of
   3; from the announce to the move the party gets 3 actions against 4
   shields, so unboosted chipping from the announce does not break it in
-  time. Fuse: one turn; shields kept at 4.
+  time. Fuse: one turn; shields kept at 4. **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): Mega Volt
+  took 46 of TERRA's 77 (59%), 43 of 91 (47%) and 42 of 93 (45%).
 - **Break story:** the guards warn you away from the shell, and Fire
   Beam is the probe the game points you at. Three beams and a
   TekMissile break the game's first boss within two rounds, which
@@ -264,7 +265,11 @@ piercing.
   turn was read: no cancel, and the Broken turn purged the strike);
   Defending to the announce and then Fighting breaks him in the fuse 2 of
   3 (2 actions) and leaves 1 shield the third time (4 actions), and the
-  strike fires. Fuse: one turn; shields kept at 4.
+  strike fires. Fuse: one turn; shields kept at 4. **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): his
+  two Battles and the Lobos' attacks that landed with them took 0 of
+  LOCKE's 122, 25 of 146 (17%), 28 of 108 (25%) and 22 of 102 (21%) of
+  the moogles'; Defend halves physical damage, so a member who acts
+  takes about twice that.
 - **Break story:** twelve bodies generate BP quickly and damage
   slowly. Moogle spears chip him steadily, and the break protects
   whichever squad he is attacking. Piercing is the featured class,
@@ -341,6 +346,8 @@ fire + slashing.
   before SABIN joins. In phase two SABIN alone takes one shield an AuraBolt
   against 5, and his first Pummel ends the fight. The telegraph here warns
   (Defend, heal) rather than races. Fuse: one turn; shields kept at 5.
+  **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): Gale Cut took 48 of EDGAR's 280 (17%), 49 of LOCKE's
+  279 (17%) and 52 of TERRA's 241 (21%).
 - **Break story:** phase one gives the trio very little chip.
   BioBlaster's poison is their only key and takes Vargas down 1 while
   the script has the fight going against you. Sabin then arrives with
@@ -410,7 +417,8 @@ he keeps all game.
   after the three line turns. Defending to the announce without BANON's
   Health wiped the party, 3 of 3, before it came (the lab's policy, not
   play). The suite measures the window: one of his turns, 802 frames
-  (f9,052 to f9,854). Fuse: one turn; shields kept at 5.
+  (f9,052 to f9,854). Fuse: one turn; shields kept at 5. Not measured
+  for damage: his move is vanilla's Tentacle on BANON, unchanged.
 - **Break story:** Banon's Health makes stalling survivable, so the
   fight teaches banking: probe fire (he has a scripted line about
   seafood), hold at 2–3 BP, break on the fuse, and dump with boosted
@@ -458,7 +466,17 @@ authored** (`Ot6ElemAddTbl` `$0104` + `$02`, weak byte resolves
   turn, and the window holds about 2 party actions: Defending to the
   announce and then chipping left 4-5 shields, 3 of 3 (CELES's boosted
   Ice took one and 882 HP; LOCKE's turn did not fall in the window), and
-  the move fired. Fuse: one turn; shields kept at 5. The fight has
+  the move fired. Fuse: one turn; shields kept at 5. **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending):
+  TekLaser took 204 of CELES's 310 (65%) and none of LOCKE's 314 on that
+  draw (it was queued on both: a miss or his gear). **Runic, played**
+  (`battle_tunnelarmr`'s fifth case): CELES's Runic, confirmed after the
+  line, took the cast aimed at both whole ("1 absorb(s) after the move
+  (targets $03)"), and neither member lost HP to it. Her stance lasts
+  until she queues her next action (vanilla's clear), so an unboosted
+  Runic whose next turn comes before the laser lapses: in the first cut
+  of the case it did, and the laser took 225 from LOCKE. A boosted Runic
+  stands through one more of her turns (`Ot6RunicHold`); the case uses
+  boost 1. The fight has
   two valid answers, Runic the quake (vanilla's tutorial) or break the
   machine first (ours), and doing both is best, since Runic converts
   the telegraph into +1 BP ✦ (kits.md), so the boss's biggest move
@@ -601,7 +619,8 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
   4 keys, 5-6 party actions after the line, and lost on `$C0`
   (`lab-c-TRAIN-CHIP-*`). The line's own fighter Suplexes the train dead
   with one shield off before any announce, as before
-  (`[b68] WON: 1 of 4 shields off`).
+  (`[b68] WON: 1 of 4 shields off`). **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): Evil Toot is a
+  status move: 7 of 363, 4 of 282 and 0 of 358 HP.
 - **Break story:** the keys are the abilities the scenario gives you.
   AuraBolt is holy chip at range, Pummel ×2 chips repeatedly, and
   Shadow's elemental skeans reach two of the three element bits rather
@@ -730,7 +749,8 @@ line's own fighter broke him in 1-2 actions before any announce; a pair
 that Defends from the surfacing and Fights from the announce broke him
 in the fuse on 2 of the 3 keys that announced (1-2 actions after the
 line), and lost the third to El Nino 1 action after it
-(`lab-b-RIZOPAS-CHIP-*`). Kept at one turn.
+(`lab-b-RIZOPAS-CHIP-*`). Kept at one turn. **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): El Nino
+took 232 of SABIN's 363 (63%) and 243 of CYAN's 358 (67%).
 
 **Break story, measured.** The row is honest and the party's Fight is
 the key: SABIN's and CYAN's swings both chip. A 1-BP Fight from either is
@@ -895,7 +915,13 @@ below).
   on 3 of 4 keys, 2-3 actions after the line, and on `$87` took the cast
   2 actions after it (`lab-b-KEFKA-CHIP-*`). The line's own fighter
   breaks him in 6-7 actions, about 1,800 frames in, before any announce
-  (`lab-a-KEFKA-LINE-*`).
+  (`lab-a-KEFKA-LINE-*`). **Damage** (`build/attempts/wt/v051-tg-wob1/s6/damage.txt`: the boss suite's unbroken case with the party's HP at each member's own maximum, the line's levels and gear, the party Defending): Ice 2 on the squad took 221 of
+  TERRA's 306 (72%), 225 of CELES's 310 (72%) and none of EDGAR's 315
+  on that draw. **Runic, played** (`battle_kefka`'s fifth case): CELES's
+  Runic, confirmed after the line and boosted, took the cast aimed at all
+  three whole ("1 absorb(s) after the move (targets $07)"); no member
+  lost HP to it. Unboosted, it lapses when she queues her next action
+  (block 5).
 - **Break story:** the waves drain resources before Kefka himself, so
   the fight teaches banking across a sequence of fights: earn BP on
   the waves, arrive holding 4–5 BP, and break him on the first fuse.

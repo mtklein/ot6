@@ -19348,7 +19348,19 @@ function M.fuseWatch(species, write)
     if not W.on then return end
     local e = W.ent()
     if not e then return end
-    if W.pin then
+    -- (FUSE_DMG: each boss command pauses the party's pin for 200 frames, and the party's HP at the pause's end is
+    -- kept on the command as hpAfter: what that command, and whatever else landed in those frames, took)
+    if rawget(_G, "FUSE_DMG") == true then
+      for j = #W.cmds, math.max(1, #W.cmds - 8), -1 do
+        local lc = W.cmds[j]
+        if lc.f == M.frame then W.pinPause = M.frame + 400 end
+        if lc.hpAfter == nil and M.frame >= lc.f + 399 then
+          lc.hpAfter = {}
+          for i = 0, 3 do lc.hpAfter[i] = M.readWord(0x3BF4 + 2 * i) end
+        end
+      end
+    end
+    if W.pin and not (W.pinPause ~= nil and M.frame < W.pinPause) then
       -- the DECLARED pins (see the header): the boss's HP, and every standing member's
       if W.pin.boss and M.readWord(0x3BF4 + e) > 0 then write.word(0x3BF4 + e, W.pin.boss) end
       if W.pin.party then
@@ -19454,8 +19466,8 @@ end
 --                           the Whelk's head, which the shell could otherwise draw in)
 --   cfg.runic = { who }     (optional) a fifth case: that member's Runic, confirmed in the fuse, takes the move: the
 --                           absorb is seen (RunicEffect's target), and every member's HP is logged before and after
---   FUSE_DMG (a lab's global): the "unbroken" case alone, the party's HP held at each member's own maximum until
---                           the move is dispatched and not after: the move's damage on each member, as a share of
+--   FUSE_DMG (a lab's global): the "unbroken" case alone, the party's HP held at each member's own maximum but for
+--                           the 200 frames after each boss command: the move's damage on each member, as a share of
 --                           its maximum, logged as a [fuse] damage line
 --   cfg.lineShot            (optional) a screenshot "fuse_<tag>_line" this many frames after the first announce
 --                           is dispatched (the line in its window), beside the "_lit" one (the mark)
@@ -19627,7 +19639,7 @@ function M.fuseCases(cfg)
           M.assertEq(c.tchars & 0x0F, want, string.format("%s: the move is queued on every standing member (its "
             .. "targets $%02X at dispatch, the standing seats $%02X)", tag, c.tchars & 0x0F, want))
         end
-        if rawget(_G, "FUSE_DMG") == true then C.dmgFrom = { f = c.f, hp = c.hp }; W.pin.party = false end
+        if rawget(_G, "FUSE_DMG") == true then C.dmgFrom = { f = c.f, hp = c.hp, after = c.hpAfter } end
         say(string.format("the move is dispatched on turn %d, %d turn(s) after the announce", c.turn,
           c.turn - l.turn))
       end),
@@ -19642,15 +19654,18 @@ function M.fuseCases(cfg)
       }, {}),
       M.lazy(function() return (cfg.fired and cfg.fired(C, W, n)) or M.waitFrames(0) end),
       M.cond(function() return C.dmgFrom ~= nil end, {
-        idle(function() return gone() or M.frame - C.dmgFrom.f >= 300 end, 400, "the move's damage settles"),
+        idle(function() return gone() or M.frame - C.dmgFrom.f >= 420 end, 600, "the move's damage settles"),
         M.call(function()
+          -- (the party's HP as the move was dispatched against 400 frames later, the pin paused meanwhile: the whole
+          -- move's damage, the Marshal's two Battles after his marker and the Lobos' attacks that land with them)
+          local dmg, mc = {}, nil
+          for _, c in ipairs(W.cmds) do if c.f == C.dmgFrom.f and mc == nil then mc = c end end
+          for i = 0, 3 do dmg[i] = (mc and mc.hpAfter) and math.max(0, mc.hp[i] - mc.hpAfter[i]) or 0 end
           local t = {}
           for i = 0, 3 do
             local id, mx = M.readByte(0x3ED8 + 2 * i), M.readWord(0x3C1C + 2 * i)
             if id ~= 0xFF and mx > 0 then
-              local before, after = C.dmgFrom.hp[i], M.readWord(0x3BF4 + 2 * i)
-              t[#t + 1] = string.format("char $%02X %d -> %d of %d (%d, %d%% of max)", id, before, after, mx,
-                before - after, (before - after) * 100 // mx)
+              t[#t + 1] = string.format("char $%02X %d of %d (%d%% of max)", id, dmg[i] or 0, mx, (dmg[i] or 0) * 100 // mx)
             end
           end
           M.log(string.format("[fuse] damage: %s's move ($%02X/$%02X) on the party: %s", tag, cfg.move.cmd,

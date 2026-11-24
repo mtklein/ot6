@@ -19,17 +19,18 @@ Fight while it is broken no longer counts toward its stored Bolt 3.
 then Mega Volt on the party), the Marshal ("Strike as one!", then two
 strikes with both Lobos acting at once), Vargas ("Feel the wind!", then
 Gale Cut), Ultros at the Lete River ("Squirm, BANON!", then his Tentacle
-on Banon), TunnelArmr ("Laser charges!", then TekLaser on both, which
-Celes's Runic absorbs), Telstar ("It radios in!", then its backup), the
-GhostTrain ("Whistle blows!", then Evil Toot two turns later), Rizopas
-("Waters swell!", then El Nino) and Kefka at Narshe ("Frost creeps!", then
-Ice 2 on the squad) say what is coming ahead of time (the Whelk's head now casts Mega Volt
-itself), with the yellow **!**
-in front of the shield icon. Break the boss before the move and it is
-cancelled. Against some of them you will usually win the race; against
-Vargas, Ultros and TunnelArmr the line is mostly a cue to brace. While the
-Whelk's head is charging, or broken, the shell no longer pulls it in. Telstar has 2
-shields instead of 4.
+on Banon), TunnelArmr ("Laser charges!", then TekLaser on both), Telstar
+("It radios in!", then its backup), the GhostTrain ("Whistle blows!",
+then Evil Toot two turns later), Rizopas ("Waters swell!", then El Nino)
+and Kefka at Narshe ("Frost creeps!", then Ice 2 on the squad) say what
+is coming ahead of time (the Whelk's head now casts Mega Volt itself),
+with the yellow **!** in front of the shield icon. Break the boss before
+the move and it is cancelled. Against some of them you will usually win
+the race; against Vargas, Ultros and TunnelArmr the line is mostly a cue
+to brace. Celes's Runic takes TekLaser or Kefka's Ice 2 whole, aimed at
+everyone, if her stance is still up when it lands: it ends when she next
+acts unless you boost it. While the Whelk's head is charging, or broken,
+the shell no longer pulls it in. Telstar has 2 shields instead of 4.
 
 **Boosted Dances open on their rare step.** Each of Mog's Dances has four
 steps, and the rarest (Cokatrice, Wombat, Kitty, Tapir, Whump, Wild Bear,
