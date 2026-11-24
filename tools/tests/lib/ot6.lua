@@ -19769,7 +19769,9 @@ function M.fuseCases(cfg)
   end
   -- `via` (optional): { name, who, cmd, row or spell } -- the breaking action is that character's command instead
   -- of a Fight (cfg.via's cases), boost 0
-  local function breakIt(why, when, max, via)
+  -- miss (optional): true once the moment the break was aimed at has passed with no break (the fuse's move came
+  -- first); breakIt then ends with C.missed set, the gauge back at 63 so the hit still in flight only chips
+  local function breakIt(why, when, max, via, miss)
     local plan, staged = {}, false
     -- (an aimed break, or the suite's breaker, takes the plan path in the "outside" case too)
     if when == nil and (cfg.aim or cfg.breaker) and via == nil then when = function() return true end end
@@ -19802,7 +19804,11 @@ function M.fuseCases(cfg)
                 W.slot()))
             else
               plan[1] = { who = id, cmd = 0x00, slot = cfg.aim and W.slot() or nil,
-                confirmWhen = not cfg.openHold and confirmWhen or nil, openWhen = cfg.openHold and confirmWhen or nil }
+                -- (a fuse the party arms by Fighting waits on the command window too: a held target select stops
+                -- the clock in Wait mode, and the others' Fights that arm the next fuse with it -- battle_atma on
+                -- wt/v051-tg-wob1's gate, its breaker Imp'd through the first fuse)
+                confirmWhen = not (cfg.openHold or cfg.arm == "fight") and confirmWhen or nil,
+                openWhen = (cfg.openHold or cfg.arm == "fight") and confirmWhen or nil }
               say(string.format("character %d (seat %d) aims the breaking Fight%s", id, i,
                 cfg.aim and string.format(" at slot %d", W.slot()) or ""))
             end
@@ -19820,21 +19826,29 @@ function M.fuseCases(cfg)
           -- waits: on wt/v051-tg-wob1's gate draw an Imp'd breaker missed the first fuse, and Defending others never
           -- armed a second)
           others = (cfg.arm == "fight" and when ~= nil) and "fight" or nil,
-          giveUp = function() return gone() or #W.breaks > C.nBreaks end })
+          giveUp = function() return gone() or #W.breaks > C.nBreaks or (miss ~= nil and miss()) end })
       end),
       M.call(function()
         standing()
+        C.missed = nil
+        if #W.breaks == C.nBreaks and miss ~= nil and miss() then
+          C.missed = true
+          stage(63, "the fuse's move came before the break: the hit still in flight only chips")
+          return
+        end
         M.assertEq(#W.breaks > C.nBreaks, true, string.format("%s: a %s took the boss's last shield (%s)", tag,
           via and via.name or (cfg.breaker and cfg.breaker.name) or "Fight", why))
         C.brk = W.breaks[#W.breaks]
         C.brk.cmdsAt = #W.cmds
       end),
-      M.waitFrames(2),
-      M.call(function()
-        C.brk.post = W.cells()
-        W.max = { bvar3 = 0, mvar = 0 }
-        say("after the break: " .. W.cellsLine(C.brk.post))
-      end),
+      M.cond(function() return not C.missed end, {
+        M.waitFrames(2),
+        M.call(function()
+          C.brk.post = W.cells()
+          W.max = { bvar3 = 0, mvar = 0 }
+          say("after the break: " .. W.cellsLine(C.brk.post))
+        end),
+      }, {}),
     })
   end
   local function untilRecovered()
@@ -19941,15 +19955,39 @@ function M.fuseCases(cfg)
     open("broken"),
     -- a party that arms the fuse by fighting does so first; then one member's aimed Fight waits for the fuse to
     -- be lit (the line dispatched; on the cancel's ROM the mark in VRAM too) and is confirmed
-    M.cond(function() return cfg.arm == "fight" end, {
-      arm(function() return gone() or lineAfter(1) ~= nil end, 30000, "the fuse arms (to be broken)"),
-    }, {}),
-    breakIt("the break during the fuse", function()
-      local i, c = lineAfter(1)
-      if i == nil then return false end
-      if W.fixed and not measure then return markOn() end
-      return M.frame - c.f >= 60
-    end, 40000),
+    -- (up to three fuses: a draw can bring a fuse's move before the breaker's hit -- an Imp'd breaker on
+    -- battle_atma's draw at wt/v051-tg-wob1's gate -- and the case then aims at the next one, armed as the first was)
+    M.call(function() C.from, C.brk, C.tries = 1, nil, 0 end),
+    (function()
+      local tries = {}
+      for k = 1, 3 do
+        tries[k] = M.cond(function() return C.brk == nil end, {
+          M.call(function() C.tries = k end),
+          M.cond(function() return cfg.arm == "fight" end, {
+            arm(function() return gone() or lineAfter(C.from) ~= nil end, 30000, "the fuse arms (to be broken)"),
+          }, {}),
+          breakIt("the break during the fuse", function()
+            local i, c = lineAfter(C.from)
+            if i == nil then return false end
+            if W.fixed and not measure then return markOn() end
+            return M.frame - c.f >= 60
+          end, 40000, nil, function()
+            local i = lineAfter(C.from)
+            return i ~= nil and moveAfter(i) ~= nil
+          end),
+          M.call(function()
+            if C.missed then
+              say(string.format("fuse %d's move came before the breaking hit: the case aims at the next", k))
+              C.from = #W.cmds + 1
+            end
+          end),
+        }, {})
+      end
+      return M.seqStep(tries)
+    end)(),
+    M.call(function()
+      M.assertEq(C.brk ~= nil, true, tag .. ": a break landed in one of the first three fuses")
+    end),
     M.call(function()
       -- (the announce the break landed after: a draw can let one fuse fire before the breaker's turn comes)
       noteLine(lastLineBefore(C.brk.f), "the fuse arms (to be broken)")

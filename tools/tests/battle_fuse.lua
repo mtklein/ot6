@@ -441,7 +441,9 @@ H.run({ maxFrames = 400000 }, {
     via = { { name = "Filch", who = 0x01, cmd = 0x05, row = 0x57, filch = true } },
     arm = "idle",
     bossHp = 60000,
-    row = { max = 3, classes = 0x0F },
+    -- (63 shields: a member's counterattack chips it while the party Defends -- wt/v051-tg-wob1's gate drew a party
+    -- whose counters broke the staged 3 in the unbroken case, the roll's arming purged with the Broken turn)
+    row = { max = 63, classes = 0x0F },
     -- at once: its clock (if_monster_timer 8: 256 frames) has not run
     partway = function(W) return true end,
     onOpen = function() gen = gen + 1 end,
