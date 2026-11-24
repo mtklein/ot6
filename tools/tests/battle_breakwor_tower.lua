@@ -81,12 +81,19 @@ local EVENTS = { 98, 99, 100, 112, 114, 135, 136, 140 }
 --            column, Doom (355)
 -- The chamber's gate switches shut each column behind the party that enters it, so the order the weights fall
 -- in sets the lanes (route-wor-kefka-tower.md section 2): party 1 east, party 3 west, party 2 the middle.
+-- Since the 2026-11-24 regroup (claws Dagger, the curved swords Katana) the route's gear rule arms the lanes
+-- otherwise; the hands below are the regrouped replay's in the tower (gate on fccf9cf3, the wor_kt_* legs' [keys]):
+-- party 1 "src=c0:r15,c8:r3C,c4:r21:tools,c9:r06" (TERRA's Falchion, a Katana; RELM's Magus Rod; EDGAR's
+-- pike; SETZER's Man Eater), party 2 "src=c6:r14:l13,c7:r07,c1:r4C:T,c10:r20" (CELES's Crystal and Enhancer;
+-- STRAGO's Swordbreaker, or the Pearl Rod $39; LOCKE's Wing Edge; MOG's Partisan), party 3
+-- "src=c2:r19:l31:S,c3:r29:throw,c5:r59:l58:B,c12:r3A:tools" (CYAN's Scimitar and Strato; SHADOW; SABIN's Tiger
+-- Fangs and Dragon Claw, Daggers now; GOGO's rod)
 local LANES = TOWER_LANES or {
-  { "party 1", W(0x15) | W(0x3C) | W(0x06) | W(0x50), FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
+  { "party 1", W(0x15) | W(0x3C) | W(0x21) | W(0x20) | W(0x06), FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
     226 }, { 99 } },
-  { "party 2", W(0x15) | W(0x39) | W(0x4C) | W(0x20), ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
+  { "party 2", W(0x14) | W(0x13) | W(0x07) | W(0x39) | W(0x4C) | W(0x20), ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
     { 112, 135, 140, 100 } },
-  { "party 3", W(0x31) | W(0x29) | SK(0x51) | W(0x58) | W(0x06), FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
+  { "party 3", W(0x19) | W(0x31) | W(0x29) | SK(0x51) | W(0x59) | W(0x58) | W(0x3A), FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
     { 114, 136, 98 } },
 }
 
