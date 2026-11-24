@@ -64,10 +64,10 @@ fist, which is Blunt.
 
 | Type | Icon | Weapons | Skills |
 |---|---|---|---|
-| Sword | a broad blade, up and to the left | swords | Edgar's Chain Saw |
-| Dagger | a short blade lying level | daggers, ninja blades; Gau's fangs | Locke's Trickshot and Dismantle |
+| Sword | a broad blade, up and to the left | swords, but the five curved ones | Edgar's Chain Saw |
+| Dagger | a short blade lying level | daggers, ninja blades; the claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs); Gau's fangs | Locke's Trickshot and Dismantle |
 | Spear | a spear standing upright | spears and lances | Edgar's Drill |
-| Katana | a thin blade, up and to the right | katanas; the edged claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | Cyan's Dispatch, Slash, Quadra Slam, Stunner and Cleave |
+| Katana | a thin blade, up and to the right | katanas; the curved swords (RegalCutlass, Flame Sabre, Falchion, Soul Sabre, Scimitar) | Cyan's Dispatch, Slash, Quadra Slam, Stunner and Cleave |
 | Blunt | a mallet | bare fists; MetalKnuckle, Kaiser and Fire Knuckle; rods, brushes; the Flail, Morning Star and Bone Club | Sabin's Pummel, Suplex and Bum Rush; Umaro's Charge and Throw |
 | Ranged | a throwing star | Shuriken and the other thrown stars; Darts; Cards, Trump and Dice; boomerangs, the Hawk Eye and the other thrown rings | Edgar's AutoCrossbow and Air Anchor; TekMissile; Shadow's skeans; Setzer's Coin Toss |
 
@@ -81,13 +81,13 @@ Each character has a type of their own, and most can equip a second:
 
 | Character | Own type | Can also equip | Skills with a type |
 |---|---|---|---|
-| Terra | Sword | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | TekMissile, in Magitek armor: Ranged |
-| Locke | Dagger | Sword (MithrilBlade, Flame Sabre, Blizzard, ThunderBlade, Drainer, Falchion, Soul Sabre, Excalibur, Illumina, Ragnarok, Atma Weapon); Ranged (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Trickshot, Dismantle: Dagger. Mug uses his weapon's type |
-| Edgar | Spear | Sword (every sword); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Air Anchor: Ranged. Drill: Spear. Chain Saw: Sword |
-| Sabin | Blunt (bare fists; MetalKnuckle, Kaiser, Fire Knuckle) and Katana (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | none | Pummel, Suplex, Bum Rush: Blunt |
-| Cyan | Katana | Sword (the Scimitar) | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
+| Terra | Sword, or Katana with a curved sword | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | TekMissile, in Magitek armor: Ranged |
+| Locke | Dagger | Sword (MithrilBlade, Blizzard, ThunderBlade, Drainer, Excalibur, Illumina, Ragnarok, Atma Weapon); Katana (Flame Sabre, Falchion, Soul Sabre); Ranged (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Trickshot, Dismantle: Dagger. Mug uses his weapon's type |
+| Edgar | Spear | Sword (every straight sword); Katana (the five curved swords); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Air Anchor: Ranged. Drill: Spear. Chain Saw: Sword |
+| Sabin | Blunt (bare fists; MetalKnuckle, Kaiser, Fire Knuckle) and Dagger (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | none | Pummel, Suplex, Bum Rush: Blunt |
+| Cyan | Katana (and the Scimitar) | none | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
 | Shadow | Dagger (ninja blades, daggers) | none | Throw: stars Ranged, skeans Ranged and their element; a thrown weapon keeps its type |
-| Celes | Sword | Dagger and Blunt, as Terra | none |
+| Celes | Sword, or Katana with a curved sword | Dagger and Blunt, as Terra | none |
 | Setzer | Ranged (Cards, Trump, Dice, Darts, Doom Darts) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | Coin Toss: Ranged. Hired Help: a type the target is weak to |
 | Strago | Blunt (rods; Flail, Morning Star) | Dagger (Dirk, MithrilKnife, Air Lancet, Man Eater, SwordBreaker, Graedus) | none |
 | Relm | Blunt (brushes, rods; Flail, Morning Star) | Dagger, as Strago | none |
@@ -211,6 +211,9 @@ are in MP. Every character's first skill is theirs from the day they join.
   Fire with 3 BP casts Ultima, for 80 MP.
 - **Economizer.** Won at the Colosseum with the Gem Box. Every spell its
   wearer casts costs 1 MP at any boost.
+- **Sword or Katana.** A curved sword (the RegalCutlass, Flame Sabre,
+  Falchion, Soul Sabre and Scimitar) is Katana. The first, the
+  RegalCutlass, is in South Figaro's weapon shop beside the MithrilBlade.
 
 ### Locke, Treasure Hunter (dagger)
 
@@ -273,8 +276,8 @@ by level, as in FF6.
 | **Bum Rush** | 99 | 70, or from Duncan |
 
 Bare fists and the knuckles are Blunt, and so are Pummel, Suplex and Bum Rush
-whatever he wears. The edged claws make his Fight Katana, so with a claw on
-he holds two types. Aura Bolt, Fire Dance and Air Blade hit their elements.
+whatever he wears. The claws make his Fight Dagger, so with a claw on he
+holds two types. Aura Bolt, Fire Dance and Air Blade hit their elements.
 **Bum Rush** is offered only at 3 BP. It is four blows, each at
 8x. Each blow removes a shield whatever the enemy is weak to.
 
@@ -309,6 +312,7 @@ that can die, dies. A boss loses four shields and takes a very heavy cut.
   from absorbing is limited to one per round.
 - **Ultimate: RunicBlade**, learned in the Magitek factory when Celes turns on
   Kefka. Runic with 3 BP also sends each absorbed spell back at its caster.
+- **Sword or Katana.** As Terra, she holds Katana with a curved sword.
 
 ### Gau, Beast Tamer (fangs)
 

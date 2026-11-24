@@ -50,9 +50,9 @@ would let the Dragoon Boots' wearer equip a spear; it is not built.
   chip Ranged-weak enemies.
 - Cyan is the Katana *specialist* (Quadra Slam ×4 is the best Katana
   chip in the game), but he is not the only Katana key: Terra and Celes
-  hold it by choosing a curved sword, at the same power as the straight
-  sword of its tier (RegalCutlass 54, Rune Edge 55; Flame Sabre 108,
-  Blizzard and ThunderBlade 108). The first is the RegalCutlass in South
+  hold it by choosing a curved sword, at the power of a straight sword of
+  its tier (RegalCutlass 54, Rune Edge 55; Flame Sabre 108, Blizzard and
+  ThunderBlade 108). The first is the RegalCutlass in South
   Figaro's weapon shop, before Mt. Kolts. Class-coverage balance is
   re-asked every milestone ✦.
 - The 8 elements stay untouched ✦.

@@ -22,16 +22,17 @@ katanas, blunt or ranged).
 
 Who holds which:
 
-- **Sword**: swords, and Edgar's Chain Saw. Terra and Celes; Edgar and
-  Locke can equip swords, and Cyan the Scimitar.
-- **Dagger**: daggers and ninja blades; Locke's Trickshot and Dismantle;
-  Gau's fangs (his bare hands, and his Fight in a rage). Locke, Shadow and
-  Gau; Terra, Celes, Edgar, Setzer, Mog, Strago and Relm can equip some
-  daggers.
+- **Sword**: swords but the curved ones, and Edgar's Chain Saw. Terra and
+  Celes; Edgar and Locke can equip swords.
+- **Dagger**: daggers, ninja blades and claws; Locke's Trickshot and
+  Dismantle; Gau's fangs (his bare hands, and his Fight in a rage). Locke,
+  Shadow, Gau, and Sabin with a claw on; Terra, Celes, Edgar, Setzer, Mog,
+  Strago and Relm can equip some daggers.
 - **Spear**: spears and lances; Edgar's Drill. Edgar and Mog.
-- **Katana**: katanas, and the claws with an edge (Mithril Claw, Poison
-  Claw, Dragon Claw, Tiger Fangs); Cyan's SwdTech. Cyan, and Sabin with a
-  claw on.
+- **Katana**: katanas, and the curved swords (RegalCutlass, Flame Sabre,
+  Falchion, Soul Sabre, Scimitar); Cyan's SwdTech. Cyan, and Terra or Celes
+  with a curved sword; Edgar can equip them too. The first is the
+  RegalCutlass in South Figaro's weapon shop.
 - **Blunt**: bare fists, the knuckles (MetalKnuckle, Kaiser, Fire Knuckle),
   rods, brushes, the Flail, Morning Star and Bone Club; Sabin's Pummel,
   Suplex and Bum Rush; Umaro's Charge and Throw. Sabin, Umaro, Strago and
@@ -43,9 +44,10 @@ Who holds which:
 
 What to watch for: ninja blades are Dagger and Shadow's throws Ranged, so he
 holds two types; Edgar's AutoCrossbow is Ranged and his Drill Spear; Sabin's
-claws are Katana and his Blitzes Blunt; rods and brushes are Blunt. You will
-meet more enemies that the weapons in hand cannot break. A second weapon
-type in the party, a spell of the right element, Locke's Filch, the Break
+claws are Dagger and his Blitzes Blunt; Terra and Celes hold Sword or Katana
+by the sword they choose; rods and brushes are Blunt. You will meet more
+enemies that the weapons in hand cannot break. A second weapon type in the
+party, a spell of the right element, Locke's Filch, the Break
 spell, or Setzer's Hired Help (which swings a type the target is weak to)
 answers them. The guide (docs/PLAYING.md, "Weapon types") lists every type
 each character can equip.
