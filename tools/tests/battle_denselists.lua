@@ -363,6 +363,15 @@ local function walk(kindName, slot, want, tag)
     upChecked[tag] = (upChecked[tag] or 0) + 1
     press("up")
     idle(10)
+    -- the summon window comes up through the menu's transition state ($01), and how long that takes is the
+    -- battle's: 8 frames from Up's first frame on most presses, up to 25 when the battle is busy (160 Up presses
+    -- on wor_ancient_hunt's battle, build/attempts/wt/v051-six-classes/suites4/dense/uplab_b0.log), so a fixed
+    -- settle read $01 on the v0.51 line's gate10 draw ("late: Up from the first cell opens the worn stone's
+    -- summon: got 1 ($1), want 22 ($16)").  The transition is waited out; what it ends in is the assertion
+    for _ = 1, 120 do
+      if st() ~= ST_TRANS then break end
+      frame({})
+    end
     H.assertEq(st(), ST_ESPER, tag .. ": Up from the first cell opens the worn stone's summon")
     press("down")             -- the summon window closes with Down or Right
     for _ = 1, 60 do if st() == k.st then break end frame({}) end
