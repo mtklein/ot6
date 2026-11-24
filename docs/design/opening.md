@@ -30,13 +30,13 @@ then what the first shops sell.
 
 | member | joins with | class | changes when |
 |---|---|---|---|
-| TERRA | Mithril Knife; Fire, Cure | Dagger | South Figaro's shop sells the first swords (Mithril Blade, RegalCutlass): Sword from Mt. Kolts on |
+| TERRA | Mithril Knife; Fire, Cure | Dagger | South Figaro's shop sells the first blades, before Mt. Kolts: the Mithril Blade (Sword) or the RegalCutlass (Katana), by choice; Narshe's shop also sells the RegalCutlass |
 | LOCKE | Dirk; Steal, Filch, Bestow | Dagger | Trickshot (Dagger whatever he holds) from the Lete on; a sword is his by choice |
-| MOG and ten moogles | pikes, flails, a brush, blades, a claw, boomerangs | all six | the defense only |
+| MOG and ten moogles | pikes, flails, a brush, blades, a claw (Dagger), boomerangs | all but Katana | the defense only |
 | EDGAR | Mithril Blade; the AutoCrossbow | Sword; Ranged by tool | Bio Blaster (poison), NoiseBlaster, Flash at Figaro; the first Mithril Pike on sale is Narshe's, before the defense; the Drill (Spear) at Figaro after the dive |
-| SABIN | MetalKnuckle; Pummel; AuraBolt (level 6) | Blunt, hand and Blitz | Suplex at 10, Fire Dance at 15; the first Mithril Claw (Katana in hand) is Mobliz's |
+| SABIN | MetalKnuckle; Pummel; AuraBolt (level 6) | Blunt, hand and Blitz | Suplex at 10, Fire Dance at 15; the first Mithril Claw (Dagger in hand; his Blitzes stay Blunt) is Mobliz's |
 | BANON | Punisher | Blunt | never |
-| CELES | nothing in hand; Ice, Runic | Blunt (bare fists) until the player equips her | a spare sword from the bag: Sword |
+| CELES | nothing in hand; Ice, Runic | Blunt (bare fists) until the player equips her | a spare blade from the bag: Sword (Mithril Blade) or Katana (RegalCutlass) |
 | CYAN | Ashura; SwdTech | Katana | never in the opening |
 | SHADOW (a hire) | Imperial; Throw | Dagger in hand | Ranged once Shurikens are bought (the merchant at the house where he is hired); Fire Skeans on the Phantom Train |
 | GAU | his fangs; Rage | Dagger | never |
@@ -52,14 +52,21 @@ Three things follow that the class list alone does not show.
   except the moogles' own fight.
 - **SABIN lost a class.** His MetalKnuckle slashed on main (all claws did) and
   his Blitzes bludgeoned, so alone he held two of four. Now both are Blunt,
-  until a claw from Mobliz's shop makes his Fight Katana.
+  until a claw from Mobliz's shop makes his Fight Dagger.
+- **A curved sword is Katana.** The RegalCutlass sits beside the Mithril
+  Blade in South Figaro's shop at the same power (54 and 55). No body from
+  South Figaro through Mt. Kolts, the Lete, TERRA's scenario or the
+  Returners' basement takes Katana, so the tables give TERRA and CELES the
+  Mithril Blade; the cutlass keys the Narshe raiders, the Rider and Zozo's
+  SlamDancer, Red Fang and Over Grunk.
 
 The automated route's hands differ, and `shares.txt` gives its numbers beside
 the new player's: TERRA keeps the knife to Mt. Kolts, LOCKE takes EDGAR's
 Mithril Blade, EDGAR wields MOG's pike from Figaro on (it keys nothing before
 Narshe under these rows: 15 of the route's 27 cave-and-plains fights are keyed
 in hand, where four classes keyed 27), LOCKE wears a Genji Glove pair of
-knives from his scenario, and SABIN buys his claw at Narshe. Its gear step
+knives from his scenario, SABIN buys his claw at Narshe, and TERRA (from the
+defense) and CELES (at Zozo) carry a RegalCutlass, Katana now. Its gear step
 should choose by key under six classes: EDGAR keeps the Mithril Blade until
 Narshe, TERRA takes a sword at South Figaro.
 
@@ -119,7 +126,7 @@ Teaches: One member, one weapon class: her knife keys every body. Fire keys two 
 
 ### 3. The moogle defense
 
-**LOCKE's squad.** LOCKE (Dirk; Steal, Filch, Bestow); KUPEK (Mithril Pike); KUPOP (Morning Star); KUMAMA (Mithril Claw). Holds: Dagger, Spear, Katana, Blunt in hand; elements: -. Keys 3 of 3 species (3 in hand, 3 by kit, 0 by element); under four classes 3 (3 in hand). Each member's own keys: LOCKE 2, KUPEK 2, KUPOP 1, KUMAMA 0.
+**LOCKE's squad.** LOCKE (Dirk; Steal, Filch, Bestow); KUPEK (Mithril Pike); KUPOP (Morning Star); KUMAMA (Mithril Claw). Holds: Dagger, Spear, Blunt in hand; elements: -. Keys 3 of 3 species (3 in hand, 3 by kit, 0 by element); under four classes 3 (3 in hand). Each member's own keys: LOCKE 2, KUPEK 2, KUPOP 1, KUMAMA 2.
 
 **MOG's squad.** MOG (Mithril Pike); KUKU (Flail); KUTAN (Mithril Blade); KUPAN (Full Moon). Holds: Sword, Spear, Blunt, Ranged in hand; elements: -. Keys 3 of 3 species (3 in hand, 3 by kit, 0 by element); under four classes 3 (3 in hand). Each member's own keys: MOG 2, KUKU 1, KUTAN 1, KUPAN 0.
 
@@ -133,7 +140,7 @@ Teaches: One member, one weapon class: her knife keys every body. Fire keys two 
 
 Formations: Vomammoth + Lobo (battle 5); Lobo x2 + Marshal (battle 6).
 
-Teaches: All six weapon icons are on the field at once and nobody has a spell: the Lobo takes points (the pikes, LOCKE's dirk), the Vomammoth swords and blows, and each squad holds a key to both. The Marshal is the first boss broken by weapons alone.
+Teaches: Five of the six weapon icons are on the field at once (no Katana: KUMAMA's claw is a dagger) and nobody has a spell: the Lobo takes points (the pikes, LOCKE's dirk), the Vomammoth swords and blows, and each squad holds a key to both. The Marshal is the first boss broken by weapons alone.
 
 ### 4. TERRA and LOCKE: the plains and the Figaro desert (and the school's practice chest)
 
@@ -213,7 +220,7 @@ Teaches: No body here is weak to fire: the Bio Blaster is the element (all three
 
 Formations: Cirpius x3 (map 96); Tusker + Cirpius x3 (map 96); Trilium + Tusker + Cirpius x2 (map 98); Trilium x2 (map 98); Brawler x2 (map 100); Tusker x2 (map 100); Brawler + Trilium + Vaporite x2 (map 101); Vargas + Ipooh x2 (battle 66).
 
-Teaches: TERRA's new sword and her Fire carry the mountain; the Tusker has no weapon weakness at all (Fire or the Bio Blaster); the fliers fall to the dagger or the sweep. Vargas cannot be broken until SABIN arrives: Pummel, his MetalKnuckle and AuraBolt.
+Teaches: TERRA's new Mithril Blade and her Fire carry the mountain (a RegalCutlass keys nothing here); the Tusker has no weapon weakness at all (Fire or the Bio Blaster); the fliers fall to the dagger or the sweep. Vargas cannot be broken until SABIN arrives: Pummel, his MetalKnuckle and AuraBolt.
 
 ### 8b. The Returners' side of Mt. Kolts, SABIN's first walk
 
@@ -391,17 +398,17 @@ Teaches: CYAN's katana keys every body but the train itself; AuraBolt's holy key
 
 Formations: Piranha x2 (battle 18); Actaneon x3 (battle 19); Anguiform (battle 19); Anguiform + Actaneon + Aspik (battle 20); Anguiform x2 (battle 21); Actaneon x3 + Aspik x2 (battle 21).
 
-Teaches: The falls take both hands. The trench is three aquatics, three keys, one a member: CYAN's katana, SABIN's Blitzes, GAU's fangs.
+Teaches: The falls take both hands. The trench is three aquatics, three keys: CYAN's katana, SABIN's Blitzes, GAU's fangs (and SABIN's claw, a dagger).
 
 ### 11. The Narshe defense and Kefka
 
-**All seven.** TERRA (a sword from South Figaro's shop; Fire, Cure); LOCKE (a dagger; Steal, Filch, Bestow, Trickshot (from the Lete on)); EDGAR (the Mithril Pike Narshe's shop sells before the defense; AutoCrossbow; Bio Blaster); SABIN (a Mithril Claw (Mobliz's or Narshe's shop); Pummel, Suplex, AuraBolt); CYAN (Ashura; SwdTech); GAU (his fangs; Rage); CELES (a spare Mithril Blade (she joins unarmed); Ice, Cure, Runic). Holds: Sword, Dagger, Spear, Katana in hand, Blunt, Ranged by kit; elements: fire, ice, poison, holy. Keys 6 of 6 species (6 in hand, 6 by kit, 6 by element); under four classes 6 (6 in hand). Each member's own keys: TERRA 5, LOCKE 6, EDGAR 4, SABIN 4, CYAN 4, GAU 6, CELES 4.
+**All seven.** TERRA (a sword from South Figaro's shop; Fire, Cure); LOCKE (a dagger; Steal, Filch, Bestow, Trickshot (from the Lete on)); EDGAR (the Mithril Pike Narshe's shop sells before the defense; AutoCrossbow; Bio Blaster); SABIN (a Mithril Claw (Mobliz's or Narshe's shop); Pummel, Suplex, AuraBolt); CYAN (Ashura; SwdTech); GAU (his fangs; Rage); CELES (a spare Mithril Blade (she joins unarmed); Ice, Cure, Runic). Holds: Sword, Dagger, Spear, Katana in hand, Blunt, Ranged by kit; elements: fire, ice, poison, holy. Keys 6 of 6 species (6 in hand, 6 by kit, 6 by element); under four classes 6 (6 in hand). Each member's own keys: TERRA 5, LOCKE 6, EDGAR 4, SABIN 6, CYAN 4, GAU 6, CELES 4.
 
 **A squad as the scenarios ended: TERRA, EDGAR.** Holds: Sword, Spear in hand, Ranged by kit; elements: fire, poison. Keys 6 of 6 species (4 in hand, 4 by kit, 6 by element); under four classes 6 (6 in hand). Each member's own keys: TERRA 5, EDGAR 4.
 
 **A squad as the scenarios ended: LOCKE, CELES.** Holds: Sword, Dagger in hand; elements: ice. Keys 6 of 6 species (6 in hand, 6 by kit, 0 by element); under four classes 6 (6 in hand). Each member's own keys: LOCKE 6, CELES 4.
 
-**A squad as the scenarios ended: SABIN, CYAN, GAU.** Holds: Dagger, Katana in hand, Blunt by kit; elements: holy. Keys 6 of 6 species (6 in hand, 6 by kit, 0 by element); under four classes 6 (6 in hand). Each member's own keys: SABIN 4, CYAN 4, GAU 6.
+**A squad as the scenarios ended: SABIN, CYAN, GAU.** Holds: Dagger, Katana in hand, Blunt by kit; elements: holy. Keys 6 of 6 species (6 in hand, 6 by kit, 0 by element); under four classes 6 (6 in hand). Each member's own keys: SABIN 6, CYAN 4, GAU 6.
 
 **The automated route's party 1: TERRA, EDGAR, CELES.** Holds: Sword, Spear in hand, Ranged by kit; elements: fire, ice, poison. Keys 6 of 6 species (4 in hand, 4 by kit, 6 by element); under four classes 6 (6 in hand). Each member's own keys: TERRA 5, EDGAR 4, CELES 4.
 
@@ -420,11 +427,11 @@ Teaches: The falls take both hands. The trench is three aquatics, three keys, on
 
 Formations: Trooper x4 (battle 22); Bounty Man + Trooper x2 (battle 22); Fidor + Trooper (battle 23); HeavyArmor + Trooper x2 (battle 23); Rider (battle 24); Kefka (battle 57).
 
-Teaches: The player forms three squads from seven without seeing the enemy, so one row serves the raiders: swords, daggers and fangs, the katana. The Rider takes the dagger and the katana, Kefka the sword and the dagger, and both Fire and poison: his four cells are full, and the katana has none.
+Teaches: The player forms three squads from seven without seeing the enemy, so one row serves the raiders: swords, daggers, claws and fangs, the katana and a cutlass. The Rider takes the dagger and the katana, Kefka the sword and the dagger, and both Fire and poison: his four cells are full, and the katana has none.
 
 ### 12. Kohlingen, the plains and Zozo, with Dadaluma
 
-**All six.** LOCKE (a dagger; Steal, Filch, Bestow, Trickshot (from the Lete on)); EDGAR (Mithril Pike; AutoCrossbow, the Drill (Figaro, after the dive); Bio Blaster); SABIN (a Mithril Claw; Pummel, Suplex, AuraBolt, Fire Dance (level 15)); CYAN (Ashura; SwdTech); GAU (his fangs; Rage); CELES (a spare Mithril Blade (she joins unarmed); Ice, Cure, Runic). Holds: Sword, Dagger, Spear, Katana in hand, Blunt, Ranged by kit; elements: fire, ice, poison, holy. Keys 13 of 13 species (11 in hand, 13 by kit, 11 by element); under four classes 13 (13 in hand). Each member's own keys: LOCKE 5, EDGAR 12, SABIN 8, CYAN 3, GAU 5, CELES 6.
+**All six.** LOCKE (a dagger; Steal, Filch, Bestow, Trickshot (from the Lete on)); EDGAR (Mithril Pike; AutoCrossbow, the Drill (Figaro, after the dive); Bio Blaster); SABIN (a Mithril Claw; Pummel, Suplex, AuraBolt, Fire Dance (level 15)); CYAN (Ashura; SwdTech); GAU (his fangs; Rage); CELES (a spare Mithril Blade (she joins unarmed); Ice, Cure, Runic). Holds: Sword, Dagger, Spear, Katana in hand, Blunt, Ranged by kit; elements: fire, ice, poison, holy. Keys 13 of 13 species (11 in hand, 13 by kit, 11 by element); under four classes 13 (13 in hand). Each member's own keys: LOCKE 5, EDGAR 12, SABIN 10, CYAN 3, GAU 5, CELES 6.
 
 | species | L | HP | shields | weapon weaknesses | elements | on main (four classes) |
 |---|---|---|---|---|---|---|
@@ -456,8 +463,9 @@ Teaches: The first free party. EDGAR's tools reach almost everything (the sweep,
    break: three Fire Beams and a TekMissile.
 2. **TERRA wakes: a dagger, and Fire.** *One weapon class.* The Were-Rat and
    the Vaporite take both; the Repo Man takes the knife and not Fire.
-3. **LOCKE: a second dagger, and Steal. The moogles: every class.** Each squad
-   holds a pike and a flail or brush; two hold a sword. The Lobo takes points,
+3. **LOCKE: a second dagger, and Steal. The moogles: every class but
+   Katana.** Each squad holds a pike and a flail or brush; two hold a sword,
+   and KUMAMA's claw is a dagger. The Lobo takes points,
    the Vomammoth swords and blows, the Marshal points: LOCKE's dirk chips the
    boss, as it did on main.
 4. **The school** (optional, at Narshe's gate): the weapon advisor names the
@@ -474,8 +482,10 @@ Teaches: The first free party. EDGAR's tools reach almost everything (the sweep,
 7. **The cave.** The Bleary takes the knives, the Crawly EDGAR's blade, the
    Hornet a dagger or the sweep, and Fire burns all three. LOCKE has no key
    on the Crawly and EDGAR none on the Bleary.
-8. **South Figaro's shop: a sword for TERRA.** On the plains it keys the
-   Rhodox only; LOCKE's dagger keys the Rhodox and the GreaseMonk; the
+8. **South Figaro's shop: a blade for TERRA, the Mithril Blade (Sword) or
+   the RegalCutlass (Katana).** No body until the Narshe defense takes
+   Katana, so the Mithril Blade is the one that keys. On the plains it keys
+   the Rhodox only; LOCKE's dagger keys the Rhodox and the GreaseMonk; the
    Rhinotaur is EDGAR's (the crossbow, the Bio Blaster). On Mt. Kolts the
    sword keys the Trilium, the Brawler and the Ipoohs, and Fire the Tusker
    (no weapon weakness), the Trilium, the Vaporite and the Ipoohs.
@@ -494,8 +504,9 @@ Teaches: The first free party. EDGAR's tools reach almost everything (the sweep,
 12. **LOCKE alone.** *One weapon class.* The Merchant, the Officer and the
     HeavyArmor all take a dagger, in hand or by Trickshot.
 13. **CELES: Sword once equipped, and Ice.** She joins unarmed; her fists are
-    Blunt and key the Trilobiter, the Primordite and the Gold Bear. With a
-    blade she keys the soldiers, the hounds, the Primordite and the bear, and
+    Blunt and key the Trilobiter, the Primordite and the Gold Bear. A spare
+    RegalCutlass would be Katana and key nothing here. With a Mithril Blade
+    she keys the soldiers, the hounds, the Primordite and the bear, and
     LOCKE the soldiers, the hounds and the shell. TunnelArmor (Dagger; bolt,
     water, +ice) takes LOCKE's dagger and Trickshot and her Ice. Mug is
     learned when the escape is done, after this fight.
@@ -505,29 +516,34 @@ Teaches: The first free party. EDGAR's tools reach almost everything (the sweep,
 15. **SHADOW, if hired: Dagger in hand, Ranged by Throw.** His blade keys the
     CrassHoppr, the Stray Cat, the Templars and the Dobermans; a Shuriken the
     Beakor.
-16. **CYAN: Katana.** *One weapon class in his duel.* The Soldiers and the
-    Leader take it. With SABIN the camp's infantry take both hands; on the
-    train his katana keys every body but the GhostTrain, which takes only
-    blows, fire, bolt and holy, so SABIN breaks it and CYAN's Cleave gets its
-    Broken target.
-17. **Mobliz's shop: a claw for SABIN (Katana in hand, Blunt by Blitz). GAU:
-    his fangs (Dagger).** The trench's three take one member each: the
-    Anguiform CYAN's katana, the Actaneon SABIN's Blitzes, the Aspik GAU's
-    fangs.
+16. **CYAN: Katana.** *One weapon class in his duel.* He is the only Katana
+    in SABIN's scenario. The Soldiers and the Leader take it. With SABIN the
+    camp's infantry take both hands; on the train his katana keys every body
+    but the GhostTrain, which takes only blows, fire, bolt and holy, so SABIN
+    breaks it and CYAN's Cleave gets its Broken target.
+17. **Mobliz's shop: a claw for SABIN (Dagger in hand, Blunt by Blitz). GAU:
+    his fangs (Dagger).** The trench's three: the Anguiform takes only CYAN's
+    katana, the Actaneon SABIN's Blitzes, the Aspik GAU's fangs and SABIN's
+    claw.
 18. **Narshe's shop, before the defense: the first Mithril Pike (Spear), a
-    claw, a Kotetsu.** The raiders take a sword, a dagger or a katana, so
+    claw (Dagger), a Kotetsu, the RegalCutlass (Katana).** The raiders take a
+    sword, a dagger (a claw too) or a katana (a cutlass too), so
     every squad the player can form holds a key unless it is only EDGAR with
     a new pike and SABIN with a knuckle, and those two have the Bio Blaster
     and Pummel's damage. The Rider takes a dagger, a katana, Fire and poison;
-    Kefka a sword, a dagger, Fire and poison. No body takes a Spear or a
-    bolt: with a pike in hand, EDGAR's key at the defense is the Bio Blaster.
+    Kefka a sword, a dagger (SABIN's claw), Fire and poison, and not a katana
+    or a cutlass. No body takes a Spear or a bolt: with a pike in hand,
+    EDGAR's key at the defense is the Bio Blaster.
 19. **Kohlingen and Zozo: any four of six; the Drill (Spear) at Figaro,
     SHADOW for hire, boomerangs and skeans in Kohlingen.** EDGAR's pike and
     Drill key the Red Fang, the Harvester and the FossilFang; his crossbow the
     Gabbldegak pack, the Vulture, the Mind Candy swarm, the Iron Fist and the
-    HadesGigas; his Bio Blaster all of Zozo. Every pick of four keys at least
-    11 of the 13 bodies; the pick without EDGAR and SABIN has no key on the
-    HadesGigas or the Iron Fist.
+    HadesGigas; his Bio Blaster all of Zozo. SABIN's claw is a dagger with
+    LOCKE's and GAU's (the Gabbldegak, the Vulture, the sand bodies,
+    Dadaluma); the SlamDancer, the Red Fang and the Over Grunk take CYAN's
+    katana or a cutlass. Every pick of four keys at least 11 of the 13
+    bodies; the pick without EDGAR and SABIN has no key on the HadesGigas or
+    the Iron Fist.
 
 ### The stretches with one weapon class
 
@@ -580,7 +596,7 @@ in the row (7 more, and some of those above).**
 - Stray Cat (slash|pierce to Dagger, Blunt), Soldier (to Katana, Blunt),
   Templar, Doberman, Brawler: Blunt for SABIN, whose hand was slash on main.
 - Aspik (bludgeon to Dagger): GAU's bare hand was bludgeon and is his fangs
-  now; the trench keeps one key a member.
+  now; SABIN's claw is a dagger too.
 - SlamDancer (slash|pierce to Sword, Katana): both slash's children. The
   body that one-shots takes the two blade classes; Dagger went to the pack
   beside it.
@@ -595,11 +611,16 @@ From `split.py`'s report, the opening's rows only.
 | Beakor (Katana, Ranged) | east of the Lete, SABIN before CYAN | only a hired SHADOW's star | Acceptable as the one body there: 3 of 4 take SABIN's fists, and it is a random encounter. Blunt in place of Ranged relieves it. |
 | Dark Wind (Dagger, Ranged) | the World of Ruin, CELES alone | she holds a sword | A 34-HP bird. Sword in place of Ranged relieves it and costs the fliers' rule. |
 | Actaneon (Blunt) | the trench again, the Opera-era party | SABIN is the one real Blunt holder of seven | Fire and bolt are vanilla weaknesses and the party has espers by then. Ranged as a second weakness relieves it. |
+| Anguiform (Katana) | the trench again, the Opera-era party | only CYAN of seven really holds Katana (SABIN's claw is a dagger since 2026-11-24) | Bolt is a vanilla weakness and the party has espers by then. Blunt or Dagger as a second weakness relieves it. |
+
+Past the opening, Number 128's RightBlade and Left Blade (Katana) bind the
+same way since the regroup: only CYAN of that party holds Katana.
 
 Not flagged, but the same kind: the Bleary, the Sand Ray, the Areneid, the
 Merchant, the Officer, the HeavyArmor and TunnelArmor take only a dagger.
 The story puts LOCKE (and early TERRA, with her knife) in each party that
-must fight them; at Narshe and Kohlingen LOCKE and GAU both hold one.
+must fight them; at Narshe and Kohlingen LOCKE, GAU and SABIN (a claw)
+hold one.
 
 ## The HUD's four cells
 
@@ -614,7 +635,7 @@ Every row here fits the four cells with its elements, except:
   `pins.FAMILY` and has three elements (the bolt add), so it shows Sword and
   never Ranged.
 
-## Bosses 1-10, restated
+## Bosses 1-11, restated
 
 | # | boss | shields | weak | the forced party's break |
 |---|---|---|---|---|
@@ -627,7 +648,7 @@ Every row here fits the four cells with its elements, except:
 | 7 | Telstar (Dobermans 2) | 4 | bolt, water; Blunt (Dobermans: fire; Dagger, Blunt) | SABIN's fists and Pummel |
 | 8 | GhostTrain | 4 | fire, bolt, holy; Blunt | AuraBolt, Pummel, SABIN's knuckle, SHADOW's Fire Skean; not CYAN |
 | 9 | Rizopas (Piranhas 1) | 4 | bolt; Katana, Blunt | CYAN's Ashura and SABIN's knuckle, as before |
-| 10 | Kefka at Narshe | 6 | +fire, +poison; Sword, Dagger | TERRA's, CELES's and EDGAR's swords, LOCKE's dagger, GAU's fangs, TERRA's Fire, EDGAR's Bio Blaster |
+| 10 | Kefka at Narshe | 6 | +fire, +poison; Sword, Dagger | TERRA's, CELES's and EDGAR's swords (not a cutlass), LOCKE's dagger, SABIN's claw, GAU's fangs, TERRA's Fire, EDGAR's Bio Blaster |
 | 11 | Dadaluma (Iron Fists 2) | 6 | poison; Dagger, Blunt (Iron Fists: Blunt, Ranged) | every pick of four holds LOCKE, GAU, SABIN or EDGAR |
 
 Two of these change what `bosses-wob.md` measured:
@@ -636,10 +657,26 @@ Two of these change what `bosses-wob.md` measured:
   Blunt. `bosses-wob.md` 3 (#329) rests on his Fight chipping nothing: "`$08`
   is not reachable Broken". It may be now, and wants measuring.
 - **Kefka no longer takes a katana.** On main CYAN's blade and SABIN's
-  claws chipped him (slash). A squad of CYAN and SABIN alone keys him only
-  with Fire Dance (level 15); with GAU it has his fangs. Sword, Dagger and
-  Katana together need a fifth cell. The Rider before him takes the katana
-  and not the sword.
+  claws chipped him (slash). SABIN's claw is a dagger now and still keys
+  him; a squad of CYAN and SABIN with a knuckle keys him only with Fire
+  Dance (level 15), and with GAU it has his fangs. A RegalCutlass does not
+  key him. Sword, Dagger and Katana together need a fifth cell. The Rider
+  before him takes the katana and not the sword.
+
+## After the 2026-11-24 regroup
+
+The claws moved to Dagger and the five curved swords to Katana; no row
+changed. Rows that read worse for it:
+
+- **Anguiform** (`$03A`, Katana; the trench, SABIN, CYAN, GAU): SABIN's claw
+  keyed it as Katana; now only CYAN's katana does. The party still holds a
+  key. On the Opera-era trench run it binds the holder rule (above).
+- **Red Fang** (`$078`, Spear, Katana; Zozo, a free pick): LOCKE, SABIN, GAU
+  and CELES with a Mithril Blade had SABIN's claw on it and now hold no key.
+  CELES with a RegalCutlass keys it.
+
+The Teaches lines of areas 3, 8, 10c4 and 11 are restated here;
+`opening.py --md` still prints the earlier text.
 
 ## Proposals (not made here)
 
@@ -673,8 +710,8 @@ Element adds, shield counts, shops and events are outside this change.
   `build/attempts/wt/v051-six-classes/opening/shares.txt`.
 - Over the areas' first parties: the party keys 110 of 113 species some way
   under both; in hand 96 under four classes and 99 under six. A single
-  member keys 77% under four and 70% under six, and by weapon or skill 70%
-  and 57%: the party still holds a key, and who acts matters more.
+  member keys 77% under four and 72% under six, and by weapon or skill 70%
+  and 59%: the party still holds a key, and who acts matters more.
 - `python3 tools/six_classes/split.py --report-only`: every row, its reason, the
   departures and the holder rule's binds.
   `build/attempts/wt/v051-six-classes/opening/split-report.txt`.
