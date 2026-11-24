@@ -85,16 +85,31 @@ def main():
             sp |= species(f)
         own[leg] = sp
     order = [leg for leg in stages.line_order(str(ROOT / "build.ninja")) if leg in own]
+    # the generator of each state (the generate edge's `gen`): the lib knows its script (OT6_SCRIPT, the composed
+    # preamble's; Mesen's sandbox has no os.getenv), so the table is keyed by generator, each the union of its
+    # states' species and their successors'
+    gen_of, state = {}, None
+    for line in open(ROOT / "build.ninja"):
+        m = re.match(r"build build/states/(\w+)\.mss\.lua .*: generate", line)
+        if m:
+            state = m.group(1)
+            continue
+        m = re.match(r"\s+gen = (\w+)", line)
+        if m and state:
+            gen_of[state] = m.group(1)
+            state = None
     table = {}
     for i, leg in enumerate(order):
         u = set(own[leg])
         if i + 1 < len(order):
             u |= own[order[i + 1]]
-        if u:
-            table[leg] = sorted(u)
+        g = gen_of.get(leg)
+        if u and g:
+            table[g] = sorted(set(table.get(g, [])) | u)
+    order = sorted(table)
     lines = ["-- BEGIN leg_species (tools/six_classes/leg_species.py %s; do not edit by hand)" %
              os.path.relpath(logs, ROOT),
-             "M.LEG_SPECIES = {"]
+             "M.LEG_SPECIES = {   -- generator (OT6_SCRIPT) -> the species its legs and the next ones deal"]
     for leg in order:
         if leg in table:
             lines.append("  %s = { %s }," % (leg, ", ".join("0x%03X" % s for s in table[leg])))
@@ -109,7 +124,7 @@ def main():
         print("leg_species: %s" % ("up to date" if new == text else "would change"))
         return 0 if new == text else 1
     LIB.write_text(new)
-    print("leg_species: %d legs, %d species-leg pairs, from %s" % (len(table), sum(len(v) for v in table.values()),
+    print("leg_species: %d generators, %d species-generator pairs, from %s" % (len(table), sum(len(v) for v in table.values()),
                                                                    os.path.relpath(logs, ROOT)))
     return 0
 
