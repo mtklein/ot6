@@ -4055,6 +4055,9 @@ end
 --                 would spend on the party's HP hole cost at least a
 --                 Tent's own price, or the bag cannot lift a member under
 --                 the threshold (#278)
+-- opts.statusTent true also pitches one for a status1 bit (Petrify, Imp,
+--                 Poison, Zombie, Dark) the bag holds no cure for: the
+--                 Tent's rest clears it (default off)
 -- opts.maxFrames  budget for the whole visit (default 24000)
 -- opts.maxTries   plans to attempt before giving up (default 48)
 -- opts.tag        log prefix
@@ -5083,6 +5086,18 @@ local function careKernel(opts)
     end
     for _, c in ipairs(careParty()) do
       if why == nil and mpShort(c) then why = "a Tincture would be due" end
+    end
+    -- opts.statusTent (off by default, so the line's care is unchanged): the Tent's rest clears every status1
+    -- bit but Magitek (_cacfbd's and_status), so it also answers a status the bag holds no cure for.  The
+    -- status pass runs first, so a member whose status reaches here has nothing in the bag for it
+    -- (water-rondo-v1 saved MOG an Imp: "status1=20 ... remedy=0", no Green Cherry)
+    if why == nil and opts.statusTent then
+      for _, c in ipairs(careParty()) do
+        local s1 = M.charStatus1(c)
+        if why == nil and (s1 & 0x80) == 0 and (s1 & 0x67) ~= 0 then
+          why = string.format("char %d carries status1 $%02X and the bag has no cure for it", c, s1)
+        end
+      end
     end
     tentWhy = why
     return why and w or nil
@@ -7473,9 +7488,53 @@ local function gearName(id)
 end
 local function charRec(c) return 0x1600 + 37 * c end
 local function gearWorn(c, slot) return M.readByte(charRec(c) + 0x1F + slot) end
+-- M.equipWord(id): the item's equip word as the game checks it
+-- (Ot6EquipWord, battle/ot6_spear.asm, #567): ItemProp +$01, a 16-bit mask
+-- by actor, and for a spear (ids Ot6SpearPermit+0 .. +1) the bit of every
+-- actor up to Ot6SpearPermit+3 (GOGO) whose character block wears the
+-- Dragoon Boots (Ot6SpearPermit+2) in either relic slot, the actor read
+-- from the block's first byte.  Read from the ROM's own permit bytes so
+-- the driver and the Equip menu, shops and battle agree.
+function M.equipWord(id)
+  if id == nil or id == 0xFF then return 0 end
+  local ip = M.sym("ItemProp") & 0x3FFFFF
+  local w = M.readRomByte(ip + id * 30 + 1) | (M.readRomByte(ip + id * 30 + 2) << 8)
+  local sp = M.sym("Ot6SpearPermit") & 0x3FFFFF
+  local first, last, relic, lastActor = M.readRomByte(sp), M.readRomByte(sp + 1),
+    M.readRomByte(sp + 2), M.readRomByte(sp + 3)
+  if id < first or id > last then return w end
+  for b = 0, 15 do
+    local base = 0x1600 + 37 * b
+    local actor = M.readByte(base)
+    if actor <= lastActor and (M.readByte(base + 0x23) == relic or M.readByte(base + 0x24) == relic) then
+      w = w | (1 << actor)
+    end
+  end
+  return w
+end
+
+-- M.canEquipNow(ch, id): character block ch may hold item id as the Equip
+-- menu decides it today (GetCharEquipMask, menu/equip.asm): the actor's
+-- bit, plus bit 15 under a Merit Award (relic +12 bit 5) or for the
+-- revealed Leo (GOGO's slot once event switch $00E0 is set, #552), tested
+-- against M.equipWord (the Dragoon Boots' spears included).
+function M.canEquipNow(ch, id)
+  if id == nil or id == 0xFF then return false end
+  local actor = M.charActor(ch)
+  if actor > 15 then return false end
+  local mask = 1 << actor
+  local ip = M.sym("ItemProp") & 0x3FFFFF
+  for s = 0, 1 do
+    local r = M.readByte(0x1600 + 37 * ch + 0x23 + s)
+    if r ~= 0xFF and (M.readRomByte(ip + r * 30 + 12) & 0x20) ~= 0 then mask = mask | 0x8000 end
+  end
+  if actor == 12 and (M.readByte(0x1E80 + (0xE0 >> 3)) & (1 << (0xE0 & 7))) ~= 0 then mask = mask | 0x8000 end
+  return (M.equipWord(id) & mask) ~= 0
+end
+
 local function wearable(c, id)
   if id == nil or id == 0xFF then return false end
-  local mask = gearByte(id, 1) | (gearByte(id, 2) << 8)
+  local mask = M.equipWord(id)
   if (gearByte(id, 2) & 0x40) ~= 0 then return false end    -- an Imp item
   return ((mask >> c) & 1) == 1
 end
@@ -8162,7 +8221,7 @@ function M.bagWeapons(c)
       local t = M.readRomByte(ip + id * 30)
       local wears = c == nil
         if not wears then
-          wears = (M.readRomWord(ip + id * 30 + 1) >> M.charActor(c)) & 1 == 1
+          wears = (M.equipWord(id) >> M.charActor(c)) & 1 == 1
         end
       if (t & 0x80) == 0 and (t & 0x07) == 1 and wears and not M.weaponHeals(id) then
         seen[id] = true
@@ -8449,7 +8508,7 @@ local function spellsLearned(ch)
   return n
 end
 local function wearsItem(ch, id)
-  return (((itemProp(id, 1) | (itemProp(id, 2) << 8)) >> ch) & 1) == 1
+  return ((M.equipWord(id) >> ch) & 1) == 1    -- with the Dragoon Boots' spears (#567)
 end
 M.wearsItem = wearsItem                         -- (ItemProp +1/+2: the character's bit; gen_wor_kt_factory's guards)
 
@@ -9115,7 +9174,10 @@ function M.dressRelics(members, opts)
                 if restore == nil then
                   local back = {}
                   for s = 0, 3 do
-                    if charByte(p.ch, 0x1F + s) ~= before[s] and before[s] ~= 0xFF then
+                    -- (a spear the Dragoon Boots lent goes when they do: the
+                    -- re-equip took it off and it is not put back, #567)
+                    if charByte(p.ch, 0x1F + s) ~= before[s] and before[s] ~= 0xFF
+                        and M.canEquipNow(p.ch, before[s]) then
                       M.log(string.format("[%s] %s: the Relic menu's re-equip moved slot %d $%02X -> $%02X; "
                         .. "putting it back", tag, p.name, s, before[s], charByte(p.ch, 0x1F + s)))
                       back[#back + 1] = { s, before[s] }
@@ -9885,7 +9947,8 @@ function M.keepGear(ch, label, step)
     M.lazy(function()
       local back, swapped = {}, false
       for g = 0, 3 do
-        if charByte(ch, 0x1F + g) ~= before[g] and before[g] ~= 0xFF then
+        if charByte(ch, 0x1F + g) ~= before[g] and before[g] ~= 0xFF
+            and M.canEquipNow(ch, before[g]) then   -- (#567: not a spear the boots took with them)
           M.log(string.format("[ribbons] %s: the Relic menu's re-equip moved slot %d $%02X -> $%02X; putting it back",
             label, g, before[g], charByte(ch, 0x1F + g)))
           back[#back + 1] = { g, before[g] }

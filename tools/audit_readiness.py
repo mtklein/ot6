@@ -58,8 +58,16 @@ def item_type(i):
     return item_rec(i)[0] & 0x07
 
 
-def equippable_by(i, actor):
-    """The per-character equip mask, item_prop +$01, 16-bit, bit N = actor N."""
+# The Dragoon Boots' spear permit (#567, ff6/src/battle/ot6_spear.asm
+# Ot6SpearPermit): spears $1D-$24 for actors 0-12 wearing relic $BF.
+SPEARS, DRAGOON_BOOTS, PERMIT_LAST_ACTOR = range(0x1D, 0x25), 0xBF, 12
+
+
+def equippable_by(i, actor, relics=()):
+    """The per-character equip mask, item_prop +$01, 16-bit, bit N = actor N,
+    and a spear for an actor wearing the Dragoon Boots."""
+    if i in SPEARS and DRAGOON_BOOTS in relics and actor <= PERMIT_LAST_ACTOR:
+        return True
     return bool((int.from_bytes(item_rec(i)[1:3], "little") >> actor) & 1)
 
 
@@ -103,13 +111,14 @@ def report(path):
             who, "BACK" if party & 0x20 else "front", dsum, msum,
             " ".join(worn) or "NOTHING AT ALL"))
 
+        relics = {at(rec + 0x23), at(rec + 0x24)}
         for k in range(6):
             if at(rec + 0x1F + k) != 0xFF:
                 continue
             fits = [i for i in bag
-                    if item_type(i) in SLOT_TYPE[k] and equippable_by(i, actor)]
+                    if item_type(i) in SLOT_TYPE[k]
+                    and equippable_by(i, actor, relics)]
             if k == 1:
-                relics = {at(rec + 0x23), at(rec + 0x24)}
                 if not (relics & TWO_WEAPON_RELICS):
                     fits = [i for i in fits if item_type(i) == 3]
             if fits:

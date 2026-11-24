@@ -54,6 +54,23 @@
 -- shielded non-boss bodies and at least three bodies in all (arm 2 needs
 -- hits to keep landing after the kill); the rest are fled.
 --
+-- The party's condition is the suite's own to keep (docs/TESTING.md, a soft
+-- dependency): two members Defend and one Fights from the back row for as
+-- long as an arm takes, and what the pool does to them meanwhile is the
+-- draw's.  The chain regenerated on the v0.51 ROM dealt the draw that showed
+-- it: battle 1's two marks came with SHADOW Near Fatal, battle 2 went on in
+-- the same fight, he fell, and the two Defending members were worn down to
+-- a wipe at f31726 (build/attempts/wt/v051-spellblade/sb5/
+-- gate_assassinate.log).  So: every walk to an encounter starts with field
+-- care (H.fieldCare: Tonics, a Fenix Down for the fallen), and an arm plays
+-- its fight only while the party holds (danger(): a seated member down or
+-- under a third of max HP, or SHADOW a Zombie).  A fight that turns
+-- dangerous makes no claim: its ledger is put to the arm's negative checks
+-- and dropped, the fight is handed to the route's fight driver and fought
+-- out (the isolation arm's, with its staged 9999-HP body, is run from), and
+-- the arm starts over in the next fight, inside the same FIGHTS budget
+-- (battle_runicblade's hand-over, #468).
+--
 --   1. battle 1: at 3 BP SHADOW's hits kill two bodies in one battle (no
 --      once-a-battle limit); at least one is the breaking hit itself, whose
 --      ledger order is checked: the chip path's break store with x =
@@ -353,12 +370,19 @@ local function fightPulse()
       parts[#parts + 1] = string.format("m%d:%d/sh%d%s", m, mhp(m), sh(m),
         brk(m) ~= 0 and "B" or "")
     end
+    -- the party's seats too: what danger() (below) reads
+    local seats = {}
+    for s = 0, 3 do
+      if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
+        seats[#seats + 1] = string.format("s%d:%d/%d", s, H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2))
+      end
+    end
     H.log(string.format("[pulse f%d] menu=%02x act=%d st=%02x drops=%d "
-      .. "broken=%d ic=%d kills=%d shadow bp=%d pend=%d want=%d tgt=%s %s", H.frame,
+      .. "broken=%d ic=%d kills=%d shadow bp=%d pend=%d want=%d tgt=%s %s | party %s", H.frame,
       H.readByte(MENU), H.readByte(ACTOR) & 3, H.readByte(MSTATE), hpDrops,
       brokenHits, counters, #divineKills, shadowSlot and H.readByte(0x3E9C + shadowSlot * 2) or -1,
       shadowPend(), H.vars.shadowBoost or 0, tostring(pickTarget()),
-      table.concat(parts, " ")))
+      table.concat(parts, " "), table.concat(seats, " ")))
   end
   if H.readByte(MENU) == 0 then
     -- no window up: an animation, or the spoils.  battleLoadStarted()
@@ -435,6 +459,68 @@ local function drive(pred, maxFrames, what)
   return H.driveUntil(pred, maxFrames, { H.call(fightPulse) }, what)
 end
 
+-- ---- the party's care (header) --------------------------------------------
+-- Before a walk to an encounter: the fallen raised and everyone topped up
+-- from the bag, through the field menu.  fight = false: a battle that opens
+-- under the visit is a draw like any other, the walk's own to read.
+local CARE = 0.95
+local function careStep(tag)
+  return H.fieldCare({ tag = "assassinate: care before " .. tag, threshold = CARE, fight = false })
+end
+-- Why an arm's fight cannot go on as the arm plays it (SHADOW Fights, the
+-- bench Defends), or nil: a seated member down (0 HP, Wound or Petrify) or
+-- under a third of max HP, or SHADOW a Zombie (he then takes no command).
+-- `handed` holds the reason for the fight in hand; every fight clears it.
+local LOW = 1 / 3   -- danger(): a seated member under this fraction of max HP
+local handed = nil
+local function danger()
+  if not H.battleLoadStarted() then return nil end
+  for s = 0, 3 do
+    if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
+      local hp, mx, st1 = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2), H.readByte(0x3EE4 + s * 2)
+      if hp == 0 or (st1 & 0xC0) ~= 0 or (s == shadowSlot and (st1 & 0x02) ~= 0) or (mx > 0 and hp < mx * LOW) then
+        return string.format("seat %d%s at %d/%d HP, status1 $%02X", s, s == shadowSlot and " (SHADOW)" or "", hp, mx,
+          st1)
+      end
+    end
+  end
+  return nil
+end
+-- an arm's drive: until pred(), or the party is in danger (`handed` set)
+local function driveSafe(pred, maxFrames, what)
+  return drive(function()
+    if pred() then return true end
+    handed = handed or danger()
+    return handed ~= nil
+  end, maxFrames, what .. ", or the party in danger")
+end
+-- the route's fight driver fights the battle out from wherever it stands
+-- (it heals and raises from the bag as it goes); nothing in it is the arm's,
+-- so the ledger is shut until the next fight's resetLedger
+local function fightOut(tag)
+  local F = nil
+  return H.withReset(H.driveUntil(function() return not H.battleLoadStarted() end, 60000, {
+    H.call(function()
+      if F == nil then
+        watching = false
+        F = H.newFightDriver(tag, { tactical = true, boost = true, items = true, bank = 0, healPercent = 55,
+          setzer = false })
+      end
+      F.frame()
+    end),
+  }, tag .. ": the battle fought out"), function() if F then F.idle() end; F = nil end)
+end
+-- the isolation arm's way out: its bitted body holds STAGED_HP, which no
+-- party in danger fights through, so the fight is run from (fought only if
+-- the formation cannot be run from)
+local function leave()
+  return H.repeatN(1, {
+    H.call(function() watching = false end),
+    H.fleeBattle(9000, { onCantRun = "fight" }),
+    H.waitFrames(30),
+  })
+end
+
 -- ---- encounter selection --------------------------------------------------
 -- suitable: at least two PIERCE-weak shielded non-boss bodies (one for the
 -- kill, one for the fight to go on with) and at least three bodies in all
@@ -456,6 +542,7 @@ local function walkSteps(n)
     H.waitUntil(function()
       return H.worldMode() and H.worldHasControl() and H.worldAligned()
     end, 4000, "world control (draw " .. n .. ")", 5),
+    careStep("draw " .. n),
     H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
       H.call(function()
         if H.battleLoadStarted() then H.setPad({}) return end
@@ -547,7 +634,8 @@ local function encounter(tag)
   local steps = { H.call(function() H.vars.suitable = false end) }
   for n = 1, MAXDRAWS do
     local w = walkSteps(n)
-    table.insert(w, 5, H.call(function()
+    -- (after the walk's "battle active" wait, its fifth step)
+    table.insert(w, 6, H.call(function()
       group, budget = P.group, budgetFor(P.group)
       P.assertGroup(string.format("%s draw %d", tag, n))
     end))
@@ -608,6 +696,7 @@ add({
 })
 for i = 1, BURN do
   add({
+    careStep("BURN encounter " .. i),
     H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
       H.call(function() H.setPad(P.pad()) end),
     }, "BURN encounter " .. i),
@@ -645,17 +734,30 @@ add({
         fights = fights + 1
         phase = "b"
         H.vars.shadowBoost = 3
+        handed = nil
         H.log(string.format("[battle 1] fight %d of up to %d", fights, FIGHTS))
       end),
-      drive(function() return #firstMarks() >= 2 or not H.battleLoadStarted() end, 40000,
+      -- (the two marks are read before the party's danger: a fight that made both is the arm's, whatever
+      -- state it left the party in, and battle 2 hands it over if it must)
+      driveSafe(function() return #firstMarks() >= 2 or not H.battleLoadStarted() end, 40000,
         "SHADOW at 3 BP: the divine, twice"),
       H.call(function()
         if #firstMarks() < 2 then
-          H.log(string.format("[battle 1] fight %d ended with %d body(ies) marked (marks %d, hpDrops %d, interceptor "
-            .. "%d) -- the next encounter", fights, #firstMarks(), #divineKills, hpDrops, counters))
+          if handed ~= nil then
+            H.log(string.format("[battle 1] fight %d handed to the fight driver (%s) with %d body(ies) marked "
+              .. "(marks %d, hpDrops %d, interceptor %d) -- the next encounter", fights, handed, #firstMarks(),
+              #divineKills, hpDrops, counters))
+          else
+            H.log(string.format("[battle 1] fight %d ended with %d body(ies) marked (marks %d, hpDrops %d, "
+              .. "interceptor %d) -- the next encounter", fights, #firstMarks(), #divineKills, hpDrops, counters))
+          end
           divineKills, brokeAt, hookReads = {}, {}, {}
+        else
+          handed = nil
         end
       end),
+      H.cond(function() return handed ~= nil and H.battleLoadStarted() end,
+        { fightOut("battle 1: handed over") }, {}),
     }
     return H.repeatN(1, {
       H.repeatN(FIGHTS, {
@@ -722,6 +824,17 @@ add({
 -- ninja-0e003449.log); the gate mutant that opens under three points fails
 -- this assertion (build/attempts/wt/v036-boost/).
 local control, controlFights = nil, 0
+-- the ledger's marks, each attributed to the pending its action held: how
+-- many were under three points
+local function marksUnderThree()
+  local under = 0
+  for _, k in ipairs(divineKills) do
+    if k.pend < 3 then under = under + 1 end
+    H.log(string.format("[battle 2] mark on body %d at f%d seq%d: SHADOW's pending %d (written %s)%s", k.m, k.f,
+      k.seq, k.pend, k.pendBy or "?", k.pend >= 3 and " -- a 3-BP action, the divine as ruled" or ""))
+  end
+  return under
+end
 add({
   H.call(function()
     -- battle 1's fight may still be up: battle 2 continues it (nextFight
@@ -735,9 +848,10 @@ add({
       H.call(function()
         controlFights = controlFights + 1
         H.vars.shadowBoost = 0
+        handed = nil
         H.log(string.format("[battle 2] fight %d of up to %d (unboosted)", controlFights, FIGHTS))
       end),
-      drive(function()
+      driveSafe(function()
         for m, b in pairs(brokeAt) do
           if b.atk == shadowSlot * 2 and b.pend == 0 then control = { m = m, b = b }; return true end
         end
@@ -745,7 +859,7 @@ add({
       end, 30000, "SHADOW's unboosted hit breaks a body"),
       H.cond(function() return control ~= nil and H.battleLoadStarted() end, {
         H.call(function() H.vars.hookReads0 = #hookReads end),
-        drive(function()
+        driveSafe(function()
           for i = H.vars.hookReads0 + 1, #hookReads do
             if hookReads[i].y == ent(control.m) then return true end
           end
@@ -754,10 +868,24 @@ add({
       }, {}),
       H.waitFrames(8),
       H.call(function()
-        if control == nil then
+        if handed ~= nil then
+          -- a fight handed over makes no claim, and hides none: what its ledger holds is put to the arm's
+          -- own check before it is dropped (a mark under three points fails here as it does below), and the
+          -- break it may have recorded is not the arm's control -- the next fight finds its own
+          H.log(string.format("[battle 2] fight %d handed to the fight driver (%s); %s; marks %d -- the next "
+            .. "encounter", controlFights, handed, control and string.format("body %d broke at f%d by SHADOW at "
+            .. "%d BP pending, dropped with the fight", control.m, control.b.f, control.b.pend)
+            or "no unboosted break by SHADOW", #divineKills))
+          H.assertEq(marksUnderThree(), 0, "under three points SHADOW's hits drew no in-proc Death mark in the "
+            .. "fight handed over (marks on an action with under three points pending)")
+          control, H.vars.hookReads0 = nil, nil
+          divineKills, brokeAt, hookReads, hpWrite, deathAt, killPending = {}, {}, {}, {}, {}, {}
+        elseif control == nil then
           H.log(string.format("[battle 2] fight %d ended with no unboosted break by SHADOW", controlFights))
         end
       end),
+      H.cond(function() return handed ~= nil and H.battleLoadStarted() end,
+        { fightOut("battle 2: handed over") }, {}),
     }
     return H.repeatN(1, {
       H.repeatN(FIGHTS, { H.cond(function() return control == nil end, fight, {}) }),
@@ -771,12 +899,7 @@ add({
         H.log(string.format("[battle 2] body %d broke at f%d seq%d by SHADOW at %d BP pending; hook point %s; marks %d",
           control.m, control.b.f, control.b.seq, control.b.pend, hooked and string.format("read it at f%d (pending %d)",
           hooked.f, hooked.pend) or "not reached", #divineKills))
-        local under = 0
-        for _, k in ipairs(divineKills) do
-          if k.pend < 3 then under = under + 1 end
-          H.log(string.format("[battle 2] mark on body %d at f%d seq%d: SHADOW's pending %d (written %s)%s", k.m, k.f,
-            k.seq, k.pend, k.pendBy or "?", k.pend >= 3 and " -- a 3-BP action, the divine as ruled" or ""))
-        end
+        local under = marksUnderThree()
         H.assertEq(under, 0, "under three points SHADOW's breaking hit, and his hits on the Broken body, "
           .. "drew no in-proc Death mark (marks on an action with under three points pending)")
         watching = false
@@ -825,6 +948,7 @@ add({
       H.call(function()
         fights = fights + 1
         H.vars.shadowBoost = 3   -- the gate open, so the boss check is what refuses
+        handed = nil
         local best, bh = nil, nil
         for _, m in ipairs(msPresent) do
           if alive(m) and (weak(m) & OT6_PIERCE) ~= 0 and sh(m) > 0
@@ -842,14 +966,20 @@ add({
           .. "wears $3aa1.2 -- the bit a boss carries -- before any chip",
           fights, best, mhp(best), sh(best)))
       end),
-      drive(function()
+      driveSafe(function()
         local m = H.vars.bossBody
         return brokeAt[m] ~= nil or not alive(m) or not H.battleLoadStarted()
       end, 30000, "Shadow's chips break the bitted body (isolation arm)"),
       H.call(function()
         local m = H.vars.bossBody
         local b = brokeAt[m]
-        if b ~= nil and b.ctl ~= nil then
+        if handed ~= nil then
+          -- the party is in danger before the body broke (the gate was never put to the bitted body, which
+          -- it reads only Broken): the fight is left, below, and another drawn, as one whose body went
+          -- unbroken
+          H.log(string.format("[isolation arm] fight %d: the party is in danger (%s) before Shadow broke body %d "
+            .. "(hp=%d sh=%d): left, another fight", fights, handed, m, mhp(m), sh(m)))
+        elseif b ~= nil and b.ctl ~= nil then
           -- SHADOW's control was taken (the v032-locke-kit-2 chain's
           -- camp_escaped draw: Berserk, $3EE5 bit 4, and the engine's 0-BP
           -- Fights broke the bitted body, build/attempts/wt/v032-locke-kit/
@@ -890,13 +1020,20 @@ add({
       -- draws once the battle is over, and the bodies still standing here
       -- carry no bit.  Whatever this tail does to the ledger or the flag,
       -- the next fight is a fresh battle and resets both.
+      -- A party in danger does not fight on (header): the fight is run from
+      -- (leave()), whether the danger came before the break, above, or comes
+      -- while the tail is fought out.
       H.cond(function() return not broke and H.battleLoadStarted() end, {
         H.call(function() forced = nil end),
-        drive(function() return not H.battleLoadStarted() end, 30000,
-          "the isolation arm's unbroken fight is fought out"),
+        H.cond(function() return handed == nil end, {
+          driveSafe(function() return not H.battleLoadStarted() end, 30000,
+            "the isolation arm's unbroken fight is fought out"),
+        }, {}),
+        H.cond(function() return handed ~= nil and H.battleLoadStarted() end, { leave() }, {}),
         H.call(function()
-          H.log(string.format("[isolation arm] fight %d fought out: hpDrops=%d "
+          H.log(string.format("[isolation arm] fight %d %s: hpDrops=%d "
             .. "interceptor=%d divineKills=%d (a body without the bit)", fights,
+            handed and string.format("left, the party in danger (%s)", handed) or "fought out",
             hpDrops, counters, #divineKills))
           watching = false
         end),
@@ -915,7 +1052,7 @@ add({
       H.cond(function()
         return broke and alive(H.vars.bossBody) and H.battleLoadStarted()
       end, {
-        drive(function()
+        driveSafe(function()
           local m = H.vars.bossBody
           for _, r in ipairs(hookReads) do
             if r.y == ent(m) and r.seq > brokeAt[m].seq and r.pend == 3 and r.ctr == 0 then return true end
@@ -952,15 +1089,25 @@ add({
       -- qual_3cd80eac/suite_battle_assassinate.log)
       H.cond(function() return broke and not H.vars.siteHalf end, {
         H.call(function()
-          H.log(string.format("[isolation arm] fight %d: the window closed before Shadow's next hit on "
-            .. "body %d; fought out, another fight", fights, H.vars.bossBody))
+          if handed ~= nil then
+            -- the party came into danger with the body Broken and the hook point half unread (the break's
+            -- own check is made, above; the half is still owed): the fight is left and another drawn, as
+            -- one whose window closed
+            H.log(string.format("[isolation arm] fight %d: the party is in danger (%s) before Shadow's next "
+              .. "3-BP hit on body %d reached the hook point; left, another fight", fights, handed,
+              H.vars.bossBody))
+          else
+            H.log(string.format("[isolation arm] fight %d: the window closed before Shadow's next hit on "
+              .. "body %d; fought out, another fight", fights, H.vars.bossBody))
+          end
           forced = nil
           broke = false
         end),
-        H.cond(function() return H.battleLoadStarted() end, {
-          drive(function() return not H.battleLoadStarted() end, 30000,
+        H.cond(function() return handed == nil and H.battleLoadStarted() end, {
+          driveSafe(function() return not H.battleLoadStarted() end, 30000,
             "the isolation arm's fight without the hook point half is fought out"),
         }, {}),
+        H.cond(function() return handed ~= nil and H.battleLoadStarted() end, { leave() }, {}),
         H.call(function() watching = false end),
       }, {}),
     }

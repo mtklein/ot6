@@ -18,7 +18,8 @@
 --   1. CELES raises Runic at 2 BP; EDGAR casts Bolt at a monster: CELES
 --      absorbs it (RunicEffect enrols her: Ot6RunicBP runs for her) and
 --      nothing comes back;
---   2. CELES raises Runic at 3 BP; EDGAR casts Bolt: absorbed, and CELES
+--   2. CELES raises Runic at 3 BP; EDGAR casts Bolt: absorbed (the absorb
+--      arms her blade with the spell's element, OT6_RUNE $04: #563), and CELES
 --      casts Bolt at EDGAR as a counter ($b1 bit 0) at no MP, which no
 --      Runic stance absorbs (her own stands: Ot6BladeNoRunic) and which
 --      lands on him;
@@ -39,6 +40,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local CELES, EDGAR, RUNIC, CMD_MAGIC, BOLT = 0x06, 0x04, 0x0B, 0x02, 0x02
+local RUNE = 0xED8F                  -- OT6_RUNE (ot6_memory.inc): a seat's rune, stride 2
 
 local celes, edgar = nil, nil
 local casts = {}   -- every $3410 <- Bolt: { counter, b8, cmd, celesMp, f }
@@ -53,6 +55,17 @@ local function arm()
       H.log(string.format("[blade] f%d CELES absorbs (%d)", H.frame, absorbs))
     end
   end, emu.callbackType.exec, rb, rb)
+  -- #563: the absorb arms her blade with the spell's element (Ot6RuneAbsorb,
+  -- inside Ot6RunicBP).  Ot6BladeAbsorb is Ot6RunicBP's next call, so the rune
+  -- read at its entry is the one this absorb left ($b6 = the absorbed spell)
+  local ba = H.sym("Ot6BladeAbsorb")
+  emu.addMemoryCallback(function()
+    if celes == nil or (emu.getState()["cpu.y"] & 0xff) ~= celes * 2 then return end
+    local c = casts[#casts]
+    if c ~= nil and H.readByte(0xB6) == BOLT then c.rune = H.readByte(RUNE + celes * 2) end
+    H.log(string.format("[blade] f%d the absorb of spell $%02X leaves OT6_RUNE $%02X at CELES's seat", H.frame,
+      H.readByte(0xB6), H.readByte(RUNE + celes * 2)))
+  end, emu.callbackType.exec, ba, ba)
   emu.addMemoryCallback(function(_, v)
     if v ~= BOLT or celes == nil or H.readByte(0x3A7C) ~= CMD_MAGIC then return end
     casts[#casts + 1] = { counter = (H.readByte(0xB1) & 1) == 1, b8 = H.readByte(0xB8), b9 = H.readByte(0xB9),
@@ -295,6 +308,8 @@ add(step(2, { { who = CELES, cmd = RUNIC, boost = 3, self = true }, { who = EDGA
 add({ H.waitFrames(120), live(function()
   if ownBolt(mark[2].casts + 1) == nil then return end
   H.assertEq(absorbs > mark[2].absorbs, true, "2. CELES absorbed EDGAR's Bolt")
+  H.assertEq(ownBolt(mark[2].casts + 1).rune, 0x04, "2. the absorbed Bolt armed CELES's blade with its element "
+    .. "(OT6_RUNE at her seat = $04, bolt: #563, Ot6RuneAbsorb)")
   H.assertEq(bounces(mark[2].casts + 1), 1, "2. the 3-BP Runic (RunicBlade) sent EDGAR's Bolt back at him, as "
     .. "CELES's counter")
   if landed(mark[2].casts + 1) then mark.two = true end

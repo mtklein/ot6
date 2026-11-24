@@ -728,10 +728,11 @@ CheckSkillValid:
         bne     @1e9c
         inx
 .if LANG_EN
-        cpx     #$0009          ; + the Thief row.  Without this an
+        cpx     #$000a          ; + the Thief row.  Without this an
                                 ;   early Locke (Steal, no Magic) could not
                                 ;   open his own Skills menu at all.  And
-                                ;   the Painter row (#549).
+                                ;   the Painter row (#549) and the RuneKnt
+                                ;   row (#563).
 .else
         cpx     #$0007
 .endif
@@ -1107,7 +1108,7 @@ SelectSkillsOption:
         asl
         tax
 .if LANG_EN
-        jmp     (near Ot6SkillsOptionTbl,x)     ; nine (ot6_painter_page.asm)
+        jmp     (near Ot6SkillsOptionTbl,x)     ; ten (ot6_painter_page.asm)
 .else
         jmp     (near SkillsOptionTbl,x)
 .endif
@@ -1121,7 +1122,7 @@ SelectSkillsOption:
 
 ; skills menu jump table (espers, magic, swdtech, blitz, lore, rage, dance)
 ; (EN: no longer read; SelectSkillsOption jumps through Ot6SkillsOptionTbl,
-; which adds Painter, and these bytes stay so nothing moves)
+; which adds Painter and RuneKnt, and these bytes stay so nothing moves)
 SkillsOptionTbl:
 @20a5:  .addr   SkillsOption_00
         .addr   SkillsOption_01

@@ -28,11 +28,13 @@
 --
 -- Asserted:
 --   1. every seated character's Skills list draws the Painter row at BG3A
---      {2,21} inside the list window, which now closes at row 22; the row is
+--      {2,21} inside the list window, which closes at row 24 (under the
+--      tenth row, RuneKnt: menu_runekntpage); the row is
 --      white (zSkillsTextColor::Painter $20) exactly for the character whose
 --      record carries Sketch and grey ($24) for the rest; the Treasure
 --      Hunter row's colour is LOCKE's alone, as before;
---   2. the cursor reaches row 8 (y = 164, the row's text row) and wraps;
+--   2. the cursor reaches row 8 (y = 164, the row's text row), and the list
+--      wraps after the row under it;
 --   3. A on RELM's row opens menu state $31, which draws the eight rows as
 --      above, the geometry of menu_thiefpage (odd rows 1-15, nothing in the
 --      gutter or past the price), the title "Painter" at BG3B {23,5}, and
@@ -255,10 +257,11 @@ local function assertList(tag)
       "%s: nothing after 'Painter' on its row ({%d,21})", tag, x))
   end
   -- the frame: Window1 ({1,1} 7x4) gives the reference tiles
-  H.assertEq(vcell(BG2A_V, 1, 22), vcell(BG2A_V, 1, 6), string.format(
-    "%s: the list window closes at row 22: its bottom-left corner at BG2A {1,22}", tag))
-  H.assertEq(vcell(BG2A_V, 9, 22), vcell(BG2A_V, 9, 6), string.format(
-    "%s: ... and its bottom-right at {9,22}: vanilla's seven columns", tag))
+  -- (row 24 since the tenth row, RuneKnt at row 23: menu_runekntpage)
+  H.assertEq(vcell(BG2A_V, 1, 24), vcell(BG2A_V, 1, 6), string.format(
+    "%s: the list window closes at row 24: its bottom-left corner at BG2A {1,24}", tag))
+  H.assertEq(vcell(BG2A_V, 9, 24), vcell(BG2A_V, 9, 6), string.format(
+    "%s: ... and its bottom-right at {9,24}: vanilla's seven columns", tag))
   H.assertEq(vcell(BG2A_V, 1, 21), vcell(BG2A_V, 1, 5), string.format(
     "%s: the Painter row is inside the frame: left border at {1,21}", tag))
   H.assertEq(vcell(BG2A_V, 9, 7), vcell(BG2A_V, 9, 1), string.format(
@@ -354,12 +357,19 @@ local steps = {
   H.pressButtons({ "down" }, 2),
   H.waitFrames(10),
   H.call(function()
-    H.assertEq(H.readByte(ZCURSOR), 0, "down from Painter wraps to Espers (the list's nine rows)")
+    H.assertEq(H.readByte(ZCURSOR), ROW_PAINTER + 1, "down from Painter is the tenth row, RuneKnt (#563)")
+  end),
+  H.pressButtons({ "down" }, 2),
+  H.waitFrames(10),
+  H.call(function()
+    H.assertEq(H.readByte(ZCURSOR), 0, "down again wraps to Espers (the list's ten rows)")
   end),
   H.pressButtons({ "up" }, 2),
   H.waitFrames(10),
+  H.pressButtons({ "up" }, 2),
+  H.waitFrames(10),
   H.call(function()
-    H.assertEq(H.readByte(ZCURSOR), ROW_PAINTER, "up from Espers wraps to Painter")
+    H.assertEq(H.readByte(ZCURSOR), ROW_PAINTER, "up from Espers wraps to RuneKnt, and up again is Painter")
   end),
 
   -- the page

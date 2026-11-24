@@ -1052,6 +1052,24 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         sta     hVMADDL
         lda     f:$7e0000+OT6_PIPROWW,x
         sta     hVMDATAL
+        ; #563: the cell before it, the name's sixth, as the name buffer
+        ; holds it: a rune's sign (Ot6RuneSignStage) or the name's own cell
+        lda     f:Ot6PipRowAddr,x
+        dec     a
+        sta     hVMADDL
+        phx
+        lda     f:Ot6SignOffTbl,x
+        tax
+        lda     f:$7e0000+OT6_SIGN_CELL,x
+        plx
+        pha
+        sta     hVMDATAL
+        lda     f:Ot6PipRowAddr,x
+        clc
+        adc     #$00ff
+        sta     hVMADDL
+        pla
+        sta     hVMDATAL
 @pdone: shorta0
 @out:   plb
         ply
@@ -1466,7 +1484,11 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         stz     OT6_PIPROWW,x   ;   leaves its cell alone
         shorta0
         bra     @next
-:       pha                     ; [$02,s] the slot
+:       pha
+        tya                     ; the menu row
+        jsr     Ot6RuneSignStage ; #563: the rune's sign beside the name
+        pla
+        pha                     ; [$02,s] the slot
         jsr     Ot6PipFace      ; a = tile, b = attribute; carry = arrows
         pha                     ; [$01,s] the tile
         bcc     @calm
@@ -1944,7 +1966,10 @@ Ot6PipRowAddr:
         sbc     #$1c
         inx
         bra     :-
-:       lda     f:$7e64d6,x     ; menu row -> character slot
+:       txa                     ; the menu row: the engine has just staged
+        jsr     Ot6RuneSignStage ;  its name, so the rune's sign goes back
+                                ;   beside it (#563)
+        lda     f:$7e64d6,x     ; menu row -> character slot
         cmp     #$ff
         beq     @blank
         pha                     ; [$01,s] the slot

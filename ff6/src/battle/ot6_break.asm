@@ -743,6 +743,7 @@ merge:  jsr     Ot6Hold         ; #539: the gauge shows this hit with its hit
         plp
         lda     OT6_SHIELD_CUR,y
         beq     done            ; shieldless monster
+        jsr     Ot6RuneChipMark ; #563: Break Blade takes no second shield
         dec     a
         jsr     Ot6Conductor    ; #328: Ramuh's signature takes one more
         jsr     Ot6Underpaint   ; #538: and Underpainting one more
@@ -781,6 +782,7 @@ done:   rtl
         php
         longi
         jsr     Ot6BumRushTake  ; ot6 #388: each Bum Rush blow takes a shield
+        jsr     Ot6BreakBladeTake ; ot6 #563: and each Break Blade hit
         jsr     Ot6ClassChip
         jsr     Ot6AssassinateGate      ; ot6: shadow's break is his divine
         jsr     Ot6ShieldedDmg  ; ot6: sturdiness while shields hold
@@ -1878,6 +1880,7 @@ done:   rts
         bra     @store
 @miss:  lda     #$00
 @store: sta     f:$7e0000+OT6_ATKCLASS
+        jsr     Ot6RuneNoSwing  ; #563: no weapon swing, no rune on it
         pla
         plx
         plp
@@ -1913,6 +1916,7 @@ done:   rts
 @none:  lda     #$00
 @store: sta     f:$7e0000+OT6_ATKCLASS
         jsr     Ot6TintSwing    ; #538: a Tinted ally's colour
+        jsr     Ot6RuneSwing    ; #563: the rune on the swinger's blade
         plp
         rtl
 .endproc
@@ -1932,6 +1936,7 @@ done:   rts
         shorta0
         lda     f:Ot6WeapClassTbl,x
         sta     f:$7e0000+OT6_ATKCLASS
+        jsr     Ot6RuneNoSwing  ; #563: a thrown or used item is no swing
         pla
         plx
         plp
