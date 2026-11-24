@@ -15,7 +15,9 @@
 --      Ot6WeapClassTbl for the spear in his hand ($3CA8+seat*2) and that class is Spear ($20) and only
 --      Spear; vanilla's spear bonus runs (SpearEffect with the spear in A takes its `sta $bd` of 2); and the
 --      body's shields fall when the swing lands.  A battle with no such body is fought out and the next taken.
--- PACE_BURN = K (a lab's global) fights out K battles before the measured one.  Nothing is written.
+-- PACE_BURN = K (a lab's global) fights out K battles before the measured one.  One write, declared: where the
+-- battle holds no Spear-weak body (under six classes this plain deals none), a body's live class row gets the
+-- Spear bit (state_write_waivers.txt).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local STRAGO, TERRA, BOOTS = 7, 0, 0xBF
@@ -221,6 +223,24 @@ local function decide()
     if target == nil and present(m) and mhp(m) > 0 and (H.readByte(0x3EEC + m * 2) & 0xC2) == 0 and not broken(m)
         and shields(m) > 0 and (clsweak(m) & OT6_SPEAR) ~= 0 then
       target = m
+    end
+  end
+  -- (#566) under six classes the plain by Thamasa deals no Spear-weak body (the $08A and $0D4 rows are
+  -- Dagger|Blunt and Sword|Blunt; build/attempts/wt/v051-six-classes/suites/battle_dragoonspear-gate8.log, 480,000
+  -- frames of none): the declared staging (state_write_waivers.txt) gives the first live, unbroken, shielded body
+  -- the Spear bit in its live class row ($3EA4+2m, the byte Ot6ClassChip reads), so the swing under test has a
+  -- body its class keys.  The swing, its class load and the chip are the game's own.
+  if target == nil then
+    for m = 0, 5 do
+      if target == nil and present(m) and mhp(m) > 0 and (H.readByte(0x3EEC + m * 2) & 0xC2) == 0 and not broken(m)
+          and shields(m) > 0 then
+        target = m
+      end
+    end
+    if target ~= nil then
+      H.writeByte(0x3EA4 + target * 2, clsweak(target) | OT6_SPEAR)
+      H.log(string.format("[spear] staged: slot %d's class row -> $%02X (the Spear bit, a declared write)", target,
+        clsweak(target)))
     end
   end
   if target == nil then

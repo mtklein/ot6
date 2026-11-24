@@ -186,8 +186,8 @@ The lessons:
 | Dueller `$0D9`, Innoc `$0F6` | 52-53 / 6,600-7,200 | weak bolt, water | 3 | Ranged, Spear (each) |
 | Fortis `$0EA`, Prometheus `$105`, Scullion `$0A1` | 54-57 / 9,800-27,000 | weak bolt, water | 4 | Ranged, Spear (each) |
 | Inferno `$10C` (battle 114) | 67 / 30,800 | weak bolt; absorbs fire | 6 | Ranged, Spear |
-| Striker `$142` (Inferno's arm) | 67 / 11,000 | weak fire; absorbs ice | 3 | Katana, Spear |
-| Rough `$141` (Inferno's arm) | 69 / 8,000 | weak ice; absorbs bolt | 3 | Ranged, Katana |
+| Striker `$142` (Inferno's arm) | 67 / 11,000 | weak fire; absorbs ice | 3 | Dagger, Katana |
+| Rough `$141` (Inferno's arm) | 69 / 8,000 | weak ice; absorbs bolt | 3 | Katana, Blunt |
 | Guardian `$112` (battle 140) | 67 / 60,000 | weak bolt, water | 10 | Ranged, Spear |
 | Doom `$127` (battle 98) | 73 / 63,000 | weak holy; absorbs ice, poison | 10 | Ranged, Katana |
 | Goddess `$128` (battle 99) | 68 / 44,000 | none; absorbs bolt, holy | 8 | Ranged, Spear |
@@ -196,8 +196,9 @@ The lessons:
 | Gold Drgn `$150` (battle 135) | 62 / 32,400 | weak water; absorbs bolt | 6 | Katana, Spear |
 | Skull Drgn `$151` (battle 136) | 62 / 32,800 | weak fire, holy; absorbs poison | 6 | Blunt, Ranged |
 
-Inferno's arms are not machines: both take Katana (Striker with Spear,
-Rough with Ranged), where no machine does.
+Inferno's arms are not machines: both take Katana (Striker with Dagger,
+Rough with Blunt), where no machine does: party 3 (CYAN, SHADOW, SABIN,
+GOGO) holds a key on each in more than one hand (2026-11-24).
 
 The GtBehemoth's three is the Tyranosaur's count (route-wor-side-trips.md
 finding 3): a break that comes before its second Meteor. Atma was given

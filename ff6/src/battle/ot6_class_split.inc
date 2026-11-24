@@ -331,8 +331,8 @@ Ot6ClassSplitTbl:
         .byte   $01, $04, $00, $00 ; 318 Tentacle
         .byte   $10, $00, $00, $00 ; 319 RightBlade
         .byte   $10, $00, $00, $00 ; 320 Left Blade
-        .byte   $10, $00, $08, $00 ; 321 Rough
-        .byte   $10, $20, $00, $00 ; 322 Striker
+        .byte   $10, $00, $04, $00 ; 321 Rough
+        .byte   $10, $02, $00, $00 ; 322 Striker
         .byte   $00, $00, $00, $04 ; 323 L.70 Magic
         .byte   $01, $20, $00, $00 ; 324 Tritoch
         .byte   $00, $08, $00, $00 ; 325 Laser Gun

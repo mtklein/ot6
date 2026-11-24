@@ -19338,6 +19338,12 @@ function M.kitBattle(plan, opts)
       end
       if p.direct and cool == 0 then done(p, a) end
       pulse("a")
+    elseif st == 0x38 and not p.opened then
+      -- a target select this entry did not open (#566: battle_sixchip's ranged case met the actor's window
+      -- already at a Fight's target select, and the confirm here ran the Fight, not the planned Tools row:
+      -- "pass x=0 y=8 cls=$20 b5=$00 b6=$7F", build/attempts/wt/v051-six-classes/suites/sixchip_dbg.log):
+      -- back out to the command list, as for a list window above
+      pulse("b")
     elseif st == 0x38 then
       if p.refused ~= nil then
         M.assertEq(false, true, string.format("entry %d (planned refused at the %s) reached target select",

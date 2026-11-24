@@ -1524,8 +1524,8 @@ Levels at Guardian's save: TERRA 63, CELES 58, CYAN 55, SHADOW 56, RELM
 
 Party 3 (`wor_kt_inferno.log:2607`). Formation 484, event battle 114.
 
-**Built.** Inferno 6, ranged and spear; Striker 3, katana and spear;
-Rough 3, ranged and katana (`ot6_hud.asm:3429-3438`). A triangle of
+**Built.** Inferno 6, ranged and spear; Striker 3, dagger and katana;
+Rough 3, katana and blunt (2026-11-24: party 3's points and SABIN's blows, battle_rejoin_inferno) (`ot6_hud.asm:3429-3438`). A triangle of
 elements: Inferno weak to bolt and drinking fire, Striker weak to fire
 and drinking ice, Rough weak to ice and drinking bolt.
 

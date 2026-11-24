@@ -547,6 +547,13 @@ Teaches: The first free party. EDGAR's tools reach almost everything (the sweep,
 
 ### The stretches with one weapon class
 
+The solo stretches are meant to be thin, and are not spikes to fix (owner,
+2026-11-24): LOCKE alone ("that's a scenario that's intended to teach you to
+avoid combat in favor of puzzle solving"), TERRA alone ("supposed to feel a
+little scary alone"), and by the same reading CELES alone at the World of
+Ruin's start and SABIN alone. No row is re-keyed to raise their coverage; the
+one rule kept there is that no fight the story forces on them is unwinnable.
+
 | stretch | class | bodies that take it | elements held | bodies that take one |
 |---|---|---|---|---|
 | in armor | Ranged (TERRA's TekMissile only) | Guard, the Whelk's head | fire, ice, bolt (all three); poison (TERRA) | all four |

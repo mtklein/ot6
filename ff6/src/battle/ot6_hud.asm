@@ -3533,10 +3533,10 @@ Ot6ShieldTbl:
                                 ;   410): the factory's engine.  bolt
                                 ;   vanilla; absorbs fire
         .word   $0142
-        .byte   3, OT6_SPEAR|OT6_KATANA ; striker: inferno's arm.  fire
+        .byte   3, OT6_DAGGER|OT6_KATANA ; striker: inferno's arm.  fire
                                 ;   vanilla; absorbs ice
         .word   $0141
-        .byte   3, OT6_KATANA|OT6_RANGED ; rough: inferno's other arm.  ice
+        .byte   3, OT6_KATANA|OT6_BLUNT ; rough: inferno's other arm.  ice
                                 ;   vanilla; absorbs bolt
         .word   $0112
         .byte   10, OT6_SPEAR|OT6_RANGED ; guardian (event battle 140, map
