@@ -19053,12 +19053,25 @@ function M.kitBattle(plan, opts)
       -- p.listR = n: R pressed n times with the cursor on the row (#538: a
       -- row whose boost buys nothing refuses it); the pending boost before
       -- and after is kept on the entry (p.listR0, p.listR1)
-      if p.listR ~= nil and (p.listRn or 0) < p.listR then
-        if cool == 0 then
-          if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
-          p.listRn = (p.listRn or 0) + 1
+      -- Held taps, each one read: a tap Ot6Boost answered with neither its
+      -- ching nor its buzz was never read (a one-frame pulse can fall
+      -- between two frames of the battle's loop, #555), and is pressed
+      -- again, up to six times an entry, as the Magic list's are (#563:
+      -- battle_gogokits's line-less row read "refused" off two lost taps
+      -- on the mutant that lets R through, build/attempts/wt/
+      -- v051-spellblade/final/)
+      if p.listR ~= nil and tapT == 0 and p.tapSnd ~= nil then
+        if M.kitBoostSounds() == p.tapSnd and (p.tapMiss or 0) < 6 then
+          p.listRn, p.tapMiss = p.listRn - 1, (p.tapMiss or 0) + 1
+          M.log(string.format("[kit] f%d an R tap on the list's row was not read (no ching, no buzz): pressed again "
+            .. "(%d)", M.frame, p.tapMiss))
         end
-        pulse("r")
+        p.tapSnd = nil
+      end
+      if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
+        if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
+        if tapT == 0 then p.listRn = (p.listRn or 0) + 1; p.tapSnd = M.kitBoostSounds() end
+        tap("r")
         return
       end
       if p.listR ~= nil and p.listR1 == nil and cool == 0 then p.listR1 = M.readByte(0x3E9D + a * 2) end
