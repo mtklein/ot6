@@ -9,17 +9,28 @@
         Start := AIScript
 .endscope
 
-; cf/8400
+; OT6 (#561): the "ai_script" segment loads in bank $f1 (ff6-en.cfg), with a
+; larger block, so that boss scripts can grow: vanilla's block at cf/8700 was
+; $3950 bytes with under ten free.  Every read of the table and of the block
+; is long-addressed (`lda f:AIScriptPtrs,x`, `lda f:AIScript,x`) and the
+; table holds offsets from AIScript, so nothing else changes; cf/8400-cf/c04f
+; is fill, and the segment after it (monster_text) is pinned where it was.
+; The block must end below $8000: an offset's high bit is the "no counter
+; script" test (`lda $3269,x / bmi`, CheckRetal and Ot6RetalStory).
+OT6_AI_BLOCK = $6000
+.assert OT6_AI_BLOCK <= $8000, error, "an AI script offset must stay below $8000 (the no-counter-script test)"
+
+; cf/8400 (vanilla); f1/0000 (OT6)
 AIScriptPtrs:
         ptr_tbl AIScript
 
 ; ------------------------------------------------------------------------------
 
-; cf/8700
+; cf/8700 (vanilla); f1/0300 (OT6)
 AIScript:
 
 .if LANG_EN
-        fixed_block $3950
+        fixed_block OT6_AI_BLOCK
 .else
         fixed_block $4100
 .endif
@@ -5185,14 +5196,17 @@ AIScript::_279:
                 short_glow MONSTER_1
                 attack NOTHING, NOTHING, NOTHING
                 wait
+Ot6FuseAtmaWeapon:              ; ot6: the fuse is lit from here (ot6_fuse.asm;
+                                ;   a label, no byte)
                 short_glow MONSTER_1
                 attack NOTHING, NOTHING, NOTHING
                 wait
-                long_glow MONSTER_1
-                set_target NOTHING
-                attack FLARE_STAR
-                clr_monster_switch 0
-                clr_monster_switch 1
+Ot6FuseAtmaWeaponFire:          ; ot6: ... to here, the turn that fires it
+                clr_monster_switch 0    ; ot6: vanilla cleared these after the
+                clr_monster_switch 1    ;   move; a break that lands between
+                long_glow MONSTER_1     ;   the two purges what is still queued
+                set_target NOTHING      ;   (Ot6BrokenTurn), so the clears go
+                attack FLARE_STAR       ;   first (ot6_fuse.asm, the idiom)
                 end_if
         if_hp SELF, 6144
                 set_target NOTHING
@@ -6014,6 +6028,7 @@ AIScript::_298:
                 set_battle_switch 0, 0
                 kefka_head MONSTER_1
                 wait
+Ot6FuseGonerLow:                ; ot6: the fuse is lit here (ot6_fuse.asm)
                 set_target NOTHING
                 attack GONER
                 wait
@@ -6028,6 +6043,7 @@ AIScript::_298:
                 set_battle_switch 0, 1
                 kefka_head MONSTER_1
                 wait
+Ot6FuseGoner:                   ; ot6: the fuse is lit here (ot6_fuse.asm)
                 set_target NOTHING
                 attack GONER
                 wait
@@ -6476,7 +6492,35 @@ AIScript::_310:
 ; ------------------------------------------------------------------------------
 
 ; czardragon
+; OT6 (#561): no battle deals the CzarDragon (formation 561 is in no group and
+; no event calls it), so its script carries the worked example of an authored
+; fuse block (ot6_fuse.asm has the idiom; battle_fuse.lua plays it on a
+; staged formation).  A clock and a roll arm it on one of its ordinary turns
+; (the roll comes before the announce, never after it), the line announces
+; it on the next, the turn after that fires it, and a break in between
+; cancels it: the switch is cleared and the clock restarted, so both have to
+; come round again.  Vanilla's script was `attack BATTLE / end`: those are
+; its other turns.  Whoever designs the CzarDragon's fight (bosses-wor.md
+; section 6) replaces this.
 AIScript::_311:
+        if_monster_timer 8
+        if_monster_switch_clr 0
+        if_roll 128
+                attack BATTLE
+                set_monster_switch 0
+                end_if
+        if_monster_switch_set 0
+                dlg $8d
+; CzarDragon draws breath!
+                short_glow MONSTER_1
+                wait
+Ot6FuseCzar:                    ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clears first, then the
+                reset_monster_timer     ;   move (ot6_fuse.asm, the idiom)
+                long_glow MONSTER_1
+                set_target NOTHING
+                attack FLARE_STAR
+                end_if
         attack BATTLE
         end
 
@@ -8106,13 +8150,15 @@ AIScript::_381:
                 short_glow MONSTER_1
                 attack NOTHING
                 wait
+Ot6FuseAtma:                    ; ot6: the fuse is lit from here (ot6_fuse.asm)
                 short_glow MONSTER_1
                 attack NOTHING
                 wait
-                long_glow MONSTER_1
+Ot6FuseAtmaFire:                ; ot6: ... to here, the turn that fires it
+                clr_monster_switch 0    ; ot6: before the move, not after it
+                long_glow MONSTER_1     ;   (ot6_fuse.asm, the idiom)
                 set_target NOTHING
                 attack ULTIMA
-                clr_monster_switch 0
                 end_if
         if_hp SELF, 32640
                 set_target NOTHING

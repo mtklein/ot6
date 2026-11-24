@@ -477,6 +477,18 @@ AI_SCRIPT_INC = 1
         .byte STATUS_ID::status
 .endmac
 
+; ot6 (#561): continue with a chance of `chance` in 256 (conditional $0a,
+; vanilla's unused second "never"; Ot6AICondRoll, ot6_fuse.asm).  It rolls
+; every time it is tested, and a block's conditions are tested again on each
+; turn the block resumes after a `wait`: so a roll belongs on the block that
+; ARMS a telegraph (it sets a switch), never on the fuse block itself, whose
+; announced move must fire (the owner, 2026-11-23: "don't announce anything
+; that won't happen ... okay to make a roll before that").  battle_fuse.lua
+; refuses a fuse block that holds one.
+.mac if_roll chance
+        .byte $fc, $0a, chance, 0
+.endmac
+
 ; if the monster timer reaches a certain value
 .mac if_monster_timer timer_value
         .byte $fc, $0b, timer_value, 0

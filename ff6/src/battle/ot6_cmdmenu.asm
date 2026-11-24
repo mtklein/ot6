@@ -411,6 +411,8 @@
         beq     @thief
         cmp     #$04
         beq     @setzer
+        cmp     #$07
+        beq     @rune           ; the Rune Knight's list (#563)
         cmp     #$05
         bcs     @paint          ; Relm's list and its colours (#538)
         cmp     #$00
@@ -430,6 +432,8 @@
         jml     Ot6ThiefRowCost ;   boost multiplies (Ot6ThiefCharge's rule)
 @paint: pla                     ; the reach rows per body at the pending
         jml     Ot6PaintRowCost ;   boost, the rest flat (Ot6PaintCharge's rule)
+@rune:  pla                     ; a blade at its cheapest spell's price,
+        jml     Ot6RuneRowCost  ;   Break Blade's 99 (Ot6RuneCharge's rule)
 @empty: lda     #$00            ; an empty cell draws two blanks and stays white
         rtl
 .endproc
@@ -578,7 +582,11 @@
         .i16
         pha                     ; [S+1] park the MP grey
         lda     $6168
-        cmp     #$05
+        cmp     #$07
+        bne     :+              ; the Rune Knight's list: Break Blade's gate
+        pla
+        jml     Ot6RuneRowGrey
+:       cmp     #$05
         bne     :+              ; Relm's list: the divine, Gesture's loop and
         pla                     ;   the party-side rows' bodies
         jml     Ot6PaintRowGrey

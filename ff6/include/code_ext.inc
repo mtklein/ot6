@@ -37,6 +37,16 @@ CODE_EXT_INC = 1
 .global Ot6ThiefBannerName       ;   attack name type 3: a thief row's banner
 .global Ot6ThiefPageRow          ;   the field Thief page's rows: id, name, gate
 .global Ot6ThiefName             ;   the later thief rows' 10-letter list names
+.global Ot6RuneListOpen          ; #563 celes's kit: runic -> tools-shell list
+.global Ot6RuneExec              ;   Cmd_0b's execute-side dispatch (the rows)
+.global Ot6TargetPre             ;   CalcTargetDmg: the rune joins a weak body's hit
+.global Ot6RuneWeakMul           ;   ... and its tier multiplies it
+.global Ot6SwingPal_ext          ;   InitWeaponAnim: the swing's colour
+.global LoadSpriteAnimPal        ;   btlgfx, for that one's tail
+.global Ot6RunePageRows          ;   the field Rune Knight page's rows and prices
+.global Ot6RunePageOpens         ;   the Skills list's RuneKnt row: white or grey
+.global Ot6RuneName              ;   the list's 10-letter names
+.global Ot6RunePageDescPtrs, Ot6RunePageDescStr  ;   its help lines (kit_pages.py)
 .global Ot6PaintListOpen         ; #538 relm's kit: sketch -> tools-shell list
 .global Ot6PaintExec             ;   Cmd_0d's execute-side dispatch (the rows)
 .global Ot6KitConfirm            ;   the tools-shell confirm in modes 4-6
@@ -191,6 +201,9 @@ OT6_LEO_SWITCH = $00e0
 OT6_LEO_FLAG := $7e1e80 + (OT6_LEO_SWITCH >> 3)
 OT6_LEO_BIT = 1 << (OT6_LEO_SWITCH & 7)
 .global Ot6LeoReveal, Ot6LeoBattleRow, Ot6LeoActorMask
+; #567: an item's equip word with the Dragoon Boots' spear permit
+; (battle/ot6_spear.asm), for every equippability check, menu and battle
+.global Ot6EquipWord, Ot6SpearPermit, Ot6ReequipRelics, Ot6ReequipRelicTbl
 .global Ot6EsperVictory, Ot6VictoryNext ; #552 piece F: a revealed Leo earns at
                                  ;   victory (ot6_esper.asm; the loop's next member)
 .global Ot6FieldLeoMagic         ; #552 piece F: his own stone's spells in the

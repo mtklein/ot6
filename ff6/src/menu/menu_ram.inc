@@ -198,9 +198,14 @@ ram_scope zSkillsTextColor
                                 ; z80, which nothing in the tree referenced, so
                                 ; growing the scope moves no other address.
         ram_byte Painter        ; the 9th, Relm's page (#549): z81 the same way
+        ram_byte RuneKnt        ; the 10th, Celes's page (#563): z82.  $80-$84
+                                ; are also where the character-select cursor's
+                                ; five property bytes are staged
+                                ; (LoadCharSelectCursorProp), read by its task
+                                ; before a Skills scan can write here; its
+                                ; positions, read every frame, start at $85
 end_ram_scope
 
-ram_byte z82
 ram_byte z83
 ram_byte z84
 ram_byte z85

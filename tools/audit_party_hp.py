@@ -329,7 +329,7 @@ def main() -> int:
     # boots it, so nothing inherits what this audit guards against.
     ended = ended_states(args.repo)
     for name in sorted(ended):
-        print(f"  ({name}: the line's end, after The End; nothing boots it, not audited)")
+        print(f"  ({name}: the line's end (its last run's state); no leg boots it, not audited)")
     files = [p for p in files if stem_of(p) not in ended]
 
     scanned, skipped, bad = 0, [], []

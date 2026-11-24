@@ -123,6 +123,7 @@ local function defendPress(st)
   if st == ST_CMD then return "right" end
   if st == ST_DEF then return "a" end
   if st == ST_TGT then return "b" end
+  if st == ST_LIST then return "b" end   -- RELM's painter's list, left open by a try voided at its target
   return nil
 end
 
@@ -146,12 +147,16 @@ local function runTry(t)
         Tm.observe()
         -- the battle can end before RELM's Sketch runs (the others' Defend turns and the monsters' own
         -- actions, queued in the window's snapshot, can finish the last body): that window gave no try.
-        -- A Sketch that ran (t.drawn set) and itself killed the last body is a try, not a void.
+        -- A Sketch that ran (t.drawn set) and itself killed the last body is a try, not a void.  The same
+        -- actions can fell the target alone before RELM confirms it (the target cursor then never lights its
+        -- slot): that window gave no try either, and the next window picks a standing target.
         if t.endF == nil and t.void == nil and t.drawn == nil then
           local standing = false
           for m = 0, 5 do if live(m) then standing = true end end
-          if not H.battleLoadStarted() or not standing then
+          if not H.battleLoadStarted() or not standing or (not t.sent and not live(tgtMon)) then
             t.void = H.frame
+            t.voidWhy = standing and H.battleLoadStarted() and ("the target m" .. tostring(tgtMon) .. " fell")
+              or "the battle ended"
             H.setPad({})
             return
           end
@@ -204,9 +209,9 @@ local function runTry(t)
       armed = nil
       H.setPad({})
       if t.void then
-        H.log(string.format("[sketch] try %d (%s): the battle ended at f%d before RELM's Sketch ran (sent %s, drawn %s): "
+        H.log(string.format("[sketch] try %d (%s): %s at f%d before RELM's Sketch ran (sent %s, drawn %s): "
           .. "no try; the next window counts instead", t.n, t.window and ("window " .. t.window) or ("delay " ..
-          t.delay), t.void, tostring(t.sent), t.drawn and string.format("$%02X", t.drawn) or "nil"))
+          t.delay), t.voidWhy, t.void, tostring(t.sent), t.drawn and string.format("$%02X", t.drawn) or "nil"))
         return
       end
       H.log(string.format("[sketch] try %d (%s%s): pending at the confirm %s; drew %s%s; bank %s -> %s", t.n,

@@ -753,8 +753,11 @@ STATES = [
     # escape_start: gen_fc_escape's second artifact, first control on the
     # escape map 393 with the 6:00 master clock and Shadow's 5:55 clock
     # running -- the escape-policy lab's fixture (one run, both states).
+    # atmaweapon_entry: its third, the party on AtmaWeapon's doorstep before
+    # the talk -- battle_atmaweapon's fixture.
     S("wor_landing", gen="gen_fc_escape", prev="fc_alcove",
-      checkpoint="fc-alcove-v1", also=["escape_start"], timeout=3600),
+      checkpoint="fc-alcove-v1", also=["escape_start", "atmaweapon_entry"],
+      timeout=3600),
 
     # ---- the World of Ruin ----------------------------------------------------
     # wor_landing -> the World of Ruin's first save: dress CELES (the opening
@@ -1388,8 +1391,10 @@ STATES = [
     # the `wor-kt-atma-v1` checkpoint (docs/design/route-wor-kefka-tower.md).
     # A cut.  wor_kt_guardian below boots its checkpoint.  Re-cut by
     # checkpoint_drift.py --recut.
+    # atma_entry: its second artifact, party 2 two tiles below Atma before
+    # the talk -- battle_atma's fixture.
     S("wor_kt_atma", gen="gen_wor_kt_atma", prev="wor_kt_inferno",
-      checkpoint="wor-kt-inferno-v1", timeout=7200),
+      checkpoint="wor-kt-inferno-v1", also=["atma_entry"], timeout=7200),
 
     # wor-kt-inferno-v1 -> 296, a branch beside wor_kt_atma: party 3 out of
     # the factory's hall to its west column, round by 334's east side to
@@ -1406,8 +1411,10 @@ STATES = [
     # parties spread through the tower: the `wor-kt-guardian-v1` checkpoint
     # (docs/design/route-wor-kefka-tower.md).  A cut.  wor_kt_doom below
     # boots its checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    # golddrgn_entry: its second artifact, party 2 two tiles below the Gold
+    # Dragon before the talk -- battle_golddrgn's fixture.
     S("wor_kt_guardian", gen="gen_wor_kt_guardian", prev="wor_kt_atma",
-      checkpoint="wor-kt-atma-v1", timeout=7200),
+      checkpoint="wor-kt-atma-v1", also=["golddrgn_entry"], timeout=7200),
 
     # wor-kt-guardian-v1 -> Doom's save point, map 355 (64,11): party 2
     # opens the cell doors (337 (8,6)) and stays there; party 3 down the west
@@ -1452,8 +1459,11 @@ STATES = [
     # the runner retries from the save), the ending and the staff roll, to
     # "The End" (#274; docs/design/route-wor-the-end.md).  The line's end:
     # no save point follows, so its last state is this savestate.
+    # kefka_tier: its second artifact, the battle as Kefka's formation (514)
+    # begins, the party as the three tiers left it -- battle_goner's fixture.
     S("wor_kefka", gen="gen_wor_kefka", prev="wor_kt_plates",
-      checkpoint="wor-kt-plates-v1", timeout=7200, end=True),
+      checkpoint="wor-kt-plates-v1", also=["kefka_tier"], timeout=7200,
+      end=True),
 
 ]
 

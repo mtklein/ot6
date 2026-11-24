@@ -15,6 +15,32 @@ Stated once, assumed by every block:
   cancels the move**; the charge does not resume when the boss
   recovers, and has to be started again. Everything else in the fight
   stays vanilla AI.
+- **After a cancel the trigger is earned again.** Whatever armed the fuse
+  starts over: a hit count from zero, a clock from zero, a rotation from
+  its first turn. A boss whose HP alone arms it announces again on its
+  first turn back and needs the full fuse again.
+- **An announced move always fires** unless a break cancels it or the
+  boss dies (owner, 2026-11-23: "don't announce anything that won't
+  happen. however, okay to make a roll before that to determine whether
+  or not to do the whole sequence"). Nothing rolls between the announce
+  and the move. Where a move is not to come every time, the roll is made
+  before the announce, on the turn that arms the fuse.
+- **A break releases whatever the broken body holds** (owner,
+  2026-11-23: "definitely breaking a tentacle should free a party
+  member. if possible same for enemies that swallow party members
+  temporarily"). Not built yet; the Tentacles' Seize is the first case
+  ([bosses-wor.md](bosses-wor.md) block 1).
+- **While a fuse is lit the HUD says so**: a yellow **!** before the
+  boss's shield emblem, from the announce until the move fires or a
+  break cancels it.
+- **What is built** (#561, `ot6_fuse.asm`, DESIGN.md "Break system"): the
+  cancel, the trigger's reset, the **!**, and the rule that hits on a
+  Broken boss wind no fuse, on the one fuse vanilla wrote for a World of
+  Balance boss, AtmaWeapon's (block 21, `battle_atmaweapon`), and on
+  three in the World of Ruin. Every other **Telegraph** line below is
+  design text: the scripts do not announce those moves yet. The fuse
+  block's idiom for writing them, and its worked example, are in
+  `ot6_fuse.asm` and `battle_fuse`.
 - **Bosses get no exemption from breaks.** Turn loss and ×2 apply to
   AtmaWeapon the same way they apply to a Lobo. Shields are the only
   value tuned per boss.
@@ -1070,6 +1096,20 @@ roster.
   Its opening speech is flavour and has no mechanical effect. Mind
   Blast stays untelegraphed and can arrive mid-rotation, exactly as
   vanilla dealt it.
+  **Built** (#561), on vanilla's own script, unchanged: under 12,800 HP
+  its turns are a rotation of four (Bio, Quake or Meteo; Battle or its
+  Special; Fire 2 on the party; Mind Blast), and the turn after Mind
+  Blast it says "Vast energy focused", takes Shell, Safe and Haste and
+  glows; it glows again on the next turn and fires Flare Star on the
+  one after, so the fuse is two of its turns, not one. The **!** stands
+  from the line to Flare Star. A break in between cancels it and the
+  rotation starts over: four turns, then the line again
+  (`battle_atmaweapon`: "the line returned on its turn 5 back, as many
+  turns as the first arming took"). Before, the break only delayed it:
+  Flare Star came on its second turn back with no new line
+  (build/attempts/wt/v051-fuse/measure/atmaweapon.log). Under 6,144 HP
+  the rotation is a different one and no longer reaches Mind Blast, so a
+  fuse not yet lit never comes; one already lit still fires.
 - **Break story:** 11 shields takes two to three full break cycles,
   with the fuse returning every rotation. Bank BP, break *on* the
   fuse, dump during the ×2 window, survive Mind Blast, and rebuild.

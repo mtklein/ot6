@@ -34,6 +34,21 @@
 --       staging is battle_gogokits': every standing non-boss monster without
 --       a Death ward is Broken (OT6_BROKEN_TICKS) as the copy begins; no
 --       party here breaks one on cue.
+--     The Rune Knight's rows (#563, ot6_rune.asm) are self-targeted, so a
+--     copy runs on the copier, as a copy of Runic raises GOGO's own stance:
+--     * rune: CELES plays a blade row of her list (an element her battle
+--       spell list can cast, derived there); a copy of it at 0 of GOGO's
+--       points arms GOGO's own rune with that element (Ot6RuneArm's write to
+--       OT6_RUNE at his seat) at tier 1 (OT6_RUNETIER), free, and nothing is
+--       written at hers;
+--     * runetier: the tier is the copier's.  CELES plays a row that climbs a
+--       line at 0 BP (tier 1 on her blade); a copy with one of GOGO's points
+--       pending arms his at tier 2, free of MP, and spends his point;
+--     * breakunder: CELES casts Break Blade at 3 BP; a copy with two of
+--       GOGO's points pending does nothing and charges nothing (his
+--       OT6_BREAKBLADE stays 0): the divine's gate is the copier's boost;
+--     * breakblade: a copy of it with three pending starts his own
+--       (OT6_BREAKBLADE at his seat reads 3 after the copy), free.
 --   M2 (GOGO, TERRA, STRAGO, RELM; GOGO's commands Lore, Steal, Blitz)
 --     * ultima: a copy of TERRA's 0-BP Fire at 3 runs as Ultima ($14; $B6 at
 --       ExecCmd), TERRA's fourth fold, once she has rejoined (switch $00BF);
@@ -51,7 +66,10 @@
 --
 -- Lever, for evidence only (the suite runs BURN 0; a lab sets the global
 -- GOGOMIMIC_BURN ahead of the file): the walker fights that many encounters
--- by the landing first, to vary the encounter history (TESTING.md).
+-- by the landing first, to vary the encounter history (TESTING.md).  A
+-- second lever, GOGOMIMIC_ARMS (a string of arm tags, "rune breakblade"):
+-- only those arms, and the rounds that hold one, are played (a lab's or a
+-- mutant's run; the suite plays every arm).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, SHADOW, EDGAR, CELES, STRAGO, RELM, GOGO = 0x00, 0x03, 0x04, 0x06, 0x07, 0x08, 0x0C
@@ -63,8 +81,13 @@ local FIRE, SCAN, ULTIMA = 0x00, 0x18, 0x14
 local DEBIL, SHURIKEN = 0xA7, 0x41
 local BREAK_TICKS = 16                                     -- a staged break's length (OT6_BROKEN_TICKS)
 local RUNICBLADE = 0x7EEDD4                                -- OT6_RUNICBLADE (ot6_memory.inc)
+local RUNE_AT, BREAKBLADE_AT = 0x7EED8F, 0x7EEDA2          -- OT6_RUNE, OT6_BREAKBLADE (+ seat * 2)
+local TIER_AT = 0x7EEE3A                                   -- OT6_RUNETIER (+ seat * 2)
+local RUNE_RUNIC, RUNE_BLADE, RUNE_BREAK = 0xD0, 0xD1, 0xD9 -- the Rune Knight's rows (ot6_rune.asm)
+local BREAK_MP, BREAK_TURNS = 99, 3
 local LANDING = { 69, 183 }                                 -- the Falcon's tile by Maranda (wor-colosseum-v1's)
 local BURN = type(GOGOMIMIC_BURN) == "number" and GOGOMIMIC_BURN or 0
+local ONLY = type(GOGOMIMIC_ARMS) == "string" and (" " .. GOGOMIMIC_ARMS .. " ") or nil
 local MAX_BATTLES = 24
 local ROUND_BATTLES = 10                                   -- a round's arms all played within this many
 local DANGER = 1 / 3
@@ -168,29 +191,140 @@ local function studyRow(sp)
   end
 end
 
+-- ---- the Rune Knight's list, as ot6_rune.asm builds it for seat s (#563) ------
+-- Ot6RuneListOpen: Runic; a blade row $D1 + e for each element bit e (0 fire,
+-- 1 ice, 2 bolt, 3 poison, 4 wind, 5 pearl, 6 earth, 7 water) that a spell of
+-- the seat's battle spell list carries (the list $302C + seat*2 points at,
+-- rows 1-54, ids under $36; MagicProp +1); then Break Blade, 99, once it is
+-- learned (switch $0266 or $00A4).  A row's spell is the cheapest of its
+-- element the seat can cast (Ot6BladeSpell: MagicProp +5 through the seat's
+-- Gold Hairpin or Economizer, the list's first at a tie).  When that is the
+-- head of the element's line in Ot6FoldTbl (fire, ice, bolt, poison:
+-- three-byte rows, the head and the spells one and two boosts reach) the row
+-- climbs (Ot6BladeClimbs): with `boost` points pending it stands for the
+-- line's spell min(boost, 2) steps up (Ot6BladeRow).  The row's price is its
+-- spell's MP, and the tier it arms that spell's place in its line
+-- (Ot6RuneTierOf: 2 for a line's second spell, 3 for its third, else 1); a
+-- row that climbs nothing arms tier 1 and takes no boost.  The shell has
+-- eight cells: a blade is listed while a cell is free for it (the last is
+-- Break Blade's once learned), so the last elements in bit order are cut.
+-- The k-th row sits in cell (k & 3) * 2 + (k >> 2): down the left column,
+-- then the right.  `cells` is the eight cells as the list holds them
+-- (id.price.flags, FF for an empty one); price, tier, spell and climbs are
+-- by element bit.
+local function spellElem(id) return H.readRomByte((H.sym("MagicProp") & 0x3FFFFF) + id * 14 + 1) end
+local function lineSpell(e, col) return H.readRomByte((H.sym("Ot6FoldTbl") & 0x3FFFFF) + e * 3 + col) end
+local function runeTierOf(id)
+  for e = 0, 3 do if id == lineSpell(e, 1) then return 2 end end
+  for e = 0, 2 do if id == lineSpell(e, 2) then return 3 end end
+  return 1
+end
+local function runeModel(s, boost)
+  local MP = H.sym("MagicProp") & 0x3FFFFF
+  local relic, list = H.readByte(0x3C45 + s * 2), H.readWord(0x302C + s * 2)
+  local function spellMp(id) return H.casterSpellMp(H.readRomByte(MP + id * 14 + 5), relic) end
+  local cheap = {}
+  for r = 1, 54 do
+    local id = H.readByte(list + r * 4)
+    if id < 0x36 then
+      local el, mp = H.readRomByte(MP + id * 14 + 1), spellMp(id)
+      for e = 0, 7 do
+        if (el >> e) & 1 == 1 and (cheap[e] == nil or mp < cheap[e].mp) then cheap[e] = { id = id, mp = mp } end
+      end
+    end
+  end
+  local m = { price = {}, tier = {}, spell = {}, climbs = {}, learned = sw(0x266) == 1 or sw(0xA4) == 1 }
+  for e = 0, 7 do
+    if cheap[e] ~= nil then
+      m.climbs[e] = e < 4 and cheap[e].id == lineSpell(e, 0)
+      m.spell[e] = m.climbs[e] and lineSpell(e, math.min(boost or 0, 2)) or cheap[e].id
+      m.price[e] = spellMp(m.spell[e])
+      m.tier[e] = m.climbs[e] and runeTierOf(m.spell[e]) or 1
+    end
+  end
+  m.rows = { { RUNE_RUNIC, 0 } }
+  for e = 0, 7 do
+    if m.spell[e] ~= nil and #m.rows < (m.learned and 7 or 8) then
+      m.rows[#m.rows + 1] = { RUNE_BLADE + e, m.price[e] }
+    end
+  end
+  if m.learned then m.rows[#m.rows + 1] = { RUNE_BREAK, BREAK_MP } end
+  local cells = {}
+  for c = 0, 7 do cells[c] = "FF" end
+  for k, row in ipairs(m.rows) do
+    cells[((k - 1) & 3) * 2 + ((k - 1) >> 2)] = string.format("%02X.%02X.02", row[1], row[2])
+  end
+  m.cells = table.concat(cells, " ", 0, 7)
+  return m
+end
+local function runeAt(s) return H.readByte(RUNE_AT + s * 2) end
+local function tierAt(s) return H.readByte(TIER_AT + s * 2) end
+-- The tier a copy of blade row e arms on the copier (Ot6RuneBlade), m his
+-- model at his own pending boost `pend`: his own row's when he can cast the
+-- element (a row that climbs reaches the line's spell at his boost, one
+-- that does not arms tier 1); when he cannot, the element's line by his
+-- boost if it has one.
+local function copyTier(m, e, pend)
+  if m.spell[e] ~= nil then return m.tier[e] end
+  if e < 4 then return runeTierOf(lineSpell(e, math.min(pend, 2))) end
+  return 1
+end
+local function breakBladeAt(s) return H.readByte(BREAKBLADE_AT + s * 2) end
+local function fourOf(fn) return { [0] = fn(0), fn(1), fn(2), fn(3) } end
+
 -- ---- observers ---------------------------------------------------------------
 -- acts: every action GOGO runs: { copy = { cmd, atk, pend } (mimicreplace, or
 -- nil for his own command), cmd, atk ($b5/$b6 at ExecCmd), pend, mp0, mp1,
 -- passes (Ot6PassTargeted), marks (Ot6AssassinateGate's Death writes), staged,
--- studied (Ot6StudyOne's $3A84 writes), want, blade, f }
--- src: the last action each owner ran, { cmd, atk, f } at its ExecCmd
+-- studied (Ot6StudyOne's $3A84 writes), want, blade, f; runes0/runes1 and
+-- bbs0/bbs1 (every seat's OT6_RUNE and OT6_BREAKBLADE as it begins and once
+-- it has ended), tiers0/tiers1 (OT6_RUNETIER likewise), armed and armedTier
+-- (the values Ot6RuneArm wrote to OT6_RUNE and OT6_RUNETIER at his seat
+-- during it), armedElse (its writes at any other seat), model (runeModel
+-- for his seat at his pending boost, for a Runic command's action), tgt
+-- (a throw's monster targets, $b9), src (the owners' last actions as it
+-- begins) }
+-- src: the last action each owner ran, { cmd, atk, f, pend, seat, mp0 } at
+-- its ExecCmd, and { mp1, rune1, tier1, bb1, armed, armedTier } once it has
+-- ended
 local acts, cur, copyAt, src = {}, nil, nil, {}
+local srcOpen = nil    -- the owner's action now running
 local inflight = nil   -- the arm whose copy is queued or running (no Item care meanwhile)
 local awaiting = nil   -- the arm whose owner's action has run, its copy still to come (no Item care either)
 local round = nil
 local function closeAct()
   if cur == nil or not cur.ended or H.frame <= cur.ended + 1 then return false end
   cur.mp1 = mpOf(cur.seat)
+  cur.runes1, cur.bbs1, cur.bank1 = fourOf(runeAt), fourOf(breakBladeAt), H.readByte(0x3E9C + cur.seat * 2)
+  cur.tiers1 = fourOf(tierAt)
   acts[#acts + 1] = cur
   local c = cur.copy
   H.log(string.format("[gogomimic] GOGO's action %d (f%d): %s; ran cmd $%02X atk $%02X at %d BP: MP %d -> %d, "
-    .. "passes %d, marks %d (staged $%02X), studied $%06X (want $%06X), blade %s", #acts, cur.f,
+    .. "passes %d, marks %d (staged $%02X), studied $%06X (want $%06X), blade %s; rune $%02X -> $%02X (armed %s, "
+    .. "%d write(s) at other seats), tier %d -> %d (armed %s), break blade %d -> %d, bank %d -> %d", #acts, cur.f,
     c and string.format("a Mimic's copy of cmd $%02X atk $%02X at %d BP", c.cmd, c.atk, c.pend) or "his own command",
     cur.cmd, cur.atk, cur.pend, cur.mp0, cur.mp1, cur.passes, cur.marks, cur.staged or 0, cur.studied, cur.want,
-    tostring(cur.blade)))
+    tostring(cur.blade), cur.runes0[cur.seat], cur.runes1[cur.seat],
+    cur.armed and string.format("$%02X", cur.armed) or "none", cur.armedElse, cur.tiers0[cur.seat],
+    cur.tiers1[cur.seat], tostring(cur.armedTier or "none"), cur.bbs0[cur.seat], cur.bbs1[cur.seat], cur.bank0,
+    cur.bank1))
   if c ~= nil then inflight, awaiting = nil, nil end
   cur = nil
   return true
+end
+-- an owner's action, closed as GOGO's is: its MP, rune and Break Blade read
+-- once its end has passed (`now`: at once, when another action begins)
+local function closeSrc(now)
+  local r = srcOpen
+  if r == nil or not (now or (r.ended and H.frame > r.ended + 1)) then return end
+  r.mp1, r.rune1, r.bb1, r.tier1 = mpOf(r.seat), runeAt(r.seat), breakBladeAt(r.seat), tierAt(r.seat)
+  if r.cmd == CMD.RUNIC then
+    H.log(string.format("[gogomimic] f%d %s's cmd $%02X atk $%02X at %d BP has ended: MP %d -> %d, rune $%02X -> "
+      .. "$%02X (armed %s), tier %d -> %d (armed %s), break blade %d -> %d", H.frame, NAMES[r.who] or "?", r.cmd,
+      r.atk, r.pend, r.mp0, r.mp1, r.rune0, r.rune1, r.armed and string.format("$%02X", r.armed) or "none",
+      r.tier0, r.tier1, tostring(r.armedTier or "none"), r.bb0, r.bb1))
+  end
+  srcOpen = nil
 end
 
 local installed = false
@@ -214,7 +348,14 @@ local function install()
     if id ~= GOGO then
       -- (a Defend or a Row change runs here too and is never mimicked)
       if H.readByte(0xB5) == 0x15 or H.readByte(0xB5) == 0x14 then return end
-      src[id] = { cmd = H.readByte(0xB5), atk = H.readByte(0xB6), f = H.frame, pend = H.readByte(0x3E9D + x) }
+      closeSrc(true)
+      src[id] = { cmd = H.readByte(0xB5), atk = H.readByte(0xB6), f = H.frame, pend = H.readByte(0x3E9D + x),
+        who = id, seat = x // 2, mp0 = mpOf(x // 2), rune0 = runeAt(x // 2), bb0 = breakBladeAt(x // 2),
+        tier0 = tierAt(x // 2) }
+      -- the model's prices and tiers for a Rune Knight's row at its pending boost, read while the seat's list
+      -- and relics are the battle's
+      if src[id].cmd == CMD.RUNIC then src[id].model = runeModel(x // 2, src[id].pend) end
+      srcOpen = src[id]
       H.log(string.format("[gogomimic] f%d %s runs cmd $%02X atk $%02X at %d BP ($3A7C/D $%02X $%02X)", H.frame,
         NAMES[id] or string.format("$%02X", id), src[id].cmd, src[id].atk, src[id].pend, H.readByte(0x3A7C),
         H.readByte(0x3A7D)))
@@ -228,9 +369,14 @@ local function install()
     local s = x // 2
     local want = 0
     for m = 0, 5 do if present(m) then want = want | studyRow(species(m)) end end
+    closeSrc(true)
     cur = { copy = copyAt, cmd = H.readByte(0xB5), atk = H.readByte(0xB6), pend = H.readByte(0x3E9D + x),
       seat = s, mp0 = mpOf(s), passes = 0, marks = 0, studied = 0, want = want & ~lores() & 0xFFFFFF, f = H.frame,
-      planned = copyAt and inflight }
+      planned = copyAt and inflight, runes0 = fourOf(runeAt), bbs0 = fourOf(breakBladeAt), armedElse = 0, src = {},
+      bank0 = H.readByte(0x3E9C + x), tiers0 = fourOf(tierAt) }
+    for id2, r in pairs(src) do cur.src[id2] = r end
+    -- the copier's own model at his pending boost: a copied row runs on his list and his points
+    if cur.cmd == CMD.RUNIC then cur.model = runeModel(s, cur.pend) end
     copyAt = nil
     if cur.copy ~= nil and cur.cmd == CMD.THROW and cur.pend >= 3 then
       -- the declared staging (state_write_waivers.txt; battle_gogokits'):
@@ -245,9 +391,16 @@ local function install()
           cur.staged = cur.staged | (1 << m)
         end
       end
+      -- the body the copy is aimed at ($b9, the action's monster targets): a
+      -- throw at a body that could not be staged (it wards Death) is not the
+      -- divine's to judge
+      cur.tgt = H.readByte(0xB9)
       if cur.staged == 0 then
         H.log(string.format("[gogomimic] f%d GOGO's copied throw: no standing monster without a Death ward to "
           .. "stage: not counted, played again next battle", H.frame))
+      elseif (cur.tgt & cur.staged) == 0 then
+        H.log(string.format("[gogomimic] f%d GOGO's copied throw is aimed at monsters $%02X, none of the staged "
+          .. "$%02X: not counted, played again next battle", H.frame, cur.tgt, cur.staged))
       end
     end
   end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"), H.sym("ExecCmd@battle_code"))
@@ -275,9 +428,35 @@ local function install()
       cur.studied = cur.studied | (v << (8 * (addr - 0x7E3A84)))
     end
   end, emu.callbackType.write, 0x7E3A84, 0x7E3A86)
-  emu.addEventCallback(function() if cur ~= nil then closeAct() end end, emu.eventType.endFrame)
+  -- every arming of a blade (Ot6RuneArm's write to OT6_RUNE; the battle's clear writes 0): during GOGO's action
+  -- it is that action's, at his seat or (counted) at another; during an owner's, the owner's
+  emu.addMemoryCallback(function(addr, v)
+    local off = addr - RUNE_AT
+    if off % 2 ~= 0 or v == 0 then return end
+    if cur and not cur.ended then
+      if off == cur.seat * 2 then cur.armed = v else cur.armedElse = cur.armedElse + 1 end
+    elseif srcOpen and not srcOpen.ended and off == srcOpen.seat * 2 then
+      srcOpen.armed = v
+    end
+  end, emu.callbackType.write, RUNE_AT, RUNE_AT + 6)
+  -- and its tier (Ot6RuneArm's second store, OT6_RUNETIER), by the same rule
+  emu.addMemoryCallback(function(addr, v)
+    local off = addr - TIER_AT
+    if off % 2 ~= 0 or v == 0 then return end
+    if cur and not cur.ended then
+      if off == cur.seat * 2 then cur.armedTier = v end
+    elseif srcOpen and not srcOpen.ended and off == srcOpen.seat * 2 then
+      srcOpen.armedTier = v
+    end
+  end, emu.callbackType.write, TIER_AT, TIER_AT + 6)
+  emu.addEventCallback(function()
+    if cur ~= nil then closeAct() end
+    closeSrc()
+  end, emu.eventType.endFrame)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
+    local x = cpu()["cpu.x"] & 0xFF
+    if srcOpen and not srcOpen.ended and x == srcOpen.seat * 2 then srcOpen.ended = H.frame end
     if cur == nil or cur.ended or (cpu()["cpu.x"] & 0xFF) ~= cur.seat * 2 then return end
     local s = cur.seat
     cur.ended = H.frame
@@ -288,12 +467,26 @@ end
 -- ---- the arms ---------------------------------------------------------------------
 -- Each arm: the owner's plain action (`src`, a kitBattle entry at 0 BP), the
 -- copy it wants (cmd, atk), and `check(a)` on GOGO's action that copied it.
+-- `pend` is the points GOGO copies with (3 unless given); `prepare(arm, s)`,
+-- run as a battle opens (s the owner's seat), says whether the pair can be
+-- played in it, and sets the src and atk of an arm whose action is chosen
+-- from the battle.
 local got = {}         -- tag -> GOGO's action that counted
+-- the slot a throw is aimed at so that the staging can break its body: the
+-- first standing monster without a Death ward ($3AA1 bit 2), read as the
+-- target select opens
+local function throwSlot()
+  for m = 0, 5 do
+    local e = 8 + m * 2
+    if present(m) and H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3AA1 + e) & 0x04) == 0 then return m end
+  end
+  return nil
+end
 local function copyOf(arm, from)
   for i = #acts, from or 1, -1 do
     local a = acts[i]
-    if a.copy and a.planned == arm.tag and a.copy.cmd == arm.cmd and (arm.atk == nil or a.copy.atk == arm.atk) and a.copy.pend == 3
-       and (arm.counts == nil or arm.counts(a)) then
+    if a.copy and a.planned == arm.tag and a.copy.cmd == arm.cmd and (arm.atk == nil or a.copy.atk == arm.atk)
+       and a.copy.pend == (arm.pend or 3) and (arm.counts == nil or arm.counts(a)) then
       return a
     end
   end
@@ -322,13 +515,116 @@ local ROUNDS = {
           H.assertEq(a.blade, true, "M1: GOGO's Mimic of CELES's 0-BP Runic, copied at 3 of his points, is a "
             .. "RunicBlade (his OT6_RUNICBLADE bit)")
         end },
+      -- SHADOW aims at a body the staging can break (throwSlot: one without
+      -- a Death ward), which the copy is aimed at in turn; a copy aimed at
+      -- any other body is not counted (battle_gogokits' R3 drew such a throw
+      -- on formation 00D2 0087 00B0 00B0: 0 marks with $02 staged)
       { tag = "assassinate", owner = SHADOW, cmd = CMD.THROW, atk = SHURIKEN,
-        counts = function(a) return a.staged ~= nil and a.staged ~= 0 end,
-        src = { who = SHADOW, cmd = CMD.THROW, row = SHURIKEN, boost = 0 },
+        counts = function(a) return a.staged ~= nil and (a.tgt & a.staged) ~= 0 end,
+        src = { who = SHADOW, cmd = CMD.THROW, row = SHURIKEN, boost = 0, slotFn = throwSlot },
         check = function(a)
           H.assertEq(a.marks > 0, true, string.format("M1: GOGO's Mimic of SHADOW's 0-BP Shuriken, copied at 3 of "
             .. "his points, marks Death on the Broken non-boss it hits (Assassinate; %d mark(s), staged $%02X)",
             a.marks, a.staged))
+        end },
+      -- the Rune Knight's rows (#563): each is self-targeted, so its copy
+      -- runs on GOGO.  CELES's row is the first blade row her list holds
+      -- (an element her own battle spell list can cast in this battle).
+      { tag = "rune", owner = CELES, cmd = CMD.RUNIC, pend = 0,
+        prepare = function(arm, s)
+          local row = runeModel(s, 0).rows[2]
+          H.assertEq(row ~= nil and row[1] >= RUNE_BLADE and row[1] < RUNE_BREAK, true, "M1 precondition: CELES's "
+            .. "Rune Knight's list holds a blade row (her battle spell list holds an elemental spell)")
+          arm.atk, arm.src = row[1], { who = CELES, cmd = CMD.RUNIC, row = row[1], boost = 0, self = true }
+          return true
+        end,
+        check = function(a)
+          local r, bit = a.src[CELES], 1 << (a.copy.atk - RUNE_BLADE)
+          H.assertEq(r ~= nil and r.atk == a.copy.atk and r.armed == bit and r.rune1 == bit, true, string.format(
+            "M1 precondition: CELES's own blade row $%02X armed her blade with its element $%02X (her action: row "
+            .. "$%02X, armed %s)", a.copy.atk, bit, r and r.atk or 0xFF, tostring(r and r.armed)))
+          H.assertEq(r.mp0 - r.mp1, r.model.price[r.atk - RUNE_BLADE], "M1 precondition: and cost her the cheapest "
+            .. "spell of that element in her list")
+          H.assertEq(a.armed, bit, string.format("M1: GOGO's Mimic of CELES's blade row $%02X, copied at 0 of his "
+            .. "points, arms GOGO's own rune with its element (Ot6RuneArm's write to OT6_RUNE at his seat; it held "
+            .. "$%02X)", a.copy.atk, a.runes0[a.seat]))
+          H.assertEq(a.runes1[a.seat], bit, "M1: and OT6_RUNE at his seat holds that element once the copy has ended")
+          H.assertEq(a.armedTier, 1, "M1: at tier 1, with none of his points pending (Ot6RuneArm's write to "
+            .. "OT6_RUNETIER at his seat)")
+          H.assertEq(a.tiers1[a.seat], 1, "M1: and OT6_RUNETIER at his seat reads 1 once the copy has ended")
+          H.assertEq(a.mp1, a.mp0, "M1: the copy is free (his MP is unchanged)")
+          H.assertEq(a.armedElse, 0, "M1: the copy writes no other seat's rune")
+          H.assertEq(a.runes1[r.seat], bit, "M1: and CELES's rune is hers still, the element she armed")
+        end },
+      -- the tier is the copier's: CELES plays a row that climbs a line at 0
+      -- BP (her blade at tier 1), and the copy, with one of GOGO's points
+      -- pending, arms his at tier 2, the line's second spell, free of MP; the
+      -- point is spent as any boosted copy's is (Ot6ActionEnd)
+      { tag = "runetier", owner = CELES, cmd = CMD.RUNIC, pend = 1,
+        prepare = function(arm, s)
+          local m, pick = runeModel(s, 0), nil
+          for e = 7, 0, -1 do if m.climbs[e] then pick = RUNE_BLADE + e end end
+          H.assertEq(pick ~= nil, true, "M1 precondition: CELES's Rune Knight's list holds a row that climbs a "
+            .. "line (her cheapest spell of the element is its line's head: Ice)")
+          arm.atk, arm.src = pick, { who = CELES, cmd = CMD.RUNIC, row = pick, boost = 0, self = true }
+          return true
+        end,
+        check = function(a)
+          local r, e = a.src[CELES], a.copy.atk - RUNE_BLADE
+          H.assertEq(r ~= nil and r.atk == a.copy.atk and r.pend == 0 and r.armed == 1 << e and r.armedTier == 1, true,
+            string.format("M1 precondition: CELES's own row $%02X at 0 BP armed her blade at tier 1 (her action: "
+            .. "row $%02X at %s BP, tier %s)", a.copy.atk, r and r.atk or 0xFF, tostring(r and r.pend),
+            tostring(r and r.armedTier)))
+          H.assertEq(copyTier(a.model, e, a.pend), 2, string.format("M1 precondition: one point reaches the second "
+            .. "spell of row $%02X's line for the copier (Ot6FoldTbl; he casts the element: %s)", a.copy.atk,
+            tostring(a.model.spell[e] ~= nil)))
+          H.assertEq(a.armed, 1 << e, string.format("M1: GOGO's Mimic of CELES's row $%02X, copied with one of his "
+            .. "points pending, arms GOGO's own rune with its element", a.copy.atk))
+          H.assertEq(a.armedTier, 2, string.format("M1: at tier 2, the tier his own boost reaches (Ot6RuneArm's "
+            .. "write to OT6_RUNETIER at his seat; it held %d)", a.tiers0[a.seat]))
+          H.assertEq(a.tiers1[a.seat], 2, "M1: and OT6_RUNETIER at his seat reads 2 once the copy has ended")
+          H.assertEq(a.mp1, a.mp0, "M1: the copy is free (his MP is unchanged)")
+          H.assertEq(a.bank1, a.bank0 - 1, string.format("M1: and his point is spent, as a boosted copy's is (bank "
+            .. "%d, then %d)", a.bank0, a.bank1))
+          H.assertEq(a.tiers1[r.seat], 1, "M1: CELES's blade keeps the tier she armed")
+        end },
+      -- Break Blade's control comes first, so GOGO has none running when it
+      -- is read; each of the two pairs has CELES cast her own at 3 BP
+      { tag = "breakunder", owner = CELES, cmd = CMD.RUNIC, atk = RUNE_BREAK, pend = 2,
+        src = { who = CELES, cmd = CMD.RUNIC, row = RUNE_BREAK, boost = 3, self = true },
+        prepare = function(_, s)
+          if mpOf(s) >= 2 * BREAK_MP then return true end
+          H.log(string.format("[gogomimic] CELES opens with %d MP: Break Blade's pairs wait for another battle",
+            mpOf(s)))
+          return false
+        end,
+        counts = function(a) return a.bbs0[a.seat] == 0 end,
+        pre = function()
+          H.assertEq(sw(0x266) == 1 or sw(0xA4) == 1, true, "M1 precondition: Break Blade is learned (switch "
+            .. "$0266, or $00A4: the World of Ruin)")
+        end,
+        check = function(a)
+          local r = a.src[CELES]
+          H.assertEq(r ~= nil and r.atk == RUNE_BREAK and r.pend == 3 and r.mp0 - r.mp1 == BREAK_MP, true,
+            "M1 precondition: CELES's own Break Blade ran at 3 BP, for 99 MP")
+          H.assertEq(a.bbs1[a.seat], 0, "M1: GOGO's Mimic of CELES's Break Blade, copied with two of his points "
+            .. "pending, starts none: OT6_BREAKBLADE at his seat stays 0 (the divine's gate is the copier's boost)")
+          H.assertEq(a.mp1, a.mp0, "M1: and nothing is charged (his MP is unchanged)")
+          H.assertEq(a.bank1 >= a.bank0, true, string.format("M1: nor his points (the two he raised are not spent: "
+            .. "bank %d, then %d)", a.bank0, a.bank1))
+        end },
+      { tag = "breakblade", owner = CELES, cmd = CMD.RUNIC, atk = RUNE_BREAK,
+        src = { who = CELES, cmd = CMD.RUNIC, row = RUNE_BREAK, boost = 3, self = true },
+        prepare = function(_, s) return mpOf(s) >= 2 * BREAK_MP end,
+        counts = function(a) return a.bbs0[a.seat] == 0 end,
+        check = function(a)
+          local r = a.src[CELES]
+          H.assertEq(a.bbs1[a.seat], BREAK_TURNS, "M1: GOGO's Mimic of CELES's Break Blade, copied with three of "
+            .. "his points pending, starts his own: OT6_BREAKBLADE at his seat reads 3 after the copy")
+          H.assertEq(a.mp1, a.mp0, "M1: and the copy is free (his MP is unchanged)")
+          H.assertEq(r ~= nil and r.atk == RUNE_BREAK and r.pend == 3 and r.mp0 - r.mp1 == BREAK_MP
+            and r.bb1 == BREAK_TURNS, true, "M1: the Break Blade it copied was CELES's own at 3 BP: 99 MP of hers, "
+            .. "and her OT6_BREAKBLADE 3 after it")
         end },
     } },
   { tag = "M2", party = { GOGO, TERRA, STRAGO, RELM }, cmds = { { 1, CMD.LORE }, { 2, CMD.STEAL }, { 3, CMD.BLITZ } },
@@ -358,6 +654,17 @@ local ROUNDS = {
         end },
     } },
 }
+
+-- the GOGOMIMIC_ARMS lever: only the arms it names, and the rounds that hold one
+if ONLY ~= nil then
+  for i = #ROUNDS, 1, -1 do
+    local arms = ROUNDS[i].arms
+    for j = #arms, 1, -1 do
+      if not ONLY:find(" " .. arms[j].tag .. " ", 1, true) then table.remove(arms, j) end
+    end
+    if #arms == 0 then table.remove(ROUNDS, i) end
+  end
+end
 
 -- ---- the battle loop -------------------------------------------------------------
 local battles, roundBattles = 0, 0
@@ -415,7 +722,9 @@ local function decide()
     .. "seat %d, L%d, MP %d, bank %d", battles, round.tag, fw[1], fw[2], fw[3], fw[4], fw[5], fw[6],
     H.readByte(0xBE), s, K.lv(GOGO), mpOf(s), H.readByte(0x3E9C + s * 2)))
   skipStudy = false
-  if round.tag == "M2" and not armDone(round.arms[2]) then
+  local study = nil
+  for _, arm in ipairs(round.arms) do if arm.tag == "study" then study = arm end end
+  if study ~= nil and not armDone(study) then
     -- the lores the present species cast (Ot6StudyTbl rows): STRAGO knows
     -- every one this plain's casters know, so the declared staging
     -- (state_write_waivers.txt, the battle_study expedient) unlearns them
@@ -435,17 +744,30 @@ local function decide()
     end
   end
   for _, arm in ipairs(round.arms) do
-    if not armDone(arm) and seatOf[arm.owner] ~= nil and not (arm.tag == "study" and skipStudy) then
+    if not armDone(arm) and seatOf[arm.owner] ~= nil and not (arm.tag == "study" and skipStudy)
+       and (arm.prepare == nil or arm.prepare(arm, seatOf[arm.owner])) then
       local p = {}
       for k, v in pairs(arm.src) do p[k] = v end
       plan[#plan + 1] = p
       entryArm[p] = arm
+      -- the owner's action this pair's own entry played: the last one the
+      -- owner ran, once it has run after kitBattle recorded that entry's
+      -- confirm and SaveForMimic has stored it.  (Two pairs of one battle can
+      -- share an owner, CELES's three here: an earlier pair's action is not
+      -- this pair's.)
+      local srcAt = #plan
+      local function played()
+        local r, at = src[arm.owner], nil
+        for _, kr in ipairs(H.vars.kit or {}) do if kr.entry == srcAt then at = kr.frame end end
+        if r == nil or at == nil or r.f < at or r.saved == nil or H.frame <= r.saved then return nil end
+        return r
+      end
       -- GOGO's Mimic, once the owner's action has run in this battle and is
       -- the last one (the copy's source: SaveForMimic's $3F20)
-      local m = { who = GOGO, cmd = CMD.MIMIC, boost = 3, self = true }
+      local m = { who = GOGO, cmd = CMD.MIMIC, boost = arm.pend or 3, self = true }
       m.openWhen = function()
-        local r = src[arm.owner]
-        local ok = r ~= nil and r.f >= got.battleF0 and r.saved ~= nil and H.frame > r.saved and r.cmd == arm.cmd and H.readByte(0x3F20) == arm.cmd
+        local r = played()
+        local ok = r ~= nil and r.cmd == arm.cmd and H.readByte(0x3F20) == arm.cmd
           and (arm.atk == nil or H.readByte(0x3F21) == arm.atk)
         if ok and inflight ~= arm.tag then
           inflight = arm.tag
@@ -457,8 +779,8 @@ local function decide()
       -- member's action, or a counter -- SHADOW's Interceptor -- ran since):
       -- the copy would be of that, so this pair waits for another battle
       m.skip = function()
-        local r = src[arm.owner]
-        if r == nil or r.f < got.battleF0 or r.saved == nil or H.frame <= r.saved or inflight == arm.tag then
+        local r = played()
+        if r == nil or inflight == arm.tag then
           return false
         end
         local gone = r.cmd ~= arm.cmd or H.readByte(0x3F20) ~= arm.cmd
@@ -600,7 +922,11 @@ local body = {
 }
 for i, r in ipairs(ROUNDS) do body[#body + 1] = playRound(r, i == 1) end
 body[#body + 1] = H.call(function()
+  if ONLY ~= nil then
+    H.log("[gogomimic] GOGOMIMIC_ARMS: only" .. ONLY .. "played (a lab's run, not the suite's)")
+  end
   H.log(string.format("[gogomimic] PASS: GOGO's 3-BP Mimic of Tools, Runic, Throw, Fire and Scan buys Overclock, "
-    .. "RunicBlade, Assassinate, Ultima and Study, in %d battles", battles))
+    .. "RunicBlade, Assassinate, Ultima and Study, and his copy of a blade row or of Break Blade runs on his own "
+    .. "blade, in %d battles", battles))
 end)
 H.run({ maxFrames = 1500000 }, body)

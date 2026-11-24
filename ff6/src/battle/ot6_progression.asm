@@ -152,7 +152,19 @@
         lda     ($f0),y         ; vanilla learned status for spell id Y
         inc
         beq     @grant          ; $ff -> innately known: keep it ($ff)
-        cpy     #OT6_ANALYZE_SPELL
+        cpy     #OT6_CELES_BREAK
+        bne     @scan
+        rep     #$20            ; CELES at level 13 or more knows Break
+        .a16                    ;   (#563, Ot6CelesBreak below): her learned
+        lda     $f0             ;   table is the one at $1a6e + 6 * $36
+        cmp     #$1a6e + OT6_CHAR_CELES * $36
+        sep     #$20
+        .a8
+        bne     @stone
+        jsr     Ot6CelesBreak
+        bcs     @grant
+        bra     @stone
+@scan:  cpy     #OT6_ANALYZE_SPELL
         bne     @stone
         rep     #$20            ; Strago always knows Analyze (#381,
         .a16                    ;   ot6_analyze.asm): his learned table is
@@ -209,6 +221,28 @@
 
 ; ------------------------------------------------------------------------------
 
+; [ CELES knows Break from level 13, whatever her learned table says (#563) ]
+;
+; Break replaced Imp at level 13 in her natural magic (NaturalMagic,
+; field/event.asm; kits.md "Celes").  A level-up to 13, or her joining at 13
+; or more, writes it into her learned table as any natural spell; a save
+; from before the change has her past 13 with Imp learned and Break not, and
+; a load must leave the save's block as the file has it (the golden saves),
+; so nothing is written: the three spell-known hooks grant it by her level,
+; as they grant Strago's Analyze.  Such a save keeps the Imp it learned.
+; Her record is the sixth ($1600 + 37 * 6; level at +8), as OT6_RELM_LEVEL
+; reads Relm's.  out: carry set = she knows it.  a8, any index width, any
+; db.  Preserves X and Y; clobbers A.
+OT6_CELES_BREAK   = $0c         ; ATTACK::BREAK
+OT6_CELES_BREAKLV = 13
+OT6_CELES_LEVEL   = $1600 + 37 * 6 + 8
+.proc Ot6CelesBreak
+        .a8
+        lda     f:$7e0000+OT6_CELES_LEVEL
+        cmp     #OT6_CELES_BREAKLV
+        rts
+.endproc
+
 ; [ equipped esper grants its spells in the field Magic list too ]
 ;
 ; Field-menu `_c350ae` used to return the selected actor's raw $1a6e learn
@@ -229,6 +263,18 @@
 .proc Ot6FieldSpellKnown
         .a8
         .i16
+        cmp     #OT6_CHAR_CELES
+        bne     @strago
+        lda     f:$7e00e0       ; CELES at level 13 or more knows Break
+        cmp     #OT6_CELES_BREAK        ;   (#563, Ot6CelesBreak)
+        bne     :+
+        jsr     Ot6CelesBreak
+        bcc     :+
+        lda     #$ff
+        rtl
+:       lda     #OT6_CHAR_CELES ; A was her actor id
+        bra     @begin
+@strago:
         cmp     #OT6_CHAR_STRAGO
         bne     @begin
         lda     f:$7e00e0       ; Strago always knows Analyze (#381)
@@ -406,8 +452,15 @@ known: lda     #$ff
         jmp     @next           ;   grants) join the union as anyone's do,
                                 ;   and his list takes the union whole
 @own:   cmp     #$0c
-        bcs     @next           ; empty/special/umaro: no esper to grant
-        cmp     #OT6_CHAR_STRAGO
+        jcs     @next           ; empty/special/umaro: no esper to grant
+        cmp     #OT6_CHAR_CELES
+        bne     :+
+        jsr     Ot6CelesBreak   ; CELES's Break by her level has a slot too
+        bcc     @stone          ;   (#563)
+        lda     #OT6_CELES_BREAK
+        jsr     @add
+        bra     @stone
+:       cmp     #OT6_CHAR_STRAGO
         bne     @stone
         lda     #OT6_ANALYZE_SPELL      ; Strago's Analyze has a slot too
         jsr     @add            ;   (#381); clobbers A and Y, keeps X

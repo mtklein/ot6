@@ -19,7 +19,9 @@
 -- No state is written.  The fixture is vargas_won, Sabin on the Mt. Kolts
 -- ledge just after his own boss fight.  A natural encounter is paced into,
 -- Sabin's real Blitz command is opened, and two of his real learned rows
--- are picked with the d-pad and A.
+-- are picked with the d-pad and A.  The others Defend, or care for the
+-- party as a person would (H.newSpinnerCare): Sabin's control given back
+-- when a monster takes it, a raise, a Potion.
 --
 -- Asserted:
 --   1. AuraBolt, a Blitz with no row in the table, leaves $3a70 at 0: one
@@ -88,6 +90,11 @@ local function arm()
     log[#log + 1] = { k = "chip", frame = H.frame,
                       y = emu.getState()["cpu.y"] & 0xFF }
   end, emu.callbackType.exec, H.sym("Ot6ClassChip"), H.sym("Ot6ClassChip"))
+  -- #545: a later pass whose aimed body has fallen ends the action at ExecAttack (Ot6PassSpent's carry; the
+  -- `stz $3a70` after Ot6PassSpentHire), a third write of 0 in a Pummel whose first hit killed
+  refs.spent = emu.addMemoryCallback(function()
+    log[#log + 1] = { k = "spent", frame = H.frame }
+  end, emu.callbackType.exec, H.sym("Ot6PassSpentHire"), H.sym("Ot6PassSpentHire"))
   refs.n = emu.addMemoryCallback(function(_, v)
     log[#log + 1] = { k = "n", frame = H.frame, v = v }
   end, emu.callbackType.write, 0x7E3A70, 0x7E3A70)
@@ -137,6 +144,8 @@ local function disarm()
     H.sym("Ot6HitJoin"), H.sym("Ot6HitJoin"))
   emu.removeMemoryCallback(refs.chip, emu.callbackType.exec,
     H.sym("Ot6ClassChip"), H.sym("Ot6ClassChip"))
+  emu.removeMemoryCallback(refs.spent, emu.callbackType.exec,
+    H.sym("Ot6PassSpentHire"), H.sym("Ot6PassSpentHire"))
   emu.removeMemoryCallback(refs.n, emu.callbackType.write, 0x7E3A70, 0x7E3A70)
   emu.removeMemoryCallback(refs.spell, emu.callbackType.write, 0x7E3410, 0x7E3410)
   emu.removeMemoryCallback(refs.script, emu.callbackType.exec,
@@ -152,7 +161,7 @@ local function actionsFor(id)
   local out = {}
   for start, e0 in ipairs(log) do
     if e0.k == "hook" and e0.id == id then
-      local a = { sets = {}, hits = 0, chips = 0, at = e0.frame,
+      local a = { sets = {}, hits = 0, chips = 0, spent = 0, at = e0.frame,
                   before = e0.n, closed = false }
       for i = start + 1, #log do
         local e = log[i]
@@ -168,6 +177,7 @@ local function actionsFor(id)
             break
           end
           a.sets[#a.sets + 1] = e.v
+        elseif e.k == "spent" then a.spent = a.spent + 1
         elseif e.k == "hit" then a.hits = a.hits + 1
         elseif e.k == "chip" then a.chips = a.chips + 1 end
       end
@@ -244,6 +254,8 @@ local function entryOf(id)
 end
 
 local ph, hb, lane = 0, -900, nil
+-- the others' windows (H.newSpinnerCare, the Slot suites' party): a Defend, or care
+local care = H.newSpinnerCare({ spinner = function() return slotOf[SABIN] end, name = "SABIN" })
 local BACK = { left = "right", right = "left", up = "down", down = "up" }
 
 local function pulse()
@@ -280,17 +292,20 @@ local function pulse()
   lane = nil
 
   if H.readByte(MENU) == 0 then                      -- page a battle dialog
+    care.reset()
     H.setPad(edge and { a = true } or {})
     return
   end
+  -- the bystanders Defend, or give the care a person beside SABIN gives: his control back when a monster takes it
+  -- (the v0.51 landing's ledge draw petrified him after his first Pummel, "s1 40", and the Defending three fell
+  -- around him: GAME OVER with SABIN at 245/324, build/attempts/wt/v051-land/), a raise, a Potion under half
+  care.watch("battle_hitcount")
   local a = H.readByte(ACTOR)
-  if a ~= slotOf[SABIN] then                         -- bystander: Defend
-    local step = ph % 40
-    if step < 4 then H.setPad({ right = true })
-    elseif step >= 20 and step < 24 then H.setPad({ a = true })
-    else H.setPad({}) end
+  if a ~= slotOf[SABIN] or care.spinnerTaken() then
+    care.window()
     return
   end
+  care.reset()
   local st = H.readByte(MSTATE)
   if st == ST_TGT then
     H.setPad(edge and { a = true } or {})
@@ -427,10 +442,14 @@ H.run({ maxFrames = 120000 }, {
   -- Which formation the ledge draws is random, so this is a bounded ladder
   -- rather than one attempt.
   H.call(function() want = PUMMEL end),
+  -- (and until BtlGfx_04 has read that action's script: it plays a frame or more after the attack loop closes,
+  -- and the step below reads it.  The drive used to end on the close alone, and on wt/v051-fuse's line the close
+  -- came at f2649 and the verdict at f2651, before the script: "Pummel #1: ... closed=true (frame 2649); script
+  -- []", build/attempts/wt/v051-fuse/failed/battle_hitcount-race.log)
   drive(function()
     local a = bestFor(PUMMEL)
-    return a ~= nil and a.hits >= 2
-  end, 40000, "a Pummel whose target survives its first hit"),
+    return a ~= nil and a.hits >= 2 and a.script ~= nil
+  end, 40000, "a Pummel whose target survives its first hit, its script played"),
 
   H.call(function()
     disarm()
@@ -450,10 +469,21 @@ H.run({ maxFrames = 120000 }, {
     -- The once-per-action property is asserted over EVERY Pummel cast, not
     -- just the one that landed twice: a hook that re-armed on some later
     -- action would otherwise hide behind the first clean one.
+    -- A Pummel whose first hit felled its body has its second pass spent (#545): the loop's
+    -- dec, then Ot6PassSpent's zeroing, one Ot6HitJoin pass.  That third write is the spent pass's alone, so it is
+    -- asserted where the spent hook ran, and nowhere else (the v0.51 landing's ledge draw: "Pummel #1: ... writes
+    -- [1 0 0], 1 Ot6HitJoin pass(es)" beside a two-hit "Pummel #2: ... writes [1 0]",
+    -- build/attempts/wt/v051-land/)
     for i, a in ipairs(pummels) do
       if a.closed then
-        H.assertEq(#a.sets, 2, string.format(
-          "Pummel #%d wrote $3a70 twice: the hook's 1 and the loop's dec", i))
+        H.assertEq(a.spent <= 1, true, string.format("Pummel #%d: at most one spent pass (%d)", i, a.spent))
+        local want = a.spent == 1 and "1 0 0" or "1 0"
+        H.assertEq(table.concat(a.sets, " "), want, string.format(
+          "Pummel #%d wrote $3a70 as the hook's 1 and the loop's dec%s", i,
+          a.spent == 1 and ", then the spent second pass's 0 (#545)" or ""))
+        if a.spent == 1 then
+          H.assertEq(a.hits, 1, string.format("Pummel #%d: its spent second pass landed no hit", i))
+        end
         H.assertEq(a.sets[1], 1, string.format(
           "Pummel #%d had the hook set $3a70 = 1, once", i))
         H.assertEq(a.before, 0, string.format(

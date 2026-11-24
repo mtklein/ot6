@@ -165,12 +165,14 @@ end
 -- a boss touched as an NPC: from two tiles below it, the care, absorb-safe arms, the talk and the fight until its
 -- show-switch reads clear (the dragon's event clears it after the fight: _cc18d9 $06B3, _cc1906 $06B4; lib
 -- T.touchBoss: a random battle can open on the talk's step)
-local function npcBoss(x, y, species, mapId, shown, what)
+local function npcBoss(x, y, species, mapId, shown, what, entry)
   return H.seqStep({
     walk(x, y + 2, what .. ": two tiles below it"),
     H.absorbSafeArms(nil, { species }, { tag = "arms for " .. what }),
     H.fieldCare({ threshold = 1.0, tag = "before " .. what }),
     H.call(function() say("boss", "before " .. what) end),
+    -- (entry: a state saved here, before the talk -- golddrgn_entry, battle_golddrgn's fixture; also= in the graph)
+    entry and H.saveState(entry) or H.call(function() end),
     T.touchBoss(x, y, mapId, function() return sw(shown) == 0 end, what, BOSS_FIGHT),
   })
 end
@@ -266,7 +268,7 @@ H.run({ maxFrames = 3000000 }, {
   door(90, 7, 334, "party 2: 292 (90,7) -> 334 (18,50)"),
   door(23, 47, 294, "party 2: 334 (23,47) -> 294 (52,14)"),
   door(52, 2, 335, "party 2: 294 (52,2) -> 335 (82,42)"),
-  npcBoss(82, 33, GOLD, 335, 0x06B3, "the Gold Dragon (335 NPC_1)"),
+  npcBoss(82, 33, GOLD, 335, 0x06B3, "the Gold Dragon (335 NPC_1)", "golddrgn_entry.mss"),
   door(77, 31, 354, "party 2: 335 (77,31) -> 354 (51,44)"),
   door(55, 41, 337, "party 2: 354 (55,41) -> 337 (5,27)"),
   walk(4, 12, "party 2 onto the west plate (337 (4,12))"),

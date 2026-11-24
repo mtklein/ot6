@@ -169,7 +169,11 @@ OT6_SLOTTIER         := $57ba   ; Slot's stored boost tier:
                                 ;   OT6_BOOST_REVEALED by Ot6SlotCommit so
                                 ;   Ot6ActionEnd charges what the reels
                                 ;   delivered (ot6_slot.asm, the Slot strip)
-; $57bb held OT6_PIPTAIL until v0.50 (written, never read since #540); free.
+; (#563) what the weapon swing now resolving carries from its character's
+; blade: the rune's elements (Ot6RuneSwing writes it at every swing, 0 for
+; none; Ot6SkillClass and Ot6ItemClass zero it for everything that is no
+; swing).  $57bb held OT6_PIPTAIL until v0.50.
+OT6_RUNESWING        := $57bb
 OT6_RANDPEND         := $57bc
 OT6_RANDBTL          := $57bd
 OT6_HUDVEIL          := $57be
@@ -204,6 +208,18 @@ OT6_SHADOW           := $ecf1
 ; InitBP's shadow clear and per-slot by Ot6SeedShields (Cmd_20 reloads).
 OT6_RVPEND_ELEM      := $ed45   ; 12 bytes
 OT6_RVPEND_CLS       := $ed51   ; 12 bytes
+; A boss's fuse (#561, ot6_fuse.asm), in odd bytes of the two strides above,
+; so InitBP's shadow clear zeroes them.  OT6_FUSE: one byte per monster slot,
+; stride 2 by the slot offset: bit 7, this body's species has a row in
+; Ot6FuseTbl (Ot6FuseSeed, at every seed); bit 0, its fuse is lit, as the HUD
+; last polled it (Ot6FusePoll: display state, behind a held gauge like the
+; trap's mark; the cancel reads the script itself).  OT6_FUSEPOLL: 0 while no
+; body with a row has been seeded this battle; else $80 | the slot offset
+; polled last.
+OT6_FUSE             := OT6_RVPEND_ELEM + 1     ; 6 bytes, stride 2
+OT6_FUSEPOLL         := OT6_RVPEND_CLS + 1
+.assert OT6_FUSE + 10 < OT6_RVPEND_CLS, error, "the fuse bytes must sit in the element stride's odd bytes"
+.assert OT6_FUSEPOLL < OT6_SHADOW + $70, error, "the fuse poll byte must sit inside InitBP's shadow clear"
 ; wallet pseudo-line: current-MP display painted into the open costed
 ; list window every nmi.  CUR/PREV are the first cell's vram word address
 ; (0 = off; prev != cur blanks the old cells one-shot), CELLS the staged
@@ -330,6 +346,12 @@ OT6_RUNICTURNS       := $ed8e   ; 8 bytes (4 characters, stride 2)
 ; interaction nobody asked for and nobody would find.  The rule that a
 ; reactive earn happens once per round is shared; the storage is not.
 OT6_RUNICPAID        := $ed96
+; (#563) the rune on a character's blade: the element bits its weapon swings
+; carry onto a body weak to them (ot6_rune.asm), 0 for none.  One byte per
+; character in OT6_RUNICTURNS's odd bytes (by entity offset, stride 2), but
+; not the stance's state: Ot6RuneArm sets it, nothing clears it during a
+; battle, and InitBP zeroes it.
+OT6_RUNE             := OT6_RUNICTURNS + 1
 ; the retaliation pair (#236).  Two per-character bitmasks in the
 ; ----1234 shape OT6_COVERPAID / OT6_RUNICPAID / $3f2f already use.
 ;
@@ -431,6 +453,10 @@ OT6_WEAPSPELL        := $eda0
 ; and the one writer of that status (Cmd_13's start) always records first,
 ; so a stale byte is never read and InitBP need not clear it.
 OT6_DANCETIER        := $eda1   ; 8 bytes (4 characters, stride 2)
+; (#563) Break Blade's turns left, per character, in OT6_DANCETIER's odd
+; bytes (by entity offset, stride 2): set by the cast (Ot6RuneExec), counted
+; down by Ot6ActionEnd (Ot6RuneActionEnd), zeroed by InitBP.
+OT6_BREAKBLADE       := OT6_DANCETIER + 1
 .assert OT6_DANCETIER = OT6_WEAPSPELL + 1, error, "the dance tier must follow the weapon-spell flag without a gap"
 .assert OT6_DANCETIER + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
@@ -607,8 +633,15 @@ OT6_BLUESEEN         := $ee2b
 ; anchor commits, so it needs no init.
 OT6_HUDLEAD          := $ee2c   ; 12 bytes
 .assert OT6_HUDLEAD = OT6_BLUESEEN + 1, error, "the hud lead cells must follow the blue-magic mark"
-; $ee38 held OT6_GREYLIVE, the grey painter's wake flag, until #543 took the
-; grey look for broken monsters away (v0.46); it is free.
+; (#563) the swing now resolving: bit 7, its character's Break Blade is
+; running, so each hit takes a shield (Ot6BreakBladeTake); bits 4-5, the
+; tier of the rune it carries; bit 1, the rune bit this target
+; (Ot6TargetPre, for Ot6RuneWeakMul); bit 0, the element chip already took
+; this target's shield (Ot6Chip), so a Break Blade hit takes no second.
+; Written with OT6_RUNESWING.  $ee38 held OT6_GREYLIVE, the grey
+; painter's wake flag, until #543 took the grey look for broken monsters away.
+OT6_BLADESWING       := $ee38
+.assert OT6_BLADESWING = OT6_HUDLEAD + 12, error, "the Break Blade swing flags sit in the free byte past the hud lead cells"
 ; The boost tier a Rage was started at, per character (4 characters, stride
 ; 2, indexed by the rager's entity offset): Ot6RageTierStore writes it at the
 ; start turn (Cmd_10 and FixPlayerAttack's cmd-$10 arm), Ot6RageCoin reads it
@@ -621,6 +654,11 @@ OT6_HUDLEAD          := $ee2c   ; 12 bytes
 ; writer of that status (Cmd_10's start) always records first, so a stale
 ; byte is never read (the OT6_DANCETIER contract).
 OT6_RAGETIER         := $ee39   ; 8 bytes (4 characters, stride 2)
+; (#563) the tier of the rune on a character's blade, 1-3 (the place of the
+; spell that armed it in its line), in OT6_RAGETIER's odd bytes (by entity
+; offset, stride 2): set with OT6_RUNE by Ot6RuneArm, read only while
+; OT6_RUNE is non-zero, zeroed by InitBP.
+OT6_RUNETIER         := OT6_RAGETIER + 1
 .assert OT6_RAGETIER = OT6_HUDLEAD + 13, error, "the rage tier must sit one free byte past the hud lead cells"
 .assert OT6_RAGETIER >= OT6_SHADOW + $70, error, "OT6 rage tier must sit PAST InitBP's shadow clear (it is stored per trance, not per battle)"
 .assert OT6_RAGETIER + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
@@ -718,7 +756,8 @@ OT6_UNDERPAINT       := $ef14
 ; vanilla's 18); also cleared per slot by Ot6SeedShields and whole at every
 ; script's and action's end (Ot6ShowFlush), so a pin never outlives its
 ; action.  OT6_MARKCELL: per slot, the mark the shield line should show
-; before its emblem (0 free, 1 hobbled: Slow, 2 pinned: Stop), written by
+; before its emblem (0 free, 1 hobbled: Slow, 2 pinned: Stop, 3 a lit fuse:
+; #561, ot6_fuse.asm), written by
 ; Ot6BgHudLine every frame a line is live (the held mark while the slot is
 ; held, #539, else the live status).  OT6_MARKSHOWN: the slots whose mark
 ; cell the nmi flush last wrote with a mark, so a mark that ends is blanked
@@ -747,5 +786,11 @@ OT6_LIMITBREAK       := $ef1d
 OT6_REFLCASTER       := $ef1e
 .assert OT6_REFLCASTER = OT6_LIMITBREAK + 1, error, "the bounce's caster must follow the limit-break mask"
 .assert OT6_REFLCASTER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
-
+; (#563) the rune's elements the weapon swing now resolving does not already
+; carry (Ot6RuneSwing), which Ot6TargetPre adds to the hit on a body they
+; bite and takes off again for the next; zeroed with OT6_RUNESWING at every
+; attack's load.  The shadow tail's last byte.
+OT6_RUNEADD          := $ef1f
+.assert OT6_RUNEADD = OT6_REFLCASTER + 1, error, "the rune's added bits must follow the bounce's caster"
+.assert OT6_RUNEADD <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 .endif
