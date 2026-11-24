@@ -269,12 +269,12 @@ local function toolCell(id)
 end
 local function onRow(c, s)
   if c.rowR and not c.triedR then
-    c.triedR, c.pendBeforeR = true, pend(s)
+    c.triedR, c.pendBeforeR, c.snd0 = true, pend(s), H.kitBoostSounds()
     return "r"
   end
   if c.rowR and c.pendAfterR == nil then
-    c.pendAfterR = pend(s)
-    ev(c, string.format("R on the row: pending %d -> %d", c.pendBeforeR, c.pendAfterR))
+    c.pendAfterR, c.sndR = pend(s), H.kitBoostSounds() - c.snd0
+    ev(c, string.format("R on the row: pending %d -> %d, %d ching/buzz", c.pendBeforeR, c.pendAfterR, c.sndR))
   end
   return "a"
 end
@@ -714,6 +714,11 @@ steps[#steps + 1] = H.call(function()
       .. "(want $%02X $%02X)", c.name, c.cmdEnd or 0, c.atkEnd or 0, c.cmd, wantAtk))
     if c.rowR then
       H.assertEq(c.pendBeforeR, 0, c.name .. ": nothing pending when R was pressed on the row")
+      -- the R was read (#563 review): Ot6Boost answers every R it reads with
+      -- its ching or its buzz, so a pending left at 0 is the game's refusal,
+      -- not a tap that never reached it
+      check((c.sndR or 0) >= 1, string.format("%s: the game read the R on the row (Ot6Boost's ching or buzz: %s)",
+        c.name, tostring(c.sndR)))
       check(c.pendAfterR == c.rowR, string.format("%s: R on the row left the pending at %s (%s)", c.name,
         tostring(c.pendAfterR), c.rowR == 0 and "refused: the boost buys nothing here" or "raised: it buys"))
       c.boost = c.pendAfterR or c.boost

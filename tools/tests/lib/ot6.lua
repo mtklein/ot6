@@ -18653,6 +18653,24 @@ function M.kitBoostSounds()
   return M.boostSnd
 end
 
+-- an R tap on a kitBattle list row, judged once it is over: Ot6Boost
+-- answers every R it reads with its ching (a point taken) or its buzz (one
+-- refused), so a tap that ended with neither was never read and is pressed
+-- again; six unread in one entry fail the run, so a pending boost left
+-- unchanged always means a refusal the game made, never taps it missed
+-- (#563 review: the retry used to give up silently)
+function M.kitTapRead(p)
+  if M.kitBoostSounds() == p.tapSnd then
+    p.tapMiss = (p.tapMiss or 0) + 1
+    M.assertEq(p.tapMiss <= 6, true, string.format("[kit] an R tap on the list's row is read by the game (Ot6Boost's "
+      .. "ching or buzz): %d taps in a row went unanswered", p.tapMiss))
+    p.listRn = p.listRn - 1
+    M.log(string.format("[kit] f%d an R tap on the list's row was not read (no ching, no buzz): pressed again "
+      .. "(%d)", M.frame, p.tapMiss))
+  end
+  p.tapSnd = nil
+end
+
 function M.kitBattle(plan, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -18989,12 +19007,7 @@ function M.kitBattle(plan, opts)
       -- buzz (M.kitBoostSounds), so a tap that ends with neither is pressed
       -- again, up to six times an entry.
       if p.listR ~= nil and p.listKey == nil and tapT == 0 and p.tapSnd ~= nil then
-        if M.kitBoostSounds() == p.tapSnd and (p.tapMiss or 0) < 6 then
-          p.listRn, p.tapMiss = p.listRn - 1, (p.tapMiss or 0) + 1
-          M.log(string.format("[kit] f%d an R tap on the list's row was not read (no ching, no buzz): pressed again "
-            .. "(%d)", M.frame, p.tapMiss))
-        end
-        p.tapSnd = nil
+        M.kitTapRead(p)
       end
       if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
         if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
@@ -19061,12 +19074,7 @@ function M.kitBattle(plan, opts)
       -- on the mutant that lets R through, build/attempts/wt/
       -- v051-spellblade/final/)
       if p.listR ~= nil and tapT == 0 and p.tapSnd ~= nil then
-        if M.kitBoostSounds() == p.tapSnd and (p.tapMiss or 0) < 6 then
-          p.listRn, p.tapMiss = p.listRn - 1, (p.tapMiss or 0) + 1
-          M.log(string.format("[kit] f%d an R tap on the list's row was not read (no ching, no buzz): pressed again "
-            .. "(%d)", M.frame, p.tapMiss))
-        end
-        p.tapSnd = nil
+        M.kitTapRead(p)
       end
       if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
         if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end

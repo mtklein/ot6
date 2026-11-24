@@ -943,7 +943,11 @@ the divine in the eighth:
   the cheapest such spell's own (through a Gold Hairpin or Economizer), or
   its line's tier at the boost pending.  The row takes her turn and targets
   herself as Runic does.  Mute does
-  not stop a blade row (it is not a cast); an Imp's command window turns
+  not stop a blade row (it is not a cast): the rows read the spell ids in
+  her battle Magic list (`Ot6BladeSpell`), which Mute does not change
+  (it greys the Magic command), so a muted CELES keeps every row and can
+  still arm her blade (read from the code; no suite mutes her); an Imp's
+  command window turns
   Runic into Fight, as vanilla's does.  Like Runic itself, the command
   greys without a runic weapon in hand (vanilla's `UpdateCmd_01`), and the
   list with it.
@@ -958,7 +962,10 @@ the divine in the eighth:
   #555, and a Mimic's copy short of three does nothing and costs nothing),
   99 MP.  For three of her turns after the cast (`OT6_BREAKBLADE`, counted
   down as each of her actions ends, the span a 3-BP Runic stands for; a
-  fallen Celes takes no turns, so it waits on her) **every landed hit of her
+  fallen Celes takes no turns, so it waits on her; a counter of hers is
+  not a turn: `ExecRetal` ends at `EndAction` without `Ot6ActionEnd`, the
+  one place the count is spent, so a Black Belt's counters swing under it
+  for free; no suite checks the counter case) **every landed hit of her
   weapon takes one shield**, whatever the body's keys, on top of its damage
   (`Ot6BreakBladeTake`, Bum Rush's kind of take: a body that keys her
   weapon's class or the hit's element loses that hit's shield to the chip
@@ -1088,14 +1095,20 @@ the divine in the eighth:
   little more than one at 3 BP (eight hits), and every hit also chips.  It
   is a long fight's purchase, not a random battle's.  Break
   Blade, from a bank of five and through the real menu in Darill's Tomb's
-  random battles (a two-weapon CELES, nothing staged, six uses over two
-  seeds, `build/attempts/wt/v051-spellblade/balance/`): 41 weapon hits
-  landed under it and 26 shields were taken, 4, 4, 4, 4, 6 and 4 a use,
-  every use ending with nothing standing unbroken (those formations hold
-  four to seven shields).  Its ceiling a use is the hits of three turns: 6
-  with one weapon from a full bank (2 BP, 0, 1), 12 with two; 4 and 8 from a
-  bank of exactly three.  Bum Rush takes four in one turn for the same 99
-  MP, and Cleave four from every death-immune body at once.
+  random battles (a two-weapon CELES, nothing staged): on the ROM before
+  the final merge, six uses over two seeds took 4, 4, 4, 4, 6 and 4 shields
+  from 41 landed hits (`build/attempts/wt/v051-spellblade/balance/`); on
+  the final ROM, two distinct draws gave four uses, 4, 7, 6 and 4 shields
+  from 31 hits (`build/attempts/wt/v051-spellblade/final/labs/`: bal0's
+  one use before its controller failed, and bal2's three; bal1 replayed
+  bal2's draw exactly and is not counted).  Most uses ended with nothing
+  standing unbroken: those formations hold four to seven shields, so the
+  formation, not the blade, set the number.  The blade itself has no cap:
+  one shield a landed hit of her weapon for three of her turns, so 6 a use
+  with one weapon from a full bank (2 BP, 0, 1), 12 with two, about 24
+  with a Genji Glove and an Offering (not measured); 4 and 8 from a bank of
+  exactly three.  Bum Rush takes four in one turn for the same 99 MP, and
+  Cleave four from every death-immune body at once.
 - **The field page** (#563, the owner 2026-11-23: "the full treatment"):
   Skills > RuneKnt, the list's tenth row, under Painter.  The row reads
   BattleCmdName's record, as the TresHnt and Painter rows do; the Status

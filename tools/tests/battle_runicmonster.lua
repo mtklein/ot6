@@ -556,4 +556,9 @@ local steps = {
     }),
   }, "a Mag Roader's elemental spell absorbed"),
 }
+-- The frame budget is a hang guard, not a pace: 900000 held the first half
+-- alone; #563's second half (the walk down the cliffs and into the mines,
+-- and as many Mag Roader battles as it takes to absorb an elemental spell)
+-- raised it to 1400000.  A passing run ends far inside either (frame 29450 on
+-- build/attempts/wt/v051-spellblade/sb2/B/runicmonster_final/).
 H.run({ maxFrames = 1400000 }, steps)
