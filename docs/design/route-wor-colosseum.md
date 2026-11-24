@@ -94,7 +94,7 @@ fighter beats:
 | Assassin | Test Rider (3, Spear: the Narshe arc's) | SwordBreaker | LOCKE's blade (Dagger, 164) |
 | Stunner | Test Rider | Strato | CYAN's second Strato (his pair: 199 and 199 for 199 and 162) |
 | Regal Crown | Opinicus (3, Sword/Blunt: Ebot's Rock's) | Genji Helmet | SHADOW's helmet |
-| Soul Sabre | Opinicus | Falchion | TERRA's blade (over the Enhancer) |
+| Soul Sabre | Opinicus | Falchion | TERRA's blade (over the Enhancer; Katana since 2026-11-24, where the Enhancer is Sword) |
 | Gem Box | SrBehemoth (the Colosseum's: 6, Ranged/Spear; weak fire, holy) | Economizer | TERRA's relic (section 5) |
 
 Measured with CELES before the leg (labs `sw_stun_celes_s*`,
@@ -164,8 +164,11 @@ arc's rows.  The K battles the sweeps used up met the plain by Figaro Castle
 (world group 47: Bogy; Deep Eye with Muus; Maliga), the Falcon arc's rows.
 No species met lacks an authored row.
 
-**The lesson SHADOW brings.**  The cabin's other three hold Sword (CELES,
-TERRA) and Katana (CYAN).  On the plain by Maranda the Crawler takes Dagger
+**The lesson SHADOW brings.**  The cabin's other three hold Katana: CYAN's
+katanas, and since 2026-11-24 CELES's Scimitar and Falchion and TERRA's
+Falchion, curved swords (Sword, CELES and TERRA, when this was written).
+Their kits hold no Sword once TERRA's Falchion replaces the Enhancer.
+On the plain by Maranda the Crawler takes Dagger
 and Blunt, which none of the three holds.  SHADOW's Striker is a Dagger and
 keys it; his thrown stars and skeans are Ranged and do not (CELES's ice
 still finds it, as a spell).

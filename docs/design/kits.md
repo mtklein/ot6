@@ -201,15 +201,15 @@ no single price; its cost is the **sum (Σ)** of the two it fires.
   bosses (Spear, as his pike). Chain Saw is Sword, so Edgar alone spans
   three physical classes through tools: Ranged, Spear and Sword.
 
-### Sabin — Monk (Blunt: fists, knuckles; edged claws buy Katana)
+### Sabin — Monk (Blunt: fists, knuckles; claws buy Dagger)
 
 The 8 Blitzes, verbatim ✦, with the vanilla level table preserved ✦,
 selected from a menu. Fists are
 the core of the **Blunt** class (fists, knuckles, rods, flails, clubs).
-Equipping an edged claw (Mithril Claw, Poison Claw, Dragon Claw, Tiger
-Fangs) switches his *Fight* to Katana ✦, but blitz classes are
-immutable: Pummel with claws on is still Blunt. His ability list
-sets his first class and his weapon slot sets his second, as slash and
+Equipping a claw (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs)
+switches his *Fight* to Dagger ✦ (owner, 2026-11-24: "claws just feels
+like daggers"), but blitz classes are immutable: Pummel with claws on
+is still Blunt. His ability list sets his first class and his weapon slot sets his second, as slash and
 bludgeon were through v0.50 (owner, 2026-11-23: he "has been very
 versatile for having slashing and pummel"). The three knuckles
 (MetalKnuckle, Kaiser, Fire Knuckle) strike, so they are Blunt like his
@@ -269,7 +269,9 @@ are in mp-economy.md's "The baseline".
 The 8 SwdTechs priced in BP ✦ (charge gauge deleted ✦). Katana is
 a class of its own since v0.51 (it lived inside slashing with swords).
 Cyan is its *specialist*, with multi-hit Katana chips nobody else matches;
-he is not the only Katana key: Sabin's edged claws are Katana too. Vanilla
+he is not the only Katana key: the five curved swords (RegalCutlass,
+Flame Sabre, Falchion, Soul Sabre, Scimitar) are Katana, so Terra and
+Celes hold it by their choice of sword (owner, 2026-11-24). Vanilla
 level schedule kept.
 
 Names below are the ones the game prints (`BushidoName`, the table the SwdTech
@@ -525,6 +527,9 @@ Test: `tools/tests/battle_bushido.lua`.
 ## The middle three
 
 ### Terra — Esper mage (Sword, fire lean)
+
+Her weapon is Sword, or Katana when she holds a curved sword (the
+RegalCutlass from South Figaro's shop on; weapon-classes.md).
 
 Vanilla's natural-magic table, trimmed to base tiers with the levels
 compressed so the list completes late-WoB. Vanilla makes her the
@@ -833,6 +838,8 @@ Rulings that fall out of the vanilla math (see `tools/tests/battle_steal.lua`):
   axes separate.
 
 ### Celes — Rune Knight (Sword, ice lean)
+
+Her weapon is Sword, or Katana with a curved sword, as Terra's.
 
 Vanilla natural-magic levels nearly verbatim, since the table already
 suited a rune knight: sensing, warding, hastening. It mirrors

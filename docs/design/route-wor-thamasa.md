@@ -222,7 +222,7 @@ keys are a proposal**; the route's play sets them.
 | Nightshade `$033` | event 147 | 37 / 2,200 | weak fire; absorbs water; Charm | 2 | Katana | a painted flower |
 | Still Life `$050` | event 148 | 37 / 4,889 | weak fire; Lullaby; counter Condemned | 4 | Katana, Ranged | the basement's miniboss painting |
 | Chadarnook (painting) `$11E` | event 86 | 37 / 56,000 | weak fire; absorbs holy, water; counter Phantasm | 0 | -- | the goddess: hitting her is the fight's mistake, so she carries no shields to chip |
-| Chadarnook (demon) `$148` | event 86 | 41 / 30,000 | weak fire, holy; absorbs bolt; Bolt 2/3 (Runic-able), Flash Rain | 6 | Katana, Spear | the boss: CYAN's katana (or MOG's spear, SABIN's claw), with fire and Pearl; TERRA's and CELES's swords do not key it |
+| Chadarnook (demon) `$148` | event 86 | 41 / 30,000 | weak fire, holy; absorbs bolt; Bolt 2/3 (Runic-able), Flash Rain | 6 | Katana, Spear | the boss: CYAN's katana (or MOG's spear, or TERRA's or CELES's curved sword), with fire and Pearl; their straight swords do not key it, nor SABIN's claw since it became Dagger (2026-11-24) |
 
 ### 4.2 The Fanatics' Tower
 

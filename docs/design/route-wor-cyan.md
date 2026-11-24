@@ -317,8 +317,10 @@ storm leg on Mt. Zozo's east face, group 160), each at shifts 0 and 12
   CYAN's Quadra Slam 5, his Fight 2 and Empowerer 1, CELES 1. CYAN lands
   a quarter of them in the fight he joins for. (Measured under the four
   classes: SABIN's claw and CELES's sword were slash keys. The row is
-  Sword, Katana now: the swords and SABIN's claw (Katana) still key it,
-  and the ThunderBlade chips by its blade and its bolt.)
+  Sword, Katana now: the swords and CYAN's katana still key it, and the
+  ThunderBlade chips by its blade and its bolt. SABIN's claw is Dagger
+  since 2026-11-24 and no longer keys it, so the measured top breaker
+  holds no weapon key on the dragon.)
 
 The first variation set (`varA/`, the generator before b429308e) stalled in
 9 of 12 seeds on Zozo's outside stair, a battle under the pressed walk

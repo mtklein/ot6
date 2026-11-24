@@ -795,8 +795,8 @@ unchanged: it grows only once the driving has played these areas.
 
 | hand | classes | elements |
 |---|---|---|
-| Celes alone (to Tzen) | **Sword** (every sword; Dagger only on the 26-30-power daggers) | **ice** (own Ice; Blizzard), **bolt** (ThunderBlade, in the bag), **fire** and bolt (Maduin, worn); holy with Unicorn's Pearl (40 MP) |
-| Celes + Sabin | + **Blunt** (fists, knuckles, Pummel, Suplex); **Katana** with a claw | + **holy** (AuraBolt), **fire** (Fire Dance) |
+| Celes alone (to Tzen) | **Sword** (every straight sword; Dagger only on the 26-30-power daggers); **Katana** with a curved sword (the Flame Sabres from Tzen on) | **ice** (own Ice; Blizzard), **bolt** (ThunderBlade, in the bag), **fire** and bolt (Maduin, worn); holy with Unicorn's Pearl (40 MP) |
+| Celes + Sabin | + **Blunt** (fists, knuckles, Pummel, Suplex); **Dagger** with a claw (Katana until 2026-11-24) | + **holy** (AuraBolt), **fire** (Fire Dance) |
 
 ### 8.2 The Solitary Island (world groups 29, 30; not met on the way to `wor-start-v1`)
 

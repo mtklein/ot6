@@ -15,10 +15,10 @@ every weapon one class, `Ot6SkillClassTbl` every class-bearing skill.
 
 | Class | Weapons | Skills that carry it | Who really holds it | Icon |
 |---|---|---|---|---|
-| **Sword** | swords | Edgar's Chain Saw | Terra, Celes, Leo (Edgar and Locke when they carry one) | $d9 |
-| **Dagger** | daggers, ninja blades; Gau's fangs (his empty hand, and his Fight while he rages) | Locke's Trickshot and Dismantle | Locke, Shadow, Gau | $d8 |
+| **Sword** | the straight swords (every sword but the five curved ones) | Edgar's Chain Saw | Terra, Celes, Leo (Edgar and Locke when they carry one) | $d9 |
+| **Dagger** | daggers, ninja blades; the claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs); Gau's fangs (his empty hand, and his Fight while he rages) | Locke's Trickshot and Dismantle | Locke, Shadow, Gau, Sabin (with claws) | $d8 |
 | **Spear** | spears and lances | Edgar's Drill | Edgar, Mog | $da |
-| **Katana** | katanas; the edged claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | every SwdTech that cuts (Dispatch, Slash, Quadra Slam, Stunner, Cleave) | Cyan, Sabin (with claws) | $db |
+| **Katana** | katanas; the curved swords (RegalCutlass, Flame Sabre, Falchion, Soul Sabre, Scimitar) | every SwdTech that cuts (Dispatch, Slash, Quadra Slam, Stunner, Cleave) | Cyan, Terra and Celes (with a curved sword) | $db |
 | **Blunt** | bare fists; the knuckles (MetalKnuckle, Kaiser, Fire Knuckle); rods, brushes; the Flail, Morning Star and Bone Club | Sabin's Pummel, Suplex and Bum Rush; Umaro's Charge and Throw | Sabin, Umaro, Strago, Relm, Banon | $dc |
 | **Ranged** | thrown stars; Darts, Doom Darts; Cards, Trump, Dice; the boomerangs and rings (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Edgar's AutoCrossbow and Air Anchor; TekMissile; Shadow's skeans; Setzer's Coin Toss | Setzer, Shadow (Throw), Edgar (AutoCrossbow) | $de |
 
@@ -26,10 +26,11 @@ Spear is thin on purpose: Edgar and Mog. A plan on another branch (#567)
 would let the Dragoon Boots' wearer equip a spear; it is not built.
 
 - **The weapon sets Fight's class; abilities carry their own ✦.**
-  Sabin with a claw equipped cuts as Katana when he Fights, and Pummel
+  Sabin with a claw equipped strikes as Dagger when he Fights, and Pummel
   is Blunt whatever he wears, so claws are how the monk holds a second
   class (owner: he "has been very versatile for having slashing and
-  pummel"). Edgar's Chain Saw is Sword with a spear in his hand.
+  pummel"; 2026-11-24: "claws just feels like daggers"). Edgar's Chain
+  Saw is Sword with a spear in his hand.
   Ability class bytes are immutable; only the basic attack reads the
   equipped weapon. Locke's Mug is a Fight that steals, so it takes the
   class of the weapon he holds.
@@ -48,8 +49,11 @@ would let the Dragoon Boots' wearer equip a spear; it is not built.
   Dice roll high numbers and reveal nothing, while the ordinary dice
   chip Ranged-weak enemies.
 - Cyan is the Katana *specialist* (Quadra Slam ×4 is the best Katana
-  chip in the game), but he is not the only Katana key: Sabin's edged
-  claws cover the class when he is absent. Class-coverage balance is
+  chip in the game), but he is not the only Katana key: Terra and Celes
+  hold it by choosing a curved sword, at the power of a straight sword of
+  its tier (RegalCutlass 54, Rune Edge 55; Flame Sabre 108, Blizzard and
+  ThunderBlade 108). The first is the RegalCutlass in South
+  Figaro's weapon shop, before Mt. Kolts. Class-coverage balance is
   re-asked every milestone ✦.
 - The 8 elements stay untouched ✦.
 - **Row jank preserved ✦**: weapons that ignore row in vanilla
@@ -71,8 +75,12 @@ Where a weapon sits badly in its class (`classes.py` says each once):
   holds: Dagger.
 - **Brushes**: a brush is no bludgeon; it goes with the rods, the other
   caster's weapon ("rods and fists could group").
-- **Claws**: the four edged claws cut, so Katana; the three knuckles
-  strike, so Blunt.
+- **Claws**: the four claws are Dagger (owner, 2026-11-24: "claws just
+  feels like daggers"); the three knuckles strike, so Blunt.
+- **Curved swords**: the RegalCutlass, Flame Sabre, Falchion, Soul Sabre
+  and Scimitar are Katana (owner, 2026-11-24), every other sword Sword. A
+  cutlass is no katana, but Katana is the nearest blade class, and vanilla
+  already lets Cyan equip the Scimitar.
 - **Hawk Eye and the returning rings** are thrown: Ranged, though vanilla
   drew them with the flails.
 - **Dice and cards** are Setzer's thrown things: Ranged (the Fixed Dice
@@ -116,10 +124,10 @@ prints every species' old row, new row and reason):
 5. then what the four-class row's own comment suggests;
 6. then an even balance across the six.
 
-Of the 349 species the game deals and gauges, 120 are weak to Sword, 102
-to Dagger, 79 to Spear, 83 to Katana, 141 to Blunt and 128 to Ranged.
-One class keys 23-40% of them, two classes 42-67%, three 62-85%, four
-81-94%, five 93-99% (`tools/six_classes/party_share.py`).
+Of the 349 species the game deals and gauges, 104 are weak to Sword, 107
+to Dagger, 76 to Spear, 99 to Katana, 144 to Blunt and 123 to Ranged.
+One class keys 22-41% of them, two classes 45-67%, three 65-84%, four
+80-93%, five 93-99% (`tools/six_classes/party_share.py`).
 
 A save from an older release keeps its revealed weaknesses, each shown as
 the class that weakness became for that monster
@@ -173,7 +181,7 @@ scenario split is the stress test:
 | Narshe intro | (magitek: TekMissile is Ranged) | fire, bolt | beam-weak, tutorial-obvious |
 | Figaro → Kolts | **Dagger, Dagger, Spear** going up, Ranged with Edgar's AutoCrossbow (a Sword if he buys the Mithril Blade); Blunt only after Sabin | **fire, poison** (+cure) | authored: poison is the second key ✦ |
 | **Locke scenario** | Dagger only | none | *everything* in occupied South Figaro takes a Dagger ✦ |
-| **Sabin scenario** | Blunt and Katana (Sabin), Katana (Cyan), Dagger and Ranged (Shadow), Dagger (Gau) | holy, fire, wind | Phantom Train: holy + Katana featured |
+| **Sabin scenario** | Blunt, and Dagger with a claw from Mobliz (Sabin), Katana (Cyan), Dagger and Ranged (Shadow), Dagger (Gau) | holy, fire, wind | Phantom Train: holy + Katana featured |
 | **Terra/Banon scenario** | Sword, Spear and Ranged (Edgar), Blunt (Banon's rod) | fire, ice, bolt, poison | mage-check spread |
 | Zozo | reunited | most | first dungeon needing a per-encounter read |
 | Opera → Vector | + Setzer (Ranged: cards, dice, darts) | — | fliers that take a point + enemies weak to what is thrown |
@@ -198,41 +206,43 @@ is over the parties of four.
 
 | Stage (its first leg) | The player can field | four classes | six: really held | six: widest |
 |---|---|---|---|---|
-| `battle_entry`, in Magitek armor | Terra | 58% | 36% | 36% |
-| `narshe_streets` | Terra | 56% | 28% | 71% |
-| `moogle_cleared` | Locke, Mog | 58% | 54% | 87% |
-| `worldmap_narshe` | Locke, Terra | 86% | 48% | 90% |
-| `figaro_intro` | Edgar, Locke, Terra | 86% | 87% | 97% |
+| `battle_entry`, in Magitek armor | Terra | 58% | 35% | 35% |
+| `narshe_streets` | Terra | 56% | 55% | 87% |
+| `moogle_cleared` | Kamog, Kuku, Kumama, Kupan, Kupek, Kupop, Kurin, Kuru, Kushu, Kutan, Locke, Mog | 0-58% (mean 33%) | 0-51% (mean 17%) | 0-93% (mean 42%) |
+| `worldmap_narshe` | Locke, Terra | 86% | 71% | 99% |
+| `figaro_intro` | Edgar, Locke, Terra | 86% | 93% | 99% |
 | `vargas_entry` | Edgar, Locke, Sabin, Terra | 96% | 99% | 99% |
-| `scenario_hub` | Banon, Edgar, Sabin, Terra | 96% | 96% | 99% |
-| `locke_scenario` | Locke | 58% | 27% | 74% |
-| `sfigaro_escape` | Celes, Locke | 86% | 48% | 90% |
-| `sabin_world` | Sabin, Shadow | 96% | 87% | 87% |
-| `cyan_defence` | Cyan, Sabin, Shadow | 96% | 87% | 98% |
+| `scenario_hub` | Banon, Edgar, Sabin, Terra | 96% | 99% | 99% |
+| `locke_scenario` | Locke | 58% | 31% | 89% |
+| `sfigaro_escape` | Celes, Locke | 86% | 71% | 99% |
+| `sabin_world` | Sabin, Shadow | 96% | 84% | 84% |
+| `cyan_defence` | Cyan, Sabin, Shadow | 96% | 92% | 92% |
 | `camp_escaped`, in Magitek armor | Cyan, Sabin, Shadow | 0% | 0% | 0% |
-| `forest_done` | Cyan, Sabin, Shadow | 96% | 87% | 98% |
-| `falls_done` | Cyan, Sabin | 85% | 56% | 78% |
-| `gau_joined` | Cyan, Gau, Sabin | 85% | 69% | 84% |
-| `rapids_start` | Banon, Edgar, Terra | 96% | 87% | 97% |
-| `narshe_battle` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Terra | 85-96% (mean 93%) | 48-99% (mean 86%) | 84-99% (mean 96%) |
-| `figaro_submerged` | Celes, Cyan, Edgar, Gau, Locke, Sabin | 85-96% (mean 95%) | 69-99% (mean 90%) | 84-99% (mean 98%) |
-| `ultros2_entry` | Cyan, Edgar, Gau, Locke, Sabin | 96-96% (mean 96%) | 69-97% (mean 90%) | 96-99% (mean 98%) |
-| `vector_entry` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Setzer | 85-99% (mean 97%) | 69-99% (mean 89%) | 84-99% (mean 97%) |
-| `vector_sneak` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Setzer | 85-99% (mean 97%) | 69-99% (mean 89%) | 84-99% (mean 97%) |
-| `minecart_entry` | Cyan, Edgar, Gau, Locke, Sabin, Setzer | 94-99% (mean 98%) | 69-97% (mean 88%) | 87-99% (mean 97%) |
-| `narshe_mission` | Cyan, Edgar, Gau, Locke, Sabin, Setzer | 94-99% (mean 98%) | 69-97% (mean 88%) | 87-99% (mean 97%) |
-| `wob_airship_hunt` | Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer | 74-99% (mean 96%) | 69-97% (mean 87%) | 87-99% (mean 96%) |
-| `gate_cave_save` | Celes, Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer, Terra | 74-99% (mean 95%) | 48-99% (mean 86%) | 83-99% (mean 96%) |
-| `vector_crash` | Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer, Terra | 74-99% (mean 95%) | 66-99% (mean 87%) | 84-99% (mean 96%) |
-| `crescent_landing` | Locke, Terra | 86% | 48% | 90% |
-| `thamasa_night` | Locke, Shadow, Terra | 86% | 74% | 90% |
-| `fire_out` | Locke, Strago, Terra | 96% | 71% | 90% |
-| `thamasa_done` | Celes, Cyan, Edgar, Gau, Locke, Mog, Relm, Sabin, Setzer, Strago, Terra | 68-99% (mean 95%) | 48-99% (mean 84%) | 69-99% (mean 94%) |
-| `wor_landing` | Celes | 56% | 28% | 71% |
-| `wor_sabin` | Celes, Sabin | 85% | 78% | 84% |
-| `wor_edgar` | Celes, Edgar, Sabin | 96% | 96% | 99% |
-| `wor_falcon` | Celes, Edgar, Sabin, Setzer | 99% | 96% | 99% |
-| `wor_terra` | Celes, Edgar, Sabin, Setzer | 99% | 96% | 99% |
+| `forest_done` | Cyan, Sabin, Shadow | 96% | 92% | 92% |
+| `falls_done` | Cyan, Sabin | 85% | 76% | 76% |
+| `gau_joined` | Cyan, Gau, Sabin | 85% | 76% | 76% |
+| `rapids_start` | Banon, Edgar, Terra | 96% | 95% | 99% |
+| `narshe_battle` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Terra | 85-96% (mean 93%) | 71-99% (mean 89%) | 87-99% (mean 97%) |
+| `figaro_submerged` | Celes, Cyan, Edgar, Gau, Locke, Sabin | 85-96% (mean 95%) | 71-99% (mean 91%) | 87-99% (mean 98%) |
+| `ultros2_entry` | Cyan, Edgar, Gau, Locke, Sabin | 96-96% (mean 96%) | 76-97% (mean 90%) | 93-99% (mean 98%) |
+| `vector_entry` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Setzer | 85-99% (mean 97%) | 71-99% (mean 90%) | 87-99% (mean 98%) |
+| `vector_sneak` | Celes, Cyan, Edgar, Gau, Locke, Sabin, Setzer | 85-99% (mean 97%) | 71-99% (mean 90%) | 87-99% (mean 98%) |
+| `minecart_entry` | Cyan, Edgar, Gau, Locke, Sabin, Setzer | 94-99% (mean 98%) | 74-97% (mean 88%) | 89-99% (mean 96%) |
+| `narshe_mission` | Cyan, Edgar, Gau, Locke, Sabin, Setzer | 94-99% (mean 98%) | 74-97% (mean 88%) | 89-99% (mean 96%) |
+| `wob_airship_hunt` | Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer | 74-99% (mean 96%) | 64-97% (mean 86%) | 85-99% (mean 95%) |
+| `gate_cave_save` | Celes, Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer, Terra | 74-99% (mean 95%) | 64-99% (mean 88%) | 85-99% (mean 97%) |
+| `vector_crash` | Cyan, Edgar, Gau, Locke, Mog, Sabin, Setzer, Terra | 74-99% (mean 95%) | 64-99% (mean 88%) | 85-99% (mean 97%) |
+| `crescent_landing` | Locke, Terra | 86% | 71% | 99% |
+| `thamasa_night` | Locke, Shadow, Terra | 86% | 89% | 99% |
+| `fire_out` | Locke, Strago, Terra | 96% | 87% | 99% |
+| `wob_esper_mtn_hunt` | Locke, Relm, Strago, Terra | 99% | 87% | 99% |
+| `thamasa_done` | Celes, Cyan, Edgar, Gau, Leo, Locke, Mog, Relm, Sabin, Setzer, Strago, Terra | 56-99% (mean 94%) | 55-99% (mean 88%) | 62-99% (mean 96%) |
+| `fc_landing` | Celes, Cyan, Edgar, Gau, Locke, Mog, Relm, Sabin, Setzer, Shadow, Strago, Terra | 58-99% (mean 94%) | 62-99% (mean 90%) | 62-99% (mean 96%) |
+| `wor_island` | Celes | 56% | 55% | 87% |
+| `wor_sabin` | Celes, Sabin | 85% | 87% | 87% |
+| `wor_edgar` | Celes, Edgar, Sabin | 96% | 99% | 99% |
+| `wor_tomb` | Celes, Edgar, Sabin, Setzer | 99% | 99% | 99% |
+| `wor_terra` | Celes, Edgar, Sabin, Setzer | 99% | 99% | 99% |
 
 The share is of every species in the game, not of the species the stage
 deals: the rows there were split toward the party that meets them (steps 3
@@ -282,7 +292,7 @@ another class three ways, none needing battle code:
 1. **Skills** (above): a kit can reach outside its weapon class.
    Edgar's tools give him Ranged (AutoCrossbow, Air Anchor), Spear
    (Drill) and Sword (Chain Saw); Shadow's Throw is Ranged beside his
-   Dagger; Sabin's Blitzes are Blunt beside a claw's Katana.
+   Dagger; Sabin's Blitzes are Blunt beside a claw's Dagger.
 2. **Other weapons**: the equip lists are vanilla's, so most characters
    can hold a second family (the table below). The holder rule does not
    count these: they are what a player who re-arms for a key can reach.
@@ -296,13 +306,13 @@ one. The first column is the class the character really holds.
 
 | Character | Signature | Can also equip | Skills with a class of their own |
 |---|---|---|---|
-| Terra | **Sword** (every sword) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | in Magitek armor, TekMissile: Ranged |
-| Locke | **Dagger** (every dagger) | Sword (MithrilBlade, Flame Sabre, Blizzard, ThunderBlade, Drainer, Falchion, Soul Sabre, Excalibur, Illumina, Ragnarok, Atma Weapon); Ranged (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Trickshot, Dismantle: Dagger whatever he holds. Mug swings his weapon |
-| Edgar | **Spear** (every spear) | Sword (every sword); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Air Anchor: Ranged. Drill: Spear. Chain Saw: Sword |
-| Sabin | **Blunt** (bare fists; MetalKnuckle, Kaiser, Fire Knuckle) and **Katana** (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | — | Pummel, Suplex, Bum Rush: Blunt |
-| Cyan | **Katana** (every katana) | Sword (the Scimitar) | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
+| Terra | **Sword** (every straight sword) and **Katana** (the curved swords: RegalCutlass, Flame Sabre, Falchion, Soul Sabre, Scimitar) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | in Magitek armor, TekMissile: Ranged |
+| Locke | **Dagger** (every dagger) | Sword (MithrilBlade, Blizzard, ThunderBlade, Drainer, Excalibur, Illumina, Ragnarok, Atma Weapon); Katana (Flame Sabre, Falchion, Soul Sabre); Ranged (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Trickshot, Dismantle: Dagger whatever he holds. Mug swings his weapon |
+| Edgar | **Spear** (every spear) | Sword (every straight sword); Katana (the five curved swords); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Air Anchor: Ranged. Drill: Spear. Chain Saw: Sword |
+| Sabin | **Blunt** (bare fists; MetalKnuckle, Kaiser, Fire Knuckle) and **Dagger** (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | — | Pummel, Suplex, Bum Rush: Blunt |
+| Cyan | **Katana** (every katana, and the Scimitar) | — | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
 | Shadow | **Dagger** (the ninja blades; Dirk, MithrilKnife, ThiefKnife, Assassin, Man Eater, SwordBreaker, Graedus) | — | Throw: the three stars Ranged, the three skeans Ranged and their element; a thrown weapon keeps its class |
-| Celes | **Sword** (every sword) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | — |
+| Celes | **Sword** (every straight sword) and **Katana** (the five curved swords) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus); Blunt (Flail, Morning Star) | — |
 | Setzer | **Ranged** (Cards, Trump, Dice, Darts, Doom Darts; the Fixed Dice chip nothing) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | Coin Toss: Ranged. Hired Help: a class the target is weak to |
 | Strago | **Blunt** (every rod but the Heal Rod, which has no class; Flail, Morning Star) | Dagger (Dirk, MithrilKnife, Air Lancet, Man Eater, SwordBreaker, Graedus) | — |
 | Relm | **Blunt** (every brush; the rods, Flail and Morning Star, as Strago) | Dagger, as Strago | — |

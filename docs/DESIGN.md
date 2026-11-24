@@ -37,12 +37,12 @@ touches vanilla behavior where a pillar requires it.
 
 | Character | Job read | Weapon class | Element lean | 8-skill kit |
 |---|---|---|---|---|
-| Terra | Mage | Sword | Fire | 8 spells; divine: Trance (Morph at a full boost); Ultima is Fire's fourth fold |
+| Terra | Mage | Sword, Katana (a curved sword) | Fire | 8 spells; divine: Trance (Morph at a full boost); Ultima is Fire's fourth fold |
 | Locke | Thief | Dagger | — | Steal, Filch, Bestow, Mug, Trickshot, Dismantle, Appraise; divine: Master's Mark |
 | Edgar | Machinist | Spear (Ranged: the AutoCrossbow; Sword: the Chain Saw) | — | seven Tools, learned by acquisition; divine: Overclock. Air Anchor is a findable extra |
-| Sabin | Monk | Blunt (fists, knuckles), Katana (edged claws) | Fire/Holy/Wind | the 8 Blitzes, selected from a menu |
+| Sabin | Monk | Blunt (fists, knuckles), Dagger (claws) | Fire/Holy/Wind | the 8 Blitzes, selected from a menu |
 | Cyan | Samurai | Katana | Wind | the 8 SwdTech, priced in BP (see below) |
-| Celes | Rune Knight | Sword | Ice | Runic from the start (signature) + spells (see below) |
+| Celes | Rune Knight | Sword, Katana (a curved sword) | Ice | Runic from the start (signature) + spells (see below) |
 | Gau | Beast Tamer | Dagger (his fangs) | varies by rage | Rage learned without limit on the Veldt, 8 equipped (see below); no divine (a varied set needs none; owner, 2026-11-15) |
 | Setzer | Gambler/Merchant | Ranged (cards, dice, darts) | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
 | Strago | Scholar | Blunt (rod) | varies by lore | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; divine: Study, his Scan at a full boost, which learns every lore the monsters present could cast; Bserk, learned by watching a monster inflict Berserk (kits.md) |
@@ -52,9 +52,9 @@ touches vanilla behavior where a pillar requires it.
 | Umaro | Berserker | Blunt (club, fists) | Ice | takes no orders; four arms (Fight, Charge, Throw, Storm); divine: Storm, ice on every enemy, on a dump of all three points (kits.md "Umaro") |
 | Gogo | Mime | Blunt (rod) | — | bonus character; has access to every job and masters none |
 
-**Break classes (6),** after Octopath's six: Sword (swords), Dagger
-(daggers, ninja blades, Gau's fangs), Spear (spears and lances), Katana
-(katanas, the edged claws), Blunt (fists, knuckles, rods, brushes, flails,
+**Break classes (6),** after Octopath's six: Sword (the straight swords),
+Dagger (daggers, ninja blades, claws, Gau's fangs), Spear (spears and
+lances), Katana (katanas, the five curved swords), Blunt (fists, knuckles, rods, brushes, flails,
 clubs) and Ranged (what is thrown or shot: stars, skeans, darts, cards,
 dice, coins, boomerangs, the AutoCrossbow), `OT6_SWORD` .. `OT6_SPEAR` in
 `ot6_class.asm`; `Ot6WeapClassTbl` gives every weapon one. The column

@@ -380,8 +380,9 @@ fight, on the band.
 
 **Break story.** SABIN's fists and Blitzes (Blunt) key three bodies, and
 EDGAR's Break Blade and CELES's blade (Sword) three; `$13D` answers only
-fists and a spear (EDGAR's Drill). The AutoCrossbow (Ranged) and SABIN's
-claws (Katana) key none. Elements are a trap: each body drinks one of the
+fists and a spear (EDGAR's Drill). The AutoCrossbow (Ranged), SABIN's
+claws (Dagger since 2026-11-24) and a curved sword such as CELES's
+RegalCutlass (Katana) key none. Elements are a trap: each body drinks one of the
 party's three.
 
 **On the line.** Won in 7,060 ticks with no death, and **no body was
@@ -448,7 +449,8 @@ gathers in the wound", a `wait`, then the cure; a break denies the heal.
 **Shields.** 10, the capstone band.
 
 **Break story.** EDGAR's AutoCrossbow and SETZER's darts, cards and dice
-are Ranged; SABIN's Blitz is the blow and his claws carry fire; CELES
+are Ranged; SABIN's Blitz is the blow and his claws are Dagger and carry
+fire; CELES
 holds fire by Maduin and stands on Runic, which five of his spells feed
 (route-wor-falcon.md section 5). Every member has a key.
 
@@ -595,9 +597,9 @@ Wind Slash, Rage, the counter's Battle.
 
 **Shields.** 14 today (section 3.2, 5).
 
-**Break story.** Four blades: TERRA's and CELES's swords, CYAN's katana and
-SABIN's claws all key it; bolt is the
-ThunderBlade's; CYAN's Tempest heals it (route-wor-cyan.md section 6).
+**Break story.** Three blades: TERRA's and CELES's swords (straight or
+curved) and CYAN's katana key it; SABIN's claws did until they became
+Dagger (2026-11-24). Bolt is the ThunderBlade's; CYAN's Tempest heals it (route-wor-cyan.md section 6).
 
 **On the line.** Won in 14,383 ticks, no death; broken once, at tick
 8,027 with 36,202 of 42,000 HP (`wor_storm.log:3570`, :5153): more than
@@ -812,8 +814,9 @@ counter, Flash Rain under 15,360.
 
 **Shields.** 6 on the demon.
 
-**Break story.** CYAN's katana and SABIN's claws key the demon; TERRA's
-and CELES's swords do not. Fire from TERRA and the Ifrit wearer, Pearl
+**Break story.** CYAN's katana keys the demon, and TERRA's or CELES's
+curved sword (Katana); their straight swords do not, and since 2026-11-24
+neither do SABIN's claws (Dagger). Fire from TERRA and the Ifrit wearer, Pearl
 from TERRA; CELES on Runic for Bolt 2 and 3. The demon absorbs bolt.
 
 **On the line.** Won in 12,576 ticks, no death, and broken once, late: at
@@ -1396,7 +1399,8 @@ verbatim: the arms' clocks, Delta Hit, Meteor, TekBarrier.
 **Shields.** 6 and 3, 3: a guard and its parts.
 
 **Break story.** SHADOW's throws (Ranged) key Inferno and Rough; CYAN's
-katana and SABIN's claws key both arms; bolt is SHADOW's Bolt Edge. "SABIN's Fire Knuckle
+katana keys both arms (SABIN's claws did until they became Dagger,
+2026-11-24); bolt is SHADOW's Bolt Edge. "SABIN's Fire Knuckle
 healed Inferno"
 (route-wor-kefka-tower.md section 6): the absorb triangle bites.
 
@@ -1640,8 +1644,8 @@ statuses, ForceField, R.Polarity at eight hits, the ice rotation.
 
 **Shields.** 10.
 
-**Break story.** CYAN's katana and SABIN's claws are Katana, SHADOW's
-throws Ranged; holy is SABIN's Aura Bolt. His phase change runs
+**Break story.** CYAN's katana is Katana (SABIN's claws are Dagger since
+2026-11-24 and do not key him), SHADOW's throws Ranged; holy is SABIN's Aura Bolt. His phase change runs
 even while he is Broken (its block holds a `dlg`), and its Haste shortens
 his breaks (bosses-wob.md:77-80).
 
