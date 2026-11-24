@@ -160,6 +160,10 @@ ADD = {
     # 0x0110: ['katana'],
     # battle_breakwor_narshe 'each of the four holds a key on Tritoch': slash was CELES's sword and CYAN's katana at once.  HUD: fire + sword, katana, spear = four cells, all shown
     0x0144: ['katana'],
+    # battle_breakwor_cyan 'each of the four with CYAN holds a key on the Storm Dragon': SABIN's Dragon Claw was Katana and is
+    # Dagger since 2026-11-24 (claws to Dagger); his knuckle and Blitzes key nothing on him.  HUD: bolt + sword, dagger, katana =
+    # four cells, all shown
+    0x014b: ['claw'],
     # battle_breakwor_end 'formation 471 (tier 1): its bodies together key every hand': tier 1 has one slash body, and every hand needs the sword and the katana both; the Long Arm is hide and sinew, what any blade cuts.  HUD: wind + sword, dagger, katana = four cells, all shown
     0x0158: ['katana'],
 }

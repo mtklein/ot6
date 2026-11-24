@@ -17,7 +17,7 @@ Ot6ClassSplitTbl:
         .byte   $00, $00, $08, $00 ;   6 Mag Roader
         .byte   $10, $00, $04, $00 ;   7 Retainer
         .byte   $10, $00, $00, $04 ;   8 Hazer
-        .byte   $10, $00, $00, $08 ;   9 Dahling
+        .byte   $10, $00, $00, $04 ;   9 Dahling
         .byte   $00, $00, $04, $08 ;  10 Rain Man
         .byte   $01, $00, $00, $00 ;  11 Brawler
         .byte   $01, $02, $00, $04 ;  12 Apokryphos
@@ -28,7 +28,7 @@ Ot6ClassSplitTbl:
         .byte   $01, $02, $00, $00 ;  17 Commander
         .byte   $01, $02, $00, $00 ;  18 Rhodox
         .byte   $01, $02, $00, $00 ;  19 Were-Rat
-        .byte   $01, $00, $04, $00 ;  20 Ursus
+        .byte   $10, $00, $04, $00 ;  20 Ursus
         .byte   $00, $08, $04, $00 ;  21 Rhinotaur
         .byte   $00, $20, $08, $00 ;  22 Steroidite
         .byte   $01, $00, $02, $00 ;  23 Leafer
@@ -39,7 +39,7 @@ Ot6ClassSplitTbl:
         .byte   $11, $02, $00, $00 ;  28 Fidor
         .byte   $01, $02, $00, $00 ;  29 Baskervor
         .byte   $10, $00, $08, $00 ;  30 Suriander
-        .byte   $01, $08, $00, $00 ;  31 Chimera
+        .byte   $01, $02, $00, $00 ;  31 Chimera
         .byte   $01, $20, $00, $00 ;  32 Behemoth
         .byte   $01, $20, $00, $00 ;  33 Mesosaur
         .byte   $01, $08, $00, $00 ;  34 Pterodon
@@ -69,7 +69,7 @@ Ot6ClassSplitTbl:
         .byte   $10, $00, $00, $00 ;  58 Anguiform
         .byte   $00, $00, $04, $00 ;  59 Reach Frog
         .byte   $01, $20, $00, $00 ;  60 Lizard
-        .byte   $01, $00, $04, $00 ;  61 ChickenLip
+        .byte   $10, $00, $04, $00 ;  61 ChickenLip
         .byte   $10, $00, $08, $00 ;  62 Hoover
         .byte   $10, $02, $00, $00 ;  63 Rider
         .byte   $00, $00, $00, $00 ;  64 Chupon
@@ -88,7 +88,7 @@ Ot6ClassSplitTbl:
         .byte   $01, $02, $00, $00 ;  77 Repo Man
         .byte   $01, $20, $00, $00 ;  78 Harvester
         .byte   $10, $00, $08, $00 ;  79 Bomb
-        .byte   $10, $00, $00, $08 ;  80 Still Life
+        .byte   $10, $00, $00, $04 ;  80 Still Life
         .byte   $10, $00, $08, $00 ;  81 Boxed Set
         .byte   $11, $00, $00, $00 ;  82 SlamDancer
         .byte   $00, $00, $0c, $00 ;  83 HadesGigas
@@ -144,7 +144,7 @@ Ot6ClassSplitTbl:
         .byte   $00, $20, $08, $00 ; 133 Allosaurus
         .byte   $00, $0a, $00, $00 ; 134 Cirpius
         .byte   $01, $02, $00, $00 ; 135 Sprinter
-        .byte   $01, $02, $00, $00 ; 136 Gobbler
+        .byte   $10, $02, $00, $00 ; 136 Gobbler
         .byte   $01, $08, $00, $00 ; 137 Harpiai
         .byte   $00, $02, $04, $00 ; 138 GloomShell
         .byte   $00, $20, $08, $00 ; 139 Drop
@@ -154,14 +154,14 @@ Ot6ClassSplitTbl:
         .byte   $00, $02, $04, $00 ; 143 Toe Cutter
         .byte   $10, $00, $04, $00 ; 144 Over Grunk
         .byte   $01, $08, $00, $00 ; 145 Exoray
-        .byte   $00, $20, $04, $00 ; 146 Crusher
+        .byte   $00, $02, $08, $00 ; 146 Crusher
         .byte   $00, $00, $04, $00 ; 147 Uroburos
         .byte   $01, $00, $04, $00 ; 148 Primordite
         .byte   $00, $20, $00, $08 ; 149 Sky Cap
         .byte   $01, $02, $00, $00 ; 150 Cephaler
         .byte   $01, $00, $04, $00 ; 151 Maliga
         .byte   $01, $20, $00, $00 ; 152 Gigan Toad
-        .byte   $01, $02, $00, $00 ; 153 Geckorex
+        .byte   $10, $02, $00, $00 ; 153 Geckorex
         .byte   $10, $00, $04, $00 ; 154 Cluck
         .byte   $10, $02, $00, $00 ; 155 Land Worm
         .byte   $00, $20, $00, $00 ; 156 Test Rider
@@ -181,10 +181,10 @@ Ot6ClassSplitTbl:
         .byte   $00, $08, $04, $00 ; 170 Grenade
         .byte   $01, $00, $08, $00 ; 171 Critic
         .byte   $00, $00, $04, $08 ; 172 Pan Dora
-        .byte   $10, $00, $00, $08 ; 173 SoulDancer
+        .byte   $10, $00, $00, $04 ; 173 SoulDancer
         .byte   $01, $00, $08, $00 ; 174 Gigantos
         .byte   $00, $00, $08, $00 ; 175 Mag Roader
-        .byte   $01, $02, $04, $00 ; 176 Spek Tor
+        .byte   $10, $02, $04, $00 ; 176 Spek Tor
         .byte   $10, $00, $00, $00 ; 177 Parasite
         .byte   $01, $00, $00, $00 ; 178 EarthGuard
         .byte   $10, $00, $00, $00 ; 179 Coelecite
@@ -195,30 +195,30 @@ Ot6ClassSplitTbl:
         .byte   $00, $00, $08, $04 ; 184 Slurm
         .byte   $01, $20, $00, $00 ; 185 Latimeria
         .byte   $10, $00, $04, $00 ; 186 StillGoing
-        .byte   $01, $00, $02, $00 ; 187 Allo Ver
+        .byte   $10, $00, $02, $00 ; 187 Allo Ver
         .byte   $00, $00, $00, $04 ; 188 Phase
         .byte   $01, $02, $00, $00 ; 189 Outsider
         .byte   $01, $00, $00, $10 ; 190 Barb-e
         .byte   $10, $02, $00, $00 ; 191 Parasoul
         .byte   $01, $00, $00, $08 ; 192 Pm Stalker
         .byte   $10, $00, $00, $08 ; 193 Hemophyte
-        .byte   $01, $20, $00, $00 ; 194 Sp Forces
+        .byte   $01, $02, $00, $00 ; 194 Sp Forces
         .byte   $01, $00, $00, $00 ; 195 Nohrabbit
         .byte   $10, $02, $00, $08 ; 196 Wizard
-        .byte   $01, $00, $04, $00 ; 197 Scrapper
+        .byte   $10, $00, $04, $00 ; 197 Scrapper
         .byte   $00, $20, $08, $00 ; 198 Ceritops
         .byte   $00, $02, $00, $00 ; 199 Commando
-        .byte   $01, $00, $04, $00 ; 200 Opinicus
+        .byte   $10, $00, $04, $00 ; 200 Opinicus
         .byte   $10, $20, $00, $00 ; 201 Poppers
         .byte   $01, $20, $00, $00 ; 202 Lunaris
         .byte   $00, $20, $08, $00 ; 203 Garm
         .byte   $10, $02, $00, $00 ; 204 Vindr
         .byte   $10, $20, $00, $00 ; 205 Kiwok
-        .byte   $01, $00, $08, $00 ; 206 Nastidon
+        .byte   $10, $00, $08, $00 ; 206 Nastidon
         .byte   $00, $08, $00, $04 ; 207 Rinn
         .byte   $00, $02, $04, $00 ; 208 Insecare
         .byte   $00, $20, $04, $00 ; 209 Vermin
-        .byte   $01, $00, $08, $04 ; 210 Mantodea
+        .byte   $10, $00, $08, $04 ; 210 Mantodea
         .byte   $01, $00, $00, $08 ; 211 Bogy
         .byte   $01, $00, $04, $00 ; 212 Prussian
         .byte   $01, $00, $00, $00 ; 213 Black Drgn
@@ -228,8 +228,8 @@ Ot6ClassSplitTbl:
         .byte   $00, $20, $08, $00 ; 217 Dueller
         .byte   $00, $02, $00, $08 ; 218 Psychot
         .byte   $01, $00, $04, $00 ; 219 Muus
-        .byte   $01, $00, $04, $00 ; 220 Karkass
-        .byte   $01, $02, $00, $00 ; 221 Punisher
+        .byte   $10, $00, $04, $00 ; 220 Karkass
+        .byte   $10, $02, $00, $00 ; 221 Punisher
         .byte   $00, $00, $00, $00 ; 222 Balloon
         .byte   $00, $0a, $00, $00 ; 223 Gabbldegak
         .byte   $00, $02, $04, $00 ; 224 GtBehemoth
@@ -240,7 +240,7 @@ Ot6ClassSplitTbl:
         .byte   $10, $00, $04, $08 ; 229 Lich
         .byte   $01, $20, $00, $00 ; 230 Osprey
         .byte   $00, $20, $08, $00 ; 231 Mag Roader
-        .byte   $01, $20, $00, $00 ; 232 Bug
+        .byte   $10, $20, $00, $00 ; 232 Bug
         .byte   $10, $00, $00, $00 ; 233 Sea Flower
         .byte   $00, $20, $08, $00 ; 234 Fortis
         .byte   $01, $20, $00, $00 ; 235 Abolisher
@@ -250,13 +250,13 @@ Ot6ClassSplitTbl:
         .byte   $00, $08, $04, $00 ; 239 1st Class
         .byte   $01, $00, $04, $00 ; 240 Tap Dancer
         .byte   $01, $00, $00, $04 ; 241 Necromancr
-        .byte   $01, $00, $04, $00 ; 242 Borras
+        .byte   $10, $00, $04, $00 ; 242 Borras
         .byte   $00, $20, $08, $00 ; 243 Mag Roader
         .byte   $01, $02, $00, $00 ; 244 Wild Rat
         .byte   $01, $00, $04, $00 ; 245 Gold Bear
         .byte   $00, $20, $08, $00 ; 246 Innoc
         .byte   $00, $20, $00, $04 ; 247 Trixter
-        .byte   $01, $02, $00, $00 ; 248 Red Wolf
+        .byte   $10, $02, $00, $00 ; 248 Red Wolf
         .byte   $00, $00, $04, $08 ; 249 Didalos
         .byte   $01, $00, $00, $00 ; 250 Woolly
         .byte   $01, $02, $00, $00 ; 251 Veteran
@@ -302,7 +302,7 @@ Ot6ClassSplitTbl:
         .byte   $00, $02, $04, $00 ; 291 Hidon
         .byte   $10, $20, $00, $00 ; 292 KatanaSoul
         .byte   $00, $00, $00, $04 ; 293 L.30 Magic
-        .byte   $01, $00, $04, $00 ; 294 Hidonite
+        .byte   $10, $00, $04, $00 ; 294 Hidonite
         .byte   $10, $00, $00, $08 ; 295 Doom
         .byte   $00, $20, $00, $08 ; 296 Goddess
         .byte   $00, $00, $04, $08 ; 297 Poltrgeist
@@ -360,7 +360,7 @@ Ot6ClassSplitTbl:
         .byte   $01, $00, $04, $00 ; 349 Hit
         .byte   $11, $2a, $00, $00 ; 350 Girl
         .byte   $00, $00, $04, $08 ; 351 Sleep
-        .byte   $01, $00, $04, $00 ; 352 Hidonite
+        .byte   $10, $00, $04, $00 ; 352 Hidonite
         .byte   $00, $02, $04, $00 ; 353 Hidonite
         .byte   $00, $00, $04, $00 ; 354 Hidonite
         .byte   $00, $00, $00, $04 ; 355 L.80 Magic

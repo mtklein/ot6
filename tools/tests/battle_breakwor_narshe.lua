@@ -37,8 +37,8 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x0F8] = { "Red Wolf", 2, SWORD | DAGGER, 0, 0 },
-  [0x0CE] = { "Nastidon", 2, SWORD | RANGED, FIRE, 0 },
+  [0x0F8] = { "Red Wolf", 2, DAGGER | KATANA, 0, 0 },
+  [0x0CE] = { "Nastidon", 2, KATANA | RANGED, FIRE, 0 },
   [0x09C] = { "Test Rider", 3, SPEAR, POISON, 0 },
   [0x0C4] = { "Wizard", 2, DAGGER | KATANA | RANGED, BOLT | POISON, 0 },
   [0x0DA] = { "Psychot", 1, DAGGER | RANGED, ICE, FIRE },

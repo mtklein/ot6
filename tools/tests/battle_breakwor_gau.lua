@@ -34,7 +34,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 local WANT = {
   [0x08F] = { "Toe Cutter", 3, DAGGER | BLUNT, FIRE | WIND, ICE },
   [0x07E] = { "Rhyos", 4, DAGGER, 0, 0 },
-  [0x0BB] = { "Allo Ver", 3, SWORD | DAGGER, FIRE | HOLY, POISON },
+  [0x0BB] = { "Allo Ver", 3, DAGGER | KATANA, FIRE | HOLY, POISON },
   [0x119] = { "SrBehemoth", 6, DAGGER | BLUNT, FIRE | POISON, ICE },
 }
 

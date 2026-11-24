@@ -20,7 +20,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
   [0x096] = { "Cephaler", 2, SWORD | DAGGER, BOLT, 0, 0 },
-  [0x01F] = { "Chimera", 4, SWORD | RANGED, 0, 0, POISON },
+  [0x01F] = { "Chimera", 4, SWORD | DAGGER, 0, 0, POISON },
   [0x01D] = { "Baskervor", 2, SWORD | DAGGER, 0, 0, POISON },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the

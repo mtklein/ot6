@@ -38,7 +38,7 @@ local WANT = {
   [0x0CF] = { "Rinn", 1, BLUNT | RANGED, FIRE | HOLY, POISON },
   [0x079] = { "Bounty Man", 2, SWORD | DAGGER | KATANA, FIRE, 0 },
   [0x01C] = { "Fidor", 2, SWORD | DAGGER | KATANA, FIRE, 0 },
-  [0x0C2] = { "Sp.Forces", 3, SWORD | SPEAR, POISON, 0 },
+  [0x0C2] = { "Sp.Forces", 3, SWORD | DAGGER, POISON, 0 },
   [0x00F] = { "Over-Mind", 2, KATANA | RANGED, FIRE | HOLY, POISON },
   [0x131] = { "Siegfried", 1, DAGGER | KATANA | BLUNT, 0, 0 },
 }

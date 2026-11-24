@@ -110,7 +110,7 @@ local want = {
   { 0x0066, 2, SPEAR | RANGED, "general (officer in plate)" },
   { 0x002d, 2, RANGED,         "trapper (a device; you smash it)" },
   { 0x00a0, 2, DAGGER | BLUNT, "chaser (1202 hp, on the escape map)" },
-  { 0x0088, 2, SWORD | DAGGER, "gobbler (the area's deliberate blade target)" },
+  { 0x0088, 2, DAGGER | KATANA, "gobbler (the area's deliberate blade target)" },
   { 0x0075, 2, RANGED,         "rhinox (THE FLAGSHIP: bludgeon alone)" },
   { 0x0006, 2, RANGED,         "mag roader $006 (minecart)" },
   { 0x00af, 2, RANGED,         "mag roader $0af (minecart)" },

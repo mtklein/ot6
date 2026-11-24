@@ -50,7 +50,7 @@ end
 -- below are re-derived from the shipped table when the split moves.
 local base = find(
   { RANGED, BLUNT, DAGGER, SWORD, SWORD, SWORD, RANGED, BLUNT,
-    BLUNT, RANGED, BLUNT, SWORD, SWORD, BLUNT, BLUNT, RANGED },
+    BLUNT, BLUNT, BLUNT, SWORD, SWORD, BLUNT, BLUNT, RANGED },
   0x300000, 0x310000)
 
 if not base then
