@@ -142,7 +142,7 @@ line's party already spends its gil at Jidoor's shops on this leg.
 | box | species | row | leg |
 |---|---|---|---|
 | Narshe school 107 (54,28) | Lobo `$019` | 3 pierce (authored) | none (below) |
-| Imperial Camp 117 (17,18) | Telstar `$044` | 4 bludg (authored) | `wob_camp_telstar` |
+| Imperial Camp 117 (17,18) | Telstar `$044` | 2 bludg (authored; 4 until wt/v051-tg-wob2, bosses-wob.md block 7) | `wob_camp_telstar` |
 | Phantom Train 153 (22,24) | Specter `$156` | **3 slash\|special** (new) | `wob_train_specter` |
 | Floating Continent 394 (48,15) | Gigantos `$0AE` | **5 slash\|bludg** (new) | `wob_fc_gigantos` |
 

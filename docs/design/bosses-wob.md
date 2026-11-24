@@ -37,9 +37,11 @@ Stated once, assumed by every block:
   cancel, the trigger's reset, the **!**, and the rule that hits on a
   Broken boss wind no fuse, on the one fuse vanilla wrote for a World of
   Balance boss, AtmaWeapon's (block 21, `battle_atmaweapon`), and on
-  three in the World of Ruin. Every other **Telegraph** line below is
-  design text: the scripts do not announce those moves yet. The fuse
-  block's idiom for writing them, and its worked example, are in
+  three in the World of Ruin. Since wt/v051-tg-wob2 the telegraphs of
+  blocks 7-10 are built too (Telstar, the GhostTrain, Rizopas, Kefka at
+  Narshe; each block's **Built** line). Every other **Telegraph** line
+  below is design text: the scripts do not announce those moves yet. The
+  fuse block's idiom for writing them, and its worked example, are in
   `ot6_fuse.asm` and `battle_fuse`.
 - **Bosses get no exemption from breaks.** Turn loss and ×2 apply to
   AtmaWeapon the same way they apply to a Lobo. Shields are the only
@@ -131,7 +133,7 @@ then on; only his shield count grows.
 | 4 | Ultros ① | Lete River | 5 |
 | 5 | TunnelArmor | Locke scenario | 5 |
 | 6 | Kefka ×2 | Imperial Camp (Sabin) | — (no gauge) |
-| 7 | Telstar | Imperial Camp (Sabin) | 4 (Dobermans 2) |
+| 7 | Telstar | Imperial Camp (Sabin) | 2 (Dobermans 2) |
 | 8 | GhostTrain | Phantom Train (Sabin) | 4 |
 | 9 | Rizopas | Baren Falls (Sabin) | 4 (Piranhas 1) |
 | 10 | Kefka | Narshe defense | 6 |
@@ -405,14 +407,53 @@ scripted. He takes a few hits and flees, twice, with the waiter line
 unchanged, and the empty HUD says so from the start, which is the same
 rule as Tritoch one scenario earlier.
 
-**Telstar:** 4 shields · bolt, water + bludgeoning (Dobermans 2 · fire +
+**What the contract means here: nothing to build** (wt/v051-tg-wob2). His
+script (`AIScript::_367`) is `attack BATTLE` on his turns and, on the
+first hit, `battle_event $1d / end_battle`: the fight lasts until the
+party lands one blow. There is no big move to announce, no turn on which
+a fuse could burn, and no gauge to break it with, so a telegraph would
+only delay the scene. The script and both scenes are unchanged.
+
+**Telstar:** 2 shields · bolt, water + bludgeoning (Dobermans 2 · fire +
 piercing). (Decoded, not recalled: `$044` weak = **bolt|water** —
 `monster_prop.dat` +25 reads `$84`, the same byte TunnelArmor and the whole
 AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
 - **Telegraph:** its antenna sparks and it radios for backup → a
-  Doberman wave arrives next turn. Break to stop the call. This is the
+  wave arrives next turn. Break to stop the call. This is the
   first break that prevents a summon; the same use returns at
   FlameEater.
+- **Built (wt/v051-tg-wob2, `battle_telstar`).** Each of vanilla's three
+  calls (its monster timer at 25, 80 and 200, once each) is announced on
+  the turn its clock comes due: "It radios in!" (dialogue `$98`) and a
+  glow; the wave comes on Telstar's next turn with vanilla's own "Alarm's
+  ringing!" and sound. A break between them cancels the call and
+  restarts the clock (`Ot6FuseTbl`, three rows `$0044`), so that wave is
+  earned again from zero. The three blocks are vanilla's in reverse
+  order, 25 first, so an earlier call is always spent before a later one
+  announces (no earlier block can take a lit call's turn); vanilla
+  differed only when two calls came due on one turn. The wave is
+  formation 61's slots 2-5, species `$001` (Soldier), not Dobermans as
+  this block said: read from `battle_monsters.dat` and logged by the suite
+  (`[telstar] the slots its calls fill hold $001 $001 $001 $001`).
+- **Shields 4 → 2 (the lab).** The pair's only bludgeon is SABIN's Pummel,
+  two chips, and Telstar's counter answers every Blitz that lands on it
+  unbroken with Megazerk (vanilla's `if_cmd BLITZ`), so after one Pummel
+  nothing the pair holds chips. At 4 a party that Pummeled from the
+  battle's open never broke it before the first call (4 of 4 keys:
+  `lab-b-TELSTAR-CHIPFULL-*`, "race LOST (the move fired)", 2 chips then
+  SABIN berserk); 3 is no better. At 2 a Pummel from a full gauge breaks
+  it, and a broken Telstar makes no counter, so the Pummel that breaks it
+  is never Megazerked. Lab at 2 (`build/attempts/wt/v051-tg-wob2/lab/`,
+  four distinct keys `$38 $4C $6C $A8`/61): from the open, broken in 1-2
+  party actions, one of Telstar's turns; a party that Defends to the
+  announce and then Pummels broke it inside the one-turn fuse on all
+  four keys, 2-3 party actions after the line (SABIN gets one window in
+  the fuse). The race is won whenever SABIN acts in the fuse; the dial
+  has no setting between that and unwinnable with this pair. Adding
+  piercing to the row (SHADOW's dagger) would make 4 shields a real race;
+  that is a row design change, left to the owner.
+- **Break story:** SABIN's Pummel is the key (bludgeon), and it has to be
+  the breaking blow: a Pummel on an unbroken Telstar draws Megazerk.
 - **Jank:** the treasure chest that turns out to be a monster is
   unchanged.
 
@@ -437,6 +478,29 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
   Toot**, a party-wide random status attack. Break the boiler before
   the move lands; Acid Rain between fuses keeps pressure on your
   healing.
+- **Built (wt/v051-tg-wob2, `battle_ghosttrain`).** Vanilla tooted on the
+  turn its count of ordinary turns (battle variable 3) reached 2, with two
+  of the party standing. Those conditions, the count read one turn
+  earlier, now arm the fuse (monster switch 0) on a turn the train spends
+  on its ordinary attacks; the next turn announces it, "Whistle blows!"
+  (dialogue `$99`) and a glow, in the turn vanilla's toot took; a second
+  glowing turn follows; Evil Toot comes on the turn after. The party
+  count is tested where the fuse is armed, not on the fuse block, so a
+  member felled between the line and the toot cannot drop an announced
+  move. A break in the fuse clears switch 0 and the count (`Ot6FuseTbl`
+  row `$0106`): an ordinary turn has to come round again. Its opening
+  turn (Battle, Special or Evil Toot, once, unannounced: vanilla's), Acid
+  Rain's clock and the Suplex are unchanged.
+- **Fuse two turns (the lab).** At one turn a party that chipped from the
+  announce (SABIN's Pummel, the others Fight) lost 4 of 4 keys, the toot
+  coming 2-4 party actions after the line (`lab-b-TRAIN-CHIP-*`). From a
+  full gauge that party breaks it in 5-6 party actions, two of the
+  train's turns (`lab-c-TRAIN-CHIPFULL-*`, keys `$80 $A0 $E0`/437; on
+  `$C0` the train fell first). At two turns the same race was won on 3 of
+  4 keys, 5-6 party actions after the line, and lost on `$C0`
+  (`lab-c-TRAIN-CHIP-*`). The line's own fighter Suplexes the train dead
+  with one shield off before any announce, as before
+  (`[b68] WON: 1 of 4 shields off`).
 - **Break story:** the keys are the abilities the scenario gives you.
   AuraBolt is holy chip at range, Pummel ×2 chips repeatedly, and
   Shadow's elemental skeans reach two of the three element bits rather
@@ -545,6 +609,27 @@ two 358/363-HP members: that is the 650-frame double kill of #162
 ten draws past InitBattle's store in every run here). Nothing about it
 is a telegraph the AI script honours; the doc's earlier "the falls swell
 backward" line is not in the script and is removed.
+
+**Built: the nearest telegraph that keeps the contract** (wt/v051-tg-wob2,
+`battle_rizopas`). Vanilla's El Nino was a one-in-three pick on turn B,
+never announced. The one-in-three is now rolled on turn A (`if_roll 85`,
+85 in 256), a turn before anything is announced, and only arms the fuse
+(monster switch 0): turn A's own attacks are vanilla's either way. Armed,
+the next turn announces it in place of turn B, "Waters swell!" (dialogue
+`$9A`) and a glow, and El Nino comes on the turn after. Unarmed, turn B is
+its Battle. A break between the line and the wave cancels it
+(`Ot6FuseTbl` row `$0155`): the rotation starts again at turn A, roll and
+all. Monster switch 1 stands for vanilla's `wait` between the turns, so
+the roll can sit on a block's head. El Nino's rate is about the same
+(vanilla one a six turns; now one a seven, the announce taking a turn),
+and it never comes unannounced. Lab (one-turn fuse, 4 shields, keys `$4E
+$72 $82 $9E`/79): with the bank the line carries out of the school, a
+full gauge breaks in one Fight (`lab-b-RIZOPAS-CHIPFULL-*`), and the
+line's own fighter broke him in 1-2 actions before any announce; a pair
+that Defends from the surfacing and Fights from the announce broke him
+in the fuse on 2 of the 3 keys that announced (1-2 actions after the
+line), and lost the third to El Nino 1 action after it
+(`lab-b-RIZOPAS-CHIP-*`). Kept at one turn.
 
 **Break story, measured.** The row is honest and the party's Fight is
 the key: SABIN's and CYAN's swings both chip. A 1-BP Fight from either is
@@ -692,6 +777,24 @@ below).
 
 - **Telegraph:** he giggles and frost crawls the ground → **Ice 2**
   across the engaged squad.
+- **Built (wt/v051-tg-wob2, `battle_kefka`).** His clock arms it (the
+  monster timer at 40, about 1,300 frames) on one of his turns that is
+  vanilla's opening Battle; "Frost creeps!" (dialogue `$9B`) and a glow
+  announce it on his next turn; Ice 2 on every member of the squad
+  (`set_target ALL_CHARS`) follows on the turn after. A break between
+  cancels it and restarts his clock (`Ot6FuseTbl` row `$014A`). His
+  four-turn rotation, its own one-in-three Ice 2 on one member, his
+  parting line and his flight are vanilla's; after the cast his rotation
+  starts again from its first turn, as after Telstar's calls. CELES's
+  Runic takes the cast whole, as TunnelArmor's quake teaches. Lab (one
+  turn, 6 shields, TERRA, EDGAR and CELES, keys `$27 $47 $67 $87`/505): a
+  squad that Fights with its keys from the open breaks him in 3 party
+  actions, one of his turns (`lab-b-KEFKA-CHIPFULL-*`); one that Defends
+  until the line (banking the pips) and then Fights broke him in the fuse
+  on 3 of 4 keys, 2-3 actions after the line, and on `$87` took the cast
+  2 actions after it (`lab-b-KEFKA-CHIP-*`). The line's own fighter
+  breaks him in 6-7 actions, about 1,800 frames in, before any announce
+  (`lab-a-KEFKA-LINE-*`).
 - **Break story:** the waves drain resources before Kefka himself, so
   the fight teaches banking across a sequence of fights: earn BP on
   the waves, arrive holding 4–5 BP, and break him on the first fuse.
