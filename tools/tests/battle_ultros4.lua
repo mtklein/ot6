@@ -3,7 +3,7 @@
 -- Broken (#329), on the airship deck.  Boots ultros4_entry (the Blackjack's
 -- deck at the Ultros teaser; gen_fc_landing), walks to the deck's right edge
 -- to arm Ultros IV ($168, 7 shields, two weapon classes: the ROM's row,
--- slash|pierce under four classes), and fights him the way
+-- Sword|Ranged under six classes, #566), and fights him the way
 -- that lets the party break him before his story line: every member Fights
 -- unboosted while he is unbroken (one chip a weapon hand, the least damage a
 -- chip costs), then boosted with every pip once he is Broken.  His counter
@@ -12,7 +12,14 @@
 --     dlg $53 / restore_monsters MONSTER_1, SIDE / dlg $57 /
 --     set_monster_switch 1
 --
--- ("I lose AGAIN!  ...Mr. Chupon!  Come on down!") is all story.  Asserted:
+-- ("I lose AGAIN!  ...Mr. Chupon!  Come on down!") is all story.  The
+-- fixture's precondition, asserted first: every seated member's weapon hand
+-- keys him (gen_fc_landing's "arm for Ultros IV", the gear rule's dress with
+-- his row favoured).  A hand that chips nothing adds damage and no chip, the
+-- break comes late, and the line is crossed by a long boosted swing whose
+-- counter waits on its animation: on 05150ed5's fixture EDGAR held the
+-- RegalCutlass (a Katana), LOCKE's six-hit Fight crossed at f2528 and the
+-- entry came 901 frames later (suites/u4_dbg.log).  Asserted:
 --   1. the hit that takes Ultros under 12,800 HP lands while he is Broken
 --      (the precondition: named if a draw breaks the line first);
 --   2. Chupon's entry (dlg $53, restore_monsters) runs on cue, within 900
@@ -168,6 +175,18 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(maxShields(), 7, "Ultros IV seeds 7 shields (max)")
     H.assertEq(shields(), 7, "Ultros IV seeds 7 shields")
     H.assertEq(uhp() >= LINE, true, "Ultros IV starts above his story line")
+    -- the precondition (header): every seated member's hand keys his row
+    local row = H.speciesClassRow(ULTROS4)
+    for i = 0, 3 do
+      local c = H.readByte(0x3ED8 + 2 * i)
+      if c ~= 0xFF then
+        local base = 0x1600 + 37 * c
+        local r, l = H.readByte(base + 0x1F), H.readByte(base + 0x20)
+        local m = (H.handClass(c, r, false) | H.handClass(c, l, false)) & row
+        H.assertEq(m ~= 0, true, string.format("char %d's hands ($%02X, $%02X) key Ultros IV's row $%02X (the fixture's "
+          .. "dress: gen_fc_landing's arm for Ultros IV)", c, r, l, row))
+      end
+    end
   end),
   H.driveUntil(function() return cross ~= nil end, 20000, { driver() },
     "a hit takes Ultros IV under " .. LINE .. " HP"),

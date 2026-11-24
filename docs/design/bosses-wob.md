@@ -57,13 +57,13 @@ Stated once, assumed by every block:
   | 1 | Whelk | 2 turns | Race: unboosted beams from the announce break the head in the fuse, 5 of 5 keys; the prize is the head kept out |
   | 2 | Marshal | 1 turn | Race (while a Lobo stands): broken in the fuse 3 of 3 chipping from the open, 2 of 3 from the announce |
   | 3 | Vargas | 1 turn | Warning: the trio holds no key while an Ipooh stands, and SABIN's Pummel ends the fight |
-  | 4 | Ultros ① | 1 turn | Warning: a party chipping from the open breaks him before his first announce (3 of 3); a race only for a party that banks to the announce |
+  | 4 | Ultros ① | 1 turn | Warning: TERRA's sword breaks him before his first announce (the six-class line: 6 party actions, scenario_hub.log; the four-class lab's 3 of 3 agrees); a race only for a party that banks to the announce |
   | 5 | TunnelArmr | 1 turn | Warning: LOCKE's boosted Fight breaks it before it announces (3 of 3); at the announce the answer is CELES's Runic |
   | 6 | Kefka ×2 (camp) | — | None: no big move, no gauge (block 6) |
   | 7 | Telstar | 1 turn | Race: won whenever SABIN acts in the fuse, 4 of 4 keys |
   | 8 | GhostTrain | 2 turns | Race: won on 3 of 4 keys from the announce |
   | 9 | Rizopas | 1 turn | Race: won on 2 of 3 keys from the announce |
-  | 10 | Kefka (Narshe) | 1 turn | Race: won on 3 of 4 keys from the announce |
+  | 10 | Kefka (Narshe) | 1 turn | Race (four-class lab, when EDGAR's pike keyed him too): won on 3 of 4 keys from the announce; under six classes EDGAR keys him only by Bio Blaster and the line's squad broke him 12 actions in; not re-raced |
 
   Ultros and TunnelArmr stay at one turn: their warnings fit the feel,
   and a longer fuse would only lengthen fights the party usually ends
@@ -360,9 +360,7 @@ fire + sword.
   279 (17%) and 52 of TERRA's 241 (21%).
 - **Break story:** phase one gives the trio very little chip.
   BioBlaster's poison is their only key and takes Vargas down 1 while
-  the script has the fight going against you. Sabin then arrives with
-  Pummel ×2 for Blunt and AuraBolt for holy, which supplies the
-  chip; Vargas cannot be broken before Sabin joins. **The escorts
+  the script has the fight going against you. Sabin then arrives with his MetalKnuckle (a knuckle, Blunt on every Fight since v0.51), Pummel ×2 for Blunt and AuraBolt for holy, which supply the chip; Vargas cannot be broken before Sabin joins. **The escorts
   block the key** (measured, above): the spray goes to the Ipoohs'
   target group until both are down, so phase one is clear the adds
   first, then spend the tool. That ordering was not planned, and it
@@ -416,8 +414,7 @@ Party: Terra, Edgar, Sabin, Banon (Health is a free party heal; his
 death is a game over).
 
 **Shields:** 5 · **Weak:** fire, bolt + sword, ranged — the row
-he keeps all game. TERRA's and EDGAR's swords, EDGAR's AutoCrossbow
-and TERRA's Fire key him; SABIN and BANON hit and heal (opening.md 9).
+he keeps all game. TERRA's sword, TERRA's Fire and EDGAR's AutoCrossbow key him (EDGAR's own Mithril Blade would too; the route's EDGAR carries MOG's Mithril Pike, a Spear, which does not); SABIN's knuckles and BANON's rod are Blunt and key nothing, so they hit and heal (opening.md 9).
 
 - **Telegraph:** two tentacles rise → **Tentacle** hits Banon. Break
   during the fuse to cancel it.
@@ -580,7 +577,7 @@ AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
   lab/`), and it cut the gauge to 2. Under six classes the row is
   Dagger|Blunt: SHADOW's Fight chips one shield a swing and draws no
   Megazerk (the counter answers Blitzes), so the pair races with two
-  hands, and the row keeps 4. battle_telstar measures the race at 4.
+  hands, and the row keeps 4. battle_telstar plays the cancel at 4 with the gauge and all six keys staged (a mechanism test); the pair's own race at 4 is measured in the lab below.
 - **Break story:** SHADOW's blade chips while SABIN waits, and SABIN's
   Pummel is the breaking blow (it must be: a Pummel on an unbroken
   Telstar draws Megazerk).
@@ -902,12 +899,9 @@ with no weakness of any kind, and `Ot6ElemAddTbl` carries `$09`
 (poison|fire) outright. +$2957/+$2958 are both `$00`, so nothing is
 absorbed or nulled. The 6 shields and the two classes were already in
 `Ot6ShieldTbl`. Kefka's own row is deliberately broad (poison|fire +
-sword, dagger): a squad with a sword (TERRA, CELES, EDGAR), a dagger
-(LOCKE) or GAU's fangs in it, or one that brings fire or poison, can
-break him. His waves (Trooper, HeavyArmor, Rider) carry their own rows
+sword, dagger): a squad with a sword (CELES; TERRA and EDGAR while they hold one), a dagger (LOCKE; TERRA's Mithril Knife, which the line's dress puts back in her hand for him) or GAU's fangs in it, or one that brings fire or poison (TERRA's Fire, EDGAR's Bio Blaster), can break him. His waves (Trooper, HeavyArmor, Rider) carry their own rows
 (see "The imperial soldier line" below). The katana is not on his row:
-a squad of CYAN and SABIN alone keys him only with SABIN's Fire Dance
-(level 15), and with GAU it has his fangs (opening.md 10).
+a squad of CYAN and SABIN alone keys him with SABIN's claw (a Mithril Claw is a Dagger) or his Fire Dance (level 15), and with GAU it has his fangs (opening.md 10).
 
 - **Telegraph:** he giggles and frost crawls the ground → **Ice**
   across the engaged squad (Ice 2 in this block's first design; the

@@ -19794,12 +19794,23 @@ function M.fuseCases(cfg)
     cfg.write.byte(0x3E38 + e, n)
     say(string.format("the gauge staged to %d (%s)", n, why))
   end
+  -- The gauge held at 63 whenever a wait begins with the boss up and unbroken: the party Defends, but a member's
+  -- counter (a Black Belt: SABIN's Fight countered Rizopas's blows at the falls and broke him, x=00 with $B1 bit 0,
+  -- build/attempts/wt/v051-six-classes/suites/riz_dbg2.log) and a Fight in flight at the snapshot (the falls' open:
+  -- two shields gone before any input) chip it, so only a case's own staged hit breaks it.  A Broken boss's gauge
+  -- is left alone.
+  local function hold(why)
+    local c = W.cells()
+    if c == nil or c.ticks ~= 0 or c.shields == 63 then return end
+    stage(63, why)
+  end
   -- (the party sits a phase out by Defending: a window left open with no input can hold the battle still)
   -- (max frames at most: the caller's assert names what did not come)
   local function idle(pred, max, what)
     local t0 = nil
     return M.lazy(function()
       t0 = M.frame
+      hold("the party waits: a counter or a hit in flight is not to break the boss")
       return M.kitBattle({}, { idle = "defend", care = false, maxFrames = max + 600,
         giveUp = function() return pred() or M.frame - t0 >= max end })
     end)
@@ -19990,6 +20001,7 @@ function M.fuseCases(cfg)
         standing()
         C.nBreaks = #W.breaks
         if when == nil then stageBreak(why); return end
+        hold("the breaker waits for its moment: nothing else is to break the boss first")
         for i = 0, 3 do
           local id = M.readByte(0x3ED8 + 2 * i)
           if id ~= 0xFF and (via == nil or id == via.who) and M.readWord(0x3BF4 + 2 * i) > 0
@@ -20043,7 +20055,7 @@ function M.fuseCases(cfg)
         C.missed = nil
         if #W.breaks == C.nBreaks and miss ~= nil and miss() then
           C.missed = true
-          stage(63, "the fuse's move came before the break: the hit still in flight only chips")
+          stage(63, "the moment passed with no break: the hit still in flight only chips")
           return
         end
         M.assertEq(#W.breaks > C.nBreaks, true, string.format("%s: a %s took the boss's last shield (%s)", tag,
@@ -20263,19 +20275,57 @@ function M.fuseCases(cfg)
     M.call(function() say(measure and "MEASURED broken" or "PASS broken") end),
   })
 
+  -- (up to three tries, as the broken case: a draw can bring the announce before the breaking hit lands -- the
+  -- Marshal's on this branch's gates, LOCKE's aimed Fight confirmed at f36141 with no shield taken by his turn 3's
+  -- announce, the break only after the fuse had fired, battle_marshal-gate11.log -- and the case then waits out
+  -- that fuse's move and aims again once the trigger is part earned; FUSE_OUTSIDE_TRIES, a lab's global, lowers the
+  -- count, the negative)
+  local outsideTries = rawget(_G, "FUSE_OUTSIDE_TRIES") or 3
   local outside = M.seqStep({
     open("outside"),
-    arm(function() return gone() or cfg.partway(W) end, 30000, "the trigger part earned"),
+    M.call(function() C.brk, C.tries = nil, 0 end),
+    (function()
+      local tries = {}
+      for k = 1, outsideTries do
+        tries[k] = M.cond(function() return C.brk == nil end, {
+          M.call(function() C.tries = k end),
+          -- (a fuse lit by a missed try burns out first: its move)
+          idle(function()
+            local li = C.from and lineAfter(C.from)
+            return gone() or li == nil or moveAfter(li) ~= nil
+          end, 12000, "the missed try's fuse fires"),
+          arm(function() return gone() or cfg.partway(W) end, 30000, "the trigger part earned"),
+          M.call(function()
+            standing()
+            -- (a prelude's play, or a missed try, can run a whole fuse first, Vargas's: the case counts from its last
+            -- move, if any)
+            local li = lineAfter(1)
+            while li ~= nil and moveAfter(li) ~= nil and lineAfter(moveAfter(li)) ~= nil do
+              li = lineAfter(moveAfter(li))
+            end
+            C.from = (li ~= nil and moveAfter(li) ~= nil) and moveAfter(li) + 1 or 1
+            M.assertEq(lineAfter(C.from) == nil and not W.litBit(), true, tag .. ": no fuse is lit yet (the case's "
+              .. "precondition: no announce since the case's open or its last move)")
+          end),
+          breakIt("a break outside the fuse", nil, nil, nil, function() return lineAfter(C.from) ~= nil end),
+          M.call(function()
+            if C.missed then
+              say(string.format("try %d: the announce came before the breaking hit; the case waits out that fuse and "
+                .. "aims again", k))
+              C.brk = nil
+            end
+          end),
+        }, {})
+      end
+      return M.seqStep(tries)
+    end)(),
     M.call(function()
-      standing()
-      -- (a prelude's play can run a whole fuse first, Vargas's: the case counts from its last move, if any)
-      local li = lineAfter(1)
-      while li ~= nil and moveAfter(li) ~= nil and lineAfter(moveAfter(li)) ~= nil do li = lineAfter(moveAfter(li)) end
-      C.from = (li ~= nil and moveAfter(li) ~= nil) and moveAfter(li) + 1 or 1
-      M.assertEq(lineAfter(C.from) == nil and not W.litBit(), true, tag .. ": no fuse is lit yet (the case's "
-        .. "precondition: no announce since the case's open or its last move)")
+      M.assertEq(C.brk ~= nil, true, string.format("%s: a break landed outside the fuse in one of %d tries", tag,
+        outsideTries))
+      local li = lineAfter(C.from)
+      M.assertEq(li == nil or W.cmds[li].f > C.brk.f, true, tag .. ": the break landed before any announce (the "
+        .. "case's precondition)")
     end),
-    breakIt("a break outside the fuse"),
     M.call(function()
       local a, b = C.brk.pre, C.brk.post
       say("before the break: " .. W.cellsLine(a))
