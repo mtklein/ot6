@@ -297,14 +297,16 @@ that can die, dies. A boss loses four shields and takes a very heavy cut.
   Fire 2, 4x for Fire 3, where a plain blade is 2x); it still takes one
   shield a hit. A spell Runic absorbs leaves a blade of its own strength.
   Blades of spells with no stronger form (Pearl, Quake) take no boost.
+  Muted, she cannot arm a blade or Break Blade (Runic still works, and a
+  blade she already holds keeps biting).
 - **What you see.** The element's icon stands beside her name while her
   blade holds it, and her swing is drawn in the element's colour when it
   bites.
 - **Ultimate: Break Blade**, her Break spell on the blade, learned on the
   Floating Continent when Celes turns her sword on Kefka. At 3 BP, for 99
-  MP: for three of her turns every
-  hit of her weapon takes a shield, whatever the enemy's weaknesses. Her
-  rune comes back when it ends.
+  MP: for three of her turns every hit of her weapon takes a shield,
+  whatever the enemy's weaknesses, with no limit a turn: two weapons, a
+  Genji Glove or an Offering multiply it. Her rune comes back when it ends.
 
 In the field menu, Skills > RuneKnt lists the rows she has now, with their
 MP and a line of help for each: Runic, a blade for each element she can

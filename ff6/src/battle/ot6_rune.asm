@@ -832,7 +832,9 @@ done:   rts
 .endproc
 
 ; [ the Rune Knight arm of Ot6BushidoRowGrey: a row its gate refuses ]
-; Break Blade under three points pending (the divine's one gate).  Read by
+; Break Blade under three points pending (the divine's one gate), and every
+; blade row and Break Blade while the caster is Muted (owner, 2026-11-24: a
+; blade is a spell of hers; Runic stays usable, as vanilla's is).  Read by
 ; the row's colour and by the confirm (Ot6KitConfirmMP), so a greyed row is
 ; a refused one.  a8/i16.  in: A = the MP grey, Y = the row's wItemList
 ; offset.  out: A = A | ($04 if refused).  Preserves X and Y.  rtl.
@@ -841,18 +843,32 @@ done:   rts
         .i16
         pha                     ; [1,s] the MP grey
         lda     $4005,y
-        cmp     #OT6_RUNE_BREAK
-        bne     @white
+        cmp     #OT6_RUNE_BLADE
+        bcc     @white          ; Runic: usable under Mute, as vanilla's is
+        cmp     #OT6_RUNE_LAST+1
+        bcs     @white
         phx
+        pha                     ; the row's id
         jsr     Ot6RuneCaster
+        lda     $3ee5,x         ; Mute (status 2 bit 3): a blade is a spell of
+        and     #$08            ;   hers, so a muted caster's blade rows and
+        bne     @muted          ;   Break Blade grey, as her spells do
+        pla
+        cmp     #OT6_RUNE_BREAK
+        bne     @plxw
         lda     OT6_BOOST_REVEALED,x
         plx
         cmp     #OT6_BREAK_BOOST
         bcs     @white
-        pla
-        ora     #$04
-        rtl
+        bra     @grey
+@muted: pla
+        plx
+        bra     @grey
+@plxw:  plx
 @white: pla
+        rtl
+@grey:  pla
+        ora     #$04
         rtl
 .endproc
 
@@ -1041,6 +1057,13 @@ done:   rts
         bcs     @plain
         cpx     #$08
         bcs     @plain          ; (a monster never queues these)
+        pha
+        lda     $3ee5,x         ; Mute landed between the pick and the turn:
+        and     #$08            ;   a blade row or Break Blade is refused as
+        beq     :+              ;   a muted spell is, nothing done, nothing
+        pla                     ;   charged, the boost kept (owner,
+        bra     @none           ;   2026-11-24)
+:       pla
         cmp     #OT6_RUNE_BREAK
         beq     @break
         phy

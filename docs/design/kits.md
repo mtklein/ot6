@@ -942,12 +942,20 @@ the divine in the eighth:
   divine's).  The worn shields that grant a spell count too.  The price is
   the cheapest such spell's own (through a Gold Hairpin or Economizer), or
   its line's tier at the boost pending.  The row takes her turn and targets
-  herself as Runic does.  Mute does
-  not stop a blade row (it is not a cast): the rows read the spell ids in
-  her battle Magic list (`Ot6BladeSpell`), which Mute does not change
-  (it greys the Magic command), so a muted CELES keeps every row and can
-  still arm her blade (read from the code; no suite mutes her); an Imp's
-  command window turns
+  herself as Runic does.  **Mute** (owner, 2026-11-24: "it's a spell
+  blade, so she must be casting some sort of spell to enable it.  it
+  wouldn't remove an existing spell blade, but should stop applying it"):
+  while she is Muted every blade row and Break Blade greys in the list and
+  its A buzzes, as a Muted caster's spells do (`Ot6RuneRowGrey`), and one
+  picked before Mute landed does nothing at its action and charges nothing,
+  the boost kept, as Break Blade short of three does (`Ot6RuneExec`).
+  Runic stays usable, as vanilla's is (Mute greys only Magic, Lore and
+  X-Magic, `UpdateCmd_03`-`05`), and its absorb still arms the rune: the
+  absorb is no cast of hers, and vanilla's Runic absorbs while Muted (its
+  gate, `RunicEffect`, refuses only Death, Petrify, Sleep, Stop, Frozen and
+  Hide).  A rune or a Break Blade already on the blade stays and keeps
+  working.  The same holds for Gogo's list.  `battle_spellblade` check 13;
+  an Imp's command window turns
   Runic into Fight, as vanilla's does.  Like Runic itself, the command
   greys without a runic weapon in hand (vanilla's `UpdateCmd_01`), and the
   list with it.
@@ -1107,7 +1115,8 @@ the divine in the eighth:
   one shield a landed hit of her weapon for three of her turns, so 6 a use
   with one weapon from a full bank (2 BP, 0, 1), 12 with two, about 24
   with a Genji Glove and an Offering (not measured); 4 and 8 from a bank of
-  exactly three.  Bum Rush takes four in one turn for the same 99 MP, and
+  exactly three.  That is intended (owner, 2026-11-24: "let's allow
+  offering and genji glove being crazy. that's true to the original.").  Bum Rush takes four in one turn for the same 99 MP, and
   Cleave four from every death-immune body at once.
 - **The field page** (#563, the owner 2026-11-23: "the full treatment"):
   Skills > RuneKnt, the list's tenth row, under Painter.  The row reads

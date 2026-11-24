@@ -47,7 +47,8 @@
 --     at the target select of a pick made in a list is refused, which check
 --     10's cast plays;
 --   * her MP, set one under the price of the blade row's top tier while R is
---     pressed on the row (a level-33 pool pays every tier), then put back.
+--     pressed on the row (a level-33 pool pays every tier), then put back;
+--   * Mute on her (she wears a Ribbon), for check 13, taken off after it.
 -- Everything asserted is read at the ROM's own routines (exec hooks on
 -- Ot6RunicBP, Ot6RuneArm, Ot6TargetPre, Ot6Chip, Ot6RuneWeakMul, Ot6HitJoin,
 -- Ot6SwingPal_ext, LoadSpriteAnimPal, Ot6BpBegin, Ot6ActionEnd, Cmd_0b) and
@@ -90,7 +91,11 @@
 --      meanwhile); when it ends the rune bites again;
 --  11. either switch alone teaches Break Blade, neither leaves no row;
 --  12. a Runic the engine chooses (Muddle) queues attack $00: the plain
---      stance, never a blade row or the divine.
+--      stance, never a blade row or the divine;
+--  13. Mute (staged): a blade row is refused in the list (13a) and, Muted
+--      after the pick, at its action, arming and charging nothing (13b);
+--      Runic still raises the stance (13c); a rune armed before Mute keeps
+--      biting (13d).
 -- A blade row with no line (Pearl's, Quake's) takes no boost; CELES casts
 -- none here, so that is the Gogo suite's.
 -- Mutants (one per arm, each red at its own check) and the draws the suite
@@ -133,7 +138,8 @@ local S = { battles = 0, tick = 0, acts = {}, hits = {}, pals = {}, absorbs = {}
   shots = {}, starts = {}, signLags = {}, runeViol = {}, armedNow = 0, ching = 0, buzz = 0 }
 local D = {}          -- checks made
 local NEED = { "1", "2", "2t2", "2t3", "3", "4a", "4b", "4c1", "4c2", "5a", "5t2", "5t3", "5w", "5b", "5c", "5d", "5e",
-  "6", "7a", "7b", "7c", "8", "9a", "9b", "10a", "10b", "10c", "10d", "10e", "10f", "11", "12" }
+  "6", "7a", "7b", "7c", "8", "9a", "9b", "10a", "10b", "10c", "10d", "10e", "10f", "11", "12", "13a", "13b",
+  "13c", "13d" }
 local IN_BATTLE = {}  -- (all but 7c, which the next battle's first frame makes)
 for _, k in ipairs(NEED) do if k ~= "7c" then IN_BATTLE[#IN_BATTLE + 1] = k end end
 
@@ -376,6 +382,7 @@ local function stage(weak, absorb, null, half)
 end
 -- the body as the tomb dealt it, before the battle is fought out
 local function unstage()
+  if S.muted and S.celes ~= nil and inBattle() then setMute(false) end
   if S.orig == nil or S.slot == nil or not inBattle() then return end
   local y = monY()
   for _, a in ipairs(STAGED) do H.writeByte(a + y, S.orig[a]) end
@@ -412,6 +419,13 @@ local function releaseMuddle(h)
 end
 -- her MP pool, for check 4b (and put back after it)
 local function setMp(v) H.writeWord(0x3C08 + ent(), v) end
+-- Mute on her (status 2 bit 3), for check 13, and taken off after it (she wears a Ribbon: nothing mutes her on cue)
+local function muted() return S.celes ~= nil and (H.readByte(0x3EE5 + ent()) & 0x08) ~= 0 end
+local function setMute(on)
+  local v = H.readByte(0x3EE5 + ent())
+  H.writeByte(0x3EE5 + ent(), on and (v | 0x08) or (v & 0xF7))
+  S.muted = on or nil
+end
 
 -- ---- observers ----
 -- A value its routine has yet to write when the hook at the routine's head fires is read two frame callbacks
@@ -440,6 +454,12 @@ local function arm()
     end
     if S.slot ~= nil then S.cur.hp0, S.cur.sh0 = monHp(), shields() end
     S.acts[#S.acts + 1] = S.cur
+    -- check 13b's staging: a blade row picked unmuted finds her Muted as its action begins
+    if S.muteAt and S.cur.cmd == RUNIC and S.cur.b6 == S.muteAt then
+      S.muteAt = nil
+      setMute(true)
+      S.cur.mutedAt = true
+    end
     -- check 9b's staging: Break Blade, picked at three points, finds two as its action begins
     if S.lower and S.cur.cmd == RUNIC and S.cur.b6 == ROW_BREAK and S.cur.pend0 == 3 then
       S.lower = nil
@@ -1573,6 +1593,101 @@ do
       end),
     }),
   })
+end
+
+-- 13. Mute (owner, 2026-11-24: "it's a spell blade, so she must be casting some sort of spell to enable it.  it
+-- wouldn't remove an existing spell blade, but should stop applying it"): Muted (staged), her blade rows and Break
+-- Blade are refused in the list (13a) and at the action if Mute lands after the pick (13b), nothing done and
+-- nothing charged; Runic stays usable, as vanilla's is (13c); a rune already on the blade keeps biting (13d)
+do
+  local at = nil
+  add({
+    block("13a", function() return bblade() == 0 and not muted() end, {
+      H.call(function() at = nil end),
+      play("check 13a", function()
+        return { { who = CELES, cmd = RUNIC, row = S.RB.id, boost = 0, refused = "list",
+          openWhen = function() if not muted() then setMute(true) end; return true end } }
+      end, { onList = function() if at == nil then at = { mp = mp(S.celes), rune = rune(), tier = tier(),
+          mute = muted() } end end,
+        giveUp = function()
+          if at ~= nil and H.readByte(0x7BC2) == 0x38 and (H.readByte(0x62CA) & 3) == S.celes then
+            at.opened = true
+          end
+          return at ~= nil and at.opened == true
+        end }),
+      check(function()
+        local k = H.vars.kit[#H.vars.kit]
+        local wasMuted = muted()
+        if S.muted then setMute(false) end
+        if at == nil or (k == nil and not at.opened) then
+          say("check 13a: the row was not reached; asked again")
+          return
+        end
+        say("check 13a: A on blade row $%02X Muted (%s): refused %s, target select opened %s; MP %d -> %d, "
+          .. "rune %02X -> %02X", S.RB.id, tostring(at.mute), tostring(k ~= nil and k.refusedSeen),
+          tostring(at.opened == true), at.mp, mp(S.celes), at.rune, rune())
+        H.assertEq(at.mute and wasMuted, true, "13a. she was Muted while the list was open (staged)")
+        H.assertEq(at.opened == true, false, "13a. a Muted caster's blade row is refused in the list (its A opens "
+          .. "no target select)")
+        H.assertEq(k ~= nil and k.refusedSeen, true, "13a. a Muted caster's blade row is refused in the list (the "
+          .. "buzz)")
+        H.assertEq(mp(S.celes), at.mp, "13a. the refused row spent no MP")
+        H.assertEq(rune() == at.rune and tier() == at.tier, true, "13a. and armed nothing")
+        passed("13a", "a blade row refused while Muted")
+      end),
+    }),
+    block("13b", function() return bblade() == 0 and not muted() end, {
+      play("check 13b", function()
+        S.muteAt = S.RB.id
+        return { { who = CELES, cmd = RUNIC, row = S.RB.id, boost = 0, self = true } }
+      end, { done = lastActionDone }),
+      check(function()
+        S.muteAt = nil
+        local a = actSince(S.mark, function(x) return x.cmd == RUNIC and x.b6 == S.RB.id end)
+        if S.muted then setMute(false) end
+        if a == nil then say("check 13b: the blade row's action did not come; asked again"); return end
+        say("check 13b: blade row $%02X picked unmuted, Muted as its action began (%s): rune %02X/%d -> %02X/%d, "
+          .. "MP %d -> %d, bank %d -> %d, pending %d -> %d", S.RB.id, tostring(a.mutedAt), a.rune0, a.tier0,
+          a.rune2, a.tier2, a.mp0, a.mp1, a.bank0, a.bank2, a.pend0, a.pend2)
+        H.assertEq(a.mutedAt == true, true, "13b. she was Muted as the blade row's action began (staged)")
+        H.assertEq(a.rune2 == a.rune0 and a.tier2 == a.tier0, true, "13b. Muted at its action, the blade row armed "
+          .. "nothing (the rune and its tier as they were)")
+        H.assertEq(a.mp1, a.mp0, "13b. and charged no MP")
+        H.assertEq(a.bank2, math.min(a.bank0 + 1, 5), "13b. and the bank was not charged")
+        passed("13b", "Muted at its action: nothing done, nothing paid")
+      end),
+    }),
+    block("13c", function() return bblade() == 0 and not muted() end, {
+      play("check 13c", function()
+        setMute(true)
+        return { { who = CELES, cmd = RUNIC, row = ROW_RUNIC, boost = 0, self = true } }
+      end, { done = lastActionDone }),
+      check(function()
+        local a = actSince(S.mark, function(x) return x.cmd == RUNIC end)
+        local wasMuted = muted()
+        if S.muted then setMute(false) end
+        if a == nil then say("check 13c: the Runic action did not come; asked again"); return end
+        say("check 13c: Runic Muted (status 2 %02X at the action): stance %s -> %s", a.st2, tostring(a.stance0),
+          tostring(a.stance1))
+        H.assertEq((a.st2 & 0x08) ~= 0 and wasMuted, true, "13c. she was Muted as Runic ran (staged)")
+        H.assertEq(a.stance1, true, "13c. Runic is usable while Muted, as vanilla's is: the stance stands")
+        passed("13c", "Runic raised while Muted")
+      end),
+    }),
+  })
+  add({ fightCheck("13d", { what = "a rune armed before Mute keeps biting while she is Muted", rune = true,
+    when = function() return bblade() == 0 and D["13a"] end,
+    bytes = function()
+      if not muted() and armedAt(nil) then setMute(true) end
+      return S.RB.bit, 0, 0, 0
+    end,
+    judge = function(r)
+      local wasMuted = (r.act.st2 & 0x08) ~= 0
+      if S.muted then setMute(false) end
+      if not wasMuted then say("check 13d: she was not Muted as she swung; asked again"); return false end
+      bites("13d", r, r.act.tier0)
+      return true
+    end }) })
 end
 
 -- 10. Break Blade
