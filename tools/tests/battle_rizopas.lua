@@ -42,7 +42,8 @@ local function up() return H.readByte(0x3AA8 + SLOT * 2) & 1 == 1 and H.readWord
 local rolls, gen = {}, 0
 local ENT = 8 + 2 * SLOT
 
-H.run({ maxFrames = 400000 }, {
+-- The cap: its run ended at f26,663 on the merged ROM (wt/v051-tg-wob1), so 55,000 is about 2x the longest.
+H.run({ maxFrames = 55000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),

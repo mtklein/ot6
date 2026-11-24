@@ -36,7 +36,8 @@ local STATE = "build/states/train_b68_entry.mss.lua"
 
 local TRAIN = 0x106
 
-H.run({ maxFrames = 400000 }, {
+-- The cap: its run ended at f34,113 on the merged ROM (wt/v051-tg-wob1), so 70,000 is about 2x the longest.
+H.run({ maxFrames = 70000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),

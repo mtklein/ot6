@@ -77,7 +77,8 @@ local function waveCheck(what)
   })
 end
 
-H.run({ maxFrames = 400000 }, {
+-- The cap: its run ended at f20,799 on the merged ROM (wt/v051-tg-wob1), so 45,000 is about 2x the longest.
+H.run({ maxFrames = 45000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),

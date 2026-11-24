@@ -39,7 +39,8 @@ local STATE = "build/states/whelk_entry.mss.lua"
 local WHELK, HEAD = 0x100, 0x134
 local MAGITEK, FIRE_BEAM = 0x1D, 0          -- the command, and the MagiTek list's entry (attack $83 + entry)
 
-H.run({ maxFrames = 400000 }, {
+-- The cap: its four cases ran to f23,485 (wt/v051-tg-wob1, the afterMove case included), so 50,000 is about 2x the longest.
+H.run({ maxFrames = 50000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),

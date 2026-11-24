@@ -77,7 +77,8 @@ local function ySwitchTo(p)
   }, "Y-switch to party " .. p), function() n, own = 0, 0 end)
 end
 
-H.run({ maxFrames = 400000 }, {
+-- The cap: the waves and its three cases ran to f30,874 (wt/v051-tg-wob1), so 65,000 is about 2x the longest.
+H.run({ maxFrames = 65000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),

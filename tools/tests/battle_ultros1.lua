@@ -284,7 +284,8 @@ local function lineAfter(f)
   end
 end
 
-H.run({ maxFrames = 40000 }, {
+-- The cap: its run ended at f29,055 with the telegraph's cases (wt/v051-tg-wob1), so 60,000 is about 2x the longest.
+H.run({ maxFrames = 60000 }, {
   H.loadState(DOOR),
   -- the fixture is the dialog before his battle, waiting on a press: page it
   -- (A, edge-tapped, only while a dialog waits) until the battle loads.  How

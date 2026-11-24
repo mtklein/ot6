@@ -149,7 +149,10 @@ local FUSE = {
   end,
 }
 
-H.run({ maxFrames = 400000 }, {
+-- The cap: back to the 120,000 it was before the telegraph's cases: the whole run, cases (the Runic case included)
+-- and the real fight, ended at f24,380 on the merged ROM before the Runic case, about 8,000 more with it
+-- (wt/v051-tg-wob1), well inside the fight's own budget.
+H.run({ maxFrames = 120000 }, {
   H.loadState(ENTRY),
   H.waitFrames(30),
   engage(),

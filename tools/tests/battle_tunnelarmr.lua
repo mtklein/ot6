@@ -33,7 +33,8 @@ local STATE = "build/states/tunnelarmr_entry.mss.lua"
 local ARMR, TUTORIAL = 0x104, 0x10
 local function map() return H.mapId() & 0x1ff end
 
-H.run({ maxFrames = 400000 }, {
+-- The cap: its four cases ran to f18,899 (wt/v051-tg-wob1, the Runic case included), so 40,000 is about 2x the longest.
+H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(60),
