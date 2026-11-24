@@ -77,7 +77,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_DAGGER  ;  65 Pipsqueak -> row -> DAGGER
         .byte   OT6_DAGGER  ;  66 M-TekArmor -> row -> DAGGER
         .byte   OT6_SWORD   ;  67 Sky Armor -> row -> SWORD
-        .byte   OT6_BLUNT   ;  68 Telstar -> row -> BLUNT
+        .byte   OT6_DAGGER  ;  68 Telstar -> row -> DAGGER
         .byte   OT6_RANGED  ;  69 Lethal Wpn -> row -> RANGED
         .byte   OT6_DAGGER  ;  70 Vaporite -> row -> DAGGER
         .byte   OT6_RANGED  ;  71 Flan -> row -> RANGED

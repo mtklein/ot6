@@ -413,9 +413,10 @@ scripted. He takes a few hits and flees, twice, with the waiter line
 unchanged, and the empty HUD says so from the start, which is the same
 rule as Tritoch one scenario earlier.
 
-**Telstar:** 4 shields · bolt, water + blunt (Dobermans 2 · fire +
+**Telstar:** 4 shields · bolt, water + dagger, blunt (Dobermans 2 · fire +
 dagger, blunt). SABIN's fists and Pummel key both; SHADOW's blade, when
-he is in, keys the Dobermans too. (Decoded, not recalled: `$044` weak = **bolt|water** —
+he is in, keys both too, so the pair races the call with two hands, where
+SABIN's alone could not break four shields in time (2026-11-24). (Decoded, not recalled: `$044` weak = **bolt|water** —
 `monster_prop.dat` +25 reads `$84`, the same byte TunnelArmor and the whole
 AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
 - **Telegraph:** its antenna sparks and it radios for backup → a

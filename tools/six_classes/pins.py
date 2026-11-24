@@ -197,7 +197,9 @@ OPENING = {
              "hire; his blade in hand keeps it and SABIN's fists dent the plate"),
     0x001a: (('ninja blade', 'knuckle'), "opening 10c: doberman: as the templar; a x3 pack of 465 HP with no key "
              "for SABIN alone was the camp's slog"),
-    0x0044: (('knuckle',), "opening 10c: telstar: 'bolt, water + bludgeoning' (bosses-wob.md 6-7)"),
+    0x0044: (('knuckle', 'ninja blade'), "opening 10c: telstar: 'bolt, water + bludgeoning' (bosses-wob.md 6-7), and "
+             "SHADOW's blade (2026-11-24, the coordinator: the camp's pair, SABIN and SHADOW, could not break 4 shields "
+             "with SABIN's blows alone; a key SHADOW really holds makes the race real; four HUD cells)"),
     0x014e: (('katana',), "opening 10c: leader: CYAN's solo duel"),
     0x014f: (('katana', 'knuckle'), "opening 10c: grunt: CYAN and SABIN at the camp"),
     0x0176: (('katana', 'knuckle'), "opening 10c: cadet: the same two, a bigger body"),

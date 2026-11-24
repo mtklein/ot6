@@ -353,7 +353,7 @@ Teaches: One member, one class: fists key three of the four bodies. The Beakor i
 | `$14E` Leader | 12 | 456 | 3 | Katana | - | slash |
 | `$14F` Grunt | 12 | 100 | 2 | Katana, Blunt | - | slash, bludg |
 | `$176` Cadet | 13 | 380 | 3 | Katana, Blunt | poison | slash, bludg |
-| `$044` Telstar | 14 | 1800 | 4 | Blunt | bolt, water | bludg |
+| `$044` Telstar | 14 | 1800 | 4 | Dagger, Blunt | bolt, water | bludg |
 
 Formations: Templar x2 (battle 12); Doberman x3 (battle 12); Doberman x2 (battle 42); Templar x2 + Soldier x2 (battle 44); Soldier x2 (battle 43); Leader (battle 46); Grunt x3 (battle 13); Grunt x4 (battle 13); Cadet + Grunt x2 (battle 14); Telstar (chest, battle 32).
 
@@ -559,9 +559,13 @@ Teaches: The first free party. EDGAR's tools reach almost everything (the sweep,
 
 ## Where the rows depart from "same count, a child class"
 
-22 of the 85 rows (`split.py`'s report lists them as OPENING DEPARTS).
+23 of the 85 rows (`split.py`'s report lists them as OPENING DEPARTS).
 
-**More weaknesses than on main (12).**
+**More weaknesses than on main (13).**
+
+- Telstar (bludgeon to Blunt, Dagger; 2026-11-24): the camp's pair is SABIN and
+  SHADOW, and SABIN's blows alone could not break four shields before the
+  call for backup; SHADOW's blade makes it a race for both hands.
 
 - Lobo, Marshal (pierce to Dagger, Spear): the old pierce was LOCKE's dirk
   and the moogles' pikes at once. One class would take the boss's key out of
@@ -645,7 +649,7 @@ Every row here fits the four cells with its elements, except:
 | 4 | Ultros 1 | 5 | fire, bolt; Sword, Ranged | TERRA's sword and Fire, EDGAR's sword and AutoCrossbow |
 | 5 | TunnelArmor | 5 | bolt, water, +ice; Dagger | LOCKE's dagger and Trickshot, CELES's Ice, Runic for the quake |
 | 6 | Kefka at the camp | no gauge | | |
-| 7 | Telstar (Dobermans 2) | 4 | bolt, water; Blunt (Dobermans: fire; Dagger, Blunt) | SABIN's fists and Pummel |
+| 7 | Telstar (Dobermans 2) | 4 | bolt, water; Dagger, Blunt (Dobermans: fire; Dagger, Blunt) | SABIN's fists and Pummel, SHADOW's blade |
 | 8 | GhostTrain | 4 | fire, bolt, holy; Blunt | AuraBolt, Pummel, SABIN's knuckle, SHADOW's Fire Skean; not CYAN |
 | 9 | Rizopas (Piranhas 1) | 4 | bolt; Katana, Blunt | CYAN's Ashura and SABIN's knuckle, as before |
 | 10 | Kefka at Narshe | 6 | +fire, +poison; Sword, Dagger | TERRA's, CELES's and EDGAR's swords (not a cutlass), LOCKE's dagger, SABIN's claw, GAU's fangs, TERRA's Fire, EDGAR's Bio Blaster |

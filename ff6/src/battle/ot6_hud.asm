@@ -2119,7 +2119,7 @@ Ot6ShieldTbl:
                                 ;   imperial camp gags carry no monster entity at all (see the
                                 ;   block comment)
         .word   $0044
-        .byte   4, OT6_BLUNT ; telstar: 'bolt, water + bludgeoning' (bosses-wob.md 6-7)
+        .byte   4, OT6_DAGGER|OT6_BLUNT ; telstar: 'bolt, water + bludgeoning' (bosses-wob.md 6-7)
                                 ;   (opening.md 10c).  bolt|water vanilla
         .word   $001a
         .byte   2, OT6_DAGGER|OT6_BLUNT ; doberman: as the templar; a x3 pack of 465 HP with no
