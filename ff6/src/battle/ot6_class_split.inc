@@ -187,7 +187,7 @@ Ot6ClassSplitTbl:
         .byte   $10, $02, $04, $00 ; 176 Spek Tor
         .byte   $10, $00, $00, $00 ; 177 Parasite
         .byte   $01, $00, $00, $00 ; 178 EarthGuard
-        .byte   $10, $00, $00, $00 ; 179 Coelecite
+        .byte   $01, $00, $00, $00 ; 179 Coelecite
         .byte   $10, $00, $00, $00 ; 180 Anemone
         .byte   $00, $02, $04, $00 ; 181 Hipocampus
         .byte   $00, $00, $04, $08 ; 182 Spectre

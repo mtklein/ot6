@@ -28,7 +28,7 @@ rule.
 |---|---|---|---|---|---|---|
 | `$06E` | ninja | 20 | 781 | **ice\|holy** | **fire**\|poison | 2 · sword\|dagger |
 | `$0E5` | spirit | 20 | 590 | **holy** | fire\|poison | 2 · blunt\|ranged\|katana |
-| `$0B3` | soft flier | 20 | 480 | **ice** | fire | 2 · katana |
+| `$0B3` | soft flier | 20 | 480 | **ice** | fire | 2 · sword |
 | `$048` | shelled tank (×3 stacks) | 21 | 1100 | **holy\|water** | fire\|poison | 3 · dagger\|blunt |
 | `$082` | brute | 21 | 1991 | **fire\|holy** | poison | 4 · sword\|ranged |
 
@@ -40,10 +40,10 @@ rule.
   hands: TERRA's and EDGAR's blades (Sword) the ninja and the brute,
   LOCKE's daggers the ninja and the `$048` trio, EDGAR's AutoCrossbow
   (Ranged) the spirit and the brute, SABIN's fists (Blunt) the spirit and
-  the trio. The soft flier takes only a Katana. SABIN's claw keyed it
-  until claws became Dagger (2026-11-24); now a curved sword does
-  (TERRA's, LOCKE's or EDGAR's Flame Sabre, TERRA's or EDGAR's
-  RegalCutlass). Without one the party's key on it is ice (Shiva).
+  the trio. The soft flier takes the blades (Sword) and ice (Shiva).
+  It was Katana, keyed by SABIN's claw, until claws became Dagger
+  (2026-11-24); the mission's blades are straight (the ThunderBlade, the
+  Blizzard), so its row went to Sword (battle_breakgate).
 - **The spirit takes Ranged** too: a Setzer brought on the mission (he
   can be, from the Opera on) keys it with cards or dice.
 - Shields follow the house curve: 2 for trash, 3 for the stacked tank,

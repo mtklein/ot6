@@ -188,7 +188,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_DAGGER  ; 176 Spek Tor -> row -> DAGGER
         .byte   OT6_KATANA  ; 177 Parasite -> row -> KATANA
         .byte   OT6_SWORD   ; 178 EarthGuard -> row -> SWORD
-        .byte   OT6_KATANA  ; 179 Coelecite -> row -> KATANA
+        .byte   OT6_SWORD   ; 179 Coelecite -> row -> SWORD
         .byte   OT6_KATANA  ; 180 Anemone -> row -> KATANA
         .byte   OT6_DAGGER  ; 181 Hipocampus -> row -> DAGGER
         .byte   OT6_BLUNT   ; 182 Spectre -> row -> BLUNT

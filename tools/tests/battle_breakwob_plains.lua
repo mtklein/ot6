@@ -39,7 +39,10 @@ local PARTIES = {
   -- zozo-outside-v1: LOCKE the MithrilKnife $01, EDGAR the Mithril Pike $1D, SABIN the Kaiser $55, CELES the
   -- RegalCutlass $0B; narshe-mission-v1: EDGAR the Blizzard $0E, SABIN the Poison Claw $56, SETZER the Cards $4D
   { "LOCKE, EDGAR, SABIN, CELES (to Zozo)", { { "LOCKE", W(0x01), 0 }, { "EDGAR", W(0x1D), POISON }, { "SABIN", W(0x55), FIRE | HOLY }, { "CELES", W(0x0B), 0 } }, nil },
-  { "LOCKE, EDGAR, SABIN, SETZER (to Narshe)", { { "LOCKE", W(0x01), 0 }, { "EDGAR", W(0x0E), ICE }, { "SABIN", W(0x56), FIRE | HOLY }, { "SETZER", W(0x4D), 0 } }, nil },
+  -- EDGAR's tools are his in both parties (the Bio Blaster's poison, as the first party's model has it, and the
+  -- AutoCrossbow $AA): after the 2026-11-24 regroup SABIN's Poison Claw is a Dagger, and the Red Fang (Spear|Katana,
+  -- +poison) takes the Bio Blaster from this party (#566)
+  { "LOCKE, EDGAR, SABIN, SETZER (to Narshe)", { { "LOCKE", W(0x01), 0 }, { "EDGAR", W(0x0E) | W(0xAA), ICE | POISON }, { "SABIN", W(0x56), FIRE | HOLY }, { "SETZER", W(0x4D), 0 } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {

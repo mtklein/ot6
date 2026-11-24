@@ -20,7 +20,7 @@ local WANT = {                    -- species -> { shields, class mask }
   [0x0DF] = { 2, DAGGER | RANGED }, -- gabbldegak: dagger|ranged
   [0x06E] = { 2, SWORD | DAGGER },  -- ninja: sword|dagger
   [0x0E5] = { 2, KATANA | BLUNT | RANGED }, -- spirit: katana|blunt|ranged (#347)
-  [0x0B3] = { 2, KATANA },          -- soft flier: katana
+  [0x0B3] = { 2, SWORD },           -- soft flier: sword
   [0x048] = { 3, DAGGER | BLUNT },  -- shelled tank: dagger|blunt
   [0x082] = { 4, SWORD | RANGED },  -- brute: sword|ranged
 }

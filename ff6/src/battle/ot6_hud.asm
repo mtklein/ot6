@@ -2403,7 +2403,7 @@ Ot6ShieldTbl:
                                 ;   ranged for a Setzer brought along
                                 ;   (#347).  holy vanilla
         .word   $00B3
-        .byte   2, OT6_KATANA ; the soft flier (a katana's); ice vanilla
+        .byte   2, OT6_SWORD ; the soft flier (a katana's); ice vanilla
         .word   $0048
         .byte   3, OT6_DAGGER|OT6_BLUNT ; the shelled tank, in threes:
                                 ;   LOCKE's daggers find the seams, fists
