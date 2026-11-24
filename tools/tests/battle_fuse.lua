@@ -173,7 +173,7 @@ local HAND = {
       .. "again while lit; cleared by the move's turn or the cancel.  The head leaves the field only by its own "
       .. "move: the shell's script no longer draws it in (SHELL_GUARD below checks it), and its show block acts "
       .. "only on a head that is gone" },
-  ["064@0000"] = { blocks = "earlier [13 01 01 / 15 24 01]; own [14 24 00]",
+  ["064@0011"] = { blocks = "earlier [13 01 01 / 15 24 01]; own [14 24 00]",
     why = "the Marshal: the earlier block is vanilla's alone block (one monster left), which now also drops an "
       .. "armed fuse; switch 1, set by the announce, shuts it from the announce to the move, and only the move's "
       .. "turn or the cancel clears it.  His own condition is switch 0, set by his rotation's second turn, cleared "

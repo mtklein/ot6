@@ -19816,6 +19816,10 @@ function M.fuseCases(cfg)
       M.lazy(function()
         return M.kitBattle(plan, { maxFrames = max or 6000, care = when ~= nil,
           idle = (cfg.aim or cfg.breaker) and "defend" or nil,  -- (the others Defend: no stray Fight on a Lobo)
+          -- (a fuse the party arms by Fighting, Atma's tally, is armed again by the others' Fights while the breaker
+          -- waits: on wt/v051-tg-wob1's gate draw an Imp'd breaker missed the first fuse, and Defending others never
+          -- armed a second)
+          others = (cfg.arm == "fight" and when ~= nil) and "fight" or nil,
           giveUp = function() return gone() or #W.breaks > C.nBreaks end })
       end),
       M.call(function()
