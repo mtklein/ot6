@@ -521,7 +521,7 @@ member's experience.
 - **Weapons in reach**: the Gold Lance (EDGAR, Spear 139, 12,000 GP,
   Kohlingen 65), the **Man Eater** (Dagger 146; EDGAR, CELES or SETZER; the
   east-room chest), Darts (SETZER, Ranged 115, 10,000) or Trump (SETZER,
-  Ranged 133, 13,000), the Soul Sabre in the bag (Sword 125). `items.txt`.
+  Ranged 133, 13,000), the Soul Sabre in the bag (Katana 125 since 2026-11-24). `items.txt`.
 - **Armor**: Kohlingen's 66 (Diamond Shld/Helm/Vest/Armor, Bard's Hat,
   Green Beret); the tomb's Genji Helmet and Crystal Mail (EDGAR, CELES,
   SETZER).
@@ -728,7 +728,7 @@ Dullahan SABIN, EDGAR and SETZER do; CELES's key on him is fire (8.4).
 
 | hand | classes | elements |
 |---|---|---|
-| CELES | Sword (Enhancer, ThunderBlade; the Soul Sabre in the bag) | fire, ice, bolt (MADUIN), bolt (the blade) |
+| CELES | Sword (Enhancer, ThunderBlade); Katana (the Soul Sabre in the bag) | fire, ice, bolt (MADUIN), bolt (the blade) |
 | SABIN | Blunt (Fire Knuckles, bare hands, Pummel, Suplex) | fire (Knuckles, Fire Dance, IFRIT), holy (AuraBolt), wind (Air Blade) |
 | EDGAR | Sword (Break Blade), Spear (Mithril Pike, Gold Lance) or Dagger (Man Eater); Ranged on every body (AutoCrossbow) | bolt (RAMUH), poison (Bio Blaster) |
 | SETZER (from Kohlingen) | Ranged (Cards, Trump, Dice, Darts) or Dagger (Man Eater) | his Esper's (Unicorn holy, Shiva ice) |

@@ -79,12 +79,12 @@ elements stay.
 | species | where | L / HP | vanilla elements; notes | shields | classes | why |
 |---|---|---|---|---|---|---|
 | Phase `$0BC` | 315 | 47 / 4,550 | weak ice, absorbs fire; Float; Smirk (Stop) | 2 | Blunt, **+holy** | a phantom: holy for the half with no ice |
-| Parasoul `$0BF` | 315 | 47 / 2,077 | weak ice, absorbs fire; El Nino, Flash Rain | 2 | Dagger, Katana | cut or puncture the canopy; party 2 holds neither, and keys it with CELES's ice |
-| Necromancr `$0F1` | 315 | 48 / 3,525 | weak fire, holy; absorbs poison; Doom, X-Zone, Flare (Runic) | 2 | Sword, Blunt | a robed caster; CELES's Runic eats its list |
+| Parasoul `$0BF` | 315 | 47 / 2,077 | weak ice, absorbs fire; El Nino, Flash Rain | 2 | Dagger, Katana | cut or puncture the canopy; party 2 holds neither unless CELES carries a curved sword (her Falchion is Katana since 2026-11-24), and keys it with CELES's ice |
+| Necromancr `$0F1` | 315 | 48 / 3,525 | weak fire, holy; absorbs poison; Doom, X-Zone, Flare (Runic) | 2 | Sword, Blunt | a robed caster; CELES's Runic eats its list. RELM's rod and UMARO's club key it; CELES's Falchion, pinned as a key, is Katana since 2026-11-24 and does not |
 | Trixter `$0F7` | 313, 315 | 49 / 3,815 | weak holy; Fire 1-3, Cure 2, Rflect, Haste | 2 | Blunt, Spear | MOG's spear for the half with no holy |
 | Aquila `$0EC` | 315 (16/256) | 49 / 6,013 | weak ice, absorbs fire; Flap (x5) | 3 | Katana, Spear | a bird, the cave's rare killer |
 | Chaos Drgn `$0E2` | 313, 315 | 44 / 9,013 | weak ice, absorbs fire; defence 5; Disaster, Cinderizer | 4 | Blunt, Spear | a dragon with no armour |
-| Sea Flower `$0E9` | 313 | 47 / 4,200 | weak ice, bolt; absorbs fire, water; Feeler | 2 | Katana | a plant, in fives; party 2 holds no Katana, and keys it with CELES's ice |
+| Sea Flower `$0E9` | 313 | 47 / 4,200 | weak ice, bolt; absorbs fire, water; Feeler | 2 | Katana | a plant, in fives; party 2 holds no Katana but a curved sword in CELES's hand (the Falchion, since 2026-11-24), and keys it with CELES's ice |
 | Uroburos `$093` | 313 | 48 / 50 | weak ice, absorbs fire; defence and magic defence 252 | 1 | Blunt | 50 HP behind its defence: one Blunt hit breaks it |
 | Red Dragon `$153` | event 138 | 67 / 30,000 | weak ice, water; absorbs fire | 6 | Spear | MOG's spear between the scales, CELES's ice |
 | Doom Gaze `$11D` | event 93 (the sky) | 68 / 55,555 | weak fire, holy; absorbs ice, poison; escapes | 8 | Spear, Ranged | an eye in the sky; v0.34 fights it |

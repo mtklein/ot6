@@ -87,7 +87,7 @@ The routed party at the save (`audit_levels`, `savestate_party`):
 
 The keys are as recorded, under four classes.  Today the Trapper's class
 is Ranged: EDGAR's AutoCrossbow keys it, and SABIN's MetalKnuckle and
-Pummel (Blunt) and the RegalCutlass and MithrilBlade (Sword) do not.  The
+Pummel (Blunt), the RegalCutlass (Katana) and the MithrilBlade (Sword) do not.  The
 measurements below, which rest on Pummel as the class key, are v0.50's.
 
 Bag: 84 Tonics, 13 Fenix Downs, 2 Tinctures, 3 Elixirs.  XP: LOCKE 13097

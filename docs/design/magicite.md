@@ -47,7 +47,7 @@ authority for both, alongside the data in `ff6/src/menu/genju_prop.asm` and
 row, the Spells and Stat columns are built (below). **The Passive and Permit
 columns were never built** and are superseded by the ladder
 (esper-rework.md); read them only as the themes the stones were given. The
-Permit column keeps the four-class words it was written in (claws are Katana
+Permit column keeps the four-class words it was written in (claws are Dagger
 now).
 
 | Esper | Source | Spells (base) | Stat vig/spd/stm/mag | Passive | Permit | Notes |

@@ -146,16 +146,16 @@ pike).
 
 Lesson: the Bio Blaster keys the guard and heals the rat beside him, which
 TERRA's Fire keys; BANON's rod and EDGAR's AutoCrossbow dent the guard's
-plate. On the `water_rondo` leg the knife and the Blizzard key the rat and
-the AutoCrossbow the guard.
+plate. On the `water_rondo` leg the knife, the Blizzard and the Poison Claw
+(Dagger since 2026-11-24) key the rat and the AutoCrossbow the guard.
 
 ## 8. The plains between Narshe, Kohlingen, Jidoor and Zozo (world groups 9, 10, 11, 13)
 
 Two parties: to Zozo, LOCKE (knives: dagger), EDGAR (pike: spear; poison),
-SABIN (Kaiser: blunt; fire, holy), CELES (RegalCutlass: sword), from
-`zozo-outside-v1`; to Narshe after the Opera, LOCKE (knife), EDGAR
-(Blizzard: sword, ice), SABIN (Poison Claw: katana), SETZER (Cards: ranged),
-from `narshe-mission-v1`.
+SABIN (Kaiser: blunt; fire, holy), CELES (RegalCutlass: katana since
+2026-11-24), from `zozo-outside-v1`; to Narshe after the Opera, LOCKE
+(knife), EDGAR (Blizzard: sword, ice), SABIN (Poison Claw: dagger since
+2026-11-24), SETZER (Cards: ranged), from `narshe-mission-v1`.
 
 | id | body | L | HP | vanilla weak | absorbs | floor | authored |
 |---|---|---|---|---|---|---|---|
@@ -166,9 +166,14 @@ from `narshe-mission-v1`.
 
 Lesson: the flier falls to LOCKE's knife and the AutoCrossbow, not the
 blade (weapon-classes.md's "pierce-weak fliers" for this stretch, pierce
-through v0.50); the moth takes SETZER's cards and the blades, the first
-trash his hand is made for; the Red Fang takes EDGAR's pike or SABIN's
-claw; the Over-Grunk is the tank, for SABIN's fists or claw.
+through v0.50); the moth takes SETZER's cards and the straight blades
+(EDGAR's Blizzard; not CELES's cutlass), the first
+trash his hand is made for; the Red Fang takes EDGAR's pike or CELES's
+cutlass; the Over-Grunk is the tank, for SABIN's fists and Blitzes or
+CELES's cutlass. Since 2026-11-24 SABIN's claw is a dagger: it keys the
+Vulture and not the Red Fang, so the party after the Opera (EDGAR in the
+Blizzard) holds no weapon key on the Red Fang; the Bio Blaster's poison
+keys it.
 
 ## 9. The south continent round Albrook (world groups 14, 21, 15)
 
@@ -348,7 +353,7 @@ the four classes that squad held no key (fists were bludgeon).
 The banquet runs before the roster is rewritten, so the bout is fought by
 `vector-crash-v1`'s party: TERRA (ThunderBlade: sword, bolt; Fire), LOCKE
 (MithrilKnife: dagger), EDGAR (Blizzard: sword, ice; AutoCrossbow: ranged;
-Bio Blaster: poison) and SABIN (Poison Claw: katana, poison; Fire Dance,
+Bio Blaster: poison) and SABIN (Poison Claw: dagger since 2026-11-24, poison; Fire Dance,
 AuraBolt). During the banquet's free time a trooper offers a two-minute bout
 (`_cc8a47`). The canon banquet talks instead.
 

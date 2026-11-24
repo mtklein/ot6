@@ -147,7 +147,8 @@ brings Ultima (Ragnarok), Sketch and the party's only Blunt key; TERRA the
 dreamscape's solo walk; CELES the Genji Glove pair and ice for Wrexsoul.
 After the dream the same four, CYAN back, walk the Ancient Castle, whose
 Reflecting bodies want steel: CYAN's katanas (Strato and Aura, the Genji
-Glove from the dream's train), CELES's Falchion pair, TERRA's blade.
+Glove from the dream's train), CELES's Falchion pair (Katana since
+2026-11-24), TERRA's blade.
 
 ## 3. Species and break rows
 
@@ -161,7 +162,10 @@ dream's and the Ancient Castle's only, event groups 90, 92 and 137 theirs).
 dream's Doma; 182, the cave).  TERRA, CELES and RELM hold Sword (the two
 blades), Blunt (RELM's rod), fire, ice, bolt and holy (TERRA's and CELES's
 spells, the Pearl Rod).  TERRA walks the dreamscape alone until the stooges
-run.  Every body there takes her Sword or her fire.
+run.  Every body there takes her Sword or her fire.  Since 2026-11-24 a
+curved sword is Katana: in her Falchion pair CELES holds Katana, not
+Sword, and keys the Parasite, the Samurai, the Barb-e, the Suriander,
+Curley and Wrexsoul with it.
 In the cave the three ride Magitek armor, whose rows are the beams (fire,
 bolt, ice), Bio Blast (poison) and TERRA's Tek Missile (Ranged), with no
 Fight; every body there is weak to bolt vanilla, so the bolt beam breaks

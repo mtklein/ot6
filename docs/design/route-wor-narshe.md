@@ -214,9 +214,10 @@ Vanilla stats (`species.txt`; identical to vanilla, `vanilla_cmp.txt`).
 Shields follow ot6_hud.asm's tiers: trash 1-3, tanks and minibosses 4, bosses
 by HP and fight length (the Storm Drgn's 14 at 42,000 HP, Phunbaba's 4-12).
 Only one of these species appears anywhere else (Nastidon, random group 86,
-`sharing.txt`). The party here holds Sword (TERRA, CELES), Katana (CYAN,
-SABIN's claw), Spear (MOG's spear) and fire; UMARO brings Blunt at the
-end.
+`sharing.txt`). The party here holds Sword (TERRA, CELES), Katana (CYAN;
+TERRA's or CELES's curved sword), Spear (MOG's spear) and fire; UMARO
+brings Blunt at the end. (SABIN's claw, named here before, is Dagger
+since 2026-11-24, and SABIN waits aboard: section 5.4.)
 **Counts and keys are a proposal**; the route agent's play sets them.
 (Built as proposed but for the Wizard, the Pugs and the Test Rider's
 lesson: section 11.3.)
@@ -312,8 +313,9 @@ Haste, Regen (:4917-4932). The party's Magic counts up a monster variable
 draws Tackle or Blizzard; any hit can draw Tackle.
 
 - **Kit.** L33 against L38-40. Break him before 10,240 HP, while his Green
-  Cherry is unspent; Fight (CYAN's katana and the spear: his row is
-  Spear, Katana, which TERRA's and CELES's swords no longer key), and fire
+  Cherry is unspent; Fight (his row is Sword, Spear in `ot6_hud.asm`:
+  MOG's spear and TERRA's and CELES's straight swords; CYAN's katana and
+  CELES's Flame Sabres, Katana since 2026-11-24, do not key it), and fire
   on the break.
   The lair is a cave, MOG's terrain for Dusk Requiem (Elf Fire among its
   steps, `dance_prop.asm`).

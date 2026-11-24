@@ -704,8 +704,8 @@ it* can reach:
 | Grunt | `$014F` | 2 · blunt\|katana | Doma defense `b13` (Cyan's katana + Sabin's knuckles and Blitz) | two heroes overwhelm a footman |
 | Cadet | `$0176` | 3 · blunt\|katana | Doma defense `b14` (same two) | ditto, a bigger body |
 | Officer | `$0175` | 2 · dagger | Locke SOLO S.Figaro `b9` | the thief's dagger finds the seam |
-| Trooper | `$0065` | 2 · sword\|dagger\|katana | Narshe waves — a squad with a sword, a dagger or a katana | sword for Terra/Celes/Edgar's blade, dagger for Locke and for Gau's fangs, katana for Cyan; Sabin's knuckles hold none |
-| Rider | `$003F` | 3 · dagger\|katana | Narshe waves — a squad with a dagger or a katana | Locke's dagger, Gau's fangs, Cyan's katana; Terra's Fire and Edgar's poison (fire still breaks it on the train) |
+| Trooper | `$0065` | 2 · sword\|dagger\|katana | Narshe waves — a squad with a sword, a dagger or a katana | sword for Terra/Celes/Edgar's blade, dagger for Locke and for Gau's fangs, katana for Cyan; Sabin's knuckles hold none, his claw (Dagger since 2026-11-24) does |
+| Rider | `$003F` | 3 · dagger\|katana | Narshe waves — a squad with a dagger or a katana | Locke's dagger, Gau's fangs, Sabin's claw, Cyan's katana; Terra's Fire and Edgar's poison (fire still breaks it on the train) |
 | HeavyArmor | `$009F` | 3 · dagger | Locke SOLO `b11` (dagger) + Narshe wave (a dagger, or bolt, water or poison) | heavy plate; a blade at the seams |
 
 Shields track the early-war stretch (2 basic infantry, 3 for the elite /
@@ -761,9 +761,9 @@ rule that Sabin's fights are Blunt.
 Sabin + Cyan + Gau ride the trench (`battle 19`/`20`/`21`, UNDERWATER,
 event_main.asm:21194+; the party is placed together at the ride's entry
 `_ca8ae3`). The classes they can field are **blunt** (Sabin's knuckles,
-fists and Blitz), **katana** (Cyan's katana and SwdTech, Sabin's edged
-claws once he owns a pair) and **dagger** (Gau's fangs: his bare hand),
-and nothing else. Every trench
+fists and Blitz), **katana** (Cyan's katana and SwdTech) and **dagger**
+(Gau's fangs: his bare hand; Sabin's claws once he owns a pair, since
+2026-11-24), and nothing else. Every trench
 aquatic was a formula species whose vanilla element the party cannot
 reach: Anguiform is bolt-only and the party has no bolt, and
 Actaneon/Aspik are fire-weak but Sabin's Fire Dance needs level 15. All
@@ -905,10 +905,12 @@ the party that walked in.
 | body | 7 | bolt, water + dagger |
 | Left/Right blades | 3 each | bolt + katana |
 
-The blades take CYAN's blade, or SABIN's with a claw. The route's three
-(LOCKE, EDGAR, SABIN, `level-curve.md`) break them with Bolt, their
-vanilla weakness (Ramuh is held by then), and with SABIN's claw if he
-wears one; the body takes LOCKE's dagger and Bolt.
+The blades take CYAN's blade, or a curved sword (LOCKE's or EDGAR's
+Flame Sabre; since 2026-11-24 a claw is Dagger and no longer keys them).
+The route's three (LOCKE, EDGAR, SABIN, `level-curve.md`) break them with
+Bolt, their vanilla weakness (Ramuh is held by then), and with a Flame
+Sabre if LOCKE or EDGAR holds one; the body takes LOCKE's dagger, SABIN's
+claw and Bolt.
 
 - Blades regenerate a few turns after dying (vanilla ✦), and regrown
   blades return at full shields. Their weakness row stays revealed.

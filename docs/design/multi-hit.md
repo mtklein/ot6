@@ -190,10 +190,10 @@ can they reach a second axis without re-equipping, with the weapon they are
 holding. That is runtime state, and no static tool answers it.
 
 One reach fact is solid: Sabin's fists and knuckles are Blunt and so is
-Pummel (`ot6_class.asm:158-183`, `:214`), so a bare-fisted or knuckled
-Sabin's Blitz opens no axis his Fight does not. The edged claws are Katana
-(`ot6_class.asm:157-164`), as they were slashing under four classes, so
-with a claw Pummel is his second axis.
+Pummel (`ot6_class.asm:160-167`, `:217`), so a bare-fisted or knuckled
+Sabin's Blitz opens no axis his Fight does not. The claws are Dagger
+(`ot6_class.asm:160-167`; owner, 2026-11-24; slashing under four
+classes), so with a claw Pummel is his second axis.
 
 ### 2.4 Duration — hits per turn thereafter, paid once
 A poison status tick chips, measured. Cmd_22
@@ -373,7 +373,7 @@ Principles, stated so they can be reviewed:
 | AuraBolt / Fire Dance / Air Blade | ×1 | Element probes, and Fire Dance/Air Blade are already breadth. Adding rate on top would make Sabin the answer to every fight, and P2 allows him one rate ability, which Pummel is. |
 | Mantra / Spiraler | ×1, and the question does not arise | Neither strikes an enemy. Mantra heals the party and Spiraler is a sacrifice; a hit count on either has nothing to chip. |
 
-Identity: the cheapest chips in the game, on one axis (a claw adds Katana
+Identity: the cheapest chips in the game, on one axis (a claw adds Dagger
 on Fight). His three Blunt Blitzes are one of each shape — Pummel is the rate probe,
 Suplex the single-hit committer, Bum Rush the capstone — so the class stays
 constant while the job changes, which is P3 applied inside one axis.

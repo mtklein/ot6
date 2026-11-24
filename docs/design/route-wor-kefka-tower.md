@@ -237,7 +237,8 @@ cure in every party:
 | 3 | CYAN 53, SHADOW 53, SABIN 39, GOGO 44 | SABIN's (Starlet) | the factory: Inferno, the Skull Dragon; the west column, Doom |
 
 GAU (no weapon; #496's casualty) and UMARO sit out. Party 3 holds Katana
-(CYAN, SABIN's claws), Dagger (GOGO's knife, SHADOW's Striker), Ranged
+(CYAN), Dagger (SABIN's claws, Dagger since 2026-11-24; GOGO's knife,
+SHADOW's Striker), Ranged
 (SHADOW's throws) and Blunt (SABIN's Blitzes): a key for Doom (Ranged,
 Katana), which it takes, and for the Goddess (Ranged) and the Poltergeist
 (Blunt, Ranged) too. Under the four classes its keys were slash and pierce
