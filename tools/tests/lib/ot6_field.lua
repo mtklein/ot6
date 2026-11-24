@@ -8182,8 +8182,10 @@ function M.gearDressPlan(opts)
               cands[#cands + 1] = id
             end
           end
+          -- what c holds now in the plan, and what the bag still has: a piece another member's pick took is
+          -- not c's to take back (wor_falcon on 59c1a825: two members planned the one Man Eater, and the
+          -- gear baseline's equip found it gone, "SETZER slot 0 holds $06: got 80 ($50)")
           cand(cur)
-          cand(gearWorn(c, 0))
           for id, n in pairs(bag) do if n > 0 then cand(id) end end
           local top = 0
           for _, id in ipairs(cands) do top = math.max(top, power(id)) end
