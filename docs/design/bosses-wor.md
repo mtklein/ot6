@@ -237,7 +237,15 @@ rule in one paragraph.
   drawn from and, when the member whose turn it is can take the boss's
   last shields with a Fight, makes its planned attack that Fight
   (`Driver:fusePlan`). It does not yet hold a last shield for an
-  announce, or work a full gauge down inside a fuse.
+  announce, or work a full gauge down inside a fuse. On the line played
+  on unit A's ROM (the gate at c44f23b2, `build/attempts/wt/v051-fuse/gate-c44f/`)
+  no fuse lit in any of the four fights: the legs' logs hold no `[fuse]`
+  line, and the party won each before its boss announced (AtmaWeapon 7,610
+  ticks, Atma 7,087, the Gold Dragon 3,727, Kefka 14,506; 6,907, 6,611,
+  4,019 and 17,138 on the survey's line, whose play upstream differed). So
+  the line does not exercise the cancel; the suites do. Whether a party
+  that meets the announce breaks the boss in time is each unit's lab
+  (turns to break against the fuse's length).
 
 ## 2. Hooks at a glance
 
