@@ -25,9 +25,10 @@
 --   outside   a break after its opening turn, nothing counted and nothing lit: nothing is cancelled and the
 --             script's cells stand, two Fights in the window wind nothing, and the toot then lights and fires as in
 --             the first case.
--- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v051-tg-wob2/mutants/): fuse_never is red at "the break
--- during the fuse cancels it", fuse_no_trigger at "monster switch 0 and the count are clear after the cancel".  A
--- mechanism test, not play.
+-- Mutants (tools/build/mutant_rom.py, on the branch's ROM; build/attempts/wt/v051-tg-wob2/mutants/): fuse_never
+-- (Ot6FuseCancel+3=80) is red at "the break during the fuse cancels it"; train_no_trigger (its row keeps every bit
+-- and clears no count: Ot6FuseTbl+77=FF, +79=00) at "monster switch 0 is clear after the cancel".  A mechanism test,
+-- not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }

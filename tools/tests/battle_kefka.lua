@@ -36,8 +36,9 @@
 --        outside   a break before his clock has run: nothing is cancelled and the cells stand, two Fights in the
 --                  window wind nothing, and the fuse then lights and fires as in the first case.
 --      Then the entry is restored and the real fight below is played: the cases are staged, the fight is not.
---      Mutants (build/attempts/wt/v051-tg-wob2/mutants/): fuse_never is red at "the break during the fuse
---      cancels it", fuse_no_trigger at "his clock was restarted by the cancel".
+--      Mutants (build/attempts/wt/v051-tg-wob2/mutants/): fuse_never (Ot6FuseCancel+3=80) is red at "the break
+--      during the fuse cancels it"; kefka_no_trigger (his row keeps every bit and restarts no clock:
+--      Ot6FuseTbl+93=FF, +95=00) at "monster switch 0 is clear after the cancel".
 --
 -- The fight is the one both generators play (gen_narshe_battle,
 -- gen_kefka_won): the library's fight driver with FIGHT below

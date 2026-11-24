@@ -21,9 +21,9 @@
 --             turns back, and the line returns only once the clock has climbed to 25 again; the wave follows.
 --   outside   a break before the clock reaches 25, no line yet: nothing is cancelled and the script's cells stand,
 --             two Fights in the window wind nothing, and the call then lights and fires as in the first case.
--- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v051-tg-wob2/mutants/): fuse_never is red at "the break
--- during the fuse cancels it", fuse_no_trigger at "the clock was restarted by the cancel".  A mechanism test, not
--- play.
+-- Mutants (tools/build/mutant_rom.py, on the branch's ROM; build/attempts/wt/v051-tg-wob2/mutants/): fuse_never
+-- (Ot6FuseCancel+3=80) is red at "the break during the fuse cancels it"; telstar_no_clock (its three rows' flags 0:
+-- Ot6FuseTbl+55/+63/+71=00) at "the clock was restarted by the cancel".  A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }

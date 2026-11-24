@@ -24,9 +24,10 @@
 --             nothing, and the fuse then lights and fires as in the first case.
 -- Every roll is read where it is made (Ot6AIRolled: the roll in A, the chance in $3A2E); the announce must follow a
 -- roll under the chance and the arming exactly the rolls under it.  The school and the surfacing are vanilla's.
--- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v051-tg-wob2/mutants/): fuse_never is red at "the break
--- during the fuse cancels it", fuse_no_trigger at "switches 0 and 1 are clear after the cancel", roll_always at
--- "the roll ... does not arm the fuse".  A mechanism test, not play.
+-- Mutants (tools/build/mutant_rom.py, on the branch's ROM; build/attempts/wt/v051-tg-wob2/mutants/): fuse_never
+-- (Ot6FuseCancel+3=80) is red at "the break during the fuse cancels it"; rizopas_no_trigger (its row keeps every
+-- bit: Ot6FuseTbl+85=FF) at "switches 0 and 1 are clear after the cancel"; roll_always (every roll arms:
+-- Ot6AICondRoll+6=3860EA) at "a roll under the chance came between the cancel and the second line".  A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }
