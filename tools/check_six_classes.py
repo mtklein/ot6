@@ -6,7 +6,8 @@
     python3 tools/check_six_classes.py --rom build/mutants/sixpike.sfc --red weapon
 
 The design is written once, below (DESIGN, FAMILIES, SKILLS, KIT, ART), from
-the issue and the owner's grouping of 2026-11-23 (tools/six_classes/REGROUP.md),
+the issue and the owner's grouping of 2026-11-23 (tools/six_classes/REGROUP.md;
+claws to Dagger and the curved swords to Katana on 2026-11-24),
 not copied from the tables or from tools/six_classes/classes.py, which writes
 them: six classes, Sword $01, Dagger $02, Blunt $04, Ranged $08, Katana $10,
 Spear $20, and a null-break property $80.  Read from the ROM through
@@ -81,14 +82,16 @@ def ids(*parts):
 
 # the families: every item id that carries a class (everything else is $00)
 FAMILIES = {
-    # daggers; ninja blades
-    DAGGER: ids((0x00, 0x09), (0x25, 0x2A)),
-    # swords
-    SWORD: ids((0x0A, 0x1C)),
+    # daggers; ninja blades; the claws (Mithril Claw, Poison Claw, Dragon Claw,
+    # Tiger Fangs; owner 2026-11-24: "claws just feels like daggers")
+    DAGGER: ids((0x00, 0x09), (0x25, 0x2A), 0x54, 0x56, 0x58, 0x59),
+    # the straight swords
+    SWORD: ids(0x0A, 0x0C, 0x0E, 0x0F, (0x10, 0x14), 0x17, 0x18, (0x1A, 0x1C)),
     # spears
     SPEAR: ids((0x1D, 0x24)),
-    # katanas; the edged claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs)
-    KATANA: ids((0x2B, 0x32), 0x54, 0x56, 0x58, 0x59),
+    # katanas; the curved swords (RegalCutlass, Flame Sabre, Falchion, Soul
+    # Sabre, Scimitar; owner 2026-11-24)
+    KATANA: ids((0x2B, 0x32), 0x0B, 0x0D, 0x15, 0x16, 0x19),
     # rods (not the Heal Rod), brushes; the Flail, Morning Star, Bone Club;
     # the knuckles (MetalKnuckle, Kaiser, Fire Knuckle)
     BLUNT: ids((0x34, 0x40), 0x44, 0x46, 0x4A, 0x53, 0x55, 0x57),
@@ -347,7 +350,8 @@ def selftest(rom_path, dbg_path):
     mutants = [
         ("the Mithril Pike a sword", sym["Ot6WeapClassTbl"] + 0x1D, [SWORD], "weapon"),
         ("the Imperial (a ninja blade) a katana", sym["Ot6WeapClassTbl"] + 0x25, [KATANA], "weapon"),
-        ("the Mithril Claw (an edged claw) blunt", sym["Ot6WeapClassTbl"] + 0x54, [BLUNT], "weapon"),
+        ("the Mithril Claw (a claw) a katana", sym["Ot6WeapClassTbl"] + 0x54, [KATANA], "weapon"),
+        ("the RegalCutlass (a curved sword) a sword", sym["Ot6WeapClassTbl"] + 0x0B, [SWORD], "weapon"),
         ("the MetalKnuckle a katana", sym["Ot6WeapClassTbl"] + 0x53, [KATANA], "weapon"),
         ("the Mithril Rod ranged", sym["Ot6WeapClassTbl"] + 0x34, [RANGED], "weapon"),
         ("the Hawk Eye a dagger", sym["Ot6WeapClassTbl"] + 0x49, [DAGGER], "weapon"),

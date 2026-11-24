@@ -152,7 +152,7 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Claws cut, so they are Katana. Ninja blades are Dagger, and so are Gau's fangs.
+> Claws and ninja blades are Dagger, and so are Gau's fangs. Curved swords, like the RegalCutlass, are Katana.
 >
 > *(next box)*
 >
@@ -338,8 +338,9 @@ What the pages have to carry is the part a player cannot read off a weapon:
 the item menu shows every weapon's icon and type word, so the names of the
 six and the rule "Fight uses your weapon's type" are one page; the two
 classes that are not a kind of blade (Blunt, Ranged) get a page saying what
-counts; the three places a guess goes wrong (claws are not Blunt, ninja
-blades are not Katana, Gau's bare hand is not Blunt) get a page; and one page
+counts; the places a guess goes wrong (claws are not Blunt, ninja blades
+are not Katana, Gau's bare hand is not Blunt, a curved sword is not Sword)
+get a page; and one page
 says a skill can have a type whatever is held.
 
 Each claim against `ff6/src/battle/ot6_class.asm`:
@@ -351,8 +352,11 @@ Each claim against `ff6/src/battle/ot6_class.asm`:
   dice `$4D`-`$52` (the Fixed Dice chip nothing), and the darts and
   boomerangs, which the page covers with "anything shot or thrown".
 - Claws: Mithril Claw `$54`, Poison Claw `$56`, Dragon Claw `$58`, Tiger
-  Fangs `$59` are Katana. Ninja blades `$25`-`$2A` are Dagger. Gau's bare
-  hand, and either hand while he rages, is `OT6_CLS_FANG`, Dagger.
+  Fangs `$59` are Dagger (owner, 2026-11-24). Ninja blades `$25`-`$2A` are
+  Dagger. Gau's bare hand, and either hand while he rages, is
+  `OT6_CLS_FANG`, Dagger. The curved swords, RegalCutlass `$0B` (the one
+  the page names: South Figaro's shop sells it), Flame Sabre `$0D`,
+  Falchion `$15`, Soul Sabre `$16` and Scimitar `$19`, are Katana.
 - Skills: Pummel `$5D` Blunt (`Ot6SkillClassTbl`), the AutoCrossbow Ranged
   (its item row), Trickshot Dagger (`OT6_CLS_THIEF`). SwdTech is not the
   example: five of Cyan's eight are Katana, Retort and Empowerer have no
@@ -367,7 +371,7 @@ counts in game):
 |---|---|---|
 | The six weapon types are ... | 4 | 214 |
 | Blunt is rods, brushes ... | 4 | 223 |
-| Claws cut, so they are Katana ... | 3 | 226 |
+| Claws and ninja blades are Dagger ... | 4 | 224 |
 | Some skills carry their own type ... | 4 | 196 |
 
 (A width counts the line's trailing space; vanilla-era pages here reach

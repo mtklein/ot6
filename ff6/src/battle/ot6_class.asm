@@ -4,21 +4,22 @@
 ; six physical classes, one bit each, sharing a byte with the null-break
 ; property. with the 8 elements these are 14 probe axes (octopath has 12).
 ; the weapon sets Fight's class; abilities keep their own class byte
-; (sabin with a claw equipped is katana on Fight, and Pummel stays blunt).
+; (sabin with a claw equipped is dagger on Fight, and Pummel stays blunt).
 ; ------------------------------------------------------------------------------
 
 ; six weapon classes (#566), after Octopath's six: the four of v0.50 and
 ; before (slash $01, pierce $02, bludgeon $04, special $08) regrouped by the
 ; weapon in hand.  tools/six_classes/classes.py is the grouping as data, and
 ; this file's two tables follow it (the [kind] tags are its kinds).
-OT6_SWORD   := $01              ; swords; the chain saw
-OT6_DAGGER  := $02              ; daggers and ninja blades; a thief's hit
+OT6_SWORD   := $01              ; straight swords; the chain saw
+OT6_DAGGER  := $02              ; daggers, ninja blades and claws; a thief's hit
 OT6_BLUNT   := $04              ; fists and knuckles, rods and brushes, flails
                                 ;   and clubs; the blitzes' blows; umaro's arms
 OT6_RANGED  := $08              ; what is thrown or shot: stars, skeans, darts,
                                 ;   cards, dice, coins, boomerangs, the
                                 ;   autocrossbow, the air anchor, tekmissile
-OT6_KATANA  := $10              ; katanas and the edged claws; swdtech
+OT6_KATANA  := $10              ; katanas and the curved swords (the sabres,
+                                ;   the cutlass, falchion, scimitar); swdtech
 OT6_SPEAR   := $20              ; spears; the drill
 OT6_CLASSES := $3f              ; every class bit
 OT6_NCLASS  = 6
@@ -55,8 +56,10 @@ OT6_CLS_FANG  = OT6_DAGGER      ; Gau's own body: his bare hand, and his raging 
 ;   - air anchor $a9: ranged (it fires a harpoon, as the crossbow its bolts).
 ;   - atma weapon $1c: a plain sword, not null-break.
 ;   - empty hand $ff: blunt, a fist. the knuckles strike and are blunt too;
-;     the edged claws cut and are katana ("claws are how the monk buys
-;     into a second class"). umaro needs no special case; gau's empty
+;     the claws are dagger (owner, 2026-11-24: "claws just feels like
+;     daggers"), so sabin with a claw holds a second class.  the curved,
+;     single-edged swords are katana (regalcutlass, flame sabre, falchion,
+;     soul sabre, scimitar); every other sword is sword. umaro needs no special case; gau's empty
 ;     hand is his fangs, dagger, in Ot6WeaponClass (OT6_CLS_FANG).
 ;   - dried meat is $fe and "empty" is $ff in equipment slots; only $ff
 ;     ever appears in a hand.
@@ -75,9 +78,9 @@ Ot6WeapClassTbl:
         .byte   OT6_DAGGER      ; $09 valiantknife [dagger]
         ; swords $0a-$1c
         .byte   OT6_SWORD       ; $0a mithrilblade [sword]
-        .byte   OT6_SWORD       ; $0b regalcutlass [sword]
+        .byte   OT6_KATANA      ; $0b regalcutlass [sabre]
         .byte   OT6_SWORD       ; $0c rune edge [sword]
-        .byte   OT6_SWORD       ; $0d flame sabre [sword]
+        .byte   OT6_KATANA      ; $0d flame sabre [sabre]
         .byte   OT6_SWORD       ; $0e blizzard [sword]
         .byte   OT6_SWORD       ; $0f thunderblade [sword]
         .byte   OT6_SWORD       ; $10 epee [sword]
@@ -85,11 +88,11 @@ Ot6WeapClassTbl:
         .byte   OT6_SWORD       ; $12 drainer [sword]
         .byte   OT6_SWORD       ; $13 enhancer [sword]
         .byte   OT6_SWORD       ; $14 crystal [sword]
-        .byte   OT6_SWORD       ; $15 falchion [sword]
-        .byte   OT6_SWORD       ; $16 soul sabre [sword]
+        .byte   OT6_KATANA      ; $15 falchion [sabre]
+        .byte   OT6_KATANA      ; $16 soul sabre [sabre]
         .byte   OT6_SWORD       ; $17 ogre nix [sword]
         .byte   OT6_SWORD       ; $18 excalibur [sword]
-        .byte   OT6_SWORD       ; $19 scimitar [sword]
+        .byte   OT6_KATANA      ; $19 scimitar [sabre]
         .byte   OT6_SWORD       ; $1a illumina [sword]
         .byte   OT6_SWORD       ; $1b ragnarok [sword]
         .byte   OT6_SWORD       ; $1c atma weapon [sword]
@@ -156,12 +159,12 @@ Ot6WeapClassTbl:
         .byte   OT6_RANGED|OT6_NULLBRK; $52 fixed dice: high damage, teaches nothing [dice]
         ; claws $53-$59
         .byte   OT6_BLUNT       ; $53 metalknuckle [knuckle]
-        .byte   OT6_KATANA      ; $54 mithril claw [claw]
+        .byte   OT6_DAGGER      ; $54 mithril claw [claw]
         .byte   OT6_BLUNT       ; $55 kaiser [knuckle]
-        .byte   OT6_KATANA      ; $56 poison claw [claw]
+        .byte   OT6_DAGGER      ; $56 poison claw [claw]
         .byte   OT6_BLUNT       ; $57 fire knuckle [knuckle]
-        .byte   OT6_KATANA      ; $58 dragon claw [claw]
-        .byte   OT6_KATANA      ; $59 tiger fangs [claw]
+        .byte   OT6_DAGGER      ; $58 dragon claw [claw]
+        .byte   OT6_DAGGER      ; $59 tiger fangs [claw]
         ; shields/helms/armor $5a-$a2: no class
         .res    $a3 - $5a, $00
         ; tools $a3-$aa (the Tools command resolves through item data,

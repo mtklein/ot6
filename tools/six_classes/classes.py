@@ -22,9 +22,9 @@ ORDER = (SWORD, DAGGER, SPEAR, KATANA, BLUNT, RANGED)       # the order a row's 
 # ---- weapon kinds: what the thing is, then the class the kind carries -------
 KIND_CLASS = {
     "sword": SWORD, "chainsaw": SWORD,
-    "dagger": DAGGER, "ninja blade": DAGGER, "thief hit": DAGGER, "fang": DAGGER,
+    "dagger": DAGGER, "ninja blade": DAGGER, "thief hit": DAGGER, "fang": DAGGER, "claw": DAGGER,
     "spear": SPEAR, "drill": SPEAR,
-    "katana": KATANA, "claw": KATANA, "swdtech": KATANA,
+    "katana": KATANA, "sabre": KATANA, "swdtech": KATANA,
     "rod": BLUNT, "brush": BLUNT, "fist": BLUNT, "knuckle": BLUNT, "flail": BLUNT, "club": BLUNT, "blitz": BLUNT,
     "umaro": BLUNT,
     "crossbow": RANGED, "air anchor": RANGED, "tekmissile": RANGED, "star": RANGED, "skean": RANGED, "dart": RANGED,
@@ -42,8 +42,11 @@ AWKWARD = {
                  "the weapon in hand and takes its class): Dagger",
     "brush": "a brush is no bludgeon; it goes with the rods, the other caster's weapon ('rods and fists could "
              "group')",
-    "claw": "the four edged claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) cut, so Katana; the three "
-            "knuckles (MetalKnuckle, Kaiser, Fire Knuckle) strike, so Blunt",
+    "claw": "the four claws (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) are Dagger (owner, 2026-11-24: "
+            "'claws just feels like daggers'); the three knuckles (MetalKnuckle, Kaiser, Fire Knuckle) strike, so Blunt",
+    "sabre": "the curved, single-edged swords (RegalCutlass, Flame Sabre, Falchion, Soul Sabre, Scimitar) are Katana "
+             "(owner, 2026-11-24), every other sword Sword: a cutlass is no katana, but it is the nearest blade class, "
+             "and vanilla already lets CYAN equip the Scimitar",
     "boomerang": "Hawk Eye and the returning rings are thrown: Ranged, though vanilla drew them with the flails",
     "dice": "dice and cards are Setzer's thrown things: Ranged (the Fixed Dice stay null-break)",
 }
@@ -54,6 +57,8 @@ for _i in range(0x00, 0x0a):
     ITEM_KIND[_i] = "dagger"
 for _i in range(0x0a, 0x1d):
     ITEM_KIND[_i] = "sword"
+for _i in (0x0b, 0x0d, 0x15, 0x16, 0x19):   # RegalCutlass, Flame Sabre, Falchion, Soul Sabre, Scimitar
+    ITEM_KIND[_i] = "sabre"
 for _i in range(0x1d, 0x25):
     ITEM_KIND[_i] = "spear"
 for _i in range(0x25, 0x2b):
@@ -109,7 +114,9 @@ CHILDREN = {SLASH: (SWORD, KATANA), PIERCE: (DAGGER, SPEAR, RANGED), BLUDG: (BLU
 CHARS = ["TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES", "STRAGO", "RELM", "SETZER", "MOG", "GAU",
          "GOGO", "UMARO", "BANON", "LEO"]
 SIGNATURE = {
-    "TERRA": {"sword"}, "CELES": {"sword"}, "LEO": {"sword"},
+    # TERRA and CELES wield swords, and a curved one (a sabre: Katana) is a sword in their hands by choice of
+    # blade at the same power as a straight one of its tier (owner, 2026-11-24): both classes are theirs
+    "TERRA": {"sword", "sabre"}, "CELES": {"sword", "sabre"}, "LEO": {"sword"},
     "LOCKE": {"dagger", "thief hit"},
     "SHADOW": {"ninja blade", "star", "skean"},
     "EDGAR": {"spear", "drill", "crossbow"},
