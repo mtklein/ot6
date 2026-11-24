@@ -14049,7 +14049,11 @@ function Driver:zingerPlan(actor, plan)
   end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   if fight == nil then return plan end
-  local boost = actor ~= host and plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
+  -- the bank (up to three points) goes into the host Fight, whatever the plan it replaces: Fight costs no MP, and
+  -- each point is another swing (#566: on the regrouped replay's wor_doma_throne the host, RELM at 4927 HP, took
+  -- unboosted Fights in place of heals and stood at 936 HP 21,000 frames after the plan, past the line's measured
+  -- 3,544-13,921: build/attempts/wt/v051-six-classes/suites/suite_battle_zinger.log)
+  local boost = actor ~= host and math.min(3, M.readByte(BATTLE.BP + actor * 2)) or 0
   local target = host
   M.zingers[#M.zingers + 1] = { actor = actor, host = host, target = target, slot = (za - 8) // 2,
     frame = M.frame, over = plan.kind, boost = boost, own = actor == host }
