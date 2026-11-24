@@ -435,6 +435,15 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   -- It cannot heal parties 2 and 3 -- the menu shows the active party and
   -- this generator never switches with Y -- but it does not need to: they
   -- never leave the staging tile.  The assertion below covers them anyway.
+  -- #566: the three arm for KEFKA from the bag, his row read from the ROM
+  -- (Sword|Dagger): the gear rule's own dress with his classes favoured.
+  -- Without it the rule had spread the party's classes (TERRA's RegalCutlass
+  -- is a Katana since 2026-11-24, unique beside CELES's Mithril Blade), and
+  -- battle_kefka went red on fccf9cf3: "two real class chips landed and
+  -- revealed before the fight ended: got false", [keys] "hands=$31 ...
+  -- e0:c0:$10/$10 ... e2:c6:$01/$01 ... src=c0:r0B" (only CELES keyed him,
+  -- and her turns are Runic).
+  H.gearDress({ tag = "arm for KEFKA", favor = function() return H.speciesClassRow(0x14A) end }),
   H.fieldCare({ tag = "care before KEFKA", threshold = 0.95,
                 mpFloor = 0.75 }),
 

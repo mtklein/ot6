@@ -7829,8 +7829,16 @@ function M.gearDressPlan(opts)
     -- opts.mdefWeight: each point of an armor piece's magic defence counts
     -- this much more, on top of gearValue's one (mdefWeight 2 counts it
     -- three times): a fight of spells, the Fanatics' Tower
+    -- opts.favor (#566): the class mask of the body the party is arming for (a boss the route walks up to, its
+    -- row read from the ROM: what an informed player knows), or a function giving it; a weapon of one of its classes
+    -- is worth two keys more
+    local favor = opts.favor
+    if type(favor) == "function" then favor = favor() end
     local function score(c, slot, id, others)
       local v = slotScore(c, slot, id, others)
+      if favor and id ~= nil and id ~= 0xFF and gearType(id) == 1 and (M.weaponClass(id) & favor) ~= 0 then
+        v = v + 2 * GEAR_KEY
+      end
       if opts.mdefWeight and id ~= nil and id ~= 0xFF and gearType(id) ~= 1 then
         v = v + opts.mdefWeight * gearByte(id, 21)
       end
