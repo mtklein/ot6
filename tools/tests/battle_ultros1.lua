@@ -12,8 +12,8 @@
 --     if_element FIRE / dlg $0b ("Yaaooouch!  Seafood soup!") /
 --     attack SPECIAL
 --
--- The party Fights him unboosted (one chip a weapon hand, the least damage
--- a chip costs) until he is Broken, with BANON's Health and Fenix Downs
+-- The party Fights him (unboosted, or for a hand that keys him boosted one
+-- swing short of his shields, so no swing lands Broken) until he is Broken, with BANON's Health and Fenix Downs
 -- keeping it standing (the care note at the driver); then TERRA casts Fire
 -- on him while the others Defend.  Breaking him before the party falls is
 -- this file's precondition, reached by that play rather than by the
@@ -206,7 +206,19 @@ local function pulse()
     end
     -- the boost: Health takes every pip banked (cap 3); everything else
     -- goes unboosted
+    -- a Fighter whose hand keys him swings boosted, one swing short of his
+    -- shields (a boost point is a swing): every swing chips and none lands
+    -- Broken, so the volley cannot take him past the break before TERRA's
+    -- Fire.  Unboosted, TERRA's sword alone (with EDGAR's two crossbow
+    -- volleys) lost BANON at two shields on the merged main's draw
+    -- (build/attempts/wt/v051-six-classes/suites/ultros1-merge.log)
     local boost = plan == "health" and math.min(bank(a), 3) or 0
+    if plan == "fight" then
+      local hand = H.handClass(chid(a), H.readByte(0x1600 + 37 * chid(a) + 0x1F), false)
+      if (H.speciesClassRow(ULTROS1) & hand) ~= 0 then
+        boost = math.max(0, math.min(bank(a), 3, shields() - 1))
+      end
+    end
     local pend = H.readByte(0x3E9D + a * 2)
     if pend ~= boost then
       H.setPad(ph < 5 and { pend < boost and "r" or "l" } or {})
