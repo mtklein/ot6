@@ -7242,6 +7242,11 @@ local BATTLE = {
   -- $05 -> $38 with the target latched on herself (chars = 1<<actor); B ->
   -- $05; A commits ($38 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00).
   CMD_RUNIC = 0x0B,
+  -- since #563 Runic opens the Rune Knight's list ($05 -> $2E -> $01 -> $30,
+  -- the Tools shell, w7e6168 = 7): Runic $D0 its first row, a blade row
+  -- $D1 + element bit for each element the caster can cast, Break Blade $D9;
+  -- a row's A goes on to that same latched target select
+  RUNE_RUNIC = 0xD0, RUNE_BLADE = 0xD1, RUNE_BREAK = 0xD9,
   CMD_MORPH = 0x03,
   -- SETZER's Slot (probe_slot.lua, deleted in bd50a973; last version at f1f26173): A on Slot $05 -> $06 (OpenSlotWindow)
   -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the reels spin
@@ -17317,8 +17322,23 @@ function Driver:button(actor)
     return { "a" }
   end
   if (st == BATTLE.ST_TOOLS_OPEN or st == BATTLE.ST_TOOLS_CLOSE)
-     and (self.plan.kind == "skill" or self.plan.kind == "slot") then
+     and (self.plan.kind == "skill" or self.plan.kind == "slot" or self.plan.kind == "runic") then
     return nil                       -- the shell is building / closing; wait
+  end
+  -- CELES's Runic row (#563, ot6_rune.asm): the Runic command opens the Rune
+  -- Knight's list (w7e6168 = 7), whose first row is the stance; its A goes
+  -- on to the target select latched on her own seat, below.
+  if st == BATTLE.ST_TOOLS and self.plan.kind == "runic" then
+    local want
+    for i = 0, 7 do
+      if M.readByte(BATTLE.ITEMLIST + i * 3) == BATTLE.RUNE_RUNIC then want = i; break end
+    end
+    if want == nil then self:dropPlan("runic_row_missing"); return { "b" } end
+    local wc, wr = want % 2, want // 2
+    local cc, cr = M.readByte(BATTLE.BLCOL + actor), M.readByte(BATTLE.BLROW + actor)
+    if cc ~= wc then return { wc > cc and "right" or "left" } end
+    if cr ~= wr then return { wr > cr and "down" or "up" } end
+    return { "a" }
   end
   -- SETZER's Slot row (ot6_setzer.asm): the Slot command opens his table,
   -- whose first row closes it and opens the reels ($30 -> $01 -> $06 ...
@@ -17966,7 +17986,7 @@ end
 -- hand since, and battle_jackpot its own).  A caller reads these after the
 -- battle; nothing it asked for (who, cmd, boost, row, slot...) is touched.
 M.KIT_ENTRY_STATE = { "opened", "seat", "presses", "lPresses", "tookBack", "allyPresses", "greyed",
-  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen", "raised", "rPresses" }
+  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen", "raised", "rPresses", "tapSnd", "tapMiss" }
 function M.freshKitEntries(plan)
   for _, q in ipairs(plan) do
     for _, f in ipairs(M.KIT_ENTRY_STATE) do q[f] = nil end
@@ -18668,6 +18688,39 @@ function M.battleKeyWait()
   return M.dlgKeyFrame ~= nil and M.frame - M.dlgKeyFrame <= 2
 end
 
+-- Ot6Boost's answers so far, counted from the first call: the ching of a
+-- point taken ($6281 written non-zero) and the buzz of one refused ($95,
+-- the menu's error sound, written non-zero).  Armed once.
+function M.kitBoostSounds()
+  if not M.boostSndArmed then
+    M.boostSndArmed, M.boostSnd = true, 0
+    local function hit(_, v) if v ~= 0 then M.boostSnd = M.boostSnd + 1 end end
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x7E6281, 0x7E6281)
+    -- (`inc $95` is a direct-page store: it lands in bank $00, so both views are watched)
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x000095, 0x000095)
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x7E0095, 0x7E0095)
+  end
+  return M.boostSnd
+end
+
+-- an R tap on a kitBattle list row, judged once it is over: Ot6Boost
+-- answers every R it reads with its ching (a point taken) or its buzz (one
+-- refused), so a tap that ended with neither was never read and is pressed
+-- again; six unread in one entry fail the run, so a pending boost left
+-- unchanged always means a refusal the game made, never taps it missed
+-- (#563 review: the retry used to give up silently)
+function M.kitTapRead(p)
+  if M.kitBoostSounds() == p.tapSnd then
+    p.tapMiss = (p.tapMiss or 0) + 1
+    M.assertEq(p.tapMiss <= 6, true, string.format("[kit] an R tap on the list's row is read by the game (Ot6Boost's "
+      .. "ching or buzz): %d taps in a row went unanswered", p.tapMiss))
+    p.listRn = p.listRn - 1
+    M.log(string.format("[kit] f%d an R tap on the list's row was not read (no ching, no buzz): pressed again "
+      .. "(%d)", M.frame, p.tapMiss))
+  end
+  p.tapSnd = nil
+end
+
 function M.kitBattle(plan, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -18996,9 +19049,19 @@ function M.kitBattle(plan, opts)
       -- p.listR = n: R pressed n times with the cursor on the spell (#555:
       -- a point the MP cannot pay for is refused); the pending boost before
       -- and after is kept on the entry (p.listR0, p.listR1)
+      -- An R tap the game never read does not count (#563's gate:
+      -- battle_spellboost_mp's second tap, pressed while the list was still
+      -- redrawing the first one's fold, was lost on one draw in three, on
+      -- the ROM before the change too: build/attempts/wt/v051-spellblade/
+      -- sbmp/).  Ot6Boost answers every R it reads with its ching or its
+      -- buzz (M.kitBoostSounds), so a tap that ends with neither is pressed
+      -- again, up to six times an entry.
+      if p.listR ~= nil and p.listKey == nil and tapT == 0 and p.tapSnd ~= nil then
+        M.kitTapRead(p)
+      end
       if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
         if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
-        if tapT == 0 then p.listRn = (p.listRn or 0) + 1 end
+        if tapT == 0 then p.listRn = (p.listRn or 0) + 1; p.tapSnd = M.kitBoostSounds() end
         tap(p.listKey or "r")
         return
       end
@@ -19019,6 +19082,10 @@ function M.kitBattle(plan, opts)
         done(p, a, true)
       end
       pulse("b")
+    elseif st == 0x30 and p.cmd == 0x0B and p.row == nil and not p.peek then
+      -- Runic opens CELES's list since #563 (ot6_rune.asm, w7e6168 = 7); an
+      -- entry that names no row means the stance, the list's first row
+      p.row = 0xD0
     elseif (st == 0x30 or st == 0x2D) and p.row ~= nil then
       -- the Tools shell, or the Throw list in the same shell (#383: SHADOW's
       -- throwing kit; wItemList $4005, three-byte rows, $FF ends the list).
@@ -19049,12 +19116,20 @@ function M.kitBattle(plan, opts)
       -- p.listR = n: R pressed n times with the cursor on the row (#538: a
       -- row whose boost buys nothing refuses it); the pending boost before
       -- and after is kept on the entry (p.listR0, p.listR1)
-      if p.listR ~= nil and (p.listRn or 0) < p.listR then
-        if cool == 0 then
-          if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
-          p.listRn = (p.listRn or 0) + 1
-        end
-        pulse("r")
+      -- Held taps, each one read: a tap Ot6Boost answered with neither its
+      -- ching nor its buzz was never read (a one-frame pulse can fall
+      -- between two frames of the battle's loop, #555), and is pressed
+      -- again, up to six times an entry, as the Magic list's are (#563:
+      -- battle_gogokits's line-less row read "refused" off two lost taps
+      -- on the mutant that lets R through, build/attempts/wt/
+      -- v051-spellblade/final/)
+      if p.listR ~= nil and tapT == 0 and p.tapSnd ~= nil then
+        M.kitTapRead(p)
+      end
+      if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
+        if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
+        if tapT == 0 then p.listRn = (p.listRn or 0) + 1; p.tapSnd = M.kitBoostSounds() end
+        tap("r")
         return
       end
       if p.listR ~= nil and p.listR1 == nil and cool == 0 then p.listR1 = M.readByte(0x3E9D + a * 2) end

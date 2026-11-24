@@ -38,9 +38,10 @@ local ZCHARID = 0x69
 local PAINTER_COLOR = 0x81
 local CHAR_RELM, CHAR_GOGO = 0x08, 0x0c
 local CMD_SKETCH, CMD_CONTROL, CMD_LORE, CMD_TOOLS = 0x0d, 0x0e, 0x0c, 0x09
--- the commands that colour a Skills row (_c34d78 and the Painter row's scan)
+-- the commands that colour a Skills row (_c34d78, the Painter row's scan and
+-- the RuneKnt row's, #563)
 local ROW_CMDS = { [0x02] = true, [0x07] = true, [0x0a] = true, [0x0c] = true, [0x10] = true, [0x13] = true,
-  [0x05] = true, [0x0d] = true }
+  [0x05] = true, [0x0d] = true, [0x0b] = true }
 local plainCmd
 local FAKE_MUSTACHE = 0xd7
 local ST_MAIN, ST_CHAR, ST_SKILLS, ST_PAINTER = 0x05, 0x06, 0x0a, 0x31
@@ -249,7 +250,7 @@ local function assertEsperClear(char, tag, onList)
   H.assertEq(e ~= 0xff, true, tag .. ": an esper is equipped")
   local frames
   if onList then
-    frames = frameTiles(BG2A_V, 1, 7, 9, 22)              -- the list window
+    frames = frameTiles(BG2A_V, 1, 7, 9, 24)              -- the list window (ten rows, #563)
   else
     -- a page shows BG2 screen B, where no list window is drawn: the frame
     -- tiles every window border uses, read off the list screen's
@@ -457,6 +458,7 @@ H.run({ maxFrames = 300000 }, {
       H.assertEq(H.readByte(0x79 + i), GREY, string.format(
         "GOGO's Skills row %d is grey: the Painter row alone let his Skills menu open", i))
     end
+    H.assertEq(H.readByte(0x82), GREY, "GOGO's tenth row, RuneKnt, is grey too (he carries no Runic)")
   end),
   opensPage("GOGO with Sketch", "painterpage_gogo"),
   closeMenu("out"),

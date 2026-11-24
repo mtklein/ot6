@@ -89,24 +89,24 @@ With fewer than three points pending, a divine is not offered: its row
 greys and the A button buzzes (Jackpot), or the command does what it
 does at that boost (Morph lasts a shorter span; Cleave is only ever the
 SwdTech window's 3-BP row;
-Runic and Tools under three points are their plain selves; Shadow's hit
-under three points is a hit).  A divine picked at three and then taken
+Tools under three points are their plain selves; Break Blade's row greys;
+Shadow's hit under three points is a hit).  A divine picked at three and then taken
 back to fewer (L during target select) falls back at execution and charges
 nothing it did not deliver.  Each divine is tuned to be worth a full boost
 and to be used more than once a fight; each entry below gives its reason.
 Mimic copies a divine's action, not its price, but the gate is the boost:
 a Gogo's copy takes the full boost from Gogo's own bank where the copy reads
 it (a Jackpot; a Bum Rush, which under three of Gogo's points is Pummel at
-the boost he has; since #547 an Overclock, a RunicBlade, an Assassinate on
-a Throw and Terra's Ultima fold, which answer for Gogo as for their
-owners), and is free where it does not (a Cleave: the boost is kept, #461,
+the boost he has; since #547 an Overclock, an Assassinate on a Throw, and
+the two folds, Terra's Ultima and Celes's RunicBlade, which answer for
+Gogo as for their owners; since #563 a Break Blade), and is free where it does not (a Cleave: the boost is kept, #461,
 and a copy on a boss strips its four shields too).  Gogo's own commands
 open the same divines: [kit-gogo.md](kit-gogo.md).
 
 | Character | Divine | What three points buy | Built |
 |---|---|---|---|
 | Terra | Trance | her Morph (esper form: magic x2, damage taken halved) until the battle ends or she reverts; under 3 BP Morph lasts a shorter span | yes (`ot6_trance.asm`) |
-| Celes | RunicBlade | a 3-turn Runic that also sends every spell it absorbs back at its caster | yes (`ot6_runicblade.asm`) |
+| Celes | Break Blade | the RuneKnt list's last row at three points pending only: for three of her turns every hit of her weapon takes a shield, whatever the body's keys, 99 MP | yes (`ot6_rune.asm`, #563) |
 | Edgar | Overclock | the Tool fires twice, at the boost's x8 each, priced as the two firings | yes (`ot6_overclock.asm`) |
 | Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: it strikes every enemy; each killable one dies, each death-immune one loses four shields (Break's 3-BP ceiling) and takes a power-255 cut | yes (`ot6_divine.asm`, learned by story since #379; the strip and every body read #388) |
 | Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
@@ -120,10 +120,14 @@ open the same divines: [kit-gogo.md](kit-gogo.md).
 | Gau | (none: a varied set of rages needs no divine, owner 2026-11-15; kit-gau.md §9) | — | no |
 
 Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
-(Fire at 3 BP, after her World of Ruin return; see Terra below).  `$3ecb`,
+(Fire at 3 BP, after her World of Ruin return; see Terra below).  So is
+Celes's RunicBlade since #563 (her Runic row at 3 BP, after the Magitek
+factory): it was her divine through v0.50, and Break Blade took the slot
+when Runic became the first row of her list.  `$3ecb`,
 the once-a-battle flag (`OT6_DIVINE_USED`), is retired.
 Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_bumrush` and `battle_bumrushmimic`, `battle_jackpot`,
-`battle_assassinate`, `battle_trance` and `battle_morphrandom`, `battle_runicblade`,
+`battle_assassinate`, `battle_trance` and `battle_morphrandom`, `battle_spellblade` (Break Blade; the
+fold is `battle_runicblade`'s),
 `battle_overclock`, `battle_umaro`, `battle_mastersmark`, each with its gate
 (under 3 BP no divine), and an old-ROM red; the menu divines also with a
 second use in one battle.
@@ -132,7 +136,9 @@ The engine picks a command for a character the player is not driving
 (Muddle, Charm, the Colosseum, Berserk) and spends no boost doing it, so
 every divine closes that path: a random SwdTech's range stops short of
 Cleave (`Ot6RandBushidoTop`), a random Blitz never picks Bum Rush
-(`Ot6RandBlitzBits`), a Morph the engine chose takes
+(`Ot6RandBlitzBits`), a Runic the engine chose is the bare stance, never a
+row of her list (`RandCharAction` queues attack byte `$00`, which is no
+row's id: `Ot6RuneExec`), a Morph the engine chose takes
 the 0-BP span, whatever is pending (`Ot6MorphTake`), and Umaro's Storm is his only on a dump of all
 three points, which only being hurt makes (`Ot6UmaroArm`).
 
@@ -826,22 +832,181 @@ Rulings that fall out of the vanilla math (see `tools/tests/battle_steal.lua`):
 
 ### Celes — Rune Knight (slashing: sword, ice lean)
 
-Vanilla natural-magic levels nearly verbatim, since the table already
-suited a rune knight: sensing, warding, hastening. It mirrors
-Terra: both share Cure, and fire/life/transcendence is set against
-ice/order/tempo. The pairing is clearer here than in vanilla.
+A spellblade, as FF5's Mystic Knight is (owner, 2026-11-23, #563): her
+command is a list, **RuneKnt**, whose rows put magic on her sword.  Runic,
+the stance, is its first row; a blade row arms her weapon with an element
+she can cast; the divine is Break Blade.  Her natural magic is vanilla's
+table nearly verbatim (sensing, warding, hastening), set against Terra's
+fire/life/transcendence; both share Cure.
+
+The list (`ot6_rune.asm`; the Tools shell, as Locke's and Relm's):
+
+| # | Row | What it does | MP | Boost | Learned |
+|---|---|---|---|---|---|
+| 1 | Runic ✦ | the stance: absorbs the next spell as MP and **+1 BP** ✦; arms her blade with the spell's element | 0 | **turns** ✦ (1/2/3 of her own); at 3 BP **RunicBlade**, a fold | join |
+| 2+ | a blade row, drawn as the sword icon and the element (Fire, Ice, Bolt, Poison, Wind, Pearl, Earth, Water) | arms her blade with that element for the rest of the battle | the cheapest spell of it she holds | **the spell line's tier**, as in the Magic list: Fire, Fire 2, Fire 3 at each tier's MP (Poison to Bio); an element with no line refuses | one row per element she can cast now |
+| last | **Break** with the sword icon, Break Blade (divine) | her Break spell on the blade: for three of her turns every hit of her weapon takes a shield, whatever the body's keys | 99 | three points only | the Floating Continent (switch `$0266`, or `$00A4`) |
+
+Her eight slots: the command and her natural magic (vanilla's levels), with
+the divine in the eighth:
 
 | # | Spell/Skill | Level |
 |---|---|---|
-| 1 | Runic ✦ (absorbs next spell → **+1 BP** ✦; **boost buys turns** ✦) | join |
+| 1 | Runic ✦ (the RuneKnt list: the stance, the blade rows) | join |
 | 2 | Ice | join (vanilla 1) |
 | 3 | Cure | 4 (vanilla) |
-| 4 | Imp | 13 (vanilla) |
+| 4 | Break | 13 (was Imp, #563) |
 | 5 | Scan | 18 (vanilla) |
 | 6 | Safe | 22 (vanilla) |
 | 7 | Haste | 32 (vanilla) |
-| 8 | **RunicBlade** (divine) | Magitek factory (story: switch `$0068`) |
+| 8 | **Break Blade** (divine) | the Floating Continent (story: switch `$0266`, else `$00A4`) |
 
+- **Break at 13, where vanilla has Imp** (owner, 2026-11-23: "let's get one
+  of break/osmose/drain onto her spell list natively. what value does imp
+  have really on the list?").  Imp is refused by most of the roster: 299 of
+  `monster_prop.dat`'s 384 records carry the Imp immunity bit (status
+  immunity byte 1, bit `$20`), and an Imped caster stops casting, which
+  starves Runic.  Of the three offered, Drain is already Terra's natural
+  spell and Osmose duplicates what Runic pays her in MP; OT6's Break (a
+  shield whatever the keys, one more a point, `ot6_breakspell.asm`) suits a
+  rune knight and makes Break Blade the blade of a spell she owns, as her
+  other blades come from what she can cast.  Stray still lends Imp to
+  whoever wears it.  A save from before the change has her past 13 with Imp
+  learned and Break not: the three spell-known hooks grant her Break by her
+  level (`Ot6CelesBreak`, as they grant Strago's Analyze) and write nothing,
+  so the load leaves the save's block as the file has it (the golden saves);
+  such a save keeps the Imp it learned.
+- **The rune.**  Her blade holds one element (or none) for the rest of the
+  battle (`OT6_RUNE`, per character; armed only through `Ot6RuneArm`, which
+  takes a character, an element and a tier).  Two things arm it:
+  - a **Runic absorb** of a spell that carries an element (`MagicProp`'s
+    element byte, read at the absorb: `Ot6RuneAbsorb`, from `Ot6RunicBP`).
+    An enemy's spell or an ally's: vanilla's ally-spell quirk is kept on
+    purpose, and here it is the two-character combo (Terra's Fire into her
+    stance is a Fire Blade and her MP back).  Her own spell caught by her
+    own standing stance arms it too.  A spell without an element leaves the
+    rune as it was.
+  - a **blade row**.
+  A later arming replaces it, element and tier together.  Nothing else
+  clears it: it stays through her
+  fall and her return (the simplest rule that reads: the rune is the
+  blade's, and a wipe ends the battle), and `InitBP` zeroes it for the next
+  battle.  It is separate from the stance's bit (`$3e4c.2`), which comes and
+  goes with her turns.  A spell with two elements would be kept whole and
+  each element judged on its own at the swing; none of the 20 elemental
+  spells Runic can absorb carries two.  One player spell does: Merton is
+  fire and wind (and is the only wind a player casts: W Wind carries no
+  element), so a caster whose only fire spell is Merton has a fire row and
+  a wind row, each at Merton's price and each arming its own element.
+- **What it does: weak-only** (owner, 2026-11-23: "hurting more than helping
+  is no good").  Her weapon's swings — Fight and each of its boosted swings,
+  either hand of a Genji Glove, a counter, Mug and Capture, Jump; every pass
+  through `_magicpunch` — carry the rune's element onto a **monster that is
+  weak to it** (vanilla's weak byte with `Ot6ElemAddTbl`'s rows) **and
+  neither absorbs, nulls nor halves it**, nor has it nulled by a ForceField
+  (`Ot6RuneBites`, judged per target in `Ot6TargetPre`).  There the hit
+  truly carries the element: vanilla's weakness doubles it and `Ot6Chip`
+  takes a shield and reveals the weakness, once a hit.  On any other body
+  the rune does nothing, so it never turns her Fight into an element a body
+  drinks; measured before the rule was set, the caster of an absorbable
+  elemental spell itself absorbs that element in 73 of 240 (monster, spell)
+  pairs (#563).  That is its difference from Relm's Tint, a colour the
+  player picked, which lands on a body that drinks it.  The weapon's own
+  element and a Tint on her apply as before, OR'd in.  A thrown weapon is
+  not a swing (as for Tint), nor is the spell her weapon casts by itself (a
+  ThunderBlade's Bolt).  Halving is refused with absorbing and nulling
+  because a halved hit also hurts more than it helps.
+- **The rune's tier buys damage, not shields** (owner and lead,
+  2026-11-23).  A rune is tier 1, 2 or 3: the place of the spell that armed
+  it in its line (`Ot6FoldTbl`: Fire 2, Ice 2, Bolt 2 and Bio are tier 2,
+  the 3s tier 3, every other spell tier 1; `Ot6RuneTierOf`).  A blade row
+  boosted climbs its line as the Magic list's row does, so one point on the
+  Fire row is a Fire 2 Blade and two a Fire 3 Blade, at the tier's own MP,
+  the row showing the tier's name and price as R is pressed; R adds no
+  point her MP cannot pay for (#555), a third point adds nothing, and the
+  boost is spent as any boosted action's is (no point earned that turn).
+  Whether she "knows" the tier is the Magic list's rule: boost reaches up
+  from the line's head.  Pearl, Quake, Merton and the other spells that head
+  no line take no boost (R is refused, `Ot6RuneNoBoost`, and a boost raised
+  on the command window first is dropped before it costs anything,
+  `Ot6KeepBoost`).  An absorb takes the tier of the spell absorbed: Fire 3
+  caught is a tier-3 fire rune.  On a body the rune bites, the hit's
+  weakness multiplier is x2 at tier 1 (vanilla's), x3 at tier 2 and x4 at
+  tier 3 (`Ot6RuneWeakMul`); the chip stays one a hit at every tier.
+- **Blade rows follow what she can cast.**  A row is listed for each element
+  some spell in her battle Magic list carries (`Ot6BladeCost` walks the list
+  the Magic window draws: her natural spells and the ones her worn esper
+  lends), so the rows follow an esper swap with no save data: Ifrit gives a
+  Fire Blade, Ramuh a Bolt Blade, Maduin all three; with no esper she has
+  Ice (and Break, which carries no element and so has no row but the
+  divine's).  The worn shields that grant a spell count too.  The price is
+  the cheapest such spell's own (through a Gold Hairpin or Economizer), or
+  its line's tier at the boost pending.  The row takes her turn and targets
+  herself as Runic does.  **Mute** (owner, 2026-11-24: "it's a spell
+  blade, so she must be casting some sort of spell to enable it.  it
+  wouldn't remove an existing spell blade, but should stop applying it"):
+  while she is Muted every blade row and Break Blade greys in the list and
+  its A buzzes, as a Muted caster's spells do (`Ot6RuneRowGrey`), and one
+  picked before Mute landed does nothing at its action and charges nothing,
+  the boost kept, as Break Blade short of three does (`Ot6RuneExec`).
+  Runic stays usable, as vanilla's is (Mute greys only Magic, Lore and
+  X-Magic, `UpdateCmd_03`-`05`), and its absorb still arms the rune: the
+  absorb is no cast of hers, and vanilla's Runic absorbs while Muted (its
+  gate, `RunicEffect`, refuses only Death, Petrify, Sleep, Stop, Frozen and
+  Hide).  A rune or a Break Blade already on the blade stays and keeps
+  working.  The same holds for Gogo's list.  `battle_spellblade` check 13;
+  an Imp's command window turns
+  Runic into Fight, as vanilla's does.  Like Runic itself, the command
+  greys without a runic weapon in hand (vanilla's `UpdateCmd_01`), and the
+  list with it.
+- **The window has eight cells** (the Tools shell does not scroll): Runic,
+  Break Blade and six blades.  Celes never has more (Ice and one esper's
+  spells); a Gogo whose seated party holds all seven elements player magic
+  has is not offered the last in element order.
+- **Break Blade** (kit slot 8, the divine; owner, 2026-11-23): her Break
+  spell on the blade.  Offered
+  only with three points pending (the row greys and the A button buzzes
+  under three; a list pick's boost cannot be lowered at target select,
+  #555, and a Mimic's copy short of three does nothing and costs nothing),
+  99 MP.  For three of her turns after the cast (`OT6_BREAKBLADE`, counted
+  down as each of her actions ends, the span a 3-BP Runic stands for; a
+  fallen Celes takes no turns, so it waits on her; a counter of hers is
+  not a turn: `ExecRetal` ends at `EndAction` without `Ot6ActionEnd`, the
+  one place the count is spent, so a Black Belt's counters swing under it
+  for free; no suite checks the counter case) **every landed hit of her
+  weapon takes one shield**, whatever the body's keys, on top of its damage
+  (`Ot6BreakBladeTake`, Bum Rush's kind of take: a body that keys her
+  weapon's class or the hit's element loses that hit's shield to the chip
+  instead, which also reveals the key, so a hit never takes two).  The
+  elemental rune waits while it runs and applies again when it ends.
+  Learned on the Floating Continent, where she turns her sword on Kefka:
+  switch `$0266` is set in that scene when she is in the party there, and a
+  party that left her on the airship has the row from the World of Ruin's
+  first scene (`$00A4`); no save can be made between the two, so a save past
+  the beat has the row whatever version wrote it.  Vanilla has a sword of
+  the same name, the one that casts Break; it keeps it (owner, 2026-11-23:
+  "don't worry about the name clash"; "Shatter" was tried for an hour and
+  dropped), and the two do not interact beyond the sword being a weapon she
+  can swing.  No other row's name is an item's, a spell's or an attack's:
+  the blade rows' banners ("Fire Blade", "Bolt 2 Blade", "Bio Blade") match
+  nothing in the item, magic, attack, esper-attack or monster-special name
+  tables (the nearest are the sword ThunderBlade and Sabin's Air Blade), and
+  their list rows are a spell's name behind the sword icon on purpose.
+- **RunicBlade is a fold now, not the divine** (#563): what a full boost
+  buys on the Runic row once she has learned it (switch `$0068`, the Magitek
+  factory), as Ultima is what one buys on Terra's Fire.  It is unchanged:
+  the stance stands for three of her turns and sends every spell it absorbs
+  back at its caster as her own free cast of it, through vanilla's
+  counterattack queue (`Ot6BladeRaise` / `Ot6BladeAbsorb` /
+  `Ot6BladeBounce`).  The bounce is the absorbed spell, not a stronger one,
+  and no Runic stance absorbs it again (`Ot6BladeNoRunic`).  An ally's spell
+  she absorbs goes back at the ally, and a spell of her own that her stance
+  catches goes nowhere.  Only player magic ($00-$35) bounces; a counter is
+  not countered back, and a battle with counters off bounces nothing.  The
+  bounce waits in the counter queue behind turns already waiting, so its
+  caster can fall first; it then lands nothing (#423).  It arms the rune as
+  any Runic absorb does.  `battle_runicblade` (an ally's Bolt),
+  `battle_runicmonster` (a monster's spell).
 - **Runic's absorb becomes MP and banks 1 BP** (`Ot6RunicBP`, ot6_boost.asm,
   hooked into vanilla's `RunicEffect`). Rulings, all covered by `battle_runic.lua`:
   an absorb at a full bank is **capped, never wrapped**; the
@@ -849,7 +1014,8 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
   governs a turn's own end-of-action tick while the absorb is paid
   during the *caster's* action, so boosting on the turn she raises Runic
   still pays for what she catches; and only the Runic *command*
-  pays, not the separate "enemy runic" stance a raging Gau can carry.
+  pays, not the separate "enemy runic" stance a raging Gau can carry (which
+  arms no rune either).
   Vanilla's own gate is untouched: what Runic can absorb is still set by the
   spell's `MagicProp` absorb flag, which excludes every esper and every
   MagiTek beam. The Narshe school's $026F now names the BP.
@@ -875,33 +1041,132 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
     Runic absorbs a *friendly* cast as readily as a hostile one, and a stance
     that stands for three turns will absorb a lot of Terra's Cures. That is
     the constraint that stops a standing shield from being strictly good,
-    so it is documented rather than patched.
+    so it is documented rather than patched; since #563 it is also how an
+    ally hands her an element.
   - Known edge: a spell that arrives while Celes is stopped/asleep clears
     the stance bit at `RunicEffect`:8671 without absorbing (vanilla's own
     `CheckStatus` gate), and the bit only comes back at her next turn. The
     duration is not shortened, but that spell is not absorbed. Left as vanilla.
-- **RunicBlade is what a full boost buys on Runic** once Celes has
-  learned it (event switch `$0068`, the Magitek factory, where she turns on
-  Kefka).  A 3-BP Runic stands for three of her turns as any 3-BP Runic
-  does, absorbs as Runic does (the MP, the once-a-round BP), and sends every
-  spell it absorbs back at its caster as her own free cast of it, through
-  vanilla's counterattack queue (`Ot6BladeRaise` / `Ot6BladeAbsorb` /
-  `Ot6BladeBounce`).  The bounce is the absorbed spell, not a stronger one,
-  and no Runic stance absorbs it again (`Ot6BladeNoRunic`: her own stance
-  stands while it flies).  An ally's spell she absorbs goes back at the ally
-  -- vanilla's ally-spell quirk, kept -- and a spell of her own that her
-  stance catches goes nowhere.  Only player magic ($00-$35) bounces;
-  a counter is not countered back, and a battle with counters off bounces
-  nothing.  The bounce waits in the counter queue behind turns already
-  waiting, so its caster can fall first; it then lands nothing (it is not
-  retargeted, as no counter is).  Left as vanilla: skipping it would take a
-  hook at the queued action's execution for a turn that costs nothing (#423).
-  *Reason: the old objection to making the divine "Runic at 3
-  BP" -- that the canon would have an exception at its top tier and the
-  divine would be out of reach without BP -- is the owner's rule now
-  (divines take the full boost), and as the 3-BP Runic it costs no menu row
-  and keeps duration the reactive verb's purchase.*  `battle_runicblade`
-  (an ally's Bolt), `battle_runicmonster` (a monster's spell).
+- **What the player sees.**
+  - *The swing's colour.*  A swing at a body the rune bites is drawn in the
+    element's colours, the weapon's sprite and the hit on the target both
+    (`Ot6SwingPal_ext`, at `InitWeaponAnim`'s palette load): the Flame
+    Sabre's, the Blizzard's, the ThunderBlade's and the Illumina's own
+    palettes for fire, ice, bolt and pearl, and the nearest existing ones
+    for poison, wind, earth and water (no palette data added); a Break Blade
+    swing has its own, violet.  A swing at any other body keeps the weapon's
+    colours, so the colour comes with the doubled number and the shield
+    lost, and a red swing never lands on a body that shrugs fire off.  (An
+    action's passes are all computed before its script plays them, so the
+    colour is judged at the animation, from the pass's own target, by the
+    rule the hit was judged by.)
+  - *The standing sign.*  The rune's element icon, in its colour (the
+    weakness strip's), stands in the sixth cell of her name in the party
+    window, against her boost cell; a running Break Blade shows the sword
+    there (`Ot6RuneSignStage`, written with the boost cells).  The name row
+    is full (six of name, the boost cell, four of HP, six of gauge), so a
+    six-letter name shows no sign; CELES, GOGO and LEO are shorter.
+  - *The banner* at a blade row or Break Blade: its name, with the tier
+    ("Fire 3 Blade").  The sign has one cell, so it does not show the tier.
+  - *The list* draws a blade row as the item lists' sword icon and the
+    element, or the line's spell at the boost pending ("Fire 3"), with the
+    price after it: ten letters ("Fire3Blade") ran into the two-digit
+    price.
+- **Gogo** opens the same list with his Runic pick (#547): the stance (a
+  RunicBlade at 3 BP), a blade row for each element *he* can cast (his
+  Magic list is the seated party's), and Break Blade once the party has
+  learned it; his Runic's absorbs arm his blade.  **Mimic** copies the
+  action, and the action is self-targeted (a copy of Runic has always
+  raised the copier's own stance), so his copy of a blade row arms his own
+  weapon with that element, free, and his copy of Break Blade takes three
+  of his own points, as his copies of the other divines do.
+- **Engine-chosen turns** (Muddle, Charm, the Colosseum) never reach the
+  list: `RandCharAction` queues Runic with attack byte `$00`, which is no
+  row's id, so it is the bare stance (no blade, no Break Blade; a boost is
+  never spent by the engine).  Berserk only Fights, with whatever her blade
+  holds.
+- **Balance, measured and not tuned** (#563).  With a rune that suits the
+  body, each swing chips, so a 3-BP Fight is four chips and doubled hits
+  (eight with a Genji Glove's two weapons: a 1-BP Fight by a two-weapon
+  CELES chipped four, `build/attempts/wt/v051-spellblade/suite/`).  That is
+  what Tint already gives any fighter for four turns at 10 MP and Relm's
+  turn; the rune costs Celes's own turn and 4-6 MP (or nothing, from an
+  absorb), lasts the battle, is hers alone, and cannot backfire.  The
+  tiers, on a body staged weak to fire with its shields up, a two-weapon
+  CELES at level 33 (`build/attempts/wt/v051-spellblade/tier/`): a 0-BP
+  Fight's two hits took 575 and 598 HP with a tier-1 rune and about 1,144
+  with a tier-3 one (the hits read 1,164 and 1,124 before the shield's
+  half), where they take about 290 with no rune; Fire 3 cast at the same
+  body took 2,986 and 2,820.  A Fire 3 Blade costs Fire 3's 51 MP, so it
+  has repaid one cast of Fire 3 after about ten hits over a tier-1 blade
+  (4 MP) and seven over a bare one: five unboosted two-weapon Fights, or
+  little more than one at 3 BP (eight hits), and every hit also chips.  It
+  is a long fight's purchase, not a random battle's.  Break
+  Blade, from a bank of five and through the real menu in Darill's Tomb's
+  random battles (a two-weapon CELES, nothing staged): on the ROM before
+  the final merge, six uses over two seeds took 4, 4, 4, 4, 6 and 4 shields
+  from 41 landed hits (`build/attempts/wt/v051-spellblade/balance/`); on
+  the final ROM, two distinct draws gave four uses, 4, 7, 6 and 4 shields
+  from 31 hits (`build/attempts/wt/v051-spellblade/final/labs/`: bal0's
+  one use before its controller failed, and bal2's three; bal1 replayed
+  bal2's draw exactly and is not counted).  Most uses ended with nothing
+  standing unbroken: those formations hold four to seven shields, so the
+  formation, not the blade, set the number.  The blade itself has no cap:
+  one shield a landed hit of her weapon for three of her turns, so 6 a use
+  with one weapon from a full bank (2 BP, 0, 1), 12 with two, about 24
+  with a Genji Glove and an Offering (not measured); 4 and 8 from a bank of
+  exactly three.  That is intended (owner, 2026-11-24: "let's allow
+  offering and genji glove being crazy. that's true to the original.").  Bum Rush takes four in one turn for the same 99 MP, and
+  Cleave four from every death-immune body at once.
+- **The field page** (#563, the owner 2026-11-23: "the full treatment"):
+  Skills > RuneKnt, the list's tenth row, under Painter.  The row reads
+  BattleCmdName's record, as the TresHnt and Painter rows do; the Status
+  screen's command box and Gogo's picker already read the same record
+  (`menu_runeknt`), which is all the Status screen shows of Locke's and
+  Relm's kits too.  The page lists the rows the battle list would offer
+  now, in its order: Runic (free, no price drawn); a blade row for each
+  element of which the field Magic list has a spell for the character,
+  priced at the cheapest such spell as that list prices it (Gold Hairpin
+  and Economizer included); and Break Blade last, its name and 99 once
+  learned and the other pages' locked marker until then.  The battle list
+  reads the caster's battle Magic list; the field has none, so the page
+  asks the field Magic list's own test of each spell (`_c350a2`:
+  `Ot6FieldSpellKnown`'s learned spells, Break by her level, the worn
+  esper's spells and worn items' grants), and the two follow an esper put
+  on or taken off together.  For a Gogo carrying the command that test is
+  the seated party's union, as his field Magic list has it (and his own
+  stone's spells once he is revealed as Leo with Summon picked), which is
+  what his battle list holds.  Six blades at most, the battle shell's eight
+  cells less Runic and Break Blade; the cursor walks only the rows there
+  are.  The help window shows a line a row (`tools/kit_pages.py`'s RUNE
+  table, eleven lines by row id: a blade's line names its element and
+  says "Boost it like Fire" on the four elements with a spell line, "Takes
+  no boost" on the rest; Break Blade not learned says where it is learned).
+  The row is white for whoever carries the command **and holds a weapon
+  that allows Runic**, and grey otherwise: no relic rewrites command `$0B`,
+  but battle still greys it when neither hand's weapon carries the runic
+  property (vanilla's `UpdateCmd_01`; for Celes a Flail, a Morning Star,
+  the Atma Weapon or bare hands), and the field menu offers no page where
+  the battle offers no list, as under a Thief Glove or a Fake Mustache
+  (`ot6_runeknt_page.asm`; `Ot6RunePageRows` and `Ot6RunePageOpens` in
+  `ot6_runepage.asm`; `menu_runekntpage`, `menu_runekntpage_wob`).  In the
+  built ROM Merton carries fire and wind and W Wind no element, so Merton
+  alone gives a Fire row and a Wind row at its 85 MP.
+- Suites: `battle_spellblade` (the list, arming from an ally's spell,
+  replacement, persistence, the weak-only rule with absorbing, nulling and
+  halving bodies, each hit of a boosted Fight, the tiers' prices and
+  multipliers, the colours and the sign, the divine's gate, count, take and
+  the rune's return, the switch, the engine's pick), `battle_spellblade_esper` (the rows follow her esper),
+  `battle_runicmonster` (an enemy's spell arms it), `battle_gogokits` and
+  `battle_gogomimic` (Gogo's list and copies, the rows with no line),
+  `save_celesbreak` (an old save's Celes has Break by her level, nothing
+  written), `menu_runeknt` (the command's name in the three windows that
+  draw it), `menu_runekntpage` and `menu_runekntpage_wob` (the field page:
+  its rows against a model, following her esper, Gogo's, the weapon rule,
+  Break Blade learned and locked), `battle_runic`, `battle_runicblade`.
+  Mutants, one an arm:
+  `build/attempts/wt/v051-spellblade/mutants/mutants.py`, and the page's in
+  `build/attempts/wt/v051-spellblade/sb4/mutants.py`.
 
 ### Setzer — Gambler/Merchant (special ¤: cards, dice; darts = piercing)
 
@@ -1499,8 +1764,9 @@ route-wor-gogo.md section 0, finding 4).
   "we basically want to let him have access to everything cool about each
   character"; [kit-gogo.md](kit-gogo.md) is the survey and the engine
   limits).  Slot opens Setzer's table (Coin Toss, Hired Help, Jackpot);
-  Tools overclock, Runic is a RunicBlade, his Throw assassinates and his
-  Fire folds into Ultima at 3 BP; carrying Lore he has Strago's Scan and
+  Tools overclock, Runic opens Celes's list (the stance, a RunicBlade at
+  3 BP; a blade row for each element he can cast; Break Blade), his Throw
+  assassinates and his Fire folds into Ultima at 3 BP; carrying Lore he has Strago's Scan and
   Bserk on his Magic row and studies with Scan at 3 BP; Steal, Painter,
   Blitz, SwdTech, Rage and Dance open Locke's, Relm's, Sabin's, Cyan's,
   Gau's and Mog's lists as they did.  Morph and Leap stay Terra's and Gau's

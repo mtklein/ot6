@@ -19088,7 +19088,9 @@ OpenCmdMenuTbl:
         .addr   OpenThrowWindow
         .addr   OpenToolsWindow
         .addr   _c1776b
-        .addr   _c17795
+        .addr   _c1_rune_open           ; ot6: $0b runic -- was _c17795; now
+                                        ;   the Rune Knight's list, whose first
+                                        ;   row IS Runic (#563)
         .addr   OpenLoreWindow
         .addr   _c1_paint_open          ; ot6: $0d sketch -- was _c17795;
                                         ;   now Relm's list, whose first row
@@ -23901,7 +23903,8 @@ InitWeaponAnim:
         jsr     LoadBG1AnimFrames
         jsr     InitBG1AnimPos
         lda     w7e626d       ; weapon palette
-        jsr     LoadSpriteAnimPal
+        jsr     Ot6SwingPal_c1  ; ot6 #563: a rune's colour on the swing, then
+                                ;   LoadSpriteAnimPal (a same-size jsr edit)
         lda     w7e626f       ; hit palette
         sta     w7e6167       ; animation bg1 palette
         jsr     _c1a04b
@@ -38793,6 +38796,25 @@ BattleEventCmd_02:
 
 ; unused
 @ffe4:  rts
+
+; ------------------------------------------------------------------------------
+
+; ot6 #563 (celes's kit): two stubs at the segment's end, so that nothing
+; before them moves (the bank's NMI code addresses are pinned).
+;
+; Runic is the first row of the Rune Knight's list, the twin of the thief
+; submenu.  OpenCmdMenuTbl[$0b] hits this stub; bank $f0 fills wItemList with
+; Runic, a blade row for each element the caster can cast and Break Blade,
+; and raises mode w7e6168=7.
+_c1_rune_open:
+        jsl     Ot6RuneListOpen
+        jmp     OpenToolsWindow
+
+; InitWeaponAnim's weapon-palette load: bank $f0 swaps in the rune's colours
+; for a swing that carried it and ends in LoadSpriteAnimPal, whose rts
+; returns to InitWeaponAnim.
+Ot6SwingPal_c1:
+        jml     Ot6SwingPal_ext
 
 ; ------------------------------------------------------------------------------
 

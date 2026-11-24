@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "e47202042784bc9be5be018dd44f43c2e154df6f7b29dff7b93a7763e5126b69",
-  "generator_sig": "404806ab1f4117988e8d1e5f0af3d274a1b58b68743f7b0be9e2ec9f98c19a8b gen_wor_tritoch build/checkpoints/wor-narshe-cliffs-v1/manifest.json build/checkpoints/wor-narshe-cliffs-v1/wor-narshe-cliffs.sram",
+  "payload_sha256": "c46bf2fecb3c7fe556d50c41d4adaac258fbd0d35d4c65644c2b58abfee4902d",
+  "generator_sig": "87c3958b99f2f84d1d4957c0442e4527045dc4f5e9a3bd543f3969936ade142e gen_wor_tritoch build/checkpoints/wor-narshe-cliffs-v1/manifest.json build/checkpoints/wor-narshe-cliffs-v1/wor-narshe-cliffs.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-narshe-cliffs-v1/manifest.json",
-      "sha256": "98e80f146e0adb653d47a13ea1bd9615b08c1c6c0a66ec6b1758c176d517f6b4"
+      "sha256": "bb2ecd33cd29497a5c1b3f93a841d9e38ce6d2d1c6610028a57fb3fcf6a53853"
     }
   ]
 }

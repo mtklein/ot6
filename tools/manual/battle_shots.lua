@@ -5,8 +5,9 @@
 -- below the Narshe cliffs) and paces into a random battle.  The library's
 -- menu driver plays everyone's turns (real inputs only) except the first
 -- turn of CELES and of MOG, which this script plays through the same
--- command window: down to the second command (Runic, Dance) and A, and for
--- Mog A again on the first Dance in his list.  After each, it takes
+-- command window: down to the second command (RuneKnt, Dance) and A, which
+-- opens Celes's list (#563; the driver backs out of it and plays her turn),
+-- and for Mog A again on the first Dance in his list.  After each, it takes
 -- "<who>_<k>" every 8 frames, k = 1..24.
 local H = dofile("tools/tests/lib/ot6.lua")
 local CELES, MOG = 6, 10

@@ -508,7 +508,10 @@ local function armrPulse()              -- fresh menu machine per attempt
     if mSeq == nil then
       local actor = H.readByte(ACTOR)
       local chid = H.readByte(CHID + actor * 2)
-      mSeq = chid == CHAR_CELES and { "down", "a" }      -- Runic
+      -- Runic: since #563 the command opens her list (ot6_rune.asm), whose
+      -- first row, where a fresh cursor stands, is the stance; its A goes
+      -- on to the target latched on her, and the third A confirms
+      mSeq = chid == CHAR_CELES and { "down", "a", "a", "a" }
                                  or { "r", "a", "a", "a" } -- boosted Fight
       mIdx = 1
       local s = armrSlot()

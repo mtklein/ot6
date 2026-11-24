@@ -1857,8 +1857,11 @@ CalcTargetDmg:
         jsr     CalcDmgMod
         bra     @0b9b
 @0b98:  jsr     CalcDmgRatio
-@0b9b:  jsl     Ot6SeraphHeal   ; ot6 #328: Sraphim's healing +25% and
-                                ;   full revives (ot6_esper.asm)
+@0b9b:  jsl     Ot6TargetPre    ; ot6 #563: a rune on the swinging blade
+                                ;   joins the hit on a body weak to it
+                                ;   (ot6_rune.asm), then, as before,
+                                ;   ot6 #328: Sraphim's healing +25% and
+                                ;   full revives (Ot6SeraphHeal, ot6_esper.asm)
         stz     $f2
         lda     $3ee4,y
         asl
@@ -1913,7 +1916,9 @@ CalcTargetDmg:
         bit     $11a1
         beq     @0c1e
         jsl     Ot6Chip                 ; ot6: weakness hit chips shields
-        jsl     Ot6WeakDouble           ; ot6 #550: x2, saturating at $ffff
+        jsl     Ot6RuneWeakMul          ; ot6 #550: x2, saturating at $ffff
+                                        ;   (Ot6WeakDouble); #563: x3 or x4
+                                        ;   for a hit a tiered rune bit
         nop4                            ;   (was lda $f1 / bmi / asl / rol:
                                         ;   32,768 and up went undoubled)
 @0c1e:  jsl     Ot6HitJoin              ; ot6: class chip, then broken double
@@ -4210,13 +4215,16 @@ Cmd_14:
 
 Cmd_0b:
 @195b:  tyx
+        jsr     _c2298a
+        jsl     Ot6RuneExec     ; ot6 #563: Runic is the first row of the Rune
+        bcs     :+              ;   Knight's list; carry set = a blade row or
+                                ;   Break Blade, run in bank F0 (no stance)
         lda     $3e4c,x     ; set $3e4c.2 (runic)
         ora     #$04
         sta     $3e4c,x
         jsl     Ot6RunicRaise   ; ot6: and boost buys the stance a duration
                                 ;   -- on reactive verbs, boost buys duration
-        jsr     _c2298a
-        jmp     ExecSelfAttack
+:       jmp     ExecSelfAttack
 
 ; ------------------------------------------------------------------------------
 
