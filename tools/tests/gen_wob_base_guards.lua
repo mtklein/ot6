@@ -21,6 +21,10 @@ local K = H.worLegKit({ fight = FIGHT, links = {}, names = NAMES })
 local map, say, kitLine, sw, settled = K.map, K.say, K.kitLine, K.sw, K.settled
 
 local won, seen = {}, nil
+-- soldiers a visit walked toward and left the base without fighting (the walk to them crossed the gate's exit):
+-- the next visit goes to another (wt/v051-tg-wob1's gate, build/attempts/wt/v051-tg-wob1/gate2/: five visits in a
+-- row to obj $16 at (3,17)-(3,18), beside the west gate, each one back on the world map with no fight)
+local noFight = {}
 local function scan()
   while seen < #H.outcomes do
     seen = seen + 1
@@ -52,7 +56,7 @@ local function visit(n)
         local bd = nil
         for o = 0x11, 0x19 do
           local ox, oy = H.objX(o), H.objY(o)
-          if ox ~= 0 or oy ~= 0 then
+          if (ox ~= 0 or oy ~= 0) and not noFight[o] then
             local d = math.abs(ox - H.fieldX()) + math.abs(oy - H.fieldY())
             if bd == nil or d < bd then target, bd = o, d end
           end
@@ -138,6 +142,13 @@ local function visit(n)
         end),
       }, "toward the guard")
     end)(), function() end),
+    H.call(function()
+      if not H.battleLoadStarted() and not H.dialogWaiting() and H.worldMode() then
+        noFight[target] = true
+        say("guard", string.format("visit %d: left the base with no fight on the way to obj $%02X; the next visit "
+          .. "goes to another soldier", n, target))
+      end
+    end),
     H.release(),
     H.advanceStory(function()
       return H.worldMode() and H.worldSettled() and not H.battleLoadStarted()

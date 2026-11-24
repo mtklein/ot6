@@ -284,7 +284,8 @@ local function lineAfter(f)
   end
 end
 
-H.run({ maxFrames = 40000 }, {
+-- The cap: its run ended at f29,055 with the telegraph's cases (wt/v051-tg-wob1), so 60,000 is about 2x the longest.
+H.run({ maxFrames = 60000 }, {
   H.loadState(DOOR),
   -- the fixture is the dialog before his battle, waiting on a press: page it
   -- (A, edge-tapped, only while a dialog waits) until the battle loads.  How
@@ -391,4 +392,70 @@ H.run({ maxFrames = 40000 }, {
       "command (the SPECIAL behind his fire line was held back)")
     H.log("[ultros1] PASSED")
   end),
+
+  -- The telegraph (#561, bosses-wob.md block 4).  The fuse block is the
+  -- first of his turn script: his rotation's second turn sets monster
+  -- switch 0, the next says "Squirm, BANON!" (dlg $91) and glows, and the
+  -- turn after it clears the switch, says his own "Y...you frighten me!"
+  -- (dlg $4D) and fires Tentacle on BANON.  A break in between cancels it
+  -- (Ot6FuseTbl's row $012C): his rotation starts over.  A fresh battle from
+  -- the fixture, played three times from a snapshot at its open
+  -- (M.fuseCases: the gauge, the row's classes and HP held are its DECLARED
+  -- staging -- Ultros at 2,800).  The party Defends.
+  -- Mutants (build/attempts/wt/v051-tg-wob1/merged/mutants-merged/): ultros1_no_clear (Ot6FuseTbl+77=FF) is red at "monster switch
+  -- 0 is clear after the cancel"; ultros1_no_tentacle (Ot6FuseUltros1+9=EE) at "Tentacle ($0C/$D0) follows".
+  H.loadState(DOOR),
+  H.fuseEngage(function()
+    local n = 0
+    return H.driveUntil(function() return H.battleLoadStarted() end, 3000, {
+      H.call(function()
+        n = H.dialogWaiting() and n + 1 or 0
+        H.setPad((n > 0 and n % 8 < 4) and { "a" } or {})
+      end),
+    }, "the dialog paged into Ultros's battle (the telegraph's)")
+  end, ULTROS1, "Ultros"),
+  H.fuseCases({
+    tag = "ultros1", species = ULTROS1, write = { byte = function(a, v) H.writeByte(a, v) end,
+      word = function(a, v) H.writeWord(a, v) end },
+    -- the move is marked by his own line, which only the fire turn says: his rotation's first turn and his two
+    -- one-time lines use Tentacle too, so the attack id alone does not single the move out (the Tentacle on
+    -- BANON follows the line in the same turn, asserted below)
+    line = 0x91, move = { cmd = 0x21, atk = 0x4D }, turns = 1, glows = 1,
+    arm = "idle", openHold = true,
+    bossHp = 2800,
+    lineShot = 30,
+    -- his rotation's first turn taken (his opening line's before it), no fuse armed yet
+    partway = function(W)
+      local c = W.cells()
+      return c ~= nil and #W.turns >= 2 and (c.mvar & 0x01) == 0
+    end,
+    earned = function(C, W)
+      local pre, post, l1, l2 = C.brk.pre, C.brk.post, C.lines[1], C.lines[2]
+      H.assertEq(pre.mvar & 0x01, 1, "ultros1: monster switch 0 stood at the break (the fuse was armed)")
+      H.assertEq(post.mvar & 0x01, 0, "ultros1: monster switch 0 is clear after the cancel")
+      local back = l2.turn - C.rec.turn
+      H.assertEq(back >= 3, true, string.format("ultros1: the trigger was earned again in full: the line "
+        .. "returned on his turn %d back, after his rotation's two turns", back))
+    end,
+    -- the Tentacle follows his line in the fire turn: the next attack he dispatches after it is Tentacle ($0C/$D0)
+    fired = function(C, W, n)
+      local function tentacle()
+        for j = C.lines[n].move.i + 1, #W.cmds do
+          local c = W.cmds[j]
+          if c.cmd ~= 0x21 and c.cmd < 0x2B then return c end
+        end
+        return nil
+      end
+      return H.seqStep({
+        H.waitUntil(function() return tentacle() ~= nil end, 1200, "ultros1: an attack after \"Y...you frighten me!\""),
+        H.call(function()
+          local t = tentacle()
+          H.assertEq(t.cmd == 0x0C and t.arg == 0xD0 and t.turn == C.lines[n].move.turn, true, string.format(
+            "ultros1: Tentacle ($0C/$D0) follows \"Y...you frighten me!\" in the fire turn (case %s: $%02X/$%02X on "
+            .. "turn %d)", C.name, t.cmd, t.arg, t.turn))
+        end),
+      })
+    end,
+  }),
+  H.logStep("[ultros1] PASS: the announce, the schedule, the cancel and the trigger earned again"),
 })

@@ -2083,7 +2083,10 @@ Ot6ShieldTbl:
                                 ;   imperial camp gags carry no monster
                                 ;   entity at all (see the block comment)
         .word   $0044
-        .byte   4, OT6_BLUDG    ; telstar
+        .byte   2, OT6_BLUDG    ; telstar: 2 (was 4), wt/v051-tg-wob2: its counter
+                                ;   Megazerks the first Blitz that lands
+                                ;   unbroken, and SABIN's Pummel (2 chips)
+                                ;   is the pair's only bludgeon
         .word   $001a
         .byte   2, OT6_PIERCE   ; doberman
         .word   $0106
