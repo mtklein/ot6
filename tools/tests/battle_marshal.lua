@@ -124,7 +124,10 @@ H.run({ maxFrames = 400000 }, {
   end),
   H.fuseCases({
     tag = "marshal", species = MARSHAL, write = WRITE,
-    line = 0x8F, move = { cmd = 0x00, atk = 0xEE }, turns = 1, glows = 1,
+    -- the move is marked by its first command, fill_atb on the Lobos (AI $FB $08, dispatched as $30/$08), which only
+    -- the fire turn has: his ordinary turns Battle too, so a Battle alone does not single the move out (on the merged
+    -- ROM's draw his first turn back was a plain Battle).  The two Battles follow it, asserted in `fired`.
+    line = 0x8F, move = { cmd = 0x30, atk = 0x08 }, turns = 1, glows = 1,
     arm = "idle", aim = true, openHold = true,
     bossHp = 400,
     lineShot = 30,
@@ -132,6 +135,23 @@ H.run({ maxFrames = 400000 }, {
     partway = function(W)
       local c = W.cells()
       return c ~= nil and #W.turns >= 1 and (c.mvar & 0x01) == 0
+    end,
+    fired = function(C, W, n)
+      local function battles()
+        local k = 0
+        for j = C.lines[n].move.i + 1, #W.cmds do
+          local c = W.cmds[j]
+          if c.turn == C.lines[n].move.turn and c.cmd == 0x00 and c.arg == 0xEE then k = k + 1 end
+        end
+        return k
+      end
+      return H.seqStep({
+        H.waitUntil(function() return battles() >= 2 end, 1200, "marshal: his two Battles after the Lobos' gauges"),
+        H.call(function()
+          H.assertEq(battles(), 2, string.format("marshal: two Battles ($00/$EE) follow the Lobos' gauges in the fire "
+            .. "turn (case %s)", C.name))
+        end),
+      })
     end,
     earned = function(C, W)
       local pre, post, l2 = C.brk.pre, C.brk.post, C.lines[2]

@@ -65,6 +65,8 @@ H.run({ maxFrames = 400000 }, {
     tag = "whelk", species = HEAD, write = WRITE,
     line = 0x8E, move = { cmd = 0x0C, atk = 0xB8 }, turns = 1, glows = 1,
     arm = "idle", hides = true,
+    -- (HP held: two Fire Beams on the Broken head in the "outside" window took its last 1,406 on the merged ROM's draw)
+    bossHp = 1600,
     breaker = { name = "Fire Beam", cmd = MAGITEK, mtek = FIRE_BEAM, open = true },
     lineShot = 30,
     -- a Mega Volt fired and a plain turn counted since (switch 6 set, 7 clear, the count 1, the shell's hold set):
