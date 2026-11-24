@@ -926,7 +926,7 @@ H.run({ maxFrames = 90000 }, {
   -- DECLARED staging -- VARGAS at 11,500, above the 10,880 line his counter
   -- brings SABIN in at, so the trio fights it).  The trio Defends; the
   -- breaking Fight is aimed at him (the Ipoohs stand in front).
-  -- Mutant (build/attempts/wt/v051-tg-wob1/final/mutants/): vargas_no_clear (Ot6FuseTbl+69=FF) is red at "monster switch 0
+  -- Mutant (build/attempts/wt/v051-tg-wob1/merged/mutants-merged/): vargas_no_clear (Ot6FuseTbl+69=FF) is red at "monster switch 0
   -- is clear after the cancel".
   -- ===================================================================== --
   H.call(function() TW.on = false; mode = "hold" end),

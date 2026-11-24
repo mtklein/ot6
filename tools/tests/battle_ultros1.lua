@@ -401,7 +401,7 @@ H.run({ maxFrames = 40000 }, {
   -- the fixture, played three times from a snapshot at its open
   -- (M.fuseCases: the gauge, the row's classes and HP held are its DECLARED
   -- staging -- Ultros at 2,800).  The party Defends.
-  -- Mutants (build/attempts/wt/v051-tg-wob1/final/mutants/): ultros1_no_clear (Ot6FuseTbl+77=FF) is red at "monster switch
+  -- Mutants (build/attempts/wt/v051-tg-wob1/merged/mutants-merged/): ultros1_no_clear (Ot6FuseTbl+77=FF) is red at "monster switch
   -- 0 is clear after the cancel"; ultros1_no_tentacle (Ot6FuseUltros1+9=EE) at "Tentacle ($0C/$D0) follows".
   H.loadState(DOOR),
   H.fuseEngage(function()

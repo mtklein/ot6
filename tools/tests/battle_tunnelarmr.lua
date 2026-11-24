@@ -21,7 +21,7 @@
 --             rotation's two turns again; TekLaser follows that.
 --   outside   a break after the rotation's first turn, before any line: nothing is cancelled, and the fuse lights
 --             and fires as in the first case.
--- Mutants (build/attempts/wt/v051-tg-wob1/final/mutants/): armr_no_clear (Ot6FuseTbl+85=FF) is red at "monster switch 0 is clear after the
+-- Mutants (build/attempts/wt/v051-tg-wob1/merged/mutants-merged/): armr_no_clear (Ot6FuseTbl+85=FF) is red at "monster switch 0 is clear after the
 -- cancel"; armr_no_tutorial (Ot6FuseTunnelArmr+12=F147: battle_event $10 gone) at "the Runic tutorial ... played
 -- once in the case".
 -- A mechanism test, not play.

@@ -204,8 +204,11 @@ beams; Terra adds TekMissile and Bio Blast).
   drawn into its shell cannot be hit, so the head, the body with the
   gauge, carries the telegraph. Its first turn arms it (a normal attack),
   its second says **"Static builds!"** and glows, its third is Mega Volt
-  on the party (about 45 to each member, measured in the line: 77/91/93
-  to 32/46/50). After a Mega Volt it takes one plain turn before arming
+  on the whole party, its damage split (about 45 to each member, measured
+  in the line: 77/91/93 to 29/46/50). Aimed at no target it sometimes fell
+  on one member unsplit and killed TERRA from 77/77 (the merged line's
+  `arvis_wake`, build/attempts/wt/v051-tg-wob1/merged/legs/), so it is aimed
+  at all of them. After a Mega Volt it takes one plain turn before arming
   again. From its first turn to the Mega Volt the head holds a battle
   switch that keeps the shell from hiding it (the shell's one change), so
   the race can be run and a Broken head stays out for its window. Lab

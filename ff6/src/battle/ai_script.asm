@@ -6573,7 +6573,10 @@ Ot6FuseWhelk:                   ; the fuse is lit here (Ot6FuseTbl's row)
                 set_monster_var 0       ; the trigger's clears first: the count
                 set_monster_switch 6    ;   and switch 7 (one byte; switch 6
                 clr_battle_switch 0, 0  ;   back), the shell's hold; the move
-                set_target NOTHING
+                set_target ALL_CHARS    ; the whole party, its damage split: with
+                                        ;   no target it fell on one member at a
+                                        ;   time, unsplit, and killed TERRA from
+                                        ;   77/77 (the merged line's arvis_wake)
                 attack MEGA_VOLT
                 end_if
         if_monster_switch_clr 6         ; its first turn
