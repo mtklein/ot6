@@ -6,18 +6,19 @@
 -- break-class icon.  Under six classes (#566) Dirk, item 0, wears the dagger
 -- icon {dagger} = $D8, the byte vanilla FF3us has there too, so Dirk no
 -- longer tells an OT6 ROM from a vanilla one (under four classes it wore the
--- piercing icon $DA and was the marker).  The marker is the Mithril Claw,
--- item $54: an edged claw is a Katana and wears the katana icon $DB, where
--- vanilla has the claw icon $E1.  Dirk's own bytes are still checked: a
--- dagger wears the dagger icon.
+-- piercing icon $DA and was the marker).  The marker is the RegalCutlass,
+-- item $0B: a curved sword is a Katana (2026-11-24) and wears the katana icon
+-- $DB, where vanilla has the sword icon $D9.  (Until then the marker was the
+-- Mithril Claw, then a Katana; a claw is a Dagger now and wears the dagger
+-- icon.)  Dirk's own bytes are still checked: a dagger wears the dagger icon.
 -- The item_name segment loads at $D2B300, HiROM $D2B300 -> PRG file offset
 -- 0x12B300; ITEM_SIZE = 13 per entry. "Dirk" encodes as 83 A2 AB A4 and
--- "Mithril Claw" as 8C A2 AD A1 AB A2 A5 FE 82 A5 9A B0.
+-- "RegalCutlass" as 91 9E A0 9A A5 82 AE AD A5 9A AC AC.
 local ITEM_NAME, ITEM_SIZE = 0x12B300, 13
 local expected = {
   { item = 0x00, what = "{dagger}Dirk", bytes = { 0xD8, 0x83, 0xA2, 0xAB, 0xA4 } },
-  { item = 0x54, what = "{katana}Mithril Claw",
-    bytes = { 0xDB, 0x8C, 0xA2, 0xAD, 0xA1, 0xAB, 0xA2, 0xA5, 0xFE, 0x82, 0xA5, 0x9A, 0xB0 } },
+  { item = 0x0B, what = "{katana}RegalCutlass",
+    bytes = { 0xDB, 0x91, 0x9E, 0xA0, 0x9A, 0xA5, 0x82, 0xAE, 0xAD, 0xA5, 0x9A, 0xAC, 0xAC } },
 }
 
 local function check()
@@ -32,7 +33,7 @@ local function check()
       end
     end
   end
-  emu.log("smoke: {dagger}Dirk and the {katana}Mithril Claw class-icon marker found in ROM - PASS")
+  emu.log("smoke: {dagger}Dirk and the {katana}RegalCutlass class-icon marker found in ROM - PASS")
   emu.stop(0)
 end
 

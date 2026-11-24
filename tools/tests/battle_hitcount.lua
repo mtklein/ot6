@@ -427,10 +427,15 @@ H.run({ maxFrames = 120000 }, {
   -- Which formation the ledge draws is random, so this is a bounded ladder
   -- rather than one attempt.
   H.call(function() want = PUMMEL end),
+  -- ...and whose battle script BtlGfx_04 has started (#554's reading below):
+  -- the loop closes a few frames before ExecCmd plays the script, and a
+  -- drive that stopped at the close read none (the six-class gate on
+  -- fccf9cf3: "Pummel #1: ... closed=true (frame 2693); script []", the
+  -- verdict at frame 2695)
   drive(function()
     local a = bestFor(PUMMEL)
-    return a ~= nil and a.hits >= 2
-  end, 40000, "a Pummel whose target survives its first hit"),
+    return a ~= nil and a.hits >= 2 and a.script ~= nil
+  end, 40000, "a Pummel whose target survives its first hit, its script played"),
 
   H.call(function()
     disarm()
