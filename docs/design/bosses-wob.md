@@ -210,8 +210,12 @@ beams; Terra adds TekMissile and Bio Blast).
   `arvis_wake`, build/attempts/wt/v051-tg-wob1/merged/legs/), so it is aimed
   at all of them. After a Mega Volt it takes one plain turn before arming
   again. From its first turn to the Mega Volt the head holds a battle
-  switch that keeps the shell from hiding it (the shell's one change), so
-  the race can be run and a Broken head stays out for its window. Lab
+  switch that keeps the shell from hiding it (the shell's one change), and
+  every break of the head sets that switch again (`Ot6FuseTbl`'s
+  `OT6_FUSE_HOLD`), so the race can be run and a Broken head stays out for
+  its whole window, a break just after its Mega Volt included
+  (`battle_whelk`'s fourth case; the `whelk_no_break_hold` mutant is red
+  there). Lab
   (`race` lab, build/attempts/wt/v051-tg-wob1/lab/, keys $15/$39/$51): a party that beams the head from the
   open (Fire Beam, boost at its bank) breaks it with its 4th beam, the 1st
   after the announce, and the cancel fires, 3 of 3; a party that Defends
@@ -447,7 +451,7 @@ authored** (`Ot6ElemAddTbl` `$0104` + `$02`, weak byte resolves
   bit 3 clear) and its power is 100, so the move is TunnelArmr's own
   TekLaser ($B5, Runic-absorbable) on both. Its first turn is the Runic
   tutorial (`battle_event $10`, unchanged); its rotation's second turn
-  arms the fuse; the next says **"Laser charging"** and glows; the turn
+  arms the fuse; the next says **"Laser charges!"** and glows; the turn
   after it is TekLaser on the party. Lab (build/attempts/wt/v051-tg-wob1/lab/, keys $5E/$6E/$8E): chipping
   from the open breaks it before any announce, 3 of 3, in 2 actions
   (LOCKE's boosted Genji Fight takes 4); its announce comes on its 4th

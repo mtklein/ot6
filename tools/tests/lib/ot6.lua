@@ -19319,7 +19319,7 @@ function M.fuseWatch(species, write)
     local hp = {}
     for i = 0, 3 do hp[i] = M.readWord(0x3BF4 + 2 * i) end
     W.cmds[#W.cmds + 1] = { f = M.frame, cmd = cmd, arg = arg, turn = #W.turns, retal = M.readByte(0xB1) & 1 == 1,
-      tchars = M.readByte(0xB8), tmons = M.readByte(0xB9), hp = hp }
+      tchars = M.readByte(0xB8), tmons = M.readByte(0xB9), hp = hp, stand = W.standingMask() }
     -- (a line closes a tally: the maxima up to it ride on its record, and are counted afresh)
     if cmd == 0x21 then
       W.cmds[#W.cmds].max = W.max
@@ -19356,7 +19356,13 @@ function M.fuseWatch(species, write)
           -- (9,999, above any member's own maximum where that is lower: a blow that takes a whole HP bar at once,
           -- AtmaWeapon's Meteo on a Floating Continent party, would otherwise fell the member it lands on)
           local hp = M.readWord(0x3BF4 + 2 * i)
-          if M.readByte(0x3ED8 + 2 * i) ~= 0xFF and hp > 0 and hp < 9999 then write.word(0x3BF4 + 2 * i, 9999) end
+          if M.readByte(0x3ED8 + 2 * i) ~= 0xFF and hp > 0 and hp < 9999 then
+            -- (W.pin.party == "max": the member's own maximum, FUSE_DMG's party until the move, so the move's damage
+            -- reads as a share of a full bar)
+            local mx = M.readWord(0x3C1C + 2 * i)
+            if W.pin.party ~= "max" then write.word(0x3BF4 + 2 * i, 9999)
+            elseif hp < mx then write.word(0x3BF4 + 2 * i, mx) end
+          end
         end
       end
     end
@@ -19448,8 +19454,9 @@ end
 --                           the Whelk's head, which the shell could otherwise draw in)
 --   cfg.runic = { who }     (optional) a fifth case: that member's Runic, confirmed in the fuse, takes the move: the
 --                           absorb is seen (RunicEffect's target), and every member's HP is logged before and after
---   FUSE_DMG (a lab's global): the "unbroken" case alone, with the party's HP not held: the move's damage on each
---                           member, as a share of its maximum, logged as a [fuse] damage line
+--   FUSE_DMG (a lab's global): the "unbroken" case alone, the party's HP held at each member's own maximum until
+--                           the move is dispatched and not after: the move's damage on each member, as a share of
+--                           its maximum, logged as a [fuse] damage line
 --   cfg.lineShot            (optional) a screenshot "fuse_<tag>_line" this many frames after the first announce
 --                           is dispatched (the line in its window), beside the "_lit" one (the mark)
 -- The cases:
@@ -19536,7 +19543,7 @@ function M.fuseCases(cfg)
         W.reset()
         W.on = true
         W.pin = { boss = (name == "outside" and cfg.outsideHp) or cfg.bossHp,
-          party = rawget(_G, "FUSE_DMG") ~= true }
+          party = rawget(_G, "FUSE_DMG") == true and "max" or true }
         C = { name = name }
         if cfg.onOpen then cfg.onOpen(name) end
         say(string.format("case %s, from the battle's open", name))
@@ -19616,11 +19623,11 @@ function M.fuseCases(cfg)
           c.turn, what))
         l.move = { i = i, f = c.f, turn = c.turn }
         if cfg.allTargets then
-          local want = W.standingMask()
+          local want = c.stand
           M.assertEq(c.tchars & 0x0F, want, string.format("%s: the move is queued on every standing member (its "
             .. "targets $%02X at dispatch, the standing seats $%02X)", tag, c.tchars & 0x0F, want))
         end
-        if rawget(_G, "FUSE_DMG") == true then C.dmgFrom = { f = c.f, hp = c.hp } end
+        if rawget(_G, "FUSE_DMG") == true then C.dmgFrom = { f = c.f, hp = c.hp }; W.pin.party = false end
         say(string.format("the move is dispatched on turn %d, %d turn(s) after the announce", c.turn,
           c.turn - l.turn))
       end),
@@ -20008,11 +20015,21 @@ function M.fuseCases(cfg)
         end
         absorbed = {}
       end),
-      idle(function() return gone() or lineAfter(1) ~= nil end, 30000, "the announce (the Runic's cue)"),
+      -- (the member waits on its command window, its turn up, until the announce, then confirms: a Runic acts when
+      -- it resolves, so one confirmed late in the fuse can resolve after the move -- the first cut of this case
+      -- confirmed CELES's only when her next turn came, and Kefka's Ice 2 came 30 frames later, unabsorbed)
       M.lazy(function()
-        local plan = { { who = cfg.runic.who, cmd = 0x0B, self = true, boost = 0 } }
-        return M.kitBattle(plan, { idle = "defend", care = false, maxFrames = 6000, untilPlanDone = true,
-          giveUp = function() return gone() or moveAfter(lineAfter(1)) ~= nil end })
+        -- (boost 1: the stance stands through one more of the member's own turns, Ot6RunicHold.  Unboosted, it
+        -- ends when the member queues its next action, vanilla's QueueAction clear: CELES's next Defend dropped it
+        -- 46 frames before TunnelArmr's TekLaser, which then hit LOCKE for 225)
+        local plan = { { who = cfg.runic.who, cmd = 0x0B, self = true, boost = 1,
+          openWhen = function() return lineAfter(1) ~= nil end } }
+        return M.kitBattle(plan, { idle = "defend", care = false, maxFrames = 36000, untilPlanDone = true,
+          giveUp = function() local li = lineAfter(1); return gone() or (li ~= nil and moveAfter(li) ~= nil) end })
+      end),
+      M.call(function()
+        M.assertEq(lineAfter(1) ~= nil, true, tag .. ": the announce came (the Runic's cue)")
+        C.stanceAt = {}
       end),
       M.call(function()
         standing()

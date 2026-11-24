@@ -28,8 +28,11 @@
 -- And the shell stays vanilla but for the one guard: while battle switch 0 is set the shell does not hide the
 -- head (the shell's hide block, if_battle_switch_clr 0, 0).
 -- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v051-tg-wob1/merged/mutants-merged/): whelk_no_clear (Ot6FuseTbl+53=FF: the cancel keeps the head's byte) is
--- red at "the head's byte reads $40 after the cancel"; whelk_no_hold (Ot6FuseTbl+54=FE: the cancel clears the
--- shell's hold) at "battle switch 0 (the shell's hold on the head) still stands after the cancel".
+-- red at "the head's byte reads $40 after the cancel"; whelk_no_break_hold (Ot6FuseTbl+54=FF, +55=00: no
+-- OT6_FUSE_HOLD, the cancel keeping the hold) at "the Broken boss stayed on the field for its whole window" (the
+-- break right after Mega Volt); whelk_untargeted (Ot6FuseWhelk+12=47: set_target NOTHING) at "the head's fire turn
+-- sets its target to ALL_CHARS".  (whelk_no_hold, the cancel clearing the hold, no longer changes anything: every
+-- break sets it again.)
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
@@ -61,6 +64,19 @@ H.run({ maxFrames = 50000 }, {
   end, HEAD, "the Whelk"),
   H.call(function()
     H.assertEq(H.formationHas({ [WHELK] = true }), true, "the battle is the Whelk's (shell $100 and head $134)")
+    -- the fire turn aims Mega Volt at the whole party (`set_target ALL_CHARS`, $F1 $43, before the move): aimed at no
+    -- target the engine picks one member or all by its own roll, so the queued targets alone (allTargets, below)
+    -- read $07 on most draws either way; an unsplit Mega Volt on one member killed TERRA from 77/77 in the line
+    local a = H.sym("Ot6FuseWhelk") & 0x3FFFFF
+    local x, tgt = a, nil
+    while H.readRomByte(x) ~= 0xB8 and x < a + 32 do
+      local b = H.readRomByte(x)
+      if b == 0xF1 then tgt = H.readRomByte(x + 1) end
+      local SIZE = { [0] = 4, 2, 4, 3, 4, 4, 4, 2, 3, 4, 4, 3, 4, 1, 1, 1 }   -- AICmdSizeTbl
+      x = x + (b >= 0xF0 and SIZE[b - 0xF0] or 1)
+    end
+    H.assertEq(tgt, 0x43, string.format("the head's fire turn sets its target to ALL_CHARS ($43) before Mega Volt "
+      .. "(read $%02X)", tgt or 0))
   end),
   H.fuseCases({
     tag = "whelk", species = HEAD, write = WRITE,
