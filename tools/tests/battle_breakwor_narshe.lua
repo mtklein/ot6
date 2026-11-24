@@ -60,9 +60,14 @@ local WANT = {
 -- (wor-cyan-v1's kit: TERRA knows Fire and Quake, CELES Ice, CYAN's
 -- Tempest $2E is wind; TERRA's and CELES's blades, the Falchion $15),
 -- MOG's spear (the Partisan $20) with them once he joins, and UMARO's Bone
--- Club $4A and Storm on the plain at the end with MOG, TERRA and CELES
-local TERRA = { "TERRA", W(0x15), FIRE | EARTH }
-local CELES = { "CELES", W(0x15), ICE }
+-- Club $4A and Storm on the plain at the end with MOG, TERRA and CELES.
+-- Since the 2026-11-24 regroup the Falchion is a Katana, and the route's gear
+-- rule spreads the blades: the regrouped replay walks in with TERRA's Crystal
+-- $14 (Sword) and CELES's Enhancer $13 and Soul Sabre $16 (Sword, Katana)
+-- (wor_narshe's [keys] "src=c2:r2E:S,c0:r14,c6:r13:l16,c10:r20", fccf9cf3,
+-- build/attempts/wt/v051-six-classes/line/)
+local TERRA = { "TERRA", W(0x14), FIRE | EARTH }
+local CELES = { "CELES", W(0x13) | W(0x16), ICE }
 local CYAN  = { "CYAN", W(0x2E), WIND }
 local MOG   = { "MOG", W(0x20), 0 }
 local UMARO = { "UMARO", W(0x4A), ICE }

@@ -57,7 +57,9 @@ local WANT = {
 -- weapon and no Fight row: no key of his own; his Mimic copies the others' keys, which the union already
 -- holds)
 local TERRA = { "TERRA", W(0x06), FIRE | HOLY }
-local CELES = { "CELES", W(0x15), ICE }
+-- since the 2026-11-24 regroup the Falchion is a Katana; the regrouped replay's CELES walks the belly with the
+-- Crystal $14 and the Enhancer $13 (both Sword): wor_belly's [keys] "src=c0:r06,c6:r14:l13,c8:r39,c7:r3A" (fccf9cf3)
+local CELES = { "CELES", W(0x14) | W(0x13), ICE }
 local RELM = { "RELM", W(0x39) | W(0x3D), 0 }
 local STRAGO = { "STRAGO", W(0x39), HOLY }
 local GOGO = { "GOGO", 0, 0 }

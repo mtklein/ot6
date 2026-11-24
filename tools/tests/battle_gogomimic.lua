@@ -438,6 +438,18 @@ local function decide()
     if not armDone(arm) and seatOf[arm.owner] ~= nil and not (arm.tag == "study" and skipStudy) then
       local p = {}
       for k, v in pairs(arm.src) do p[k] = v end
+      -- the throw a copy repeats is aimed at a body the staging Breaks (no
+      -- Death ward, $3AA1 bit 2), and the Mimic copies its target; unaimed,
+      -- it went to a warded body beside the staged one on the six-class
+      -- replay: "0 mark(s), staged $02" (battle_gogokits had the same)
+      if arm.tag == "assassinate" then
+        for m = 0, 5 do
+          local e = 8 + m * 2
+          if p.slot == nil and present(m) and H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3AA1 + e) & 0x04) == 0 then
+            p.slot = m
+          end
+        end
+      end
       plan[#plan + 1] = p
       entryArm[p] = arm
       -- GOGO's Mimic, once the owner's action has run in this battle and is
