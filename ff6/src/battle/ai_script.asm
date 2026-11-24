@@ -4473,7 +4473,9 @@ AIScript::_260:
 ; count of ordinary turns (battle variable 3) reached 2, with two or more of the party standing.  Here those
 ; conditions ARM the fuse a turn ahead, on a turn the train spends on its ordinary attacks (the count read one
 ; earlier, so the announce lands on the turn vanilla's toot did): "Whistle blows!" (battle dialogue $99) and a
-; glow announce it on the next turn, and Evil Toot follows on the train's turn after that.  The party count is
+; glow announce it on the next turn, a second glowing turn follows (the fuse is two of its turns, AtmaWeapon's
+; length: the lab's party broke a full gauge in two of the train's turns, wt/v051-tg-wob2), and Evil Toot comes on
+; the turn after that.  The party count is
 ; tested where the fuse is armed, not on the fuse block, whose only condition is monster switch 0: a member
 ; felled between the announce and the toot cannot drop an announced move (ot6_fuse.asm, the idiom).  A break
 ; in between cancels it: switch 0 and the count go (Ot6FuseTbl), so two of its turns earn it again.  The
@@ -4488,7 +4490,10 @@ AIScript::_262:
 ; Whistle blows!
                 short_glow MONSTER_1
                 wait
-Ot6FuseGhostTrain:              ; the fuse is lit here (Ot6FuseTbl's row)
+Ot6FuseGhostTrain:              ; the fuse is lit from here (Ot6FuseTbl's row)
+                short_glow MONSTER_1
+                wait
+Ot6FuseGhostTrainFire:          ; ... to here, the turn that fires it
                 clr_monster_switch 0    ; the trigger's clears first, then the
                 set_battle_var 3, 0     ;   move (ot6_fuse.asm, the idiom)
                 attack EVIL_TOOT

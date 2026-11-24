@@ -19404,6 +19404,7 @@ end
 --   cfg.earned(c)           the "broken" case's boss-specific asserts: c = the case's record (below)
 --   cfg.outside(c)          the "outside" case's, likewise (optional)
 --   cfg.onOpen(name)        called as each case opens (optional)
+--   cfg.fired(C, W, n)      called once the move after announce n is dispatched (optional)
 -- The cases:
 --   unbroken   the party arms the fuse; the line shows, the HUD mark shows, and the move is dispatched on the
 --              boss's cfg.turns-th turn after the announce; the mark is gone after it.
@@ -19549,6 +19550,7 @@ function M.fuseCases(cfg)
         l.move = { i = i, f = c.f, turn = c.turn }
         say(string.format("the move is dispatched on turn %d, %d turn(s) after the announce", c.turn,
           c.turn - l.turn))
+        if cfg.fired then cfg.fired(C, W, n) end     -- (a boss's own asserts on the turn that fired)
       end),
       M.cond(function() return W.fixed and not measure end, {
         -- (the lit bit too: a veil over the HUD, an animation's, also takes the mark out of VRAM for a while)

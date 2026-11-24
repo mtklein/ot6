@@ -155,9 +155,9 @@ Ot6FuseTbl:
         ot6_fuse $0044, Ot6FuseTelstar1, Ot6FuseTelstar1, $ff, $ff, OT6_FUSE_TIMER
         ot6_fuse $0044, Ot6FuseTelstar2, Ot6FuseTelstar2, $ff, $ff, OT6_FUSE_TIMER
         ot6_fuse $0044, Ot6FuseTelstar3, Ot6FuseTelstar3, $ff, $ff, OT6_FUSE_TIMER
-        ; the GhostTrain: "Whistle blows!", Evil Toot; armed by its count of
-        ; ordinary turns (battle variable 3), monster switch 0
-        ot6_fuse $0106, Ot6FuseGhostTrain, Ot6FuseGhostTrain, $fe, $ff, OT6_FUSE_VAR3
+        ; the GhostTrain: "Whistle blows!", two glowing turns, Evil Toot; armed
+        ; by its count of ordinary turns (battle variable 3), monster switch 0
+        ot6_fuse $0106, Ot6FuseGhostTrain, Ot6FuseGhostTrainFire, $fe, $ff, OT6_FUSE_VAR3
         ; Rizopas: "Waters swell!", El Nino; armed by a roll on its turn A,
         ; monster switch 0 (switch 1, its turn B, is clear while lit)
         ot6_fuse $0155, Ot6FuseRizopas, Ot6FuseRizopas, $fc, $ff, 0
