@@ -19411,8 +19411,9 @@ end
 --   cfg.partway(W)          true once the trigger is part earned and no fuse is lit (the "outside" case's break)
 --   cfg.earned(c)           the "broken" case's boss-specific asserts: c = the case's record (below)
 --   cfg.outside(c)          the "outside" case's, likewise (optional)
---   cfg.fired(c, W, n)      (optional) a step played as each move has been recorded and its mark has gone, after the
---                           n-th announce of the case (the party Defends meanwhile)
+--   cfg.fired(C, W, n)      (optional) called once the move after the case's n-th announce has been recorded and its
+--                           mark has gone: a boss's own asserts on the turn that fired (Telstar's, Rizopas's), or a
+--                           step to play (Ultros's: wait for the Tentacle behind his line); the party Defends meanwhile
 --   cfg.onOpen(name)        called as each case opens (optional)
 --   cfg.aim                 (optional) the breaking action is aimed at the boss's slot, in the "outside" case too (a
 --                           formation with other bodies: Vargas's Ipoohs, the Marshal's Lobos)
@@ -19601,7 +19602,7 @@ function M.fuseCases(cfg)
           say("the mark is gone after the move")
         end),
       }, {}),
-      M.lazy(function() return cfg.fired and cfg.fired(C, W, n) or M.waitFrames(0) end),
+      M.lazy(function() return (cfg.fired and cfg.fired(C, W, n)) or M.waitFrames(0) end),
     })
   end
   -- The breaking Fight.  The gauge goes to 1 and the row takes every class (so whichever hand swings is a key);
