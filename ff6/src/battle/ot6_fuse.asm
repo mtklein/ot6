@@ -148,6 +148,20 @@ Ot6FuseTbl:
         ; its timer and a roll, monster switch 0 (no battle deals it; see
         ; AIScript::_311)
         ot6_fuse $0137, Ot6FuseCzar, Ot6FuseCzar, $fe, $ff, OT6_FUSE_TIMER
+        ; ---- wt/v051-tg-wob1: World of Balance bosses 1-5 (bosses-wob.md) ----
+        ; Each fuse block is its script's first, lit by a monster switch an
+        ; ordinary turn sets; a break clears what the move's turn clears.
+        ; the Whelk's head: its count and switch 7, one byte (the count again)
+        ot6_fuse $0134, Ot6FuseWhelk, Ot6FuseWhelk, $00, $ff, 0
+        ; the Marshal: switch 0 (his rotation again)
+        ot6_fuse $0064, Ot6FuseMarshal, Ot6FuseMarshal, $fe, $ff, 0
+        ; Vargas: switch 0 (his rotation again)
+        ot6_fuse $0103, Ot6FuseVargas, Ot6FuseVargas, $fe, $ff, 0
+        ; the Lete River Ultros: switch 0 (his rotation again)
+        ot6_fuse $012c, Ot6FuseUltros1, Ot6FuseUltros1, $fe, $ff, 0
+        ; TunnelArmr: switch 0 (its rotation again)
+        ot6_fuse $0104, Ot6FuseTunnelArmr, Ot6FuseTunnelArmr, $fe, $ff, 0
+        ; ---- end wt/v051-tg-wob1 ----
         .word   $ffff
 
 ; the announce lines a counter speaks (a `dlg` id, low byte; every id is

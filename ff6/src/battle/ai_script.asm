@@ -113,7 +113,27 @@ AIScript::_77:
 ; ------------------------------------------------------------------------------
 
 ; marshal
+; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 2): his telegraph.
+; The fuse block comes first, so that no other block can take the move's turn
+; (ot6_fuse.asm, the idiom; bosses-wor.md 1.4): his rotation's second turn
+; arms it (monster switch 0), the next says "Lobos, at 'em!" and glows, and
+; the turn after it fills both Lobos' gauges and strikes twice.  A break in
+; between clears the switch: the rotation starts over from its first turn.
+; Everything below the fuse block is vanilla's, but for the arming switch on
+; the second turn.
 AIScript::_100:
+        if_monster_switch_set 0
+                dlg $8f
+; Lobos, at 'em!
+                short_glow MONSTER_3
+                wait
+Ot6FuseMarshal:                 ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clear first, then the move
+                fill_atb MONSTER_SLOT_1 ; the Lobos come in with him
+                fill_atb MONSTER_SLOT_2
+                attack BATTLE
+                attack BATTLE
+                end_if
         if_num_monsters 1
                 attack BATTLE, SPECIAL, SPECIAL
                 end_if
@@ -121,6 +141,7 @@ AIScript::_100:
         attack BATTLE, NET, BATTLE
         wait
         attack BATTLE
+        set_monster_switch 0    ; ot6: arms the fuse block (above)
         wait
         attack NET, NET, BATTLE
         wait
@@ -4358,7 +4379,24 @@ AIScript::_257:
 ; ------------------------------------------------------------------------------
 
 ; vargas
+; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 3): his
+; telegraph.  The fuse block comes first, so that no other block (his Sabin
+; lines, his 50-count double Battle) can take the move's turn (ot6_fuse.asm,
+; the idiom): his rotation's second Battle arms it (monster switch 0), the
+; next turn says "Feel the wind!" and glows, and the turn after it is Gale
+; Cut, the rotation's own.  A break in between clears the switch: the rotation starts
+; over from its first turn.  Below the fuse block everything is vanilla's but
+; the rotation's middle turn, which was the Gale Cut the fuse now fires.
 AIScript::_259:
+        if_monster_switch_set 0
+                dlg $90
+; Feel the wind!
+                short_glow MONSTER_1
+                wait
+Ot6FuseVargas:                  ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clear first, then the move
+                attack GALE_CUT
+                end_if
         if_battle_switch_set 0, 0
         if_battle_switch_clr 0, 4
         if_status_clr SABIN, CONDEMNED
@@ -4384,10 +4422,9 @@ AIScript::_259:
                 attack BATTLE
                 end_if
         attack BATTLE
-        wait
-        attack GALE_CUT, GALE_CUT, GALE_CUT
-        wait
-        attack BATTLE
+        wait                    ; ot6: vanilla's next turn was `attack
+        attack BATTLE           ;   GALE_CUT` x3, which the fuse block fires
+        set_monster_switch 0    ; ot6: arms the fuse block (above)
         end
 
         if_self_dead
@@ -4418,7 +4455,26 @@ AIScript::_259:
 ; ------------------------------------------------------------------------------
 
 ; tunnelarmr
+; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 5): its
+; telegraph, the one Celes's Runic answers.  The fuse block comes first, so
+; that no other block (the low-HP rotation) can take the move's turn
+; (ot6_fuse.asm, the idiom): its rotation's second turn arms it (monster
+; switch 0), the next says "Laser charging" and glows, and the turn after it
+; is TekLaser on the whole party (its own laser, Runic-absorbable).  A break
+; in between clears the switch: the rotation starts over from its first turn.
+; Below the fuse block everything is vanilla's, the Runic tutorial
+; (battle_event $10) included, but for the arming switch.
 AIScript::_260:
+        if_monster_switch_set 0
+                dlg $92
+; Laser charging
+                short_glow MONSTER_1
+                wait
+Ot6FuseTunnelArmr:              ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clear first, then the move
+                set_target ALL_CHARS
+                attack TEK_LASER
+                end_if
         if_battle_switch_clr 0, 0
                 battle_event $10
                 toggle_battle_switch 0, 0
@@ -4433,6 +4489,7 @@ AIScript::_260:
         attack BATTLE, BOLT, FIRE
         wait
         attack POISON, SPECIAL, FIRE
+        set_monster_switch 0    ; ot6: arms the fuse block (above)
         end
 
         if_self_dead
@@ -6094,7 +6151,28 @@ Ot6FuseGoner:                   ; ot6: the fuse is lit here (ot6_fuse.asm)
 ; ------------------------------------------------------------------------------
 
 ; ultros (lete river)
+; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 4): his
+; telegraph.  The fuse block comes first, so that no other block (his opening
+; and his two one-time lines) can take the move's turn (ot6_fuse.asm, the
+; idiom): his rotation's second turn arms it (monster switch 0), the next
+; says "Squirm, BANON!" and glows, and the turn after it is the rotation's
+; own third turn, "Y...you frighten me!" and Tentacle on BANON.  A break in
+; between clears the switch: the rotation starts over from its first turn.
+; Below the fuse block everything is vanilla's, every line included, but the
+; rotation's third turn, which the fuse block now holds.
 AIScript::_300:
+        if_monster_switch_set 0
+                dlg $91
+; Squirm, BANON!
+                short_glow MONSTER_1
+                wait
+Ot6FuseUltros1:                 ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clear first, then the move
+                dlg $4d
+; Y…you frighten me!
+                set_target BANON
+                attack TENTACLE
+                end_if
         if_battle_switch_clr 0, 0
                 dlg $0c
 ; Uwee hee hee…
@@ -6129,12 +6207,8 @@ AIScript::_300:
         wait
         attack BATTLE
         attack BATTLE, SPECIAL, TENTACLE
-        wait
-        dlg $4d
-; Y…you frighten me!
-        set_target BANON
-        attack TENTACLE
-        end
+        set_monster_switch 0    ; ot6: arms the fuse block (above); vanilla's
+        end                     ;   third turn is the fuse's move
 
         if_self_dead
                 hide_monsters SELF, WATER
@@ -6421,8 +6495,34 @@ AIScript::_305:
 ; ------------------------------------------------------------------------------
 
 ; head
+; OT6 (#561, wt/v051-tg-wob1; docs/design/bosses-wob.md block 1): the Narshe
+; Whelk's head (the WoR Presenter's is _309) carries the Whelk's telegraph, on
+; the body that holds the gauge: its turns count in its monster variable
+; (bits 0-6), the second one arms the fuse (monster switch 7), the next says
+; "Static builds!" and glows, and the turn after it is Mega Volt on the party.
+; A break in between clears the byte: the count starts over.  The fuse block
+; comes first, so that no other block can take the move's turn (ot6_fuse.asm,
+; the idiom).  Vanilla's turn was `attack BATTLE, BATTLE, SPECIAL / end`.
 AIScript::_308:
+        if_monster_switch_set 7
+                dlg $8e
+; Static builds!
+                short_glow MONSTER_2
+                wait
+Ot6FuseWhelk:                   ; the fuse is lit here (Ot6FuseTbl's row)
+                set_monster_var 0       ; the trigger's clear first (the count
+                                        ;   and switch 7: one byte), then the move
+                set_target NOTHING
+                attack MEGA_VOLT
+                end_if
+        if_monster_switch_clr 7
+        if_battle_var_greater 36, 1     ; (the byte: bit 7 is clear here)
+                attack BATTLE, BATTLE, SPECIAL
+                set_monster_var 0
+                set_monster_switch 7
+                end_if
         attack BATTLE, BATTLE, SPECIAL
+        add_monster_var 1
         end
 
         if_self_dead
