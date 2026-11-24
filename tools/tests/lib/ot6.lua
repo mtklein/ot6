@@ -14049,7 +14049,21 @@ function Driver:zingerPlan(actor, plan)
   if M.readWord(0x3BF4 + host * 2) == 0 then return plan end
   local care = plan.kind == "item" or plan.kind == "heal" or plan.kind == "raise" or plan.kind == "defer"
     or plan.kind == "switch" or (plan.ally and plan.reason ~= "zinger")
-  if care and (plan.target ~= host or plan.all) then return plan end
+  -- a party-wide cure refills the host as well, which undoes the line (two of ten keys took 23,624 and 30,132
+  -- frames against 4,690-12,225, build/attempts/wt/v051-tg-wob1/zgrid/summary.txt): it stands only when another
+  -- member is in danger (down, or under 40% of max HP); else the turn is the host Fight.  Care aimed at the host
+  -- alone is held for the Fight below, as before.
+  local function otherInDanger()
+    for e = 0, 3 do
+      if e ~= host then
+        local mx, hp = M.readWord(0x3C1C + e * 2), M.readWord(0x3BF4 + e * 2)
+        if mx > 0 and mx ~= 0xFFFF and (hp == 0 or hp * 100 < mx * 40) then return true end
+      end
+    end
+    return false
+  end
+  if care and plan.all and otherInDanger() then return plan end
+  if care and not plan.all and plan.target ~= host then return plan end
   if actor == host and not (care and plan.kind ~= "defer" and plan.kind ~= "switch") then
     return plan
   end
