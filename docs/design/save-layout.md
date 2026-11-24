@@ -414,7 +414,15 @@ the four classes: slash `$01`, pierce `$02`, bludgeon `$04`, special `$08`.
 Each of a species' four-class weaknesses became a six-class weakness of
 that species (slash became Sword or Katana; pierce Dagger, Spear or Ranged;
 bludgeon and special Blunt or Ranged; and all six for the two species any
-weapon breaks), so a revealed four-class bit has one meaning per species.
+weapon breaks), so a revealed four-class bit has one meaning per species:
+usually one class, but a few early species took two six-class weaknesses
+for one four-class weakness (Lobo, Marshal, Cirpius, Dark Wind, Hornet: a
+revealed bit shows both), and a few lost a four-class weakness outright
+(Dark Wind `$028`, Hornet `$02E`, SlamDancer `$052`, Sand Ray `$05C`,
+Areneid `$05D`, HeavyArmor `$09F`: that revealed bit shows nothing and the
+weakness the species has now is found again). Every table byte is a subset
+of the species' row, or with no row its floor class (`check_save_layout`
+checks it on the built ROM).
 `Ot6ClassSplitTbl` (`ot6_class_split.inc`, written by
 `tools/six_classes/split.py`) records it: four bytes per species id 0-383,
 byte k the six-class bits the species' weakness of four-class bit k
@@ -444,8 +452,10 @@ differed; the v0.28-v0.44 golden saves hold a few) becomes nothing.
   console that loses power inside the 384-byte rewrite keeps O8 over a
   part-rewritten table, and the next load rewrites all of it: a reveal
   already moved can be lost and has to be found again. An O7 migration
-  rewrites page 1 last, so its O7 magic restarts an interrupted one from a
-  whole payload.
+  rewrites page 1 last, so its O7 magic restarts an interrupted one: from
+  page 1's whole payload if the loss came during pages 2 and 3, and from a
+  part-rewritten page 1 if it came inside page 1's own rewrite, where a
+  reveal already moved can be lost the same way.
 - **No lie on screen.** The table's bytes are weaknesses the species has in
   v0.51, so a migrated page reveals nothing false. After that, a revealed
   bit a species' row no longer answers to (a later change to a row, or a
@@ -457,6 +467,7 @@ differed; the v0.28-v0.44 golden saves hold a few) becomes nothing.
   mean under v0.51's rows. It moves with the rows until v0.51 is published
   (`split.py` rewrites it) and never after, even when a species' row does:
   a changed row is a content change, and the mask above keeps it honest.
+  `check_save_layout.py` pins its sha256 (`SPLIT_SHA256`) as that freeze.
 - **Old tools' names.** The harness's checkpoint layout tag stays
   `ot6-codex-o8-v1` (`OT6_CHECKPOINT_LAYOUT`, each checkpoint's
   `persistent_layout`): it names the family of batteries a step can

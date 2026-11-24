@@ -98,7 +98,7 @@ Each character has a type of their own, and most can equip a second:
 | Locke | Dagger | Sword (MithrilBlade, Blizzard, ThunderBlade, Drainer, Excalibur, Illumina, Ragnarok, Atma Weapon); Katana (Flame Sabre, Falchion, Soul Sabre); Ranged (Boomerang, Full Moon, Rising Sun, Hawk Eye, Sniper, Wing Edge) | Trickshot, Dismantle: Dagger. Mug uses his weapon's type |
 | Edgar | Spear | Sword (every straight sword); Katana (the five curved swords); Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | AutoCrossbow, Air Anchor: Ranged. Drill: Spear. Chain Saw: Sword |
 | Sabin | Blunt (bare fists; MetalKnuckle, Kaiser, Fire Knuckle) and Dagger (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs) | none | Pummel, Suplex, Bum Rush: Blunt |
-| Cyan | Katana (and the Scimitar) | none | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
+| Cyan | Katana (his katanas) | none | Dispatch, Slash, Quadra Slam, Stunner, Cleave: Katana |
 | Shadow | Dagger (ninja blades, daggers) | none | Throw: stars Ranged, skeans Ranged and their element; a thrown weapon keeps its type |
 | Celes | Sword, or Katana with a curved sword | Dagger and Blunt, as Terra | none |
 | Setzer | Ranged (Cards, Trump, Dice, Darts, Doom Darts) | Dagger (Dirk, MithrilKnife, Man Eater, Graedus) | Coin Toss: Ranged. Hired Help: a type the target is weak to |

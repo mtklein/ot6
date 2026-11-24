@@ -2248,9 +2248,11 @@ Ot6ShieldTbl:
         .word   $010b
         .byte   7, OT6_DAGGER ; number 128 (body)
         .word   $013f
-        .byte   3, OT6_KATANA ; right blade
+        .byte   3, OT6_DAGGER|OT6_KATANA ; right blade: CYAN's katana, and the
+                                ;   minecart's forced LOCKE's dagger (#566: a forced
+                                ;   member holds a key)
         .word   $0140
-        .byte   3, OT6_KATANA ; left blade
+        .byte   3, OT6_DAGGER|OT6_KATANA ; left blade: as the right
         .word   $010d
         .byte   6, OT6_DAGGER ; crane (element sides verified at m6 entry)
         .word   $010e

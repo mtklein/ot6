@@ -1214,11 +1214,20 @@ check("shield_rows",
        "ff6/src/menu/colosseum.asm", "ff6/include/const.inc",
        "ff6/src/battle/battle_main.asm"] + sorted(glob("ff6/src/event/*.asm"))
       + glob("src/event/*.asm", "ff6"))
-check("break_reach", "python3 tools/check_break_reach.py",
+# --strict-holders (#566): the holder rule is enforced over the declared areas (sealed-gate, vector-factory, zozo):
+# a sole weapon key two real holders hold, or one the story forces in.  The opening's accepted misses (Actaneon,
+# Anguiform, Beakor: docs/design/opening.md "holder rule") lie outside the declared areas.
+check("break_reach", "python3 tools/check_break_reach.py --strict-holders",
       ["tools/check_break_reach.py", "tools/check_boss_rows.py", "tools/ot6_class.py",
        "ff6/src/battle/battle_main.asm", "ff6/src/battle/ot6_break_floor.inc",
        "ff6/src/menu/item_prop_en.dat", "ff6/src/field/char_prop.asm"]
       + glob("src/battle/ot6_*.asm", "ff6"))
+# #566: the area dress's table (M.LEG_SPECIES, ot6_field.lua) lists every species the replayed line's legs deal
+# (their maps' pools, the sectors walked, the battles opened), read from the play's own logs.
+check("leg_species", "python3 tools/six_classes/leg_species.py build/states --covers",
+      ["tools/six_classes/leg_species.py", "tools/six_classes/stages.py", "tools/tests/lib/ot6_field.lua",
+       "ff6/src/field/map_prop.dat", "ff6/src/field/sub_battle_group.dat", "ff6/src/field/rand_battle_group.dat",
+       "ff6/src/field/world_battle_group.dat", "ff6/src/battle/battle_monsters.dat"] + all_stamps)
 # The $1600-$1FFF save block is a compatibility contract
 # (docs/design/save-layout.md): every OT6 symbol in it is documented at the
 # address and width the build assembled it at, no two fields overlap, and none

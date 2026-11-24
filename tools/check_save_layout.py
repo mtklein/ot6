@@ -47,6 +47,7 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import hashlib
 import re
 import sys
 
@@ -379,7 +380,48 @@ def source_uses(src_root, names):
     return out
 
 
-def check_codex(text, allsyms, rom, uses, split_src):
+# Ot6ClassSplitTbl frozen at the first six-class release (v0.51): a v0.50 save's reveals migrate by these bytes
+# once, so a later release that changes them would migrate the same save differently.  Moving a row after release
+# keeps the table (Ot6SeedShields masks a stale reveal) and changes this pin only by a decision recorded in
+# docs/design/save-layout.md.
+SPLIT_SHA256 = "44936a8a0a46d99b24fd0b31c1ae846fea8bf86c0d0b0198dae7683ddd1e4c5a"
+
+
+def split_row_problems(table, rows, floor):
+    """Each Ot6ClassSplitTbl byte names only classes its species' row holds (its Ot6ShieldTbl class byte, or with
+    no row its floor class): a migrated reveal must land on a weakness the species has.  table: SPECIES*4 bytes;
+    rows: {species: class byte}; floor: SPECIES bytes."""
+    out = []
+    for sp in range(SPECIES):
+        hold = rows[sp] if sp in rows else floor[sp]
+        for k in range(4):
+            b = table[sp * 4 + k]
+            if b & ~hold:
+                out.append("%s: Ot6ClassSplitTbl species $%03X, four-class bit $%02X becomes $%02X, which its %s "
+                           "($%02X) does not hold" % (ROM, sp, 1 << k, b, "row" if sp in rows else "floor", hold))
+    return out
+
+
+def split_hash_problems(table, want=None):
+    want = want or SPLIT_SHA256
+    h = hashlib.sha256(bytes(table)).hexdigest()
+    if h != want:
+        return ["%s: Ot6ClassSplitTbl's sha256 is %s, not the release freeze %s (a v0.50 save would migrate "
+                "differently; see docs/design/save-layout.md \"The six-class codex\")" % (ROM, h, want)]
+    return []
+
+
+def rom_rows_by_species(rom, at):
+    rows = {}
+    while True:
+        sp = rom[at] | (rom[at + 1] << 8)
+        if sp == 0xFFFF:
+            return rows
+        rows.setdefault(sp, rom[at + 3])
+        at += 4
+
+
+def check_codex(text, allsyms, rom, uses, split_src, split_sha=None):
     """The codex magics' roles and the six-class migration's tables (#566).
     `uses` is source_uses() of the doc's codex magic symbols; `split_src`
     the source split table's bytes (parse_split_inc), or None when the
@@ -440,6 +482,14 @@ def check_codex(text, allsyms, rom, uses, split_src):
     if wide:
         problems.append("%s: Ot6ClassSplitTbl holds a bit past the six classes (species %d, four-class bit $%02X: "
                         "$%02X)" % (ROM, wide[0] // 4, 1 << (wide[0] % 4), table[wide[0]]))
+    if "Ot6ShieldTbl" not in allsyms or "OT6_FLOOR_CLASS" not in allsyms:
+        problems.append("%s: no Ot6ShieldTbl or OT6_FLOOR_CLASS symbol (the rows the split table must agree with)"
+                        % DBG)
+    else:
+        f = rom_offset(allsyms["OT6_FLOOR_CLASS"])
+        problems += split_row_problems(table, rom_rows_by_species(rom, rom_offset(allsyms["Ot6ShieldTbl"])),
+                                       list(rom[f:f + SPECIES]))
+    problems += split_hash_problems(table, split_sha)
     if split_src is None:
         problems.append("%s is missing (Ot6ClassSplitTbl's source)" % SPLIT_INC)
     elif len(split_src) != SPECIES * 4:
@@ -738,6 +788,8 @@ SELF_DBG = (
     'sym\tname="OT6_SPEAR",val=0x20,type=lab\n'
     'sym\tname="Ot6CodexSix",val=0xC32000,type=lab\n'
     'sym\tname="Ot6ClassSplitTbl",val=0xC32200,type=lab\n'
+    'sym\tname="Ot6ShieldTbl",val=0xC33000,type=lab\n'
+    'sym\tname="OT6_FLOOR_CLASS",val=0xC33100,type=lab\n'
     'sym\tname="SRAMSlotPtrs",val=0xC31572,type=lab\n'
     'sym\tname="CopyGameDataToSRAM",val=0xC30100,type=lab\n'
     'sym\tname="LoadSaveSlot",val=0xC30140,type=lab\n'
@@ -755,6 +807,8 @@ def _self_rom():
     rom[0x0301C0 + 10:0x0301C0 + 13] = bytes.fromhex("e00020")
     rom[0xFFD8] = 5
     rom[0x032200:0x032200 + SPECIES * 4] = bytes(SELF_SPLIT)     # Ot6ClassSplitTbl
+    rom[0x033000:0x033008] = bytes([5, 0, 3, 0x3F, 0xFF, 0xFF, 0, 0])   # Ot6ShieldTbl: species 5's row, every class
+    rom[0x033100:0x033100 + SPECIES] = bytes([0x3F] * SPECIES)          # OT6_FLOOR_CLASS
     return rom
 
 
@@ -764,7 +818,7 @@ SELF_USES = [("ot6_codex.asm", 22, "OT6_CODEX_V3     := $394f"), ("ot6_codex.asm
              ("ot6_codex.asm", 117, "lda     #OT6_CODEX_V3")]
 
 
-def _run_self(doc=SELF_DOC, dbg=SELF_DBG, rom=None, literals=(), uses=SELF_USES, split=SELF_SPLIT):
+def _run_self(doc=SELF_DOC, dbg=SELF_DBG, rom=None, literals=(), uses=SELF_USES, split=SELF_SPLIT, sha=None):
     rom = rom if rom is not None else _self_rom()
     rows, scraps = parse_doc(doc)
     brows, problems = parse_battery(doc)
@@ -777,7 +831,8 @@ def _run_self(doc=SELF_DOC, dbg=SELF_DBG, rom=None, literals=(), uses=SELF_USES,
     problems += check_lengths(rows, allsyms)
     problems += check_battery(brows, parse_magic(doc), allsyms, sram_symbols(dbg),
                               list(literals), rom, allsyms)
-    problems += check_codex(doc, allsyms, rom, list(uses), split)
+    problems += check_codex(doc, allsyms, rom, list(uses), split,
+                            sha or hashlib.sha256(bytes(SELF_SPLIT)).hexdigest())
     return problems
 
 
@@ -869,6 +924,15 @@ def selftest():
     bad[0x032200 + 9 * 4 + 3] = 0x7F
     red("Ot6ClassSplitTbl holds a bit past the six classes (species 9, four-class bit $08: $7F)", rom=bad)
     red("holds 1535 bytes, not four per codex species", split=SELF_SPLIT[:-1])
+    # the split table against the rows (#566): a byte naming a class its species' row (species 5's, cut to $01)
+    # or its floor (species 6's, cut to $1F) lacks; and the release freeze's hash
+    bad = _self_rom()
+    bad[0x033003] = 0x01
+    red("species $005, four-class bit $01 becomes $0C, which its row ($01) does not hold", rom=bad)
+    bad = _self_rom()
+    bad[0x033100 + 6] = 0x1F
+    red("species $006, four-class bit $01 becomes $28, which its floor ($1F) does not hold", rom=bad)
+    red("Ot6ClassSplitTbl's sha256 is", sha="0" * 64)
     red("ot6_class_split.inc is missing", split=None)
     red("OT6_CODEX_FOUR is $1F, not $F", dbg=SELF_DBG.replace('name="OT6_CODEX_FOUR",val=0xF', 'name="OT6_CODEX_FOUR",val=0x1F'))
     red("OT6_CLASSES is $7F, not $3F", dbg=SELF_DBG.replace('name="OT6_CLASSES",val=0x3F', 'name="OT6_CLASSES",val=0x7F'))

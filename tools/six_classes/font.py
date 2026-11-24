@@ -23,8 +23,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = os.environ.get("OT6_SPLIT_BASE", "origin/main")
-MSG = {0x45: "Weak against swords", 0x46: "Weak against daggers", 0x47: "Weak against blunt",
-       0x48: "Weak against ranged", 0x4a: "Weak against katanas", 0x4b: "Weak against spears"}
+MSG = {0x45: "Weak against swords", 0x46: "Weak against daggers", 0x47: "Weak against blunt attacks",
+       0x48: "Weak against ranged attacks", 0x4a: "Weak against katanas", 0x4b: "Weak against spears"}
 KATANA = 0xDB
 # ' ' 0 clear, '.' 1 shadow, 'o' 2 grey, '#' 3 white (the text palette's stroke)
 ART = {

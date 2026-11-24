@@ -117,4 +117,5 @@ excepted); taking the boots off takes the spear off too.
 Saves from v0.28 and later load in this release. A save from before v0.44
 starts with no esper progress. A save from an older release keeps its
 revealed weaknesses, each shown as the new type that weakness became for
-that monster.
+that monster; a few early enemies show two types or lose one, which is
+found again by hitting them.

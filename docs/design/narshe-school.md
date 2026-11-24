@@ -152,7 +152,7 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Claws and ninja blades are Dagger, and so are Gau's fangs. Curved swords, like the RegalCutlass, are Katana.
+> Claws, ninja blades and fangs are Dagger. Curved swords, like the RegalCutlass, are Katana.
 >
 > *(next box)*
 >

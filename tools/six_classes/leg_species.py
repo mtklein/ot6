@@ -16,10 +16,15 @@ entry is the union of its own species and its successor's.
 
 The table is written into ot6_field.lua between the "-- BEGIN leg_species"
 and "-- END leg_species" markers (M.LEG_SPECIES[leg] = { species, ... });
---check only reports whether it would change.  LOGDIR defaults to the last
-full replay's leg logs.  Run from the repository root.
+--check only reports whether it would change.  --union keeps every species the
+table already lists beside the logs' (a replay's random encounters and walked
+sectors vary, so the table gathers them over replays).  --covers checks that the
+table holds every species the logs deal for each generator (the gate's check
+against the replay's own logs, build/states: an exact match would go red at
+every replay that walked one more sector).  LOGDIR defaults to the last full
+replay's leg logs.  Run from the repository root.
 
-    python3 tools/six_classes/leg_species.py [LOGDIR] [--check]
+    python3 tools/six_classes/leg_species.py [LOGDIR] [--check | --union | --covers]
 """
 import glob
 import os
@@ -106,16 +111,32 @@ def main():
         g = gen_of.get(leg)
         if u and g:
             table[g] = sorted(set(table.get(g, [])) | u)
+    text = LIB.read_text()
+    old = {}
+    for m in re.finditer(r"^  (\w+) = \{ ([^}]*) \},$", text[text.find("-- BEGIN leg_species"):text.find("-- END leg_species")],
+                         re.M):
+        old[m.group(1)] = {int(v, 16) for v in m.group(2).split(", ") if v}
+    if "--covers" in sys.argv:
+        miss = [(g, sorted(set(v) - old.get(g, set()))) for g, v in sorted(table.items())
+                if set(v) - old.get(g, set())]
+        for g, sp in miss:
+            print("leg_species: %s deals %s, which M.LEG_SPECIES does not list (rerun with --union)"
+                  % (g, " ".join("$%03X" % x for x in sp)))
+        print("leg_species: %s" % ("the table covers %s" % os.path.relpath(logs, ROOT) if not miss
+                                   else "%d generator(s) not covered" % len(miss)))
+        return 1 if miss else 0
+    if "--union" in sys.argv:
+        for g, v in old.items():
+            table[g] = sorted(set(table.get(g, [])) | v)
     order = sorted(table)
-    lines = ["-- BEGIN leg_species (tools/six_classes/leg_species.py %s; do not edit by hand)" %
-             os.path.relpath(logs, ROOT),
+    lines = ["-- BEGIN leg_species (tools/six_classes/leg_species.py %s%s; do not edit by hand)" %
+             (os.path.relpath(logs, ROOT), " --union" if "--union" in sys.argv else ""),
              "M.LEG_SPECIES = {   -- generator (OT6_SCRIPT) -> the species its legs and the next ones deal"]
     for leg in order:
         if leg in table:
             lines.append("  %s = { %s }," % (leg, ", ".join("0x%03X" % s for s in table[leg])))
     lines += ["}", "-- END leg_species"]
     block = "\n".join(lines) + "\n"
-    text = LIB.read_text()
     a = text.find("-- BEGIN leg_species")
     b = text.find("-- END leg_species")
     assert a >= 0 and b > a, "no leg_species markers in " + str(LIB)

@@ -626,8 +626,10 @@ From `split.py`'s report, the opening's rows only.
 | Actaneon (Blunt) | the trench again, the Opera-era party | SABIN is the one real Blunt holder of seven | Fire and bolt are vanilla weaknesses and the party has espers by then. Ranged as a second weakness relieves it. |
 | Anguiform (Katana) | the trench again, the Opera-era party | only CYAN of seven really holds Katana (SABIN's claw is a dagger since 2026-11-24) | Bolt is a vanilla weakness and the party has espers by then. Blunt or Dagger as a second weakness relieves it. |
 
-Past the opening, Number 128's RightBlade and Left Blade (Katana) bind the
-same way since the regroup: only CYAN of that party holds Katana.
+Past the opening, Number 128's RightBlade and Left Blade bound the same way
+after the regroup (Katana alone: only CYAN of that party held it, and the
+minecart forces LOCKE); they take Dagger too since 2026-11-24, so the forced
+LOCKE (and SABIN's claw) keys them.
 
 Not flagged, but the same kind: the Bleary, the Sand Ray, the Areneid, the
 Merchant, the Officer, the HeavyArmor and TunnelArmor take only a dagger.
@@ -710,9 +712,10 @@ Element adds, shield counts, shops and events are outside this change.
    that the row is every squad's again. EDGAR's key on him would then be his
    sword, if he kept it.
 6. **"Weak against blunt" and "Weak against ranged"** read as cut short beside
-   "Weak against swords". "Weak against blunt attacks" and "Weak against
-   ranged attacks" fit the message window (27 letters; vanilla lines run to
-   34) and are true of fists, Pummel and thrown things.
+   "Weak against swords". Taken (2026-11-24): the messages are "Weak against
+   blunt attacks" and "Weak against ranged attacks", which fit the message
+   window (27 letters; vanilla lines run to 34) and are true of fists, Pummel
+   and thrown things.
 
 ## Evidence
 
@@ -732,7 +735,8 @@ Element adds, shield counts, shops and events are outside this change.
   field does it; none runs past four lines.
 - `ninja build/ot6.sfc` assembles, and on the built ROM
   `tools/check_shield_rows.py`, `tools/check_break_reach.py`,
-  `tools/audit_break_coverage.py --gate` and `tools/check_save_layout.py`
-  pass. `tools/check_boss_rows.py` names 13 lines of bosses-wob.md that
-  still state the rows this change replaces
-  (`build/attempts/wt/v051-six-classes/opening/boss-rows-disagreements.txt`).
+  `tools/audit_break_coverage.py --gate`, `tools/check_save_layout.py` and
+  `tools/check_boss_rows.py` pass (the 13 lines of bosses-wob.md it first
+  named, `build/attempts/wt/v051-six-classes/opening/boss-rows-disagreements.txt`,
+  were restated), and `tools/check_break_reach.py --strict-holders` passes
+  in the gate over its declared areas.

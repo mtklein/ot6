@@ -1170,14 +1170,15 @@ the party that walked in.
 | part | shields | weak |
 |---|---|---|
 | body | 7 | bolt, water + dagger |
-| Left/Right blades | 3 each | bolt + katana |
+| Left/Right blades | 3 each | bolt + dagger, katana |
 
-The blades take CYAN's blade, or a curved sword (LOCKE's or EDGAR's
-Flame Sabre; since 2026-11-24 a claw is Dagger and no longer keys them).
-The route's three (LOCKE, EDGAR, SABIN, `level-curve.md`) break them with
-Bolt, their vanilla weakness (Ramuh is held by then), and with a Flame
-Sabre if LOCKE or EDGAR holds one; the body takes LOCKE's dagger, SABIN's
-claw and Bolt.
+The blades take a dagger or a katana (#566, 2026-11-24: Dagger added so
+that a member the minecart forces holds a key; with Katana alone only CYAN
+really held one): LOCKE's dagger, SABIN's claw, CYAN's blade, or a curved
+sword (LOCKE's or EDGAR's Flame Sabre). The route's three (LOCKE, EDGAR,
+SABIN, `level-curve.md`) break them with LOCKE's dagger and SABIN's claw,
+and with Bolt, their vanilla weakness (Ramuh is held by then); the body
+takes LOCKE's dagger, SABIN's claw and Bolt.
 
 - Blades regenerate a few turns after dying (vanilla ✦), and regrown
   blades return at full shields. Their weakness row stays revealed.

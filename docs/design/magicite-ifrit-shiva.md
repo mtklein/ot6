@@ -132,13 +132,13 @@ is what the player carries out of the dungeon.
 ### 2.3 Boss shield/class rows (already authored)
 
 `Ot6ShieldTbl` (`ot6_hud.asm`): Ifrit 6·Dagger, Shiva 6·Sword, Number
-024 7·Sword|Dagger, Number 128 7·Dagger (its blades 3·Katana), the Left and
+024 7·Sword|Dagger, Number 128 7·Dagger (its blades 3·Dagger|Katana), the Left and
 Right Cranes 6·Dagger. Under four classes every Facility boss was
 **class-breakable by the party's existing weapons**: Locke pierced and Celes
 slashed. Now Celes's sword keys Shiva and Number 024 and Locke's daggers key
 Ifrit, Number 024, Number 128 and both Cranes; Number 128's blades take a
-Katana (Cyan, or a curved sword such as Locke's or Edgar's Flame Sabre;
-Sabin's claw is Dagger since 2026-11-24) or their vanilla Bolt. The class axis is the reliable axis
+dagger (Locke's, Sabin's claw), a Katana (Cyan, or a curved sword such as
+Locke's or Edgar's Flame Sabre) or their vanilla Bolt. The class axis is the reliable axis
 in this dungeon, so **anything that makes ordinary weapon swings hit harder
 is worth more here than any element.**
 
@@ -408,7 +408,7 @@ When this was decided every Facility boss was slash|pierce-breakable (§2.3),
 the fixed party covered both, and Sabin could switch his Fight to slashing by
 equipping claws, so a claw permit on Ifrit would have added nothing. Claws
 are Dagger now (2026-11-24) and the curved swords Katana; Number 128's
-blades are the Facility's only Katana rows.
+blades are the Facility's only Katana rows, and take Dagger beside it.
 
 ---
 

@@ -328,8 +328,8 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SWORD   ; 316 Tentacle -> row -> SWORD
         .byte   OT6_BLUNT   ; 317 Tentacle -> row -> BLUNT
         .byte   OT6_SWORD   ; 318 Tentacle -> row -> SWORD
-        .byte   OT6_KATANA  ; 319 RightBlade -> row -> KATANA
-        .byte   OT6_KATANA  ; 320 Left Blade -> row -> KATANA
+        .byte   OT6_DAGGER  ; 319 RightBlade -> row -> DAGGER
+        .byte   OT6_DAGGER  ; 320 Left Blade -> row -> DAGGER
         .byte   OT6_BLUNT   ; 321 Rough -> row -> BLUNT
         .byte   OT6_DAGGER  ; 322 Striker -> row -> DAGGER
         .byte   OT6_BLUNT   ; 323 L.70 Magic -> row -> BLUNT

@@ -2,7 +2,12 @@
 ; what a four-class (v0.50 and older) save's revealed class bits mean: four
 ; bytes a species id (0..383), byte k the six-class bits the species' weakness
 ; of four-class bit k (slash $01, pierce $02, bludgeon $04, special $08) became;
-; $00 where it had none.  Written by tools/six_classes/split.py when the six
+; $00 where it had none (also where the species lost that weakness in the
+; six: Dark Wind $028, Hornet $02e, SlamDancer $052, Sand Ray $05c, Areneid
+; $05d, HeavyArmor $09f; and a few bytes name two classes: Lobo, Marshal,
+; Cirpius, Dark Wind, Hornet).  Every byte is a subset of the species' row
+; or, with none, its floor (check_save_layout).  Written by
+; tools/six_classes/split.py when the six
 ; classes replaced the four (#566), with each row: a four-class save's
 ; revealed weakness lands on a class the species' current row holds, so it
 ; is rewritten when a row moves, and frozen with the rows at release
@@ -377,12 +382,12 @@ Ot6ClassSplitTbl:
         .byte   $00, $00, $04, $08 ; 364 Phunbaba
         .byte   $01, $00, $04, $08 ; 365 Phunbaba
         .byte   $00, $00, $00, $00 ; 366 (unused)
-        .byte   $01, $00, $00, $00 ; 367 (unused)
+        .byte   $10, $00, $00, $00 ; 367 (unused)
         .byte   $00, $00, $00, $00 ; 368 (unused)
         .byte   $00, $00, $00, $00 ; 369 Zone Eater
         .byte   $00, $00, $00, $00 ; 370 (unused)
         .byte   $01, $00, $00, $00 ; 371 (unused)
-        .byte   $10, $00, $00, $00 ; 372 (unused)
+        .byte   $01, $00, $00, $00 ; 372 (unused)
         .byte   $00, $02, $00, $00 ; 373 Officer
         .byte   $10, $00, $04, $00 ; 374 Cadet
         .byte   $00, $00, $00, $00 ; 375 (unused)
@@ -390,7 +395,7 @@ Ot6ClassSplitTbl:
         .byte   $00, $00, $00, $00 ; 377 Soldier
         .byte   $00, $00, $00, $00 ; 378 (unused)
         .byte   $00, $00, $00, $00 ; 379 (unused)
-        .byte   $01, $00, $00, $00 ; 380 (unused)
+        .byte   $10, $00, $00, $00 ; 380 (unused)
         .byte   $10, $20, $00, $00 ; 381 Atma
-        .byte   $01, $00, $00, $00 ; 382 (unused)
+        .byte   $10, $00, $00, $00 ; 382 (unused)
         .byte   $00, $00, $00, $00 ; 383 (unused)

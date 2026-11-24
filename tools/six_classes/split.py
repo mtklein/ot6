@@ -42,8 +42,8 @@ breaks it" rows take all six).  The rule, in order:
      first-named children.  Species no battle deals, and the generated
      floor's rows, follow after and do not count toward the balance.
 
-Reads the four-class ot6_hud.asm from git (BASE: origin/main's first parent
-before the six, $OT6_SPLIT_BASE; so it is idempotent), rewrites the class
+Reads the four-class ot6_hud.asm from git (BASE: the v0.50 tag, the last
+release on four classes, $OT6_SPLIT_BASE; so it is idempotent), rewrites the class
 masks of Ot6ShieldTbl's rows in the working tree's ot6_hud.asm, writes
 ff6/tools/six_class_split.json (species -> new mask; gen_break_floor.py reads
 the floor rows from it) and ff6/src/battle/ot6_class_split.inc
@@ -80,7 +80,7 @@ import stages  # noqa: E402
 
 S, P, B, X = C.SLASH, C.PIERCE, C.BLUDG, C.SPECIAL
 OLD = {"OT6_SLASH": S, "OT6_PIERCE": P, "OT6_BLUDG": B, "OT6_SPECIAL": X}
-BASE = os.environ.get("OT6_SPLIT_BASE", "origin/main")       # the four-class tree
+BASE = os.environ.get("OT6_SPLIT_BASE", "v0.50")             # the four-class tree (the last release on four)
 KEYS = ROOT / "build/attempts/wt/v051-six-classes/line/route-keys-base.json"
 NEW_NAME, NEW_CONST, ORDER, CHILDREN, OLD_NAME = C.NAME, C.CONST, C.ORDER, C.CHILDREN, C.OLD_NAME
 
@@ -378,6 +378,11 @@ def compute(keep=None, redo=()):
     # what a four-class save's revealed bits mean: per species id, for each of
     # the four classes, the six-class bits its weakness became (0: it had none)
     sel = {sp: [kids.get(sp, fkids[sp]).get(o, 0) for o in (S, P, B, X)] for sp in range(gbf.CODEX_WIDTH)}
+    # every byte lands on a class the species' row (or, with none, its floor) holds: a kept floor byte from an
+    # older split can point elsewhere ($16f, $174, $17c, $17e did: check_save_layout's subset check, #566)
+    for sp in range(gbf.CODEX_WIDTH):
+        hold = new.get(sp) or floor.get(sp, 0)
+        sel[sp] = [b if not (b & ~hold) else (hold & -hold if b else 0) for b in sel[sp]]
     return dict(rows=rows, held=held, gauged=gauged, new=new, how=how, count=final_count, floor=floor,
                 names=names, sel=sel, ev=ev, binds=binds, stage=stage, departs=departs, keep=keep, kept=kept)
 

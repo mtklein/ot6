@@ -76,8 +76,8 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local CLASSES = {
   { bit = 0x01, name = "sword",  msg = 0x45, text = "Weak against swords",  glyph = 0xD9 },
   { bit = 0x02, name = "dagger", msg = 0x46, text = "Weak against daggers", glyph = 0xD8 },
-  { bit = 0x04, name = "blunt",  msg = 0x47, text = "Weak against blunt",   glyph = 0xDC },
-  { bit = 0x08, name = "ranged", msg = 0x48, text = "Weak against ranged",  glyph = 0xDE },
+  { bit = 0x04, name = "blunt",  msg = 0x47, text = "Weak against blunt attacks", glyph = 0xDC },
+  { bit = 0x08, name = "ranged", msg = 0x48, text = "Weak against ranged attacks", glyph = 0xDE },
   { bit = 0x10, name = "katana", msg = 0x4A, text = "Weak against katanas", glyph = 0xDB },
   { bit = 0x20, name = "spear",  msg = 0x4B, text = "Weak against spears",  glyph = 0xDA },
 }

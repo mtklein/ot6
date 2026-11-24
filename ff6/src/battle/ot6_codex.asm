@@ -97,8 +97,14 @@ Migrate:
         bcc     Migrate
         ; #566: O7's classes are the four, so each clone becomes a six-class
         ; page and takes its magic.  Page 1 goes last: its O7 magic is what
-        ; starts this over, from a payload still whole, if the console loses
-        ; power before all three are done.
+        ; starts this over if the console loses power before all three are
+        ; done.  A loss during pages 2 and 3 restarts from page 1's whole
+        ; payload; a loss inside page 1's own rewrite restarts from a page 1
+        ; already part-rewritten, cloned again into 2 and 3, so a reveal
+        ; already moved to a six-class bit can be lost there (read again as
+        ; four-class it is dropped or re-mapped) and has to be found again.
+        ; Nothing false is drawn either way (Ot6SeedShields masks the byte
+        ; with the body's row).
         ldx     #$0400
         jsr     Ot6CodexSix
         ldx     #$0800
@@ -154,7 +160,11 @@ Done:  ply
 ; $08.  Each of a species' four-class weaknesses became one six-class
 ; weakness (all six, for the two rows any weapon breaks), and
 ; Ot6ClassSplitTbl records which: four bytes a species, byte k the six-class
-; bits its weakness of four-class bit k became (ot6_class_split.inc).  So
+; bits its weakness of four-class bit k became (ot6_class_split.inc).  A
+; few species took two six-class weaknesses for one four-class one (Lobo,
+; Marshal, Cirpius, Dark Wind, Hornet: a reveal shows both), and a few lost
+; a four-class weakness outright (Dark Wind, Hornet, SlamDancer, Sand Ray,
+; Areneid, HeavyArmor: that reveal shows nothing and is found again).  So
 ; each class byte becomes the OR of the table's bytes for the four-class
 ; bits set in it, and every other bit is dropped.  The element table is
 ; untouched.  The page then takes the six-class magic, so this runs once a

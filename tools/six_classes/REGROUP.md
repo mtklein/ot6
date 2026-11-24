@@ -24,7 +24,7 @@ HUD glyphs (Ot6ClassGlyphTbl, bit order): sword $d9, dagger $d8 (level), blunt $
 (the thrown star), katana $db (mirrored), spear $da (upright). build/attempts/wt/v051-six-classes/glyphs-v3.png.
 Weapons' names wear {sword} {dagger} {spear} {katana} {staff}=Blunt {star}=Ranged; the type words are DAGGER, SWORD,
 SPEAR, KATANA, BLUNT, RANGED. Messages (Ot6ClassMsgTbl): $45 "Weak against swords", $46 daggers, $47 "Weak against
-blunt", $48 "Weak against ranged", $4a katanas, $4b spears.
+blunt attacks", $48 "Weak against ranged attacks", $4a katanas, $4b spears.
 
 Hired Help: the lowest-bit class the target is weak to; its Fight animation's weapon family: Sword/Katana a blade,
 Dagger/Spear/Ranged a point, Blunt a blow.

@@ -61,8 +61,8 @@ SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR, NULLBRK = 0x01, 0x02, 0x04, 0x08, 0
 DESIGN = [
     (SWORD, "sword", 0xD9, "SWORD", 0x45, "Weak against swords"),
     (DAGGER, "dagger", 0xD8, "DAGGER", 0x46, "Weak against daggers"),
-    (BLUNT, "blunt", 0xDC, "BLUNT", 0x47, "Weak against blunt"),
-    (RANGED, "ranged", 0xDE, "RANGED", 0x48, "Weak against ranged"),
+    (BLUNT, "blunt", 0xDC, "BLUNT", 0x47, "Weak against blunt attacks"),
+    (RANGED, "ranged", 0xDE, "RANGED", 0x48, "Weak against ranged attacks"),
     (KATANA, "katana", 0xDB, "KATANA", 0x4A, "Weak against katanas"),
     (SPEAR, "spear", 0xDA, "SPEAR", 0x4B, "Weak against spears"),
 ]
