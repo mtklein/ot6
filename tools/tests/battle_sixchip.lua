@@ -181,6 +181,10 @@ local function armWatches()
     local st = emu.getState()
     local x, y = st["cpu.x"] & 0xFF, st["cpu.y"] & 0xFF
     if x ~= rec.actor * 2 or y < 8 then return end
+    -- only the measured action's hits: a Fight of the same member (a turn before the entry's, or a counter)
+    -- carries his hand's class, not the case's (the merged replay's ranged case: EDGAR's pike pass, $20, before
+    -- his Tools turn, build/attempts/wt/v051-six-classes/suites/battle_sixchip-gate11.log)
+    if rec.cmd ~= nil and rec.cmd ~= CMD_FIGHT and H.readByte(0xB5) == CMD_FIGHT then return end
     local s = (y - 8) // 2
     rec.passes[#rec.passes + 1] = { slot = s, cls = H.readByte(ATKCLASS), sh = shields(s),
       elems = H.readByte(0x11A1) & H.readByte(0x3BE0 + y), brk = broken(s), f = H.frame }
@@ -363,6 +367,7 @@ local function branch(cls, side)
       r = { class = cls, side = side, actor = e, slot = s, sp = sp, passes = {}, chips = {}, otherShield = {},
         loaded = {}, shown = {}, mark = 0, sh0 = shields(s), codex0 = {}, rev0 = {}, shAll0 = {} }
       for q = 0, 5 do r.rev0[q], r.shAll0[q], r.codex0[q] = rev(q), shields(q), codex(species(q)) end
+      r.cmd = plan[1].cmd
       rec = r
     end),
     H.waitFrames(12),                  -- (the HUD line rebuilt from a staged row)
