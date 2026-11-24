@@ -267,14 +267,34 @@ local function toolCell(id)
     if H.readByte(0x4005 + i * 3) == id then return i end
   end
 end
+-- R on the row, judged a press later: Ot6Boost answers every R it reads with
+-- its ching (a point taken) or its buzz (one refused), so a tap that drew
+-- neither was never read and is pressed again, as kitBattle's list taps are
+-- (H.kitTapRead); six unread in a row fail.  The first R used to be the only
+-- one, and on some draws it goes unheard (no ching, no buzz, the pending
+-- unmoved): safe-r read "R on the row left the pending at 0" on the v0.51
+-- line's shift-1 replay (suites/br_s1.log), and on today's fixture noise-r
+-- at shift 2 read "the game read the R on the row (... 0)"; the second tap
+-- is read on that draw, as on safe-r's at BOOSTREACH_BURN 4 and quiet-r's at
+-- shift 22 (build/attempts/wt/v051-six-classes/suites4/reach/)
 local function onRow(c, s)
-  if c.rowR and not c.triedR then
-    c.triedR, c.pendBeforeR, c.snd0 = true, pend(s), H.kitBoostSounds()
-    return "r"
-  end
   if c.rowR and c.pendAfterR == nil then
-    c.pendAfterR, c.sndR = pend(s), H.kitBoostSounds() - c.snd0
-    ev(c, string.format("R on the row: pending %d -> %d, %d ching/buzz", c.pendBeforeR, c.pendAfterR, c.sndR))
+    if c.rTap then
+      c.rTap = false
+      if H.kitBoostSounds() ~= c.rSnd then
+        c.pendAfterR, c.sndR = pend(s), H.kitBoostSounds() - c.snd0
+        ev(c, string.format("R on the row: pending %d -> %d, %d ching/buzz", c.pendBeforeR, c.pendAfterR, c.sndR))
+        return "a"
+      end
+      c.rMiss = (c.rMiss or 0) + 1
+      ev(c, string.format("an R tap on the row was not read (no ching, no buzz; pending %d): pressed again (%d)",
+        pend(s), c.rMiss))
+      H.assertEq(c.rMiss <= 6, true, string.format("%s: an R tap on the row is read by the game (Ot6Boost's ching or "
+        .. "buzz): %d taps in a row went unanswered", c.name, c.rMiss))
+    end
+    if not c.triedR then c.triedR, c.pendBeforeR, c.snd0 = true, pend(s), H.kitBoostSounds() end
+    c.rTap, c.rSnd = true, H.kitBoostSounds()
+    return "r"
   end
   return "a"
 end
@@ -370,7 +390,7 @@ local function runCase(c)
       c.log = {}
       actS = c.who == "C" and celesS or c.who == "P" and phS or edgarS
       c.sent, c.after, c.endF, c.mask = false, false, nil, nil
-      c.triedR, c.pendAfterR = false, nil
+      c.triedR, c.pendAfterR, c.rTap, c.rMiss = false, nil, false, 0
       c.allyT = allyS
       if c.name == "impl-b1" and (H.readByte(0x3EE4 + allyS * 2) & 0x20) == 0 then
         -- the lift is aimed at an imped ally: impa-b1's Imp can miss its own
