@@ -492,6 +492,17 @@ H.run({ maxFrames = 300000 }, {
   end),
   H.fightBattleByMenu(40000),
   H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000, "back on the map", 5),
+  -- the battle can leave a member petrified, zombied or felled, and the field menu then refuses her Relic menu (the
+  -- v0.51 landing's draw: a $08A's Petrify landed on RELM and the battle ended before the Soft, "RELM: Mustache off:
+  -- relic options: 4 A presses on the target were not taken", build/attempts/wt/v051-land/): the party's field
+  -- care first, as a player's, and her state asserted
+  H.fieldCare({ tag = "after the battle" }),
+  H.waitUntil(function() return H.worldSettled() end, 1800, "back on the map after the care", 5),
+  H.call(function()
+    H.assertEq(H.charStatus1(CHAR_RELM) & 0xC2, 0, string.format("RELM is up for the Relic menu after the battle's "
+      .. "care (status1 $%02X, HP %d)", H.charStatus1(CHAR_RELM), H.charHp(CHAR_RELM)))
+    H.assertEq(H.charHp(CHAR_RELM) > 0, true, "RELM is alive for the Relic menu")
+  end),
 
   -- 5. the Mustache moves to GOGO, who carries Sketch: grey there too, and Control in battle
   H.unequipRelics(CHAR_RELM, { 4 }, { tag = "RELM: Mustache off" }),
