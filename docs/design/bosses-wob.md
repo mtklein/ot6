@@ -37,8 +37,10 @@ Stated once, assumed by every block:
   cancel, the trigger's reset, the **!**, and the rule that hits on a
   Broken boss wind no fuse, on the one fuse vanilla wrote for a World of
   Balance boss, AtmaWeapon's (block 21, `battle_atmaweapon`), and on
-  three in the World of Ruin. Every other **Telegraph** line below is
-  design text: the scripts do not announce those moves yet. The fuse
+  three in the World of Ruin. Blocks 1-5 (the Whelk to TunnelArmr) have
+  their authored telegraphs built (wt/v051-tg-wob1; each block's **Built**
+  line). Every other **Telegraph** line below is design text: the scripts
+  do not announce those moves yet. The fuse
   block's idiom for writing them, and its worked example, are in
   `ot6_fuse.asm` and `battle_fuse`.
 - **Bosses get no exemption from breaks.** Turn loss and ×2 apply to
@@ -173,6 +175,23 @@ beams; Terra adds TekMissile and Bio Blast).
 - **Telegraph:** the Whelk draws into its shell and the shell charges
   → **MegaVolt** hits the party. Break the head during the fuse to
   cancel it.
+- **Built** (wt/v051-tg-wob1, `battle_whelk`). Not as written: a head
+  drawn into its shell cannot be hit, so the head, the body with the
+  gauge, carries the telegraph. Its first turn arms it (a normal attack),
+  its second says **"Static builds!"** and glows, its third is Mega Volt
+  on the party (about 45 to each member, measured in the line: 77/91/93
+  to 32/46/50). After a Mega Volt it takes one plain turn before arming
+  again. From its first turn to the Mega Volt the head holds a battle
+  switch that keeps the shell from hiding it (the shell's one change), so
+  the race can be run and a Broken head stays out for its window. Lab
+  (`race` lab, build/attempts/wt/v051-tg-wob1/lab/, keys $15/$39/$51): a party that beams the head from the
+  open (Fire Beam, boost at its bank) breaks it with its 4th beam, the 1st
+  after the announce, and the cancel fires, 3 of 3; a party that Defends
+  to the announce and then dumps its bank kills the head (1,600 HP, a
+  boost-3 beam takes 1,150-1,480) before both the break and the move, 3 of
+  3; from the announce to the move the party gets 3 actions against 4
+  shields, so unboosted chipping from the announce does not break it in
+  time. Fuse: one turn; shields kept at 4.
 - **Break story:** the guards warn you away from the shell, and Fire
   Beam is the probe the game points you at. Three beams and a
   TekMissile break the game's first boss within two rounds, which
@@ -200,6 +219,20 @@ piercing.
 - **Telegraph:** the Marshal levels his blade and calls the Lobos in
   → next turn he and both Lobos attack one target. Break him and the
   Lobos attack without coordination.
+- **Built** (wt/v051-tg-wob1, `battle_marshal`). His rotation's second
+  turn arms it (with the Lobos down, every turn of his alone block does);
+  the next says **"Strike as one!"** and glows; the turn after it fills
+  both Lobos' ATB gauges and he strikes twice. Not as written: a monster's
+  script cannot aim another monster's attack, so the Lobos act at once on
+  their own targets rather than on his. His rotation's last two turns
+  (Net/Net/Battle, Battle) no longer come. Lab (build/attempts/wt/v051-tg-wob1/lab/, LOCKE's squad at full
+  HP after gen_moogle's waves, keys $A0/$E0/$30): chipping from the open
+  (Fights at the bank) breaks him in the fuse 3 of 3, 7-8 actions from the
+  open, 2-3 after the announce (one of those breaks landed after his fire
+  turn was read: no cancel, and the Broken turn purged the strike);
+  Defending to the announce and then Fighting breaks him in the fuse 2 of
+  3 (2 actions) and leaves 1 shield the third time (4 actions), and the
+  strike fires. Fuse: one turn; shields kept at 4.
 - **Break story:** twelve bodies generate BP quickly and damage
   slowly. Moogle spears chip him steadily, and the break protects
   whichever squad he is attacking. Piercing is the featured class,
@@ -263,6 +296,19 @@ fire + slashing.
   the party. This is the same move the script later uses to knock the
   trio out of the fight; it is his only named move, and it is used as
   the fuse.
+- **Built** (wt/v051-tg-wob1, `battle_vargas` 9). His rotation is now
+  Battle, Battle (arms it), **"Feel the wind!"** with a glow, Gale Cut;
+  vanilla's was Battle, Gale Cut, Battle. The fuse block is the script's
+  first, so his SABIN lines and his 50-count double Battle wait for the
+  move (at most two turns). The Pummel finish and the `battle_event`
+  $07/$08 counters are unchanged. Lab (build/attempts/wt/v051-tg-wob1/lab/, the lib's fight driver, keys
+  $C0/$D4): the line comes on his 3rd turn, Gale Cut on his 4th, with 3
+  party actions between and no break: in phase one the trio holds no key
+  while an Ipooh stands (BioBlaster's group targeting, above), so the race
+  is not winnable there, by the design's own rule that he cannot be broken
+  before SABIN joins. In phase two SABIN alone takes one shield an AuraBolt
+  against 5, and his first Pummel ends the fight. The telegraph here warns
+  (Defend, heal) rather than races. Fuse: one turn; shields kept at 5.
 - **Break story:** phase one gives the trio very little chip.
   BioBlaster's poison is their only key and takes Vargas down 1 while
   the script has the fight going against you. Sabin then arrives with
@@ -321,6 +367,18 @@ he keeps all game.
 
 - **Telegraph:** two tentacles rise → **Tentacle** hits Banon. Break
   during the fuse to cancel it.
+- **Built** (wt/v051-tg-wob1, `battle_ultros1`). His rotation's second
+  turn arms it; the next says **"Squirm, BANON!"** and glows; the turn
+  after it is vanilla's third turn, "Y…you frighten me!" and Tentacle on
+  BANON. The fuse block is the script's first, so his opening line and his
+  two one-time lines (Terra's, Sabin's) wait for the move. Lab (build/attempts/wt/v051-tg-wob1/lab/, keys
+  $A4/$B8/$D0): chipping from the open (TERRA's Fire, the others' Fights,
+  at the bank) breaks him before any announce, 3 of 3, in 8 actions (about
+  f2,440); his first announce comes on his 7th turn (the suite, idle party),
+  after the three line turns. Defending to the announce without BANON's
+  Health wiped the party, 3 of 3, before it came (the lab's policy, not
+  play). The suite measures the window: one of his turns, 802 frames
+  (f9,052 to f9,854). Fuse: one turn; shields kept at 5.
 - **Break story:** Banon's Health makes stalling survivable, so the
   fight teaches banking: probe fire (he has a scripted line about
   seafood), hold at 2–3 BP, break on the fuse, and dump with boosted
@@ -355,7 +413,20 @@ authored** (`Ot6ElemAddTbl` `$0104` + `$02`, weak byte resolves
 `battle 67` (event_main.asm:21005).
 
 - **Telegraph:** the drill spools down and the tunnel shakes → its
-  quake (Magnitude8 — audit list). **Runic absorbs it.** The fight has
+  quake (Magnitude8 — audit list). **Runic absorbs it.**
+- **Built** (wt/v051-tg-wob1, `battle_tunnelarmr`). Not as written:
+  Magnitude8 has no Runic flag (`magic_prop_en.dat` $BC byte 3 = $22,
+  bit 3 clear) and its power is 100, so the move is TunnelArmr's own
+  TekLaser ($B5, Runic-absorbable) on both. Its first turn is the Runic
+  tutorial (`battle_event $10`, unchanged); its rotation's second turn
+  arms the fuse; the next says **"Laser charging"** and glows; the turn
+  after it is TekLaser on the party. Lab (build/attempts/wt/v051-tg-wob1/lab/, keys $5E/$6E/$8E): chipping
+  from the open breaks it before any announce, 3 of 3, in 2 actions
+  (LOCKE's boosted Genji Fight takes 4); its announce comes on its 4th
+  turn, and the window holds about 2 party actions: Defending to the
+  announce and then chipping left 4-5 shields, 3 of 3 (CELES's boosted
+  Ice took one and 882 HP; LOCKE's turn did not fall in the window), and
+  the move fired. Fuse: one turn; shields kept at 5. The fight has
   two valid answers, Runic the quake (vanilla's tutorial) or break the
   machine first (ours), and doing both is best, since Runic converts
   the telegraph into +1 BP ✦ (kits.md), so the boss's biggest move
