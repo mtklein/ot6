@@ -38,7 +38,7 @@
 --      Then the entry is restored and the real fight below is played: the cases are staged, the fight is not.
 --      Mutants (build/attempts/wt/v051-tg-wob2/mutants/): fuse_never (Ot6FuseCancel+3=80) is red at "the break
 --      during the fuse cancels it"; kefka_no_trigger (his row keeps every bit and restarts no clock:
---      Ot6FuseTbl+93=FF, +95=00) at "monster switch 0 is clear after the cancel".
+--      Ot6FuseTbl+133=FF, +135=00 on the merged table; +93/+95 before) at "monster switch 0 is clear after the cancel".
 --
 -- The fight is the one both generators play (gen_narshe_battle,
 -- gen_kefka_won): the library's fight driver with FIGHT below

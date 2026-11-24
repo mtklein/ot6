@@ -27,7 +27,7 @@
 --             the first case.
 -- Mutants (tools/build/mutant_rom.py, on the branch's ROM; build/attempts/wt/v051-tg-wob2/mutants/): fuse_never
 -- (Ot6FuseCancel+3=80) is red at "the break during the fuse cancels it"; train_no_trigger (its row keeps every bit
--- and clears no count: Ot6FuseTbl+77=FF, +79=00) at "monster switch 0 is clear after the cancel".  A mechanism test,
+-- and clears no count: Ot6FuseTbl+117=FF, +119=00 on the merged table; +77/+79 before) at "monster switch 0 is clear after the cancel".  A mechanism test,
 -- not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)

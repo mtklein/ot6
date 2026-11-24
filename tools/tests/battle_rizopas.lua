@@ -26,7 +26,7 @@
 -- roll under the chance and the arming exactly the rolls under it.  The school and the surfacing are vanilla's.
 -- Mutants (tools/build/mutant_rom.py, on the branch's ROM; build/attempts/wt/v051-tg-wob2/mutants/): fuse_never
 -- (Ot6FuseCancel+3=80) is red at "the break during the fuse cancels it"; rizopas_no_trigger (its row keeps every
--- bit: Ot6FuseTbl+85=FF) at "switches 0 and 1 are clear after the cancel"; roll_always (every roll arms:
+-- bit: Ot6FuseTbl+125=FF on the merged table; +85 before) at "switches 0 and 1 are clear after the cancel"; roll_always (every roll arms:
 -- Ot6AICondRoll+6=3860EA) at "a roll under the chance came between the cancel and the second line".  A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
