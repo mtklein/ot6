@@ -355,6 +355,8 @@ Ot6ThiefBanner:
         lda     $6168
         cmp     #$03
         beq     :+
+        cmp     #$07            ; and the Rune Knight's (#563)
+        beq     :+
         cmp     #$05            ; Relm's list packs its rows too (#538)
         bne     :++
 :       jsl     Ot6ThiefClamp
@@ -1059,7 +1061,8 @@ done:   plp
         longa
         clc
         stz     $ee
-        lda     f:ItemProp+1,x  ; equippable characters
+        jsl     Ot6EquipWord    ; equippable characters, with the
+                                ;   Dragoon Boots' spears (#567)
         ldx     #$0006
 @chr:   bit     $3a20,x         ; actor mask
         bne     :+
@@ -1104,6 +1107,8 @@ OT6_THIEF_NAMELEN = 10
         lda     $6168
         cmp     #$02
         beq     @bushido
+        cmp     #$07
+        beq     @rune           ; the Rune Knight's list (#563)
         cmp     #$05
         bcs     @paint          ; Relm's list and its colours (#538)
         cmp     #$03
@@ -1172,6 +1177,15 @@ OT6_THIEF_NAMELEN = 10
 :       plp
         clc
         rtl
+@rune:  pla
+        jsl     Ot6RuneListName
+        bcc     :+
+        plp
+        sec
+        rtl
+:       plp
+        clc
+        rtl
 .endproc
 
 ; DrawListLetter's EN body.  in: B:A = attribute:tile, Y = buffer offset.
@@ -1205,6 +1219,13 @@ OT6_THIEF_NAMELEN = 10
         cmp     #OT6_PAINT_SKETCH
         bcc     :+
         jsl     Ot6PaintBannerName      ; Relm's rows (#538)
+        plp
+        rtl
+:       cmp     #OT6_RUNE_TIERED
+        bcc     :+
+        cmp     #OT6_RUNE_LAST+1
+        bcs     :+
+        jsl     Ot6RuneBannerName       ; the Rune Knight's rows (#563)
         plp
         rtl
 :       sec

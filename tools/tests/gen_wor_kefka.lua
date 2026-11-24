@@ -183,9 +183,17 @@ local function observers()
       -- the outcomes said before Kefka's formation loads (the driver names a tier's outcome by the formation the
       -- battle has already moved on to: "battle $202 WON ... killed s2:$15E s3:$15F" is the third tier's)
       if f == 0x0202 then E.kefkaN = #H.outcomes end
+      -- kefka_tier (also= in the graph): the machine as Kefka's formation begins, the party as the three tiers
+      -- left it -- battle_goner's fixture.  Wanted here, taken at the next frame's start (below) and emitted
+      -- after the fight; no step, no input
+      if f == 0x0202 then E.kefkaWant = true end
       H.log(string.format("[tier] f%d formation $%04X (%s) begins; standing: %s", H.frame, f, TIERS[f] or "?",
         seated()))
     end, emu.callbackType.exec, rb, rb)
+    -- (a fixture is saved outside a frame's visible lines, as H.saveState's are: render on demand, #394)
+    emu.addEventCallback(function()
+      if E.kefkaWant and not E.kefkaSnap and H.pendingStateReqs == 0 then E.kefkaSnap = H.requestSaveState() end
+    end, emu.eventType.startFrame)
   end)
 end
 
@@ -367,6 +375,8 @@ H.run({ maxFrames = 1500000 }, {
     H.assertEq(#E.tiers >= 4 and E.tiers[#E.tiers].f == 0x0202, true, "the battle moved through the tiers to "
       .. "Kefka's ([tier] lines)")
     say("boss", "Kefka beaten")
+    H.checkReq(E.kefkaSnap, "the snapshot as Kefka's formation began (kefka_tier)")
+    H.emitBlob("kefka_tier.mss", E.kefkaSnap.blob)
   end),
 
   -- @@stage ending

@@ -40,7 +40,7 @@ both states.
 |---|---|---|---|
 | Magic | the party (vanilla: Gogo's list is every spell the seated party can cast) | the union, built in `InitSpellList` (`battle_main.asm:14686`) and kept whole for him (`AddToSpellList_00`, `:14884`); Terra's Ultima fold was hers alone (`Ot6FoldSteps`, `ot6_boost.asm:2157`: char id 0) | the union as before, plus **Ultima**: his Fire at 3 BP folds into Ultima once Terra has rejoined (switch `$00BF`), priced as Ultima (`Ot6FoldSteps`, `ot6_boost.asm:2157-2161`) |
 | Morph | Terra | not pickable (`BattleCmdProp[$03]` has no GOGO flag, `battle_cmd_prop.asm:44`) | not pickable: an engine limit (section 3) |
-| Runic | Celes | plain Runic; RunicBlade was Celes's (`Ot6BladeRaise`, `ot6_runicblade.asm:45`) | **RunicBlade**: his Runic at 3 BP sends each absorbed spell back at its caster, once switch `$0068` is set (`ot6_runicblade.asm:45-48`) |
+| Runic | Celes | plain Runic; RunicBlade was Celes's (`Ot6BladeRaise`, `ot6_runicblade.asm:45`) | **RunicBlade**: his Runic at 3 BP sends each absorbed spell back at its caster, once switch `$0068` is set (`ot6_runicblade.asm:45-48`).  Since #563 the command opens **Celes's list** for him (`Ot6RuneListOpen`, `ot6_rune.asm`, no actor test): Runic, a blade row for each element *he* can cast (his Magic list is the seated party's), and Break Blade once the party has learned it (switch `$0266` or `$00A4`); his Runic's absorbs arm his blade (`Ot6RuneAbsorb`'s Gogo compare) |
 | Steal (TresHnt) | Locke | **already his**: Locke's list opens for anyone holding Steal (`_c1_thief_open`, `btlgfx_main.asm:18269`; `Ot6ThiefListOpen`, `ot6_thief.asm:228`, no actor test), with the rows Locke's story has taught | unchanged |
 | Tools | Edgar | the bag's tools; Overclock was Edgar's (`Ot6Overclocks`, `ot6_overclock.asm:48`) | **Overclock**: his Tool at 3 BP fires twice for the two firings' price (`ot6_overclock.asm:48-51`) |
 | Blitz | Sabin | **already his**: Sabin's list from `$1D28` (`Ot6BlitzListOpen`, `ot6_cmdmenu.asm:35`) with Bum Rush at 3 BP (`Ot6BlitzTake`, `ot6_divine.asm:401`, keyed on the attacker's boost) | unchanged |
@@ -94,7 +94,9 @@ Mimic copies the action, not the price (guidelines), and a copy reads
 Gogo's own pending boost where the copied action reads one.  The divines
 keyed on the actor now answer for him, so a copy at three of his points
 buys what his own command would: a Mimic of Edgar's Tool overclocks, of
-Celes's Runic is a RunicBlade, of Shadow's Throw assassinates, of Terra's
+Celes's Runic is a RunicBlade (and of her blade row arms Gogo's own
+weapon with that element, of her Break Blade starts his own: both are
+self-targeted, so the copy lands on the copier, #563), of Shadow's Throw assassinates, of Terra's
 Fire is Ultima, and (when he carries Lore) of Strago's Scan studies, each
 free as every copy is.  Under three of his points each is its plain self.
 A Mimic of a Dance copies the step that was danced and rolls none of its
@@ -110,7 +112,9 @@ in his Status menu and played through the real battle menu -- Magic, Slot
 and Tools (no Scan without Lore, Setzer's table, Ultima, Jackpot,
 Overclock, and a Tool stopping at the Assassinate gate's command test);
 Magic, Lore and Runic (Scan and Bserk, the lore loadout, Study, RunicBlade
-and its bounce); Throw, Steal and Blitz (Locke's rows, Sabin's list and Bum
+and its bounce; since #563 the Rune Knight's list as his own spells make it,
+a blade row at each tier, a row with no line refusing the boost, his
+stance's absorbs arming his blade, and the divine's gate); Throw, Steal and Blitz (Locke's rows, Sabin's list and Bum
 Rush, Assassinate's Death mark at 3 BP and none at 2); SwdTech, Rage and
 Dance (Cyan's window and Cleave, Gau's loadout, Mog's dances); then a fifth
 from `gen_wor_leo`'s state after the reveal (Setzer's table, Overclock and

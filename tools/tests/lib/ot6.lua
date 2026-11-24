@@ -7290,6 +7290,11 @@ local BATTLE = {
   -- $05 -> $38 with the target latched on herself (chars = 1<<actor); B ->
   -- $05; A commits ($38 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00).
   CMD_RUNIC = 0x0B,
+  -- since #563 Runic opens the Rune Knight's list ($05 -> $2E -> $01 -> $30,
+  -- the Tools shell, w7e6168 = 7): Runic $D0 its first row, a blade row
+  -- $D1 + element bit for each element the caster can cast, Break Blade $D9;
+  -- a row's A goes on to that same latched target select
+  RUNE_RUNIC = 0xD0, RUNE_BLADE = 0xD1, RUNE_BREAK = 0xD9,
   CMD_MORPH = 0x03,
   -- SETZER's Slot (probe_slot.lua, deleted in bd50a973; last version at f1f26173): A on Slot $05 -> $06 (OpenSlotWindow)
   -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the reels spin
@@ -13264,6 +13269,7 @@ function Driver:makePlan(actor)
   plan = self:aimedBoostPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
   plan = self:studyHoldPlan(actor, plan)
+  plan = self:fusePlan(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
@@ -14096,6 +14102,55 @@ function Driver:studyHoldPlan(actor, plan)
     M.readWord(0x57C0 + slot * 2), want, plan.kind, plan.boostLeft, M.STUDY_BOOST))
   plan.boostLeft = 0
   if plan.kind == "fight" then plan.aim = self:chipAim(actor, 0) end
+  return plan
+end
+
+-- A lit fuse (#561, ot6_fuse.asm; bosses-wob.md "The boss contract"): while a
+-- boss's announced move is pending, a yellow "!" stands before its shield
+-- emblem, and a break cancels the move.  The driver reads what the HUD shows
+-- (bit 0 of the slot's OT6_FUSE byte, the mark's own source) and does the one
+-- thing that costs nothing: when the member whose turn it is can take the
+-- boss's last shields with a Fight (at the fewest points that do, from the
+-- bank it has), an attack it had planned becomes that Fight.  Care is left
+-- alone (a heal, an item, a raise, anything aimed at the party), and so is a
+-- plan with a pressed boost count, and a Fight already aimed there that
+-- breaks it.  Holding the last shield for the announce, or working a full
+-- gauge down inside a fuse, is not here: a strategy to measure, not a reflex.
+-- Each lighting is said once, with what the gauge would take.
+-- FUSE_PLAN_OFF (a global) turns the rule off, the control arm; the lighting
+-- is still said.
+Driver.FUSE_KINDS = { fight = true, magic = true, lore = true, skill = true, throw = true, summon = true }
+function Driver:fusePlan(actor, plan)
+  self.fuseSaid = self.fuseSaid or {}
+  local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
+  local bank = M.readByte(BATTLE.BP + actor * 2)
+  for s = 0, 5 do
+    local lit = monAlive(s) and (M.readByte(0x7EED46 + 2 * s) & 0x01) ~= 0
+    if not lit then
+      self.fuseSaid[s] = nil
+    else
+      local sh, broken = M.readByte(BATTLE.SH_CUR + s * 2), M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0
+      local need = nil
+      if fight ~= nil and not broken and sh > 0 then
+        for b = 0, math.min(3, bank) do
+          if need == nil and fightChips(actor, s, b) >= sh then need = b end
+        end
+      end
+      if not self.fuseSaid[s] then
+        self.fuseSaid[s] = true
+        M.log(string.format("[%s] [fuse] slot %d ($%03X) has a fuse lit: %d shield(s)%s; actor=%d's Fight %s",
+          self.tag or "fight", s, M.readWord(0x57C0 + s * 2), sh, broken and ", Broken" or "", actor,
+          need and string.format("takes them at %d BP", need) or "cannot take them this turn"))
+      end
+      if need ~= nil and not rawget(_G, "FUSE_PLAN_OFF") and plan ~= nil and Driver.FUSE_KINDS[plan.kind]
+         and not plan.ally and plan.target == nil and not plan.exactBoost and plan.boostWant == nil
+         and not (plan.kind == "fight" and (plan.aim == nil or plan.aim == s) and (plan.boostLeft or 0) >= need) then
+        M.log(string.format("[%s] [fuse] actor=%d breaks slot %d inside its fuse: Fight at %d BP (%d shield(s)) in "
+          .. "place of the planned %s", self.tag or "fight", actor, s, need, sh, tostring(plan.kind)))
+        return { kind = "fight", row = fight, boostLeft = need, aim = s, reason = "fuse_break" }
+      end
+    end
+  end
   return plan
 end
 
@@ -17463,8 +17518,23 @@ function Driver:button(actor)
     return { "a" }
   end
   if (st == BATTLE.ST_TOOLS_OPEN or st == BATTLE.ST_TOOLS_CLOSE)
-     and (self.plan.kind == "skill" or self.plan.kind == "slot") then
+     and (self.plan.kind == "skill" or self.plan.kind == "slot" or self.plan.kind == "runic") then
     return nil                       -- the shell is building / closing; wait
+  end
+  -- CELES's Runic row (#563, ot6_rune.asm): the Runic command opens the Rune
+  -- Knight's list (w7e6168 = 7), whose first row is the stance; its A goes
+  -- on to the target select latched on her own seat, below.
+  if st == BATTLE.ST_TOOLS and self.plan.kind == "runic" then
+    local want
+    for i = 0, 7 do
+      if M.readByte(BATTLE.ITEMLIST + i * 3) == BATTLE.RUNE_RUNIC then want = i; break end
+    end
+    if want == nil then self:dropPlan("runic_row_missing"); return { "b" } end
+    local wc, wr = want % 2, want // 2
+    local cc, cr = M.readByte(BATTLE.BLCOL + actor), M.readByte(BATTLE.BLROW + actor)
+    if cc ~= wc then return { wc > cc and "right" or "left" } end
+    if cr ~= wr then return { wr > cr and "down" or "up" } end
+    return { "a" }
   end
   -- SETZER's Slot row (ot6_setzer.asm): the Slot command opens his table,
   -- whose first row closes it and opens the reels ($30 -> $01 -> $06 ...
@@ -18112,7 +18182,7 @@ end
 -- hand since, and battle_jackpot its own).  A caller reads these after the
 -- battle; nothing it asked for (who, cmd, boost, row, slot...) is touched.
 M.KIT_ENTRY_STATE = { "opened", "seat", "presses", "lPresses", "tookBack", "allyPresses", "greyed",
-  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen", "raised", "rPresses" }
+  "greyLogged", "goneLogged", "retargeted", "aim", "refusedSeen", "aimRefused", "noBody", "confirmedAt", "listRn", "listR0", "listR1", "slotChosen", "raised", "rPresses", "tapSnd", "tapMiss" }
 function M.freshKitEntries(plan)
   for _, q in ipairs(plan) do
     for _, f in ipairs(M.KIT_ENTRY_STATE) do q[f] = nil end
@@ -18814,6 +18884,39 @@ function M.battleKeyWait()
   return M.dlgKeyFrame ~= nil and M.frame - M.dlgKeyFrame <= 2
 end
 
+-- Ot6Boost's answers so far, counted from the first call: the ching of a
+-- point taken ($6281 written non-zero) and the buzz of one refused ($95,
+-- the menu's error sound, written non-zero).  Armed once.
+function M.kitBoostSounds()
+  if not M.boostSndArmed then
+    M.boostSndArmed, M.boostSnd = true, 0
+    local function hit(_, v) if v ~= 0 then M.boostSnd = M.boostSnd + 1 end end
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x7E6281, 0x7E6281)
+    -- (`inc $95` is a direct-page store: it lands in bank $00, so both views are watched)
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x000095, 0x000095)
+    emu.addMemoryCallback(hit, emu.callbackType.write, 0x7E0095, 0x7E0095)
+  end
+  return M.boostSnd
+end
+
+-- an R tap on a kitBattle list row, judged once it is over: Ot6Boost
+-- answers every R it reads with its ching (a point taken) or its buzz (one
+-- refused), so a tap that ended with neither was never read and is pressed
+-- again; six unread in one entry fail the run, so a pending boost left
+-- unchanged always means a refusal the game made, never taps it missed
+-- (#563 review: the retry used to give up silently)
+function M.kitTapRead(p)
+  if M.kitBoostSounds() == p.tapSnd then
+    p.tapMiss = (p.tapMiss or 0) + 1
+    M.assertEq(p.tapMiss <= 6, true, string.format("[kit] an R tap on the list's row is read by the game (Ot6Boost's "
+      .. "ching or buzz): %d taps in a row went unanswered", p.tapMiss))
+    p.listRn = p.listRn - 1
+    M.log(string.format("[kit] f%d an R tap on the list's row was not read (no ching, no buzz): pressed again "
+      .. "(%d)", M.frame, p.tapMiss))
+  end
+  p.tapSnd = nil
+end
+
 function M.kitBattle(plan, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -19142,9 +19245,19 @@ function M.kitBattle(plan, opts)
       -- p.listR = n: R pressed n times with the cursor on the spell (#555:
       -- a point the MP cannot pay for is refused); the pending boost before
       -- and after is kept on the entry (p.listR0, p.listR1)
+      -- An R tap the game never read does not count (#563's gate:
+      -- battle_spellboost_mp's second tap, pressed while the list was still
+      -- redrawing the first one's fold, was lost on one draw in three, on
+      -- the ROM before the change too: build/attempts/wt/v051-spellblade/
+      -- sbmp/).  Ot6Boost answers every R it reads with its ching or its
+      -- buzz (M.kitBoostSounds), so a tap that ends with neither is pressed
+      -- again, up to six times an entry.
+      if p.listR ~= nil and p.listKey == nil and tapT == 0 and p.tapSnd ~= nil then
+        M.kitTapRead(p)
+      end
       if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
         if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
-        if tapT == 0 then p.listRn = (p.listRn or 0) + 1 end
+        if tapT == 0 then p.listRn = (p.listRn or 0) + 1; p.tapSnd = M.kitBoostSounds() end
         tap(p.listKey or "r")
         return
       end
@@ -19165,6 +19278,10 @@ function M.kitBattle(plan, opts)
         done(p, a, true)
       end
       pulse("b")
+    elseif st == 0x30 and p.cmd == 0x0B and p.row == nil and not p.peek then
+      -- Runic opens CELES's list since #563 (ot6_rune.asm, w7e6168 = 7); an
+      -- entry that names no row means the stance, the list's first row
+      p.row = 0xD0
     elseif (st == 0x30 or st == 0x2D) and p.row ~= nil then
       -- the Tools shell, or the Throw list in the same shell (#383: SHADOW's
       -- throwing kit; wItemList $4005, three-byte rows, $FF ends the list).
@@ -19195,12 +19312,20 @@ function M.kitBattle(plan, opts)
       -- p.listR = n: R pressed n times with the cursor on the row (#538: a
       -- row whose boost buys nothing refuses it); the pending boost before
       -- and after is kept on the entry (p.listR0, p.listR1)
-      if p.listR ~= nil and (p.listRn or 0) < p.listR then
-        if cool == 0 then
-          if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
-          p.listRn = (p.listRn or 0) + 1
-        end
-        pulse("r")
+      -- Held taps, each one read: a tap Ot6Boost answered with neither its
+      -- ching nor its buzz was never read (a one-frame pulse can fall
+      -- between two frames of the battle's loop, #555), and is pressed
+      -- again, up to six times an entry, as the Magic list's are (#563:
+      -- battle_gogokits's line-less row read "refused" off two lost taps
+      -- on the mutant that lets R through, build/attempts/wt/
+      -- v051-spellblade/final/)
+      if p.listR ~= nil and tapT == 0 and p.tapSnd ~= nil then
+        M.kitTapRead(p)
+      end
+      if p.listR ~= nil and ((p.listRn or 0) < p.listR or tapT > 0) then
+        if p.listRn == nil then p.listR0 = M.readByte(0x3E9D + a * 2) end
+        if tapT == 0 then p.listRn = (p.listRn or 0) + 1; p.tapSnd = M.kitBoostSounds() end
+        tap("r")
         return
       end
       if p.listR ~= nil and p.listR1 == nil and cool == 0 then p.listR1 = M.readByte(0x3E9D + a * 2) end
@@ -19342,6 +19467,662 @@ function M.kitBattle(plan, opts)
     M.call(function()
       M.log(string.format("[kit] the battle step is over: %d entr(ies) played of %d planned", k - 1, #plan))
     end),
+  })
+end
+
+-- ---- a boss's fuse, watched and played (#561) ------------------------------
+-- The boss contract (docs/design/bosses-wob.md): a boss announces its big
+-- move a turn ahead, and a break during the fuse cancels it (ot6_fuse.asm).
+-- M.fuseWatch(species) arms the observers the fuse suites share and returns
+-- the record they fill while W.on:
+--   W.turns   each of the boss's own turns (ExecMonsterAction): { f, blk, at }
+--             the script cells as the turn begins ($3240, $3D0C)
+--   W.cmds    each command the boss dispatches (ExecCmd): { f, cmd, arg,
+--             turn, retal }; a `dlg` is cmd $21 with its line in arg, a glow
+--             cmd $2B, an attack its command with the attack id in arg
+--   W.breaks  each time its last shield is taken (Ot6HitBroke): { f, pre }
+--             pre = W.cells() before the cancel ran
+--   W.snuffs  each cancel (Ot6FuseSnuff): { f }
+--   W.marks   the transitions of its HUD mark cell in VRAM: { f, w }
+--   W.party   each Fight a character dispatches: { f }
+--   W.max     the most battle variable 3 and the monster's variable have read since it was last cleared (each
+--             dlg's record takes the maxima up to it, as .max, and clears them)
+-- W.cells() reads the script's and the trigger's cells; W.slot() the boss's
+-- slot.  W.pin = { boss = hp or nil, party = true } holds HP while set: a
+-- DECLARED write of the mechanism suites (the boss's HP where its script's
+-- line needs it, every standing member's at 9,999 so no draw ends the case).
+-- The library itself writes nothing: `write` = { byte = fn(addr, v), word =
+-- fn(addr, v) } is the calling suite's own pair of writers, declared there
+-- (tools/state_write_waivers.txt), and every staging goes through it.
+function M.fuseWatch(species, write)
+  local W = { species = species, on = false, turns = {}, cmds = {}, breaks = {}, snuffs = {}, marks = {},
+    party = {}, max = { bvar3 = 0, mvar = 0 }, FUSE_WORD = 0x29BE }
+  local SHADOWL, FUSE = 0x7EECF1, 0x7EED46
+  function W.slot()
+    for s = 0, 5 do
+      if M.readByte(0x3AA8 + s * 2) & 1 == 1 and M.readWord(0x57C0 + s * 2) == species then return s end
+    end
+    return nil
+  end
+  function W.ent()
+    local s = W.slot()
+    return s and 8 + 2 * s
+  end
+  function W.cells()
+    local e = W.ent()
+    if not e then return nil end
+    return { blk = M.readByte(0x3240 + e), at = M.readWord(0x3D0C + e), mvar = M.readByte(0x3DAC + e),
+      bsw = M.readByte(0x3EB0), bvar3 = M.readByte(0x3EB3), timer = M.readWord(0x3DC0 + e),
+      shields = M.readByte(0x3E38 + e), ticks = M.readByte(0x3E88 + e), hp = M.readWord(0x3BF4 + e),
+      start = M.readWord(0x3254 + e) }
+  end
+  function W.cellsLine(c)
+    if not c then return "(the boss is not on the field)" end
+    return string.format("block $%02X at script+$%04X, monster variable $%02X, battle switches $%02X, battle "
+      .. "variable 3 = %d, timer %d, shields %d, broken ticks %d, HP %d", c.blk, (c.at - c.start) & 0xFFFF, c.mvar,
+      c.bsw, c.bvar3, c.timer, c.shields, c.ticks, c.hp)
+  end
+  -- (the lit bit the HUD polls: OT6_FUSE, the cancel's ROM only)
+  function W.litBit()
+    local s = W.slot()
+    return s ~= nil and M.readByte(FUSE + 2 * s) & 1 == 1
+  end
+  -- the mark cell's word in VRAM, two before the line's anchor (nil: no line, or no mark cell at this column)
+  function W.vramMark()
+    local s = W.slot()
+    if not s then return nil end
+    local cur = M.readWord(SHADOWL + s * 14)
+    if cur == 0 or (cur & 0x1F) < 2 then return nil end
+    return emu.readWord((cur - 2) * 2, emu.memType.snesVideoRam)
+  end
+  function W.reset()
+    W.turns, W.cmds, W.breaks, W.snuffs, W.marks, W.party = {}, {}, {}, {}, {}, {}
+    W.lastMark, W.lastLit = nil, nil
+    W.max = { bvar3 = 0, mvar = 0 }
+  end
+  -- the first command at or after index `from` with this cmd and arg (arg nil: any)
+  function W.find(cmd, arg, from)
+    for i = from or 1, #W.cmds do
+      local c = W.cmds[i]
+      if c.cmd == cmd and (arg == nil or c.arg == arg) then return i, c end
+    end
+    return nil
+  end
+  -- (each symbol is named in a literal M.sym call: compose.py embeds only those)
+  local function reg(a, fn) emu.addMemoryCallback(fn, emu.callbackType.exec, a, a) end
+  local function x8() return emu.getState()["cpu.x"] & 0xFF end
+  local function y8() return emu.getState()["cpu.y"] & 0xFF end
+  reg(M.sym("ExecMonsterAction"), function()
+    if not W.on or x8() ~= W.ent() then return end
+    local c = W.cells()
+    W.turns[#W.turns + 1] = { f = M.frame, blk = c.blk, at = c.at }
+    M.log(string.format("[fuse] f%d the boss's turn %d begins: %s", M.frame, #W.turns, W.cellsLine(c)))
+  end)
+  reg(M.sym("_dispatcher"), function()
+    if not W.on then return end
+    local x = x8()
+    if x < 8 then
+      if M.readByte(0xB5) == 0x00 then W.party[#W.party + 1] = { f = M.frame } end
+      return
+    end
+    if x ~= W.ent() then return end
+    local cmd, arg = M.readByte(0xB5), M.readByte(0xB6)
+    W.cmds[#W.cmds + 1] = { f = M.frame, cmd = cmd, arg = arg, turn = #W.turns, retal = M.readByte(0xB1) & 1 == 1 }
+    -- (a line closes a tally: the maxima up to it ride on its record, and are counted afresh)
+    if cmd == 0x21 then
+      W.cmds[#W.cmds].max = W.max
+      W.max = { bvar3 = 0, mvar = 0 }
+    end
+    M.log(string.format("[fuse] f%d the boss dispatches command $%02X arg $%02X (turn %d%s)", M.frame, cmd, arg,
+      #W.turns, M.readByte(0xB1) & 1 == 1 and ", a counter" or ""))
+  end)
+  reg(M.sym("Ot6HitBroke"), function()
+    if not W.on or y8() ~= W.ent() then return end
+    local c = W.cells()
+    W.breaks[#W.breaks + 1] = { f = M.frame, pre = c, turn = #W.turns }
+    M.log(string.format("[fuse] f%d the boss's last shield is taken (Ot6HitBroke): %s", M.frame, W.cellsLine(c)))
+  end)
+  -- (the ROM before the cancel has no such proc: W.fixed says which ROM this is)
+  local okSnuff, snuff = pcall(function() return M.sym("Ot6FuseSnuff") end)
+  W.fixed = okSnuff
+  if okSnuff then
+    reg(snuff, function()
+      if not W.on or y8() ~= W.ent() then return end
+      W.snuffs[#W.snuffs + 1] = { f = M.frame }
+      M.log(string.format("[fuse] f%d Ot6FuseSnuff: the lit fuse is cancelled", M.frame))
+    end)
+  end
+  emu.addEventCallback(function()
+    if not W.on then return end
+    local e = W.ent()
+    if not e then return end
+    if W.pin then
+      -- the DECLARED pins (see the header): the boss's HP, and every standing member's
+      if W.pin.boss and M.readWord(0x3BF4 + e) > 0 then write.word(0x3BF4 + e, W.pin.boss) end
+      if W.pin.party then
+        for i = 0, 3 do
+          -- (9,999, above any member's own maximum where that is lower: a blow that takes a whole HP bar at once,
+          -- AtmaWeapon's Meteo on a Floating Continent party, would otherwise fell the member it lands on)
+          local hp = M.readWord(0x3BF4 + 2 * i)
+          if M.readByte(0x3ED8 + 2 * i) ~= 0xFF and hp > 0 and hp < 9999 then write.word(0x3BF4 + 2 * i, 9999) end
+        end
+      end
+    end
+    -- the most the tally cells have read since W.max was last cleared (battle variable 3; the monster's variable
+    -- less its switch bit 7)
+    W.max.bvar3 = math.max(W.max.bvar3, M.readByte(0x3EB3))
+    W.max.mvar = math.max(W.max.mvar, M.readByte(0x3DAC + e) & 0x7F)
+    local w = W.vramMark()
+    if w ~= W.lastMark then
+      W.lastMark = w
+      W.marks[#W.marks + 1] = { f = M.frame, w = w }
+      if w == W.FUSE_WORD or (#W.marks > 1 and W.marks[#W.marks - 1].w == W.FUSE_WORD) then
+        M.log(string.format("[fuse] f%d the mark cell in VRAM reads %s (the lit-fuse mark is $%04X)", M.frame,
+          w and string.format("$%04X", w) or "nothing (no cell)", W.FUSE_WORD))
+      end
+    end
+    if W.fixed then
+      local lit = W.litBit()
+      if lit ~= W.lastLit then
+        W.lastLit = lit
+        M.log(string.format("[fuse] f%d OT6_FUSE's lit bit reads %s", M.frame, lit and "set" or "clear"))
+      end
+    end
+  end, emu.eventType.endFrame)
+  return W
+end
+
+-- M.fuseEngage(talk, species, what): the talk that opens a boss's battle, made again (four times at most) while
+-- the battle it opened is another: a random battle can open on the step the talk takes (lib T.touchBoss), and it
+-- is fought out (M.kitBattle: everyone Fights).  talk() returns the step.  Ends with the boss's battle up.
+function M.fuseEngage(talk, species, what, tries)
+  tries = tries or 0
+  local function here()
+    for s = 0, 5 do
+      if M.readByte(0x3AA8 + s * 2) & 1 == 1 and M.readWord(0x57C0 + s * 2) == species then return true end
+    end
+    return false
+  end
+  return M.seqStep({
+    M.lazy(talk),
+    M.waitUntil(function() return M.battleActive() end, 3000, what .. ": a battle is up", 2),
+    M.lazy(function()
+      if here() then return M.logStep(string.format("[fuse] %s: its battle is up (try %d)", what, tries + 1)) end
+      M.assertEq(tries < 4, true, what .. ": the talk opened its battle within four tries")
+      return M.seqStep({
+        M.logStep(string.format("[fuse] %s: a random battle opened on the talk's step; it is fought out", what)),
+        M.kitBattle({}, { maxFrames = 60000 }),
+        M.waitUntil(function() return not M.battleLoadStarted() and M.hasControl() and M.tileAligned() end, 9000,
+          what .. ": the field again after the random battle", 2),
+        M.fuseEngage(talk, species, what, tries + 1),
+      })
+    end),
+  })
+end
+
+-- M.fuseCases(cfg) is the fuse suites' shared body: one boss battle, already loading or up, played three times from
+-- a snapshot at its open, through the real menu (M.kitBattle: Fights, and Defends while the party sits a phase out).
+--   cfg.tag, cfg.species
+--   cfg.write = { byte = fn(addr, v), word = fn(addr, v) }   the suite's own declared writers (M.fuseWatch)
+--   cfg.line                the announce's dlg id
+--   cfg.move = { cmd, atk } the move's command and attack id as ExecCmd dispatches it
+--   cfg.turns               the boss's own turns from the announce to the move (vanilla's count of `wait`s)
+--   cfg.arm = "idle" | "fight"   what the party does while the fuse arms: nothing, or everyone Fights
+--   cfg.bossHp              (optional) the boss's HP, held (W.pin); cfg.outsideHp, the "outside" case's until its
+--                           break ends (a boss whose HP line arms the fuse)
+--   cfg.row = { max, classes }   (optional) a shield row staged at the open, for a body with none
+--   cfg.partway(W)          true once the trigger is part earned and no fuse is lit (the "outside" case's break)
+--   cfg.earned(c)           the "broken" case's boss-specific asserts: c = the case's record (below)
+--   cfg.outside(c)          the "outside" case's, likewise (optional)
+--   cfg.onOpen(name)        called as each case opens (optional)
+-- The cases:
+--   unbroken   the party arms the fuse; the line shows, the HUD mark shows, and the move is dispatched on the
+--              boss's cfg.turns-th turn after the announce; the mark is gone after it.
+--   broken     the same to the announce; then the gauge is staged to 1 and a Fight breaks the boss: the cancel
+--              fires, the mark goes with the hit, the move is not dispatched when the boss recovers, and the next
+--              announce comes only once cfg.earned says the trigger was earned again; the move follows it.
+--   outside    the gauge is staged to 1 before any fuse is lit (cfg.partway) and a Fight breaks the boss: no
+--              cancel, the trigger's cells as they were, two more Fights in the window move none of them, and the
+--              fuse then lights and fires as in the first case.
+-- DECLARED SYNTHETIC SETUP (each suite's cfg.write, in tools/state_write_waivers.txt): the gauge staged (to 63 while the party's Fights arm
+-- the fuse, so they do not break the boss early; to 1 for the breaking Fight), cfg.row, and W.pin's HP.  The break
+-- itself, every hit and every boss turn are the game's.  A mechanism test, not play.
+-- FUSE_MEASURE (a lab's global): the ROM before the cancel; the "broken" case reports what the break did instead
+-- of asserting the cancel.
+function M.fuseCases(cfg)
+  local W = M.fuseWatch(cfg.species, cfg.write)
+  local measure = rawget(_G, "FUSE_MEASURE") == true
+  local snap, req = nil, nil
+  local C = nil                 -- the case in play
+  local tag = cfg.tag
+  local function say(s) M.log(string.format("[fuse] f%d %s: %s", M.frame, tag, s)) end
+  local function lineAfter(i) return W.find(0x21, cfg.line, i) end
+  local function moveAfter(i) return W.find(cfg.move.cmd, cfg.move.atk, i) end
+  local function stage(n, why)
+    local e = W.ent()
+    cfg.write.byte(0x3E38 + e, n)
+    say(string.format("the gauge staged to %d (%s)", n, why))
+  end
+  -- (the party sits a phase out by Defending: a window left open with no input can hold the battle still)
+  -- (max frames at most: the caller's assert names what did not come)
+  local function idle(pred, max, what)
+    local t0 = nil
+    return M.lazy(function()
+      t0 = M.frame
+      return M.kitBattle({}, { idle = "defend", care = false, maxFrames = max + 600,
+        giveUp = function() return pred() or M.frame - t0 >= max end })
+    end)
+  end
+  local function fight(pred, max)
+    local t0 = nil
+    return M.lazy(function()
+      t0 = M.frame
+      return M.kitBattle({}, { care = false, maxFrames = max + 600,
+        giveUp = function() return pred() or M.frame - t0 >= max end })
+    end)
+  end
+  -- the party's part while a fuse arms
+  local function arm(pred, max, what)
+    if cfg.arm == "fight" then
+      -- (63: the gauge byte's bit 6 is the HUD's "dead" flag, Ot6ShownGauge, so a count above it draws no line)
+      return M.seqStep({ M.call(function() stage(63, "the arming Fights are not to break the boss") end),
+        fight(pred, max) })
+    end
+    return idle(pred, max, what)
+  end
+  local function markOn() return W.vramMark() == W.FUSE_WORD end
+  local function gone() return W.ent() == nil or not M.battleLoadStarted() end
+  local function recovered()
+    local c = W.cells()
+    return c ~= nil and c.ticks == 0
+  end
+  local function standing()
+    M.assertEq(not gone(), true, string.format("%s: the boss still stands and the battle is up (%s)", tag,
+      tostring(C and C.name)))
+  end
+  local function open(name)
+    return M.seqStep({
+      M.call(function()
+        if snap == nil then snap = M.requestSaveState() else M.setPad({}); req = M.requestLoadState(snap.blob) end
+      end),
+      M.waitFrames(2),
+      M.call(function()
+        if req == nil then M.checkReq(snap, tag .. ": the snapshot at the battle's open")
+        else M.checkReq(req, tag .. ": the battle's open restored"); M.rearmInputInjection() end
+        req = req or false
+        W.reset()
+        W.on = true
+        W.pin = { boss = (name == "outside" and cfg.outsideHp) or cfg.bossHp, party = true }
+        C = { name = name }
+        if cfg.onOpen then cfg.onOpen(name) end
+        say(string.format("case %s, from the battle's open", name))
+      end),
+      M.waitUntil(function() return W.ent() ~= nil and M.battleActive() end, 3000, tag .. ": the boss on the field", 2),
+      M.call(function()
+        if cfg.row then
+          local e = W.ent()
+          cfg.write.byte(0x3E39 + e, cfg.row.max)
+          cfg.write.byte(0x3E38 + e, cfg.row.max)
+          cfg.write.byte(0x3E9C + e, cfg.row.classes)
+          say(string.format("a shield row staged: %d shields, classes $%02X", cfg.row.max, cfg.row.classes))
+        end
+        say("at the open: " .. W.cellsLine(W.cells()))
+      end),
+    })
+  end
+  -- the announce: the line dispatched, and (the cancel's ROM) the mark in VRAM and the lit bit
+  local function noteLine(from, what)
+    standing()
+    local i, c = lineAfter(from)
+    M.assertEq(i ~= nil, true, string.format("%s: the announce shows (dlg $%02X) -- %s", tag, cfg.line, what))
+    C.lines = C.lines or {}
+    C.lines[#C.lines + 1] = { i = i, f = c.f, turn = c.turn, cells = W.cells(), max = c.max }
+    return c
+  end
+  local function announce(from, max, what)
+    return M.seqStep({
+      arm(function() return gone() or lineAfter(from()) ~= nil end, max, what),
+      M.call(function()
+        local c = noteLine(from(), what)
+        say(string.format("the announce (dlg $%02X) on the boss's turn %d%s: %s", cfg.line, c.turn,
+          c.retal and " (its counter's)" or "", W.cellsLine(W.cells())))
+      end),
+      M.cond(function() return W.fixed and not measure end, {
+        idle(function() return gone() or markOn() end, 1200, "the HUD mark after the announce"),
+        M.call(function()
+          standing()
+          M.assertEq(markOn(), true, string.format("%s: the lit-fuse mark stands before the shield emblem (VRAM "
+            .. "$%04X at the anchor - 2)", tag, W.FUSE_WORD))
+          M.assertEq(W.litBit(), true, tag .. ": OT6_FUSE's lit bit is set for the boss's slot")
+          local l = C.lines[#C.lines]
+          l.markF = M.frame
+          if not cfg.shot then cfg.shot = true; M.screenshot("fuse_" .. tag .. "_lit") end
+          say(string.format("the mark shows %d frames after the line", M.frame - l.f))
+        end),
+      }, {}),
+    })
+  end
+  -- the move, cfg.turns of the boss's own turns after the announce `n`
+  local function fires(n, what)
+    return M.seqStep({
+      idle(function()
+        local l = C.lines[n]
+        return gone() or moveAfter(l.i) ~= nil or #W.turns > l.turn + cfg.turns + 1
+      end, 12000, what),
+      M.call(function()
+        local l = C.lines[n]
+        local i, c = moveAfter(l.i)
+        M.assertEq(i ~= nil, true, string.format("%s: the move (command $%02X, attack $%02X) is dispatched after "
+          .. "the announce -- %s", tag, cfg.move.cmd, cfg.move.atk, what))
+        M.assertEq(c.turn - l.turn, cfg.turns, string.format("%s: the move fires on the boss's turn %d after the "
+          .. "announce, vanilla's count (announce on turn %d, move on turn %d) -- %s", tag, cfg.turns, l.turn,
+          c.turn, what))
+        l.move = { i = i, f = c.f, turn = c.turn }
+        say(string.format("the move is dispatched on turn %d, %d turn(s) after the announce", c.turn,
+          c.turn - l.turn))
+      end),
+      M.cond(function() return W.fixed and not measure end, {
+        -- (the lit bit too: a veil over the HUD, an animation's, also takes the mark out of VRAM for a while)
+        idle(function() return gone() or (not W.litBit() and not markOn()) end, 900, "the mark gone after the move"),
+        M.call(function()
+          M.assertEq(gone() or not markOn(), true, tag .. ": the mark is gone once the move has fired")
+          if not gone() then M.assertEq(W.litBit(), false, tag .. ": the lit bit is clear once the move has fired") end
+          say("the mark is gone after the move")
+        end),
+      }, {}),
+    })
+  end
+  -- The breaking Fight.  The gauge goes to 1 and the row takes every class (so whichever hand swings is a key);
+  -- with `when`, one standing member aims a Fight and confirms it once when() is true (M.kitBattle's confirmWhen:
+  -- the cursor rests on the boss until then), the staging made at that moment; without it everyone Fights.
+  local function stageBreak(why)
+    local e = W.ent()
+    cfg.write.byte(0x3E9C + e, 0x0F)
+    stage(1, why .. "; every class a key")
+  end
+  -- `via` (optional): { name, who, cmd, row or spell } -- the breaking action is that character's command instead
+  -- of a Fight (cfg.via's cases), boost 0
+  local function breakIt(why, when, max, via)
+    local plan, staged = {}, false
+    return M.seqStep({
+      M.call(function()
+        standing()
+        C.nBreaks = #W.breaks
+        if when == nil then stageBreak(why); return end
+        for i = 0, 3 do
+          local id = M.readByte(0x3ED8 + 2 * i)
+          if id ~= 0xFF and (via == nil or id == via.who) and M.readWord(0x3BF4 + 2 * i) > 0
+             and (M.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
+            local confirmWhen = function()
+              if gone() or not when() then return false end
+              if not staged then staged = true; stageBreak(why) end
+              return true
+            end
+            if via then
+              plan[1] = { who = id, cmd = via.cmd, row = via.row, spell = via.spell, boost = 0,
+                confirmWhen = confirmWhen }
+              say(string.format("character %d (seat %d) aims the breaking %s", id, i, via.name))
+            else
+              plan[1] = { who = id, cmd = 0x00, confirmWhen = confirmWhen }
+              say(string.format("character %d (seat %d) aims the breaking Fight", id, i))
+            end
+            break
+          end
+        end
+        M.assertEq(#plan, 1, via and string.format("%s: character %d stands to aim the breaking %s (the case's "
+          .. "precondition: the entry state seats them)", tag, via.who, via.name)
+          or tag .. ": a member stands to aim the breaking Fight")
+      end),
+      M.lazy(function()
+        return M.kitBattle(plan, { maxFrames = max or 6000, care = when ~= nil,
+          giveUp = function() return gone() or #W.breaks > C.nBreaks end })
+      end),
+      M.call(function()
+        standing()
+        M.assertEq(#W.breaks > C.nBreaks, true, string.format("%s: a %s took the boss's last shield (%s)", tag,
+          via and via.name or "Fight", why))
+        C.brk = W.breaks[#W.breaks]
+        C.brk.cmdsAt = #W.cmds
+      end),
+      M.waitFrames(2),
+      M.call(function()
+        C.brk.post = W.cells()
+        W.max = { bvar3 = 0, mvar = 0 }
+        say("after the break: " .. W.cellsLine(C.brk.post))
+      end),
+    })
+  end
+  local function untilRecovered()
+    return M.seqStep({
+      idle(function() return gone() or recovered() end, 4000, "the break ends"),
+      M.call(function()
+        standing()
+        C.rec = { f = M.frame, turn = #W.turns, cells = W.cells(), cmdsAt = #W.cmds }
+        say(string.format("the boss recovers after %d frames: %s", M.frame - C.brk.f, W.cellsLine(C.rec.cells)))
+      end),
+    })
+  end
+
+  local unbroken = M.seqStep({
+    open("unbroken"),
+    announce(function() return 1 end, 30000, "the fuse arms (unbroken)"),
+    fires(1, "unbroken"),
+    M.call(function()
+      local l = C.lines[1]
+      -- the glow between: one a turn (vanilla's commands, cmd $2B)
+      if cfg.glows then
+        local n = 0
+        for i = l.i, l.move.i do if W.cmds[i].cmd == 0x2B then n = n + 1 end end
+        M.assertEq(n, cfg.glows, string.format("%s: %d glow command(s) from the announce to the move, vanilla's",
+          tag, cfg.glows))
+      end
+      M.assertEq(#W.snuffs, 0, tag .. ": no cancel in the unbroken case")
+      say("PASS unbroken")
+    end),
+  })
+
+  -- The other routes to a break during the fuse (cfg.via: Filch, OT6's Break), each a case of its own played
+  -- before the Fight's: the breaking action is that command, and the break must come through Ot6TakeShields, the
+  -- leaf those routes share, entered with 8-bit index registers as they call it; then the cancel, as for a Fight.
+  local tsEntries = {}
+  local viaArmed = false
+  local function viaCase(v)
+    return M.seqStep({
+      open("via " .. v.name),
+      M.call(function()
+        if not viaArmed then
+          viaArmed = true
+          local ts = M.sym("Ot6TakeShields")
+          emu.addMemoryCallback(function()
+            if not W.on then return end
+            local st = emu.getState()
+            tsEntries[#tsEntries + 1] = { f = M.frame, ps = st["cpu.ps"], b6 = M.readByte(0xB6) }
+          end, emu.callbackType.exec, ts, ts)
+          local fl = M.sym("Ot6Filch")
+          emu.addMemoryCallback(function()
+            if W.on then tsEntries[#tsEntries + 1] = { f = M.frame, filch = true } end
+          end, emu.callbackType.exec, fl, fl)
+        end
+        tsEntries = {}
+      end),
+      M.cond(function() return cfg.arm == "fight" end, {
+        arm(function() return gone() or lineAfter(1) ~= nil end, 30000, "the fuse arms (to be broken by " .. v.name
+          .. ")"),
+      }, {}),
+      breakIt("the break during the fuse, by " .. v.name, function()
+        local i = lineAfter(1)
+        return i ~= nil and markOn()
+      end, 40000, v),
+      M.call(function()
+        noteLine(1, "the fuse arms (to be broken by " .. v.name .. ")")
+        local l = C.lines[1]
+        M.assertEq(l.f < C.brk.f and moveAfter(l.i) == nil, true, string.format("%s: the %s landed after the "
+          .. "announce and before the move (the case's precondition)", tag, v.name))
+        -- the route: the last Ot6TakeShields entry at or before the break, and what called it
+        local last, filch = nil, nil
+        for _, e in ipairs(tsEntries) do
+          if e.f <= C.brk.f then
+            if e.filch then filch = e else last = e end
+          end
+        end
+        M.assertEq(last ~= nil and C.brk.f - last.f <= 2, true, string.format("%s: the break came through "
+          .. "Ot6TakeShields (the %s's leaf), on the break's own frame", tag, v.name))
+        M.assertEq(type(last.ps) == "number" and (last.ps & 0x10) ~= 0, true, string.format("%s: Ot6TakeShields was "
+          .. "entered with 8-bit index registers (P = $%02X), as the %s calls it", tag, last.ps or 0, v.name))
+        if v.filch then
+          M.assertEq(filch ~= nil and last.f - filch.f <= 2, true, tag .. ": the take was Ot6Filch's")
+        else
+          M.assertEq(last.b6, v.spell, string.format("%s: the take was the spell $%02X's ($B6)", tag, v.spell))
+        end
+        say(string.format("the %s took the last shield through Ot6TakeShields (P = $%02X)", v.name, last.ps))
+        M.assertEq(#W.snuffs, 1, string.format("%s: the break by %s during the fuse cancels it (Ot6FuseSnuff fired "
+          .. "once)", tag, v.name))
+        M.assertEq(C.brk.post.blk, 0xFF, string.format("%s: the script waits nowhere after the %s's cancel ($3240 = "
+          .. "$FF)", tag, v.name))
+      end),
+      idle(function() return gone() or (not W.litBit() and not markOn()) end, 1500, "the mark gone with the break"),
+      M.call(function()
+        standing()
+        M.assertEq(markOn(), false, string.format("%s: the mark is gone after the %s's break", tag, v.name))
+        M.assertEq(W.litBit(), false, string.format("%s: the lit bit is clear after the %s's break", tag, v.name))
+        say("PASS via " .. v.name)
+      end),
+    })
+  end
+  local vias = {}
+  for _, v in ipairs(cfg.via or {}) do vias[#vias + 1] = viaCase(v) end
+
+  local broken = M.seqStep({
+    open("broken"),
+    -- a party that arms the fuse by fighting does so first; then one member's aimed Fight waits for the fuse to
+    -- be lit (the line dispatched; on the cancel's ROM the mark in VRAM too) and is confirmed
+    M.cond(function() return cfg.arm == "fight" end, {
+      arm(function() return gone() or lineAfter(1) ~= nil end, 30000, "the fuse arms (to be broken)"),
+    }, {}),
+    breakIt("the break during the fuse", function()
+      local i, c = lineAfter(1)
+      if i == nil then return false end
+      if W.fixed and not measure then return markOn() end
+      return M.frame - c.f >= 60
+    end, 40000),
+    M.call(function()
+      noteLine(1, "the fuse arms (to be broken)")
+      local l = C.lines[1]
+      M.assertEq(l.f < C.brk.f, true, tag .. ": the announce came before the break (the case's precondition)")
+      M.assertEq(moveAfter(l.i) == nil, true, tag .. ": the break landed before the move was dispatched (the case's "
+        .. "precondition)")
+      C.brk.markBefore = false
+      for _, m in ipairs(W.marks) do if m.f <= C.brk.f and m.w == W.FUSE_WORD then C.brk.markBefore = true end end
+      if measure or not W.fixed then return end
+      M.assertEq(C.brk.markBefore, true, tag .. ": the lit-fuse mark stood in VRAM before the break")
+      M.assertEq(#W.snuffs, 1, tag .. ": the break during the fuse cancels it (Ot6FuseSnuff fired once)")
+      M.assertEq(C.brk.post.blk, 0xFF, tag .. ": the script waits nowhere after the cancel ($3240 = $FF, as after "
+        .. "end_if)")
+    end),
+    M.cond(function() return W.fixed and not measure end, {
+      idle(function() return gone() or (not W.litBit() and not markOn()) end, 1500,
+        "the mark gone with the breaking hit"),
+      M.call(function()
+        standing()
+        M.assertEq(markOn(), false, tag .. ": the mark is gone after the breaking hit")
+        M.assertEq(W.litBit(), false, tag .. ": the lit bit is clear after the breaking hit")
+        C.brk.markGone = M.frame
+        if not cfg.shot2 then cfg.shot2 = true; M.screenshot("fuse_" .. tag .. "_cancelled") end
+        say(string.format("the mark is gone %d frames after the break was computed", M.frame - C.brk.f))
+      end),
+    }, {}),
+    untilRecovered(),
+    -- the boss's first turns back, the party idle: on the ROM before the cancel the fuse resumes here
+    idle(function()
+      return gone() or #W.turns >= C.rec.turn + cfg.turns + 1 or moveAfter(C.brk.cmdsAt + 1) ~= nil
+        or lineAfter(C.brk.cmdsAt + 1) ~= nil
+    end, 12000, "the boss's first turns back"),
+    M.call(function()
+      standing()
+      local mi, mc = moveAfter(C.brk.cmdsAt + 1)
+      local li, lc = lineAfter(C.brk.cmdsAt + 1)
+      C.resumed = mi ~= nil and (li == nil or li > mi)
+      if C.resumed then
+        say(string.format("the move was dispatched on the boss's turn %d back (frame %d, %d frames after the "
+          .. "break) with no new announce: the break DELAYED the fuse", mc.turn - C.rec.turn, mc.f, mc.f - C.brk.f))
+      else
+        say(string.format("%d turn(s) back and no move without a new announce", #W.turns - C.rec.turn))
+      end
+      if measure or not W.fixed then return end
+      M.assertEq(C.resumed, false, tag .. ": the move does not fire when the boss recovers (no dispatch of it "
+        .. "before a new announce)")
+    end),
+    M.cond(function() return W.fixed and not measure end, {
+      -- earned again: the next announce, and what it took
+      M.lazy(function()
+        C.earnFrom = C.brk.cmdsAt + 1
+        return announce(function() return C.earnFrom end, 40000, "the trigger earned again")
+      end),
+      M.call(function()
+        local l = C.lines[2]
+        M.assertEq(moveAfter(C.brk.cmdsAt + 1) == nil or moveAfter(C.brk.cmdsAt + 1) > l.i, true, tag .. ": no "
+          .. "move between the cancel and the next announce")
+        cfg.earned(C, W)
+      end),
+      fires(2, "after the second announce"),
+    }, {}),
+    M.call(function() say(measure and "MEASURED broken" or "PASS broken") end),
+  })
+
+  local outside = M.seqStep({
+    open("outside"),
+    arm(function() return gone() or cfg.partway(W) end, 30000, "the trigger part earned"),
+    M.call(function()
+      standing()
+      M.assertEq(lineAfter(1) == nil, true, tag .. ": no fuse is lit yet (the case's precondition)")
+    end),
+    breakIt("a break outside the fuse"),
+    M.call(function()
+      local a, b = C.brk.pre, C.brk.post
+      say("before the break: " .. W.cellsLine(a))
+      M.assertEq(#W.snuffs, 0, tag .. ": a break outside the fuse cancels nothing")
+      M.assertEq(string.format("%02X %04X %02X %02X %d", b.blk, b.at, b.mvar, b.bsw, b.bvar3),
+        string.format("%02X %04X %02X %02X %d", a.blk, a.at, a.mvar, a.bsw, a.bvar3),
+        tag .. ": the break left the script's and the trigger's cells as they were (block, resume address, "
+        .. "monster variable, battle switches, battle variable 3)")
+      C.partyAt = #W.party
+    end),
+    -- two more Fights land in the window
+    fight(function() return gone() or #W.party >= C.partyAt + 2 or recovered() end, 3000),
+    untilRecovered(),
+    M.call(function()
+      local a, b = C.brk.post, C.rec.cells
+      C.window = string.format("%02X %04X %02X %02X %d", b.blk, b.at, b.mvar, b.bsw, b.bvar3)
+      C.windowWant = string.format("%02X %04X %02X %02X %d", a.blk, a.at, a.mvar, a.bsw, a.bvar3)
+      say(string.format("%d Fight(s) landed in the window; the cells at recovery: %s (at the break: %s)",
+        #W.party - C.partyAt, C.window, C.windowWant))
+      W.pin.boss = cfg.bossHp
+      if measure or not W.fixed then return end
+      M.assertEq(C.window, C.windowWant, tag .. ": Fights on the Broken boss wound nothing (the cells at recovery "
+        .. "are the cells at the break)")
+    end),
+    announce(function() return 1 end, 40000, "the fuse arms after a break outside it"),
+    M.call(function() if cfg.outside then cfg.outside(C, W) end end),
+    fires(1, "after a break outside the fuse"),
+    M.call(function()
+      M.assertEq(#W.snuffs, 0, tag .. ": no cancel in the outside case")
+      say("PASS outside")
+    end),
+  })
+
+  return M.seqStep({
+    M.waitUntil(function() return M.battleActive() end, 3000, tag .. ": the battle is up", 2),
+    M.call(function()
+      M.logRomIdentity("[fuse]")
+      say(string.format("the ROM %s the cancel%s", W.fixed and "has" or "has NOT", measure and " (FUSE_MEASURE: "
+        .. "reporting, not asserting it)" or ""))
+      M.assertEq(W.fixed or measure, true, tag .. ": the ROM under test has Ot6FuseSnuff (or the run is a "
+        .. "measurement of the ROM before it)")
+    end),
+    unbroken, M.seqStep(vias), broken, outside,
+    M.call(function() W.on = false; W.pin = nil
+      say(#vias > 0 and string.format("PASS: the three cases, and %d other route(s) to the break", #vias)
+        or "PASS: the three cases") end),
   })
 end
 

@@ -76,10 +76,63 @@ local function visit(n)
             H.setPad(t % 16 < 4 and { face, "a" } or { face })
             return
           end
+          -- the route keeps clear of the other soldiers: a soldier the party passes, or who wanders into it,
+          -- starts his own fight (Commandos), and the party is chucked out before it reaches the one it wants.
+          -- The base's foot soldier obj $11 wanders the corridor the rider's route takes, x 7-10 by y 11-15
+          -- (v0.51 landing's second replay: six visits, six Commando fights, "416 won" each time and never the
+          -- rider's, build/attempts/wt/v051-land/).  Tiles within two steps of another soldier are left out; with no
+          -- such route the party waits for them to wander off (a one-step margin let obj $11 close the last gap
+          -- in the corridor: build/attempts/wt/v051-land/guards/)
+          local function clearOf(r)
+            local avoid = {}
+            for o = 0x10, 0x19 do
+              local sx, sy = H.objX(o), H.objY(o)
+              if o ~= target and (sx ~= 0 or sy ~= 0) then
+                for ax = -r, r do
+                  for ay = -r, r do
+                    if math.abs(ax) + math.abs(ay) <= r then avoid[(((sy + ay) & 0xFF) << 8) | ((sx + ax) & 0xFF)] = true end
+                  end
+                end
+              end
+            end
+            return avoid
+          end
+          -- and a soldier who wanders up within two steps is backed away from, a step that leaves the most room
+          local function nearest(x, y)
+            local d = nil
+            for o = 0x10, 0x19 do
+              local sx, sy = H.objX(o), H.objY(o)
+              if o ~= target and (sx ~= 0 or sy ~= 0) then
+                local e = math.abs(sx - x) + math.abs(sy - y)
+                if d == nil or e < d then d = e end
+              end
+            end
+            return d or 99
+          end
+          local px, py = H.fieldX(), H.fieldY()
+          local here = nearest(px, py)
+          if here <= 2 then
+            local away, room = nil, here
+            for _, s in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
+              local p = H.bfsPath(px + s[1], py + s[2])
+              local r = nearest(px + s[1], py + s[2])
+              if p and #p == 1 and r > room then away, room = p, r end
+            end
+            if away then
+              if H.tileAligned() then H.setPad({ H.movePress(away[1]) }) end
+              return
+            end
+          end
           local best = nil
-          for _, s in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
-            local p = H.bfsPath(ox + s[1], oy + s[2])
-            if p and #p > 0 and (best == nil or #p < #best) then best = p end
+          for _, r in ipairs({ 2 }) do
+            local avoid = clearOf(r)
+            for _, s in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
+              if not avoid[(((oy + s[2]) & 0xFF) << 8) | ((ox + s[1]) & 0xFF)] then
+                local p = H.bfsPath(ox + s[1], oy + s[2], nil, avoid)
+                if p and #p > 0 and (best == nil or #p < #best) then best = p end
+              end
+            end
+            if best then break end
           end
           if best and H.tileAligned() then H.setPad({ H.movePress(best[1]) }) elseif not best then H.setPad({}) end
         end),

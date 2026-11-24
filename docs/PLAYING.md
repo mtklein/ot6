@@ -56,6 +56,19 @@ battles and in your save. Scan reveals all of a kind's weaknesses at once.
 
 A few enemies have no shields and show no line.
 
+### A boss's big move
+
+Some bosses announce their biggest move before they use it with a line of
+text, and some also glow. From then until the move a yellow **!** stands
+in front of the boss's shield icon. Break the boss while the **!** is up and
+the move is cancelled. When the boss recovers it does not pick the move up
+where it left off: it has to earn it again the way it did the first time.
+For most bosses that means several more turns or hits. Kefka's move comes
+from how hurt he is, so he announces it again on his first turn back and
+uses it on the turn after. A move that has been announced always comes unless
+you break the boss first. AtmaWeapon's Flare Star, Atma's Ultima, the Gold
+Dragon's Bolt 3 and Kefka's Goner work this way.
+
 ### Weapon types
 
 There are six weapon types. A weapon's icon shows its type, and the item
@@ -99,6 +112,11 @@ Each character has a type of their own, and most can equip a second:
 The Fixed Dice and the Heal Rod take no shields. With the Genji Glove each
 hand hits with its own weapon's type.
 
+The Dragoon Boots let the wearer equip any spear, Gau and Gogo included
+(not Umaro, who keeps his club). Take the boots off and the spear comes
+off with them: the menu re-equips the character, as it does for the Genji
+Glove, Gauntlet and Merit Award.
+
 ### Elements
 
 Fire, ice, lightning, wind, earth, water, holy and poison. A spell hits the
@@ -136,10 +154,11 @@ Locke's Filch, Sabin's Bum Rush and Cyan's Cleave on a boss.
 | Kind of action | Examples | A point buys |
 |---|---|---|
 | Fight | Fight, Mug, Capture | one more hit with a weapon in hand. With the Genji Glove and two weapons, both hands swing again. No MP. |
-| Spell families | Fire, Ice, Bolt, Poison, Cure, Life, Slow, Haste | the next spell of the line: one point casts Fire 2, two points Fire 3. A third point adds nothing. You pay the MP of the spell cast. |
+| Spell families | Fire, Ice, Bolt, Poison, Cure, Life, Slow, Haste; Celes's Fire, Ice, Bolt and Poison blades | the next spell of the line: one point casts Fire 2, two points Fire 3. A third point adds nothing. You pay the MP of the spell cast. |
 | Damage or healing | Blitz, Tools, Lores, Dances, Esper summons, Drain, Pearl, Quake, Merton, Ultima, items that heal a number | double damage for 1 point, 4x for 2, 8x for 3 |
 | Chance | Steal, Slot, Rage, a Dance's start (the stumble and the first step) | better odds; the third point removes the gamble |
 | Duration | Runic, Morph | more of the character's own turns, or more time |
+| None | anything a boost would do nothing for | R is refused, and points raised earlier are kept |
 | Reach | Safe, Shell, Rflect, Vanish (on your party), Bserk, Regen, Antdot, Remedy, Mute, Sleep, Muddle, Stop, Imp, Dispel; Shadow's smoke and exit | one more target per point |
 | Shields | the Break spell, Filch | one more shield per point |
 | Steps | Dismantle, Debilitator | one more application per point |
@@ -304,14 +323,50 @@ that can die, dies. A boss loses four shields and takes a very heavy cut.
 
 ### Celes, Rune Knight (sword, ice)
 
-- **Spells by level.** Ice from the start; Cure at 4, Imp at 13, Scan at 18,
-  Safe at 22, Haste at 32.
-- **Runic** is hers from the start. It absorbs the next spell as MP and gives
-  Celes 1 BP. As in FF6 it also absorbs spells her allies cast. Boosted, it
-  stays up for 1, 2 or 3 of her turns, and she acts normally in them. The BP
-  from absorbing is limited to one per round.
-- **Ultimate: RunicBlade**, learned in the Magitek factory when Celes turns on
-  Kefka. Runic with 3 BP also sends each absorbed spell back at its caster.
+- **Spells by level.** Ice from the start; Cure at 4, Break at 13, Scan at
+  18, Safe at 22, Haste at 32. (Break takes the place of Imp. If your save
+  already has her past level 13, she has Break when you load it, and keeps
+  her Imp.)
+- **RuneKnt** is her command, and it opens a list.
+- **Runic**, its first row, is hers from the start. It absorbs the next spell
+  as MP and gives Celes 1 BP. As in FF6 it also absorbs spells her allies
+  cast. Boosted, it stays up for 1, 2 or 3 of her turns, and she acts
+  normally in them. The BP from absorbing is limited to one per round. Once
+  she has turned on Kefka in the Magitek factory, Runic with 3 BP also sends
+  each absorbed spell back at its caster (RunicBlade).
+- **The rune.** When Runic absorbs a spell with an element, that element
+  stays on her blade for the rest of the battle; a later one replaces it.
+  Her weapon's hits then carry it onto any enemy that is weak to it: double
+  damage, and a shield with every hit. On an enemy that is not weak to it
+  the rune does nothing, so it never heals an enemy or wastes a hit. An
+  ally's spell works as well as an enemy's: cast Fire at a monster while
+  her Runic is up and her blade takes the fire.
+- **Blade rows** (Fire Blade, Ice Blade, Bolt Blade and so on) put an
+  element on her blade directly. She has one for each element she can cast:
+  Ice by herself, and whatever her Esper lends her. A blade costs her turn
+  and the MP of her cheapest spell of that element. Boost it as you would
+  the spell: one point makes Fire Blade a Fire 2 Blade, two a Fire 3 Blade,
+  for that spell's MP. A stronger blade hits harder where it bites (3x for
+  Fire 2, 4x for Fire 3, where a plain blade is 2x); it still takes one
+  shield a hit. A spell Runic absorbs leaves a blade of its own strength.
+  Blades of spells with no stronger form (Pearl, Quake) take no boost.
+  Muted, she cannot arm a blade or Break Blade (Runic still works, and a
+  blade she already holds keeps biting).
+- **What you see.** The element's icon stands beside her name while her
+  blade holds it, and her swing is drawn in the element's colour when it
+  bites.
+- **Ultimate: Break Blade**, her Break spell on the blade, learned on the
+  Floating Continent when Celes turns her sword on Kefka. At 3 BP, for 99
+  MP: for three of her turns every hit of her weapon takes a shield,
+  whatever the enemy's weaknesses, with no limit a turn: two weapons, a
+  Genji Glove or an Offering multiply it. Her rune comes back when it ends.
+
+In the field menu, Skills > RuneKnt lists the rows she has now, with their
+MP and a line of help for each: Runic, a blade for each element she can
+cast, and Break Blade, shown locked until she learns it. RuneKnt is greyed
+out while she holds no weapon that allows Runic (a Flail, a Morning Star,
+the Atma Weapon or bare hands), as her command is in battle.
+
 - **Sword or Katana.** As Terra, she holds Katana with a curved sword.
 
 ### Gau, Beast Tamer (fangs)
@@ -398,7 +453,8 @@ a stopped enemy only does damage. A broken enemy is slowed but never stopped.
 Enemies that ignore Slow or Stop still do. A dagger before an enemy's shield
 means it is slowed, by a throw or a spell; a knife in the same place means it
 is stopped. Each appears with the hit that causes it and goes when the status
-ends. Gogo's Throw and a Mimic of a throw work the same way, so Shadow can
+ends. (A boss with a big move pending shows a yellow **!** there; if it is
+also slowed or stopped the two take turns.) Gogo's Throw and a Mimic of a throw work the same way, so Shadow can
 slow an enemy and Gogo can stop it.
 
 | Item | Where | Effect |
@@ -466,7 +522,8 @@ owner has learned:
 
 - Slot opens Setzer's list: Coin Toss, Hired Help and Jackpot.
 - Tools: a 3 BP Tool fires twice (Overclock).
-- Runic: a 3 BP Runic sends spells back (RunicBlade).
+- RuneKnt opens Celes's list: Runic (at 3 BP it sends spells back), a blade
+  row for each element Gogo can cast, and Break Blade.
 - Throw: a 3 BP Throw kills the enemy it breaks (Assassinate).
 - Magic: Fire at 3 BP is Ultima once Terra has rejoined.
 - Lore: Strago's lores. With Magic among his commands too, he also has

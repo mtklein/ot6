@@ -1355,7 +1355,8 @@ UseItem:
         beq     @8510                   ; branch if a tool (back to item select)
         stz     $e0
         longa
-        lda     f:ItemProp+1,x          ; equippable characters
+        jsl     Ot6EquipWord            ; equippable characters (ot6 #567:
+                                        ;   with the Dragoon Boots' spears)
         jsr     Ot6LeoItemMask          ; ot6 #552: Leo's own set lists the
         ldx     z0                      ;   revealed slot 12 too
 @8529:  lsr

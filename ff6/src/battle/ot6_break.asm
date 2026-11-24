@@ -130,6 +130,8 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         sta     OT6_DEBIL-8,y        ; nor a Debilitator's added weakness
         jsr     Ot6FreshBreak        ; nor the slot's break, its flash, a
                                      ;   held gauge or any mark (below)
+        jsr     Ot6FuseSeed          ; #561: does this species have a fuse?
+                                     ;   (ot6_fuse.asm; clobbers a, b = 0)
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa
@@ -743,6 +745,7 @@ merge:  jsr     Ot6Hold         ; #539: the gauge shows this hit with its hit
         plp
         lda     OT6_SHIELD_CUR,y
         beq     done            ; shieldless monster
+        jsr     Ot6RuneChipMark ; #563: Break Blade takes no second shield
         dec     a
         jsr     Ot6Conductor    ; #328: Ramuh's signature takes one more
         jsr     Ot6Underpaint   ; #538: and Underpainting one more
@@ -781,6 +784,7 @@ done:   rtl
         php
         longi
         jsr     Ot6BumRushTake  ; ot6 #388: each Bum Rush blow takes a shield
+        jsr     Ot6BreakBladeTake ; ot6 #563: and each Break Blade hit
         jsr     Ot6ClassChip
         jsr     Ot6AssassinateGate      ; ot6: shadow's break is his divine
         jsr     Ot6ShieldedDmg  ; ot6: sturdiness while shields hold
@@ -1772,6 +1776,8 @@ Ot6HitBitTbl:
 ; x/y; clobbers a (b = 0).
 .proc Ot6HitBroke
         .a8
+        jsr     Ot6FuseCancel   ; #561: a break cancels the body's lit fuse
+                                ;   (ot6_fuse.asm; every break passes here)
         jsr     Ot6HitBit
         tsb     OT6_HITBRK
         rts
@@ -1898,6 +1904,7 @@ done:   rts
         bra     @store
 @miss:  lda     #$00
 @store: sta     f:$7e0000+OT6_ATKCLASS
+        jsr     Ot6RuneNoSwing  ; #563: no weapon swing, no rune on it
         pla
         plx
         plp
@@ -1953,6 +1960,7 @@ done:   rts
 @none:  lda     #$00
 @store: sta     f:$7e0000+OT6_ATKCLASS
         jsr     Ot6TintSwing    ; #538: a Tinted ally's colour
+        jsr     Ot6RuneSwing    ; #563: the rune on the swinger's blade
         plp
         rtl
 .endproc
@@ -1972,6 +1980,7 @@ done:   rts
         shorta0
         lda     f:Ot6WeapClassTbl,x
         sta     f:$7e0000+OT6_ATKCLASS
+        jsr     Ot6RuneNoSwing  ; #563: a thrown or used item is no swing
         pla
         plx
         plp
@@ -2129,8 +2138,11 @@ tbl:    phx
         cmp     #$f2            ; change_battle
         beq     yes
         cmp     #$f3            ; dlg
-        beq     yes
-        cmp     #$f5            ; monster entry/exit, every op
+        bne     :+
+        jsr     Ot6FuseLine     ; #561: a fuse's announce is no story (a
+        bcs     no              ;   counter that winds a fuse waits for the
+        bra     yes             ;   break to end; ot6_fuse.asm)
+:       cmp     #$f5            ; monster entry/exit, every op
         beq     yes
         cmp     #$f7            ; battle_event
         beq     yes

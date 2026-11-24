@@ -350,6 +350,12 @@ The mark shows the status, from any source: a body Slowed by Bismark's Slow
 shows the dagger, since the next throw will pin it; one Stopped by Fenrir
 shows the knife. That is the true state, and it teaches the rule.
 
+The cell has a second tenant since #561: a boss whose announced move is
+pending shows a yellow **!** there (`OT6_MARKCELL` 3, `ot6_fuse.asm`,
+bosses-wob.md "The boss contract"). `Ot6MarkStage` adds it after the
+trap's mark is chosen; a body with both shows each for about half a
+second in turn.
+
 **It lands with the hit** (#539). A throw's status is computed in
 `CalcAttackEffect` and applied by `UpdateStatus`, both before the battle
 script plays the throw, so a mark read from the live status would appear

@@ -226,6 +226,10 @@
         jsr     Ot6PipPending   ;   a deferred cover pip paints on it too
 :       jsr     Ot6PipStage     ; stage the four live pip-row words
         jsr     Ot6WalletStage  ; stage the costed-list MP wallet
+        lda     OT6_FUSEPOLL    ; #561: a body with a fuse stands in this
+        beq     :+              ;   battle?  then one slot's lit bit a frame
+        jsr     Ot6FusePoll     ;   (ot6_fuse.asm; inline gate, as below)
+:
         ; drive any live break flash.  after the poll above on purpose: a
         ; break armed by this tick's numeral gets its first white frame on
         ; that same frame rather than the next one.  The gate is inline rather
@@ -1070,6 +1074,24 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         sta     hVMADDL
         lda     f:$7e0000+OT6_PIPROWW,x
         sta     hVMDATAL
+        ; #563: the cell before it, the name's sixth, as the name buffer
+        ; holds it: a rune's sign (Ot6RuneSignStage) or the name's own cell
+        lda     f:Ot6PipRowAddr,x
+        dec     a
+        sta     hVMADDL
+        phx
+        lda     f:Ot6SignOffTbl,x
+        tax
+        lda     f:$7e0000+OT6_SIGN_CELL,x
+        plx
+        pha
+        sta     hVMDATAL
+        lda     f:Ot6PipRowAddr,x
+        clc
+        adc     #$00ff
+        sta     hVMADDL
+        pla
+        sta     hVMDATAL
 @pdone: shorta0
 @out:   plb
         ply
@@ -1484,7 +1506,11 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         stz     OT6_PIPROWW,x   ;   leaves its cell alone
         shorta0
         bra     @next
-:       pha                     ; [$02,s] the slot
+:       pha
+        tya                     ; the menu row
+        jsr     Ot6RuneSignStage ; #563: the rune's sign beside the name
+        pla
+        pha                     ; [$02,s] the slot
         jsr     Ot6PipFace      ; a = tile, b = attribute; carry = arrows
         pha                     ; [$01,s] the tile
         bcc     @calm
@@ -1962,7 +1988,10 @@ Ot6PipRowAddr:
         sbc     #$1c
         inx
         bra     :-
-:       lda     f:$7e64d6,x     ; menu row -> character slot
+:       txa                     ; the menu row: the engine has just staged
+        jsr     Ot6RuneSignStage ;  its name, so the rune's sign goes back
+                                ;   beside it (#563)
+        lda     f:$7e64d6,x     ; menu row -> character slot
         cmp     #$ff
         beq     @blank
         pha                     ; [$01,s] the slot
@@ -3780,7 +3809,7 @@ Ot6BgGlyphData:
 ; (gen_shield_glyphs.py draws it, beside the emblem)
         .byte   OT6_KNIFE_TILE
 
-; the trap's mark before the shield emblem (#546), by OT6_MARKCELL: free
+; the mark before the shield emblem (#546, #561), by OT6_MARKCELL: free
 ; (never drawn: Ot6BgHudFlush_ext writes nothing for it), hobbled (the
 ; battle font's own dagger, $d8, the item icon beside the class icons
 ; Ot6ClassGlyphTbl uses), pinned (the knife).  Text palette 0, the gauge's.
@@ -3788,6 +3817,9 @@ Ot6MarkWordTbl:
         .word   $01ee
         .word   (OT6_GAUGE_ATTR << 8) | $d8
         .word   (OT6_GAUGE_ATTR << 8) | OT6_KNIFE
+        ; #561: a lit fuse (OT6_MARK_FUSE, ot6_fuse.asm): the font's own "!"
+        ; ($be), yellow
+        .word   (OT6_FUSE_ATTR << 8) | $be
 
 ; ------------------------------------------------------------------------------
 

@@ -42,6 +42,21 @@
                                 ;   (0/2/4/6) are ever read, and a stale byte
                                 ;   would give the next battle's Celes a
                                 ;   standing magic shield she never paid for
+        sta     f:$7e0000+OT6_RUNE            ; nor a rune on a blade (#563),
+        sta     f:$7e0000+OT6_RUNE+2          ;   nor a running Break Blade,
+        sta     f:$7e0000+OT6_RUNE+4          ;   nor a swing's marks
+        sta     f:$7e0000+OT6_RUNE+6
+        sta     f:$7e0000+OT6_BREAKBLADE
+        sta     f:$7e0000+OT6_BREAKBLADE+2
+        sta     f:$7e0000+OT6_BREAKBLADE+4
+        sta     f:$7e0000+OT6_BREAKBLADE+6
+        sta     f:$7e0000+OT6_RUNESWING
+        sta     f:$7e0000+OT6_BLADESWING
+        sta     f:$7e0000+OT6_RUNEADD
+        sta     f:$7e0000+OT6_RUNETIER
+        sta     f:$7e0000+OT6_RUNETIER+2
+        sta     f:$7e0000+OT6_RUNETIER+4
+        sta     f:$7e0000+OT6_RUNETIER+6
         sta     f:$7e0000+OT6_WEAPSPELL ; nor a weapon-spell flag from the
                                 ;   last battle's final pass
         sta     f:$7e0000+OT6_ULTIMAFOLD ; nor a folded-Ultima mark
@@ -403,6 +418,7 @@
         ; issued no numeral at all, or a $ffff "hide numerals" one, the same
         ; hole Ot6RevealCommit is called at the top of this proc to plug.
 done:   jsr     Ot6PaintActionEnd ; #538: the painter's marks the action ends
+        jsr     Ot6RuneActionEnd ; #563: a turn of Break Blade spent
         jsr     Ot6PipPending
         plp
         rtl
@@ -590,6 +606,7 @@ done:   jsr     Ot6PaintActionEnd ; #538: the painter's marks the action ends
         ; long,y`, only long,x.  That is safe at this site: the two
         ; instructions above are vanilla's own `lda $3e4c,y`
         ; and this proc depends on db = $7e for them.
+        jsr     Ot6RuneAbsorb   ; #563: the spell's element arms her blade
         lda     OT6_RUNICTURNS,y
         beq     @earn           ; 0 = vanilla Runic: one absorb, then gone
         lda     $3e4c,y
@@ -1695,6 +1712,8 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         lda     $6168
         cmp     #$05
         beq     :+              ; Relm's list: Portrait refuses (#538)
+        cmp     #$07
+        beq     :+              ; the Rune Knight's: a blade row refuses (#563)
         cmp     #$02
         jcs     @buys           ; bushido, thief, Setzer, the colours: not a
                                 ;   tool or a blitz
@@ -1714,7 +1733,13 @@ OT6_VANISH_SPELL = $26          ; ATTACK::VANISH (#469: reach on the party only)
         pla
         shorta0
         lda     $6168
-        cmp     #$05
+        cmp     #$07
+        bne     :+
+        lda     $4005,x         ; the Rune Knight's row
+        jsl     Ot6RuneNoBoost
+        jcs     @none
+        brl     @buys
+:       cmp     #$05
         bne     :+
         lda     $4005,x         ; the painter's row
         jsl     Ot6PaintNoBoost
@@ -3028,6 +3053,8 @@ OT6_LIFE3_ID = $35
         beq     @slot           ; slot: Setzer's table, flat
         cmp     #$0d
         beq     @paint          ; sketch: Relm's list (#538)
+        cmp     #$0b
+        beq     @runic          ; runic: the Rune Knight's list (#563)
         ; no cmd-$11 arm: Leap is free.  It is never rendered on any
         ; surface, and it shares the Fight row on the Veldt (Ot6VeldtRow,
         ; battle_main.asm), where the free floor has to survive it.  Falling
@@ -3152,6 +3179,14 @@ OT6_LIFE3_ID = $35
         pla
         lda     $3a7b
         jsl     Ot6PaintCharge
+        plp
+        rtl
+@runic: ; the Rune Knight's list (ot6_rune.asm): the row the list queued is
+        ; in $3a7b, free under command $0b; Runic's row, and the $00 of a
+        ; Runic the engine chose, are free, as Runic always was
+        pla
+        lda     $3a7b
+        jsl     Ot6RuneCharge
         plp
         rtl
 @swdtech:

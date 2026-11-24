@@ -51,8 +51,28 @@
 --       staging unlearns those in $1D29 at the open of the battle GOGO
 --       studies in (battle_study's expedient), and puts them back if no
 --       study taught them; a battle with no caster present waits;
+--     * Runic opens the Rune Knight's list (#563, ot6_rune.asm; w7e6168 = 7)
+--       with GOGO's own rows: Runic, a blade row for each element his battle
+--       spell list holds a spell of (the seated party's union, read from
+--       $302C and the ROM's MagicProp: bit order, the cheapest spell's price
+--       through his relics, cut to the cells the shell has), and Break Blade,
+--       learned (switch $0266 or $00A4), 99;
 --     * Runic at 3 BP is a RunicBlade: TERRA's Fire cast into it comes back
---       at her as a counter.
+--       at her as a counter, and the absorb arms GOGO's rune with Fire's
+--       element (Ot6RuneAbsorb's GOGO gate; OT6_RUNE at his seat) at tier 1
+--       (OT6_RUNETIER); her Fire at 1 BP, cast as Fire 2, arms tier 2;
+--     * a blade row he picks takes his turn at 0 BP, arms OT6_RUNE at his
+--       seat with its element at tier 1 and costs him that spell's MP;
+--     * a row whose element has a line (Fire's), with one point: the list
+--       prices each climbing row at its line's second spell (Ot6FoldTbl), and
+--       the row arms tier 2 for that spell's MP and spends the point;
+--     * a row with no line (Pearl's or W Wind's): R on it is refused, and a
+--       point raised on the command window before it is dropped, not
+--       charged; it arms tier 1;
+--     * Break Blade under three points is refused (three A presses leave the
+--       list up, with 99 MP in hand, nothing started and nothing charged); at
+--       3 BP it costs 99 MP and OT6_BREAKBLADE at his seat reads 3 once the
+--       cast has resolved.
 --   R3 Throw, TresHnt (Steal), Blitz
 --     * Steal opens LOCKE's list (w7e6168 = 3) with exactly the rows his
 --       story has taught (Ot6ThiefRowTbl's switches);
@@ -62,7 +82,9 @@
 --       command test (SHADOW's divine on GOGO's Throw) and marks Death on
 --       the Broken non-boss it hits; at 2 BP it marks none.  The second
 --       staging breaks every standing non-boss monster (OT6_BROKEN_TICKS) as
---       GOGO's 2- or 3-BP throw begins: no party here breaks one on cue.
+--       GOGO's 2- or 3-BP throw begins: no party here breaks one on cue.  The
+--       throw is aimed at a body the staging can break (one without a Death
+--       ward), and counted only when it was.
 --   R4 SwdTech, Rage, Dance
 --     * SwdTech opens CYAN's window with Cleave on its 3 BP row, and Cleave
 --       at 3 BP runs Cleave for 99 MP;
@@ -77,7 +99,9 @@
 -- Lever, for evidence only (the suite runs BURN 0; a lab sets the global
 -- GOGOKITS_BURN ahead of the file): the walker fights that many encounters
 -- by the landing first, and again after R5's state loads, to vary the
--- encounter history (TESTING.md).
+-- encounter history (TESTING.md).  A second lever, GOGOKITS_ROUNDS (a
+-- string of round tags, "R2"): only those rounds are played (a lab's or a
+-- mutant's run of one round; the suite plays all five).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, SHADOW, RELM, GOGO, STRAGO = 0x00, 0x03, 0x08, 0x0C, 0x07
@@ -92,8 +116,14 @@ local BREAK_TICKS = 16                                     -- a staged break's l
 local ITEMLIST, MODE = 0x4005, 0x6168
 local LISTPTR = { [0] = 0x208E, [1] = 0x21CA, [2] = 0x2306, [3] = 0x2442 }
 local RUNICBLADE = 0x7EEDD4                                -- OT6_RUNICBLADE (ot6_memory.inc)
+local RUNE_AT, BREAKBLADE_AT = 0x7EED8F, 0x7EEDA2          -- OT6_RUNE, OT6_BREAKBLADE (+ seat * 2)
+local TIER_AT = 0x7EEE3A                                   -- OT6_RUNETIER (+ seat * 2)
+local MSTATE = 0x7BC2                                      -- the battle menu's state ($30: a Tools-shell list, up)
+local RUNE_RUNIC, RUNE_BLADE, RUNE_BREAK = 0xD0, 0xD1, 0xD9 -- the Rune Knight's rows (ot6_rune.asm)
+local BREAK_MP, BREAK_TURNS = 99, 3
 local LANDING = { 69, 183 }                                 -- the Falcon's tile by Maranda (wor-colosseum-v1's)
 local BURN = type(GOGOKITS_BURN) == "number" and GOGOKITS_BURN or 0
+local ONLY = type(GOGOKITS_ROUNDS) == "string" and GOGOKITS_ROUNDS or nil
 local MAX_BATTLES = 30
 local ROUND_BATTLES = 8                                    -- a round's entries all played within this many
 local DANGER = 1 / 3
@@ -211,15 +241,106 @@ local function keys(set)
   return t
 end
 
+-- ---- the Rune Knight's list, as ot6_rune.asm builds it for seat s (#563) ------
+-- Ot6RuneListOpen: Runic; a blade row $D1 + e for each element bit e (0 fire,
+-- 1 ice, 2 bolt, 3 poison, 4 wind, 5 pearl, 6 earth, 7 water) that a spell of
+-- the seat's battle spell list carries (the list $302C + seat*2 points at,
+-- rows 1-54, ids under $36; MagicProp +1); then Break Blade, 99, once it is
+-- learned (switch $0266 or $00A4).  A row's spell is the cheapest of its
+-- element the seat can cast (Ot6BladeSpell: MagicProp +5 through the seat's
+-- Gold Hairpin or Economizer, the list's first at a tie).  When that is the
+-- head of the element's line in Ot6FoldTbl (fire, ice, bolt, poison:
+-- three-byte rows, the head and the spells one and two boosts reach) the row
+-- climbs (Ot6BladeClimbs): with `boost` points pending it stands for the
+-- line's spell min(boost, 2) steps up (Ot6BladeRow).  The row's price is its
+-- spell's MP, and the tier it arms that spell's place in its line
+-- (Ot6RuneTierOf: 2 for a line's second spell, 3 for its third, else 1); a
+-- row that climbs nothing arms tier 1 and takes no boost.  The shell has
+-- eight cells: a blade is listed while a cell is free for it (the last is
+-- Break Blade's once learned), so the last elements in bit order are cut.
+-- The k-th row sits in cell (k & 3) * 2 + (k >> 2): down the left column,
+-- then the right.  `cells` is the eight cells as the list holds them
+-- (id.price.flags, FF for an empty one); price, tier, spell and climbs are
+-- by element bit.
+local function spellElem(id) return H.readRomByte((H.sym("MagicProp") & 0x3FFFFF) + id * 14 + 1) end
+local function lineSpell(e, col) return H.readRomByte((H.sym("Ot6FoldTbl") & 0x3FFFFF) + e * 3 + col) end
+local function runeTierOf(id)
+  for e = 0, 3 do if id == lineSpell(e, 1) then return 2 end end
+  for e = 0, 2 do if id == lineSpell(e, 2) then return 3 end end
+  return 1
+end
+local function runeModel(s, boost)
+  local MP = H.sym("MagicProp") & 0x3FFFFF
+  local relic, list = H.readByte(0x3C45 + s * 2), H.readWord(0x302C + s * 2)
+  local function spellMp(id) return H.casterSpellMp(H.readRomByte(MP + id * 14 + 5), relic) end
+  local cheap = {}
+  for r = 1, 54 do
+    local id = H.readByte(list + r * 4)
+    if id < 0x36 then
+      local el, mp = H.readRomByte(MP + id * 14 + 1), spellMp(id)
+      for e = 0, 7 do
+        if (el >> e) & 1 == 1 and (cheap[e] == nil or mp < cheap[e].mp) then cheap[e] = { id = id, mp = mp } end
+      end
+    end
+  end
+  local m = { price = {}, tier = {}, spell = {}, climbs = {}, learned = sw(0x266) == 1 or sw(0xA4) == 1 }
+  for e = 0, 7 do
+    if cheap[e] ~= nil then
+      m.climbs[e] = e < 4 and cheap[e].id == lineSpell(e, 0)
+      m.spell[e] = m.climbs[e] and lineSpell(e, math.min(boost or 0, 2)) or cheap[e].id
+      m.price[e] = spellMp(m.spell[e])
+      m.tier[e] = m.climbs[e] and runeTierOf(m.spell[e]) or 1
+    end
+  end
+  m.rows = { { RUNE_RUNIC, 0 } }
+  for e = 0, 7 do
+    if m.spell[e] ~= nil and #m.rows < (m.learned and 7 or 8) then
+      m.rows[#m.rows + 1] = { RUNE_BLADE + e, m.price[e] }
+    end
+  end
+  if m.learned then m.rows[#m.rows + 1] = { RUNE_BREAK, BREAK_MP } end
+  local cells = {}
+  for c = 0, 7 do cells[c] = "FF" end
+  for k, row in ipairs(m.rows) do
+    cells[((k - 1) & 3) * 2 + ((k - 1) >> 2)] = string.format("%02X.%02X.02", row[1], row[2])
+  end
+  m.cells = table.concat(cells, " ", 0, 7)
+  return m
+end
+-- the open list's eight cells: id.price.flags for a listed cell, FF for an empty one
+local function runeCells()
+  local t = {}
+  for c = 0, 7 do
+    local id = H.readByte(ITEMLIST + c * 3)
+    t[#t + 1] = id == 0xFF and "FF"
+      or string.format("%02X.%02X.%02X", id, H.readByte(ITEMLIST + c * 3 + 1), H.readByte(ITEMLIST + c * 3 + 2))
+  end
+  return table.concat(t, " ")
+end
+local function runeAt(s) return H.readByte(RUNE_AT + s * 2) end
+local function tierAt(s) return H.readByte(TIER_AT + s * 2) end
+local function bankAt(s) return H.readByte(0x3E9C + s * 2) end
+local function breakBladeAt(s) return H.readByte(BREAKBLADE_AT + s * 2) end
+
 -- ---- observers ---------------------------------------------------------------
 -- every action GOGO runs: { cmd, atk ($b5/$b6 at ExecCmd, after the queue's
 -- fold), pend, mp0, mp1, passes (Ot6PassTargeted), dice (Ot6JackpotDice
 -- entries), gate (Ot6AssassinateGate past its actor and command test),
 -- marks (its Death mark), studied (Ot6StudyOne's $3A84 writes), want (the
 -- lores the present species could teach that STRAGO lacks), blade (his
--- OT6_RUNICBLADE bit at the end) }
+-- OT6_RUNICBLADE bit at the end), rune0/rune1 and bb0/bb1 (OT6_RUNE and
+-- OT6_BREAKBLADE at his seat as it begins and once it has ended), tier0/tier1
+-- (OT6_RUNETIER) and bank0/bank1 (his banked points) likewise, armed and
+-- armedTier (the values Ot6RuneArm wrote to his OT6_RUNE and OT6_RUNETIER
+-- during it), model (runeModel at its pending boost, for a Runic command's
+-- action) }
 local acts, cur = {}, nil
 local casts = {}         -- every $3410 <- Fire by TERRA: { counter, b8, b9, f }
+-- every Runic absorb by GOGO's stance (Ot6RunicBP for his seat): { f, spell
+-- ($b6), elem ($11a1), caster (the character id), rune0, armed and armedTier
+-- (Ot6RuneArm's writes to his OT6_RUNE and OT6_RUNETIER that followed), rune1
+-- and tier1 (his rune and its tier a frame later) }
+local absorbs = {}
 local function present(m) return (H.readByte(0x3AA8 + m * 2) & 1) == 1 end
 local function species(m) return H.readWord(0x57C0 + m * 2) end
 local function lores() return H.readByte(0x1D29) | H.readByte(0x1D2A) << 8 | H.readByte(0x1D2B) << 16 end
@@ -250,13 +371,27 @@ end
 local function closeAct()
   if cur == nil or not cur.ended or H.frame <= cur.ended + 1 then return false end
   cur.mp1 = mpOf(gseat())
+  cur.rune1, cur.bb1 = runeAt(gseat()), breakBladeAt(gseat())
+  cur.tier1, cur.bank1 = tierAt(gseat()), bankAt(gseat())
   acts[#acts + 1] = cur
   H.log(string.format("[gogokits] GOGO's action %d: cmd $%02X atk $%02X at %d BP (f%d): MP %d -> %d, passes %d, "
-    .. "dice %d, gate %d, marks %d, studied $%06X (want $%06X), blade %s, monsters after $%02X", #acts, cur.cmd, cur.atk,
+    .. "dice %d, gate %d, marks %d, studied $%06X (want $%06X), blade %s, monsters after $%02X; rune $%02X -> $%02X "
+    .. "(armed %s), tier %d -> %d (armed %s), break blade %d -> %d, bank %d -> %d", #acts, cur.cmd, cur.atk,
     cur.pend, cur.f, cur.mp0, cur.mp1, cur.passes, cur.dice, cur.gate, cur.marks, cur.studied, cur.want,
-    tostring(cur.blade), cur.liveEnd))
+    tostring(cur.blade), cur.liveEnd, cur.rune0, cur.rune1, cur.armed and string.format("$%02X", cur.armed) or "none",
+    cur.tier0, cur.tier1, tostring(cur.armedTier or "none"), cur.bb0, cur.bb1, cur.bank0, cur.bank1))
   cur = nil
   return true
+end
+-- an absorb's rune, read once the frame it happened in has passed
+local function closeAbsorbs()
+  local ab = absorbs[#absorbs]
+  if ab == nil or ab.rune1 ~= nil or H.frame <= ab.f or gseat() == nil then return end
+  ab.rune1, ab.tier1 = runeAt(gseat()), tierAt(gseat())
+  H.log(string.format("[gogokits] f%d GOGO's stance absorbed spell $%02X (element $%02X) cast by %s: his rune $%02X "
+    .. "-> $%02X (armed %s), tier %d -> %d (armed %s)", ab.f, ab.spell, ab.elem,
+    NAMES[ab.caster] or string.format("$%02X", ab.caster), ab.rune0, ab.rune1,
+    ab.armed and string.format("$%02X", ab.armed) or "none", ab.tier0, ab.tier1, tostring(ab.armedTier or "none")))
 end
 
 local installed = false
@@ -271,7 +406,11 @@ local function install()
     local want = 0
     for m = 0, 5 do if present(m) then want = want | studyRow(species(m)) end end
     cur = { cmd = H.readByte(0xB5), atk = H.readByte(0xB6), pend = H.readByte(0x3E9D + s * 2), mp0 = mpOf(s),
-      passes = 0, dice = 0, gate = 0, marks = 0, studied = 0, want = want & ~lores() & 0xFFFFFF, f = H.frame }
+      passes = 0, dice = 0, gate = 0, marks = 0, studied = 0, want = want & ~lores() & 0xFFFFFF, f = H.frame,
+      rune0 = runeAt(s), bb0 = breakBladeAt(s), tier0 = tierAt(s), bank0 = bankAt(s) }
+    -- the model's rows, prices and tiers at this action's pending boost, read while the seat's list and relics
+    -- are the battle's
+    if cur.cmd == CMD.RUNIC then cur.model = runeModel(s, cur.pend) end
     if cur.cmd == CMD.SLOT and cur.atk == JACKPOT and cur.pend >= 3 then
       -- the third declared staging: every present monster's HP raised to
       -- 30,000 as the Jackpot begins (battle_hireimp's expedient), so the
@@ -297,9 +436,16 @@ local function install()
           cur.staged = cur.staged | (1 << m)
         end
       end
+      -- the body the throw is aimed at ($b9, the action's monster targets):
+      -- a throw at a body that could not be staged (it wards Death) is not
+      -- the divine's to judge
+      cur.tgt = H.readByte(0xB9)
       if cur.staged == 0 then
         H.log(string.format("[gogokits] f%d GOGO's %d-BP throw: no standing monster without a Death ward to "
           .. "stage: not counted, played again next battle", H.frame, cur.pend))
+      elseif (cur.tgt & cur.staged) == 0 then
+        H.log(string.format("[gogokits] f%d GOGO's %d-BP throw is aimed at monsters $%02X, none of the staged "
+          .. "$%02X: not counted, played again next battle", H.frame, cur.pend, cur.tgt, cur.staged))
       end
     end
     if cur.cmd == CMD.MAGIC then
@@ -343,7 +489,38 @@ local function install()
     H.log(string.format("[gogokits] f%d Fire: counter=%s targets chars $%02X mons $%02X", c.f, tostring(c.counter),
       c.b8, c.b9))
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
-  emu.addEventCallback(function() if cur ~= nil then closeAct() end end, emu.eventType.endFrame)
+  -- every Runic absorb by GOGO's stance (Ot6RunicBP: y = the absorber, x = the caster, $b6 = the spell, $11a1 its
+  -- element byte, which Ot6RuneAbsorb reads there)
+  local rb = H.sym("Ot6RunicBP")
+  emu.addMemoryCallback(function()
+    local s, st = gseat(), cpu()
+    if s == nil or (st["cpu.y"] & 0xFF) ~= s * 2 then return end
+    local x = st["cpu.x"] & 0xFF
+    absorbs[#absorbs + 1] = { f = H.frame, spell = H.readByte(0xB6), elem = H.readByte(0x11A1),
+      caster = x < 8 and H.readByte(0x3ED8 + x) or 0x100 + x, rune0 = runeAt(s), tier0 = tierAt(s) }
+  end, emu.callbackType.exec, rb, rb)
+  -- every arming of GOGO's blade (Ot6RuneArm's write to OT6_RUNE at his seat; the battle's clear writes 0): one
+  -- that follows an absorb at once is the absorb's (Ot6RuneAbsorb, in Ot6RunicBP; his own spell caught by his own
+  -- stance too), any other made while his own action runs is that action's
+  emu.addMemoryCallback(function(addr, v)
+    local s = gseat()
+    if s == nil or addr - RUNE_AT ~= s * 2 or v == 0 then return end
+    local ab = absorbs[#absorbs]
+    if ab ~= nil and ab.armed == nil and H.frame - ab.f <= 1 then ab.armed = v
+    elseif cur and not cur.ended then cur.armed = v end
+  end, emu.callbackType.write, RUNE_AT, RUNE_AT + 6)
+  -- and its tier (Ot6RuneArm's second store, OT6_RUNETIER at his seat), by the same rule
+  emu.addMemoryCallback(function(addr, v)
+    local s = gseat()
+    if s == nil or addr - TIER_AT ~= s * 2 or v == 0 then return end
+    local ab = absorbs[#absorbs]
+    if ab ~= nil and ab.armedTier == nil and H.frame - ab.f <= 1 then ab.armedTier = v
+    elseif cur and not cur.ended then cur.armedTier = v end
+  end, emu.callbackType.write, TIER_AT, TIER_AT + 6)
+  emu.addEventCallback(function()
+    if cur ~= nil then closeAct() end
+    closeAbsorbs()
+  end, emu.eventType.endFrame)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     local s = gseat()
@@ -361,6 +538,72 @@ local function lastAct(cmd, atk, pend, from)
   for i = #acts, from or 1, -1 do
     local a = acts[i]
     if a.cmd == cmd and (atk == nil or a.atk == atk) and (pend == nil or a.pend == pend) then return a end
+  end
+  return nil
+end
+-- his last Runic-command action whose queued row ($b6 at ExecCmd) is one of
+-- lo..hi: a blade row ($D1-$D8) or Break Blade ($D9); stanceAct is the
+-- stance, the Runic row ($D0) or the byte a Runic no list queued carries
+local function runeAct(lo, hi, pend, from)
+  for i = #acts, from or 1, -1 do
+    local a = acts[i]
+    if a.cmd == CMD.RUNIC and a.atk >= lo and a.atk <= hi and (pend == nil or a.pend == pend) then return a end
+  end
+  return nil
+end
+local function stanceAct(pend, from)
+  for i = #acts, from or 1, -1 do
+    local a = acts[i]
+    if a.cmd == CMD.RUNIC and (a.atk < RUNE_BLADE or a.atk > RUNE_BREAK) and (pend == nil or a.pend == pend) then
+      return a
+    end
+  end
+  return nil
+end
+-- his last throw at `pend` points that the divine can be judged on: aimed
+-- at a body the staging broke (cur.tgt, cur.staged); and the slot such a
+-- throw is aimed at, the first standing monster without a Death ward
+-- ($3AA1 bit 2), read as the target select opens
+local function throwAct(pend, from)
+  for i = #acts, from or 1, -1 do
+    local a = acts[i]
+    if a.cmd == CMD.THROW and a.pend == pend and a.staged ~= nil and (a.tgt & a.staged) ~= 0 then return a end
+  end
+  return nil
+end
+local function throwSlot()
+  for m = 0, 5 do
+    local e = 8 + m * 2
+    if present(m) and H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3AA1 + e) & 0x04) == 0 then return m end
+  end
+  return nil
+end
+-- his last blade-row action ($D1-$D8): at `pend` points pending (nil: any),
+-- of a row that climbs a line or not (`climbs`; nil: either), with at least
+-- `least` pending
+local function bladeAct(pend, climbs, least)
+  for i = #acts, 1, -1 do
+    local a = acts[i]
+    if a.cmd == CMD.RUNIC and a.atk >= RUNE_BLADE and a.atk < RUNE_BREAK and (pend == nil or a.pend == pend)
+       and (climbs == nil or (a.model.climbs[a.atk - RUNE_BLADE] == true) == climbs)
+       and (least == nil or a.pend >= least) then
+      return a
+    end
+  end
+  return nil
+end
+-- the Break Blades of his that ran with fewer than three points pending
+local function underThree()
+  local n = 0
+  for _, a in ipairs(acts) do
+    if a.cmd == CMD.RUNIC and a.atk == RUNE_BREAK and a.pend < 3 then n = n + 1 end
+  end
+  return n
+end
+-- GOGO's stance's last absorb of spell `id` cast by character `who`
+local function absorbOf(who, id)
+  for i = #absorbs, 1, -1 do
+    if absorbs[i].caster == who and absorbs[i].spell == id then return absorbs[i] end
   end
   return nil
 end
@@ -439,6 +682,43 @@ local ROUNDS = {
       end },
   } },
   { tag = "R2", cmds = { { 1, CMD.MAGIC }, { 2, CMD.LORE }, { 3, CMD.RUNIC } }, entries = {
+    -- Break Blade under the full boost: with two points pending the row's A
+    -- is refused.  The entry is an ordinary pick of the row (a ROM that takes
+    -- it goes on to cast it, and the check below fails on that cast); the
+    -- list calls onList before each A press, so its fourth call has seen
+    -- three presses leave the list up, and backs out of it there.
+    { tag = "breakshort", e = { cmd = CMD.RUNIC, row = RUNE_BREAK, boost = 2, self = true },
+      onList = function(s, p)
+        local at = got.breakshortAt
+        if at == nil then
+          at = { presses = -1, pend = H.readByte(0x3E9D + s * 2), mp = mpOf(s), bb = breakBladeAt(s) }
+          got.breakshortAt = at
+        end
+        at.presses = at.presses + 1
+        if at.presses >= 3 and got.breakshort == nil then
+          got.breakshort = { at = at, presses = at.presses, state = H.readByte(MSTATE), mode = H.readByte(MODE),
+            pend = H.readByte(0x3E9D + s * 2), bb = breakBladeAt(s), mp = mpOf(s) }
+          p.peek = true
+          H.log(string.format("[gogokits] f%d Break Blade's row at %d BP pending (MP %d): %d A presses, the menu "
+            .. "state $%02X, list mode %d; OT6_BREAKBLADE %d, MP %d", H.frame, at.pend, at.mp, at.presses,
+            got.breakshort.state, got.breakshort.mode, got.breakshort.bb, got.breakshort.mp))
+        end
+      end,
+      done = function() return got.breakshort ~= nil or underThree() > 0 end, check = function()
+        local g = got.breakshort
+        H.assertEq(g ~= nil, true, string.format("R2: Break Blade's row confirmed with two points pending is refused: "
+          .. "three A presses leave the list up (Break Blades of his that ran under three points: %d)", underThree()))
+        H.assertEq(g.at.pend, 2, "R2 precondition: GOGO stood on Break Blade with two points pending")
+        H.assertEq(g.at.mp >= BREAK_MP, true, string.format("R2 precondition: and its 99 MP in hand (%d), so the "
+          .. "refusal is the boost gate's", g.at.mp))
+        H.assertEq(g.at.bb, 0, "R2 precondition: and no Break Blade running")
+        H.assertEq(g.state == 0x30 and g.mode == 7, true, string.format("R2: the Rune Knight's list is still open "
+          .. "after the three presses (menu state $%02X, list mode %d)", g.state, g.mode))
+        H.assertEq(g.pend, 2, "R2: his two points still pending")
+        H.assertEq(underThree(), 0, "R2: no Break Blade of his ran under three points")
+        H.assertEq(g.bb, 0, "R2: OT6_BREAKBLADE at his seat stays 0")
+        H.assertEq(g.mp, g.at.mp, "R2: and his MP is unchanged")
+      end },
     { tag = "magic2", e = { cmd = CMD.MAGIC, peek = true }, onList = function(s)
         -- STRAGO's battle Lore list as the save holds it now (a study
         -- later in the round teaches more)
@@ -473,14 +753,166 @@ local ROUNDS = {
           a.studied))
         H.assertEq(a.studied & ~a.want & 0xFFFFFF, 0, "R2: and no other")
       end },
+    { tag = "runeknt", e = { cmd = CMD.RUNIC, peek = true }, onList = function(s)
+        got.runeknt = { mode = H.readByte(MODE), cells = runeCells(), want = runeModel(s, 0),
+          pend = H.readByte(0x3E9D + s * 2) }
+        H.screenshot("gogokits_runeknt")
+      end, check = function()
+        local g = got.runeknt
+        H.log(string.format("[gogokits] R2 GOGO's Runic: mode %d, cells %s; the model's, from his spell list and "
+          .. "MagicProp: %s", g.mode, g.cells, g.want.cells))
+        H.assertEq(g.mode, 7, "R2: GOGO's Runic opens the Rune Knight's list (w7e6168 = 7)")
+        H.assertEq(g.pend, 0, "R2 precondition: the list was read with no boost pending")
+        H.assertEq(g.want.learned, true, "R2 precondition: Break Blade is learned (switch $0266, or $00A4: the "
+          .. "World of Ruin)")
+        H.assertEq(#g.want.rows > 2, true, "R2 precondition: GOGO's battle spell list holds an elemental spell (the "
+          .. "seated party's union: TERRA's Fire)")
+        H.assertEq(g.cells, g.want.cells, "R2: its rows are Runic, a blade row for each element GOGO's own spell "
+          .. "list can cast (bit order, the cheapest spell's price, cut to the cells the shell has), then Break "
+          .. "Blade for 99")
+      end },
     { tag = "blade", e = { cmd = CMD.RUNIC, boost = 3, self = true },
-      done = function() return lastAct(CMD.RUNIC, nil, 3) ~= nil end, check = function()
-        local a = lastAct(CMD.RUNIC, nil, 3)
+      done = function() return stanceAct(3) ~= nil end, check = function()
+        local a = stanceAct(3)
         H.assertEq(a.blade, true, "R2: GOGO's Runic at 3 BP is a RunicBlade (his OT6_RUNICBLADE bit)")
       end },
-    { tag = "bounce", who = TERRA, e = { who = TERRA, cmd = CMD.MAGIC, spell = FIRE, boost = 0 },
+    { tag = "bounce", who = TERRA, stance = true, e = { who = TERRA, cmd = CMD.MAGIC, spell = FIRE, boost = 0 },
       after = "blade", done = function() return got.bounce ~= nil end, check = function()
         H.assertEq(got.bounce, true, "R2: TERRA's Fire into GOGO's RunicBlade came back at her as a counter")
+        -- the absorb arms his blade (#563: Ot6RuneAbsorb answers for a GOGO, #547)
+        local ab, el = absorbOf(TERRA, FIRE), spellElem(FIRE)
+        H.assertEq(el ~= 0, true, "R2 precondition: Fire carries an element (MagicProp +1)")
+        H.assertEq(ab ~= nil, true, "R2 precondition: GOGO's stance absorbed TERRA's Fire (Ot6RunicBP for his seat)")
+        H.assertEq(ab.elem, el, "R2 precondition: the absorbed Fire's element byte ($11A1) is MagicProp's")
+        H.assertEq(ab.armed, el, string.format("R2: GOGO's Runic absorbing TERRA's Fire arms his rune with its "
+          .. "element (Ot6RuneArm's write to OT6_RUNE at his seat; it held $%02X)", ab.rune0))
+        H.assertEq(ab.rune1, el, "R2: and OT6_RUNE at his seat holds Fire's element after the absorb")
+        H.assertEq(ab.armedTier, 1, "R2: at tier 1, Fire's place in its line (Ot6RuneArm's write to OT6_RUNETIER)")
+      end },
+    -- TERRA's Fire at 1 BP is cast as Fire 2 (her fold), and the stance that
+    -- absorbs it arms the rune at Fire 2's tier
+    { tag = "fire2", who = TERRA, stance = true, e = { who = TERRA, cmd = CMD.MAGIC, spell = FIRE, boost = 1 },
+      after = "blade", done = function() return absorbOf(TERRA, lineSpell(0, 1)) ~= nil end,
+      -- (cast into no stance, the blade's turns spent: the battle's plan is over, and the pair is played again)
+      playedHere = function() return got.confirmed.fire2 ~= nil and H.frame - got.confirmed.fire2 >= 900 end,
+      check = function()
+        local ab, el = absorbOf(TERRA, lineSpell(0, 1)), spellElem(FIRE)
+        H.assertEq(lineSpell(0, 0), FIRE, "R2 precondition: Fire heads Ot6FoldTbl's first line")
+        H.assertEq(ab.elem, el, string.format("R2 precondition: GOGO's stance absorbed TERRA's 1-BP Fire as spell "
+          .. "$%02X, the line's second, of Fire's element", ab.spell))
+        H.assertEq(ab.armed, el, "R2: GOGO's Runic absorbing TERRA's boosted Fire arms his rune with its element")
+        H.assertEq(ab.armedTier, 2, string.format("R2: at tier 2, the absorbed spell's place in its line "
+          .. "(Ot6RuneArm's write to OT6_RUNETIER at his seat; it held %d)", ab.tier0))
+        H.assertEq(ab.tier1, 2, "R2: and OT6_RUNETIER at his seat reads 2 after the absorb")
+      end },
+    -- a listed blade row at 0 BP, of another element than the Fire his stance
+    -- absorbs where his list has one (so each arming shows as a change)
+    { tag = "bladerow", eFn = function(s)
+        local pick = nil
+        for _, row in ipairs(runeModel(s, 0).rows) do
+          if row[1] >= RUNE_BLADE and row[1] < RUNE_BREAK
+             and (pick == nil or (1 << (pick - RUNE_BLADE)) == spellElem(FIRE)) then
+            pick = row[1]
+          end
+        end
+        H.assertEq(pick ~= nil, true, "R2 precondition: GOGO's list holds a blade row (the seated party lends him "
+          .. "an elemental spell: TERRA's Fire)")
+        return { cmd = CMD.RUNIC, row = pick, boost = 0, self = true }
+      end,
+      done = function() return bladeAct(0) ~= nil end, check = function()
+        local a = bladeAct(0)
+        local e = a.atk - RUNE_BLADE
+        local price = a.model.price[e]
+        H.assertEq(a.pend, 0, "R2: the blade row was played at 0 BP")
+        H.assertEq(price ~= nil and price > 0, true, string.format("R2 precondition: GOGO's spell list holds a "
+          .. "spell of row $%02X's element, at a price (%s MP)", a.atk, tostring(price)))
+        H.assertEq(a.armed, 1 << e, string.format("R2: GOGO's blade row $%02X arms OT6_RUNE at his seat with its "
+          .. "element (Ot6RuneArm's write during his action; it held $%02X)", a.atk, a.rune0))
+        H.assertEq(a.rune1, 1 << e, "R2: and his rune holds that element once the action has ended")
+        H.assertEq(a.armedTier, 1, "R2: at tier 1, with no boost (Ot6RuneArm's write to OT6_RUNETIER)")
+        H.assertEq(a.mp0 - a.mp1, price, string.format("R2: and it costs him the cheapest spell of that element in "
+          .. "his list (%d MP)", price))
+      end },
+    -- a row whose element has a line (the first his list holds: Fire's), with
+    -- one point: the list prices every climbing row at its line's second
+    -- spell, and the row arms tier 2 for that spell's MP and spends the point
+    { tag = "linerow", eFn = function(s)
+        local m, pick = runeModel(s, 0), nil
+        for e = 7, 0, -1 do if m.climbs[e] then pick = RUNE_BLADE + e end end
+        H.assertEq(pick ~= nil, true, "R2 precondition: GOGO's list holds a row that climbs a line (his cheapest "
+          .. "spell of the element is its line's head: TERRA's Fire)")
+        return { cmd = CMD.RUNIC, row = pick, boost = 1, self = true }
+      end,
+      onList = function(s)
+        local pend = H.readByte(0x3E9D + s * 2)
+        got.linerowAt = { pend = pend, cells = runeCells(), want = runeModel(s, pend).cells,
+          base = runeModel(s, 0).cells }
+      end,
+      done = function() return bladeAct(1, true) ~= nil end, check = function()
+        local a, g = bladeAct(1, true), got.linerowAt
+        local e = a.atk - RUNE_BLADE
+        local price = a.model.price[e]
+        H.log(string.format("[gogokits] R2 GOGO's Runic at %d BP pending: cells %s; the model's %s (at no boost %s)",
+          g.pend, g.cells, g.want, g.base))
+        H.assertEq(g.pend, 1, "R2 precondition: the list was read with one point pending")
+        H.assertEq(g.want ~= g.base, true, "R2 precondition: a point moves a price of his list (a line's second "
+          .. "spell costs more than its head)")
+        H.assertEq(g.cells, g.want, "R2: with a point pending each row that climbs is priced at its line's second "
+          .. "spell (Ot6FoldTbl, MagicProp's MP), the others as before")
+        H.assertEq(a.model.spell[e], lineSpell(e, 1), string.format("R2 precondition: at 1 BP row $%02X stands for "
+          .. "its line's second spell ($%02X)", a.atk, lineSpell(e, 1)))
+        H.assertEq(a.armed, 1 << e, string.format("R2: GOGO's row $%02X at 1 BP arms OT6_RUNE at his seat with its "
+          .. "element", a.atk))
+        H.assertEq(a.armedTier, 2, string.format("R2: at tier 2 (Ot6RuneArm's write to OT6_RUNETIER at his seat; "
+          .. "it held %d)", a.tier0))
+        H.assertEq(a.tier1, 2, "R2: and OT6_RUNETIER at his seat reads 2 once the action has ended")
+        H.assertEq(a.mp0 - a.mp1, price, string.format("R2: it costs him the line's second spell's MP (%d MP)", price))
+        H.assertEq(a.bank1, a.bank0 - 1, string.format("R2: and the point is spent, none earned that turn (bank %d, "
+          .. "then %d)", a.bank0, a.bank1))
+      end },
+    -- a row whose element has no line (the cheapest his list holds: Pearl's or
+    -- W Wind's), a point raised on the command window and a second in the
+    -- bank: R on the row is refused (the pending boost stays), and the point
+    -- raised is dropped, not charged, by a row that arms tier 1
+    { tag = "flatrow", eFn = function(s)
+        local m, pick = runeModel(s, 0), nil
+        for _, row in ipairs(m.rows) do
+          local e = row[1] - RUNE_BLADE
+          if e >= 0 and e < 8 and not m.climbs[e] and (pick == nil or row[2] < m.price[pick - RUNE_BLADE]) then
+            pick = row[1]
+          end
+        end
+        H.assertEq(pick ~= nil, true, "R2 precondition: GOGO's list holds a row with no line to climb (the seated "
+          .. "party lends him W Wind or Pearl)")
+        return { cmd = CMD.RUNIC, row = pick, boost = 1, bank = 2, listR = 2, self = true }
+      end,
+      onList = function(s, p)
+        got.flatrowAt = { r0 = p.listR0, r1 = p.listR1, bank = bankAt(s), row = p.row }
+      end,
+      done = function() return bladeAct(nil, false, 1) ~= nil end, check = function()
+        local a, g = bladeAct(nil, false, 1), got.flatrowAt
+        local e = a.atk - RUNE_BLADE
+        H.log(string.format("[gogokits] R2 R twice on row $%02X: pending %s -> %s with %d banked", g.row,
+          tostring(g.r0), tostring(g.r1), g.bank))
+        H.assertEq(g.r0 == 1 and g.bank >= 2, true, string.format("R2 precondition: GOGO stood on row $%02X with "
+          .. "one point pending and another banked (pending %s, bank %d)", g.row, tostring(g.r0), g.bank))
+        H.assertEq(g.r1, g.r0, "R2: R on a blade row with no line to climb is refused: the pending boost is "
+          .. "unchanged after two presses")
+        H.assertEq(a.pend, 1, "R2 precondition: the row was confirmed with the point raised on the command window")
+        H.assertEq(a.armed, 1 << e, string.format("R2: GOGO's row $%02X arms OT6_RUNE at his seat with its element",
+          a.atk))
+        H.assertEq(a.armedTier, 1, "R2: at tier 1, boost or no (Ot6RuneArm's write to OT6_RUNETIER)")
+        H.assertEq(a.mp0 - a.mp1, a.model.price[e], string.format("R2: for the cheapest spell of that element in "
+          .. "his list (%d MP)", a.model.price[e]))
+        H.assertEq(a.bank1 >= a.bank0, true, string.format("R2: and the point is dropped, not charged (bank %d, "
+          .. "then %d)", a.bank0, a.bank1))
+      end },
+    { tag = "breakblade", e = { cmd = CMD.RUNIC, row = RUNE_BREAK, boost = 3, self = true },
+      done = function() return runeAct(RUNE_BREAK, RUNE_BREAK, 3) ~= nil end, check = function()
+        local a = runeAct(RUNE_BREAK, RUNE_BREAK, 3)
+        H.assertEq(a.bb0, 0, "R2 precondition: no Break Blade was running when GOGO cast his")
+        H.assertEq(a.mp0 - a.mp1, BREAK_MP, "R2: GOGO's Break Blade at 3 BP costs 99 MP")
+        H.assertEq(a.bb1, BREAK_TURNS, "R2: and OT6_BREAKBLADE at his seat reads 3 once the cast has resolved")
       end },
   } },
   { tag = "R3", cmds = { { 1, CMD.THROW }, { 2, CMD.STEAL }, { 3, CMD.BLITZ } }, entries = {
@@ -514,23 +946,28 @@ local ROUNDS = {
     -- 'R3 staging: a standing non-boss monster was Broken as the throw began:
     -- got false', build/attempts/wt/v050-multihit-anim/
     -- qual8_battle_gogokits_red.log) is not counted: the entry is played
-    -- again in the round's next battle
-    { tag = "assassinate", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 3 },
-      done = function() local a = lastAct(CMD.THROW, nil, 3); return a ~= nil and a.staged ~= 0 end,
+    -- again in the round's next battle.  Nor is one aimed at a body the
+    -- staging could not break: the same formation with one unwarded body
+    -- standing beside a warded one drew the throw onto the warded one ('R3:
+    -- and marks Death on the Broken non-boss it hits (0 mark(s), staged $02)',
+    -- build/attempts/wt/v051-spellblade/sb3/gogokits2/full_asis/run.log), so
+    -- the throw is aimed at a body the staging will break (throwSlot).
+    { tag = "assassinate", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 3, slotFn = throwSlot },
+      done = function() return throwAct(3) ~= nil end,
       playedHere = function() local a = lastAct(CMD.THROW, nil, 3); return a ~= nil and a.f >= got.battleF0 end,
       check = function()
-        local a = lastAct(CMD.THROW, nil, 3)
+        local a = throwAct(3)
         H.assertEq(a.staged ~= 0, true, "R3 staging: a standing non-boss monster was Broken as the throw began")
         H.assertEq(a.gate > 0, true, "R3: GOGO's 3-BP Throw passes Ot6AssassinateGate's actor and command test "
           .. "(SHADOW's divine)")
         H.assertEq(a.marks > 0, true, string.format("R3: and marks Death on the Broken non-boss it hits (%d mark(s), "
           .. "staged $%02X)", a.marks, a.staged))
       end },
-    { tag = "assassinate2", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 2 },
-      done = function() local a = lastAct(CMD.THROW, nil, 2); return a ~= nil and a.staged ~= 0 end,
+    { tag = "assassinate2", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 2, slotFn = throwSlot },
+      done = function() return throwAct(2) ~= nil end,
       playedHere = function() local a = lastAct(CMD.THROW, nil, 2); return a ~= nil and a.f >= got.battleF0 end,
       check = function()
-        local a = lastAct(CMD.THROW, nil, 2)
+        local a = throwAct(2)
         H.assertEq(a.staged ~= 0, true, "R3 staging: a standing non-boss monster was Broken as the 2-BP throw began")
         H.assertEq(a.gate > 0, true, "R3: the 2-BP throw reaches the gate's boost test too")
         H.assertEq(a.marks, 0, "R3: and under the full boost it marks no Death (the divine's one gate)")
@@ -566,9 +1003,14 @@ local ROUNDS = {
         H.assertEq(a.passes, 2, "R5: the revealed LEO's Debilitator at 3 BP fires twice")
         H.assertEq(a.mp0 - a.mp1, a.toolPrice, string.format("R5: for the two firings' price (%d MP)", a.toolPrice))
       end },
-    { tag = "assassinate5", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 3 },
-      done = function() return got.r5from and lastAct(CMD.THROW, nil, 3, got.r5from) ~= nil end, check = function()
-        local a = lastAct(CMD.THROW, nil, 3, got.r5from)
+    { tag = "assassinate5", e = { cmd = CMD.THROW, row = SHURIKEN, boost = 3, slotFn = throwSlot },
+      done = function() return got.r5from and throwAct(3, got.r5from) ~= nil end,
+      playedHere = function()
+        local a = got.r5from and lastAct(CMD.THROW, nil, 3, got.r5from)
+        return a ~= nil and a ~= false and a.f >= got.battleF0
+      end,
+      check = function()
+        local a = throwAct(3, got.r5from)
         H.assertEq(a.gate > 0, true, "R5: the revealed LEO's 3-BP Throw passes Ot6AssassinateGate's actor test")
         H.assertEq(a.marks > 0, true, string.format("R5: and marks Death on the Broken non-boss it hits (%d)", a.marks))
       end },
@@ -645,13 +1087,14 @@ local function decide()
   end
   -- a Runic at 3 BP that raised no RunicBlade fails at once: the bounce
   -- that would follow it can never come
-  local ra = lastAct(CMD.RUNIC, nil, 3, got.r5from)
+  local ra = stanceAct(3, got.r5from)
   if round.tag == "R2" and ra ~= nil then
     H.assertEq(ra.blade, true, "R2: GOGO's Runic at 3 BP is a RunicBlade (his OT6_RUNICBLADE bit)")
   end
   findSeats()
   handed, plan, entryOf = nil, {}, {}
-  got.battleF0 = H.frame
+  got.battleF0, got.confirmed = H.frame, {}
+  if got.breakshort == nil then got.breakshortAt = nil end
   H.assertEq(gseat() ~= nil, true, "GOGO is seated")
   local s = gseat()
   local fw = H.formationWords()
@@ -680,12 +1123,22 @@ local function decide()
         lores()))
     end
   end
+  local function entryTagged(tag)
+    for _, x in ipairs(round.entries) do if x.tag == tag then return x end end
+  end
+  -- Break Blade's rows wait for a battle GOGO opens with the MP for the
+  -- round's dearest casts beside it (the study's 99 and Break Blade's own
+  -- 99, and a blade row): its refusal is read with 99 MP in hand, and a row
+  -- he cannot pay would be refused for its price.  Field care tops his MP up
+  -- between battles.
+  if round.tag == "R2" and mpOf(s) < 3 * BREAK_MP then
+    skip.breakshort, skip.breakblade = true, true
+    H.log(string.format("[gogokits] GOGO opens with %d MP: Break Blade's rows wait for another battle", mpOf(s)))
+  end
   for _, en in ipairs(round.entries) do
-    if not entryDone(en) and not skip[en.tag] and (en.after == nil or entryDone(round.entries[(function()
-          for i, x in ipairs(round.entries) do if x.tag == en.after then return i end end
-        end)()])) then
+    if not entryDone(en) and not skip[en.tag] and (en.after == nil or entryDone(entryTagged(en.after))) then
       local p = {}
-      for k, v in pairs(en.e) do p[k] = v end
+      for k, v in pairs(en.eFn and en.eFn(s) or en.e) do p[k] = v end
       p.who = p.who or GOGO
       -- the throws the staging Breaks (assassinate, assassinate2) are aimed
       -- at a body it can stage: standing, no Death ward ($3AA1 bit 2).  An
@@ -705,22 +1158,25 @@ local function decide()
       entryOf[p] = en
     end
   end
-  -- a bounce is TERRA's Fire played after the blade in the same battle: if
-  -- the blade is still to come it rides this battle's plan, else the bounce
-  -- waits for a fresh blade (the stance lasts three turns)
-  for _, en in ipairs(round.entries) do
-    if en.tag == "bounce" and not entryDone(en) and entryDone(round.entries[3]) then
-      local blade = round.entries[3]
-      local has = false
-      for _, p in ipairs(plan) do if entryOf[p] == blade then has = true end end
-      if not has then
-        -- the blade was raised in an earlier battle: raise it again first
-        local p = {}
-        for k, v in pairs(blade.e) do p[k] = v end
-        p.who = GOGO
-        table.insert(plan, #plan, p)
-        entryOf[p] = blade
-      end
+  -- an entry cast into his stance (`stance`: the bounce, the boosted Fire)
+  -- is TERRA's spell played after the blade in the same battle: if the
+  -- blade is still to come it rides this battle's plan, else those entries
+  -- wait for a fresh blade (the stance lasts three turns)
+  local blade = entryTagged("blade")
+  if blade ~= nil and entryDone(blade) then
+    local has, at = false, nil
+    for i, p in ipairs(plan) do
+      if entryOf[p] == blade then has = true end
+      if at == nil and entryOf[p].stance then at = i end
+    end
+    if at ~= nil and not has then
+      -- the blade was raised in an earlier battle: raise it again, right
+      -- before the first of them
+      local p = {}
+      for k, v in pairs(blade.e) do p[k] = v end
+      p.who = GOGO
+      table.insert(plan, at, p)
+      entryOf[p] = blade
     end
   end
   castsAt = #casts + 1
@@ -730,7 +1186,7 @@ local function decide()
 end
 local function onList(p, a)
   local en = entryOf[p]
-  if en and en.onList then en.onList(a) end
+  if en and en.onList then en.onList(a, p) end
 end
 -- the bounce: a counter Fire at TERRA alone after the blade
 local function bounceSeen()
@@ -742,10 +1198,19 @@ local function bounceSeen()
   return false
 end
 
+-- the frame kitBattle confirmed each of this battle's entries (its record),
+-- by tag: got.confirmed, for an entry whose playedHere reads it
+local function noteConfirms()
+  for _, rec in ipairs(H.vars.kit or {}) do
+    local p = plan[rec.entry]
+    if p ~= nil and entryOf[p] ~= nil then got.confirmed[entryOf[p].tag] = rec.frame end
+  end
+end
 -- the plan's last action has resolved: every entry this battle planned is
 -- done (an action is done once its record has closed)
 local function planDone()
   if got.bounce == nil and bounceSeen() then got.bounce = true end
+  noteConfirms()
   for _, p in ipairs(plan) do
     local en = entryOf[p]
     if not entryDone(en) and not (en.playedHere and en.playedHere()) then return false end
@@ -818,12 +1283,14 @@ local function playRound(r)
       H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 90000, onList = onList,
         planDone = planDone, giveUp = function()
           if got.bounce == nil and bounceSeen() then got.bounce = true end
+          noteConfirms()
           if handed == nil then handed = danger() end
           return handed ~= nil
         end }),
       H.call(function()
         if cur ~= nil then closeAct() end
         if got.bounce == nil and bounceSeen() then got.bounce = true end
+        noteConfirms()
         if handed then H.log(string.format("[gogokits] battle %d handed to the fight driver: %s", battles, handed)) end
       end),
       H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(60000) }, {}),
@@ -898,8 +1365,11 @@ for i = 1, BURN do
     end),
   })
 end
-for _, r in ipairs(ROUNDS) do body[#body + 1] = playRound(r) end
+for _, r in ipairs(ROUNDS) do
+  if ONLY == nil or ONLY:find(r.tag, 1, true) then body[#body + 1] = playRound(r) end
+end
 body[#body + 1] = H.call(function()
+  if ONLY ~= nil then H.log("[gogokits] GOGOKITS_ROUNDS: only " .. ONLY .. " played (a lab's run, not the suite's)") end
   -- the command window's name for Relm's command (the owner, 2026-11-21)
   local base = (H.sym("BattleCmdName") & 0x3FFFFF) + 0x0D * 7
   local t = {}

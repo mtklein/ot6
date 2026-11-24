@@ -670,7 +670,7 @@ def main() -> int:
     # The line's end follows the ending and nothing boots it: no step
     # ahead spends what its bag holds.
     for name in sorted(ended_states(args.repo)):
-        print(f"  ({name}: the line's end, after The End; nothing boots it, not audited)")
+        print(f"  ({name}: the line's end (its last run's state); no leg boots it, not audited)")
         declared.discard(name)
 
     states, checkpoints = load_graph(args.repo)
