@@ -56,13 +56,16 @@ A few enemies have no shields and show no line.
 
 ### A boss's big move
 
-Some bosses announce their biggest move before they use it: a line of text,
-and a glow. From then until the move a yellow **!** stands in front of the
-boss's shield icon. Break the boss while the **!** is up and the move is
-cancelled. When the boss recovers it does not pick the move up where it left
-off; it has to build up to it again. A move that has been announced always
-comes unless you break the boss first. AtmaWeapon's Flare Star, Atma's
-Ultima, the Gold Dragon's Bolt 3 and Kefka's Goner work this way.
+Some bosses announce their biggest move before they use it with a line of
+text, and some also glow. From then until the move a yellow **!** stands
+in front of the boss's shield icon. Break the boss while the **!** is up and
+the move is cancelled. When the boss recovers it does not pick the move up
+where it left off: it has to earn it again the way it did the first time.
+For most bosses that means several more turns or hits. Kefka's move comes
+from how hurt he is, so he announces it again on his first turn back and
+uses it on the turn after. A move that has been announced always comes unless
+you break the boss first. AtmaWeapon's Flare Star, Atma's Ultima, the Gold
+Dragon's Bolt 3 and Kefka's Goner work this way.
 
 ### Weapon types
 

@@ -5202,11 +5202,11 @@ Ot6FuseAtmaWeapon:              ; ot6: the fuse is lit from here (ot6_fuse.asm;
                 attack NOTHING, NOTHING, NOTHING
                 wait
 Ot6FuseAtmaWeaponFire:          ; ot6: ... to here, the turn that fires it
-                long_glow MONSTER_1
-                set_target NOTHING
-                attack FLARE_STAR
-                clr_monster_switch 0
-                clr_monster_switch 1
+                clr_monster_switch 0    ; ot6: vanilla cleared these after the
+                clr_monster_switch 1    ;   move; a break that lands between
+                long_glow MONSTER_1     ;   the two purges what is still queued
+                set_target NOTHING      ;   (Ot6BrokenTurn), so the clears go
+                attack FLARE_STAR       ;   first (ot6_fuse.asm, the idiom)
                 end_if
         if_hp SELF, 6144
                 set_target NOTHING
@@ -6515,11 +6515,11 @@ AIScript::_311:
                 short_glow MONSTER_1
                 wait
 Ot6FuseCzar:                    ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clears first, then the
+                reset_monster_timer     ;   move (ot6_fuse.asm, the idiom)
                 long_glow MONSTER_1
                 set_target NOTHING
                 attack FLARE_STAR
-                clr_monster_switch 0
-                reset_monster_timer
                 end_if
         attack BATTLE
         end
@@ -8155,10 +8155,10 @@ Ot6FuseAtma:                    ; ot6: the fuse is lit from here (ot6_fuse.asm)
                 attack NOTHING
                 wait
 Ot6FuseAtmaFire:                ; ot6: ... to here, the turn that fires it
-                long_glow MONSTER_1
+                clr_monster_switch 0    ; ot6: before the move, not after it
+                long_glow MONSTER_1     ;   (ot6_fuse.asm, the idiom)
                 set_target NOTHING
                 attack ULTIMA
-                clr_monster_switch 0
                 end_if
         if_hp SELF, 32640
                 set_target NOTHING

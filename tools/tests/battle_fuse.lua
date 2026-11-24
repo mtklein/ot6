@@ -14,12 +14,20 @@
 --      however, okay to make a roll before that"): from the announce to the move every attack command is
 --      one certain attack (its three choices the same), no command or item is rolled, and the block's own
 --      conditions hold no roll (if_roll, conditional $0A: they are tested again on the move's turn).  For a switch
---      row the same holds for every block of the turn script that the switch conditions.
+--      row the same holds for every block of the turn script that the switch conditions;
+--      in the turn that fires, every command that touches a trigger (a variable, a switch, reset_monster_timer)
+--      comes BEFORE the move (the idiom, ot6_fuse.asm: a break after the move would purge a clear queued behind it
+--      with no cancel, and the boss announce again with nothing earned);
+--      and what the checks above cannot judge is pinned to a reading by hand (HAND below, one entry a row): the
+--      conditions of every block before the fuse block (one whose conditions hold on the move's turn takes that
+--      turn) and the fuse block's own (tested again on the move's turn: an HP line a heal crosses back would drop
+--      an announced move).  A row whose blocks differ from the reading fails until its unit reads them again.
 --    The rows expected are the four fights of unit A and the worked example; a row for any other species is a
 --    change the unit that makes it adds here.
 -- 3. The worked example of an authored fuse, played: the CzarDragon's script (AIScript::_311) is the fuse block
---    in vanilla's idiom -- `if_monster_timer 8 / dlg $8D / short_glow / wait / long_glow / attack FLARE_STAR /
---    reset_monster_timer / end_if` -- with its line in the first free battle-dialogue slot, behind an arming block
+--    in vanilla's idiom -- `if_monster_switch_set 0 / dlg $8D / short_glow / wait / clr_monster_switch 0 /
+--    reset_monster_timer / long_glow / attack FLARE_STAR / end_if` -- with its line in the first free
+--    battle-dialogue slot, behind an arming block
 --    that rolls first (`if_monster_timer 8 / if_monster_switch_clr 0 / if_roll 128 / attack BATTLE /
 --    set_monster_switch 0`).  Every roll is read where it is made (Ot6AIRolled: the roll in A, the chance in
 --    $3A2E) and the arming must follow exactly the rolls under the chance.  No battle deals the
@@ -32,17 +40,25 @@
 --      broken    an aimed Fight confirmed with the mark up breaks it: the cancel fires, clears the switch and
 --                restarts the clock (the monster's timer reads 0), the mark goes, its first turn back is no Flare
 --                Star, and the line returns, after another roll under the chance, before the move does.
+--      via Filch LOCKE's Filch (Steal's list, row $57) confirmed with the mark up takes the last shield: the break
+--                comes through Ot6TakeShields, entered with 8-bit index registers as Filch and OT6's Break call it
+--                (battle_atmaweapon plays the Break spell; no member of this party knows it), and cancels the fuse;
+--                the mark goes.
 --      outside   a break before the clock has run: nothing is cancelled, and the fuse lights and fires after.
 -- DECLARED SYNTHETIC SETUP (tools/state_write_waivers.txt): the formation word ($11E0) at LoadBattleProp, and
 -- M.fuseCases' staging (the row, the gauge, HP held).  A mechanism test, not play.
--- Mutants (tools/build/mutant_rom.py; each run's log in build/attempts/wt/v051-fuse/mutants/, the edits in its
--- *.mutant.txt): fuse_never (Ot6FuseCancel+3=80: no break cancels) is red at "the break during the fuse cancels
--- it"; fuse_no_trigger (Ot6FuseSnuff+5=60: the cancel skips the row's clears) at "monster switch 0 is clear after
--- the cancel"; fuse_always (Ot6FuseCancel+12=EAEA: a break cancels whether or not the fuse is lit) at "a break
--- outside the fuse cancels nothing"; fuse_no_mark (Ot6MarkWordTbl+6=EE01: the mark's word is the fill word) at
--- "the lit-fuse mark stands before the shield emblem"; fuse_story (Ot6FuseLineTbl=FF: no announce is listed) at
--- "its counter's line ... is in Ot6FuseLineTbl"; roll_always (Ot6AICondRoll+6=3860EA: every roll continues) at
--- "a roll under the chance came between the cancel and the second line".
+-- Mutants (tools/build/mutant_rom.py, on the branch's final ROM and the graph's states; each run's log and its edit in
+-- build/attempts/wt/v051-fuse/mutants-review/, made by build/lab/mutants/local.sh in the branch's worktree):
+-- fuse_never (Ot6FuseCancel+3=80: no break cancels) is red at "the break by Filch during the fuse cancels it" here
+-- and at "the break by Break spell during the fuse cancels it" in battle_atmaweapon; fuse_no_trigger
+-- (Ot6FuseSnuff+5=60: the cancel skips the row's clears) at "monster switch 0 is clear after the cancel (the roll is
+-- to be won again)"; fuse_always (Ot6FuseCancel+12=EAEA: a break cancels whether or not the fuse is lit) at "a break
+-- outside the fuse cancels nothing"; fuse_no_mark (Ot6MarkWordTbl+6=EE01: the mark's word is the fill word) at "the
+-- lit-fuse mark stands before the shield emblem"; fuse_story (Ot6FuseLineTbl=FF: no announce is listed) at "its
+-- counter's line ... is in Ot6FuseLineTbl"; roll_always (Ot6AICondRoll+6=3860EA: every roll continues) at "the roll
+-- at f... (... against a chance of 128 in 256) does not arm the fuse"; fuse_old_order
+-- (Ot6FuseCzar=FA0B0100F147C6F9022400FB0000: the CzarDragon's fire turn with its clears after the move) at "in the
+-- turn that fires, the trigger's clears come before the move".
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }
@@ -80,6 +96,60 @@ local function rolls(AI, x, from, to)
   return table.concat(bad, "; ")
 end
 
+-- the commands that touch a trigger: a variable ($F8), a switch ($F9), the monster's timer (reset_monster_timer,
+-- $FB $00).  In the turn that fires, every one of them comes before the move (ot6_fuse.asm, the idiom): the fuse is
+-- unlit once that turn's script is read, and a break between the move and a clear queued behind it purges the
+-- clear with the rest of the turn (Ot6BrokenTurn) with no cancel, so the boss would announce again with nothing
+-- earned.  Returns the offences from `from` (the move) to the turn's end (a `wait`, `end_if` or `end`).
+local function clearsAfter(AI, from)
+  local bad, x = {}, from
+  while rb(AI + x) ~= 0xFD and rb(AI + x) ~= 0xFE and rb(AI + x) ~= 0xFF do
+    local b = rb(AI + x)
+    if b == 0xF8 or b == 0xF9 or (b == 0xFB and rb(AI + x + 1) == 0x00) then
+      bad[#bad + 1] = string.format("$%02X at script+$%04X after the move", b, x)
+    end
+    x = x + opSize(b)
+  end
+  return table.concat(bad, "; ")
+end
+-- a block's conditions (each `if`: $FC and its three bytes), as text
+local function conds(AI, x)
+  local t = {}
+  while rb(AI + x) == 0xFC do
+    t[#t + 1] = string.format("%02X %02X %02X", rb(AI + x + 1), rb(AI + x + 2), rb(AI + x + 3))
+    x = x + 4
+  end
+  return table.concat(t, " / ")
+end
+-- What the static checks cannot judge, checked by hand per row and pinned here: the conditions of every block of the
+-- turn script BEFORE the fuse block (a block whose conditions hold on the move's turn takes that turn instead of the
+-- resume: the move is late, or never comes), and the fuse block's own conditions (tested again on the move's turn:
+-- one that can flip, an HP line a heal crosses back, drops an announced move).  A row whose blocks differ from what
+-- was read by hand fails here until its unit reads them and says why here.  Key: species @ the fuse block's offset
+-- in its script.
+local HAND = {
+  ["117@000C"] = { blocks = "earlier [15 24 07]; own [14 24 00]",
+    why = "AtmaWeapon: the earlier block is its opening speech (monster switch 7 clear), which sets switch 7 once and "
+      .. "nothing clears it (the row keeps bit 7); its own condition is switch 0, cleared only by the move's turn or "
+      .. "the cancel" },
+  ["17D@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "Atma: the fuse block is the script's first; switch 0, cleared only by the move's turn or the cancel" },
+  ["12A@000B"] = { blocks = "earlier [15 24 00]; own [06 36 3C / 15 00 01]",
+    why = "Kefka, the line under 7,680 HP: the earlier block is the battle event once (monster switch 0, never "
+      .. "cleared); its own HP line flips back only if he is healed above 7,680 between the line and Goner, which "
+      .. "nothing in his fight does unless the party heals him (not guarded: vanilla's own); battle switch 1 is "
+      .. "set by the 32,640 line's block only" },
+  ["12A@002B"] = { blocks = "earlier [15 24 00] [06 36 3C / 15 00 01]; own [06 36 FF]",
+    why = "Kefka, the line under 32,640 HP: the earlier blocks are the battle event (once) and the 7,680 line, "
+      .. "which battle switch 1 shuts while this fuse is lit (this block sets it); its own HP line flips back only "
+      .. "if the party heals him above 32,640 between the line and Goner (not guarded: vanilla's own)" },
+  ["150@0000"] = { blocks = "earlier none; own [14 00 00 / 0D 03 02]",
+    why = "the Gold Dragon: the fire block is the script's first; battle switch 0 and its turn count (battle "
+      .. "variable 3), which only its own next block adds to, cleared only by the fire block or the cancel" },
+  ["137@0012"] = { blocks = "earlier [0B 08 00 / 15 24 00 / 0A 80 00]; own [14 24 00]",
+    why = "the CzarDragon: the earlier block is the arming block, shut while switch 0 is set (if_monster_switch_clr "
+      .. "0); its own condition is switch 0, cleared only by the move's turn or the cancel" },
+}
 local function staticChecks()
   local AI, PTRS, TBL, LINES = H.sym("AIScript"), H.sym("AIScriptPtrs"), H.sym("Ot6FuseTbl"), H.sym("Ot6FuseLineTbl")
   H.assertEq(string.format("%02X", AI >> 16), "F1", "the AI script block loads in bank $F1")
@@ -97,6 +167,24 @@ local function staticChecks()
   do
     local i = 0
     while rb(LINES + i) ~= 0xFF do lines[rb(LINES + i)] = true; i = i + 1 end
+  end
+  -- the blocks before the fuse block, and the fuse block's own conditions, against what was read by hand (HAND)
+  local function handCheck(sp, start, fuseBlock)
+    local earlier, x, bstart = {}, start, start
+    while x < fuseBlock do
+      local b = rb(AI + x)
+      x = x + opSize(b)
+      if b == 0xFE then earlier[#earlier + 1] = "[" .. conds(AI, bstart) .. "]"; bstart = x end
+    end
+    local got = string.format("earlier %s; own [%s]", #earlier > 0 and table.concat(earlier, " ") or "none",
+      conds(AI, fuseBlock))
+    local key = string.format("%03X@%04X", sp, fuseBlock - start)
+    local h = HAND[key]
+    H.log(string.format("[fuse] %s, the fuse block at script+$%04X: %s (by hand: %s)", WANT[sp], fuseBlock - start,
+      got, h and h.why or "NOT READ"))
+    H.assertEq(h ~= nil and h.blocks, got, string.format("%s: the blocks before the fuse block and its own conditions "
+      .. "are the ones read by hand (HAND[%q]: none of them can take the move's turn or flip between announce and "
+      .. "move)", WANT[sp], key))
   end
   local seen, rows = {}, 0
   local r = TBL
@@ -140,6 +228,9 @@ local function staticChecks()
         .. "and fires (an attack after it)", WANT[sp]))
       H.assertEq(rolls(AI, blockOf[lo], lineAt, moveAt), "", string.format("%s: nothing rolls from the announce "
         .. "to the move, and the block's conditions hold no roll (an announced move always fires)", WANT[sp]))
+      H.assertEq(clearsAfter(AI, moveAt), "", string.format("%s: in the turn that fires, the trigger's clears come "
+        .. "before the move (the idiom: a break after the move must not purge them)", WANT[sp]))
+      handCheck(sp, start, blockOf[lo])
       H.log(string.format("[fuse] row %d: %s ($%03X), lit at script+$%04X for %d byte(s), announce dlg $%02X, move "
         .. "attack $%02X; a break keeps monster bits $%02X, battle switches $%02X, flags $%02X", rows, WANT[sp], sp,
         lo - start, len, line, move, mkeep, bkeep, flags))
@@ -161,7 +252,7 @@ local function staticChecks()
         .. "Ot6FuseLineTbl, so the block that winds the fuse is no story block", WANT[sp], says or 0))
       H.assertEq(bkeep & len, 0, WANT[sp] .. ": a break clears the switch the row is lit by")
       -- the turn script's blocks the switch conditions (if_battle_switch_set 0, bit): certain throughout
-      local bad, nblocks = {}, 0
+      local bad, nblocks, order, firstBlock = {}, 0, {}, nil
       x = start
       local bstart, conditioned = start, false
       while true do
@@ -174,6 +265,18 @@ local function staticChecks()
             nblocks = nblocks + 1
             local r1 = rolls(AI, bstart, nil)
             if r1 ~= "" then bad[#bad + 1] = r1 end
+            -- the block's first attack, and the clears after it
+            local y = bstart
+            while rb(AI + y) ~= 0xFE and rb(AI + y) ~= 0xFF do
+              local c = rb(AI + y)
+              if c < 0xF0 or (c == 0xF0 and rb(AI + y + 1) ~= 0xFE) then
+                local o = clearsAfter(AI, y)
+                if o ~= "" then order[#order + 1] = o end
+                break
+              end
+              y = y + opSize(c)
+            end
+            firstBlock = firstBlock or bstart
           end
           if b == 0xFF then break end
           bstart, conditioned = x + 1, false
@@ -182,6 +285,9 @@ local function staticChecks()
       end
       H.assertEq(nblocks >= 1 and table.concat(bad, "; "), "", string.format("%s: the %d block(s) of its turns "
         .. "that the switch conditions roll nothing (an announced move always fires)", WANT[sp], nblocks))
+      H.assertEq(table.concat(order, "; "), "", string.format("%s: in the turn that fires, the trigger's clears come "
+        .. "before the move (the idiom: a break after the move must not purge them)", WANT[sp]))
+      handCheck(sp, start, firstBlock)
       H.log(string.format("[fuse] row %d: %s ($%03X), lit by battle switch mask $%02X, announce dlg $%02X (its "
         .. "counter's); a break keeps monster bits $%02X, battle switches $%02X, flags $%02X", rows, WANT[sp], sp,
         len, says, mkeep, bkeep, flags))
@@ -235,6 +341,9 @@ H.run({ maxFrames = 400000 }, {
   H.fuseCases({
     tag = "czar", species = CZAR, write = WRITE,
     line = 0x8D, move = { cmd = 0x0C, atk = 0xC6 }, turns = 1, glows = 2,
+    -- the break by LOCKE's Filch (Steal's Tools-window list, row $57), the Ot6TakeShields route (OT6's Break spell
+    -- is battle_atmaweapon's: no member of this party knows it)
+    via = { { name = "Filch", who = 0x01, cmd = 0x05, row = 0x57, filch = true } },
     arm = "idle",
     bossHp = 60000,
     row = { max = 3, classes = 0x0F },

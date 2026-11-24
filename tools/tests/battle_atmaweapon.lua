@@ -2,7 +2,8 @@
 -- battle_atmaweapon.lua -- AtmaWeapon under the boss contract (#561; docs/design/bosses-wob.md block 21): vanilla's
 -- own telegraph, "Vast energy focused" -> Flare Star, and the break that cancels it.
 --
--- AtmaWeapon's script (ai_script.asm AIScript::_279) is vanilla's, unchanged.  Under 12,800 HP its turns are a
+-- AtmaWeapon's script (ai_script.asm AIScript::_279) is vanilla's, but for one order: its fire turn clears the
+-- two switches before Flare Star, not after it (ot6_fuse.asm, the idiom).  Under 12,800 HP its turns are a
 -- rotation of four (Bio/Quake/Meteo, Battle/Special, Fire 2 on the party, Mind Blast), and the fourth sets monster
 -- switches 0 and 1.  With switch 0 set its turn is the fuse block: "Vast energy focused" (dlg $65), Shell, Safe and
 -- Haste, a glow; a second glowing turn; then the long glow and Flare Star on the third, which clears both
@@ -20,11 +21,15 @@
 --   broken    one member's aimed Fight is confirmed once the mark is up and breaks it: the cancel fires, the mark
 --             goes with the hit, its first turns back hold no Flare Star, both switches read clear, and the line
 --             returns only after as many of its own turns as the first arming took; Flare Star follows that.
+--   via Break spell  TERRA's Break (Magic, spell $0C) confirmed once the mark is up takes the last shield through
+--             Ot6TakeShields, entered with 8-bit index registers, and cancels the fuse; the mark goes (Filch, the
+--             other caller of that leaf, is battle_fuse's).
 --   outside   a break two turns into the rotation, before any line: nothing is cancelled, the script resumes where
 --             it waited, and the fuse lights and fires as in the first case.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers": there Flare Star
 -- came on its second turn back with no new line (build/attempts/wt/v051-fuse/measure/atmaweapon.log).  Mutants
--- (build/attempts/wt/v051-fuse/mutants/): fuse_never is red at "the break during the fuse cancels it",
+-- (build/attempts/wt/v051-fuse/mutants-review/): fuse_never is red at "the break by Break spell during the fuse
+-- cancels it",
 -- fuse_no_trigger at "monster switches 0 and 1 are clear after the cancel".
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -62,6 +67,9 @@ H.run({ maxFrames = 400000 }, {
     tag = "atmaweapon", species = ATMAWEAPON, write = WRITE,
     line = 0x65, move = { cmd = 0x0C, atk = 0xC6 }, turns = 2, glows = 3,
     arm = "idle",
+    -- the break by OT6's Break spell (TERRA's, Magic $02, spell $0C), the Ot6TakeShields route (Filch is
+    -- battle_fuse's)
+    via = { { name = "Break spell", who = 0x00, cmd = 0x02, spell = 0x0C } },
     bossHp = 12000,
     -- two turns into the rotation (its first turn is the speech, dlg $85), no line yet
     partway = function(W) return #W.turns >= 3 end,

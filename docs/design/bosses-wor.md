@@ -137,7 +137,8 @@ for them, kept for the reasons.
 
 1. **The fuse block, in the boss's own script, in vanilla's idiom.**
    AtmaWeapon's block is the pattern: a condition, a `dlg`, a glow,
-   `wait`, the move, the trigger cleared, `end_if`. Six WoR scripts already
+   `wait`, the trigger cleared, the move, `end_if` (vanilla cleared it
+   after the move; unit A put the clears first, section 1.4). Six WoR scripts already
    hold one (section 2's "vanilla" telegraphs). The announce rides on a
    turn the boss already takes, so its number of attacks does not change
    (open question 3).
@@ -231,8 +232,12 @@ rule in one paragraph.
   the turns back, the trigger earned again in full, then the move after
   the second announce), and broken outside it (nothing cancelled, the
   trigger's cells untouched, Fights in the window counting for nothing).
-  They are mechanism tests: the gauge is staged for the breaking Fight
-  and HP is held.
+  `battle_fuse` also breaks the CzarDragon in its fuse with LOCKE's
+  Filch, and `battle_atmaweapon` breaks AtmaWeapon in its fuse with
+  TERRA's Break spell: both take the last shield through
+  `Ot6TakeShields`, entered with 8-bit index registers. They are
+  mechanism tests: the gauge is staged for the breaking action and HP is
+  held.
 - **The driver.** The fight driver reads the same lit bit the **!** is
   drawn from and, when the member whose turn it is can take the boss's
   last shields with a Fight, makes its planned attack that Fight
@@ -246,6 +251,50 @@ rule in one paragraph.
   the line does not exercise the cancel; the suites do. Whether a party
   that meets the announce breaks the boss in time is each unit's lab
   (turns to break against the fuse's length).
+
+### 1.4 For the next units
+
+What unit A's review (#561) found that every authored telegraph has to
+respect:
+
+- **The clears come before the move.** In the turn that fires, the
+  trigger's clears (switches, variables, `reset_monster_timer`) are
+  queued before the attack, as the Gold Dragon's vanilla block has them.
+  The fuse stops being lit once the firing turn's script has been read;
+  a break that lands after the move and before a clear queued behind it
+  (a party member's counter to a physical finisher) purges the clear with
+  the rest of the turn (`Ot6BrokenTurn`) and no cancel runs, so the boss
+  would announce again with nothing earned: the move twice.
+  AtmaWeapon's and Atma's vanilla fire turns had their clears after the
+  move and were reordered; `battle_fuse` checks the order for every row,
+  and the `fuse_old_order` mutant is red there.
+- **Lit ends when the firing turn's script is read**, not when the move
+  lands. A break during the move's own animation cancels nothing.
+- **A row's masks are battle-wide where the cells are.** The battle-switch
+  mask (`$3eb0`) and the battle variable 3 flag clear cells every body
+  shares, and a switch row (lit by a battle switch) lights every body of
+  its species. A species that comes in twos, or shares battle switches
+  with its partners, needs its own reading before it gets a row.
+- **`mkeep` ANDs the whole `$3dac` byte**: the monster variable and the
+  monster switches are one byte, so a row that clears a variable clears
+  the switches with it, and one that keeps a switch must keep its bit.
+- **Read the earlier blocks and the fuse block's conditions by hand.** An
+  earlier block of the turn script whose conditions hold on the move's
+  turn takes that turn instead of the resume; a non-roll condition on the
+  fuse block (an HP line a heal can cross back) is tested again on the
+  move's turn and can drop an announced move. `battle_fuse` pins each
+  row's blocks to a reading written beside them (`HAND`), so a new row
+  fails until its unit reads its own. Kefka's two HP lines are the known
+  case: they flip back only if the party heals him across the line
+  between the announce and Goner, and that is not guarded.
+- **Guardian's "Vast energy focused" and its Wave Cannon count are not
+  fuses as written**: each announces and fires in one turn
+  (`ai_script.asm`, the Guardian's switch 3 and 4 blocks), so there is
+  nothing to break between them. A telegraph for him needs a `wait`
+  between the line and the move.
+- **Anything called from `Ot6BgHud_ext` must leave B (the high byte of
+  A) zero.** A dirty B there crashed the battle (`Ot6FusePoll` clears it
+  after `Ot6FuseLit`'s word loads).
 
 ## 2. Hooks at a glance
 

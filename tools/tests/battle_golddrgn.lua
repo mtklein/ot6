@@ -25,7 +25,7 @@
 --             case.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers" and at "Fights
 -- on the Broken boss wound nothing" (build/attempts/wt/v051-fuse/measure/golddrgn.log).  Mutants
--- (build/attempts/wt/v051-fuse/mutants/): fuse_never is red at "the break during the fuse cancels it",
+-- (build/attempts/wt/v051-fuse/mutants-review/): fuse_never is red at "the break during the fuse cancels it",
 -- fuse_no_trigger at "the mark is gone after the breaking hit" (the switch still set, the fuse still lit),
 -- fuse_story (no announce listed in Ot6FuseLineTbl) at "Fights on the Broken boss wound nothing".  A mechanism test, not
 -- play.

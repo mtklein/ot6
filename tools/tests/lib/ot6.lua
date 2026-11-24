@@ -19569,7 +19569,9 @@ function M.fuseCases(cfg)
     cfg.write.byte(0x3E9C + e, 0x0F)
     stage(1, why .. "; every class a key")
   end
-  local function breakIt(why, when, max)
+  -- `via` (optional): { name, who, cmd, row or spell } -- the breaking action is that character's command instead
+  -- of a Fight (cfg.via's cases), boost 0
+  local function breakIt(why, when, max, via)
     local plan, staged = {}, false
     return M.seqStep({
       M.call(function()
@@ -19578,17 +19580,27 @@ function M.fuseCases(cfg)
         if when == nil then stageBreak(why); return end
         for i = 0, 3 do
           local id = M.readByte(0x3ED8 + 2 * i)
-          if id ~= 0xFF and M.readWord(0x3BF4 + 2 * i) > 0 and (M.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
-            plan[1] = { who = id, cmd = 0x00, confirmWhen = function()
+          if id ~= 0xFF and (via == nil or id == via.who) and M.readWord(0x3BF4 + 2 * i) > 0
+             and (M.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
+            local confirmWhen = function()
               if gone() or not when() then return false end
               if not staged then staged = true; stageBreak(why) end
               return true
-            end }
-            say(string.format("character %d (seat %d) aims the breaking Fight", id, i))
+            end
+            if via then
+              plan[1] = { who = id, cmd = via.cmd, row = via.row, spell = via.spell, boost = 0,
+                confirmWhen = confirmWhen }
+              say(string.format("character %d (seat %d) aims the breaking %s", id, i, via.name))
+            else
+              plan[1] = { who = id, cmd = 0x00, confirmWhen = confirmWhen }
+              say(string.format("character %d (seat %d) aims the breaking Fight", id, i))
+            end
             break
           end
         end
-        M.assertEq(#plan, 1, tag .. ": a member stands to aim the breaking Fight")
+        M.assertEq(#plan, 1, via and string.format("%s: character %d stands to aim the breaking %s (the case's "
+          .. "precondition: the entry state seats them)", tag, via.who, via.name)
+          or tag .. ": a member stands to aim the breaking Fight")
       end),
       M.lazy(function()
         return M.kitBattle(plan, { maxFrames = max or 6000, care = when ~= nil,
@@ -19596,7 +19608,8 @@ function M.fuseCases(cfg)
       end),
       M.call(function()
         standing()
-        M.assertEq(#W.breaks > C.nBreaks, true, tag .. ": a Fight took the boss's last shield (" .. why .. ")")
+        M.assertEq(#W.breaks > C.nBreaks, true, string.format("%s: a %s took the boss's last shield (%s)", tag,
+          via and via.name or "Fight", why))
         C.brk = W.breaks[#W.breaks]
         C.brk.cmdsAt = #W.cmds
       end),
@@ -19636,6 +19649,77 @@ function M.fuseCases(cfg)
       say("PASS unbroken")
     end),
   })
+
+  -- The other routes to a break during the fuse (cfg.via: Filch, OT6's Break), each a case of its own played
+  -- before the Fight's: the breaking action is that command, and the break must come through Ot6TakeShields, the
+  -- leaf those routes share, entered with 8-bit index registers as they call it; then the cancel, as for a Fight.
+  local tsEntries = {}
+  local viaArmed = false
+  local function viaCase(v)
+    return M.seqStep({
+      open("via " .. v.name),
+      M.call(function()
+        if not viaArmed then
+          viaArmed = true
+          local ts = M.sym("Ot6TakeShields")
+          emu.addMemoryCallback(function()
+            if not W.on then return end
+            local st = emu.getState()
+            tsEntries[#tsEntries + 1] = { f = M.frame, ps = st["cpu.ps"], b6 = M.readByte(0xB6) }
+          end, emu.callbackType.exec, ts, ts)
+          local fl = M.sym("Ot6Filch")
+          emu.addMemoryCallback(function()
+            if W.on then tsEntries[#tsEntries + 1] = { f = M.frame, filch = true } end
+          end, emu.callbackType.exec, fl, fl)
+        end
+        tsEntries = {}
+      end),
+      M.cond(function() return cfg.arm == "fight" end, {
+        arm(function() return gone() or lineAfter(1) ~= nil end, 30000, "the fuse arms (to be broken by " .. v.name
+          .. ")"),
+      }, {}),
+      breakIt("the break during the fuse, by " .. v.name, function()
+        local i = lineAfter(1)
+        return i ~= nil and markOn()
+      end, 40000, v),
+      M.call(function()
+        noteLine(1, "the fuse arms (to be broken by " .. v.name .. ")")
+        local l = C.lines[1]
+        M.assertEq(l.f < C.brk.f and moveAfter(l.i) == nil, true, string.format("%s: the %s landed after the "
+          .. "announce and before the move (the case's precondition)", tag, v.name))
+        -- the route: the last Ot6TakeShields entry at or before the break, and what called it
+        local last, filch = nil, nil
+        for _, e in ipairs(tsEntries) do
+          if e.f <= C.brk.f then
+            if e.filch then filch = e else last = e end
+          end
+        end
+        M.assertEq(last ~= nil and C.brk.f - last.f <= 2, true, string.format("%s: the break came through "
+          .. "Ot6TakeShields (the %s's leaf), on the break's own frame", tag, v.name))
+        M.assertEq(type(last.ps) == "number" and (last.ps & 0x10) ~= 0, true, string.format("%s: Ot6TakeShields was "
+          .. "entered with 8-bit index registers (P = $%02X), as the %s calls it", tag, last.ps or 0, v.name))
+        if v.filch then
+          M.assertEq(filch ~= nil and last.f - filch.f <= 2, true, tag .. ": the take was Ot6Filch's")
+        else
+          M.assertEq(last.b6, v.spell, string.format("%s: the take was the spell $%02X's ($B6)", tag, v.spell))
+        end
+        say(string.format("the %s took the last shield through Ot6TakeShields (P = $%02X)", v.name, last.ps))
+        M.assertEq(#W.snuffs, 1, string.format("%s: the break by %s during the fuse cancels it (Ot6FuseSnuff fired "
+          .. "once)", tag, v.name))
+        M.assertEq(C.brk.post.blk, 0xFF, string.format("%s: the script waits nowhere after the %s's cancel ($3240 = "
+          .. "$FF)", tag, v.name))
+      end),
+      idle(function() return gone() or (not W.litBit() and not markOn()) end, 1500, "the mark gone with the break"),
+      M.call(function()
+        standing()
+        M.assertEq(markOn(), false, string.format("%s: the mark is gone after the %s's break", tag, v.name))
+        M.assertEq(W.litBit(), false, string.format("%s: the lit bit is clear after the %s's break", tag, v.name))
+        say("PASS via " .. v.name)
+      end),
+    })
+  end
+  local vias = {}
+  for _, v in ipairs(cfg.via or {}) do vias[#vias + 1] = viaCase(v) end
 
   local broken = M.seqStep({
     open("broken"),
@@ -19764,8 +19848,10 @@ function M.fuseCases(cfg)
       M.assertEq(W.fixed or measure, true, tag .. ": the ROM under test has Ot6FuseSnuff (or the run is a "
         .. "measurement of the ROM before it)")
     end),
-    unbroken, broken, outside,
-    M.call(function() W.on = false; W.pin = nil; say("PASS: the three cases") end),
+    unbroken, M.seqStep(vias), broken, outside,
+    M.call(function() W.on = false; W.pin = nil
+      say(#vias > 0 and string.format("PASS: the three cases, and %d other route(s) to the break", #vias)
+        or "PASS: the three cases") end),
   })
 end
 

@@ -29,11 +29,20 @@
 ;                       short_glow MONSTER_n
 ;                       wait            ; the fuse: the boss's next turn
 ;       Ot6Fuse<Boss>:                  ; <- its script resumes here while lit
+;                       clr_monster_switch N    ; the trigger's clears (and
+;                                       ;   any reset_monster_timer) FIRST
 ;                       attack <MOVE>   ; the move: one attack, no roll
-;                       clr_monster_switch N
 ;                       end_if
 ;
-; and one row of Ot6FuseTbl below.  An announced move always fires unless a
+; and one row of Ot6FuseTbl below.  The clears come before the move, as the
+; Gold Dragon's vanilla block has them: the fuse stops being lit once the
+; firing turn's script has been read, and a turn's commands run in order, so
+; a break that lands after the move and before a clear queued behind it (a
+; party member's counter to a physical finisher) purges that clear with the
+; rest of the turn (Ot6BrokenTurn) and no cancel runs: the trigger would
+; stand, and the boss announce again with nothing earned.  battle_fuse.lua
+; checks the order for every row; AtmaWeapon's and Atma's vanilla blocks had
+; the clears after the move and were reordered (#561 review).  An announced move always fires unless a
 ; break cancels it or the boss dies (the owner, 2026-11-23: "don't announce
 ; anything that won't happen. however, okay to make a roll before that to
 ; determine whether or not to do the whole sequence"): nothing between the

@@ -2,7 +2,8 @@
 -- battle_atma.lua -- Atma under the boss contract (#561; docs/design/bosses-wor.md block 25): the charge the
 -- party arms, and the break that cancels it.
 --
--- Atma's script (ai_script.asm AIScript::_381) is vanilla's, unchanged.  His counter tallies the hits that land
+-- Atma's script (ai_script.asm AIScript::_381) is vanilla's, but for one order: its fire turn clears monster
+-- switch 0 before Ultima, not after it (ot6_fuse.asm, the idiom).  His counter tallies the hits that land
 -- on him in battle variable 3 while monster switch 0 is clear (`if_hit / if_monster_switch_clr 0 / ... /
 -- add_battle_var 3, 1 / if_battle_var_greater 3, 12 / set_monster_switch 0 / set_battle_var 3, 0`), and with the
 -- switch set his turn is the fuse block: "Unknown light surrounded Atma!" (dlg $83) and a glow, a second glowing
@@ -22,7 +23,7 @@
 --             Fights on the Broken Atma add nothing to it, and the fuse then lights and fires as in the first case.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers": there Ultima
 -- came on his second turn back with no new line (build/attempts/wt/v051-fuse/measure/atma.log).  Mutants
--- (build/attempts/wt/v051-fuse/mutants/): fuse_never (no break cancels) is red at "the break during the fuse
+-- (build/attempts/wt/v051-fuse/mutants-review/): fuse_never (no break cancels) is red at "the break during the fuse
 -- cancels it", fuse_no_trigger (the cancel forgets the row's clears) at "monster switch 0 is clear after the
 -- cancel", fuse_always (a break cancels whether or not a fuse is lit) at "a break outside the fuse cancels
 -- nothing".

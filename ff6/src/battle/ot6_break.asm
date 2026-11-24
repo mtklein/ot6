@@ -131,7 +131,7 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         jsr     Ot6FreshBreak        ; nor the slot's break, its flash, a
                                      ;   held gauge or any mark (below)
         jsr     Ot6FuseSeed          ; #561: does this species have a fuse?
-                                     ;   (ot6_fuse.asm; a holds 0 after)
+                                     ;   (ot6_fuse.asm; clobbers a, b = 0)
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa

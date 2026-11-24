@@ -27,7 +27,7 @@
 -- against the script by battle_fuse, and the cancel it gets is this one's.
 -- The ROM before the cancel (f3f644c7) is red at "the move does not fire when the boss recovers": there Goner
 -- came on his first turn back with no new line (build/attempts/wt/v051-fuse/measure/goner.log).  Mutants
--- (build/attempts/wt/v051-fuse/mutants/): fuse_never is red at "the break during the fuse cancels it",
+-- (build/attempts/wt/v051-fuse/mutants-review/): fuse_never is red at "the break during the fuse cancels it",
 -- fuse_no_trigger at "battle switches 0 and 1 are clear after the cancel", fuse_no_mark at "the lit-fuse mark
 -- stands before the shield emblem".
 -- A mechanism test, not play.
