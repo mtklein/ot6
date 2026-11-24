@@ -155,7 +155,7 @@ AREAS = [
     dict(key="3", name="The moogle defense", legs=["moogle_cleared"],
          pools=dict(battles=[5, 6]),
          parties=list(MOOGLES.items()),
-         teaches="All six weapon icons are on the field at once and nobody has a spell: the Lobo takes points "
+         teaches="Five of the six weapon icons are on the field at once (no Katana: KUMAMA's claw is a dagger) and nobody has a spell: the Lobo takes points "
                  "(the pikes, LOCKE's dirk), the Vomammoth swords and blows, and each squad holds a key to both. "
                  "The Marshal is the first boss broken by weapons alone."),
     dict(key="4", name="TERRA and LOCKE: the plains and the Figaro desert (and the school's practice chest)",
@@ -184,7 +184,7 @@ AREAS = [
          pools=dict(maps=[96, 97, 98, 99, 100, 101, 102], battles=[66]),
          parties=[("TERRA, LOCKE, EDGAR", [TERRA, LOCKE0, EDGAR]),
                   ("with SABIN, from the summit down", [TERRA, LOCKE0, EDGAR, SABIN])],
-         teaches="TERRA's new sword and her Fire carry the mountain; the Tusker has no weapon weakness at all "
+         teaches="TERRA's new Mithril Blade and her Fire carry the mountain (a RegalCutlass keys nothing here); the Tusker has no weapon weakness at all "
                  "(Fire or the Bio Blaster); the fliers fall to the dagger or the sweep. Vargas cannot be broken "
                  "until SABIN arrives: Pummel, his MetalKnuckle and AuraBolt."),
     dict(key="8b", name="The Returners' side of Mt. Kolts, SABIN's first walk", legs=["returner_hideout"],
@@ -239,8 +239,8 @@ AREAS = [
          pools=dict(battles=[18, 19, 20, 21], extra=[0x155]),
          parties=[("SABIN and CYAN (the falls)", [SABIN, CYAN]),
                   ("SABIN, CYAN, GAU (the trench), SABIN with Mobliz's claw", [SABIN_CLAW, CYAN, GAU])],
-         teaches="The falls take both hands. The trench is three aquatics, three keys, one a member: CYAN's "
-                 "katana, SABIN's Blitzes, GAU's fangs."),
+         teaches="The falls take both hands. The trench is three aquatics, three keys: CYAN's katana, SABIN's "
+                 "Blitzes, GAU's fangs (and SABIN's claw, a dagger)."),
     dict(key="11", name="The Narshe defense and Kefka", legs=["narshe_battle", "kefka_won"],
          pools=dict(battles=[22, 23, 24, 57]),
          parties=[("all seven", SEVEN),
@@ -252,7 +252,7 @@ AREAS = [
                   ("the automated route's party 3: CYAN, SABIN (bare fists)",
                    [CYAN, mem("SABIN", [BARE], kit=["blitz"], elem=["holy"])])],
          teaches="The player forms three squads from seven without seeing the enemy, so one row serves the "
-                 "raiders: swords, daggers and fangs, the katana. The Rider takes the dagger and the katana, "
+                 "raiders: swords, daggers, claws and fangs, the katana and a cutlass. The Rider takes the dagger and the katana, "
                  "Kefka the sword and the dagger, and both Fire and poison: his four cells are full, and the "
                  "katana has none."),
     dict(key="12", name="Kohlingen, the plains and Zozo, with Dadaluma",
