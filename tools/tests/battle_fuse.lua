@@ -22,8 +22,9 @@
 --      conditions of every block before the fuse block (one whose conditions hold on the move's turn takes that
 --      turn) and the fuse block's own (tested again on the move's turn: an HP line a heal crosses back would drop
 --      an announced move).  A row whose blocks differ from the reading fails until its unit reads them again.
---    The rows expected are the four fights of unit A and the worked example; a row for any other species is a
---    change the unit that makes it adds here.
+--    The rows expected are the four fights of unit A, the worked example, and the authored telegraphs (WANT; each
+--    unit appends its own block); a row for any other species is a change the unit that makes it adds here.  A call
+--    for backup (restore_monsters, $F5 op 0) counts as a move: Telstar's waves (wt/v051-tg-wob2).
 -- 3. The worked example of an authored fuse, played: the CzarDragon's script (AIScript::_311) is the fuse block
 --    in vanilla's idiom -- `if_monster_switch_set 0 / dlg $8D / short_glow / wait / clr_monster_switch 0 /
 --    reset_monster_timer / long_glow / attack FLARE_STAR / end_if` -- with its line in the first free
@@ -74,6 +75,12 @@ local SIZE = { [0] = 4, 2, 4, 3, 4, 4, 4, 2, 3, 4, 4, 3, 4, 1, 1, 1 }   -- AICmd
 local function opSize(b) return b >= 0xF0 and SIZE[b - 0xF0] or 1 end
 local WANT = { [0x117] = "AtmaWeapon", [0x17D] = "Atma", [0x12A] = "Kefka", [0x150] = "the Gold Dragon",
   [0x137] = "the CzarDragon (the worked example)" }
+-- ---- wt/v051-tg-wob2: World of Balance bosses 7-10 (bosses-wob.md) ----
+WANT[0x044] = "Telstar"
+WANT[0x106] = "the GhostTrain"
+WANT[0x155] = "Rizopas"
+WANT[0x14A] = "Kefka at Narshe"
+-- ---- end wt/v051-tg-wob2 ----
 
 -- every command of the block at x from `from` (nil: its start) to `to` (nil: its end) that picks among three is one
 -- certain pick, and none of the block's conditions is a roll: returns the offences as text
@@ -149,6 +156,29 @@ local HAND = {
   ["137@0012"] = { blocks = "earlier [0B 08 00 / 15 24 00 / 0A 80 00]; own [14 24 00]",
     why = "the CzarDragon: the earlier block is the arming block, shut while switch 0 is set (if_monster_switch_clr "
       .. "0); its own condition is switch 0, cleared only by the move's turn or the cancel" },
+  -- ---- wt/v051-tg-wob2: World of Balance bosses 7-10 (bosses-wob.md) ----
+  ["044@0000"] = { blocks = "earlier none; own [0B 19 00 / 15 00 02]",
+    why = "Telstar's first call (its clock at 25): the script's first block; its clock only climbs (the third "
+      .. "call's turn and the cancel reset it), and battle switch 2 is set only by this call's own turn" },
+  ["044@0020"] = { blocks = "earlier [0B 19 00 / 15 00 02]; own [0B 50 00 / 15 00 01]",
+    why = "Telstar's second call (80): the earlier block is the first call, which has fired by the time this one "
+      .. "announces (its clock came due first and its block comes first), so battle switch 2 shuts it; its own "
+      .. "clock only climbs and switch 1 is set only by this call's turn" },
+  ["044@0040"] = { blocks = "earlier [0B 19 00 / 15 00 02] [0B 50 00 / 15 00 01]; own [0B C8 00 / 15 00 00]",
+    why = "Telstar's third call (200): both earlier calls have fired before it can announce (switches 2 and 1 "
+      .. "shut them); its own clock only climbs until this call's turn resets it, and switch 0 is set by that "
+      .. "turn only" },
+  ["106@000D"] = { blocks = "earlier [15 00 00]; own [14 24 00]",
+    why = "the GhostTrain: the earlier block is its opening turn (battle switch 0 clear), toggled once and never "
+      .. "again; its own condition is monster switch 0, set by the arming block (vanilla's count and two-standing "
+      .. "test, read a turn ahead) and cleared only by the move's turn or the cancel" },
+  ["155@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "Rizopas: the fuse block is the script's first; monster switch 0, set by turn A's roll and cleared only "
+      .. "by the move's turn or the cancel" },
+  ["14A@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "Kefka at Narshe: the fuse block is the script's first; monster switch 0, set by his clock's arming turn "
+      .. "and cleared only by the move's turn or the cancel" },
+  -- ---- end wt/v051-tg-wob2 ----
 }
 local function staticChecks()
   local AI, PTRS, TBL, LINES = H.sym("AIScript"), H.sym("AIScriptPtrs"), H.sym("Ot6FuseTbl"), H.sym("Ot6FuseLineTbl")
@@ -192,7 +222,7 @@ local function staticChecks()
     local sp, lo, len, mkeep, bkeep, flags = rw(r), rw(r + 2), rb(r + 4), rb(r + 5), rb(r + 6), rb(r + 7)
     rows = rows + 1
     seen[sp] = (seen[sp] or 0) + 1
-    H.assertEq(WANT[sp] ~= nil, true, string.format("row %d's species $%03X is one of the fuses built (unit A's "
+    H.assertEq(WANT[sp] ~= nil, true, string.format("row %d's species $%03X is one of the fuses built (WANT: unit A's "
       .. "four fights and the worked example)", rows, sp))
     -- the species' two scripts: its turns' to the first $FF, its counter's to the next
     local start = rw(PTRS + 2 * sp)
@@ -222,6 +252,8 @@ local function staticChecks()
         if x >= hi and move == nil and (b < 0xF0 or (b == 0xF0 and rb(AI + x + 1) ~= 0xFE)) then
           move, moveAt = b < 0xF0 and b or rb(AI + x + 1), x
         end
+        -- (a call for backup is a move too: restore_monsters, $F5 with op 0 -- Telstar's waves, wt/v051-tg-wob2)
+        if x >= hi and move == nil and b == 0xF5 and rb(AI + x + 2) == 0x00 then move, moveAt = b, x end
         x = x + opSize(b)
       end
       H.assertEq(line ~= nil and move ~= nil, true, string.format("%s: the block announces (a dlg before the fuse) "
@@ -298,6 +330,7 @@ local function staticChecks()
     H.assertEq(seen[sp] ~= nil, true, name .. " has a row in Ot6FuseTbl")
   end
   H.assertEq(seen[0x12A], 2, "Kefka has two rows (the line under 7,680 HP and the line under 32,640)")
+  H.assertEq(seen[0x044], 3, "Telstar has three rows (its calls at 25, 80 and 200; wt/v051-tg-wob2)")
   H.log(string.format("[fuse] PASS static: %d rows", rows))
 end
 

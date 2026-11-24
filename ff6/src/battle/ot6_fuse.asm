@@ -148,6 +148,23 @@ Ot6FuseTbl:
         ; its timer and a roll, monster switch 0 (no battle deals it; see
         ; AIScript::_311)
         ot6_fuse $0137, Ot6FuseCzar, Ot6FuseCzar, $fe, $ff, OT6_FUSE_TIMER
+        ; ---- wt/v051-tg-wob2: World of Balance bosses 7-10 (bosses-wob.md) ----
+        ; Telstar: "It radios in!", a wave of backup on its next turn; one row
+        ; a call (its clock at 25, 80, 200).  Each call's battle switch is set
+        ; only by the turn that fires it, so a break clears the clock alone.
+        ot6_fuse $0044, Ot6FuseTelstar1, Ot6FuseTelstar1, $ff, $ff, OT6_FUSE_TIMER
+        ot6_fuse $0044, Ot6FuseTelstar2, Ot6FuseTelstar2, $ff, $ff, OT6_FUSE_TIMER
+        ot6_fuse $0044, Ot6FuseTelstar3, Ot6FuseTelstar3, $ff, $ff, OT6_FUSE_TIMER
+        ; the GhostTrain: "Whistle blows!", Evil Toot; armed by its count of
+        ; ordinary turns (battle variable 3), monster switch 0
+        ot6_fuse $0106, Ot6FuseGhostTrain, Ot6FuseGhostTrain, $fe, $ff, OT6_FUSE_VAR3
+        ; Rizopas: "Waters swell!", El Nino; armed by a roll on its turn A,
+        ; monster switch 0 (switch 1, its turn B, is clear while lit)
+        ot6_fuse $0155, Ot6FuseRizopas, Ot6FuseRizopas, $fc, $ff, 0
+        ; Kefka at Narshe: "Frost creeps!", Ice 2 on the squad; armed by his
+        ; clock, monster switch 0
+        ot6_fuse $014a, Ot6FuseKefkaNarshe, Ot6FuseKefkaNarshe, $fe, $ff, OT6_FUSE_TIMER
+        ; ---- end wt/v051-tg-wob2 ----
         .word   $ffff
 
 ; the announce lines a counter speaks (a `dlg` id, low byte; every id is
