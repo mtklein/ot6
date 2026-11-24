@@ -60,7 +60,7 @@ Stated once, assumed by every block:
   | 4 | Ultros ① | 1 turn | Warning: TERRA's sword breaks him before his first announce (the six-class line: 6 party actions, scenario_hub.log; the four-class lab's 3 of 3 agrees); a race only for a party that banks to the announce |
   | 5 | TunnelArmr | 1 turn | Warning: LOCKE's boosted Fight breaks it before it announces (3 of 3); at the announce the answer is CELES's Runic |
   | 6 | Kefka ×2 (camp) | — | None: no big move, no gauge (block 6) |
-  | 7 | Telstar | 1 turn | Race: won whenever SABIN acts in the fuse, 4 of 4 keys |
+  | 7 | Telstar | 1 turn | Race at 3 shields: SHADOW's unboosted Fights chip from the announce and SABIN's Pummel breaks, 8 of 10 keys (at 4 it lost 10 of 10; one pip on SHADOW's Fight wins 8 of 10 at 4) |
   | 8 | GhostTrain | 2 turns | Race: won on 3 of 4 keys from the announce |
   | 9 | Rizopas | 1 turn | Race: won on 2 of 3 keys from the announce |
   | 10 | Kefka (Narshe) | 1 turn | Race (four-class lab, when EDGAR's pike keyed him too): won on 3 of 4 keys from the announce; under six classes EDGAR keys him only by Bio Blaster and the line's squad broke him 12 actions in; not re-raced |
@@ -158,7 +158,7 @@ then on; only his shield count grows.
 | 4 | Ultros ① | Lete River | 5 |
 | 5 | TunnelArmor | Locke scenario | 5 |
 | 6 | Kefka ×2 | Imperial Camp (Sabin) | — (no gauge) |
-| 7 | Telstar | Imperial Camp (Sabin) | 4 (Dobermans 2) |
+| 7 | Telstar | Imperial Camp (Sabin) | 3 (Dobermans 2) |
 | 8 | GhostTrain | Phantom Train (Sabin) | 4 |
 | 9 | Rizopas | Baren Falls (Sabin) | 4 (Piranhas 1) |
 | 10 | Kefka | Narshe defense | 6 |
@@ -545,7 +545,7 @@ party lands one blow. There is no big move to announce, no turn on which
 a fuse could burn, and no gauge to break it with, so a telegraph would
 only delay the scene. The script and both scenes are unchanged.
 
-**Telstar:** 4 shields · bolt, water + dagger, blunt (Dobermans 2 · fire +
+**Telstar:** 3 shields · bolt, water + dagger, blunt (Dobermans 2 · fire +
 dagger, blunt). SABIN's fists and Pummel key both; SHADOW's blade, when
 he is in, keys both too, so the pair races the call with two hands, where
 SABIN's alone could not break four shields in time (2026-11-24). (Decoded, not recalled: `$044` weak = **bolt|water** —
@@ -568,7 +568,7 @@ AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
   formation 61's slots 2-5, species `$001` (Soldier), not Dobermans as
   this block said: read from `battle_monsters.dat` and logged by the suite
   (`[telstar] the slots its calls fill hold $001 $001 $001 $001`).
-- **Shields: 4, with SHADOW's blade a key (#566, 2026-11-24).** The
+- **Shields: 3, with SHADOW's blade a key (#566, 2026-11-24).** The
   telegraph branch measured that with bludgeoning alone the pair could
   not win the race at 4: SABIN's Pummel takes two chips and Telstar's
   counter answers every Blitz that lands on it unbroken with Megazerk
@@ -577,7 +577,16 @@ AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
   lab/`), and it cut the gauge to 2. Under six classes the row is
   Dagger|Blunt: SHADOW's Fight chips one shield a swing and draws no
   Megazerk (the counter answers Blitzes), so the pair races with two
-  hands, and the row keeps 4. battle_telstar plays the cancel at 4 with the gauge and all six keys staged (a mechanism test); the pair's own race at 4 is measured in the lab below.
+  hands. Measured from the camp (`build/attempts/wt/v051-six-classes/
+  labs/telstar/`, 10 distinct keys): the party Defends until "It radios
+  in!", then SHADOW Fights unboosted and SABIN Pummels once the gauge
+  reads 2. At 4 shields only two party actions fit in the one-turn fuse
+  and the race was lost on 10 of 10 keys; at 3 it is won on 8 of 10 (a
+  two-turn fuse also won 8 of 10, but its `wait` does not fit beside the
+  wave's sound), so the row takes 3. With one pip on SHADOW's Fight the
+  pair wins 8 of 10 at 4 too, and with his whole bank he breaks it alone.
+  battle_telstar plays the cancel with the gauge and all six keys staged
+  (a mechanism test).
 - **Break story:** SHADOW's blade chips while SABIN waits, and SABIN's
   Pummel is the breaking blow (it must be: a Pummel on an unbroken
   Telstar draws Megazerk).

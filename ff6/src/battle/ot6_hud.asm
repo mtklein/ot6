@@ -2119,11 +2119,14 @@ Ot6ShieldTbl:
                                 ;   imperial camp gags carry no monster entity at all (see the
                                 ;   block comment)
         .word   $0044
-        .byte   4, OT6_DAGGER|OT6_BLUNT ; telstar: 'bolt, water + bludgeoning' (bosses-wob.md 6-7)
+        .byte   3, OT6_DAGGER|OT6_BLUNT ; telstar: 'bolt, water + bludgeoning' (bosses-wob.md 6-7)
                                 ;   (opening.md 10c).  bolt|water vanilla.
-                                ;   4 shields: main's telegraph branch cut it to 2
+                                ;   3 shields: main's telegraph branch cut it to 2
                                 ;   (SABIN alone could not break 4 under the call);
-                                ;   SHADOW's blade (Dagger) keys it too now, so 4 is a race
+                                ;   SHADOW's blade (Dagger) keys it too now.  At 4 the
+                                ;   pair's unboosted race (SHADOW chips, SABIN's Pummel
+                                ;   breaks) lost on 10 of 10 keys, at 3 it wins 8 of 10
+                                ;   (build/attempts/wt/v051-six-classes/labs/telstar/)
         .word   $001a
         .byte   2, OT6_DAGGER|OT6_BLUNT ; doberman: as the templar; a x3 pack of 465 HP with no
                                 ;   key for SABIN alone was the camp's slog (opening.md 10c).

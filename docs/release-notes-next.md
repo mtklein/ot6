@@ -77,8 +77,9 @@ line is mostly a cue to brace. Break the Whelk's head while it is
 drawing in and it stays out, broken, for the whole break. The Marshal
 announces only while a Lobo stands. Celes's Runic takes TekLaser or
 Kefka's Ice whole, aimed at everyone, if her stance is still up when it
-lands: it ends when she next acts unless you boost it. Telstar has 2
-shields instead of 4.
+lands: it ends when she next acts unless you boost it. Telstar has 3
+shields instead of 4, and Shadow's blade breaks it as well as Sabin's
+blows.
 
 Celes is a spellblade. Her command, now RuneKnt, opens a list. Runic is its
 first row and works as before, and a spell with an element that it absorbs,
