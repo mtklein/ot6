@@ -27,6 +27,9 @@
 --             the fuse lights and fires as in the first case.
 -- And the shell stays vanilla but for the one guard: while battle switch 0 is set the shell does not hide the
 -- head (the shell's hide block, if_battle_switch_clr 0, 0).
+-- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v051-tg-wob1/final/mutants/): whelk_no_clear (Ot6FuseTbl+53=FF: the cancel keeps the head's byte) is
+-- red at "the head's byte reads $40 after the cancel"; whelk_no_hold (Ot6FuseTbl+54=FE: the cancel clears the
+-- shell's hold) at "battle switch 0 (the shell's hold on the head) still stands after the cancel".
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)

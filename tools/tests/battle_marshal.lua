@@ -21,6 +21,7 @@
 --             after his rotation's two turns again; the strike follows that.
 --   outside   a break after his first turn, before any line: nothing is cancelled, and the fuse lights and fires
 --             as in the first case.
+-- Mutant (build/attempts/wt/v051-tg-wob1/final/mutants/): marshal_no_clear (Ot6FuseTbl+61=FF) is red at "monster switch 0 is clear after the cancel".
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)

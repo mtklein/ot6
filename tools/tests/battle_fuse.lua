@@ -60,6 +60,8 @@
 -- at f... (... against a chance of 128 in 256) does not arm the fuse"; fuse_old_order
 -- (Ot6FuseCzar=FA0B0100F147C6F9022400FB0000: the CzarDragon's fire turn with its clears after the move) at "in the
 -- turn that fires, the trigger's clears come before the move".
+-- wt/v051-tg-wob1's vargas_hand (Vargas's fuse condition, switch 0 -> 1) is red at "Vargas: the blocks before the
+-- fuse block and its own conditions are the ones read by hand" (build/attempts/wt/v051-tg-wob1/final/mutants/).
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }
