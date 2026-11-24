@@ -19572,6 +19572,12 @@ function M.fuseCases(cfg)
   local tag = cfg.tag
   local function say(s) M.log(string.format("[fuse] f%d %s: %s", M.frame, tag, s)) end
   local function lineAfter(i) return W.find(0x21, cfg.line, i) end
+  -- the index of the last announce dispatched before frame f (1 when none)
+  local function lastLineBefore(f)
+    local at = 1
+    for i, c in ipairs(W.cmds) do if c.cmd == 0x21 and c.arg == cfg.line and c.f < f then at = i end end
+    return at
+  end
   local function moveAfter(i) return W.find(cfg.move.cmd, cfg.move.atk, i) end
   local function stage(n, why)
     local e = W.ent()
@@ -19889,7 +19895,7 @@ function M.fuseCases(cfg)
         return i ~= nil and markOn()
       end, 40000, v),
       M.call(function()
-        noteLine(1, "the fuse arms (to be broken by " .. v.name .. ")")
+        noteLine(lastLineBefore(C.brk.f), "the fuse arms (to be broken by " .. v.name .. ")")
         local l = C.lines[1]
         M.assertEq(l.f < C.brk.f and moveAfter(l.i) == nil, true, string.format("%s: the %s landed after the "
           .. "announce and before the move (the case's precondition)", tag, v.name))
@@ -19941,7 +19947,8 @@ function M.fuseCases(cfg)
       return M.frame - c.f >= 60
     end, 40000),
     M.call(function()
-      noteLine(1, "the fuse arms (to be broken)")
+      -- (the announce the break landed after: a draw can let one fuse fire before the breaker's turn comes)
+      noteLine(lastLineBefore(C.brk.f), "the fuse arms (to be broken)")
       local l = C.lines[1]
       M.assertEq(l.f < C.brk.f, true, tag .. ": the announce came before the break (the case's precondition)")
       M.assertEq(moveAfter(l.i) == nil, true, tag .. ": the break landed before the move was dispatched (the case's "

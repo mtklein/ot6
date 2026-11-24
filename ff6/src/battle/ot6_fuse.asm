@@ -101,10 +101,14 @@ OT6_FUSE_VAR3   = $01           ; a break clears battle variable 3
 OT6_FUSE_TIMER  = $02           ;   and the monster's timer
 OT6_FUSE_SWITCH = $80           ; lit by a battle switch, not by a `wait`
 OT6_FUSE_HOLD   = $04           ; every break of this body, lit or not, sets
-                                ;   battle switch 0 (Ot6FuseHold): the Whelk's
-                                ;   head, whose battle switch 0 keeps the
-                                ;   shell from calling it in, so a Broken head
-                                ;   stays out for its whole window
+                                ;   battle switch 0 and clears the battle
+                                ;   switches the row's +6 mask clears
+                                ;   (Ot6FuseHold): the Whelk's head, whose
+                                ;   battle switch 0 keeps the shell from
+                                ;   calling it in and whose +6 mask is that
+                                ;   call, so a break sends a pending call away
+                                ;   and the Broken head stays out for its
+                                ;   whole window
 ; Flags $08-$40 are free.  The contract's other break rule (the owner,
 ; 2026-11-23: "a break releases whatever the broken body holds", unit B's
 ; Tentacles) fits here as a flag and a row that applies at every break, lit
@@ -157,10 +161,10 @@ Ot6FuseTbl:
         ; Each fuse block is its script's first, lit by a monster switch an
         ; ordinary turn sets; a break clears what the move's turn clears.
         ; the Whelk's head: called in by the shell (battle switch 1), two
-        ; glowing turns, then it draws into the shell.  A break clears the
-        ; call; every break of the head sets battle switch 0 (OT6_FUSE_HOLD),
-        ; the hold that keeps the shell from calling it in again until its
-        ; first turn back
+        ; glowing turns, then it draws into the shell.  Every break of the
+        ; head, lit or not, clears the call and sets battle switch 0
+        ; (OT6_FUSE_HOLD), the hold that keeps the shell from calling it in
+        ; again until its first turn back
         ot6_fuse $0134, Ot6FuseWhelk, Ot6FuseWhelkFire, $ff, $fd, OT6_FUSE_HOLD
         ; the Marshal: switches 0 and 1, armed and announced (his rotation
         ; again)
@@ -324,7 +328,9 @@ Ot6FuseLineTbl:
 
 ; [ a break holds what the body's rows say it holds ]
 ; Its own proc so the suites can watch it.  y = the monster.  a8/i16, db=$7e.
-; If any of the body's rows has OT6_FUSE_HOLD, battle switch 0 is set.
+; For each of the body's rows with OT6_FUSE_HOLD, the battle switches its +6
+; mask clears are cleared (a call not yet announced is sent away too) and
+; battle switch 0 is set.
 ; preserves y; clobbers a/x (b passes through the table's words, as in
 ; Ot6FuseLit).
 .proc Ot6FuseHold
@@ -341,8 +347,10 @@ Ot6FuseLineTbl:
         lda     f:Ot6FuseTbl+7,x
         and     #OT6_FUSE_HOLD
         beq     @next
-        lda     #$01
-        tsb     $3eb0           ; battle switch 0
+        lda     $3eb0
+        and     f:Ot6FuseTbl+6,x
+        ora     #$01
+        sta     $3eb0           ; battle switches 0-7: the mask's cleared, 0 set
 @next:  longa
         txa
         clc

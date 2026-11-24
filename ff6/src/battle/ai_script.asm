@@ -6561,11 +6561,11 @@ AIScript::_305:
 ; when the shell's clock calls the head in (battle switch 1, set by the
 ; shell's _256 where vanilla's shell drew it in), the head says "It draws
 ; in!" and glows, glows again on its next turn, and on the turn after that
-; draws into the shell, vanilla's "Gruuu" and FADE_DOWN.  A break in between
-; cancels the hide: the call is cleared (Ot6FuseTbl's row), and every break of
-; the head sets battle switch 0 (OT6_FUSE_HOLD), which keeps the shell from
-; calling it in again, so the Broken head stays out for its whole window; its
-; first turn back clears the hold.  No new damage: the head attacks as
+; draws into the shell, vanilla's "Gruuu" and FADE_DOWN.  Every break of the
+; head, lit or not, clears the call (a lit one is cancelled: Ot6FuseTbl's row)
+; and sets battle switch 0 (OT6_FUSE_HOLD), which keeps the shell from calling
+; it in again, so the Broken head stays out for its whole window; its first
+; turn back clears the hold.  No new damage: the head attacks as
 ; vanilla's did on its other turns (`attack BATTLE, BATTLE, SPECIAL`), and the
 ; shell's Mega Volt counter is vanilla's.
 AIScript::_308:

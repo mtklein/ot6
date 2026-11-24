@@ -25,6 +25,8 @@
 --             follows.
 --   outside   a break with no call pending: nothing is cancelled (the hold aside), and the fuse lights and fires as
 --             in the first case.
+-- Every break of the head, lit or not, also sends a pending call away (a draw can bring the shell's call between
+-- the moment a break is aimed and the hit), so the fourth case's window starts with no call standing.
 --   after the hide  the head broken as soon as it is back out of its shell: it stays on the field for its whole
 --             window, and the shell does not call it in during it (battle switch 1 stays clear).
 -- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v051-tg-wob1/): whelk_no_hold (Ot6FuseTbl+55=00: no
@@ -69,7 +71,7 @@ H.run({ maxFrames = 50000 }, {
     bossHp = 1600,
     breaker = { name = "Fire Beam", cmd = MAGITEK, mtek = FIRE_BEAM, open = true },
     lineShot = 30,
-    bswIgnore = 0x01,             -- (the hold every break sets)
+    bswIgnore = 0x03,             -- (the hold every break sets, and the call it sends away)
     -- no call pending and no hold, the head out and a turn of its taken
     partway = function(W)
       local c = W.cells()
@@ -88,7 +90,7 @@ H.run({ maxFrames = 50000 }, {
     afterMove = true,
     afterMoveWhen = function(W, C)
       local c = W.cells()
-      return c ~= nil and (c.bsw & 0x02) == 0 and #W.turns > C.mv.turn
+      return c ~= nil and #W.turns > C.mv.turn
     end,
     windowBad = function(W) return (H.readByte(0x3EB0) & 0x02) ~= 0 end,
     windowWhat = "the shell's call stays clear (battle switch 1)",
