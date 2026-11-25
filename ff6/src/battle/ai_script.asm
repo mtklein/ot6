@@ -4665,8 +4665,8 @@ Ot6FuseDadaluma:                ; the fuse is lit here (Ot6FuseTbl's row)
 ; shiva
 ; OT6 (bosses-wob.md block 13, wt/v052-tg-wob2): Ice 2 on the party is her telegraph, as Fire 2 is Ifrit's (_265).
 ; Her rotation's second turn arms it (battle switch 1: her monster variable is her counter's tally of spells, and
-; battle variable 0 is free in this fight); "It inhales!" (battle dialogue $94, Ifrit's line) and a glow announce it on her
-; next turn, and Ice 2 on every member follows on the turn after.  A break in between clears the switch
+; battle variable 0 is free in this fight); "It inhales!" (battle dialogue $94, Ifrit's line) and a glow announce it
+; on her next turn, and Ice 2 on every member follows on the turn after.  A break in between clears the switch
 ; (Ot6FuseTbl): the rotation starts over from its first turn.  The fuse block comes first, so the swap (six hits)
 ; and the Rflect block wait until it has fired; each sibling runs its own fuse, on its own turns.  Below it
 ; everything is vanilla's but the arming switch, and Ice 2, which her rotation no longer picks: it comes only
@@ -4733,8 +4733,9 @@ Ot6FuseShiva:                   ; the fuse is lit here (Ot6FuseTbl's row)
 ; ifrit
 ; OT6 (bosses-wob.md block 13, wt/v052-tg-wob2): Fire 2 on the party is his telegraph, as Ice 2 is Shiva's (_264).
 ; His rotation's second turn arms it (battle switch 0: his monster variable is his counter's tally of spells);
-; "It inhales!" (battle dialogue $94) and a glow announce it on his next turn, and Fire 2 on every member follows on the turn after.  A break in between clears the switch
-; (Ot6FuseTbl): the rotation starts over from its first turn.  The fuse block comes first, so the swap (six hits)
+; "It inhales!" (battle dialogue $94) and a glow announce it on his next turn, and Fire 2 on every member follows
+; on the turn after.  A break in between clears the switch (Ot6FuseTbl): the rotation starts over from its first
+; turn.  The fuse block comes first, so the swap (six hits)
 ; and the Fire 3 block wait until it has fired.  Below it everything is vanilla's but the arming switch, and Fire 2,
 ; which his rotation no longer picks: it comes only announced, so the line always means it.
 AIScript::_265:

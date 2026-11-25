@@ -66,6 +66,12 @@ Stated once, assumed by every block:
   | 8 | GhostTrain | 2 turns | Race: won on 3 of 4 keys from the announce |
   | 9 | Rizopas | 1 turn | Race: won on 2 of 3 keys from the announce |
   | 10 | Kefka (Narshe) | 1 turn | Race (four-class lab, when EDGAR's pike keyed him too): won on 3 of 4 keys from the announce; under six classes EDGAR keys him only by Bio Blaster and the line's squad broke him 12 actions in; not re-raced |
+  | 11 | Dadaluma | 1 turn | Race, for a party that casts at him: banked, broken in the fuse on 4 of 4 keys; the line casts nothing and breaks him first |
+  | 12 | Ultros ② | 1 turn | Warning: only EDGAR's AutoCrossbow keys him; 0 of 4, banked or not |
+  | 13 | Ifrit / Shiva | 1 turn each | Ifrit, race at 7: banked 5 of 5, the line's fighter 1 of 4. Shiva, warning: only EDGAR's sword keys her; banked, 1-2 shields left, 0 of 5 |
+  | 14 | Number 024 | 1 turn | Warning for the line (broken before any line, 4 of 5); a banked party 2 of 5 |
+  | 15 | Number 128 | 1 turn | Warning: banked 1 of 4; the line never cuts a blade, so never meets the ray |
+  | 16 | Cranes | 1 turn each | The line kills both before either clock (4 of 4); banked, the left Crane's quake stopped on 3 of 4 |
 
   Ultros and TunnelArmr stay at one turn: their warnings fit the feel,
   and a longer fuse would only lengthen fights the party usually ends
@@ -1095,7 +1101,18 @@ AutoCrossbow (opening.md 11).
   between cancels it and clears the tally (`Ot6FuseTbl` row `$0107`,
   `OT6_FUSE_VAR2`, a new flag): three more spells earn it again. A party
   that casts nothing at him never sees the leap, as in vanilla.
-  @RACE11@
+  Lab (one turn, 6 shields, LOCKE, CELES, EDGAR and SABIN, keys `$8B
+  $CB $EB $AB`/438, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-dadaluma/`): a party that Defends from the
+  open while CELES casts Ice at him three times, and from the announce
+  plays its best chip at its whole bank, breaks him in the fuse on 4 of
+  4 keys, 2-6 actions after the line; the line's own fighter casts
+  nothing at him and breaks him 7-9 actions in, before any leap. At 7
+  shields (an exploratory mutant ROM on the v3 fixtures, whose logs
+  carry the fixture warning: a probe, not evidence for a shipped count,
+  `build/attempts/wt/v052-tg-wob2/lab-v3/X7-dada-ifrit/`) the banked
+  party still won 4 of 4 with the same hits (a boosted Fight's swings
+  overrun the seventh), so he stays at 6. The leap took 32 of EDGAR's
+  559 HP (5%) on the damage run (`build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`).
 - **Break story:** he calls in Iron Fists at half health and uses his
   own potions. Chip through the adds with AoE Ranged
   (AutoCrossbow), bank BP, and break him during the crouch.
@@ -1128,7 +1145,13 @@ as designed).
   announce): a fresh body starts its script from the top and would
   drop an announced song. The moves that waited come on the first hit
   after the song.
-  @RACE12@
+  Lab (one turn, 6 shields, LOCKE, EDGAR and SABIN, keys `$45 $85 $81
+  $A5`, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-ultros2/`): a **warning**. Of the forced three only
+  EDGAR's AutoCrossbow keys him (Ranged); a party that banks to the line
+  and then chips left him at 5 or 6 shields when the song came, 4 of 4
+  keys, and the line's own fighter, which Fights him down by HP and
+  never breaks him, met the song 3 actions after the line on 4 of 4.
+  The song is Imp on the party, the brace a Ribbon or a Remedy.
 - **Break story:** there is no Banon to protect this time, and the
   tentacle targets whoever is most costly to lose. One more shield
   than the Lete River fight, and no free healer.
@@ -1172,7 +1195,21 @@ Party: Locke, Celes + two.
   the line always means them. The fuse block comes first, so the swap
   after six hits and the Fire 3 and Rflect blocks wait until the spell
   has fired.
-  @RACE13@
+  **Ifrit at 7 shields** (6 before this unit). Lab (one turn, LOCKE,
+  EDGAR, SABIN and CELES, keys `$D8 $08 $18 $48 $E8`,
+  `build/attempts/wt/v052-tg-wob2/lab-v4/L4-ifrit/`): a party that Defends to his line and then chips
+  (CELES's Ice, the others' Fights) breaks him in the fuse on 5 of 5
+  keys, 4-5 actions after the line; the line's own fighter, chipping
+  from the open, broke him in the fuse on 1 of 4 keys that announced and
+  took the Fire 2 with 1-3 shields left on the other 3. At 6
+  (`build/attempts/wt/v052-tg-wob2/lab-v3/L3-ifrit/`, the v3 ROM's own
+  fixtures) the line's fighter won 4 of 5, so the bank did not matter;
+  the 7 was chosen on the exploratory mutant (`lab-v3/X7-dada-ifrit/`)
+  and these numbers are the shipped 7's. **Shiva stays at 6, a warning:** of this party
+  only EDGAR's sword keys her (CELES's blade is a dagger), and a banked
+  party left her at 1-2 shields when the Ice 2 came, 4 of 5 keys (6 on
+  the fifth). So the siblings differ: break Ifrit in his fuse, brace for
+  Shiva's.
 - **Break story:** this is the first fight that requires reading
   absorbs, because fire heals Ifrit. Celes can chip both siblings by
   herself, with Ice into Ifrit and her sword into Shiva. The fight
@@ -1208,7 +1245,15 @@ wall spins.
   The wall's spell is new in kind (WallChange makes a random element
   his weakness, nulls the rest and absorbs one at random,
   `TargetEffect_26`), so the line names the wall, not his absorb.
-  @RACE14@
+  Lab (one turn, 7 shields, LOCKE, EDGAR, SABIN and CELES, keys `$FD
+  $3D $4D $6D $0D`, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-n024/`): a party that Defends to the line
+  and then Fights (LOCKE's dagger and CELES's blade key him; SABIN's
+  knuckle and EDGAR's weapon do not) broke him in the fuse on 2 of 5
+  keys and took the spell with all 7 shields up on 3; the line's own
+  fighter breaks him 9-14 actions in, before any line, on 4 of 5. A
+  **warning** for the line, a race a banked party wins sometimes; kept
+  at 7. The spell took 18-22% of each member's HP (Bolt 2 on the
+  damage run, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`).
 - **Break story:** this boss works against the codex. Physical chip is
   steady, magic requires reading the current wall, and a break keeps
   the current wall revealed until the next WallChange re-rolls it. It
@@ -1255,7 +1300,13 @@ takes LOCKE's dagger, SABIN's claw and Bolt.
   Wave in its place), so it comes only announced. A party that leaves
   the blades standing (the line steers every attack at the body) never
   sees it; a party that cuts the blades meets a ray for each.
-  @RACE15@
+  Lab (one turn, 7 shields, LOCKE, EDGAR and SABIN, keys `$E0 $D4 $70
+  $64`, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-n128/`): a **warning**. A party that Defends while it
+  cuts the right blade down and then chips broke him in the fuse on 1 of
+  4 keys and took the ray with 7 shields up on 3; the line's own fighter
+  never cuts a blade and breaks him 13-15 actions in, before any ray, 4
+  of 4. The ray took 23-26% of each member's HP (`build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`). Kept at
+  7: the minecart's party runs three, with no revival on the ride.
 - **Break story:** this is the first battle after Zozo gives you four
   espers, and a Ramuh bearer casting Bolt into the body is the first
   use of the sub-job system (magicite.md's storm-lancer).
@@ -1303,7 +1354,18 @@ Party: the factory four (Setzer is flying the airship).
   Crane's clock runs on. The element charges (Giga Volt, Fire 3) are
   vanilla's and unannounced. The battle is a pincer: the Cranes stand
   on both sides of the party.
-  @RACE16@
+  Lab (one turn each, 6 shields each, LOCKE, EDGAR, SABIN and SETZER
+  in the line's dress, keys `$7F $9B $77 $B7`, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-cranes/`): the
+  line's own fighter breaks the left Crane 5-8 actions in and kills
+  both before either clock comes due, 4 of 4 keys: the line meets no
+  quake. A party that Defends to the left Crane's line and then chips
+  stopped its quake on 3 of the 4 keys that announced (once by the
+  cancel inside the fuse, twice by a break on the quake's own turn,
+  which purges the queued quake), and on the fourth the battle ended
+  first; the right Crane's slower clock announced on 1 of 4. At 120
+  (`lab-v3/L3d-cranes/`) the line met no quake either, and a party that
+  held for it wiped first. The quake took 34-46% of each member's HP
+  (`build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`).
 - **Break story:** this is the WoB's effective 12-shield fight: two
   live gauges with two fuses on independent clocks. Focus one Crane
   and the other's charge lands. Use the wrong element and you heal its
