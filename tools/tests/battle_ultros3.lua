@@ -23,7 +23,7 @@
 --             steps 0, switch 1 clear after it), and the line returns only after four more steps; the wave follows.
 --   outside   a break two steps out, before any line: nothing is cancelled and the cells stand, two aimed Fights in
 --             the window wind nothing, and the fuse then lights and fires as in the first case.
---   scene     (below) with the wave lit his held HP drops to 10,300 and one Fight crosses RELM's scene's line
+--   scene     (below) with the wave lit his HP is set to 10,260 and one Fight crosses RELM's scene's line
 --             (10,240) and his Haste line (15,360): the scene plays inside the fuse, the wave still comes on his next
 --             turn, and no Haste or Safe takes the lit turn.
 --   held      (below) the party attacks through a whole fuse from the arming to the wave, past the tally that pushes
@@ -159,7 +159,7 @@ local function held()
 end
 
 -- the scene case: his fuse lit, a Fight takes him under RELM's scene's line (10,240) and his Haste line (15,360).
--- His HP, held at 20,000 to the line, is held at 10,300 from it (DECLARED), and one member's aimed Fight (his gauge
+-- His HP, held at 20,000 to the line, is set to 10,260 at it and no longer held (DECLARED), and one member's aimed Fight (his gauge
 -- held at 63, DECLARED) crosses 10,240: his counter's story block plays RELM's scene (battle_event $16, dispatched as
 -- command $23) while the wave is lit, and the wave must still come on his next turn.  His Haste and Safe block (a
 -- turn block under 15,360, behind the fuse block) cannot take the lit turn: no Haste or Safe before the wave.
@@ -172,13 +172,10 @@ local function scene()
     -- (from the start: his steps at 0, no fuse armed)
     H.kitBattle({}, { idle = "defend", care = false, maxFrames = 12000,
       giveUp = function() local c = W.cells(); return c ~= nil and c.mvar & 0x03 == 0 and steps() == 0 end }),
-    H.kitBattle({}, { idle = "defend", care = false, maxFrames = 30000,
-      giveUp = function() return W.find(0x21, 0x96, 1) ~= nil and W.litBit() end }),
+    -- (the Fight waits on its command window from before the line and is confirmed once the line is up: the first
+    -- cut chose it after the line, and no window opened inside the fuse, "0 entr(ies) played of 1",
+    -- build/attempts/wt/v052-tg-wob3/regen4/suites/battle_ultros3-scene-red.log)
     H.lazy(function()
-      li = W.find(0x21, 0x96, 1)
-      H.assertEq(li ~= nil and W.litBit(), true, "scene: his line came and the wave is lit")
-      W.pin.boss = 10300
-      WRITE.byte(0x3E38 + W.ent(), 63)   -- (DECLARED: the gauge held, so the Fight only chips)
       local who = nil
       for i = 0, 3 do
         local id = H.readByte(0x3ED8 + 2 * i)
@@ -186,13 +183,27 @@ local function scene()
           who = id; break
         end
       end
-      return H.kitBattle({ { who = who, cmd = 0x00, boost = 0, slot = W.slot() } }, { idle = "defend", care = false,
-        maxFrames = 8000, untilPlanDone = true, giveUp = function()
-          -- (the hit that crosses: the pin then stops holding, his HP stays where the hit leaves it)
-          local c = W.cells()
-          if c ~= nil and c.hp < 10240 and W.pin.boss then W.pin.boss = nil end
-          return W.find(0x0C, 0x8E, li) ~= nil
+      local staged = false
+      return H.kitBattle({ { who = who, cmd = 0x00, boost = 0, slot = W.slot(), openWhen = function()
+          local i = W.find(0x21, 0x96, 1)
+          if i == nil or not W.litBit() then return false end
+          if not staged then
+            staged, li = true, i
+            -- (his HP set to 10,260 and no longer held, so any hit crosses 10,240: the second cut held 10,300 and an
+            -- unboosted Fight on his unbroken body, half damage, did not cross; battle_ultros3-scene2.log)
+            W.pin.boss = nil
+            WRITE.word(0x3BF4 + W.ent(), 10260)   -- (DECLARED)
+            WRITE.byte(0x3E38 + W.ent(), 63)   -- (DECLARED: the gauge held, so the Fight only chips)
+            H.log(string.format("[ultros3] scene: the line at f%d; his HP set to 10,260, char %d's Fight confirmed",
+              W.cmds[i].f, who))
+          end
+          return true
+        end } }, { idle = "defend", care = false, maxFrames = 40000, giveUp = function()
+          return li ~= nil and W.find(0x0C, 0x8E, li) ~= nil
         end })
+    end),
+    H.call(function()
+      H.assertEq(li ~= nil, true, "scene: his line came and the wave was lit (the case's precondition)")
     end),
     H.kitBattle({}, { idle = "defend", care = false, maxFrames = 8000,
       giveUp = function() return W.find(0x0C, 0x8E, li) ~= nil or not H.battleLoadStarted() end }),
