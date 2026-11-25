@@ -7355,11 +7355,13 @@ AIScript::_326:
 ; missilebay
 ; OT6 (bosses-wob.md block 20, wt/v052-tg-wob3): the Launcher barrage is the bay's telegraph, and breaking the BAY
 ; cancels it; breaking the Air Force's body does not (each body runs its own fuse; Ot6FuseTbl's row is the bay's).
-; Its second Missile turn now ARMS the fuse (monster switch 0; under 1,536 HP, every Missile turn does), "Missiles lock
-; on!" (battle dialogue $9E) and a glow announce it on its next turn, and the Launcher comes on the turn after.  A
-; break of the bay in between cancels it (switch 0 goes): two more Missile turns earn it again.  The fuse block comes
-; first, so neither rotation can take the Launcher's turn, and the Launcher comes only announced (vanilla's low-HP
-; rotation picked it twice in three turns).  Its death's Smoke is vanilla's.
+; Above 1,536 HP it fires Missiles only, as vanilla.  Under 1,536 HP (vanilla's gate for its barrage) each Missile
+; turn now ARMS the fuse (monster switch 0); "Missiles lock on!" (battle dialogue $9E) and a glow announce it on its
+; next turn, and the Launcher comes on the turn after.  A break of the bay in between cancels it (switch 0 goes): its
+; next Missile turn earns it again.  The fuse block comes first, so the rotation cannot take the Launcher's turn,
+; and the Launcher comes only announced (vanilla's low-HP rotation picked it twice in three turns).  (The first cut
+; armed it from the open, at any HP: the line's own fighter lost the Air Force's battle on 4 of 5 keys,
+; build/attempts/wt/v052-tg-wob3/F-bay/.)  Its death's Smoke is vanilla's.
 AIScript::_327:
         if_monster_switch_set 0
                 dlg $9e
@@ -7377,11 +7379,8 @@ Ot6FuseMissileBay:              ; the fuse is lit here (Ot6FuseTbl's row)
                 set_monster_switch 0    ; ot6: arms the fuse block (above); vanilla's
                 end_if                  ;   low rotation was MISSILE / LAUNCHER,
                                         ;   MISSILE, MISSILE / LAUNCHER
-        attack MISSILE
-        wait
-        attack MISSILE
-        set_monster_switch 0    ; ot6: arms the fuse block (above); vanilla
-        end                     ;   fired a Missile every turn
+        attack MISSILE          ; (vanilla's, above 1,536 HP)
+        end
 
         if_self_dead
                 kill_monsters MONSTER_5, SMOKE

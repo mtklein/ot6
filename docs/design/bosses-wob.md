@@ -25,6 +25,17 @@ Stated once, assumed by every block:
   or not to do the whole sequence"). Nothing rolls between the announce
   and the move. Where a move is not to come every time, the roll is made
   before the announce, on the turn that arms the fuse.
+- **No status loses an announced move** (owner's ruling, the
+  wt/v052-tg-wob3 review, 2026-11-25). A Berserked monster runs no
+  script and a Muted one's MP-cost move fizzles, so a body that
+  announces (every species with a row in `Ot6FuseTbl`) is immune to
+  Berserk, and to Mute when its announced move costs MP. Sleep, Stop
+  and Muddle only delay the move and stay; Rasp or Osmose draining the
+  boss's MP is the player's earned play and stays. Six bodies were open
+  and are spliced in `MonsterProp` (battle_main.asm): the Marshal,
+  Number 128, Nerapa, the Gold Dragon and Rizopas to Berserk, and Chupon
+  to Berserk and Mute. `tools/check_fuse_immune.py` checks every row's
+  body in the built ROM.
 - **A break releases whatever the broken body holds** (owner,
   2026-11-23: "definitely breaking a tentacle should free a party
   member. if possible same for enemies that swallow party members

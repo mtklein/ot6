@@ -240,8 +240,8 @@ Ot6FuseTbl:
         ; Chupon: "It inhales!" (Ifrit's line), Fire Ball; armed by three blows
         ; counted (battle variable 3), which a break clears
         ot6_fuse $012f, Ot6FuseChupon, Ot6FuseChupon, $ff, $ff, OT6_FUSE_VAR3
-        ; the Air Force's MissileBay: "Missiles lock on!", Launcher; armed by its
-        ; second Missile (monster switch 0).  The bay's row: a break of the body
+        ; the Air Force's MissileBay: "Missiles lock on!", Launcher; armed under
+        ; 1,536 HP by a Missile turn (monster switch 0).  The bay's row: a break of the body
         ; leaves it lit
         ot6_fuse $0147, Ot6FuseMissileBay, Ot6FuseMissileBay, $fe, $ff, 0
         ; AtmaWeapon's last phase: "Vast energy focused" (vanilla's line), one

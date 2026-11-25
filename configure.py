@@ -1350,6 +1350,11 @@ check("monster_dlg",
       "python3 tools/check_monster_dlg.py --selftest && python3 tools/check_monster_dlg.py",
       ["tools/check_monster_dlg.py", "ff6/src/text/monster_dlg_en.json", "ff6/rom/ff6-en.dbg",
        copy_if_changed_from("build/ot6.sfc")] + glob("tools/romtools/*.py", "ff6") + glob("tools/char_table/*.json", "ff6"))
+# #561 (wt/v052-tg-wob3): every body with a row in Ot6FuseTbl is immune to Berserk, and to Mute where its announced
+# move costs MP (the boss contract: no status loses an announced move); the selftest restores two vanilla bytes.
+check("fuse_immune",
+      "python3 tools/check_fuse_immune.py --selftest && python3 tools/check_fuse_immune.py",
+      ["tools/check_fuse_immune.py", "ff6/rom/ff6-en.dbg", copy_if_changed_from("build/ot6.sfc")])
 # #550: the condensed numeral digits are generated; the checked-in .inc must
 # be what tools/numeral_font.py writes.
 check("numeral_font", "python3 tools/numeral_font.py",

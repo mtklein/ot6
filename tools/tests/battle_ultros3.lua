@@ -23,6 +23,9 @@
 --             steps 0, switch 1 clear after it), and the line returns only after four more steps; the wave follows.
 --   outside   a break two steps out, before any line: nothing is cancelled and the cells stand, two aimed Fights in
 --             the window wind nothing, and the fuse then lights and fires as in the first case.
+--   scene     (below) with the wave lit his held HP drops to 10,300 and one Fight crosses RELM's scene's line
+--             (10,240) and his Haste line (15,360): the scene plays inside the fuse, the wave still comes on his next
+--             turn, and no Haste or Safe takes the lit turn.
 --   held      (below) the party attacks through a whole fuse from the arming to the wave, past the tally that pushes
 --             him back: his steps stay at 4 until the wave, and the sink follows it.
 -- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v052-tg-wob3/mutants/): fuse_never (Ot6FuseCancel+3=80) is red
@@ -71,7 +74,7 @@ local function attackPlan(W)
   end
   return plan
 end
-function held()
+local function held()
   local W, armedF, waveF, minSteps, minTally, blows, sinkSeen = nil, nil, nil, 99, 99, 0, nil
   local function sw1()
     local e = W.ent()
@@ -155,6 +158,68 @@ function held()
   })
 end
 
+-- the scene case: his fuse lit, a Fight takes him under RELM's scene's line (10,240) and his Haste line (15,360).
+-- His HP, held at 20,000 to the line, is held at 10,300 from it (DECLARED), and one member's aimed Fight (his gauge
+-- held at 63, DECLARED) crosses 10,240: his counter's story block plays RELM's scene (battle_event $16, dispatched as
+-- command $23) while the wave is lit, and the wave must still come on his next turn.  His Haste and Safe block (a
+-- turn block under 15,360, behind the fuse block) cannot take the lit turn: no Haste or Safe before the wave.
+local function scene()
+  local W, li, sceneF = nil, nil, nil
+  return H.seqStep({
+    H.call(function()
+      W = H.fuseWatch(ULTROS3, WRITE); W.on = true; W.pin = { boss = 20000, party = true }
+    end),
+    -- (from the start: his steps at 0, no fuse armed)
+    H.kitBattle({}, { idle = "defend", care = false, maxFrames = 12000,
+      giveUp = function() local c = W.cells(); return c ~= nil and c.mvar & 0x03 == 0 and steps() == 0 end }),
+    H.kitBattle({}, { idle = "defend", care = false, maxFrames = 30000,
+      giveUp = function() return W.find(0x21, 0x96, 1) ~= nil and W.litBit() end }),
+    H.lazy(function()
+      li = W.find(0x21, 0x96, 1)
+      H.assertEq(li ~= nil and W.litBit(), true, "scene: his line came and the wave is lit")
+      W.pin.boss = 10300
+      WRITE.byte(0x3E38 + W.ent(), 63)   -- (DECLARED: the gauge held, so the Fight only chips)
+      local who = nil
+      for i = 0, 3 do
+        local id = H.readByte(0x3ED8 + 2 * i)
+        if id ~= 0xFF and H.readWord(0x3BF4 + 2 * i) > 0 and (H.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
+          who = id; break
+        end
+      end
+      return H.kitBattle({ { who = who, cmd = 0x00, boost = 0, slot = W.slot() } }, { idle = "defend", care = false,
+        maxFrames = 8000, untilPlanDone = true, giveUp = function()
+          -- (the hit that crosses: the pin then stops holding, his HP stays where the hit leaves it)
+          local c = W.cells()
+          if c ~= nil and c.hp < 10240 and W.pin.boss then W.pin.boss = nil end
+          return W.find(0x0C, 0x8E, li) ~= nil
+        end })
+    end),
+    H.kitBattle({}, { idle = "defend", care = false, maxFrames = 8000,
+      giveUp = function() return W.find(0x0C, 0x8E, li) ~= nil or not H.battleLoadStarted() end }),
+    H.call(function()
+      local l = W.cmds[li]
+      local mi, mc = W.find(0x0C, 0x8E, li)
+      local ei, ec = W.find(0x23, nil, li)
+      local haste = 0
+      for k = li, (mi or #W.cmds) do
+        local c = W.cmds[k]
+        if c.cmd ~= 0x21 and (c.arg == 0x1F or c.arg == 0x1C) then haste = haste + 1 end
+      end
+      H.log(string.format("[ultros3] scene: line f%d (turn %d); RELM's scene %s; the wave %s; Haste or Safe before "
+        .. "the wave: %d", l.f, l.turn, ec and string.format("at f%d (turn %d%s)", ec.f, ec.turn,
+        ec.retal and ", his counter" or "") or "not seen", mc and string.format("at f%d (turn %d)", mc.f, mc.turn) or
+        "not seen", haste))
+      H.assertEq(ec ~= nil and (mi == nil or ei < mi), true, "scene: RELM's scene (battle_event $16) played inside the "
+        .. "fuse, his HP crossing 10,240")
+      H.assertEq(mi ~= nil, true, "scene: the wave came after the scene")
+      H.assertEq(mc.turn - l.turn, 1, string.format("scene: the wave came on his next turn after the line (turn %d, "
+        .. "the line's %d)", mc.turn, l.turn))
+      H.assertEq(haste, 0, "scene: no Haste or Safe took the lit turn (his Haste line, 15,360, crossed too)")
+      W.on, W.pin = false, nil
+    end),
+  })
+end
+
 -- The cap: three cases of about 12,000 frames each and the held case's about 15,000, so 120,000 is about 2x.
 H.run({ maxFrames = 120000 }, {
   H.waitFrames(20),
@@ -225,5 +290,6 @@ H.run({ maxFrames = 120000 }, {
     end,
   }),
   held(),
+  scene(),
   H.logStep("[ultros3] PASS: the advance, the announce, the wave, the cancel and the sink"),
 })

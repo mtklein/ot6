@@ -20070,7 +20070,11 @@ function M.fuseCases(cfg)
           for i = 0, 3 do
             local id, mx = M.readByte(0x3ED8 + 2 * i), M.readWord(0x3C1C + 2 * i)
             if id ~= 0xFF and mx > 0 then
-              t[#t + 1] = string.format("char $%02X %d of %d (%d%% of max)", id, dmg[i] or 0, mx, (dmg[i] or 0) * 100 // mx)
+              -- (whether the move was queued on the seat, and the seat's status 1 and 3 now: a member the move
+              -- missed reads 0 for a reason, wt/v052-tg-wob3's review asked which)
+              t[#t + 1] = string.format("char $%02X %d of %d (%d%% of max; %s, status $%02X/$%02X)", id, dmg[i] or 0,
+                mx, (dmg[i] or 0) * 100 // mx, mc and (mc.tchars & (1 << i) ~= 0) and "a target" or "NOT a target",
+                M.readByte(0x3EE4 + 2 * i), M.readByte(0x3EF8 + 2 * i))
             end
           end
           M.log(string.format("[fuse] damage: %s's move ($%02X/%s) on the party: %s", tag, cfg.move.cmd,

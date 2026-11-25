@@ -120,6 +120,8 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(slotOf(CHUPON) ~= nil, true, "Chupon came down (Ultros's counter under 12,800 HP)")
     H.log(string.format("[chupon] f%d Chupon stands in slot %d; his count reads %d", H.frame, slotOf(CHUPON),
       H.readByte(0x3EB3)))
+    H.assertEq(H.readByte(0x3EB3), 0, "his count (battle variable 3) reads 0 as he comes down: no blow on him yet, "
+      .. "and nothing else in the fight counts in it")
     countOn = true
   end),
   H.fuseCases({
