@@ -199,7 +199,7 @@ Ot6FuseTbl:
         ot6_fuse $014a, Ot6FuseKefkaNarshe, Ot6FuseKefkaNarshe, $fe, $ff, OT6_FUSE_TIMER
         ; ---- end wt/v051-tg-wob2 ----
         ; ---- wt/v052-tg-wob2: World of Balance bosses 11-16 (bosses-wob.md) ----
-        ; Dadaluma: "Crouches to leap!", Jump; armed by his knife fan once the
+        ; Dadaluma: "He crouches!", Jump; armed by his knife fan once the
         ; party has used Magic on him three times (battle variable 2), monster
         ; switch 0; a break clears both
         ot6_fuse $0107, Ot6FuseDadaluma, Ot6FuseDadaluma, $fe, $ff, OT6_FUSE_VAR2
@@ -207,21 +207,23 @@ Ot6FuseTbl:
         ; by the battle timer alone, which a break restarts; monster switch 0
         ; holds his slot moves while lit
         ot6_fuse $012d, Ot6FuseUltros2, Ot6FuseUltros2, $fe, $ff, OT6_FUSE_BTIMER
-        ; Ifrit: "Ifrit inhales!", Fire 2 on the party; battle switch 0 (his
+        ; Ifrit: "It inhales!", Fire 2 on the party; battle switch 0 (his
         ; monster variable is his tally of spells)
         ot6_fuse $0109, Ot6FuseIfrit, Ot6FuseIfrit, $ff, $fe, 0
-        ; Shiva: "Shiva inhales!", Ice 2 on the party; battle switch 1
+        ; Shiva: "It inhales!" (Ifrit's line), Ice 2 on the party; battle
+        ; switch 1
         ot6_fuse $0108, Ot6FuseShiva, Ot6FuseShiva, $ff, $fd, 0
-        ; Number 024: the wall's spell, one row a wall (weak to fire: Ice 2; to
+        ; Number 024: "Its wall glows!", the wall's spell, one row a wall (weak to fire: Ice 2; to
         ; ice: Fire 2; to water: Bolt 2); armed by his clock's WallChange
         ; (monster switch 0), the wall held while lit (switch 1)
         ot6_fuse $010a, Ot6FuseN024Ice, Ot6FuseN024Ice, $fc, $ff, 0
         ot6_fuse $010a, Ot6FuseN024Fire, Ot6FuseN024Fire, $fc, $ff, 0
         ot6_fuse $010a, Ot6FuseN024Bolt, Ot6FuseN024Bolt, $fc, $ff, 0
-        ; Number 128: "Core overheating!", Atomic Ray; armed by his sweep's
-        ; turn B, alone (monster switch 1; switch 0 is his Haste, kept)
+        ; Number 128: "Its core heats!", Atomic Ray; armed by his sweep's turn
+        ; A, alone (monster switch 1; switch 0 is his Haste, kept; switch 2,
+        ; his turn B after the ray, is set only by the ray's turn)
         ot6_fuse $010b, Ot6FuseN128, Ot6FuseN128, $fd, $ff, 0
-        ; the Cranes: "The deck groans!", Magnitude8; each armed by its own
+        ; the Cranes: "Deck groans!", Magnitude8; each armed by its own
         ; clock (monster switch 1; switch 0 is its TekBarrier, kept), which a
         ; break restarts.  Battle variables 0-3 are their tallies: kept
         ot6_fuse $010d, Ot6FuseCraneL, Ot6FuseCraneL, $fd, $ff, OT6_FUSE_TIMER

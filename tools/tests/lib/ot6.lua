@@ -19720,9 +19720,13 @@ end
 --   cfg.tag, cfg.species
 --   cfg.write = { byte = fn(addr, v), word = fn(addr, v) }   the suite's own declared writers (M.fuseWatch)
 --   cfg.line                the announce's dlg id
---   cfg.move = { cmd, atk } the move's command and attack id as ExecCmd dispatches it
+--   cfg.move = { cmd, atk } the move's command and attack id as ExecCmd dispatches it (atk nil: any; atks = a set of
+--                           ids: any of them)
 --   cfg.turns               the boss's own turns from the announce to the move (vanilla's count of `wait`s)
---   cfg.arm = "idle" | "fight"   what the party does while the fuse arms: nothing, or everyone Fights
+--   cfg.arm = "idle" | "fight" | fn   what the party does while the fuse arms: nothing, or everyone Fights, or
+--                           fn(pred, max, W), a step the suite plays until pred() or max frames (a trigger the party
+--                           earns some other way: Dadaluma's three spells, Number 128's blades; wt/v052-tg-wob2); a
+--                           function arms the broken case's fuse before its breaker waits, as "fight" does
 --   cfg.bossHp              (optional) the boss's HP, held (W.pin); cfg.outsideHp, the "outside" case's until its
 --                           break ends (a boss whose HP line arms the fuse)
 --   cfg.row = { max, classes }   (optional) a shield row staged at the open, for a body with none
@@ -19788,7 +19792,17 @@ function M.fuseCases(cfg)
     for i, c in ipairs(W.cmds) do if c.cmd == 0x21 and c.arg == cfg.line and c.f < f then at = i end end
     return at
   end
-  local function moveAfter(i) return W.find(cfg.move.cmd, cfg.move.atk, i) end
+  -- (cfg.move.atks: a set of attack ids, any of which is the move -- Number 024's wall's spell, wt/v052-tg-wob2;
+  -- cfg.move.atk nil and no atks: any attack of the command -- Dadaluma's Jump)
+  local function moveAfter(i)
+    if cfg.move.atks == nil then return W.find(cfg.move.cmd, cfg.move.atk, i) end
+    for k = i or 1, #W.cmds do
+      local c = W.cmds[k]
+      if c.cmd == cfg.move.cmd and cfg.move.atks[c.arg] then return k, c end
+    end
+    return nil
+  end
+  local moveAtk = cfg.move.atk and string.format("$%02X", cfg.move.atk) or "any"
   local function stage(n, why)
     local e = W.ent()
     cfg.write.byte(0x3E38 + e, n)
@@ -19825,6 +19839,10 @@ function M.fuseCases(cfg)
   end
   -- the party's part while a fuse arms
   local function arm(pred, max, what)
+    if type(cfg.arm) == "function" then
+      return M.seqStep({ M.call(function() hold("the party arms the fuse: its play is not to break the boss") end),
+        cfg.arm(pred, max, W) })
+    end
     if cfg.arm == "fight" then
       -- (63: the gauge byte's bit 6 is the HUD's "dead" flag, Ot6ShownGauge, so a count above it draws no line)
       return M.seqStep({ M.call(function() stage(63, "the arming Fights are not to break the boss") end),
@@ -19933,8 +19951,8 @@ function M.fuseCases(cfg)
       M.call(function()
         local l = C.lines[n]
         local i, c = moveAfter(l.i)
-        M.assertEq(i ~= nil, true, string.format("%s: the move (command $%02X, attack $%02X) is dispatched after "
-          .. "the announce -- %s", tag, cfg.move.cmd, cfg.move.atk, what))
+        M.assertEq(i ~= nil, true, string.format("%s: the move (command $%02X, attack %s) is dispatched after "
+          .. "the announce -- %s", tag, cfg.move.cmd, moveAtk, what))
         M.assertEq(c.turn - l.turn, cfg.turns, string.format("%s: the move fires on the boss's turn %d after the "
           .. "announce, vanilla's count (announce on turn %d, move on turn %d) -- %s", tag, cfg.turns, l.turn,
           c.turn, what))
@@ -19973,8 +19991,8 @@ function M.fuseCases(cfg)
               t[#t + 1] = string.format("char $%02X %d of %d (%d%% of max)", id, dmg[i] or 0, mx, (dmg[i] or 0) * 100 // mx)
             end
           end
-          M.log(string.format("[fuse] damage: %s's move ($%02X/$%02X) on the party: %s", tag, cfg.move.cmd,
-            cfg.move.atk, table.concat(t, "; ")))
+          M.log(string.format("[fuse] damage: %s's move ($%02X/%s) on the party: %s", tag, cfg.move.cmd,
+            mc and string.format("$%02X", mc.arg) or moveAtk, table.concat(t, "; ")))
           C.dmgFrom = nil
         end),
       }, {}),
@@ -20126,7 +20144,7 @@ function M.fuseCases(cfg)
         end
         tsEntries = {}
       end),
-      M.cond(function() return cfg.arm == "fight" end, {
+      M.cond(function() return cfg.arm == "fight" or type(cfg.arm) == "function" end, {
         arm(function() return gone() or lineAfter(1) ~= nil end, 30000, "the fuse arms (to be broken by " .. v.name
           .. ")"),
       }, {}),
@@ -20185,7 +20203,7 @@ function M.fuseCases(cfg)
       for k = 1, 3 do
         tries[k] = M.cond(function() return C.brk == nil end, {
           M.call(function() C.tries = k end),
-          M.cond(function() return cfg.arm == "fight" end, {
+          M.cond(function() return cfg.arm == "fight" or type(cfg.arm) == "function" end, {
             arm(function() return gone() or lineAfter(C.from) ~= nil end, 30000, "the fuse arms (to be broken)"),
           }, {}),
           breakIt("the break during the fuse", function()

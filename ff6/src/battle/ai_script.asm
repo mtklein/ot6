@@ -4669,7 +4669,8 @@ Ot6FuseDadaluma:                ; the fuse is lit here (Ot6FuseTbl's row)
 ; next turn, and Ice 2 on every member follows on the turn after.  A break in between clears the switch
 ; (Ot6FuseTbl): the rotation starts over from its first turn.  The fuse block comes first, so the swap (six hits)
 ; and the Rflect block wait until it has fired; each sibling runs its own fuse, on its own turns.  Below it
-; everything is vanilla's but the arming switch.
+; everything is vanilla's but the arming switch, and Ice 2, which her rotation no longer picks: it comes only
+; announced, so the line always means it.
 AIScript::_264:
         if_battle_switch_set 0, 1
                 dlg $94
@@ -4698,9 +4699,9 @@ Ot6FuseShiva:                   ; the fuse is lit here (Ot6FuseTbl's row)
                 kill_monsters MONSTER_4, INSTANT
                 end_if
         set_target NOTHING
-        attack ICE, ICE, ICE_2
-        wait
-        attack ICE, ICE_2, BLIZZARD
+        attack ICE, ICE, ICE            ; ot6: Ice 2 comes only announced (vanilla
+        wait                            ;   ICE, ICE, ICE_2 ...
+        attack ICE, ICE, BLIZZARD       ;   ... and ICE, ICE_2, BLIZZARD)
         set_battle_switch 0, 1  ; ot6: arms the fuse block (above)
         end
 
@@ -4734,7 +4735,8 @@ Ot6FuseShiva:                   ; the fuse is lit here (Ot6FuseTbl's row)
 ; His rotation's second turn arms it (battle switch 0: his monster variable is his counter's tally of spells);
 ; "It inhales!" (battle dialogue $94) and a glow announce it on his next turn, and Fire 2 on every member follows on the turn after.  A break in between clears the switch
 ; (Ot6FuseTbl): the rotation starts over from its first turn.  The fuse block comes first, so the swap (six hits)
-; and the Fire 3 block wait until it has fired.  Below it everything is vanilla's but the arming switch.
+; and the Fire 3 block wait until it has fired.  Below it everything is vanilla's but the arming switch, and Fire 2,
+; which his rotation no longer picks: it comes only announced, so the line always means it.
 AIScript::_265:
         if_battle_switch_set 0, 0
                 dlg $94
@@ -4764,8 +4766,8 @@ Ot6FuseIfrit:                   ; the fuse is lit here (Ot6FuseTbl's row)
                 end_if
         attack BATTLE, FIRE, FIRE
         wait
-        attack BATTLE, BLAZE, FIRE_2
-        add_battle_var 2, 1
+        attack BATTLE, BLAZE, FIRE      ; ot6: Fire 2 comes only announced (vanilla
+        add_battle_var 2, 1             ;   BATTLE, BLAZE, FIRE_2)
         set_battle_switch 0, 0  ; ot6: arms the fuse block (above)
         end
 
@@ -4804,7 +4806,8 @@ Ot6FuseIfrit:                   ; the fuse is lit here (Ot6FuseTbl's row)
 ; wall is held because a fuse block's conditions are tested again on the move's turn: a wall changed in between
 ; would drop an announced spell.  A break in between clears both switches (Ot6FuseTbl): the next WallChange of his
 ; clock arms it again.  The three fuse blocks come first, so his clock, "System error!" and his wall's ordinary
-; turns cannot take the spell's turn.
+; turns cannot take the spell's turn.  His ordinary turns on those three walls cast the tier-1 spell where vanilla
+; could pick the tier 2: the tier 2 comes only announced.
 AIScript::_266:
         if_monster_switch_set 0
         if_weak_element SELF, FIRE
@@ -4868,12 +4871,12 @@ Ot6FuseN024Bolt:                ; the fuse is lit here (Ot6FuseTbl's row)
         if_weak_element SELF, FIRE
                 set_target NOTHING
                 clr_monster_switch 0    ; ot6: an armed fuse lapses here
-                attack ICE, ICE, ICE_2
+                attack ICE, ICE, ICE    ; ot6: Ice 2 comes only announced (ICE_2)
                 end_if
         if_weak_element SELF, ICE
                 set_target NOTHING
                 clr_monster_switch 0    ; ot6: an armed fuse lapses here
-                attack FIRE, FIRE_2, FIRE_BALL
+                attack FIRE, FIRE, FIRE_BALL    ; ot6: Fire 2 comes only announced (FIRE_2)
                 end_if
         if_weak_element SELF, LIGHTNING
                 set_target NOTHING
@@ -4903,7 +4906,7 @@ Ot6FuseN024Bolt:                ; the fuse is lit here (Ot6FuseTbl's row)
         if_weak_element SELF, WATER
                 set_target NOTHING
                 clr_monster_switch 0    ; ot6: an armed fuse lapses here
-                attack BOLT, BOLT, BOLT_2
+                attack BOLT, BOLT, BOLT ; ot6: Bolt 2 comes only announced (BOLT_2)
                 end_if
         attack BATTLE, BATTLE, SPECIAL
         clr_monster_switch 0    ; ot6: an armed fuse lapses here
@@ -4968,13 +4971,17 @@ Ot6FuseN024Bolt:                ; the fuse is lit here (Ot6FuseTbl's row)
 
 ; number 128
 ; OT6 (bosses-wob.md block 15, wt/v052-tg-wob2): Atomic Ray is his telegraph, and the blades are its trigger.  Alone
-; (both blades down), he Hastes himself once (vanilla's monster switch 0) and runs his sweep: turn A (Battle, Gale
-; Cut or Atomic Ray), then turn B (Blaster, Atomic Ray or Shock Wave), which now also ARMS the fuse (monster switch
-; 1).  On his next turn "Its core heats!" (battle dialogue $97) and a glow announce it, and Atomic Ray on the
-; whole party comes on the turn after, whether or not a blade has grown back meanwhile (the fuse block's only
-; condition is switch 1: an announced ray always comes).  A break in between clears switch 1 (Ot6FuseTbl): the
+; (both blades down), he Hastes himself once (vanilla's monster switch 0) and runs his sweep, whose first turn (A:
+; Battle, Gale Cut or Atomic Ray) now also ARMS the fuse (monster switch 1).  On his next turn "Its core heats!"
+; (battle dialogue $97) and a glow announce it, and Atomic Ray on the whole party comes on the turn after, whether
+; or not a blade has grown back meanwhile (the fuse block's only condition is switch 1: an announced ray always
+; comes).  His sweep's second turn (B: Blaster, Atomic Ray or Shock Wave) follows the ray on his next turn alone
+; (monster switch 2, set by the ray's turn), and then turn A again.  Vanilla's B waited behind A in one block, whose
+; condition, tested again on B's turn, dropped it whenever a blade had grown back; the blades regrow within a few of
+; his hasted turns, so the sweep is armed on its first turn.  A break in between clears switch 1 (Ot6FuseTbl): the
 ; sweep starts over from turn A, and only while he stands alone.  The fuse block comes first, so neither his Haste
-; nor his bladed rotation can take the ray's turn.  With a blade standing everything is vanilla's.
+; nor his bladed rotation can take the ray's turn.  Atomic Ray comes only announced: turns A and B no longer pick
+; it (Gale Cut and Shock Wave in its place).  With a blade standing everything is vanilla's.
 AIScript::_267:
         if_monster_switch_set 1
                 dlg $97
@@ -4982,7 +4989,8 @@ AIScript::_267:
                 short_glow MONSTER_1
                 wait
 Ot6FuseN128:                    ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 1    ; the trigger's clear first, then the move
+                clr_monster_switch 1    ; the trigger's clear first, and turn B
+                set_monster_switch 2    ;   next, then the move (the idiom)
                 set_target ALL_CHARS
                 attack ATOMIC_RAY
                 end_if
@@ -4994,9 +5002,12 @@ Ot6FuseN128:                    ; the fuse is lit here (Ot6FuseTbl's row)
                 set_monster_switch 0
                 end_if
         if_num_monsters 1
-                attack BATTLE, GALE_CUT, ATOMIC_RAY
-                wait
-                attack BLASTER, ATOMIC_RAY, SHOCK_WAVE
+        if_monster_switch_set 2         ; ot6: turn B, after the ray
+                clr_monster_switch 2
+                attack BLASTER, SHOCK_WAVE, SHOCK_WAVE  ; ot6: was BLASTER, ATOMIC_RAY,
+                end_if                                  ;   SHOCK_WAVE: the ray comes only announced
+        if_num_monsters 1
+                attack BATTLE, GALE_CUT, GALE_CUT       ; ot6: was BATTLE, GALE_CUT, ATOMIC_RAY
                 set_monster_switch 1    ; ot6: arms the fuse block (above)
                 end_if
         attack BATTLE, BATTLE, ICE
