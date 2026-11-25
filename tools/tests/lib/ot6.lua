@@ -19697,6 +19697,73 @@ function M.fuseWatch(species, write)
   return W
 end
 
+-- M.monsterDlgReads(): the monster dialogue as the game reads it (wt/v052-tg-wob3: the English dialogue and its
+-- pointer table moved into their own segment in bank $CF's fill, text_main.asm).  Watches reads of the pointer
+-- table (MonsterDlgPtrs, 256 words) and of the text block behind it (MonsterDlg up to $CFC050, where monster_text
+-- begins) and returns D:
+--   D.ptrReads  each read of the table: { f, id } (GfxCmd_10 reads the word at 2 * id)
+--   D.textAt(f) the first address of the text block read at or after frame f (the line's first byte, as the
+--               dialogue window draws it), or nil
+--   D.decode(a) the line at SNES address a, as text, to its end byte (A-Z a-z 0-9, the punctuation the lines use,
+--               {wait} and {n} by name)
+--   D.tableAt(id) the address the ROM's table gives the line id (bank $CF)
+function M.monsterDlgReads()
+  local D = { ptrReads = {}, textReads = {} }
+  local ptrs, dlg = M.sym("MonsterDlgPtrs"), M.sym("MonsterDlg")
+  emu.addMemoryCallback(function(addr)
+    D.ptrReads[#D.ptrReads + 1] = { f = M.frame, id = ((addr - ptrs) & 0x1FF) // 2 }
+  end, emu.callbackType.read, ptrs, ptrs + 0x1FF)
+  emu.addMemoryCallback(function(addr)
+    local last = D.textReads[#D.textReads]
+    if last == nil or last.f ~= M.frame then D.textReads[#D.textReads + 1] = { f = M.frame, at = addr } end
+    if #D.textReads > 400 then table.remove(D.textReads, 1) end
+  end, emu.callbackType.read, dlg, (dlg & 0xFF0000) | 0xC04F)
+  function D.textAt(f)
+    for _, r in ipairs(D.textReads) do if r.f >= f then return r.at end end
+    return nil
+  end
+  function D.tableAt(id)
+    local p = (ptrs & 0x3FFFFF) + 2 * id
+    return (dlg & 0xFF0000) | M.readRomByte(p) | (M.readRomByte(p + 1) << 8)
+  end
+  local PUNCT = { [0xBE] = "!", [0xBF] = "?", [0xC0] = "/", [0xC1] = ":", [0xC3] = "'", [0xC4] = "-", [0xC5] = ".",
+    [0xC6] = ",", [0xC7] = "_", [0xFF] = " ", [0x01] = "{n}", [0x05] = "{wait}" }
+  function D.decode(a)
+    local t, x = {}, a & 0x3FFFFF
+    for _ = 1, 200 do
+      local b = M.readRomByte(x)
+      if b == 0x00 then break end
+      if b >= 0x80 and b <= 0x99 then t[#t + 1] = string.char(65 + b - 0x80)
+      elseif b >= 0x9A and b <= 0xB3 then t[#t + 1] = string.char(97 + b - 0x9A)
+      elseif b >= 0xB4 and b <= 0xBD then t[#t + 1] = string.char(48 + b - 0xB4)
+      else t[#t + 1] = PUNCT[b] or string.format("{%02X}", b) end
+      x = x + 1
+    end
+    return table.concat(t)
+  end
+  return D
+end
+
+-- M.aiAttacks(species, atk): where a species' turn script (its AI script to the first end, read from the ROM)
+-- names attack `atk`: a list of offsets into the script, one per attack command that names it (a one-byte attack,
+-- or any of an `attack a, b, c`'s three).  A move a boss now makes only announced appears once: in its fuse block
+-- (wt/v052-tg-wob3's suites).
+function M.aiAttacks(species, atk)
+  local SIZE = { [0] = 4, 2, 4, 3, 4, 4, 4, 2, 3, 4, 4, 3, 4, 1, 1, 1 }   -- AICmdSizeTbl (battle_main.asm)
+  local AI, PTRS = M.sym("AIScript") & 0x3FFFFF, M.sym("AIScriptPtrs") & 0x3FFFFF
+  local start = M.readRomByte(PTRS + 2 * species) | (M.readRomByte(PTRS + 2 * species + 1) << 8)
+  local out, x = {}, start
+  while M.readRomByte(AI + x) ~= 0xFF do
+    local b = M.readRomByte(AI + x)
+    if b == atk then out[#out + 1] = x - start end
+    if b == 0xF0 then
+      for k = 1, 3 do if M.readRomByte(AI + x + k) == atk then out[#out + 1] = x - start; break end end
+    end
+    x = x + (b >= 0xF0 and SIZE[b - 0xF0] or 1)
+  end
+  return out
+end
+
 -- M.fuseEngage(talk, species, what): the talk that opens a boss's battle, made again (four times at most) while
 -- the battle it opened is another: a random battle can open on the step the talk takes (lib T.touchBoss), and it
 -- is fought out (M.kitBattle: everyone Fights).  talk() returns the step.  Ends with the boss's battle up.
@@ -19773,6 +19840,10 @@ end
 --                           its maximum, logged as a [fuse] damage line
 --   cfg.lineShot            (optional) a screenshot "fuse_<tag>_line" this many frames after the first announce
 --                           is dispatched (the line in its window), beside the "_lit" one (the mark)
+--   cfg.lineText            (optional) the announce's text, as the json writes it ("He looms over you!{wait}"): the
+--                           unbroken case asserts the dialogue window read the line from the address the ROM's
+--                           pointer table gives it, inside the relocated dialogue block, and that it reads as this
+--                           text there (M.monsterDlgReads; wt/v052-tg-wob3)
 -- The cases:
 --   unbroken   the party arms the fuse; the line shows, the HUD mark shows, and the move is dispatched on the
 --              boss's cfg.turns-th turn after the announce; the mark is gone after it.
@@ -19789,6 +19860,7 @@ end
 -- of asserting the cancel.
 function M.fuseCases(cfg)
   local W = M.fuseWatch(cfg.species, cfg.write)
+  local D = cfg.lineText and M.monsterDlgReads() or nil
   if cfg.breaker then W.partyCmd = cfg.breaker.cmd end
   local measure = rawget(_G, "FUSE_MEASURE") == true
   local snap, req = nil, nil
@@ -20126,6 +20198,21 @@ function M.fuseCases(cfg)
           tag, cfg.glows))
       end
       M.assertEq(#W.snuffs, 0, tag .. ": no cancel in the unbroken case")
+      if D then
+        -- (the line as the game reads it: the table's word for the line's id, read after the dispatch, and the text
+        -- block's first read after that, the window drawing the line)
+        local nRead = 0
+        for _, r in ipairs(D.ptrReads) do if r.f >= l.f and r.id == cfg.line then nRead = nRead + 1 end end
+        local at, want = D.textAt(l.f), D.tableAt(cfg.line)
+        say(string.format("the line's text: the table read for line $%02X %d time(s) after the dispatch; the window "
+          .. "read the text block first at $%06X (the table gives $%06X): %q", cfg.line, nRead, at or 0, want,
+          at and D.decode(at) or "(nothing read)"))
+        M.assertEq(nRead >= 1, true, string.format("%s: the dialogue window read line $%02X's word in the pointer "
+          .. "table (MonsterDlgPtrs, $%06X)", tag, cfg.line, M.sym("MonsterDlgPtrs")))
+        M.assertEq(at, want, string.format("%s: the window read the line's text where the table points ($%06X)", tag,
+          want))
+        M.assertEq(D.decode(want), cfg.lineText, string.format("%s: the line reads %q there", tag, cfg.lineText))
+      end
       say("PASS unbroken")
     end),
   })

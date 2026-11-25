@@ -6660,14 +6660,15 @@ Ot6FuseUltros2:                 ; the fuse is lit here (Ot6FuseTbl's row)
 ; OT6 (bosses-wob.md block 17, wt/v052-tg-wob3): his advance is his telegraph.  Vanilla crept forward one step a
 ; rotation (battle variable 1, his steps; two turns a rotation) and was pushed back a step by the party's blows (his
 ; counter's tally, battle variable 3: a Fight 1, a spell 4; at 8 a step back once he stands two steps out); at 8
-; steps he quaked (Magnitude8, Aqua Rake or Magnitude8) and sank back to the start.  Now the edge is 4 steps, and
+; steps he quaked (Magnitude8, Aqua Rake or Magnitude8) and sank back to the start.  The wave is now his move,
+; Aqua Rake alone (the lore STRAGO studies from him; Magnitude8 is no lore and is gone from his script).  Now the edge is 4 steps, and
 ; the turn that finds him there ARMS the fuse (monster switch 0; switch 1: he stands at the edge); "He looms over
-; you!" (battle dialogue $96) and a glow announce it on his next turn, and Magnitude8 on the whole party comes on the
+; you!" (battle dialogue $96) and a glow announce it on his next turn, and Aqua Rake on the whole party comes on the
 ; turn after; his turn after that is vanilla's sink back to the start (four steps back, his steps reset).  While he
 ; stands at the edge the party's blows push him back no step (his counter's step back waits on switch 1), so the
-; steps he has taken are the steps he sinks.  A break in between cancels the quake (Ot6FuseTbl: switch 0 goes,
+; steps he has taken are the steps he sinks.  A break in between cancels the wave (Ot6FuseTbl: switch 0 goes,
 ; switch 1 stays) and his first turn back is the sink: the break knocks him back to the start, and four more steps
-; earn the quake again.  Everything else is vanilla's.
+; earn the wave again.  Everything else is vanilla's.
 AIScript::_302:
         if_monster_switch_set 0
                 dlg $96
@@ -6676,10 +6677,10 @@ AIScript::_302:
                 wait
 Ot6FuseUltros3:                 ; the fuse is lit here (Ot6FuseTbl's row)
                 clr_monster_switch 0    ; the trigger's clear first, then the move
-                attack MAGNITUDE8
+                attack AQUA_RAKE
                 end_if
-        if_monster_switch_set 1         ; ot6: at the edge with no quake lit (the
-                clr_monster_switch 1    ;   quake has come, or a break cancelled
+        if_monster_switch_set 1         ; ot6: at the edge with no wave lit (the
+                clr_monster_switch 1    ;   wave has come, or a break cancelled
                 set_battle_var 1, 0     ;   it): vanilla's sink back to the start,
                 clr_battle_switch 0, 1  ;   a turn of its own; the clears first
                 kill_monsters_wait MONSTER_1, SAND
@@ -6718,7 +6719,7 @@ Ot6FuseUltros3:                 ; the fuse is lit here (Ot6FuseTbl's row)
                 set_target RAND_CHAR
                 attack BATTLE, BATTLE, STONE
                 end_if
-        attack BATTLE, SPECIAL, TENTACLE        ; ot6: at the edge (vanilla quaked
+        attack BATTLE, SPECIAL, TENTACLE        ; ot6: at the edge (vanilla's wave came
         set_monster_switch 0                    ;   here); arms the fuse block
         set_monster_switch 1                    ;   (above)
         end

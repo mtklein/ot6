@@ -229,7 +229,7 @@ Ot6FuseTbl:
         ot6_fuse $010e, Ot6FuseCraneR, Ot6FuseCraneR, $fd, $ff, OT6_FUSE_TIMER
         ; ---- end wt/v052-tg-wob2 ----
         ; ---- wt/v052-tg-wob3: World of Balance bosses 17-22 (bosses-wob.md) ----
-        ; the bridge Ultros: "He looms over you!", Magnitude8; armed at the edge
+        ; the bridge Ultros: "He looms over you!", Aqua Rake; armed at the edge
         ; of his advance (monster switch 0).  Switch 1 (he holds the edge) is
         ; kept: his first turn back is the sink to the start, the advance again
         ot6_fuse $012e, Ot6FuseUltros3, Ot6FuseUltros3, $fe, $ff, 0

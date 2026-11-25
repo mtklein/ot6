@@ -31,6 +31,12 @@
 -- (build/attempts/wt/v051-fuse/mutants-review/): fuse_never is red at "the break by Break spell during the fuse
 -- cancels it",
 -- fuse_no_trigger at "monster switches 0 and 1 are clear after the cancel".
+-- The last phase (wt/v052-tg-wob3, bosses-wob.md block 21): under 6,144 HP vanilla's rotation (Battle/Quartr, then
+-- Rasp/W.Wind/Blaze) no longer reaches Mind Blast; its second turn now arms a second fuse (monster switch 2): "Vast
+-- energy focused" (the same line) and a glow, and Flare Star on its next turn, one turn of warning.  Its three cases
+-- (tag atmaweapon_low) open on a snapshot of their own, its HP held at 5,000: unbroken, broken (switch 2 clear after
+-- the cancel, the line on its turn 3 back), outside.  Mutant atma_low_keeps (the second row keeps switch 2: +5 =
+-- $FF; build/attempts/wt/v052-tg-wob3/mutants/) is red at "monster switch 2 is clear after the cancel".
 -- A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
@@ -85,5 +91,32 @@ H.run({ maxFrames = 400000 }, {
         .. "on its turn %d back, as many turns as the first arming took (%d)", back, first))
     end,
   }),
-  H.logStep("[atmaweapon] PASS: the announce, the schedule, the cancel and the trigger earned again"),
+  -- the last phase (wt/v052-tg-wob3): under 6,144 HP its rotation's second turn arms a second fuse (monster switch
+  -- 2), "Vast energy focused" and a glow on its next turn, Flare Star on the turn after; a break between cancels it
+  -- (Ot6FuseTbl's second row $0117) and the rotation earns it again from its first turn.  The cases open on a
+  -- snapshot of their own, its HP held at 5,000 from there.
+  H.fuseCases({
+    tag = "atmaweapon_low", species = ATMAWEAPON, write = WRITE,
+    line = 0x65, move = { cmd = 0x0C, atk = 0xC6 }, turns = 1, glows = 2,
+    arm = "idle",
+    bossHp = 5000,
+    -- the low rotation's first turn taken, switch 2 clear
+    partway = function(W)
+      local c = W.cells()
+      return c ~= nil and #W.turns >= 1 and (c.mvar & 0x05) == 0
+    end,
+    earned = function(C, W)
+      local pre, post, l2 = C.brk.pre, C.brk.post, C.lines[2]
+      H.assertEq(pre.mvar & 0x04, 0x04, "atmaweapon_low: monster switch 2 stood at the break (armed)")
+      H.assertEq(post.mvar & 0x04, 0, "atmaweapon_low: monster switch 2 is clear after the cancel")
+      local back = l2.turn - C.rec.turn
+      H.assertEq(back, 3, string.format("atmaweapon_low: the line returned on its turn 3 back, after the low "
+        .. "rotation's two turns (turn %d)", back))
+      -- the last phase is the rotation under 6,144: no Mind Blast, so the first fuse is never armed in it
+      local mind = 0
+      for _, c in ipairs(W.cmds) do if c.arg == 0xC4 and c.cmd ~= 0x21 then mind = mind + 1 end end
+      H.assertEq(mind, 0, "atmaweapon_low: no Mind Blast in the last phase (its rotation is the low one)")
+    end,
+  }),
+  H.logStep("[atmaweapon] PASS: the announce, the schedule, the cancel and the trigger earned again, in both phases"),
 })
