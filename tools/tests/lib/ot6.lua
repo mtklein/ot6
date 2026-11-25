@@ -19005,6 +19005,13 @@ function M.kitBattle(plan, opts)
       local last = {}
       for _, d in ipairs(L.toChars) do last[d] = true end
       dir = aim.g.route(node, isGoal, function(n) return n:sub(1, 5) == "mons=" end, M.TGT_DIRS, last)
+      -- (a pincer: the body asked for stands on the party's other side, which no move among the monsters
+      -- reaches; the cursor crosses through the party, and the party side's next crossing goes the other way --
+      -- the Cranes, wt/v052-tg-wob2)
+      if dir == nil and want and L.type == 2 then
+        aim.out = (aim.out or 0) + 1
+        dir = L.toChars[1 + (aim.out - 1) % #L.toChars]
+      end
       if dir == nil then return "refuse" end
     end
     aim.presses = aim.presses + 1

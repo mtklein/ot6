@@ -249,10 +249,10 @@ local HAND = {
   ["10A@0040"] = { blocks = "earlier [14 24 00 / 1A 36 01] [14 24 00 / 1A 36 02]; own [14 24 00 / 1A 36 80]",
     why = "Number 024 on a water wall (Bolt 2): the earlier blocks are the fire and ice walls', shut while the wall "
       .. "is held at water; its own as the fire wall's" },
-  ["10B@0000"] = { blocks = "earlier none; own [14 24 01]",
-    why = "Number 128: the fuse block is the script's first, ahead of his Haste and both rotations; monster switch "
-      .. "1, set by his alone rotation's turn B, cleared only by the move's turn or the cancel (switch 0, his Haste, "
-      .. "is another bit); his counter touches nothing" },
+  ["10B@0000"] = { blocks = "earlier none; own [14 00 00]",
+    why = "Number 128: the fuse block is the script's first, ahead of his Haste and both rotations; battle switch 0, "
+      .. "set by a blade's death (_319, _320) and cleared only by the move's turn or the cancel; nothing else in his "
+      .. "fight touches battle variable 0" },
   ["10D@0000"] = { blocks = "earlier none; own [14 24 01]",
     why = "the left Crane: the fuse block is the script's first; monster switch 1, set by its clock's arming turn, "
       .. "cleared only by the move's turn or the cancel (switch 0 is its TekBarrier); its counters touch battle "

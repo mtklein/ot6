@@ -219,10 +219,9 @@ Ot6FuseTbl:
         ot6_fuse $010a, Ot6FuseN024Ice, Ot6FuseN024Ice, $fc, $ff, 0
         ot6_fuse $010a, Ot6FuseN024Fire, Ot6FuseN024Fire, $fc, $ff, 0
         ot6_fuse $010a, Ot6FuseN024Bolt, Ot6FuseN024Bolt, $fc, $ff, 0
-        ; Number 128: "Its core heats!", Atomic Ray; armed by his sweep's turn
-        ; A, alone (monster switch 1; switch 0 is his Haste, kept; switch 2,
-        ; his turn B after the ray, is set only by the ray's turn)
-        ot6_fuse $010b, Ot6FuseN128, Ot6FuseN128, $fd, $ff, 0
+        ; Number 128: "Its core heats!", Atomic Ray; armed by a blade's death
+        ; (battle switch 0, which nothing else in his fight touches)
+        ot6_fuse $010b, Ot6FuseN128, Ot6FuseN128, $ff, $fe, 0
         ; the Cranes: "Deck groans!", Magnitude8; each armed by its own
         ; clock (monster switch 1; switch 0 is its TekBarrier, kept), which a
         ; break restarts.  Battle variables 0-3 are their tallies: kept

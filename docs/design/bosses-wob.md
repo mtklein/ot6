@@ -38,9 +38,11 @@ Stated once, assumed by every block:
   Broken boss wind no fuse, on the one fuse vanilla wrote for a World of
   Balance boss, AtmaWeapon's (block 21, `battle_atmaweapon`), and on
   three in the World of Ruin. The authored telegraphs of blocks 1-5
-  (the Whelk to TunnelArmr, wt/v051-tg-wob1) and 7-10 (Telstar, the
-  GhostTrain, Rizopas, Kefka at Narshe, wt/v051-tg-wob2) are built too
-  (each block's **Built** line). Every other **Telegraph** line below is
+  (the Whelk to TunnelArmr, wt/v051-tg-wob1), 7-10 (Telstar, the
+  GhostTrain, Rizopas, Kefka at Narshe, wt/v051-tg-wob2) and 11-16
+  (Dadaluma, the opera Ultros, Ifrit and Shiva, Number 024, Number 128,
+  the Cranes, wt/v052-tg-wob2) are built too (each block's **Built**
+  line). Every other **Telegraph** line below is
   design text: the scripts do not announce those moves yet. The fuse
   block's idiom for writing them, and its worked example, are in
   `ot6_fuse.asm` and `battle_fuse`.

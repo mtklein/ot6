@@ -4970,27 +4970,22 @@ Ot6FuseN024Bolt:                ; the fuse is lit here (Ot6FuseTbl's row)
 ; ------------------------------------------------------------------------------
 
 ; number 128
-; OT6 (bosses-wob.md block 15, wt/v052-tg-wob2): Atomic Ray is his telegraph, and the blades are its trigger.  Alone
-; (both blades down), he Hastes himself once (vanilla's monster switch 0) and runs his sweep, whose first turn (A:
-; Battle, Gale Cut or Atomic Ray) now also ARMS the fuse (monster switch 1).  On his next turn "Its core heats!"
-; (battle dialogue $97) and a glow announce it, and Atomic Ray on the whole party comes on the turn after, whether
-; or not a blade has grown back meanwhile (the fuse block's only condition is switch 1: an announced ray always
-; comes).  His sweep's second turn (B: Blaster, Atomic Ray or Shock Wave) follows the ray on his next turn alone
-; (monster switch 2, set by the ray's turn), and then turn A again.  Vanilla's B waited behind A in one block, whose
-; condition, tested again on B's turn, dropped it whenever a blade had grown back; the blades regrow within a few of
-; his hasted turns, so the sweep is armed on its first turn.  A break in between clears switch 1 (Ot6FuseTbl): the
-; sweep starts over from turn A, and only while he stands alone.  The fuse block comes first, so neither his Haste
-; nor his bladed rotation can take the ray's turn.  Atomic Ray comes only announced: turns A and B no longer pick
-; it (Gale Cut and Shock Wave in its place).  With a blade standing everything is vanilla's.
+; OT6 (bosses-wob.md block 15, wt/v052-tg-wob2): Atomic Ray is his telegraph, and a falling blade its trigger.  Each
+; blade's death (its `if_self_dead` block, _319 and _320) now sets battle switch 0; on the body's next turn "Its core
+; heats!" (battle dialogue $97) and a glow announce the ray, and Atomic Ray on the whole party comes on the turn
+; after, whatever the blades do meanwhile (the fuse block's only condition is the switch: an announced ray always
+; comes).  A break in between clears the switch (Ot6FuseTbl): another blade has to fall.  The fuse block comes
+; first, so neither his Haste nor either rotation can take the ray's turn.  Atomic Ray comes only announced: his
+; sweep alone (both blades down) no longer picks it (Gale Cut and Shock Wave in its place; vanilla's sweep needs
+; an alone turn, which the blades' regrowth makes rare).  Everything else is vanilla's.
 AIScript::_267:
-        if_monster_switch_set 1
+        if_battle_switch_set 0, 0
                 dlg $97
 ; Its core heats!
                 short_glow MONSTER_1
                 wait
 Ot6FuseN128:                    ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 1    ; the trigger's clear first, and turn B
-                set_monster_switch 2    ;   next, then the move (the idiom)
+                clr_battle_switch 0, 0  ; the trigger's clear first, then the move
                 set_target ALL_CHARS
                 attack ATOMIC_RAY
                 end_if
@@ -5002,13 +4997,9 @@ Ot6FuseN128:                    ; the fuse is lit here (Ot6FuseTbl's row)
                 set_monster_switch 0
                 end_if
         if_num_monsters 1
-        if_monster_switch_set 2         ; ot6: turn B, after the ray
-                clr_monster_switch 2
-                attack BLASTER, SHOCK_WAVE, SHOCK_WAVE  ; ot6: was BLASTER, ATOMIC_RAY,
-                end_if                                  ;   SHOCK_WAVE: the ray comes only announced
-        if_num_monsters 1
                 attack BATTLE, GALE_CUT, GALE_CUT       ; ot6: was BATTLE, GALE_CUT, ATOMIC_RAY
-                set_monster_switch 1    ; ot6: arms the fuse block (above)
+                wait
+                attack BLASTER, SHOCK_WAVE, SHOCK_WAVE  ; ot6: was BLASTER, ATOMIC_RAY, SHOCK_WAVE
                 end_if
         attack BATTLE, BATTLE, ICE
         wait
@@ -7132,6 +7123,7 @@ AIScript::_319:
         end
 
         if_self_dead
+                set_battle_switch 0, 0  ; ot6: a falling blade heats the body's core (_267)
                 restore_monsters MONSTER_4, INSTANT
                 hide_monsters MONSTER_4, FADE_UP
                 reset_monster_timer
@@ -7153,6 +7145,7 @@ AIScript::_320:
         end
 
         if_self_dead
+                set_battle_switch 0, 0  ; ot6: a falling blade heats the body's core (_267)
                 restore_monsters MONSTER_2, INSTANT
                 hide_monsters MONSTER_2, FADE_UP
                 reset_monster_timer

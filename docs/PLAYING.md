@@ -71,8 +71,12 @@ Dragon's Bolt 3 and Kefka's Goner work this way. So do the early bosses: the Whe
 ("It draws in!", before its head hides), the Marshal ("Strike as one!"),
 Vargas ("Feel the wind!"), Ultros at the Lete River ("Squirm, BANON!"),
 TunnelArmr ("Laser charges!"), Telstar ("It radios in!"), the GhostTrain
-("Whistle blows!", two turns ahead), Rizopas ("Waters swell!") and Kefka at
-Narshe ("Frost creeps!"). Not every big move is announced.
+("Whistle blows!", two turns ahead), Rizopas ("Waters swell!"), Kefka at
+Narshe ("Frost creeps!"), Dadaluma ("He crouches!", after three spells cast
+at him), Ultros at the opera ("Imp! Pal! Buddy!"), Ifrit and Shiva ("It
+inhales!"), Number 024 ("Its wall glows!"; his wall holds until the spell),
+Number 128 ("Its core heats!", once both blades are down) and each of the
+Cranes ("Deck groans!"). Not every big move is announced.
 
 ### Weapon types
 
