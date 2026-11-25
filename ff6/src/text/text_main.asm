@@ -200,7 +200,18 @@ MonsterSpecialName:
 
 ; ------------------------------------------------------------------------------
 
-; cf/dfe0
+; OT6 #561 (wt/v052-tg-wob3): the English dialogue and its pointers stand in
+; their own segment, monster_dlg (cf/8400, the fill ai_script left when it
+; moved to bank $f1; ff6-en.cfg), so that the block can grow past the three
+; bytes monster_text had left.  GfxCmd_10 (btlgfx) reads the bank byte
+; (^MonsterDlg) and the pointer table by label; the pointers are offsets in
+; the bank.  tools/check_monster_dlg.py reads every line back from the built
+; ROM through the table and compares it with the json.
+.if LANG_EN
+.segment "monster_dlg"
+.endif
+
+; cf/dfe0 (vanilla); cf/8400 (OT6, English)
 MonsterDlgPtrs:
 .if LANG_EN
         ptr_tbl MonsterDlg
@@ -210,7 +221,7 @@ MonsterDlgPtrs:
         end_fixed_block
 .endif
 
-; cf/e1e0
+; cf/e1e0 (vanilla); cf/8600 (OT6, English)
 MonsterDlg:
 .if LANG_EN
         incbin_lang "monster_dlg_%s.dat"

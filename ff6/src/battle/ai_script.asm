@@ -5381,7 +5381,25 @@ AIScript::_277:
 ; ------------------------------------------------------------------------------
 
 ; flameeater
+; OT6 (bosses-wob.md block 18, wt/v052-tg-wob3): Fire Ball is its telegraph.  The last turn of its rotation of three
+; now ARMS the fuse (monster switch 2: switches 0 and 1 are its opening and its Bomblet calls); "It swells with
+; flame!" (battle dialogue $9D) and a glow announce it on its next turn, and Fire Ball on the whole party comes on the
+; turn after.  A break in between cancels it (Ot6FuseTbl: switch 2 goes): the rotation's three turns earn it again.
+; (A first cut armed it from its counter when fire struck it; an absorbed spell starts no counter, so the fuse never
+; armed: build/attempts/wt/v052-tg-wob3/regen2/suites/battle_flameeater-red.log.)  The fuse block comes first, so
+; neither its clock, its Reflect nor its Bomblet calls can take the Fire Ball's turn.  Fire Ball comes only
+; announced: its rotation casts Fire where vanilla could pick it.  Everything else is vanilla's.
 AIScript::_278:
+        if_monster_switch_set 2
+                dlg $9d
+; It swells with flame!
+                short_glow MONSTER_1
+                wait
+Ot6FuseFlameEater:              ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 2    ; the trigger's clear first, then the move
+                set_target ALL_CHARS
+                attack FIRE_BALL
+                end_if
         if_monster_switch_clr 0
                 set_monster_switch 0
                 attack BOMBLET
@@ -5442,10 +5460,11 @@ AIScript::_278:
                 end_if
         attack FIRE, NOTHING, FIRE
         wait
-        attack FIRE, FIRE_BALL, FIRE_BALL
-        wait
-        attack FIRE, FIRE_BALL, NOTHING
+        attack FIRE, FIRE, FIRE         ; ot6: Fire Ball comes only announced (vanilla
+        wait                            ;   FIRE, FIRE_BALL, FIRE_BALL ...
+        attack FIRE, FIRE, NOTHING      ;   ... and FIRE, FIRE_BALL, NOTHING)
         clr_monster_switch 1
+        set_monster_switch 2    ; ot6: arms the fuse block (above)
         end
 
         if_self_dead
@@ -5493,12 +5512,30 @@ Ot6FuseAtmaWeaponFire:          ; ot6: ... to here, the turn that fires it
                 set_target NOTHING      ;   (Ot6BrokenTurn), so the clears go
                 attack FLARE_STAR       ;   first (ot6_fuse.asm, the idiom)
                 end_if
+        ; ot6 (bosses-wob.md block 21, wt/v052-tg-wob3): the last phase's fuse.  Under 6,144 HP vanilla's rotation no
+        ; longer reaches Mind Blast, so the Flare Star above never comes again.  Now that rotation's second turn arms
+        ; a second, faster fuse (monster switch 2): "Vast energy focused" (vanilla's line, $65) and a glow on its next
+        ; turn, and Flare Star on the turn after, one turn of warning where the first gives two, and no Shell, Safe
+        ; or Haste.  A break in between cancels it (Ot6FuseTbl's second row: switch 2 goes) and the rotation earns it
+        ; again from its first turn.
+        if_monster_switch_set 2
+                dlg $65
+; Vast energy focused
+                short_glow MONSTER_1
+                wait
+Ot6FuseAtmaWeaponLow:           ; ot6: the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 2    ; the trigger's clear first, then the move
+                long_glow MONSTER_1
+                set_target NOTHING
+                attack FLARE_STAR
+                end_if
         if_hp SELF, 6144
                 set_target NOTHING
                 attack BATTLE, QUARTR, QUARTR
                 wait
                 set_target NOTHING
                 attack RASP, W_WIND, BLAZE
+                set_monster_switch 2    ; ot6: arms the last phase's fuse (above)
                 end_if
         if_hp SELF, 12800
                 set_target NOTHING
@@ -5534,7 +5571,24 @@ Ot6FuseAtmaWeaponFire:          ; ot6: ... to here, the turn that fires it
 ; ------------------------------------------------------------------------------
 
 ; nerapa
+; OT6 (bosses-wob.md block 22, wt/v052-tg-wob3): Roulette is its telegraph.  Vanilla counted the party's Fights at it
+; (its counter: a Battle back, and the tally) and, on its first turn with six counted, spun Roulette.  Now that turn
+; says "The wheel turns!" (battle dialogue $9F) and glows, and Roulette comes on its next turn.  The tally is the fuse
+; block's own condition (battle variable 3 now, vanilla 0, so that a break can clear it: OT6_FUSE_VAR3): it only
+; climbs until the move's turn clears it.  A break in between cancels Roulette and clears the tally: six more Fights
+; earn it again.  Fights that land on a Broken Nerapa count nothing (its counter holds an attack and is skipped
+; while it is Broken, ot6_break.asm).  The fuse block comes first, so the Condemned opening and the rotation cannot
+; take the spin's turn.  Everything else is vanilla's.
 AIScript::_280:
+        if_battle_var_greater 3, 6
+                dlg $9f
+; The wheel turns!
+                short_glow MONSTER_1
+                wait
+Ot6FuseNerapa:                  ; the fuse is lit here (Ot6FuseTbl's row)
+                set_battle_var 3, 0     ; the trigger's clear first, then the move
+                attack ROULETTE
+                end_if
         if_monster_switch_clr 0
                 dlg $66
 ; Mwa ha ha……You can’t run!
@@ -5548,10 +5602,6 @@ AIScript::_280:
                 attack CONDEMNED
                 set_monster_switch 0
                 end_if
-        if_battle_var_greater 0, 6
-                set_battle_var 0, 0
-                attack ROULETTE
-                end_if
         attack BATTLE, BATTLE, FIRE_2
         wait
         attack BATTLE, FIRE_BALL, FIRE_3
@@ -5561,7 +5611,7 @@ AIScript::_280:
 
         if_cmd FIGHT
                 attack BATTLE, NOTHING, NOTHING
-                add_battle_var 0, 1
+                add_battle_var 3, 1     ; ot6: the tally in battle variable 3 (vanilla 0)
                 end_retal
 
 ; ------------------------------------------------------------------------------
@@ -6605,7 +6655,39 @@ Ot6FuseUltros2:                 ; the fuse is lit here (Ot6FuseTbl's row)
 ; ------------------------------------------------------------------------------
 
 ; ultros (esper mountain)
+; OT6 (bosses-wob.md block 17, wt/v052-tg-wob3): his advance is his telegraph.  Vanilla crept forward one step a
+; rotation (battle variable 1, his steps; two turns a rotation) and was pushed back a step by the party's blows (his
+; counter's tally, battle variable 3: a Fight 1, a spell 4; at 8 a step back once he stands two steps out); at 8
+; steps he quaked (Magnitude8, Aqua Rake or Magnitude8) and sank back to the start.  The wave is now his move,
+; Aqua Rake alone (the lore STRAGO studies from him; Magnitude8 is no lore and is gone from his script).  Now the edge is 4 steps, and
+; the turn that finds him there ARMS the fuse (monster switch 0; switch 1: he stands at the edge); "He looms over
+; you!" (battle dialogue $96) and a glow announce it on his next turn, and Aqua Rake on the whole party comes on the
+; turn after; his turn after that is vanilla's sink back to the start (four steps back, his steps reset).  While he
+; stands at the edge the party's blows push him back no step (his counter's step back waits on switch 1), so the
+; steps he has taken are the steps he sinks.  A break in between cancels the wave (Ot6FuseTbl: switch 0 goes,
+; switch 1 stays) and his first turn back is the sink: the break knocks him back to the start, and four more steps
+; earn the wave again.  Everything else is vanilla's.
 AIScript::_302:
+        if_monster_switch_set 0
+                dlg $96
+; He looms over you!
+                short_glow MONSTER_1
+                wait
+Ot6FuseUltros3:                 ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clear first, then the move
+                attack AQUA_RAKE
+                end_if
+        if_monster_switch_set 1         ; ot6: at the edge with no wave lit (the
+                clr_monster_switch 1    ;   wave has come, or a break cancelled
+                set_battle_var 1, 0     ;   it): vanilla's sink back to the start,
+                clr_battle_switch 0, 1  ;   a turn of its own; the clears first
+                kill_monsters_wait MONSTER_1, SAND
+                move_back_slow MONSTER_1
+                move_back_slow MONSTER_1
+                move_back_slow MONSTER_1
+                move_back_slow MONSTER_1
+                show_monsters MONSTER_1, SAND
+                end_if
         if_battle_switch_clr 0, 6
                 dlg $4f
 ; I was just thinking about you!
@@ -6627,7 +6709,7 @@ AIScript::_302:
                 set_target RAND_CHAR
                 attack LODE_STONE
                 end_if
-        if_battle_var_less 1, 8
+        if_battle_var_less 1, 4         ; ot6: the edge at 4 steps (vanilla 8)
                 add_battle_var 1, 1
                 move_forward_slow MONSTER_1
                 attack BATTLE, SPECIAL, TENTACLE
@@ -6635,14 +6717,9 @@ AIScript::_302:
                 set_target RAND_CHAR
                 attack BATTLE, BATTLE, STONE
                 end_if
-        if_battle_var_greater 1, 8
-                attack MAGNITUDE8, AQUA_RAKE, MAGNITUDE8
-                kill_monsters_wait MONSTER_1, SAND
-                move_back_64 MONSTER_1
-                show_monsters MONSTER_1, SAND
-                set_battle_var 1, 0
-                clr_battle_switch 0, 1
-                end_if
+        attack BATTLE, SPECIAL, TENTACLE        ; ot6: at the edge (vanilla's wave came
+        set_monster_switch 0                    ;   here); arms the fuse block
+        set_monster_switch 1                    ;   (above)
         end
 
         if_hit
@@ -6662,6 +6739,7 @@ AIScript::_302:
                 end_if
         if_battle_var_greater 3, 8
         if_battle_var_greater 1, 2
+        if_monster_switch_clr 1         ; ot6: no step back while he holds the edge
                 set_battle_var 3, 0
                 move_back_slow MONSTER_1
                 sub_battle_var 1, 1
@@ -6702,16 +6780,39 @@ AIScript::_302:
 ; ------------------------------------------------------------------------------
 
 ; chupon
+; OT6 (bosses-wob.md block 19, wt/v052-tg-wob3): the airship deck's telegraph is Chupon's, and his temper its
+; trigger ("Better not irritate him!", Ultros's own line).  Every blow that strikes him is counted (his counter,
+; battle variable 3: nothing else in this fight uses it); on his first turn with three counted, "It inhales!" (battle
+; dialogue $94, Ifrit's line) and a glow announce it, and Fire Ball on the whole party comes on his next turn.  The
+; count is the fuse block's own condition: it only climbs until the move's turn clears it.  A break in between
+; cancels it and clears the count (Ot6FuseTbl, OT6_FUSE_VAR3): three more blows earn it again.  Blows that land on a
+; Broken Chupon count nothing (a counter that only counts is skipped while he is Broken, ot6_break.asm).  The fuse
+; block comes first, so his rotation cannot take the Fire Ball's turn, and Fire Ball comes only announced (his
+; rotation's second turn Fights where vanilla could pick it).  His dying Sneeze, which ends the battle, is vanilla's,
+; unchanged.  Ultros (_360) announces nothing on the deck.
 AIScript::_303:
+        if_battle_var_greater 3, 3
+                dlg $94
+; It inhales!
+                short_glow MONSTER_1
+                wait
+Ot6FuseChupon:                  ; the fuse is lit here (Ot6FuseTbl's row)
+                set_battle_var 3, 0     ; the trigger's clear first, then the move
+                set_target ALL_CHARS
+                attack FIRE_BALL
+                end_if
         attack BATTLE
         wait
-        attack BATTLE, BATTLE, FIRE_BALL
-        end
+        attack BATTLE, BATTLE, BATTLE   ; ot6: Fire Ball comes only announced
+        end                             ;   (vanilla BATTLE, BATTLE, FIRE_BALL)
 
         if_self_dead
                 set_target ALL_CHARS
                 attack SNEEZE
                 end_battle
+                end_if
+        if_hit                          ; ot6: his temper, counted (the fuse
+                add_battle_var 3, 1     ;   block above)
                 end_retal
 
 ; ------------------------------------------------------------------------------
@@ -7252,18 +7353,33 @@ AIScript::_326:
 ; ------------------------------------------------------------------------------
 
 ; missilebay
+; OT6 (bosses-wob.md block 20, wt/v052-tg-wob3): the Launcher barrage is the bay's telegraph, and breaking the BAY
+; cancels it; breaking the Air Force's body does not (each body runs its own fuse; Ot6FuseTbl's row is the bay's).
+; Above 1,536 HP it fires Missiles only, as vanilla.  Under 1,536 HP (vanilla's gate for its barrage) each Missile
+; turn now ARMS the fuse (monster switch 0); "Missiles lock on!" (battle dialogue $9E) and a glow announce it on its
+; next turn, and the Launcher comes on the turn after.  A break of the bay in between cancels it (switch 0 goes): its
+; next Missile turn earns it again.  The fuse block comes first, so the rotation cannot take the Launcher's turn,
+; and the Launcher comes only announced (vanilla's low-HP rotation picked it twice in three turns).  (The first cut
+; armed it from the open, at any HP: the line's own fighter lost the Air Force's battle on 4 of 5 keys,
+; build/attempts/wt/v052-tg-wob3/F-bay/.)  Its death's Smoke is vanilla's.
 AIScript::_327:
-        if_hp SELF, 1536
-                set_target NOTHING
-                attack MISSILE
+        if_monster_switch_set 0
+                dlg $9e
+; Missiles lock on!
+                short_glow MONSTER_5
                 wait
-                set_target NOTHING
-                attack LAUNCHER, MISSILE, MISSILE
-                wait
+Ot6FuseMissileBay:              ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clear first, then the move
                 set_target NOTHING
                 attack LAUNCHER
                 end_if
-        attack MISSILE
+        if_hp SELF, 1536
+                set_target NOTHING
+                attack MISSILE
+                set_monster_switch 0    ; ot6: arms the fuse block (above); vanilla's
+                end_if                  ;   low rotation was MISSILE / LAUNCHER,
+                                        ;   MISSILE, MISSILE / LAUNCHER
+        attack MISSILE          ; (vanilla's, above 1,536 HP)
         end
 
         if_self_dead

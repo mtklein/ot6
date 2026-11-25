@@ -642,8 +642,10 @@ STATES = [
     # bounces a physical Fight, elemental or not.  Checkpoint M
     # (fire-out-v1) captured and sealed from a clean run (verdict 0,
     # generated-state verify passed).
+    # flameeater_entry: the sweep's entry checkpoint in FlameEater's chamber
+    # before the walk onto its trigger -- battle_flameeater's fixture.
     S("fire_out", gen="gen_thamasa_fire", prev="thamasa_night",
-      checkpoint="thamasa-night-v1", timeout=1800),
+      checkpoint="thamasa-night-v1", timeout=1800, also=["flameeater_entry"]),
 
     # boundary M -> boundary N (issue #127, "the Esper Mountain approach"):
     # the world walk from M's (249,128) to the Esper Mountain world entrance
@@ -684,8 +686,10 @@ STATES = [
     # fight behind a seed sweep plus two warp-maze crossings runs past
     # run.sh's 600s default on a loaded machine.  Re-cut by
     # checkpoint_drift.py --recut.
+    # ultros3_entry: the statue room after the lore scene, one step above
+    # Ultros III's trigger -- battle_ultros3's fixture.
     S("ultros_won", gen="gen_ultros", prev="esper_mtn_save",
-      checkpoint="esper-mtn-save-v1", timeout=1800),
+      checkpoint="esper-mtn-save-v1", timeout=1800, also=["ultros3_entry"]),
     # ultros-won-v1 -> Esper Mountain's slopes (375) and its side cave (374,
     # the Chocobo Suit) hunted until each formation is won
     # (docs/design/wob-side-trips.md, #283): a branch beside thamasa_done.
@@ -724,9 +728,11 @@ STATES = [
     # scenes run past 1800 s on a loaded machine.  Re-cut by
     # checkpoint_drift.py --recut.
     # ultros4_entry is the deck at the Ultros teaser, one walk from arming
-    # Ultros IV (battle_ultros4).
+    # Ultros IV (battle_ultros4); airforce_entry the Air Force's battle as it
+    # comes up (battle_airforce).
     S("fc_landing", gen="gen_fc_landing", prev="thamasa_done",
-      checkpoint="thamasa-done-v1", timeout=3600, also=["ultros4_entry"]),
+      checkpoint="thamasa-done-v1", timeout=3600,
+      also=["ultros4_entry", "airforce_entry"]),
 
     # boundary Q -> boundary R (the continent's save alcove): cold-Continue
     # fc-landing-v1 at 394 (7,12), talk SHADOW in at (10,16), cross the
@@ -756,9 +762,11 @@ STATES = [
     # escape map 393 with the 6:00 master clock and Shadow's 5:55 clock
     # running -- the escape-policy lab's fixture (one run, both states).
     # atmaweapon_entry: its third, the party on AtmaWeapon's doorstep before
-    # the talk -- battle_atmaweapon's fixture.
+    # the talk -- battle_atmaweapon's fixture.  nerapa_entry: its fourth, the
+    # Nerapa sweep's doorstep under the escape clock -- battle_nerapa's.
     S("wor_landing", gen="gen_fc_escape", prev="fc_alcove",
-      checkpoint="fc-alcove-v1", also=["escape_start", "atmaweapon_entry"],
+      checkpoint="fc-alcove-v1",
+      also=["escape_start", "atmaweapon_entry", "nerapa_entry"],
       timeout=3600),
 
     # ---- the World of Ruin ----------------------------------------------------

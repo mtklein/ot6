@@ -17071,10 +17071,48 @@ MONSTER_PROP_REC     = 32
 MONSTER_PROP_SIZE    = 384 * MONSTER_PROP_REC
 GHOSTTRAIN_HP_AT     = MONSTER::GHOSTTRAIN * MONSTER_PROP_REC + 8
 GHOSTTRAIN_HP_OT6    = 2600
+; OT6 (#561, wt/v052-tg-wob3; bosses-wob.md "The boss contract"): a body that
+; announces a move (a row in Ot6FuseTbl) is immune to Berserk, and to Mute when
+; the announced move costs MP: a Berserked monster runs no script, and a Muted
+; one's MP-cost move fizzles, so either could lose an announced move; and to
+; Imp when the move costs MP (an Imp's MP-cost move fizzles, @3201, as a
+; Mute's does) or its command is no Imp's (an Imp's Lore, a monster's special
+; $8B-$ED, is turned into a Fight, @029a; Fight, Magic and Jump are an Imp's).
+; Bytes +$14 and +$15 of a record are its blocked status 1 and 2 (LoadRageProp;
+; a set bit is immunity): Imp $20 in +$14, Mute $08 and Berserk $10 in +$15.
+; The seven bodies that were open, each spliced over vanilla's byte
+; (tools/check_fuse_immune.py checks every row's body in the built ROM):
+;   $064 Marshal     $00 -> $10 (Berserk; his move, two Battles, costs no MP)
+;   $106 GhostTrain  (its max HP, #400, above)
+;   $10A Number 024  +$14 $CF -> $EF (Imp: Ice 2, Fire 2, Bolt 2 cost MP)
+;   $10B Number 128  $ED -> $FD (Berserk)
+;   $118 Nerapa      $CE -> $DE (Berserk)
+;   $12F Chupon      $63 -> $7B (Berserk and Mute: Fire Ball costs 20)
+;   $150 Gold Dragon $EB -> $FB (Berserk)
+;   $155 Rizopas     $09 -> $19 (Berserk)
+OT6_IMM1             = 20                       ; +$14: blocked status 1
+OT6_IMM2             = 21                       ; +$15: blocked status 2
+.macro ot6_imm2 species, value
+        .byte   value                           ; species +$14 or +$15
+.endmacro
 MonsterProp:
-        .incbin "monster_prop.dat", 0, GHOSTTRAIN_HP_AT
+        .incbin "monster_prop.dat", 0, $064 * 32 + OT6_IMM2
+        ot6_imm2 $064, $10
+        .incbin "monster_prop.dat", $064 * 32 + OT6_IMM2 + 1, GHOSTTRAIN_HP_AT - ($064 * 32 + OT6_IMM2 + 1)
         .word   GHOSTTRAIN_HP_OT6                       ; $106 +$08 (was 1900)
-        .incbin "monster_prop.dat", GHOSTTRAIN_HP_AT + 2, MONSTER_PROP_SIZE - GHOSTTRAIN_HP_AT - 2
+        .incbin "monster_prop.dat", GHOSTTRAIN_HP_AT + 2, $10A * 32 + OT6_IMM1 - (GHOSTTRAIN_HP_AT + 2)
+        ot6_imm2 $10A, $EF                      ; (+$14, blocked status 1: Imp)
+        .incbin "monster_prop.dat", $10A * 32 + OT6_IMM1 + 1, $10B * 32 + OT6_IMM2 - ($10A * 32 + OT6_IMM1 + 1)
+        ot6_imm2 $10B, $FD
+        .incbin "monster_prop.dat", $10B * 32 + OT6_IMM2 + 1, $118 * 32 - $10B * 32 - 1
+        ot6_imm2 $118, $DE
+        .incbin "monster_prop.dat", $118 * 32 + OT6_IMM2 + 1, $12F * 32 - $118 * 32 - 1
+        ot6_imm2 $12F, $7B
+        .incbin "monster_prop.dat", $12F * 32 + OT6_IMM2 + 1, $150 * 32 - $12F * 32 - 1
+        ot6_imm2 $150, $FB
+        .incbin "monster_prop.dat", $150 * 32 + OT6_IMM2 + 1, $155 * 32 - $150 * 32 - 1
+        ot6_imm2 $155, $19
+        .incbin "monster_prop.dat", $155 * 32 + OT6_IMM2 + 1, MONSTER_PROP_SIZE - ($155 * 32 + OT6_IMM2 + 1)
 .assert * - MonsterProp = MONSTER_PROP_SIZE, error, "MonsterProp splice changed the table length"
 
 ; cf/3000

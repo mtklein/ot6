@@ -301,10 +301,19 @@ H.run({ maxFrames = 150000 }, {
     -- retaliation tally.  The dump callback below necessarily still sees the OLD line,
     -- because Ot6Retaliate arms the pending byte after it moves the line --
     -- so both halves are read here, from the writes themselves.
-    -- a 16-bit store fires this once per byte, so the cell is re-read
-    -- after each one; the LAST record of a frame carries the whole word
-    emu.addMemoryCallback(function()
-      L.markWrites[#L.markWrites + 1] = { f = H.frame, v = H.readWord(D.mark) }
+    -- a 16-bit store fires this once per byte, BEFORE that byte lands: the
+    -- record is the cell's other byte as it stands with the byte being
+    -- written, so the LAST record of a frame carries the whole word.  (A
+    -- re-read of the cell saw the word as it was before the byte: on
+    -- wt/v052-tg-wob3's replayed draw the line went 256 -> 186, the high
+    -- byte changing, and the frame's last record read 442 = $01BA, the new
+    -- low byte under the old high one: "hurt-line writes near f4616:
+    -- f4616=256 f4616=442", build/attempts/wt/v052-tg-wob3/regen2/.  The
+    -- lines on the draws before stayed under 256.)
+    emu.addMemoryCallback(function(addr, v)
+      local lo, hi = H.readByte(D.mark), H.readByte(D.mark + 1)
+      if (addr & 0xFFFF) == (D.mark & 0xFFFF) then lo = v else hi = v end
+      L.markWrites[#L.markWrites + 1] = { f = H.frame, v = lo | (hi << 8) }
     end, emu.callbackType.write, D.mark, D.mark + 1)
 
     emu.addMemoryCallback(function()

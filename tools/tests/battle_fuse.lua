@@ -99,6 +99,13 @@ WANT[0x10B] = "Number 128"
 WANT[0x10D] = "the left Crane"
 WANT[0x10E] = "the right Crane"
 -- ---- end wt/v052-tg-wob2 ----
+-- ---- wt/v052-tg-wob3: World of Balance bosses 17-22 (bosses-wob.md; AtmaWeapon's last phase is its second row) ----
+WANT[0x12E] = "the bridge Ultros"
+WANT[0x116] = "FlameEater"
+WANT[0x12F] = "Chupon"
+WANT[0x147] = "the MissileBay"
+WANT[0x118] = "Nerapa"
+-- ---- end wt/v052-tg-wob3 ----
 
 -- every command of the block at x from `from` (nil: its start) to `to` (nil: its end) that picks among three is one
 -- certain pick, and none of the block's conditions is a roll: returns the offences as text
@@ -260,6 +267,33 @@ local HAND = {
   ["10E@0000"] = { blocks = "earlier none; own [14 24 01]",
     why = "the right Crane: as the left" },
   -- ---- end wt/v052-tg-wob2 ----
+  -- ---- wt/v052-tg-wob3: World of Balance bosses 17-22 (bosses-wob.md) ----
+  ["12E@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "the bridge Ultros: the fuse block is the script's first, ahead of the sink, his opening and one-time "
+      .. "lines, his Lode Stone clock and his advance; monster switch 0, set with switch 1 by the turn that finds him "
+      .. "at the edge, cleared only by the move's turn or the cancel; his counters touch battle variables and battle "
+      .. "switches only, and the Relm scene (battle_event $16) touches no monster switch" },
+  ["116@0000"] = { blocks = "earlier none; own [14 24 02]",
+    why = "FlameEater: the fuse block is the script's first, ahead of its opening, its clock, its Reflect and its "
+      .. "Bomblet calls; monster switch 2 (0 and 1 are the opening's and the calls'), set only by its rotation's last "
+      .. "turn and cleared only by the move's turn or the cancel; its counters touch none" },
+  ["12F@0000"] = { blocks = "earlier none; own [0D 03 03]",
+    why = "Chupon: the fuse block is the script's first; its condition is battle variable 3 at 3 or more, which only "
+      .. "his counter adds to (one a blow) and only the move's turn or the cancel clears: it cannot fall between the "
+      .. "announce and the move.  Ultros's script touches battle variable 0 and monster switches only" },
+  ["147@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "the MissileBay: the fuse block is the script's first, ahead of both rotations; monster switch 0, set by "
+      .. "its rotations' Missile turns, cleared only by the move's turn or the cancel; its counter touches none" },
+  ["117@003E"] = { blocks = "earlier [15 24 07] [14 24 00]; own [14 24 02]",
+    why = "AtmaWeapon's last phase: the earlier blocks are its opening speech (switch 7, once) and the first Flare "
+      .. "Star fuse (switch 0), which only its 12,800 rotation's Mind Blast turn sets and which cannot be set while "
+      .. "this one is lit (that rotation stands behind the last phase's, whose arming sets switch 2 and ends the "
+      .. "turn); its own condition is switch 2, cleared only by the move's turn or the cancel" },
+  ["118@0000"] = { blocks = "earlier none; own [0D 03 06]",
+    why = "Nerapa: the fuse block is the script's first, ahead of the Condemned opening; its condition is battle "
+      .. "variable 3 at 6 or more, which only its counter adds to (one a Fight) and only the move's turn or the "
+      .. "cancel clears" },
+  -- ---- end wt/v052-tg-wob3 ----
 }
 local function staticChecks()
   local AI, PTRS, TBL, LINES = H.sym("AIScript"), H.sym("AIScriptPtrs"), H.sym("Ot6FuseTbl"), H.sym("Ot6FuseLineTbl")
@@ -418,6 +452,8 @@ local function staticChecks()
   H.assertEq(seen[0x12A], 2, "Kefka has two rows (the line under 7,680 HP and the line under 32,640)")
   H.assertEq(seen[0x044], 3, "Telstar has three rows (its calls at 25, 80 and 200; wt/v051-tg-wob2)")
   H.assertEq(seen[0x10A], 3, "Number 024 has three rows (its fire, ice and water walls; wt/v052-tg-wob2)")
+  H.assertEq(seen[0x117], 2, "AtmaWeapon has two rows (the Flare Star under 12,800 HP and the last phase's under "
+    .. "6,144; wt/v052-tg-wob3)")
   -- ---- wt/v051-tg-wob1: the Whelk's shell no longer draws the head in (no `kill_monsters MONSTER_2`, $F5 $08 $01
   -- $02, in its script): it calls the head in (set_battle_switch 0, 1: $F9 $01 $00 $01), and only behind the head's
   -- hold, `if_battle_switch_clr 0, 0` ($FC $15 $00 $00), in the same block: else a Broken head could be called in

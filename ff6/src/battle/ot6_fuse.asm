@@ -228,6 +228,29 @@ Ot6FuseTbl:
         ot6_fuse $010d, Ot6FuseCraneL, Ot6FuseCraneL, $fd, $ff, OT6_FUSE_TIMER
         ot6_fuse $010e, Ot6FuseCraneR, Ot6FuseCraneR, $fd, $ff, OT6_FUSE_TIMER
         ; ---- end wt/v052-tg-wob2 ----
+        ; ---- wt/v052-tg-wob3: World of Balance bosses 17-22 (bosses-wob.md) ----
+        ; the bridge Ultros: "He looms over you!", Aqua Rake; armed at the edge
+        ; of his advance (monster switch 0).  Switch 1 (he holds the edge) is
+        ; kept: his first turn back is the sink to the start, the advance again
+        ot6_fuse $012e, Ot6FuseUltros3, Ot6FuseUltros3, $fe, $ff, 0
+        ; FlameEater: "It swells with flame!", Fire Ball; armed by its
+        ; rotation's last turn (monster switch 2; 0 and 1 are its opening and
+        ; its calls)
+        ot6_fuse $0116, Ot6FuseFlameEater, Ot6FuseFlameEater, $fb, $ff, 0
+        ; Chupon: "It inhales!" (Ifrit's line), Fire Ball; armed by three blows
+        ; counted (battle variable 3), which a break clears
+        ot6_fuse $012f, Ot6FuseChupon, Ot6FuseChupon, $ff, $ff, OT6_FUSE_VAR3
+        ; the Air Force's MissileBay: "Missiles lock on!", Launcher; armed under
+        ; 1,536 HP by a Missile turn (monster switch 0).  The bay's row: a break of the body
+        ; leaves it lit
+        ot6_fuse $0147, Ot6FuseMissileBay, Ot6FuseMissileBay, $fe, $ff, 0
+        ; AtmaWeapon's last phase: "Vast energy focused" (vanilla's line), one
+        ; glowing turn, Flare Star; armed by its low rotation (monster switch 2)
+        ot6_fuse $0117, Ot6FuseAtmaWeaponLow, Ot6FuseAtmaWeaponLow, $fb, $ff, 0
+        ; Nerapa: "The wheel turns!", Roulette; armed by six Fights counted
+        ; (battle variable 3), which a break clears
+        ot6_fuse $0118, Ot6FuseNerapa, Ot6FuseNerapa, $ff, $ff, OT6_FUSE_VAR3
+        ; ---- end wt/v052-tg-wob3 ----
         .word   $ffff
 
 ; the announce lines a counter speaks (a `dlg` id, low byte; every id is

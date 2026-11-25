@@ -1541,6 +1541,10 @@ local steps = {
     H.assertExitContractPreSave("fire-out-v1")
   end),
   H.saveState("fire_out.mss"),
+  -- flameeater_entry (also= in the graph): the entry-point checkpoint the sweep reloads, in FlameEater's chamber
+  -- before the walk onto its trigger -- battle_flameeater's fixture (wt/v052-tg-wob3).  Emitted here, after the play,
+  -- so that the capture spends no frames of its own.
+  H.call(function() H.emitBlob("flameeater_entry.mss", feBlob) end),
   (function()
     local saveReq, loadReq
     return H.cond(function() return true end, {

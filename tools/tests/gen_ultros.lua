@@ -124,6 +124,7 @@ end
 -- (the runner's class=wipe), and the segment runner's standard bounded retry
 -- -- the boot snapshot, a moved seed, a counted `[retry]` line -- is the only
 -- reload.
+local u3Req = nil                          -- the ultros3_entry capture (wt/v052-tg-wob3)
 local function ultrosFight()
   local F = H.newFightDriver("Ultros III", { tactical = true, boost = true,
     bank = 3, items = true, cure = false, healPercent = 45 })
@@ -299,6 +300,10 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
     H.assertEq(sw(0x0095), 0, "$0095 CLEAR -- Ultros III not fought yet")
     H.log(string.format("[ot6] lore seen f%d (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
+    -- ultros3_entry (also= in the graph): the statue room after the lore scene, one step above Ultros III's
+    -- trigger -- battle_ultros3's fixture (wt/v052-tg-wob3).  Captured with no frames spent (H.saveState waits 2,
+    -- which would move the fight after it) and emitted after the save tile's state.
+    u3Req = H.requestSaveState()
   end),
   ultrosFight(),
   H.call(function()
@@ -346,6 +351,10 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
   end),
   -- THE STEP'S SAVESTATE IS GENERATED HERE, on the save tile, before the menu
   H.saveState("ultros_won.mss"),
+  H.call(function()
+    H.checkReq(u3Req, "ultros3_entry capture")
+    H.emitBlob("ultros3_entry.mss", u3Req.blob)
+  end),
 
   -- ---- 5. the real Save UI, slot 3 (gen_esper_mtn's flow) ----------------
   (function() local calm, ph = 0, 0

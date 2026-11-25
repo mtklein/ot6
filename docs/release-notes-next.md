@@ -23,6 +23,39 @@ long. Ifrit's Fire 2, Shiva's Ice 2, Number 024's second-tier spells and
 Number 128's Atomic Ray now come only after their line. Ifrit has 7
 shields instead of 6.
 
+The rest of the World of Balance's bosses announce a move the same way.
+Ultros at Esper Mountain creeps toward you one step every other turn, and
+enough hits push him back a step, but no longer once he holds the edge.
+Three of his turns after he reaches four steps out he says "He looms over
+you!", and on his next turn Aqua Rake hits the whole party (about a
+quarter of each member's HP); on the turn after he sinks back to where he
+started. A break while the **!** is up stops the wave and sends him back
+to the start. He no longer uses Magnitude8. FlameEater says "It swells
+with flame!" a turn before Fire Ball on the whole party (about a fifth of
+each member's HP). On the airship, Chupon says "It inhales!" a turn
+before Fire Ball on the whole party (about a fifth of each member's HP),
+once he has been hit three times; a break while the **!** is up also
+starts his count of hits over. The Air Force's MissileBay fires Missiles
+until it is badly damaged, as before; from then on it says "Missiles lock
+on!" a turn before each Launcher barrage, whose hits fall at random and
+can take nearly all of a member's HP. Breaking the bay
+stops the barrage; breaking the Air Force itself does not; a bay destroyed
+while the **!** is up fires nothing. Once AtmaWeapon is badly hurt it says
+"Vast energy focused" again and uses Flare Star on its next turn (about
+half of each member's HP), where before it no longer used Flare Star at
+that point. Nerapa says "The wheel turns!" a turn before Roulette, which
+kills one target at random and which it uses after you have used Fight on
+it six times; a break while the **!** is up also starts that count over.
+FlameEater's and Chupon's Fire Ball and the MissileBay's Launcher now
+come only after their line.
+
+A boss that announces a move can no longer have it taken away by a
+status: the Marshal, Number 128, the Gold Dragon, Rizopas, Chupon and
+Nerapa can no longer be Berserked, Chupon can no longer be Muted, and
+Number 024 can no longer be turned into an Imp.
+Sleep, Stop and Muddle still delay a boss's turn, and draining a boss's
+MP still works.
+
 ## Saves
 
 Saves from v0.28 and later load in this release. A save from before v0.44

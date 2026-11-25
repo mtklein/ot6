@@ -42,6 +42,11 @@ local function up() return H.readByte(0x3AA8 + SLOT * 2) & 1 == 1 and H.readWord
 local rolls, gen = {}, 0
 local ENT = 8 + 2 * SLOT
 
+-- (The breaking Fights are aimed at him, cfg.aim: on wt/v052-tg-wob3's replayed draw, with every member Fighting at
+-- random, 15 turn-A rolls in a row missed before the second line and the case's 40,000 frames ran out, "rizopas: the
+-- announce shows (dlg $9A) -- the trigger earned again: got false" (build/attempts/wt/v052-tg-wob3/regen2/suites/
+-- battle_rizopas-red.log); aimed, the same draw is green.  A perturbation for missed rolls was tried and never ran
+-- on any draw seen (no roll missed), so it is not kept: the review of that branch asked for it proven or gone.)
 -- The cap: its run ended at f26,663 on the merged ROM (wt/v051-tg-wob1), so 55,000 is about 2x the longest.
 H.run({ maxFrames = 55000 }, {
   H.waitFrames(20),
@@ -89,7 +94,7 @@ H.run({ maxFrames = 55000 }, {
   H.fuseCases({
     tag = "rizopas", species = RIZOPAS, write = WRITE,
     line = 0x9A, move = { cmd = 0x02, atk = 0x6F }, turns = 1, glows = 1,
-    arm = "idle",
+    arm = "idle", aim = true,
     bossHp = 775,
     onOpen = function() gen = gen + 1 end,
     -- at once, before his first turn: the cases share the snapshot and the party's input, so the draw that armed
