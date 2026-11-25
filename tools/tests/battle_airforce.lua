@@ -16,7 +16,7 @@
 --   high      the bay's HP held at 2,500, above its gate (DECLARED): three of its turns, the party Defending, bring
 --             Missiles only and no line.
 --   then the bay's cases from a snapshot (M.fuseCases, lib/ot6.lua, where the cases and the DECLARED staging are
---   written out: the gauge, the row's classes for the breaking Fight, HP held -- the bay's at 1,000, under its gate):
+--   written out: the gauge, the row's classes for the breaking Fight, HP held -- the bay's at 1,500, under its gate):
 --   unbroken  the party Defends; the line shows on the turn after a Missile; the lit-fuse mark stands before the
 --             bay's shield emblem; the Launcher is dispatched on its next turn, a glow between; the mark goes; the
 --             line reads "Missiles lock on!" where the relocated dialogue table points.
@@ -94,7 +94,7 @@ local function bodyCase()
   local B, A, brokeF, from = nil, nil, nil, nil
   return H.seqStep({
     H.call(function()
-      B = H.fuseWatch(BAY, WRITE); B.on = true; B.pin = { boss = 1000, party = true }
+      B = H.fuseWatch(BAY, WRITE); B.on = true; B.pin = { boss = 1500, party = true }
       A = H.fuseWatch(AIRFORCE, WRITE); A.on = true; A.pin = { boss = 6000 }
       from = H.frame
     end),
@@ -141,7 +141,7 @@ local function killedCase()
   local B, from, diedF, s0 = nil, nil, nil, nil
   return H.seqStep({
     H.call(function()
-      B = H.fuseWatch(BAY, WRITE); B.on = true; B.pin = { boss = 1000, party = true }; from = H.frame
+      B = H.fuseWatch(BAY, WRITE); B.on = true; B.pin = { boss = 1500, party = true }; from = H.frame
       s0 = B.slot()
     end),
     H.kitBattle({}, { idle = "defend", care = false, maxFrames = 30000,
@@ -164,8 +164,11 @@ local function killedCase()
         end })
     end),
     -- (the party Defends a while: the turns the bay would have had)
-    H.kitBattle({}, { idle = "defend", care = false, maxFrames = 3000,
-      giveUp = function() return not H.battleLoadStarted() end }),
+    H.lazy(function()
+      local t0 = H.frame
+      return H.kitBattle({}, { idle = "defend", care = false, maxFrames = 3000,
+        giveUp = function() return H.frame - t0 >= 2400 or not H.battleLoadStarted() end })
+    end),
     H.call(function()
       local li, lc = lineFrom(B, from)
       local launched = false
@@ -182,8 +185,9 @@ local function killedCase()
 end
 
 -- The cap: the high case's 6,000 frames, three cases of about 10,000 frames each (the bay is slow: speed 20) and the
--- body and killed cases' about 12,000 each, so 140,000 is about 2x.
-H.run({ maxFrames = 140000 }, {
+-- body and killed cases' about 4,000 each: its run ended at f27,942 (regen4 suites, battle_airforce-dev3.log), so
+-- 60,000 is about 2x.
+H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitUntil(function() return H.battleActive() end, 3000, "the Air Force's battle is up", 2),
@@ -204,7 +208,8 @@ H.run({ maxFrames = 140000 }, {
     line = 0x9E, move = { cmd = 0x0C, atk = LAUNCHER }, turns = 1, glows = 1,
     lineText = "Missiles lock on!{wait}",
     arm = "idle", aim = true,
-    bossHp = 1000,
+    bossHp = 1500,  -- (under its 1,536 gate; at 1,000 the outside case's two Fights on the Broken bay killed it:
+                    --   build/attempts/wt/v052-tg-wob3/regen4/suites/battle_airforce-red.log)
     -- one Missile fired since the case's open (under the gate it arms the fuse), no line
     partway = function(W)
       return W.cells() ~= nil and missilesBetween(W, 0, H.frame + 1) >= 1
