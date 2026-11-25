@@ -4,7 +4,7 @@
 --
 -- Its script (ai_script.asm AIScript::_280): vanilla counted the party's Fights at it (its counter: a Battle back,
 -- and the tally) and spun Roulette on its first turn with six counted.  Now that turn says "The wheel turns!" (battle
--- dialogue $9F) and glows, and Roulette (attack $8C, command $0C) comes on its next turn.  The tally is the fuse
+-- dialogue $9F) and glows, and Roulette (attack $8C, command $1E, as ExecCmd dispatches it) comes on its next turn.  The tally is the fuse
 -- block's own condition, in battle variable 3 now (vanilla's was 0).  Under the contract (Ot6FuseTbl's row $0118,
 -- OT6_FUSE_VAR3) a break while it is lit cancels Roulette and clears the tally: six more Fights earn it again.
 -- Fights on a Broken Nerapa count nothing.  Its Fight counter is no dying counter; it is vanilla's but for the
@@ -13,7 +13,7 @@
 -- Boots nerapa_entry (gen_fc_escape: the doorstep under the escape clock, the party TERRA, LOCKE, EDGAR and CELES),
 -- talks to it (battle 81) and plays the battle from a snapshot at its open (M.fuseCases, lib/ot6.lua, where the
 -- cases and the DECLARED staging are written out: the gauge -- to 63 while the party's Fights earn the spin, to 1
--- with every class for the breaking Fight -- and HP held, its at 2,000):
+-- with every class for the breaking Fight -- HP held, its at 30,000 (no one boosted Fight takes that), and, below, the party's Condemned clocks and the escape's clocks held and Nerapa kept from instant death):
 --   unbroken  the party Fights it; six Fights counted, the line shows on its next turn; the lit-fuse mark stands;
 --             Roulette is dispatched on its turn after, a glow between; the mark goes; the line reads "The wheel
 --             turns!" where the relocated dialogue table points.
@@ -34,8 +34,9 @@ local STATE = "build/states/nerapa_entry.mss.lua"
 local NERAPA = 0x118
 local function nerapaUp() return (H.readByte(0x1EEC) >> 1) & 1 == 1 end    -- $0361: Nerapa stands
 
--- The cap: three cases of about 6,000 frames each, so 40,000 is about 2x.
-H.run({ maxFrames = 40000 }, {
+-- The cap: its run ended at f32,883 (build/attempts/wt/v052-tg-wob3/regen2/suites/battle_nerapa-dev9.log), so 70,000 is
+-- about 2x.
+H.run({ maxFrames = 70000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
@@ -60,13 +61,47 @@ H.run({ maxFrames = 40000 }, {
       end),
     }, "Nerapa engaged")
   end, NERAPA, "Nerapa"),
-  H.call(function() H.setPad({}) end),
+  H.call(function()
+    H.setPad({})
+    -- DECLARED: the Condemned clocks held.  Its opening Condemns every member (its first turn, once), and Doom came
+    -- before a case could end: the first cut's broken case wiped at f15988, 9,500 frames after the battle's open
+    -- (build/attempts/wt/v052-tg-wob3/regen2/suites/battle_nerapa-dev2.log).  A member's count ($3B05,x, StartCondemn)
+    -- under 10 goes back to 30, so no Doom ends a case; Roulette's own death stands (each case opens on the snapshot).
+    emu.addEventCallback(function()
+      if not H.battleActive() then return end
+      for i = 0, 3 do
+        local n = H.readByte(0x3B05 + 2 * i)
+        if n > 0 and n < 10 then WRITE.byte(0x3B05 + 2 * i, 30) end
+      end
+      -- DECLARED: the escape's clocks (the event timers' counters, $1189 + 6k: the master clock and Shadow's) held
+      -- at 6,000 frames or more: the second cut's broken case ran one out ("the boss still stands and the battle is
+      -- up (broken): got false" at f17943, 11,474 frames after the battle's open; battle_nerapa-dev3.log), and
+      -- holding the master clock alone did not help (dev4)
+      -- DECLARED: Nerapa protected from instant death ($3AA1,x bit 2, as FixImmuneStatus sets it for a body immune
+      -- to Wound).  LOCKE's Assassin kills at random on a hit, and on this branch's cuts a Fight of the broken
+      -- case's arming killed it at f17326 every time (its HP held at 30,000 read 0 a frame later, its status $80:
+      -- build/lab/tg-wob3/nerapa_probe.log, retained under build/attempts/wt/v052-tg-wob3/regen2/suites/), and the
+      -- battle ended
+      for sl = 0, 5 do
+        if H.readWord(0x57C0 + sl * 2) == NERAPA and H.readByte(0x3AA8 + sl * 2) & 1 == 1 then
+          local x = 0x3AA1 + 8 + 2 * sl
+          if H.readByte(x) & 0x04 == 0 then WRITE.byte(x, H.readByte(x) | 0x04) end
+        end
+      end
+      for k = 0, 3 do
+        local c = H.readWord(0x1189 + 6 * k)
+        if c > 0 and c < 6000 then WRITE.word(0x1189 + 6 * k, 12000) end
+      end
+    end, emu.eventType.endFrame)
+  end),
   H.fuseCases({
     tag = "nerapa", species = NERAPA, write = WRITE,
-    line = 0x9F, move = { cmd = 0x0C, atk = 0x8C }, turns = 1, glows = 1,
+    line = 0x9F, move = { cmd = 0x1E, atk = 0x8C }, turns = 1, glows = 1,
     lineText = "The wheel turns!{wait}",
     arm = "fight", openHold = true,
-    bossHp = 2000,
+    bossHp = 30000,  -- (far above its 2,800: the arming Fights are boosted, and a dumped Fight on a body held at 2,000
+                     --   and then 9,000 took it whole in one action, the battle ending at f17943 on the cuts dev4-dev7,
+                     --   battle_nerapa-dev7.log: Nerapa on screen at f17408, gone at f17792)
     -- one to five Fights counted, no line
     partway = function(W)
       local v = H.readByte(0x3EB3)
