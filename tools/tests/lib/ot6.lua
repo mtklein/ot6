@@ -19764,12 +19764,14 @@ function M.aiAttacks(species, atk)
   return out
 end
 
--- M.battleOpenCapture(species, tag): (wt/v052-tg-wor1) a generator's fixture of a boss battle as it comes up, before
+-- M.battleOpenCapture(species, name): (wt/v052-tg-wor1) a generator's fixture of a boss battle as it comes up, before
 -- any input.  Returns C: C.arm() is a step that arms it (and drops any earlier capture: a retried attempt's), C.emit()
--- a step that emits the capture as `tag`.mss (the graph's also= names it).  Once armed, the capture is taken with no
+-- a step that emits the capture as `name` ("<state>.mss", a literal at the call: the graph's also= names it, and
+-- compose's OT6_STACK rewrite prefixes it there).  Once armed, the capture is taken with no
 -- frames spent (M.requestSaveState) on the first frame a battle is up (M.battleActive) with `species` standing in a
 -- monster slot, so the play after it is the play without it.
-function M.battleOpenCapture(species, tag)
+function M.battleOpenCapture(species, name)
+  local tag = name:gsub("%.mss$", "")
   local C = { armed = false, req = nil }
   emu.addEventCallback(function()
     if not C.armed or C.req ~= nil or not M.battleActive() then return end
@@ -19786,7 +19788,7 @@ function M.battleOpenCapture(species, tag)
   function C.emit()
     return M.call(function()
       M.checkReq(C.req, tag .. " capture (the battle with $" .. string.format("%03X", species) .. " as it came up)")
-      M.emitBlob(tag .. ".mss", C.req.blob)
+      M.emitBlob(name, C.req.blob)
       C.armed = false
     end)
   end

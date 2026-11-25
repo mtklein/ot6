@@ -73,7 +73,7 @@ local TENTACLES_BANK = 3
 local TENTACLES_FORM = 454                          -- event battle 84
 -- tentacles_entry (also= in the graph): the Tentacles' battle as it comes up, before any input -- battle_tentacles's fixture (wt/v052-tg-wor1).
 -- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
-local TENT_CAP = H.battleOpenCapture(0x11B, "tentacles_entry")
+local TENT_CAP = H.battleOpenCapture(0x11B, "tentacles_entry.mss")
 local B2_EXITS = { { 13, 12 }, { 14, 8 }, { 2, 13 }, { 4, 6 }, { 8, 18 }, { 8, 6 } }  -- map 62's doors
 local MAP_CAVE1, MAP_CAVE2, MAP_CAVE3, MAP_CAVE4 = 68, 90, 92, 53
 local MAP_B1, MAP_B2, MAP_B3, MAP_ENGINE = 61, 62, 63, 64

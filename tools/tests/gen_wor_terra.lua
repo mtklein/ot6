@@ -30,7 +30,7 @@ local CABIN_NPCS = { { "CELES", 0x16, 0x038E }, { "SETZER", 0x19, 0x0391 }, { "S
 local function map() return H.mapId() & 0x1ff end
 -- phunbaba_entry (also= in the graph): the second Phunbaba's (battle 130) battle as it comes up, before any input -- battle_phunbaba's fixture (wt/v052-tg-wor1).
 -- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
-local PHUN_CAP = H.battleOpenCapture(0x16C, "phunbaba_entry")
+local PHUN_CAP = H.battleOpenCapture(0x16C, "phunbaba_entry.mss")
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function c(ch, off) return 0x1600 + 37 * ch + off end

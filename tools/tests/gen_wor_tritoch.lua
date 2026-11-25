@@ -34,8 +34,8 @@ local ICEDRAGON_FORMATION, TRITOCH_FORMATION, UMARO_FORMATION = 366, 487, 444
 -- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
 -- umaro_entry (also= in the graph): the Umaro's battle as it comes up, before any input -- battle_umaroboss's fixture (wt/v052-tg-wor1).
 -- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
-local TRITOCH_CAP = H.battleOpenCapture(TRITOCH_SP, "tritoch_entry")
-local UMARO_CAP = H.battleOpenCapture(UMARO_SP, "umaro_entry")
+local TRITOCH_CAP = H.battleOpenCapture(TRITOCH_SP, "tritoch_entry.mss")
+local UMARO_CAP = H.battleOpenCapture(UMARO_SP, "umaro_entry.mss")
 -- the fight driver for the three: fire, which each of them is weak to, from
 -- whoever knows it (TERRA's natural Fire; the Ifrit and Maduin wearers once
 -- they learn it), boosted toward Fire 2 and 3; CELES on Runic (N. Cross, Ice

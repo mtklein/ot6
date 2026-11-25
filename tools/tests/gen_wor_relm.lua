@@ -45,7 +45,7 @@ local IFRIT, STARLET, GOLEM, ZONESEEK = 1, 25, 22, 18
 local GODDESS_SP, DEMON_SP, CHADARNOOK_FORMATION = 0x11E, 0x148, 456
 -- chadarnook_entry (also= in the graph): the Chadarnook's battle as it comes up, before any input -- battle_chadarnook's fixture (wt/v052-tg-wor1).
 -- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
-local CHAD_CAP = H.battleOpenCapture(GODDESS_SP, "chadarnook_entry")
+local CHAD_CAP = H.battleOpenCapture(GODDESS_SP, "chadarnook_entry.mss")
 local BOSS_SPECIES = { [GODDESS_SP] = true, [DEMON_SP] = true }
 -- the fight driver for the demon (route-wor-thamasa.md 5.2): the demon only
 -- (focus; the goddess absorbs holy and water and counters every hit with
