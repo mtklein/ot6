@@ -202,7 +202,8 @@ H.run({ maxFrames = 60000 }, {
     end
     H.assertEq(present, 2, "the Air Force and its MissileBay stand at the open (airforce_entry)")
   end),
-  highCase(),
+  -- (not in a damage run, FUSE_DMG: its party pin at 9,999 would stand under the run's own and read as damage)
+  H.cond(function() return rawget(_G, "FUSE_DMG") ~= true end, { highCase() }, {}),
   H.fuseCases({
     tag = "missilebay", species = BAY, write = WRITE,
     line = 0x9E, move = { cmd = 0x0C, atk = LAUNCHER }, turns = 1, glows = 1,
