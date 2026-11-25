@@ -50,10 +50,15 @@ local LOCKE = 0x01
 -- his turn up and the battle running, until when() says so, and Fights it at 2 BP (three swings), so the hit comes
 -- at that moment; the others Defend.  A moment his window missed comes round again with the Marshal's next
 -- rotation.
-local function fightLobo(slot, when, what)
+-- (solo: LOCKE alone Fights it, the others Defend, so that no member's Fight queued behind the killing blow turns
+-- on the other Lobo as its target falls -- wt/v052-tg-wob2's gate draw: the third member's Fight killed Lobo 1
+-- after Lobo 0 fell, and the case that needs Lobo 1 standing had none)
+local function fightLobo(slot, when, what, solo)
   return H.lazy(function()
     local plan = {}
-    if when then
+    if solo then
+      for round = 1, 8 do plan[#plan + 1] = { who = LOCKE, cmd = 0x00, slot = slot } end
+    elseif when then
       plan = { { who = LOCKE, defend = true }, { who = LOCKE, cmd = 0x00, slot = slot, boost = 2, openWhen = when } }
     else
       for round = 1, 3 do
@@ -132,7 +137,11 @@ function aloneCase(kind)
     end)
   else
     local armedAt, lined
-    steps[#steps + 1] = fightLobo(0, nil, kind)
+    steps[#steps + 1] = fightLobo(0, nil, kind, true)
+    steps[#steps + 1] = H.call(function()
+      H.assertEq(#lobosStanding(), 1, string.format("marshal (%s): Lobo 1 still stands once Lobo 0 has fallen (the "
+        .. "case's precondition)", kind))
+    end)
     if kind == "dropped" then
       -- armed (switch 0) and not yet announced (switch 1, set by the announce)
       steps[#steps + 1] = fightLobo(1, function()

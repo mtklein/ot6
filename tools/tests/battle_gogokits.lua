@@ -10,7 +10,8 @@
 -- suite gives GOGO the commands through the field Status menu, as a player
 -- does, and plays them through the real battle menu (H.kitBattle).
 --
--- Played, with three declared stagings (state_write_waivers.txt; below):
+-- Played, with four declared stagings (state_write_waivers.txt; below; the fourth a SwordBreaker staged when the
+-- line lost the Colosseum's Assassin wager):
 -- Continue wor-colosseum-v1 (beside the Falcon by
 -- Maranda), board, and in the Falcon's cabin seat GOGO, TERRA, RELM and
 -- SHADOW (no STRAGO and no CELES: both cast Scan, and the Lore round reads
@@ -1337,8 +1338,20 @@ local body = {
     install()
   end),
   H.call(function()
+    -- (the SwordBreaker is gen_wor_colosseum's prize for the Assassin, a wager the line can lose -- it did on
+    -- wt/v052-tg-wob2's replay, "char 0 LOST; prize $07 0 -> 0" -- so a bag without one is staged one, in the first
+    -- empty slot: a DECLARED write, tools/state_write_waivers.txt; the property here is GOGO's kits, not the bet)
+    if H.invCountOf(SWORDBREAKER) < 1 then
+      local slot = nil
+      for i = 0, 255 do if H.readByte(0x1869 + i) == 0xFF then slot = i; break end end
+      H.assertEq(slot ~= nil, true, "the bag has an empty slot for the staged SwordBreaker")
+      H.writeByte(0x1869 + slot, SWORDBREAKER)
+      H.writeByte(0x1969 + slot, 1)
+      H.log(string.format("[gogokits] the bag held no SwordBreaker (the Colosseum's Assassin wager was lost on this "
+        .. "line): one staged in slot %d", slot))
+    end
     H.assertEq(H.invCountOf(SWORDBREAKER) >= 1, true,
-      "the bag holds a SwordBreaker (gen_wor_colosseum's prize for the Assassin)")
+      "the bag holds a SwordBreaker (gen_wor_colosseum's prize for the Assassin, or the staged one)")
   end),
   regroup({ GOGO, TERRA, RELM, SHADOW }),
   H.lazy(function()

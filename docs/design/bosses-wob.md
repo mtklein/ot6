@@ -38,9 +38,11 @@ Stated once, assumed by every block:
   Broken boss wind no fuse, on the one fuse vanilla wrote for a World of
   Balance boss, AtmaWeapon's (block 21, `battle_atmaweapon`), and on
   three in the World of Ruin. The authored telegraphs of blocks 1-5
-  (the Whelk to TunnelArmr, wt/v051-tg-wob1) and 7-10 (Telstar, the
-  GhostTrain, Rizopas, Kefka at Narshe, wt/v051-tg-wob2) are built too
-  (each block's **Built** line). Every other **Telegraph** line below is
+  (the Whelk to TunnelArmr, wt/v051-tg-wob1), 7-10 (Telstar, the
+  GhostTrain, Rizopas, Kefka at Narshe, wt/v051-tg-wob2) and 11-16
+  (Dadaluma, the opera Ultros, Ifrit and Shiva, Number 024, Number 128,
+  the Cranes, wt/v052-tg-wob2) are built too (each block's **Built**
+  line). Every other **Telegraph** line below is
   design text: the scripts do not announce those moves yet. The fuse
   block's idiom for writing them, and its worked example, are in
   `ot6_fuse.asm` and `battle_fuse`.
@@ -64,6 +66,12 @@ Stated once, assumed by every block:
   | 8 | GhostTrain | 2 turns | Race: won on 3 of 4 keys from the announce |
   | 9 | Rizopas | 1 turn | Race: won on 2 of 3 keys from the announce |
   | 10 | Kefka (Narshe) | 1 turn | Race (four-class lab, when EDGAR's pike keyed him too): won on 3 of 4 keys from the announce; under six classes EDGAR keys him only by Bio Blaster and the line's squad broke him 12 actions in; not re-raced |
+  | 11 | Dadaluma | 1 turn | Race, for a party that casts at him: banked, broken in the fuse on 4 of 4 keys; the line casts nothing and breaks him first |
+  | 12 | Ultros ② | 1 turn | Warning: only EDGAR's AutoCrossbow keys him; 0 of 4, banked or not |
+  | 13 | Ifrit / Shiva | 1 turn each | Ifrit, race at 7: banked 5 of 5, the line's fighter 1 of 4. Shiva, warning: only EDGAR's sword keys her; banked, 1-2 shields left, 0 of 5 |
+  | 14 | Number 024 | 1 turn | Warning for the line (broken before any line, 4 of 5); a banked party 2 of 5 |
+  | 15 | Number 128 | 1 turn | Warning: banked 1 of 4; the line never cuts a blade, so never meets the ray |
+  | 16 | Cranes | 1 turn each | The line kills both before either clock (4 of 4 keys); banked, the left Crane's quake stopped on the 3 keys that announced |
 
   Ultros and TunnelArmr stay at one turn: their warnings fit the feel,
   and a longer fuse would only lengthen fights the party usually ends
@@ -164,7 +172,7 @@ then on; only his shield count grows.
 | 10 | Kefka | Narshe defense | 6 |
 | 11 | Dadaluma | Zozo | 6 (Iron Fists 2) |
 | 12 | Ultros ② | Opera house | 6 |
-| 13 | Ifrit & Shiva | Magitek factory | 6 + 6 |
+| 13 | Ifrit & Shiva | Magitek factory | 7 + 6 |
 | 14 | Number 024 | Magitek factory | 7 |
 | 15 | Number 128 | minecart escape | 7 (blades 3 each) |
 | 16 | Left & Right Cranes | airship escape | 6 + 6 |
@@ -1084,6 +1092,27 @@ AutoCrossbow (opening.md 11).
 - **Telegraph:** he crouches to jump → **Jump**, which is
   untargetable and lands on one character. Break him during the
   crouch and he does not leave the ground.
+- **Built (wt/v052-tg-wob2, `battle_dadaluma`).** Vanilla's trigger
+  stays: he leaps once the party has used Magic on him three times
+  (battle variable 2, his counter's tally) and he is not Slowed. The
+  knife fan at the whole party that came first now arms the fuse
+  (monster switch 0); "He crouches!" (dialogue `$93`) and a glow announce
+  it on his next turn, and Jump comes on the turn after. A break in
+  between cancels it and clears the tally (`Ot6FuseTbl` row `$0107`,
+  `OT6_FUSE_VAR2`, a new flag): three more spells earn it again. A party
+  that casts nothing at him never sees the leap, as in vanilla.
+  Lab (one turn, 6 shields, LOCKE, CELES, EDGAR and SABIN, keys `$8B
+  $CB $EB $AB`/438, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-dadaluma/`): a party that Defends from the
+  open while CELES casts Ice at him three times, and from the announce
+  plays its best chip at its whole bank, breaks him in the fuse on 4 of
+  4 keys, 2-6 actions after the line; the line's own fighter casts
+  nothing at him and breaks him 7-9 actions in, before any leap. At 7
+  shields (an exploratory mutant ROM on the v3 fixtures, whose logs
+  carry the fixture warning: a probe, not evidence for a shipped count,
+  `build/attempts/wt/v052-tg-wob2/lab-v3/X7-dada-ifrit/`) the banked
+  party still won 4 of 4 with the same hits (a boosted Fight's swings
+  overrun the seventh), so he stays at 6. The leap took 32 of EDGAR's
+  559 HP (5%) on the damage run (`build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`).
 - **Break story:** he calls in Iron Fists at half health and uses his
   own potions. Chip through the adds with AoE Ranged
   (AutoCrossbow), bank BP, and break him during the crouch.
@@ -1100,9 +1129,29 @@ Party: Locke + three (Celes is mid-aria).
 ranged — revealed at the Lete, still revealed; the codex working
 as designed).
 
-- **Telegraph:** the same tentacle wind-up as before. He is a
-  recurring boss with a remembered weakness row and a higher shield
-  count each time.
+- **Telegraph:** his song. Vanilla sang Imp Song on the whole party
+  when the battle timer reached 60, with "Imp! Pal! Buddy!" in the
+  same turn; that line is now the announce, a turn ahead (the Lete
+  River fight already has his tentacle wind-up, so the opera's is
+  the song). He is a recurring boss with a remembered weakness row
+  and a higher shield count each time.
+- **Built (wt/v052-tg-wob2, `battle_ultros2`).** "Imp! Pal! Buddy!"
+  (vanilla's line, dialogue `$62`) and a glow come on the turn the
+  timer reaches 60, Imp Song on his next. A break in between cancels
+  the song and restarts the battle timer (`Ot6FuseTbl` row `$012D`,
+  `OT6_FUSE_BTIMER`, a new flag), so the next song is earned from the
+  cancel. His slot moves (the counters that hide one body and show
+  another) wait while it is lit (monster switch 0, set by the
+  announce): a fresh body starts its script from the top and would
+  drop an announced song. The moves that waited come on the first hit
+  after the song.
+  Lab (one turn, 6 shields, LOCKE, EDGAR and SABIN, keys `$45 $85 $81
+  $A5`, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-ultros2/`): a **warning**. Of the forced three only
+  EDGAR's AutoCrossbow keys him (Ranged); a party that banks to the line
+  and then chips left him at 5 or 6 shields when the song came, 4 of 4
+  keys, and the line's own fighter, which Fights him down by HP and
+  never breaks him, met the song 3 actions after the line on 4 of 4.
+  The song is Imp on the party, the brace a Ribbon or a Remedy.
 - **Break story:** there is no Banon to protect this time, and the
   tentacle targets whoever is most costly to lose. One more shield
   than the Lete River fight, and no free healer.
@@ -1115,7 +1164,7 @@ Party: Locke, Celes + two.
 
 | part | shields | weak |
 |---|---|---|
-| Ifrit | 6 | ice + dagger |
+| Ifrit | 7 | ice + dagger |
 | Shiva | 6 | fire + sword |
 
 - This is vanilla's tag fight: they swap in and out. Each keeps its
@@ -1134,6 +1183,33 @@ Party: Locke, Celes + two.
 - **Telegraph:** Ifrit inhales and the air shimmers → **Fire 2**;
   Shiva does the same with **Ice 2**. Whichever one is on the field
   runs its own fuse.
+- **Built (wt/v052-tg-wob2, `battle_ifrit`).** Each sibling's rotation
+  is vanilla's two turns, and the second now arms the fuse (Ifrit
+  battle switch 0, Shiva battle switch 1: their monster variable is
+  their counter's tally of spells); "It inhales!" (dialogue `$94`,
+  both) and a glow announce it on the sibling's next turn, and Fire 2
+  (Ifrit) or Ice 2 (Shiva) on the whole party comes on the turn after.
+  A break in between cancels it (`Ot6FuseTbl` rows `$0109`, `$0108`):
+  the rotation's two turns earn it again. Fire 2 and Ice 2 no longer
+  come from the ordinary rotations (Fire and Ice in their place), so
+  the line always means them. The fuse block comes first, so the swap
+  after six hits and the Fire 3 and Rflect blocks wait until the spell
+  has fired.
+  **Ifrit at 7 shields** (6 before this unit). Lab (one turn, LOCKE,
+  EDGAR, SABIN and CELES, keys `$D8 $08 $18 $48 $E8`,
+  `build/attempts/wt/v052-tg-wob2/lab-v4/L4-ifrit/`): a party that Defends to his line and then chips
+  (CELES's Ice, the others' Fights) breaks him in the fuse on 5 of 5
+  keys, 4-5 actions after the line; the line's own fighter, chipping
+  from the open, broke him in the fuse on 1 of 4 keys that announced and
+  took the Fire 2 with 1-3 shields left on the other 3. At 6
+  (`build/attempts/wt/v052-tg-wob2/lab-v3/L3-ifrit/`, the v3 ROM's own
+  fixtures) the line's fighter won 4 of 5, so the bank did not matter;
+  the 7 was chosen on the exploratory mutant (`lab-v3/X7-dada-ifrit/`)
+  and these numbers are the shipped 7's. **Shiva stays at 6, a warning:** of this party
+  only EDGAR's sword keys her (CELES's blade is a dagger), and a banked
+  party left her at 1-2 shields when the Ice 2 came, 4 of 5 keys (6 on
+  the fifth). So the siblings differ: break Ifrit in his fuse, brace for
+  Shiva's.
 - **Break story:** this is the first fight that requires reading
   absorbs, because fire heals Ifrit. Celes can chip both siblings by
   herself, with Ice into Ifrit and her sword into Shiva. The fight
@@ -1153,6 +1229,31 @@ wall spins.
   spell (Fire 2 / Ice 2 / Bolt 2). The fuse also tells you the current
   wall, and therefore the current absorb, so probe with a different
   element.
+- **Built (wt/v052-tg-wob2, `battle_number024`).** His clock's
+  WallChange (the monster timer at 30) arms the fuse (monster switch
+  0). On his next turn, on a wall whose vanilla answer held a tier-2
+  spell, he says "Its wall glows!" (dialogue `$95`) and glows, and the
+  spell comes on the whole party on the turn after: weak to fire, Ice
+  2; to ice, Fire 2; to water, Bolt 2. On the other five walls the
+  arming lapses. From the line to the spell the wall holds (monster
+  switch 1: his counters change no wall while it is set), so the wall
+  the line came on is the wall to hit: its weakness chips him and
+  does not move it. A break in between cancels the spell (`Ot6FuseTbl`
+  rows `$010A`, one a wall); the next WallChange of his clock arms it
+  again. His ordinary turns on those three walls cast the tier-1 spell
+  (vanilla could pick the tier 2), so the tier 2 comes only announced.
+  The wall's spell is new in kind (WallChange makes a random element
+  his weakness, nulls the rest and absorbs one at random,
+  `TargetEffect_26`), so the line names the wall, not his absorb.
+  Lab (one turn, 7 shields, LOCKE, EDGAR, SABIN and CELES, keys `$FD
+  $3D $4D $6D $0D`, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-n024/`): a party that Defends to the line
+  and then Fights (LOCKE's dagger and CELES's blade key him; SABIN's
+  knuckle and EDGAR's weapon do not) broke him in the fuse on 2 of 5
+  keys and took the spell with all 7 shields up on 3; the line's own
+  fighter breaks him 9-14 actions in, before any line, on 4 of 5. A
+  **warning** for the line, a race a banked party wins sometimes; kept
+  at 7. The spell took 18-22% of each member's HP (Bolt 2 on the
+  damage run, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`).
 - **Break story:** this boss works against the codex. Physical chip is
   steady, magic requires reading the current wall, and a break keeps
   the current wall revealed until the next WallChange re-rolls it. It
@@ -1182,13 +1283,30 @@ takes LOCKE's dagger, SABIN's claw and Bolt.
 
 - Blades regenerate a few turns after dying (vanilla ✦), and regrown
   blades return at full shields. Their weakness row stays revealed.
-- **Telegraph:** In `AIScript::_267` (`ff6/src/battle/ai_script.asm:4725-4746`;
-  the label index is the monster id, 267 = `$010B`), Gale Cut sits behind
-  `if_num_monsters 1`: the body Hastes itself and then runs Gale Cut,
-  Atomic Ray, Blaster and Shock Wave **once both blades are dead**. While
-  a blade is alive it runs `BATTLE, BATTLE, ICE` and `BATTLE, SPECIAL,
-  NET`. Killing the blades is what turns the sweep on, so a party that
-  leaves them standing keeps the body on its mild script.
+- **Vanilla:** In `AIScript::_267` (the label index is the monster id,
+  267 = `$010B`), Gale Cut sits behind `if_num_monsters 1`: the body
+  Hastes itself and then runs Gale Cut, Atomic Ray, Blaster and Shock
+  Wave **once both blades are dead**. While a blade is alive it runs
+  `BATTLE, BATTLE, ICE` and `BATTLE, SPECIAL, NET`. The blades regrow
+  within a few hundred frames, so an alone turn is rare.
+- **Telegraph: a falling blade heats the core.** Each blade's death (its
+  `if_self_dead` block, `_319` and `_320`) sets battle switch 0; on the
+  body's next turn "Its core heats!" (dialogue `$97`) and a glow
+  announce Atomic Ray, which comes on the whole party on the turn after,
+  whatever the blades do meanwhile.
+- **Built (wt/v052-tg-wob2, `battle_number128`).** A break in between
+  cancels the ray (`Ot6FuseTbl` row `$010B`): another blade has to
+  fall. Atomic Ray no longer comes from his sweep (Gale Cut and Shock
+  Wave in its place), so it comes only announced. A party that leaves
+  the blades standing (the line steers every attack at the body) never
+  sees it; a party that cuts the blades meets a ray for each.
+  Lab (one turn, 7 shields, LOCKE, EDGAR and SABIN, keys `$E0 $D4 $70
+  $64`, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-n128/`): a **warning**. A party that Defends while it
+  cuts the right blade down and then chips broke him in the fuse on 1 of
+  4 keys and took the ray with 7 shields up on 3; the line's own fighter
+  never cuts a blade and breaks him 13-15 actions in, before any ray, 4
+  of 4. The ray took 23-26% of each member's HP (`build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`). Kept at
+  7: the minecart's party runs three, with no revival on the ride.
 - **Break story:** this is the first battle after Zozo gives you four
   espers, and a Ramuh bearer casting Bolt into the body is the first
   use of the sub-job system (magicite.md's storm-lancer).
@@ -1224,6 +1342,40 @@ Party: the factory four (Setzer is flying the airship).
   Volt**. There is a separate timer move (`if_battle_timer 60` →
   Magnitude8). This is not the one-ATB-cycle fuse the boss contract
   defines above.
+- **Built (wt/v052-tg-wob2, `battle_cranes`): the quake is the
+  telegraph.** Vanilla's Magnitude8 ("The crane shook the deck!") came
+  on whichever Crane's turn came once the battle timer reached 60, one
+  quake for the pair a cycle. Now each Crane's own timer arms it, the
+  left Crane's at 60 (vanilla's length) and the right's at 90, on one of
+  its ordinary turns (monster switch 1); "Deck groans!" (dialogue `$9C`)
+  and a glow announce it on its next turn, and the quake comes on the
+  turn after. A break in between cancels that Crane's quake and
+  restarts its clock (`Ot6FuseTbl` rows `$010D`, `$010E`); the other
+  Crane's clock runs on. The element charges (Giga Volt, Fire 3) are
+  vanilla's and unannounced. The battle is a pincer: the Cranes stand
+  on both sides of the party.
+  Lab (one turn each, 6 shields each, LOCKE, EDGAR, SABIN and SETZER
+  in the line's dress, keys `$7F $9B $77 $B7`, `build/attempts/wt/v052-tg-wob2/lab-v4/L4-cranes/`): the
+  line's own fighter breaks the left Crane 5-8 actions in and kills
+  both before either clock comes due, 4 of 4 keys: the line meets no
+  quake. A party that Defends to the left Crane's line and then chips
+  broke the left Crane inside its fuse and cancelled the quake on the 3
+  keys that announced (`$7F`, `$9B`, `$B7`). The lab's summaries for
+  `$7F` and `$B7` read "cancel NOT fired" because the lab stopped
+  watching on the break's own frame; the review's replays of those two
+  runs with exec loggers show `Ot6FuseCancel` on the break's frame and
+  `Ot6FuseSnuff` one frame later (f16909 on `$7F`, f22134 on `$B7`):
+  ordinary cancels (`build/attempts/wt/v052-tg-wob2/review/
+  trace_crane_l_0.log`, `trace_crane_l_23.log`; the race template now
+  waits 10 frames before its summary). A second run on `$9B`, holding
+  for the line, ended in a wipe before the quake (at f17239 LOCKE and
+  SETZER were down, EDGAR at 95 HP and SABIN at 35; the lab watches only
+  the left Crane, so which body dealt the last blows is not logged), and
+  `$77` never announced; the right Crane's slower clock announced on 1
+  of 4 keys. At 120
+  (`lab-v3/L3d-cranes/`) the line met no quake either, and a party that
+  held for it wiped first. The quake took 34-46% of each member's HP
+  (`build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`).
 - **Break story:** this is the WoB's effective 12-shield fight: two
   live gauges with two fuses on independent clocks. Focus one Crane
   and the other's charge lands. Use the wrong element and you heal its

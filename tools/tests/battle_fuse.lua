@@ -89,6 +89,16 @@ WANT[0x106] = "the GhostTrain"
 WANT[0x155] = "Rizopas"
 WANT[0x14A] = "Kefka at Narshe"
 -- ---- end wt/v051-tg-wob2 ----
+-- ---- wt/v052-tg-wob2: World of Balance bosses 11-16 (bosses-wob.md) ----
+WANT[0x107] = "Dadaluma"
+WANT[0x12D] = "the opera Ultros"
+WANT[0x109] = "Ifrit"
+WANT[0x108] = "Shiva"
+WANT[0x10A] = "Number 024"
+WANT[0x10B] = "Number 128"
+WANT[0x10D] = "the left Crane"
+WANT[0x10E] = "the right Crane"
+-- ---- end wt/v052-tg-wob2 ----
 
 -- every command of the block at x from `from` (nil: its start) to `to` (nil: its end) that picks among three is one
 -- certain pick, and none of the block's conditions is a roll: returns the offences as text
@@ -112,7 +122,7 @@ local function rolls(AI, x, from, to)
 end
 
 -- the commands that touch a trigger: a variable ($F8), a switch ($F9), the monster's timer (reset_monster_timer,
--- $FB $00).  In the turn that fires, every one of them comes before the move (ot6_fuse.asm, the idiom): the fuse is
+-- $FB $00), the battle timer (reset_battle_timer, $FB $04: the opera Ultros's, wt/v052-tg-wob2).  In the turn that fires, every one of them comes before the move (ot6_fuse.asm, the idiom): the fuse is
 -- unlit once that turn's script is read, and a break between the move and a clear queued behind it purges the
 -- clear with the rest of the turn (Ot6BrokenTurn) with no cancel, so the boss would announce again with nothing
 -- earned.  Returns the offences from `from` (the move) to the turn's end (a `wait`, `end_if` or `end`).
@@ -120,7 +130,7 @@ local function clearsAfter(AI, from)
   local bad, x = {}, from
   while rb(AI + x) ~= 0xFD and rb(AI + x) ~= 0xFE and rb(AI + x) ~= 0xFF do
     local b = rb(AI + x)
-    if b == 0xF8 or b == 0xF9 or (b == 0xFB and rb(AI + x + 1) == 0x00) then
+    if b == 0xF8 or b == 0xF9 or (b == 0xFB and (rb(AI + x + 1) == 0x00 or rb(AI + x + 1) == 0x04)) then
       bad[#bad + 1] = string.format("$%02X at script+$%04X after the move", b, x)
     end
     x = x + opSize(b)
@@ -214,6 +224,42 @@ local HAND = {
     why = "Kefka at Narshe: the fuse block is the script's first; monster switch 0, set by his clock's arming turn "
       .. "and cleared only by the move's turn or the cancel" },
   -- ---- end wt/v051-tg-wob2 ----
+  -- ---- wt/v052-tg-wob2: World of Balance bosses 11-16 (bosses-wob.md) ----
+  ["107@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "Dadaluma: the fuse block is the script's first, ahead of his clock, his potions, his Fight count and the "
+      .. "knife fan that arms it; monster switch 0, set by the knife fan and cleared only by the move's turn or the "
+      .. "cancel; his counters touch battle variables only" },
+  ["12D@0000"] = { blocks = "earlier none; own [16 3C 00]",
+    why = "the opera Ultros: the fuse block is the script's first; its condition is the battle timer at 60, which "
+      .. "only climbs until the song's own turn or the cancel resets it (no other body is on the field: his slot "
+      .. "moves, the only way another of his bodies comes in, wait on monster switch 0, which the announce sets)" },
+  ["109@0000"] = { blocks = "earlier none; own [14 00 00]",
+    why = "Ifrit: the fuse block is the script's first, ahead of the swap and the Fire 3 block; battle switch 0 "
+      .. "(battle variable 0's bit 0: nothing else in this fight touches battle variable 0), set by his rotation's "
+      .. "second turn, cleared only by the move's turn or the cancel" },
+  ["108@0000"] = { blocks = "earlier none; own [14 00 01]",
+    why = "Shiva: as Ifrit, on battle switch 1" },
+  ["10A@0000"] = { blocks = "earlier none; own [14 24 00 / 1A 36 01]",
+    why = "Number 024 on a fire wall (Ice 2): the script's first block; monster switch 0, set by his clock's "
+      .. "WallChange, cleared by the move's turn, the cancel, or any ordinary turn; the wall cannot change while "
+      .. "lit: his counters' WallChange blocks stand behind monster switch 1, which the announce sets" },
+  ["10A@0020"] = { blocks = "earlier [14 24 00 / 1A 36 01]; own [14 24 00 / 1A 36 02]",
+    why = "Number 024 on an ice wall (Fire 2): the earlier block is the fire wall's, shut because the wall is held "
+      .. "at ice while this one is lit (switch 1); its own as the fire wall's" },
+  ["10A@0040"] = { blocks = "earlier [14 24 00 / 1A 36 01] [14 24 00 / 1A 36 02]; own [14 24 00 / 1A 36 80]",
+    why = "Number 024 on a water wall (Bolt 2): the earlier blocks are the fire and ice walls', shut while the wall "
+      .. "is held at water; its own as the fire wall's" },
+  ["10B@0000"] = { blocks = "earlier none; own [14 00 00]",
+    why = "Number 128: the fuse block is the script's first, ahead of his Haste and both rotations; battle switch 0, "
+      .. "set by a blade's death (_319, _320) and cleared only by the move's turn or the cancel; nothing else in his "
+      .. "fight touches battle variable 0" },
+  ["10D@0000"] = { blocks = "earlier none; own [14 24 01]",
+    why = "the left Crane: the fuse block is the script's first; monster switch 1, set by its clock's arming turn, "
+      .. "cleared only by the move's turn or the cancel (switch 0 is its TekBarrier); its counters touch battle "
+      .. "variables only" },
+  ["10E@0000"] = { blocks = "earlier none; own [14 24 01]",
+    why = "the right Crane: as the left" },
+  -- ---- end wt/v052-tg-wob2 ----
 }
 local function staticChecks()
   local AI, PTRS, TBL, LINES = H.sym("AIScript"), H.sym("AIScriptPtrs"), H.sym("Ot6FuseTbl"), H.sym("Ot6FuseLineTbl")
@@ -287,6 +333,8 @@ local function staticChecks()
         if x >= hi and move == nil and (b < 0xF0 or (b == 0xF0 and rb(AI + x + 1) ~= 0xFE)) then
           move, moveAt = b < 0xF0 and b or rb(AI + x + 1), x
         end
+        -- (a command is a move too: `cmd`, $F4 -- Dadaluma's Jump, wt/v052-tg-wob2)
+        if x >= hi and move == nil and b == 0xF4 then move, moveAt = rb(AI + x + 1), x end
         -- (a call for backup is a move too: restore_monsters, $F5 with op 0 -- Telstar's waves, wt/v051-tg-wob2;
         -- and so is a withdrawal, kill_monsters, op 1 -- the Whelk's head drawing into its shell, wt/v051-tg-wob1)
         if x >= hi and move == nil and b == 0xF5 and (rb(AI + x + 2) == 0x00 or rb(AI + x + 2) == 0x01) then
@@ -369,6 +417,7 @@ local function staticChecks()
   end
   H.assertEq(seen[0x12A], 2, "Kefka has two rows (the line under 7,680 HP and the line under 32,640)")
   H.assertEq(seen[0x044], 3, "Telstar has three rows (its calls at 25, 80 and 200; wt/v051-tg-wob2)")
+  H.assertEq(seen[0x10A], 3, "Number 024 has three rows (its fire, ice and water walls; wt/v052-tg-wob2)")
   -- ---- wt/v051-tg-wob1: the Whelk's shell no longer draws the head in (no `kill_monsters MONSTER_2`, $F5 $08 $01
   -- $02, in its script): it calls the head in (set_battle_switch 0, 1: $F9 $01 $00 $01), and only behind the head's
   -- hold, `if_battle_switch_clr 0, 0` ($FC $15 $00 $00), in the same block: else a Broken head could be called in

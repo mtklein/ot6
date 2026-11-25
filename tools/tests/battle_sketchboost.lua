@@ -226,6 +226,20 @@ local function runTry(t)
     H.call(function()
       armed = nil
       H.setPad({})
+      -- (a Sketch confirmed on a body the others' or the monsters' queued actions then felled draws nothing: the
+      -- turn ends on no body, which is no miss, and the window gave no try -- wt/v052-tg-wob2's gate draw: try 6
+      -- "drew nothing" at a hit chance of 1.000, the bank 2 -> 3)
+      if not t.void and t.drawn == nil and t.tgtAlive == false then
+        t.void = t.endF or H.frame
+        t.voidWhy = string.format("the target m%d fell between the confirm and the Sketch", tgtMon)
+        -- what holds there, asserted: the boosted Sketch fizzled on no body (nothing drawn, the target down at its
+        -- turn's end) and its pips were not spent -- the bank ends no lower than it stood at the confirm
+        H.log(string.format("[sketch] try %d fizzled on a fallen target: drawn nothing, m%d down at f%d, bank %s -> %s",
+          t.n, tgtMon, t.endF or -1, tostring(t.bank0), tostring(t.bankEnd)))
+        H.assertEq(t.bank0 ~= nil and t.bankEnd ~= nil and t.bankEnd >= t.bank0, true, string.format("try %d: a "
+          .. "boosted Sketch that fizzled on a fallen target spent no pips (bank %s -> %s)", t.n, tostring(t.bank0),
+          tostring(t.bankEnd)))
+      end
       if t.void then
         H.log(string.format("[sketch] try %d (%s): %s at f%d before RELM's Sketch ran (sent %s, drawn %s): "
           .. "no try; the next window counts instead", t.n, t.window and ("window " .. t.window) or ("delay " ..
@@ -451,7 +465,10 @@ local steps = {
     local ae = H.sym("Ot6ActionEnd")
     emu.addMemoryCallback(function()
       local t = armed
-      if t and t.sent and t.endF == nil and (emu.getState()["cpu.x"] & 0xFF) == relmS * 2 then t.endF = H.frame end
+      if t and t.sent and t.endF == nil and (emu.getState()["cpu.x"] & 0xFF) == relmS * 2 then
+        t.endF = H.frame
+        t.tgtAlive = tgtMon ~= nil and live(tgtMon)
+      end
     end, emu.callbackType.exec, ae, ae)
   end),
   findEncounter(),

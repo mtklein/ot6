@@ -238,7 +238,7 @@ local function attempt(n)
       H.assertEq(ISLOT ~= nil, true, "an IFRIT slot resolved")
       H.assertEq(SSLOT ~= nil, true, "a SHIVA slot resolved")
       -- both gauges seed full and both HP words read their authored values
-      H.assertEq(shields(ISLOT), 6, "ifrit opens with his authored 6 shields")
+      H.assertEq(shields(ISLOT), 7, "ifrit opens with his authored 7 shields (6 before wt/v052-tg-wob2)")
       H.assertEq(shields(SSLOT), 6, "shiva opens with her authored 6 shields")
       H.assertEq(mhp(ISLOT), 3300, "ifrit opens at his authored 3300 HP (no clamp)")
       H.assertEq(mhp(SSLOT), 3000, "shiva opens at her authored 3000 HP (no clamp)")
