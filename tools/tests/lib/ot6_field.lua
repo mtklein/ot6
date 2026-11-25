@@ -4044,6 +4044,9 @@ end
 --                 floor is not zero.
 -- opts.reserve    { [itemId] = n } -- keep n of that item unspent, so a step
 --                 can hold Potions back for the fight it is walking toward
+-- opts.reviveBorrow  a fallen member is raised with a Fenix Down past the
+--                 reserve (a care right before a boss: another party's share
+--                 of a split bag is still in it; wt/v052-tg-wob2)
 -- opts.mpBand     a living member under this fraction of their max MP
 --                 drinks a Tincture, and another if still under (default
 --                 0.25; #231, docs/design/supply.md)
@@ -5148,6 +5151,15 @@ local function careKernel(opts)
           local wl = { kind = "cast", char = c, caster = k, spell = CARE_CURES.life, why = "revive" }
           if k ~= c and canCast(k, CARE_CURES.life) and not failed[key(wl)] then return wl end
         end
+      end
+      -- opts.reviveBorrow (a care right before a boss): a fallen member is raised past the reserve -- another party's
+      -- unspent share of a split bag is still in the bag, and a player does not send a member into a boss dead
+      -- (wt/v052-tg-wob2's line: party 3 spent its eight Fenix Downs on its grind below Doom and met him with
+      -- SHADOW down, "c3 0/4812 hp: down; fenix 11 in the bag", the eleven the other parties' shares)
+      local wb = { kind = "item", char = c, item = CARE_FENIX, why = "revive (past the reserve)" }
+      if opts.reviveBorrow and M.charHp(c) == 0 and (M.charStatus1(c) & 0x02) == 0
+         and M.invCountOf(CARE_FENIX) > 0 and not failed[key(wb)] then
+        return wb
       end
     end
     for _, c in ipairs(careParty()) do

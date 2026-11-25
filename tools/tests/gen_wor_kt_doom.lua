@@ -82,10 +82,13 @@ H.run({ maxFrames = 3000000 }, {
   -- @@stage doom
   -- dressed against his ice (Ice 3, N. Cross, Absolute 0; ai_script.asm _295), as a player who knows him does: the
   -- care first, since the Equip menu refuses a fallen member
-  H.fieldCare({ threshold = 1.0, tag = "before dressing for Doom" }),
+  -- (reviveBorrow: a member down here is raised past the split's reserve -- the other parties' shares -- as a player
+  -- raises a fallen member before a boss; the line's replay on wt/v052-tg-wob2 met him with SHADOW down and eleven
+  -- Fenix Downs in the bag, all of them the other parties' shares)
+  H.fieldCare({ threshold = 1.0, tag = "before dressing for Doom", reviveBorrow = true }),
   H.elementDress(ICE_ELEMENT, { tag = "dress against Doom's ice" }),
   H.absorbSafeArms(nil, { DOOM }, { tag = "arms for Doom" }),
-  H.fieldCare({ threshold = 1.0, tag = "before Doom" }),
+  H.fieldCare({ threshold = 1.0, tag = "before Doom", reviveBorrow = true }),
   T.standing("party 3 before Doom"),
   H.call(function() say("boss", "party 3 before Doom: " .. H.partiesLine()) end),
   H.navTo(64, 12, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, spare = { DOOM },
