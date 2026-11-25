@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "78553bcaf9681bba875391d688c6b63ab6fa13332dad2dcf2bf6dbe40220c509",
+  "sha256": "2ad40d75cc3d79b3133b5fa173adc1f6ff41d0fe813f6605c38356bf1ea91d75",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "78553bcaf9681bba875391d688c6b63ab6fa13332dad2dcf2bf6dbe40220c509",
-    "generator_sig": "330cb971d1f551b63b5538723d016573d72c1f9cd5d16294b91eafb3ed98dc38 gen_terra_returned_checkpoint",
+    "payload_sha256": "2ad40d75cc3d79b3133b5fa173adc1f6ff41d0fe813f6605c38356bf1ea91d75",
+    "generator_sig": "7957a581e99053be15933242c701c43d915d5d5854d9919107f1549419de6823 gen_terra_returned_checkpoint",
     "ancestors": [
       {
         "path": "build/states/n128_won.stamp",
-        "sha256": "d138ff81e79a2de4f84ad855e34f868df1e3f5803a6dea8a985998935e12859c"
+        "sha256": "7a0b608b296e5268ac13a3da841877833a42f5d5e6b6187e55de0ddc4b3c3ef5"
       }
     ]
   }
