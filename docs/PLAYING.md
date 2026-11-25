@@ -77,13 +77,18 @@ at him), Ultros at the opera ("Imp! Pal! Buddy!"), Ifrit and Shiva ("It
 inhales!"), Number 024 ("Its wall glows!"; his wall holds until the spell),
 Number 128 ("Its core heats!", when one of his blades falls), each of the
 Cranes ("Deck groans!"), Ultros at Esper Mountain ("He looms over you!",
-once he has crept all the way forward; enough hits push him back a step),
+once he has crept all the way forward; enough hits push him back a step
+until he holds the edge),
 FlameEater ("It swells with flame!"), Chupon on the
 airship ("It inhales!", after he has been hit three times), the Air Force's
-MissileBay ("Missiles lock on!"; breaking the bay stops it, breaking the
-Air Force does not), AtmaWeapon once it is badly hurt ("Vast energy
+MissileBay ("Missiles lock on!", once it is badly damaged; breaking the bay
+stops it, breaking the Air Force does not), AtmaWeapon once it is badly hurt ("Vast energy
 focused" again, one turn ahead this time) and Nerapa ("The wheel turns!",
-after you have used Fight on it six times). Not every big move is announced.
+after you have used Fight on it six times). Where a boss counts what you do to
+earn its move (Dadaluma your spells, Chupon your hits, Nerapa your
+Fights), a break starts the count over.
+A boss that announces a move cannot be Berserked, and cannot be Muted when
+its move costs MP. Not every big move is announced.
 
 ### Weapon types
 
