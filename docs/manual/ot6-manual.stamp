@@ -1,5 +1,5 @@
 # written by tools/manual/build.py; `build.py --check` compares it with the tree
-inputs 9ba8f29d16e435bb8503c2a7bdbef2d0571d344e79840c079fb1ca4925c0fedb
-version 0.51
-pdf 23ff2219485b48fdabb534617aacba668c5b61d1216edbfda91c50e86efa008b
-booklet 0cf152712b9fd24f8ded6f2392bfb9fa393d712304f463cf0d5bc94aa8c8114e
+inputs c3c2d35e224335f872e454057f1d39af3ebce3b10fa717a1754acac45345fecc
+version 0.52
+pdf 3ce1013aa0de3d958451ec515a5599d4e8a2370f960110a047de51aa425b1184
+booklet 7812c0656cab5eaf32353eea066faebf1719da20c93a968ca71b2f5c8c205c07
