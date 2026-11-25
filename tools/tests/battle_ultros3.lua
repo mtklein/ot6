@@ -23,7 +23,7 @@
 --             steps 0, switch 1 clear after it), and the line returns only after four more steps; the wave follows.
 --   outside   a break two steps out, before any line: nothing is cancelled and the cells stand, two aimed Fights in
 --             the window wind nothing, and the fuse then lights and fires as in the first case.
---   held      (below) the party Fights through a whole fuse from the arming to the wave, past the tally that pushes
+--   held      (below) the party attacks through a whole fuse from the arming to the wave, past the tally that pushes
 --             him back: his steps stay at 4 until the wave, and the sink follows it.
 -- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v052-tg-wob3/mutants/): fuse_never (Ot6FuseCancel+3=80) is red
 -- at "the break during the fuse cancels it"; u3_row_keeps (his row keeps switch 0: +5 = $FF) at "monster switch 0 is
@@ -45,57 +45,96 @@ local function tally() return H.readByte(0x3EB3) end    -- battle variable 3: th
 local track, trackOn = {}, false
 local function trackRec() return track[#track] end
 
--- the held case: from a line's arming (switch 1 set) the whole party Fights (the gauge staged to 63, DECLARED, so
--- the Fights only chip) until the wave; his steps must stay at the edge though the tally passes 8, and the sink
--- must follow.
+-- the held case.  His counter steps him back once its tally of blows reaches 8 (a Fight 1, a spell 4) and he stands
+-- two steps out or more; the hold is that it waits while he holds the edge (switch 1).  The fuse is two of his turns,
+-- too short for the party's blows to raise the tally to 8 inside it (2 of 8 by Fights, 5 of 8 with spells on this
+-- branch's first two cuts: build/attempts/wt/v052-tg-wob3/regen2/suites/battle_ultros3-held-red.log, -dev2.log), so
+-- the tally is raised first, while he stands under two steps out, where no step back can come: after a sink the
+-- party attacks him (spells where a member knows one, the gauge staged to 63, DECLARED, so the blows only chip)
+-- until the tally reads 8, Defends while he creeps to the edge, and attacks again once he holds it (switch 1),
+-- through the fuse to the wave.  Every blow there meets a tally at 8 or more and a man two steps out: his steps must
+-- stay at 4, and the sink must follow the wave.
+local function attackPlan(W)
+  local plan = {}
+  for k = 1, 24 do
+    for i = 0, 3 do
+      local id = H.readByte(0x3ED8 + 2 * i)
+      if id ~= 0xFF then
+        local sp = nil
+        for _, s in ipairs({ 0x00, 0x01, 0x02, 0x03 }) do
+          if sp == nil and H.readByte(0x1A6E + 54 * id + s) == 0xFF then sp = s end
+        end
+        plan[#plan + 1] = sp and { who = id, cmd = 0x02, spell = sp, boost = 0, slot = W.slot() }
+          or { who = id, cmd = 0x00, boost = 0, slot = W.slot() }
+      end
+    end
+  end
+  return plan
+end
 function held()
-  local W, armedF, waveF, minSteps, maxTally, sinkSeen = nil, nil, nil, 99, 0, nil
+  local W, armedF, waveF, minSteps, minTally, blows, sinkSeen = nil, nil, nil, 99, 99, 0, nil
   local function sw1()
     local e = W.ent()
     return e ~= nil and H.readByte(0x3DAC + e) & 0x02 ~= 0
   end
+  local function stage63() WRITE.byte(0x3E38 + W.ent(), 63) end   -- (DECLARED: the gauge held: blows only chip)
   return H.seqStep({
     H.call(function()
       W = H.fuseWatch(ULTROS3, WRITE); W.on = true; W.pin = { boss = 20000, party = true }
+      W.partyCmd = 0x02
       emu.addEventCallback(function()
         if not W.on then return end
         if armedF and not waveF then
           minSteps = math.min(minSteps, steps())
-          maxTally = math.max(maxTally, tally())
+          minTally = math.min(minTally, tally())
         end
       end, emu.eventType.endFrame)
+      local d = H.sym("_dispatcher")
+      emu.addMemoryCallback(function()
+        if not W.on or not armedF or waveF then return end
+        local x = emu.getState()["cpu.x"] & 0xFF
+        local c = H.readByte(0xB5)
+        if x < 8 and (c == 0x00 or c == 0x02) then blows = blows + 1 end
+      end, emu.callbackType.exec, d, d)
     end),
-    -- (no fuse armed or lit as the case opens: the party Defends until switch 1 is clear)
+    -- (from the start: no fuse armed or lit, he stands at the start; the party Defends until then)
     H.kitBattle({}, { idle = "defend", care = false, maxFrames = 12000,
-      giveUp = function() return not sw1() and not W.litBit() end }),
+      giveUp = function() return not sw1() and not W.litBit() and steps() == 0 end }),
+    H.call(function()
+      H.assertEq(not sw1() and steps() == 0, true, "held: he stands at the start, no fuse armed")
+      stage63()
+    end),
+    H.lazy(function()
+      return H.kitBattle(attackPlan(W), { idle = "defend", care = false, maxFrames = 12000,
+        giveUp = function() return tally() >= 8 or steps() >= 2 or not H.battleLoadStarted() end })
+    end),
+    H.call(function()
+      H.log(string.format("[ultros3] held: the tally reads %d with his steps at %d", tally(), steps()))
+      H.assertEq(tally() >= 8 and steps() < 2, true, string.format("held: the party raised his tally to 8 while he "
+        .. "stood under two steps out (tally %d, steps %d; the case's precondition)", tally(), steps()))
+    end),
     H.kitBattle({}, { idle = "defend", care = false, maxFrames = 30000,
       giveUp = function() return sw1() or not H.battleLoadStarted() end }),
     H.call(function()
       H.assertEq(sw1(), true, "held: he reached the edge (monster switch 1 set) with the party Defending")
       armedF = H.frame
-      WRITE.byte(0x3E38 + W.ent(), 63)   -- (DECLARED: the gauge held, so the Fights only chip)
-      H.log(string.format("[ultros3] held: armed at f%d, steps %d, tally %d; the party Fights through the fuse",
+      stage63()
+      H.log(string.format("[ultros3] held: armed at f%d, steps %d, tally %d; the party attacks through the fuse",
         armedF, steps(), tally()))
     end),
     H.lazy(function()
-      local plan = {}
-      for k = 1, 24 do
-        for i = 0, 3 do
-          local id = H.readByte(0x3ED8 + 2 * i)
-          if id ~= 0xFF then plan[#plan + 1] = { who = id, cmd = 0x00, boost = 0, slot = W.slot() } end
-        end
-      end
-      return H.kitBattle(plan, { idle = "defend", care = false, maxFrames = 20000,
+      return H.kitBattle(attackPlan(W), { idle = "defend", care = false, maxFrames = 20000,
         giveUp = function() return W.find(0x0C, 0x8E, 1) ~= nil or not H.battleLoadStarted() end })
     end),
     H.call(function()
       local mi, mc = W.find(0x0C, 0x8E, 1)
       H.assertEq(mi ~= nil, true, "held: the wave came after the arming")
       waveF = mc.f
-      H.log(string.format("[ultros3] held: the wave at f%d; from the arming the tally rose to %d, the steps fell to "
-        .. "%d at the least", waveF, maxTally, minSteps))
-      H.assertEq(maxTally >= 8, true, string.format("held: the party's Fights between the arming and the wave "
-        .. "passed the tally that pushes him back (%d of 8; the case's precondition)", maxTally))
+      H.log(string.format("[ultros3] held: the wave at f%d; from the arming %d blow(s) dispatched, the tally at %d "
+        .. "or more, the steps at %d at the least", waveF, blows, minTally, minSteps))
+      H.assertEq(blows >= 1 and minTally >= 8, true, string.format("held: blows landed between the arming and the "
+        .. "wave with his tally at 8 or more (%d blow(s), the tally at least %d; the case's precondition)", blows,
+        minTally))
       H.assertEq(minSteps, EDGE, "held: his steps stayed at 4 from the arming to the wave (no blow pushed him back "
         .. "while he held the edge)")
     end),
