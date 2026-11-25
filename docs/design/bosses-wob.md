@@ -27,15 +27,21 @@ Stated once, assumed by every block:
   before the announce, on the turn that arms the fuse.
 - **No status loses an announced move** (owner's ruling, the
   wt/v052-tg-wob3 review, 2026-11-25). A Berserked monster runs no
-  script and a Muted one's MP-cost move fizzles, so a body that
-  announces (every species with a row in `Ot6FuseTbl`) is immune to
-  Berserk, and to Mute when its announced move costs MP. Sleep, Stop
-  and Muddle only delay the move and stay; Rasp or Osmose draining the
-  boss's MP is the player's earned play and stays. Six bodies were open
-  and are spliced in `MonsterProp` (battle_main.asm): the Marshal,
-  Number 128, Nerapa, the Gold Dragon and Rizopas to Berserk, and Chupon
-  to Berserk and Mute. `tools/check_fuse_immune.py` checks every row's
-  body in the built ROM.
+  script; a Muted or Imped one's MP-cost move fizzles (battle_main.asm
+  @3201); and an Imp's command that an Imp cannot use is turned into a
+  Fight (@029a: a monster's specials, $8B-$ED, go out as Lore, which no
+  Imp can use; Fight, Magic and Jump can be). So a body that announces
+  (every species with a row in `Ot6FuseTbl`) is immune to Berserk; to
+  Mute when its announced move costs MP; and to Imp when the move costs
+  MP or its command is no Imp's. Dadaluma needs no Imp block: his Jump
+  costs no MP and Jump is an Imp's command (BattleCmdProp `$16` carries
+  the Imp flag), so an Imped Dadaluma still leaps. Sleep, Stop and
+  Muddle only delay the move and stay; Rasp or Osmose draining the
+  boss's MP is the player's earned play and stays. Seven bodies were
+  open and are spliced in `MonsterProp` (battle_main.asm): the Marshal,
+  Number 128, Nerapa, the Gold Dragon and Rizopas to Berserk, Chupon to
+  Berserk and Mute, and Number 024 to Imp. `tools/check_fuse_immune.py`
+  checks every row's body in the built ROM.
 - **A break releases whatever the broken body holds** (owner,
   2026-11-23: "definitely breaking a tentacle should free a party
   member. if possible same for enemies that swallow party members
@@ -1619,7 +1625,7 @@ the Speck's purpose is to absorb spells.)
   say that fighter lost the battle on 4 of 5 keys (`[outcome] battle
   $1CB LOST`, `build/attempts/wt/v052-tg-wob3/F-bay/`), and that lab's
   fighter was a generic driver, not the route's: on this ROM, with no
-  Launcher at all, the same generic driver lost 3 of 5 (`G-bay/`). The
+  Launcher at all, the same generic driver lost 3 of 5 (`build/attempts/wt/v052-tg-wob3/lab/tg-wob3/G-bay/`). The
   gate went back to vanilla's anyway (owner's ruling, 2026-11-25).
   Lab (3 shields on the bay, TERRA, LOCKE and EDGAR, from the deck
   through Ultros IV with gen_fc_landing's Air Force driver options,

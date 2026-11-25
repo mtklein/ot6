@@ -51,7 +51,8 @@ come only after their line.
 
 A boss that announces a move can no longer have it taken away by a
 status: the Marshal, Number 128, the Gold Dragon, Rizopas, Chupon and
-Nerapa can no longer be Berserked, and Chupon can no longer be Muted.
+Nerapa can no longer be Berserked, Chupon can no longer be Muted, and
+Number 024 can no longer be turned into an Imp.
 Sleep, Stop and Muddle still delay a boss's turn, and draining a boss's
 MP still works.
 

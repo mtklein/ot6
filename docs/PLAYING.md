@@ -87,8 +87,8 @@ focused" again, one turn ahead this time) and Nerapa ("The wheel turns!",
 after you have used Fight on it six times). Where a boss counts what you do to
 earn its move (Dadaluma your spells, Chupon your hits, Nerapa your
 Fights), a break starts the count over.
-A boss that announces a move cannot be Berserked, and cannot be Muted when
-its move costs MP. Not every big move is announced.
+A boss that announces a move cannot be Berserked, and cannot be Muted or
+turned into an Imp when that would stop its move. Not every big move is announced.
 
 ### Weapon types
 
