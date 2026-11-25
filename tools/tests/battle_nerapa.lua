@@ -23,7 +23,7 @@
 --   outside   a break with one to five Fights counted: nothing is cancelled and the cells (the tally among them)
 --             stand, two Fights in the window count nothing, and the fuse then lights and fires.
 --   landed    (below, after the three) Nerapa's instant-death protection off: the party Fights to the line, and
---             Roulette, dispatched on its next turn, is seen to land: a body in the battle gains Death within 400
+--             Roulette, dispatched on its next turn, is seen to land: a body in the battle gains Death within 1,500
 --             frames of it (who it lands on is the draw's).
 -- Each case opens on the battle's snapshot; the escape's clocks are topped up (DECLARED, below) so none runs out
 -- inside a case.
@@ -52,7 +52,7 @@ local function landed()
       WRITE.byte(x, H.readByte(x) & 0xFB)   -- (DECLARED: its protection back to the game's own, bit 2 clear)
       WRITE.byte(0x3E38 + e, 63)            -- (DECLARED: the gauge held, so the arming Fights do not break it)
       emu.addEventCallback(function()
-        if rf == nil or H.frame > rf + 400 then return end
+        if rf == nil or H.frame > rf + 1500 then return end
         for _, e2 in ipairs({ 0, 2, 4, 6, 8, 10, 12, 14, 16, 18 }) do
           if dead(e2) and deaths[e2] == nil then deaths[e2] = H.frame end
         end
@@ -83,7 +83,7 @@ local function landed()
       giveUp = function()
         local i, c = W.find(0x1E, 0x8C, 1)
         if i ~= nil and rf == nil then rf = c.f end
-        return (rf ~= nil and H.frame > rf + 400) or not H.battleLoadStarted()
+        return (rf ~= nil and H.frame > rf + 1500) or not H.battleLoadStarted()
       end }),
     H.call(function()
       H.assertEq(rf ~= nil, true, "landed: Roulette was dispatched (command $1E, attack $8C) after the line")
@@ -91,9 +91,9 @@ local function landed()
       for e2, f in pairs(deaths) do
         if f ~= -1 then n = n + 1; t[#t + 1] = string.format("entity $%02X at f%d", e2, f) end
       end
-      H.log(string.format("[nerapa] landed: Roulette dispatched at f%d; Death gained within 400 frames: %s", rf,
+      H.log(string.format("[nerapa] landed: Roulette dispatched at f%d; Death gained within 1,500 frames: %s", rf,
         n > 0 and table.concat(t, ", ") or "none"))
-      H.assertEq(n >= 1, true, "landed: Roulette landed (a body gained Death within 400 frames of its dispatch)")
+      H.assertEq(n >= 1, true, "landed: Roulette landed (a body gained Death within 1,500 frames of its dispatch: its wheel spins first; 400 saw none, regen4 suites battle_nerapa-landed-red.log)")
       W.on, W.pin = false, nil
       protect = true
     end),
