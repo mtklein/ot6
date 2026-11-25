@@ -99,6 +99,11 @@ OT6_FUSE_ATTR   = $21 | (2 << 2)        ; text palette 2: navy, grey, yellow
 
 OT6_FUSE_VAR3   = $01           ; a break clears battle variable 3
 OT6_FUSE_TIMER  = $02           ;   and the monster's timer
+OT6_FUSE_VAR2   = $08           ; a break clears battle variable 2 (Dadaluma's
+                                ;   tally of spells, wt/v052-tg-wob2)
+OT6_FUSE_BTIMER = $10           ; a break restarts the battle timer ($3a44, as
+                                ;   reset_battle_timer leaves it: the opera
+                                ;   Ultros's song, wt/v052-tg-wob2)
 OT6_FUSE_SWITCH = $80           ; lit by a battle switch, not by a `wait`
 OT6_FUSE_HOLD   = $04           ; every break of this body, lit or not, sets
                                 ;   battle switch 0 and clears the battle
@@ -109,7 +114,7 @@ OT6_FUSE_HOLD   = $04           ; every break of this body, lit or not, sets
                                 ;   call, so a break sends a pending call away
                                 ;   and the Broken head stays out for its
                                 ;   whole window
-; Flags $08-$40 are free.  The contract's other break rule (the owner,
+; Flags $20-$40 are free.  The contract's other break rule (the owner,
 ; 2026-11-23: "a break releases whatever the broken body holds", unit B's
 ; Tentacles) fits here as a flag and a row that applies at every break, lit
 ; or not: the release itself is Discard's target effect (TargetEffect_44,
@@ -193,6 +198,35 @@ Ot6FuseTbl:
         ; clock, monster switch 0
         ot6_fuse $014a, Ot6FuseKefkaNarshe, Ot6FuseKefkaNarshe, $fe, $ff, OT6_FUSE_TIMER
         ; ---- end wt/v051-tg-wob2 ----
+        ; ---- wt/v052-tg-wob2: World of Balance bosses 11-16 (bosses-wob.md) ----
+        ; Dadaluma: "Crouches to leap!", Jump; armed by his knife fan once the
+        ; party has used Magic on him three times (battle variable 2), monster
+        ; switch 0; a break clears both
+        ot6_fuse $0107, Ot6FuseDadaluma, Ot6FuseDadaluma, $fe, $ff, OT6_FUSE_VAR2
+        ; the opera Ultros: "Imp! Pal! Buddy!" (vanilla's line), Imp Song; armed
+        ; by the battle timer alone, which a break restarts; monster switch 0
+        ; holds his slot moves while lit
+        ot6_fuse $012d, Ot6FuseUltros2, Ot6FuseUltros2, $fe, $ff, OT6_FUSE_BTIMER
+        ; Ifrit: "Ifrit inhales!", Fire 2 on the party; battle switch 0 (his
+        ; monster variable is his tally of spells)
+        ot6_fuse $0109, Ot6FuseIfrit, Ot6FuseIfrit, $ff, $fe, 0
+        ; Shiva: "Shiva inhales!", Ice 2 on the party; battle switch 1
+        ot6_fuse $0108, Ot6FuseShiva, Ot6FuseShiva, $ff, $fd, 0
+        ; Number 024: the wall's spell, one row a wall (weak to fire: Ice 2; to
+        ; ice: Fire 2; to water: Bolt 2); armed by his clock's WallChange
+        ; (monster switch 0), the wall held while lit (switch 1)
+        ot6_fuse $010a, Ot6FuseN024Ice, Ot6FuseN024Ice, $fc, $ff, 0
+        ot6_fuse $010a, Ot6FuseN024Fire, Ot6FuseN024Fire, $fc, $ff, 0
+        ot6_fuse $010a, Ot6FuseN024Bolt, Ot6FuseN024Bolt, $fc, $ff, 0
+        ; Number 128: "Core overheating!", Atomic Ray; armed by his sweep's
+        ; turn B, alone (monster switch 1; switch 0 is his Haste, kept)
+        ot6_fuse $010b, Ot6FuseN128, Ot6FuseN128, $fd, $ff, 0
+        ; the Cranes: "The deck groans!", Magnitude8; each armed by its own
+        ; clock (monster switch 1; switch 0 is its TekBarrier, kept), which a
+        ; break restarts.  Battle variables 0-3 are their tallies: kept
+        ot6_fuse $010d, Ot6FuseCraneL, Ot6FuseCraneL, $fd, $ff, OT6_FUSE_TIMER
+        ot6_fuse $010e, Ot6FuseCraneR, Ot6FuseCraneR, $fd, $ff, OT6_FUSE_TIMER
+        ; ---- end wt/v052-tg-wob2 ----
         .word   $ffff
 
 ; the announce lines a counter speaks (a `dlg` id, low byte; every id is
@@ -381,10 +415,21 @@ Ot6FuseLineTbl:
         bcc     @timer
         stz     $3eb3           ; battle variable 3 (the tally, the count)
 @timer: lsr
-        bcc     @out
+        bcc     @var2
+        pha
         lda     #$00            ; the monster's timer, as reset_monster_timer
         sta     $3dc0,y         ;   leaves it (MiscAIEffect_00)
         sta     $3dc1,y
+        pla
+@var2:  lsr                     ; (OT6_FUSE_HOLD: Ot6FuseHold's, not the cancel's)
+        lsr
+        bcc     @btimer
+        stz     $3eb2           ; battle variable 2 (Dadaluma's tally)
+@btimer:
+        lsr
+        bcc     @out
+        stz     $3a44           ; the battle timer, as reset_battle_timer
+        stz     $3a45           ;   leaves it (MiscAIEffect_04)
 @out:   rts
 .endproc
 

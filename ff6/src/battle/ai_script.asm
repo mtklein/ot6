@@ -4591,7 +4591,25 @@ Ot6FuseGhostTrainFire:          ; ... to here, the turn that fires it
 ; ------------------------------------------------------------------------------
 
 ; dadaluma
+; OT6 (bosses-wob.md block 11, wt/v052-tg-wob2): his leap is his telegraph.  Vanilla jumped once the party had
+; used Magic on him three times (battle variable 2, his counter's tally) and he was not Slowed: a fan of knives at
+; the whole party, then, on his next turn, Jump.  The knife turn now ARMS the fuse (monster switch 0); "He crouches!"
+; (battle dialogue $93) and a glow announce it on his next turn, and Jump comes on the turn after.  A break
+; between the line and the leap cancels it: switch 0 and the tally go (Ot6FuseTbl, OT6_FUSE_VAR2), so three more
+; spells earn it again.  The move's turn clears the tally first, as vanilla's did after the leap (ot6_fuse.asm, the
+; idiom).  The fuse block comes first, so his clock, his potions and his Fight count cannot take the leap's turn.
 AIScript::_263:
+        if_monster_switch_set 0
+                dlg $93
+; He crouches!
+                short_glow MONSTER_1
+                wait
+Ot6FuseDadaluma:                ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clears first, then the
+                set_battle_var 2, 0     ;   move (ot6_fuse.asm, the idiom)
+                set_target RAND_CHAR
+                cmd JUMP
+                end_if
         if_status_clr SELF, SILENCE
         if_monster_timer 30
                 reset_monster_timer
@@ -4619,11 +4637,8 @@ AIScript::_263:
         if_status_clr SELF, SLOW
                 set_target ALL_CHARS
                 throw_item DIRK, MITHRILKNIFE
-                wait
-                set_target RAND_CHAR
-                cmd JUMP
-                set_battle_var 2, 0
-                end_if
+                set_monster_switch 0    ; ot6: arms the fuse block (above); vanilla's next
+                end_if                  ;   turn, Jump, is the fuse's move
         set_target NOTHING
         attack BATTLE, BATTLE, SHOCK_WAVE
         wait
@@ -4648,7 +4663,24 @@ AIScript::_263:
 ; ------------------------------------------------------------------------------
 
 ; shiva
+; OT6 (bosses-wob.md block 13, wt/v052-tg-wob2): Ice 2 on the party is her telegraph, as Fire 2 is Ifrit's (_265).
+; Her rotation's second turn arms it (battle switch 1: her monster variable is her counter's tally of spells, and
+; battle variable 0 is free in this fight); "It inhales!" (battle dialogue $94, Ifrit's line) and a glow announce it on her
+; next turn, and Ice 2 on every member follows on the turn after.  A break in between clears the switch
+; (Ot6FuseTbl): the rotation starts over from its first turn.  The fuse block comes first, so the swap (six hits)
+; and the Rflect block wait until it has fired; each sibling runs its own fuse, on its own turns.  Below it
+; everything is vanilla's but the arming switch.
 AIScript::_264:
+        if_battle_switch_set 0, 1
+                dlg $94
+; It inhales!
+                short_glow MONSTER_2
+                wait
+Ot6FuseShiva:                   ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_battle_switch 0, 1  ; the trigger's clear first, then the move
+                set_target ALL_CHARS
+                attack ICE_2
+                end_if
         if_battle_var_greater 3, 5
                 set_battle_var 3, 0
                 kill_monsters_wait MONSTER_2, MATERIALIZE
@@ -4669,6 +4701,7 @@ AIScript::_264:
         attack ICE, ICE, ICE_2
         wait
         attack ICE, ICE_2, BLIZZARD
+        set_battle_switch 0, 1  ; ot6: arms the fuse block (above)
         end
 
         if_self_dead
@@ -4697,7 +4730,22 @@ AIScript::_264:
 ; ------------------------------------------------------------------------------
 
 ; ifrit
+; OT6 (bosses-wob.md block 13, wt/v052-tg-wob2): Fire 2 on the party is his telegraph, as Ice 2 is Shiva's (_264).
+; His rotation's second turn arms it (battle switch 0: his monster variable is his counter's tally of spells);
+; "It inhales!" (battle dialogue $94) and a glow announce it on his next turn, and Fire 2 on every member follows on the turn after.  A break in between clears the switch
+; (Ot6FuseTbl): the rotation starts over from its first turn.  The fuse block comes first, so the swap (six hits)
+; and the Fire 3 block wait until it has fired.  Below it everything is vanilla's but the arming switch.
 AIScript::_265:
+        if_battle_switch_set 0, 0
+                dlg $94
+; It inhales!
+                short_glow MONSTER_1
+                wait
+Ot6FuseIfrit:                   ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_battle_switch 0, 0  ; the trigger's clear first, then the move
+                set_target ALL_CHARS
+                attack FIRE_2
+                end_if
         if_battle_var_greater 3, 5
                 set_battle_var 3, 0
                 kill_monsters_wait MONSTER_1, MATERIALIZE
@@ -4718,6 +4766,7 @@ AIScript::_265:
         wait
         attack BATTLE, BLAZE, FIRE_2
         add_battle_var 2, 1
+        set_battle_switch 0, 0  ; ot6: arms the fuse block (above)
         end
 
         if_self_dead
@@ -4746,13 +4795,64 @@ AIScript::_265:
 ; ------------------------------------------------------------------------------
 
 ; number 024
+; OT6 (bosses-wob.md block 14, wt/v052-tg-wob2): the wall's spell is his telegraph.  His clock's WallChange (the
+; monster timer at 30) now ARMS the fuse (monster switch 0).  On his next turn, if the wall he wears is one whose
+; vanilla answer holds a tier-2 spell -- weak to fire (Ice 2), to ice (Fire 2) or to water (Bolt 2) -- he says
+; "Its wall glows!" (battle dialogue $95), glows and holds the
+; wall (monster switch 1: his counters change no wall while it is set), and the spell, on the whole party, comes
+; on the turn after.  On any other wall the arming lapses on that turn (each later block clears switch 0).  The
+; wall is held because a fuse block's conditions are tested again on the move's turn: a wall changed in between
+; would drop an announced spell.  A break in between clears both switches (Ot6FuseTbl): the next WallChange of his
+; clock arms it again.  The three fuse blocks come first, so his clock, "System error!" and his wall's ordinary
+; turns cannot take the spell's turn.
 AIScript::_266:
+        if_monster_switch_set 0
+        if_weak_element SELF, FIRE
+                dlg $95
+; Its wall glows!
+                short_glow MONSTER_1
+                set_monster_switch 1    ; the wall holds until the spell
+                wait
+Ot6FuseN024Ice:                 ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clears first, then the
+                clr_monster_switch 1    ;   move (ot6_fuse.asm, the idiom)
+                set_target ALL_CHARS
+                attack ICE_2
+                end_if
+        if_monster_switch_set 0
+        if_weak_element SELF, ICE
+                dlg $95
+; Its wall glows!
+                short_glow MONSTER_1
+                set_monster_switch 1    ; the wall holds until the spell
+                wait
+Ot6FuseN024Fire:                ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clears first, then the
+                clr_monster_switch 1    ;   move (ot6_fuse.asm, the idiom)
+                set_target ALL_CHARS
+                attack FIRE_2
+                end_if
+        if_monster_switch_set 0
+        if_weak_element SELF, WATER
+                dlg $95
+; Its wall glows!
+                short_glow MONSTER_1
+                set_monster_switch 1    ; the wall holds until the spell
+                wait
+Ot6FuseN024Bolt:                ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clears first, then the
+                clr_monster_switch 1    ;   move (ot6_fuse.asm, the idiom)
+                set_target ALL_CHARS
+                attack BOLT_2
+                end_if
         if_monster_timer 30
                 reset_monster_timer
                 attack WALLCHANGE
                 add_battle_var 3, 1
+                set_monster_switch 0    ; ot6: arms the fuse blocks (above)
                 end_if
         if_battle_var_greater 3, 3
+                clr_monster_switch 0    ; ot6: an armed fuse lapses on any wall
                 dlg $00
 ; System error!
                 set_target SELF
@@ -4767,37 +4867,46 @@ AIScript::_266:
                 end_if
         if_weak_element SELF, FIRE
                 set_target NOTHING
+                clr_monster_switch 0    ; ot6: an armed fuse lapses here
                 attack ICE, ICE, ICE_2
                 end_if
         if_weak_element SELF, ICE
                 set_target NOTHING
+                clr_monster_switch 0    ; ot6: an armed fuse lapses here
                 attack FIRE, FIRE_2, FIRE_BALL
                 end_if
         if_weak_element SELF, LIGHTNING
                 set_target NOTHING
+                clr_monster_switch 0    ; ot6: an armed fuse lapses here
                 attack AQUA_RAKE, ACID_RAIN, ACID_RAIN
                 end_if
         if_weak_element SELF, POISON
                 set_target NOTHING
+                clr_monster_switch 0    ; ot6: an armed fuse lapses here
                 attack CURE, CURE, CURE_2
                 end_if
         if_weak_element SELF, WIND
                 set_target NOTHING
+                clr_monster_switch 0    ; ot6: an armed fuse lapses here
                 attack MAGNITUDE8, MAGNITUDE8, CAVE_IN
                 end_if
         if_weak_element SELF, HOLY
                 set_target NOTHING
+                clr_monster_switch 0    ; ot6: an armed fuse lapses here
                 attack BATTLE, BATTLE, R_POLARITY
                 end_if
         if_weak_element SELF, EARTH
                 set_target NOTHING
+                clr_monster_switch 0    ; ot6: an armed fuse lapses here
                 attack SONIC_BOOM, GALE_CUT, GALE_CUT
                 end_if
         if_weak_element SELF, WATER
                 set_target NOTHING
+                clr_monster_switch 0    ; ot6: an armed fuse lapses here
                 attack BOLT, BOLT, BOLT_2
                 end_if
         attack BATTLE, BATTLE, SPECIAL
+        clr_monster_switch 0    ; ot6: an armed fuse lapses here
         end
 
         if_self_dead
@@ -4805,41 +4914,49 @@ AIScript::_266:
                 end_if
         if_element FIRE
         if_weak_element SELF, FIRE
+        if_monster_switch_clr 1         ; ot6: the wall holds while his spell is named
                 add_battle_var 3, 1
                 attack WALLCHANGE
                 end_if
         if_element ICE
         if_weak_element SELF, ICE
+        if_monster_switch_clr 1         ; ot6: the wall holds while his spell is named
                 add_battle_var 3, 1
                 attack WALLCHANGE
                 end_if
         if_element LIGHTNING
         if_weak_element SELF, LIGHTNING
+        if_monster_switch_clr 1         ; ot6: the wall holds while his spell is named
                 add_battle_var 3, 1
                 attack WALLCHANGE
                 end_if
         if_element POISON
         if_weak_element SELF, POISON
+        if_monster_switch_clr 1         ; ot6: the wall holds while his spell is named
                 add_battle_var 3, 1
                 attack WALLCHANGE
                 end_if
         if_element WIND
         if_weak_element SELF, WIND
+        if_monster_switch_clr 1         ; ot6: the wall holds while his spell is named
                 add_battle_var 3, 1
                 attack WALLCHANGE
                 end_if
         if_element HOLY
         if_weak_element SELF, HOLY
+        if_monster_switch_clr 1         ; ot6: the wall holds while his spell is named
                 add_battle_var 3, 1
                 attack WALLCHANGE
                 end_if
         if_element EARTH
         if_weak_element SELF, EARTH
+        if_monster_switch_clr 1         ; ot6: the wall holds while his spell is named
                 add_battle_var 3, 1
                 attack WALLCHANGE
                 end_if
         if_element WATER
         if_weak_element SELF, WATER
+        if_monster_switch_clr 1         ; ot6: the wall holds while his spell is named
                 add_battle_var 3, 1
                 attack WALLCHANGE
                 end_if
@@ -4850,7 +4967,25 @@ AIScript::_266:
 ; ------------------------------------------------------------------------------
 
 ; number 128
+; OT6 (bosses-wob.md block 15, wt/v052-tg-wob2): Atomic Ray is his telegraph, and the blades are its trigger.  Alone
+; (both blades down), he Hastes himself once (vanilla's monster switch 0) and runs his sweep: turn A (Battle, Gale
+; Cut or Atomic Ray), then turn B (Blaster, Atomic Ray or Shock Wave), which now also ARMS the fuse (monster switch
+; 1).  On his next turn "Its core heats!" (battle dialogue $97) and a glow announce it, and Atomic Ray on the
+; whole party comes on the turn after, whether or not a blade has grown back meanwhile (the fuse block's only
+; condition is switch 1: an announced ray always comes).  A break in between clears switch 1 (Ot6FuseTbl): the
+; sweep starts over from turn A, and only while he stands alone.  The fuse block comes first, so neither his Haste
+; nor his bladed rotation can take the ray's turn.  With a blade standing everything is vanilla's.
 AIScript::_267:
+        if_monster_switch_set 1
+                dlg $97
+; Its core heats!
+                short_glow MONSTER_1
+                wait
+Ot6FuseN128:                    ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 1    ; the trigger's clear first, then the move
+                set_target ALL_CHARS
+                attack ATOMIC_RAY
+                end_if
         if_monster_switch_clr 0
         if_num_monsters 1
         if_status_clr SELF, HASTE
@@ -4862,6 +4997,7 @@ AIScript::_267:
                 attack BATTLE, GALE_CUT, ATOMIC_RAY
                 wait
                 attack BLASTER, ATOMIC_RAY, SHOCK_WAVE
+                set_monster_switch 1    ; ot6: arms the fuse block (above)
                 end_if
         attack BATTLE, BATTLE, ICE
         wait
@@ -4912,8 +5048,28 @@ AIScript::_268:
 
 ; ------------------------------------------------------------------------------
 
-; crane
+; crane (left, $010D)
+; OT6 (bosses-wob.md block 16, wt/v052-tg-wob2): the quake is each Crane's telegraph, on its own clock.  Vanilla
+; quaked (Magnitude8, "The crane shook the deck!") on whichever Crane's turn came once the battle timer reached 60,
+; one quake for the pair a cycle.  Now each Crane's own timer arms it at 120 (twice the length: two Cranes, about
+; vanilla's rate) on one of its ordinary turns (monster switch 1); "Deck groans!" (battle dialogue $9C) and a
+; glow announce it on its next turn, and the quake follows on the turn after.  A break in between cancels that
+; Crane's quake: switch 1 goes and its clock restarts (Ot6FuseTbl), and the other Crane's clock runs on.  The
+; clock's reset and the switch come before the quake (ot6_fuse.asm, the idiom); the fuse block comes first, so the
+; sibling's spell and the alone TekBarrier wait.  The element charges (Giga Volt, Fire 3) are vanilla's.
 AIScript::_269:
+        if_monster_switch_set 1
+                dlg $9c
+; Deck groans!
+                short_glow MONSTER_1
+                wait
+Ot6FuseCraneL:                  ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 1    ; the trigger's clears first, then the
+                reset_monster_timer     ;   move (ot6_fuse.asm, the idiom)
+                dlg $1f
+; The crane shook the deck!
+                attack MAGNITUDE8
+                end_if
         if_battle_var_greater 1, 3
                 set_battle_var 1, 0
                 set_target MONSTER_SLOT_2
@@ -4925,11 +5081,9 @@ AIScript::_269:
                 attack TEKBARRIER
                 set_monster_switch 0
                 end_if
-        if_battle_timer 60
-                reset_battle_timer
-                dlg $1f
-; The crane shook the deck!
-                attack MAGNITUDE8
+        if_monster_timer 120
+                attack BATTLE, BOLT, BOLT
+                set_monster_switch 1    ; ot6: arms the fuse block (above)
                 end_if
         attack BATTLE, BOLT, BOLT
         wait
@@ -4965,8 +5119,21 @@ AIScript::_269:
 
 ; ------------------------------------------------------------------------------
 
-; crane
+; crane (right, $010E)
+; OT6 (bosses-wob.md block 16, wt/v052-tg-wob2): as the left Crane (_269), on its own clock.
 AIScript::_270:
+        if_monster_switch_set 1
+                dlg $9c
+; Deck groans!
+                short_glow MONSTER_2
+                wait
+Ot6FuseCraneR:                  ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 1    ; the trigger's clears first, then the
+                reset_monster_timer     ;   move (ot6_fuse.asm, the idiom)
+                dlg $1f
+; The crane shook the deck!
+                attack MAGNITUDE8
+                end_if
         if_battle_var_greater 0, 3
                 set_battle_var 0, 0
                 set_target MONSTER_SLOT_1
@@ -4978,11 +5145,9 @@ AIScript::_270:
                 attack TEKBARRIER
                 set_monster_switch 0
                 end_if
-        if_battle_timer 60
-                reset_battle_timer
-                dlg $1f
-; The crane shook the deck!
-                attack MAGNITUDE8
+        if_monster_timer 120
+                attack BATTLE, FIRE, FIRE
+                set_monster_switch 1    ; ot6: arms the fuse block (above)
                 end_if
         attack BATTLE, FIRE, FIRE
         wait
@@ -6286,19 +6451,33 @@ Ot6FuseUltros1:                 ; the fuse is lit here (Ot6FuseTbl's row)
 ; ------------------------------------------------------------------------------
 
 ; ultros (opera house)
+; OT6 (bosses-wob.md block 12, wt/v052-tg-wob2): his song is his telegraph.  Vanilla sang Imp Song on the turn the
+; battle timer reached 60, its line "Imp! Pal! Buddy!" ($62) and the song in one turn.  Now the line and a glow come
+; on that turn, and the song on his next: a break between the two cancels it, and the timer starts again from zero
+; (Ot6FuseTbl, OT6_FUSE_BTIMER), so the next song is earned from the cancel.  His clock alone arms it, so the
+; fuse block is his script's first and has no arming block; the timer only climbs until the song's own turn (or the
+; cancel) resets it.  He moves between four slots by his counters; while the fuse is lit (monster switch 0, set by
+; the announce) none of those moves comes, so the body that announced is the body that sings (a swap brings in a
+; fresh body whose script starts from the top, and an announced song would never come).  The moves that wait come
+; on the first hit after the song.  Everything else is vanilla's.
 AIScript::_301:
+        if_battle_timer 60
+                dlg $62
+; Imp! Pal! Buddy!
+                .byte   $fa, $0c, $0f, 0        ; short_glow {MONSTER_1..4}: he is in one of the four
+                set_monster_switch 0    ; his slot moves wait until the song
+                wait
+Ot6FuseUltros2:                 ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clears first, then the
+                reset_battle_timer      ;   move (ot6_fuse.asm, the idiom)
+                attack IMP_SONG
+                end_if
         if_battle_switch_clr 0, 0
                 dlg $13
 ; Long time no see!
 ; You’ve changed!
 ; Did ya miss me?
                 set_battle_switch 0, 0
-                end_if
-        if_battle_timer 60
-                reset_battle_timer
-                dlg $62
-; Imp! Pal! Buddy!
-                attack IMP_SONG, IMP_SONG, IMP_SONG
                 end_if
         if_self_in_slot MONSTER_1
                 attack BATTLE, SPECIAL, TENTACLE
@@ -6330,6 +6509,7 @@ AIScript::_301:
         if_self_in_slot MONSTER_2
         if_battle_var_greater 3, 16
         if_battle_switch_clr 2, 7
+        if_monster_switch_clr 0         ; ot6: not while his song is announced
                 set_battle_switch 2, 7
                 hide_monsters MONSTER_2, SAND
                 show_monsters MONSTER_3, SAND
@@ -6341,6 +6521,7 @@ AIScript::_301:
         if_self_in_slot MONSTER_4
         if_battle_var_greater 3, 14
         if_battle_switch_clr 2, 6
+        if_monster_switch_clr 0         ; ot6: not while his song is announced
                 set_battle_switch 2, 6
                 hide_monsters MONSTER_4, SAND
                 show_monsters MONSTER_2, SAND
@@ -6352,6 +6533,7 @@ AIScript::_301:
         if_self_in_slot MONSTER_1
         if_battle_var_greater 3, 12
         if_battle_switch_clr 2, 5
+        if_monster_switch_clr 0         ; ot6: not while his song is announced
                 set_battle_switch 2, 5
                 hide_monsters MONSTER_1, SAND
                 show_monsters MONSTER_4, SAND
@@ -6362,6 +6544,7 @@ AIScript::_301:
         if_self_in_slot MONSTER_2
         if_battle_var_greater 3, 10
         if_battle_switch_clr 2, 4
+        if_monster_switch_clr 0         ; ot6: not while his song is announced
                 set_battle_switch 2, 4
                 hide_monsters MONSTER_2, SAND
                 show_monsters MONSTER_1, SAND
@@ -6372,6 +6555,7 @@ AIScript::_301:
         if_self_in_slot MONSTER_4
         if_battle_var_greater 3, 8
         if_battle_switch_clr 2, 3
+        if_monster_switch_clr 0         ; ot6: not while his song is announced
                 set_battle_switch 2, 3
                 hide_monsters MONSTER_4, SAND
                 show_monsters MONSTER_2, SAND
@@ -6382,6 +6566,7 @@ AIScript::_301:
         if_self_in_slot MONSTER_2
         if_battle_var_greater 3, 6
         if_battle_switch_clr 2, 2
+        if_monster_switch_clr 0         ; ot6: not while his song is announced
                 set_battle_switch 2, 2
                 hide_monsters MONSTER_2, SAND
                 show_monsters MONSTER_4, SAND
@@ -6392,6 +6577,7 @@ AIScript::_301:
         if_self_in_slot MONSTER_3
         if_battle_var_greater 3, 4
         if_battle_switch_clr 2, 1
+        if_monster_switch_clr 0         ; ot6: not while his song is announced
                 set_battle_switch 2, 1
                 hide_monsters MONSTER_3, SAND
                 show_monsters MONSTER_2, SAND
@@ -6403,6 +6589,7 @@ AIScript::_301:
         if_self_in_slot MONSTER_1
         if_battle_var_greater 3, 2
         if_battle_switch_clr 2, 0
+        if_monster_switch_clr 0         ; ot6: not while his song is announced
                 set_battle_switch 2, 0
                 hide_monsters MONSTER_1, SAND
                 show_monsters MONSTER_3, SAND
