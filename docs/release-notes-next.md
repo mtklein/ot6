@@ -25,9 +25,9 @@ shields instead of 6.
 
 The rest of the World of Balance's bosses announce a move the same way.
 Ultros at Esper Mountain creeps toward you one step every other turn, and
-enough hits push him back a step; once he is four steps out he says "He
-looms over you!" and Aqua Rake follows on his next turn, then he sinks
-back to where he started. A break while the **!** is up stops the wave and
+enough hits push him back a step; on his turn after he reaches four steps
+out he says "He looms over you!", Aqua Rake follows on his next turn, and
+then he sinks back to where he started. A break while the **!** is up stops the wave and
 sends him back to the start. FlameEater says "It swells with flame!" a
 turn before Fire Ball on the whole party. On the airship, Chupon says "It
 inhales!" a turn before Fire Ball on the whole party, once he has been hit
