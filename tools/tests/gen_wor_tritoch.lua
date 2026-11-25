@@ -30,6 +30,12 @@ local TERRATO, TRITOCH = 4, 10
 -- the bosses (route_data.py pool event 132, 119, 117)
 local ICEDRAGON, TRITOCH_SP, UMARO_SP = 0x149, 0x144, 0x110
 local ICEDRAGON_FORMATION, TRITOCH_FORMATION, UMARO_FORMATION = 366, 487, 444
+-- tritoch_entry (also= in the graph): the Tritoch's battle as it comes up, before any input -- battle_tritoch's fixture (wt/v052-tg-wor1).
+-- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
+-- umaro_entry (also= in the graph): the Umaro's battle as it comes up, before any input -- battle_umaroboss's fixture (wt/v052-tg-wor1).
+-- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
+local TRITOCH_CAP = H.battleOpenCapture(TRITOCH_SP, "tritoch_entry")
+local UMARO_CAP = H.battleOpenCapture(UMARO_SP, "umaro_entry")
 -- the fight driver for the three: fire, which each of them is weak to, from
 -- whoever knows it (TERRA's natural Fire; the Ifrit and Maduin wearers once
 -- they learn it), boosted toward Fire 2 and 3; CELES on Runic (N. Cross, Ice
@@ -907,6 +913,7 @@ H.run({ maxFrames = 500000 }, {
   -- @@stage tritoch
   walkTo(25, 6, "below the save point"),
   ready("Tritoch"),
+  TRITOCH_CAP.arm(),
   walkInto(20, 1, MAP_TRITOCH, "the cliffs' save point -> Tritoch's ledge (35)", CLIFF_SAVE_AVOID),
   via({ { 23, 20 }, { 12, 19 } }, "Tritoch's ledge to the ice", { { 9, 14 }, { 9, 12 } }),
   -- (9,14), _cc3719: the thaw and event battle 119, a game over when lost;
@@ -916,6 +923,7 @@ H.run({ maxFrames = 500000 }, {
     return sw(0x029E) == 1 and not H.battleLoadStarted() and map() == MAP_TRITOCH and settled()
   end, 120000, { playBattles = "tactical", fight = BOSS_FIGHT }),
   fought(TRITOCH_FORMATION, "Tritoch"),
+  TRITOCH_CAP.emit(),
   H.call(function()
     H.assertEq(sw(0x029E), 1, "Tritoch freed ($029E, _cc3719)")
     H.assertEq((H.readByte(0x1A69 + (TRITOCH >> 3)) >> (TRITOCH & 7)) & 1, 1, "Tritoch owned (give_genju)")
@@ -955,6 +963,7 @@ H.run({ maxFrames = 500000 }, {
   -- ---- 4. Terrato and UMARO ----------------------------------------------------
   -- @@stage lair
   ready("Umaro"),
+  UMARO_CAP.arm(),
   -- the carving (283 NPC_1 (57,15), _ccd6eb): "Remove the Magicite?" Yes,
   -- event battle 117, a game over when lost; Terrato given ($027A)
   walkTo(57, 16, "below the carving"),
@@ -964,6 +973,7 @@ H.run({ maxFrames = 500000 }, {
     return sw(0x027A) == 1 and not H.battleLoadStarted() and map() == MAP_LAIR and settled()
   end, 120000, { playBattles = "tactical", fight = BOSS_FIGHT }),
   fought(UMARO_FORMATION, "Umaro"),
+  UMARO_CAP.emit(),
   H.call(function()
     H.assertEq(sw(0x027A), 1, "Terrato taken ($027A, _ccd709)")
     H.assertEq((H.readByte(0x1A69 + (TERRATO >> 3)) >> (TERRATO & 7)) & 1, 1, "Terrato owned (give_genju)")

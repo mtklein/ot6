@@ -43,6 +43,9 @@ local IFRIT, STARLET, GOLEM, ZONESEEK = 1, 25, 22, 18
 -- Chadarnook (route_data pool event 86: formation 456; the goddess $11E,
 -- the demon $148)
 local GODDESS_SP, DEMON_SP, CHADARNOOK_FORMATION = 0x11E, 0x148, 456
+-- chadarnook_entry (also= in the graph): the Chadarnook's battle as it comes up, before any input -- battle_chadarnook's fixture (wt/v052-tg-wor1).
+-- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
+local CHAD_CAP = H.battleOpenCapture(GODDESS_SP, "chadarnook_entry")
 local BOSS_SPECIES = { [GODDESS_SP] = true, [DEMON_SP] = true }
 -- the fight driver for the demon (route-wor-thamasa.md 5.2): the demon only
 -- (focus; the goddess absorbs holy and water and counters every hit with
@@ -760,12 +763,14 @@ H.run({ maxFrames = 1800000 }, {
   -- Owzer (208 NPC_2 at (75,14), _cb4cfa): his lines, then event battle 86
   -- (a game over when lost), then $0253
   walkTo(75, 15, "below Owzer"),
+  CHAD_CAP.arm(),
   talkTo(75, 14, "Owzer (208 NPC_2)"),
   H.advanceStory(function()
     return sw(0x0253) == 1 and not H.battleLoadStarted() and map() == MAP_GODDESS and settled()
   end, 150000, { playBattles = "tactical", fight = BOSS_FIGHT }),
   fought(CHADARNOOK_FORMATION, "Chadarnook"),
   H.saveState("wor_relm_chadarnook.mss"),
+  CHAD_CAP.emit(),
 
   -- ---- 2. Starlet and RELM ------------------------------------------------------
   -- @@stage relm

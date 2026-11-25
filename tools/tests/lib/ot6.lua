@@ -19764,6 +19764,35 @@ function M.aiAttacks(species, atk)
   return out
 end
 
+-- M.battleOpenCapture(species, tag): (wt/v052-tg-wor1) a generator's fixture of a boss battle as it comes up, before
+-- any input.  Returns C: C.arm() is a step that arms it (and drops any earlier capture: a retried attempt's), C.emit()
+-- a step that emits the capture as `tag`.mss (the graph's also= names it).  Once armed, the capture is taken with no
+-- frames spent (M.requestSaveState) on the first frame a battle is up (M.battleActive) with `species` standing in a
+-- monster slot, so the play after it is the play without it.
+function M.battleOpenCapture(species, tag)
+  local C = { armed = false, req = nil }
+  emu.addEventCallback(function()
+    if not C.armed or C.req ~= nil or not M.battleActive() then return end
+    for s = 0, 5 do
+      if M.readByte(0x3AA8 + s * 2) & 1 == 1 and M.readWord(0x57C0 + s * 2) == species then
+        C.req = M.requestSaveState()
+        M.log(string.format("[fixture] f%d %s: the battle with $%03X in slot %d is up; captured", M.frame, tag, species,
+          s))
+        return
+      end
+    end
+  end, emu.eventType.endFrame)
+  function C.arm() return M.call(function() C.armed, C.req = true, nil end) end
+  function C.emit()
+    return M.call(function()
+      M.checkReq(C.req, tag .. " capture (the battle with $" .. string.format("%03X", species) .. " as it came up)")
+      M.emitBlob(tag .. ".mss", C.req.blob)
+      C.armed = false
+    end)
+  end
+  return C
+end
+
 -- M.fuseEngage(talk, species, what): the talk that opens a boss's battle, made again (four times at most) while
 -- the battle it opened is another: a random battle can open on the step the talk takes (lib T.touchBoss), and it
 -- is fought out (M.kitBattle: everyone Fights).  talk() returns the step.  Ends with the boss's battle up.
