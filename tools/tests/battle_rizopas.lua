@@ -42,6 +42,34 @@ local function up() return H.readByte(0x3AA8 + SLOT * 2) & 1 == 1 and H.readWord
 local rolls, gen = {}, 0
 local ENT = 8 + 2 * SLOT
 
+-- The party's part while his roll is to be won: Defend, and after each roll he misses one member's Fight aimed at
+-- him (the library holds his gauge at 63, so it only chips).  With the party only Defending every cycle of his two
+-- turns took the same frames and the same draws, so the roll fell on the same few values: on wt/v052-tg-wob3's
+-- replayed draw 15 turn-A rolls in a row missed and the case's 40,000 frames ran out ("rizopas: the announce shows
+-- (dlg $9A) -- the trigger earned again: got false", build/attempts/wt/v052-tg-wob3/regen2/suites/
+-- battle_rizopas-red.log).  A Fight's own draws move the phase, as a player's turns do.
+local function armVaried(pred, max, W)
+  local t0, plan, lastMiss = nil, {}, 0
+  return H.lazy(function()
+    t0, plan, lastMiss = H.frame, {}, H.frame
+    return H.kitBattle(plan, { idle = "defend", care = false, maxFrames = max + 600,
+      giveUp = function()
+        local r = rolls[#rolls]
+        if r ~= nil and r.gen == gen and r.r >= r.n and r.f > lastMiss then
+          lastMiss = r.f
+          for i = 0, 3 do
+            local id = H.readByte(0x3ED8 + 2 * i)
+            if id ~= 0xFF and H.readWord(0x3BF4 + 2 * i) > 0 and (H.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
+              plan[#plan + 1] = { who = id, cmd = 0x00, boost = 0, slot = SLOT }
+              break
+            end
+          end
+        end
+        return pred() or H.frame - t0 >= max
+      end })
+  end)
+end
+
 -- The cap: its run ended at f26,663 on the merged ROM (wt/v051-tg-wob1), so 55,000 is about 2x the longest.
 H.run({ maxFrames = 55000 }, {
   H.waitFrames(20),
@@ -89,7 +117,7 @@ H.run({ maxFrames = 55000 }, {
   H.fuseCases({
     tag = "rizopas", species = RIZOPAS, write = WRITE,
     line = 0x9A, move = { cmd = 0x02, atk = 0x6F }, turns = 1, glows = 1,
-    arm = "idle",
+    arm = armVaried, aim = true,
     bossHp = 775,
     onOpen = function() gen = gen + 1 end,
     -- at once, before his first turn: the cases share the snapshot and the party's input, so the draw that armed
