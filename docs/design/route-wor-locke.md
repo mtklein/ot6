@@ -13,6 +13,12 @@ Evidence is under `build/attempts/wt/v032-locke-arc/` (`data/` read from the
 built ROM and the tracked SRAM by `tools/route_data.py` and the scripts
 beside them; `rows/` the break-row suite; `lab/` the runs).
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
+> keys below are the present ones. Quoted logs, dated measurements and
+> "before" columns keep the words they were recorded in.
+
 ## 0. Findings
 
 1. **The scene ends in Kohlingen, not on the Falcon.** `_cc3188` parks the
@@ -27,7 +33,7 @@ beside them; `rows/` the break-row suite; `lab/` the runs).
 3. **The Wing Edge is past a pit.** Its chest (315 (24,43), bit 172) stands
    beyond a floor that gives way (315 (24,44), `_cc280e`: the party drops to
    313 (25,44)); the step at 315 (23,49) lays a bridge for good (`_cc284b`,
-   `$02A5`). It is LOCKE's: blunt (the boomerang class), attack 198, no row
+   `$02A5`). It is LOCKE's: Ranged (the boomerangs' class), attack 198, no row
    penalty, the best weapon he can hold on arrival.
 4. **Five of the cave's chests are empty in the ROM**: 315 (50,36) and 313
    (18,13), (51,37), (32,42), (34,20) (bits `$0AD`, `$0B0`, `$0AE`, `$0AF`,
@@ -72,28 +78,29 @@ elements stay.
 
 | species | where | L / HP | vanilla elements; notes | shields | classes | why |
 |---|---|---|---|---|---|---|
-| Phase `$0BC` | 315 | 47 / 4,550 | weak ice, absorbs fire; Float; Smirk (Stop) | 2 | special, **+holy** | a phantom: holy for the half with no ice |
-| Parasoul `$0BF` | 315 | 47 / 2,077 | weak ice, absorbs fire; El Nino, Flash Rain | 2 | slash, pierce | cut or puncture the canopy |
-| Necromancr `$0F1` | 315 | 48 / 3,525 | weak fire, holy; absorbs poison; Doom, X-Zone, Flare (Runic) | 2 | slash, special | a robed caster; CELES's Runic eats its list |
-| Trixter `$0F7` | 313, 315 | 49 / 3,815 | weak holy; Fire 1-3, Cure 2, Rflect, Haste | 2 | pierce, special | MOG's spear for the half with no holy |
-| Aquila `$0EC` | 315 (16/256) | 49 / 6,013 | weak ice, absorbs fire; Flap (x5) | 3 | slash, pierce | a bird, the cave's rare killer |
-| Chaos Drgn `$0E2` | 313, 315 | 44 / 9,013 | weak ice, absorbs fire; defence 5; Disaster, Cinderizer | 4 | pierce, blunt | a dragon with no armour |
-| Sea Flower `$0E9` | 313 | 47 / 4,200 | weak ice, bolt; absorbs fire, water; Feeler | 2 | slash | a plant, in fives |
-| Uroburos `$093` | 313 | 48 / 50 | weak ice, absorbs fire; defence and magic defence 252 | 1 | blunt | 50 HP behind its defence: one crushing blow breaks it |
-| Red Dragon `$153` | event 138 | 67 / 30,000 | weak ice, water; absorbs fire | 6 | pierce | MOG's spear between the scales, CELES's ice |
-| Doom Gaze `$11D` | event 93 (the sky) | 68 / 55,555 | weak fire, holy; absorbs ice, poison; escapes | 8 | pierce, special | an eye in the sky; v0.34 fights it |
+| Phase `$0BC` | 315 | 47 / 4,550 | weak ice, absorbs fire; Float; Smirk (Stop) | 2 | Blunt, **+holy** | a phantom: holy for the half with no ice |
+| Parasoul `$0BF` | 315 | 47 / 2,077 | weak ice, absorbs fire; El Nino, Flash Rain | 2 | Dagger, Katana | cut or puncture the canopy; party 2 holds neither unless CELES carries a curved sword (her Falchion is Katana since 2026-11-24), and keys it with CELES's ice |
+| Necromancr `$0F1` | 315 | 48 / 3,525 | weak fire, holy; absorbs poison; Doom, X-Zone, Flare (Runic) | 2 | Sword, Blunt | a robed caster; CELES's Runic eats its list. RELM's rod and UMARO's club key it; CELES's Falchion, pinned as a key, is Katana since 2026-11-24 and does not |
+| Trixter `$0F7` | 313, 315 | 49 / 3,815 | weak holy; Fire 1-3, Cure 2, Rflect, Haste | 2 | Blunt, Spear | MOG's spear for the half with no holy |
+| Aquila `$0EC` | 315 (16/256) | 49 / 6,013 | weak ice, absorbs fire; Flap (x5) | 3 | Katana, Spear | a bird, the cave's rare killer |
+| Chaos Drgn `$0E2` | 313, 315 | 44 / 9,013 | weak ice, absorbs fire; defence 5; Disaster, Cinderizer | 4 | Blunt, Spear | a dragon with no armour |
+| Sea Flower `$0E9` | 313 | 47 / 4,200 | weak ice, bolt; absorbs fire, water; Feeler | 2 | Katana | a plant, in fives; party 2 holds no Katana but a curved sword in CELES's hand (the Falchion, since 2026-11-24), and keys it with CELES's ice |
+| Uroburos `$093` | 313 | 48 / 50 | weak ice, absorbs fire; defence and magic defence 252 | 1 | Blunt | 50 HP behind its defence: one Blunt hit breaks it |
+| Red Dragon `$153` | event 138 | 67 / 30,000 | weak ice, water; absorbs fire | 6 | Spear | MOG's spear between the scales, CELES's ice |
+| Doom Gaze `$11D` | event 93 (the sky) | 68 / 55,555 | weak fire, holy; absorbs ice, poison; escapes | 8 | Spear, Ranged | an eye in the sky; v0.34 fights it |
 
 `battle_breakwor_locke` checks the rows in the built ROM, every formation
 of the cave's two pools (groups 174 on map 315, 175 on 313) for each party
 alone, the Red Dragon for party 2 and Doom Gaze for the four from the tower,
 and the lesson (each ice-weak body keyed for party 1 without ice). Red on the
 base ROM (44 mismatches); the mutants Phase without holy and Trixter without
-pierce each turn it red where they should (`rows/`).
+pierce (Spear today) each turn it red where they should (`rows/`).
 
 ## 4. The bosses
 
 - **The Red Dragon** (event 138, `$153`; party 2). The floor had already
-  given it 6 shields and pierce, so the row changes no number of its fight.
+  given it 6 shields and pierce (the row is Spear now), so the row changes
+  no number of its fight.
   Measured: section 7.
 - **Doom Gaze** escapes; nothing on this arc fights it to the end.
 
@@ -212,10 +219,10 @@ group): `tally.py` (`tally_sw.txt`) and `tools/fight_report.py`
    The Ribbon is in this cave (313 (13,20)) and goes on in its second half.
 3. **LOCKE's commands** (#382) are another branch's; once they land, the
    next arc's route can measure who lands the breaks (guidelines.md, "every
-   recruit should feel amazing"). On arrival he brings blunt (the Wing
-   Edge) to a four that held slash, pierce and blunt already, and is six to
+   recruit should feel amazing"). On arrival he brings Ranged (the Wing
+   Edge), beside TERRA's and CELES's Sword and RELM's Blunt, and is six to
    nine levels under them.
-4. **Doom Gaze's row** (8, pierce and special) is a first design from the
+4. **Doom Gaze's row** (8, Spear and Ranged) is a first design from the
    meeting on the way; v0.34 fights it.
 
 ## 9. The Necromancers again (v0.38, #448)

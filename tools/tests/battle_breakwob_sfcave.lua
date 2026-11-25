@@ -7,18 +7,21 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: TERRA's Fire keys the whole cave; the eye takes the point (pierce) and not the edge, the worm the edge (slash) and not the point; the Hornet's one shield.
+--   3. the lessons: TERRA's Fire keys the whole cave; the eye takes the point (TERRA's knife or EDGAR's pike) and not the edge (a sword, a katana), the worm LOCKE's edge and not the point; the Hornet's one shield.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x063] = { "Bleary", 2, PIERCE, FIRE, 0, 0 },
-  [0x062] = { "Crawly", 2, SLASH | BLUDG, FIRE, 0, 0 },
-  [0x02E] = { "Hornet", 1, SLASH | PIERCE, FIRE, 0, 0 },
+  [0x063] = { "Bleary", 2, DAGGER, FIRE, 0, 0 },
+  [0x062] = { "Crawly", 2, SWORD | BLUNT, FIRE, 0, 0 },
+  [0x02E] = { "Hornet", 1, DAGGER | RANGED, FIRE, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -27,9 +30,10 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 3); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "TERRA, LOCKE, EDGAR", { { "TERRA", PIERCE, FIRE }, { "LOCKE", SLASH, 0 }, { "EDGAR", PIERCE, POISON } }, nil },
+  -- world-figaro-v1: TERRA the MithrilKnife $01, LOCKE the MithrilBlade $0A, EDGAR the Mithril Pike $1D
+  { "TERRA, LOCKE, EDGAR", { { "TERRA", W(0x01), FIRE }, { "LOCKE", W(0x0A), 0 }, { "EDGAR", W(0x1D), POISON } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -142,8 +146,8 @@ H.run({ maxFrames = 600 }, {
     for _, sp in ipairs({ 0x063, 0x062, 0x02E }) do
       if (weakOf(sp) & FIRE) == 0 then problem("$%03X %s: TERRA's Fire holds no key", sp, WANT[sp][1]) end
     end
-    if (classOf(0x063) & SLASH) ~= 0 or (classOf(0x063) & PIERCE) == 0 then problem("$063 Bleary: the eye should take the point and not the edge") end
-    if (classOf(0x062) & PIERCE) ~= 0 or (classOf(0x062) & SLASH) == 0 then problem("$062 Crawly: the worm should take the edge and not the point") end
+    if (classOf(0x063) & (SWORD | KATANA)) ~= 0 or (classOf(0x063) & (W(0x01) | W(0x1D))) == 0 then problem("$063 Bleary: the eye should take the point and not the edge") end
+    if (classOf(0x062) & (W(0x01) | W(0x1D))) ~= 0 or (classOf(0x062) & W(0x0A)) == 0 then problem("$062 Crawly: the worm should take the edge and not the point") end
     if shield[0x02E] == nil or shield[0x02E][1] ~= 1 then problem("$02E Hornet: not one shield") end
     H.log("the lessons: Fire keys the whole cave; the eye takes the point, the worm the edge; the Hornet's one shield")
     H.assertEq(#problems, 0, "WoB sfcave break row mismatches")

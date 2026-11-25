@@ -21,42 +21,47 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
   [0x171] = { "Zone Eater", 0, 0, HOLY, ICE },
-  [0x0DC] = { "Karkass", 3, SLASH | BLUDG, FIRE | HOLY, POISON },
-  [0x07D] = { "Wart Puck", 3, PIERCE | BLUDG, FIRE, 0 },
-  [0x068] = { "Ogor", 3, SLASH | PIERCE, BOLT | POISON, 0 },
-  [0x0F0] = { "Tap Dancer", 2, SLASH | BLUDG, POISON, 0 },
-  [0x067] = { "Covert", 3, PIERCE | BLUDG, HOLY, POISON },
-  [0x0FA] = { "Woolly", 3, SLASH, FIRE, ICE | BOLT | POISON | WIND | EARTH | WATER },
-  [0x069] = { "Warlock", 2, BLUDG | SPECIAL, BOLT | POISON, 0 },
-  [0x074] = { "Slatter", 2, PIERCE | BLUDG, HOLY, 0 },
-  [0x09A] = { "Cluck", 2, SLASH | BLUDG, ICE, POISON },
-  [0x0A5] = { "Eland", 2, PIERCE | BLUDG, BOLT, 0 },
-  [0x0B5] = { "Hipocampus", 2, PIERCE | BLUDG, FIRE | HOLY, POISON },
-  [0x070] = { "Displayer", 3, BLUDG | SPECIAL, FIRE | HOLY, POISON },
-  [0x0C8] = { "Opinicus", 3, SLASH | BLUDG, FIRE | HOLY, POISON },
-  [0x123] = { "Hidon", 6, PIERCE | BLUDG, FIRE | HOLY | EARTH, POISON },
-  [0x126] = { "Hidonite (poison claw)", 2, SLASH | BLUDG, EARTH, POISON },
-  [0x160] = { "Hidonite (confuclaw)", 2, SLASH | BLUDG, 0, FIRE | ICE | BOLT | POISON | WIND | HOLY | WATER },
-  [0x161] = { "Hidonite (zombi claw)", 2, PIERCE | BLUDG, FIRE | HOLY, POISON },
-  [0x162] = { "Hidonite (mega claw)", 2, BLUDG, FIRE | ICE | BOLT | POISON | WIND | HOLY | EARTH | WATER, 0 },
-  [0x14C] = { "Dirt Drgn", 6, PIERCE | BLUDG, WIND | WATER, 0 },
-  [0x11D] = { "Doom Gaze", 8, PIERCE | SPECIAL, FIRE | HOLY, ICE | POISON },
+  [0x0DC] = { "Karkass", 3, KATANA | BLUNT, FIRE | HOLY, POISON },
+  [0x07D] = { "Wart Puck", 3, DAGGER | BLUNT, FIRE, 0 },
+  [0x068] = { "Ogor", 3, SWORD | DAGGER, BOLT | POISON, 0 },
+  [0x0F0] = { "Tap Dancer", 2, SWORD | BLUNT, POISON, 0 },
+  [0x067] = { "Covert", 3, DAGGER | BLUNT, HOLY, POISON },
+  [0x0FA] = { "Woolly", 3, SWORD, FIRE, ICE | BOLT | POISON | WIND | EARTH | WATER },
+  [0x069] = { "Warlock", 2, BLUNT | RANGED, BOLT | POISON, 0 },
+  [0x074] = { "Slatter", 2, SPEAR | BLUNT, HOLY, 0 },
+  [0x09A] = { "Cluck", 2, KATANA | BLUNT, ICE, POISON },
+  [0x0A5] = { "Eland", 2, DAGGER | BLUNT, BOLT, 0 },
+  [0x0B5] = { "Hipocampus", 2, DAGGER | BLUNT, FIRE | HOLY, POISON },
+  [0x070] = { "Displayer", 3, BLUNT | RANGED, FIRE | HOLY, POISON },
+  [0x0C8] = { "Opinicus", 3, KATANA | BLUNT, FIRE | HOLY, POISON },
+  [0x123] = { "Hidon", 6, DAGGER | BLUNT, FIRE | HOLY | EARTH, POISON },
+  [0x126] = { "Hidonite (poison claw)", 2, KATANA | BLUNT, EARTH, POISON },
+  [0x160] = { "Hidonite (confuclaw)", 2, KATANA | BLUNT, 0, FIRE | ICE | BOLT | POISON | WIND | HOLY | WATER },
+  [0x161] = { "Hidonite (zombi claw)", 2, DAGGER | BLUNT, FIRE | HOLY, POISON },
+  [0x162] = { "Hidonite (mega claw)", 2, BLUNT, FIRE | ICE | BOLT | POISON | WIND | HOLY | EARTH | WATER, 0 },
+  [0x14C] = { "Dirt Drgn", 6, DAGGER | BLUNT, WIND | WATER, 0 },
+  [0x11D] = { "Doom Gaze", 8, SPEAR | RANGED, FIRE | HOLY, ICE | POISON },
 }
 
--- the hands, as the arc seats them (route-wor-gogo.md section 2): TERRA (a dagger; Fire, Pearl), CELES (a
--- blade; Ice), RELM (a rod; Chocobo Brush in the bag: special), STRAGO (a rod; Pearl Rod holy), GOGO (no
+-- the hands, as the arc seats them (route-wor-gogo.md section 2): TERRA (a dagger, the Man Eater $06; Fire, Pearl), CELES (a
+-- blade, the Falchion $15; Ice), RELM (a rod, the Pearl Rod $39; the Chocobo Brush $3D in the bag), STRAGO (a rod; Pearl Rod holy), GOGO (no
 -- weapon and no Fight row: no key of his own; his Mimic copies the others' keys, which the union already
 -- holds)
-local TERRA = { "TERRA", PIERCE, FIRE | HOLY }
-local CELES = { "CELES", SLASH, ICE }
-local RELM = { "RELM", BLUDG | SPECIAL, 0 }
-local STRAGO = { "STRAGO", BLUDG, HOLY }
+local TERRA = { "TERRA", W(0x06), FIRE | HOLY }
+-- since the 2026-11-24 regroup the Falchion is a Katana; the regrouped replay's CELES walks the belly with the
+-- Crystal $14 and the Enhancer $13 (both Sword): wor_belly's [keys] "src=c0:r06,c6:r14:l13,c8:r39,c7:r3A" (fccf9cf3)
+local CELES = { "CELES", W(0x14) | W(0x13), ICE }
+local RELM = { "RELM", W(0x39) | W(0x3D), 0 }
+local STRAGO = { "STRAGO", W(0x39), HOLY }
 local GOGO = { "GOGO", 0, 0 }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what, members = list }

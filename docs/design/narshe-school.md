@@ -11,6 +11,15 @@ advisors rewritten, and $0274's Esper pages, which were vanilla and are
 false in OT6); $026F's first page names the Boost Point; everything
 else in the school is untouched.
 
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Blunt, Ranged
+> ([weapon-classes.md](weapon-classes.md)). $0264 teaches the six
+> ("The six weapon types", below). Quoted logs and dated measurements
+> keep the words they were recorded in: slash is now Sword or Katana,
+> pierce Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special
+> Ranged or Blunt.
+
 ## The vanilla school (inventory, from source)
 
 Four maps. Doors and NPCs from `ff6/src/field/trigger/short_entrance.dat`
@@ -42,7 +51,8 @@ Four maps. Doors and NPCs from `ff6/src/field/trigger/short_entrance.dat`
   monsters-in-chests, $025E/$06D2 relics, $025F buttons, $0260
   equip-shop arrows, chocobo advisor (`_ccd2ee`, shared $03A5/$03A6).
   Chests: a **monster-in-a-box** at {54,28} (event battle group 0 =
-  formation 0, Soldier + Lobo) and a Tincture.
+  formation 0, one Lobo: its record's present mask is `$01`) and a
+  Tincture.
 
 Dialog id = index into `ff6/src/text/dlg1_en.json` ($0257 = entry 599).
 
@@ -55,17 +65,18 @@ vanilla FF6, in plain words, out of character where that helps ("OT6
 meets is explained once and only once. Every advisor says what the rule
 is, what the screen shows and which button to press, in the words the
 game's own screens use (the shield and '?' cells under each monster, the
-dots after each name, the R and L Buttons, the Magic list, "slashing",
-"piercing", "bludgeoning" from the battle's own "Weak against ..."
-messages). The 2026-09-28 rewrite (#289) replaced the first version's
-lore voice ("Strike NOW!", "Greed loses", the deserter's riddle about
-the Empire's plates), which players could not follow.
+dots after each name, the R and L Buttons, the Magic list, and the six
+weapon types by the names the item menu's type column shows: Sword,
+Dagger, Spear, Katana, Blunt, Ranged). The 2026-09-28 rewrite (#289)
+replaced the first version's lore voice ("Strike NOW!", "Greed loses",
+the deserter's riddle about the Empire's plates), which players could
+not follow.
 
 | Key mechanic (WoB) | Advisor | Room |
 |---|---|---|
 | Orientation; level-ups restore HP/MP; half as many random battles, double Exp./GP | $0257 greeter | outside the door, and the hall |
 | Shields, half damage while shielded, breaking (can't act, ×2 damage on the hits after the breaking one), recovery | $0267 | middle (106) |
-| Weaknesses: '?' cells, elements and weapon types, the Magic list's element icons and the weapon icons, the codex | $0264 | middle (106) |
+| Weaknesses: '?' cells, elements and weapon types, the Magic list's element icons and the weapon icons, the six types by name and what counts as each, skills with a type of their own, the codex | $0264 | middle (106) |
 | Boost Points: 1 at the start, +1 a turn (shown at the next turn), cap 5; R adds (up to 3; arrows until the action starts), L takes back; no point on a boosted turn | $026D | left (105) |
 | What a boost buys: Fight's extra hits (free; twice as many with two weapons); ×2/×4/×8 damage on other skills, Dance included; MP ×2.5 a point, capped at 99 and never below the unboosted price; a status spell's reach, one more target a point at its MP again | $0270 | left (105) |
 | Stronger spells: Fire → Fire 2 → Fire 3 and the other families, at the cast spell's MP; the Magic list previews | $026E | left (105) |
@@ -93,7 +104,7 @@ multi-target, now misleading, since R/L in battle menus boosts), $026D
 false in OT6 (learn rates are all 0; `ot6_progression.asm`, M5), so they
 are replaced; its first three pages (equipping and summoning an Esper)
 are still true and kept byte for byte. The $025D advisor stands beside
-the live monster chest (event battle group 0: Soldier + Lobo), so his
+the live monster chest (event battle group 0: one Lobo), so his
 second page points at a fight the player can take immediately.
 
 ## The copy (final)
@@ -133,7 +144,19 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Fight uses your weapon's type: swords and claws slash, spears and knives pierce, rods bludgeon.
+> The six weapon types are Sword, Dagger, Spear, Katana, Blunt and Ranged. Fight uses your weapon's type.
+>
+> *(next box)*
+>
+> Blunt is rods, brushes, knuckles and bare fists. Ranged is anything shot or thrown: bolts, stars, cards, dice.
+>
+> *(next box)*
+>
+> Claws, ninja blades and fangs are Dagger. Curved swords, like the RegalCutlass, are Katana.
+>
+> *(next box)*
+>
+> Some skills carry their own type: Pummel is Blunt, the AutoCrossbow is Ranged, Trickshot is Dagger.
 >
 > *(next box)*
 >
@@ -262,7 +285,8 @@ Every claim was checked against the code (2026-09-28):
   reveal is written to the save's codex at once and pre-revealed in later
   battles (`ot6_codex.asm`, `ot6_break.asm`). Magic-list element icons:
   `Ot6AbilityPad_ext`. Weapon types: `Ot6WeapClassTbl`
-  ([weapon-classes.md](weapon-classes.md)).
+  ([weapon-classes.md](weapon-classes.md)); the six-type pages are
+  checked line by line in "The six weapon types", below.
 - Boost Points: open at 1 (`Ot6InitBP`), +1 at the end of an unboosted
   action, cap 5, the pending points subtracted and no +1 on a boosted
   one (`Ot6ActionEnd`); R raises the pending boost to at most 3 and never
@@ -302,6 +326,78 @@ Every claim was checked against the code (2026-09-28):
   rank, points and rungs, with a line on what the highlighted rung does
   (`DrawEsperDetailMenu`, `Ot6RungDescText`). The old pages said Espers
   change stats while worn (`Ot6EsperStatTbl`, retired by the ladder).
+
+## The six weapon types (v0.51, #566)
+
+$0264's third page said "swords and claws slash, spears and knives pierce,
+rods bludgeon": three of the four classes, and false once the six replaced
+them. Four pages replace it; the advisor's other three pages are unchanged,
+so the dialog runs seven pages where it ran four.
+
+What the pages have to carry is the part a player cannot read off a weapon:
+the item menu shows every weapon's icon and type word, so the names of the
+six and the rule "Fight uses your weapon's type" are one page; the two
+classes that are not a kind of blade (Blunt, Ranged) get a page saying what
+counts; the places a guess goes wrong (claws are not Blunt, ninja blades
+are not Katana, Gau's bare hand is not Blunt, a curved sword is not Sword)
+get a page; and one page
+says a skill can have a type whatever is held.
+
+Each claim against `ff6/src/battle/ot6_class.asm`:
+
+- Blunt: rods `$34`-`$3C`, brushes `$3D`-`$40`, the knuckles (MetalKnuckle
+  `$53`, Kaiser `$55`, Fire Knuckle `$57`), the empty hand `$FF`; also the
+  Flail, the Morning Star and the Bone Club, which the page does not name.
+- Ranged: the AutoCrossbow's bolts `$AA`, the stars `$41`-`$43`, cards and
+  dice `$4D`-`$52` (the Fixed Dice chip nothing), and the darts and
+  boomerangs, which the page covers with "anything shot or thrown".
+- Claws: Mithril Claw `$54`, Poison Claw `$56`, Dragon Claw `$58`, Tiger
+  Fangs `$59` are Dagger (owner, 2026-11-24). Ninja blades `$25`-`$2A` are
+  Dagger. Gau's bare hand, and either hand while he rages, is
+  `OT6_CLS_FANG`, Dagger. The curved swords, RegalCutlass `$0B` (the one
+  the page names: South Figaro's shop sells it), Flame Sabre `$0D`,
+  Falchion `$15`, Soul Sabre `$16` and Scimitar `$19`, are Katana.
+- Skills: Pummel `$5D` Blunt (`Ot6SkillClassTbl`), the AutoCrossbow Ranged
+  (its item row), Trickshot Dagger (`OT6_CLS_THIEF`). SwdTech is not the
+  example: five of Cyan's eight are Katana, Retort and Empowerer have no
+  type and Quadra Slice is wind.
+
+Fit, by `python3 tools/six_classes/dlg_fit.py 0264` (the field's own wrap:
+the pen starts at 4, a word that would reach 224 starts a new line; every
+other school page it measures comes to four lines or fewer, as school.lua
+counts in game):
+
+| page | lines | widest line, pixels |
+|---|---|---|
+| The six weapon types are ... | 4 | 214 |
+| Blunt is rods, brushes ... | 4 | 223 |
+| Claws and ninja blades are Dagger ... | 4 | 224 |
+| Some skills carry their own type ... | 4 | 196 |
+
+(A width counts the line's trailing space; vanilla-era pages here reach
+228.)
+
+Not measured in game: no emulator was used for this change. The lead's replay
+should capture `school_0264_p3` through `school_0264_p6` (school.lua
+screenshots every page it waits on) and one battle message of each type the
+practice fight can show ("Weak against daggers", and "Weak against fire").
+
+**The practice chest.** Its one Lobo has 27 HP and three shields, and takes
+Dagger, Spear and fire (opening.md). TERRA's and LOCKE's daggers and her
+Fire all turn a '?', which is the lesson the advisor points at; the Lobo
+dies before its third shield goes, so the chest does not show a break.
+opening.md proposes one shield.
+
+**The battle's words.** The messages read "Weak against swords", "daggers",
+"spears", "katanas", "blunt" and "ranged" (`attack_msg_en.json` `$45`-`$48`,
+`$4A`, `$4B`). The school uses the type names as the item menu shows them;
+opening.md proposes "blunt attacks" and "ranged attacks" for the two that
+read as cut short.
+
+**school.lua.** `tools/tests/school.lua` pins $0264's bytes and its page
+count; both are out of date until `python3 tools/tests/school_bytes.py`
+regenerates the block (the dialog is seven pages, was four). Its walk is
+unchanged: the same advisor, three more key presses.
 
 ## Kept vanilla (lesson still true)
 
@@ -368,6 +464,8 @@ is held to four lines by school.lua's page count.
   dialog bytes churn wholesale. That is harmless, since everything
   reaches dialog data through DlgPtrs, cc/e602. Built after the
   plain-words rewrite (#289): 65,540 + 54,043 = 119,583 B, slack 7,649;
+  with the six weapon types (#566): 65,558 + 55,159 = 120,717 B, slack
+  6,515;
   the bank split lands at id 1684 (`Dlg1::ARRAY_LENGTH` → DlgBankInc).
 - **Element glyphs in dialog:** the dialog charset maps $76–$7E to
   {fire}-style escapes, but no vanilla string uses them and the M2

@@ -9,7 +9,8 @@
 -- Fidor and a Trooper, or a HeavyArmor and two Troopers; field/event.asm EventBattle); the descent of every draw
 -- of the v0.45 lab met Fidor three times (build/attempts/wt/v045-rows/).  In a fight that holds Fidor or Bounty
 -- Man the suite stages the property, the way a player who wants the break plays it: the first member whose hand
--- the body's keys take (slash|pierce: a blade, a knife, a spear or the crossbow) Fights it with every point
+-- the body's keys take (its class row, read from the battle's own cell $3ea4+2s: under the four classes
+-- slash|pierce, a blade, a knife or a spear; under the six, whichever of them the row names) Fights it with every point
 -- banked, held on it (aimHard), and the others Defend, unless the driver's plan is care (a heal, an item, a
 -- raise), which stands.  Played, not written: the plans go through the driver's menus.  Without the staging the
 -- driver's own Fire and kill order broke Fidor in the first fight in 1 of 6 distinct plays (the v045-rows review).
@@ -23,7 +24,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/narshe_battle.mss.lua"
 
 local AUTHORED = { [0x01C] = 2, [0x079] = 2 }     -- Fidor, Bounty Man
-local KEYS = 0x03                                  -- their rows' classes: slash|pierce (battle_breakwob_events)
+local CLASSROW = 0x3EA4                            -- a body's class row as the battle seeded it, +2s; the six class bits are $3f
 local CMDTBL, BANK, BCHID, HP = 0x202E, 0x3E9C, 0x3ED8, 0x3BF4
 local KEFKA = 0x014A
 local SH_CUR, SH_MAX, BRK, SPECIES, PRESENT, MONHP = 0x3E40, 0x3E41, 0x3E90, 0x57C0, 0x3AA8, 0x3BFC
@@ -88,27 +89,29 @@ local function targetSlot()
        and H.readWord(MONHP + s * 2) > 0 then return s end
   end
 end
-local function keyedHand(actor)
+local function keyedHand(actor, keys)
   local c = H.readByte(BCHID + actor * 2)
   if c > 13 then return false end
   for _, o in ipairs({ 0x1F, 0x20 }) do
     local w = H.readByte(0x1600 + 37 * c + o)
-    if H.isWeapon(w) and (H.weaponClass(w) & KEYS) ~= 0 then return true end
+    if H.isWeapon(w) and (H.weaponClass(w) & keys) ~= 0 then return true end
   end
   return false
 end
-local function keyedMember()
+local function keyedMember(keys)
   for a = 0, 3 do
     local hp = H.readWord(HP + a * 2)
-    if hp > 0 and hp ~= 0xFFFF and keyedHand(a) then return a end
+    if hp > 0 and hp ~= 0xFFFF and keyedHand(a, keys) then return a end
   end
 end
 local CARE = { heal = true, item = true, raise = true, revive = true, cure = true }
 local function staged(self, actor, plan)
   local t = targetSlot()
   if t == nil or plan == nil or CARE[plan.kind] then return plan end
-  local k = keyedMember()
-  H.assertEq(k ~= nil, true, "a standing member holds a hand Fidor's and Bounty Man's keys take (slash|pierce)")
+  local keys = H.readByte(CLASSROW + t * 2) & 0x3F
+  local k = keyedMember(keys)
+  H.assertEq(k ~= nil, true, string.format("a standing member holds a hand slot %d's ($%03X) keys take (its class "
+    .. "row $%02X)", t, H.readWord(SPECIES + t * 2), keys))
   if cur then cur.keyed = cur.keyed or k end
   if actor ~= k then
     H.log(string.format("[raiders] staged: actor %d Defends while actor %d Fights slot %d", actor, k, t))

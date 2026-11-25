@@ -3681,6 +3681,12 @@ function M.namedTool(slot)
   end
   return id, M.abilityCost(id)
 end
+-- The 0-based cell of tool `id` in the Tools grid (row = cell // 2, column = cell % 2, the cursor bytes namedTool
+-- reads), or nil when the bag holds none: for a fighter that steers to a named tool (gen_scenario's EDGAR, #566).
+function M.toolCell(id)
+  for i, t in ipairs(toolList()) do if t == id then return i - 1 end end
+  return nil
+end
 
 -- ------------------------------------------------- pressing R is a claim --
 -- The ONE place a fighter decides how deep a boost it may press (#230).
@@ -4360,7 +4366,49 @@ function M.weaponClass(item)
   if item == nil or item > 0xFF then return 0 end
   local c = M.readRomByte((M.sym("Ot6WeapClassTbl") & 0x3FFFFF) + item)
   if (c & 0x80) ~= 0 then return 0 end
-  return c & 0x0F
+  return c & 0x7F
+end
+
+-- The class a skill carries by its own table row: Ot6SkillClassTbl
+-- (ot6_class.asm: (ability id, class) pairs, $FF ends), 0 for an ability
+-- with no row or a null-break one.  Read from the ROM, so the chip model
+-- follows the classes the build has (#566: six in the prototype).
+function M.skillClass(id)
+  local t = M.sym("Ot6SkillClassTbl") & 0x3FFFFF
+  for i = 0, 255 do
+    local a = M.readRomByte(t + i * 2)
+    if a == 0xFF then return 0 end
+    if a == id then
+      local c = M.readRomByte(t + i * 2 + 1)
+      return (c & 0x80) ~= 0 and 0 or (c & 0x7F)
+    end
+  end
+  return 0
+end
+
+-- The class a character's hand swings: the weapon's (M.weaponClass), except
+-- GAU's own body, which is his fangs (Ot6WeaponClass, #566): his empty hand,
+-- and either hand while he rages (his hands then hold the rage's graphics
+-- code, not an item).  On a ROM without the fangs (no Ot6KitClassTbl) it is
+-- the weapon table's answer, as that ROM plays.
+function M.handClass(char, item, raging)
+  if char == 0x0B and (item == 0xFF or raging)
+     and not (type(OT6_SYMS) == "table" and OT6_SYMS["Ot6KitClassTbl"] == nil) then
+    return M.kitClass("fang")
+  end
+  return M.weaponClass(item)
+end
+
+-- The classes the kits load by hand, from Ot6KitClassTbl (ot6_class.asm):
+-- "thief" LOCKE's hits (Mug, Trickshot), "coin" Coin Toss and GP Rain,
+-- "club" UMARO's Charge and Throw, "hire" every class a hire may swing.
+function M.kitClass(which)
+  local k = ({ thief = 0, coin = 1, club = 2, hire = 3, fang = 4 })[which]
+  if type(OT6_SYMS) == "table" and OT6_SYMS["Ot6KitClassTbl"] == nil then
+    -- the four-class ROM: pierce, special, bludgeon, the three a hire swung, GAU's bare fist
+    return ({ 0x02, 0x08, 0x04, 0x07, 0x04 })[k + 1]
+  end
+  return M.readRomByte((M.sym("Ot6KitClassTbl") & 0x3FFFFF) + k) & 0x7F
 end
 
 -- ---- a boosted Fight: passes attempted, and hits that land (#235) --------
@@ -4834,7 +4882,7 @@ M.HUD_QMARK_ATTR = 0x25
 -- with each icon's palette taken from Ot6ElemPalTbl and its cell from
 -- Ot6ElemGlyphTbl / Ot6ClassGlyphTbl.
 M.HUD_ICON_NAMES = { "fire", "ice", "lightning", "poison", "wind", "holy", "earth", "water",
-  "slash", "pierce", "bludgeon", "special" }
+  "sword", "dagger", "blunt", "ranged", "katana", "spear" }
 function M.hudColours(drawn)
   local vr, rom, cg = emu.memType.snesVideoRam, emu.memType.snesPrgRom, emu.memType.snesCgRam
   local function stroke(cell, pal)
@@ -4856,7 +4904,7 @@ function M.hudColours(drawn)
   local pals = M.sym("Ot6ElemPalTbl") & 0x3FFFFF
   local ecells = M.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
   local ccells = M.sym("Ot6ClassGlyphTbl") & 0x3FFFFF
-  for k = 0, 11 do
+  for k = 0, #M.HUD_ICON_NAMES - 1 do
     local cell = k < 8 and emu.read(ecells + k, rom) or emu.read(ccells + k - 8, rom)
     out.icons[#out.icons + 1] = { M.HUD_ICON_NAMES[k + 1],
       stroke(cell, palOf(emu.read(pals + k, rom))) }
@@ -7595,9 +7643,12 @@ end
 local function fightChips(actor, slot, boost)
   local r, l = handsOf(actor)
   local mainHits, offHits = M.fightHits(l ~= nil and 2 or 1, boost)
-  local n = M.absorbedHand(slot, r) and 0 or mainHits * hitChips(slot, M.weaponClass(r), M.weaponElement(r))
+  local ch = M.readByte(BATTLE.BCHID + actor * 2)
+  local raging = (M.readByte(BATTLE.ST4 + actor * 2) & 0x01) ~= 0
+  local n = M.absorbedHand(slot, r) and 0
+    or mainHits * hitChips(slot, M.handClass(ch, r, raging), M.weaponElement(r))
   if l and not M.absorbedHand(slot, l) then
-    n = n + offHits * hitChips(slot, M.weaponClass(l), M.weaponElement(l))
+    n = n + offHits * hitChips(slot, M.handClass(ch, l, raging), M.weaponElement(l))
   end
   return n
 end
@@ -7626,16 +7677,157 @@ end
 -- here is not offered to the chip model's lines (bestLine) or the race.
 -- (Table fields, not locals: the main chunk is at Lua's 200-local limit.)
 BATTLE.BLITZ_SHAPE = {
-  [0x5D] = { class = 0x04, elem = 0, hits = 2 },   -- Pummel
+  [0x5D] = { class = true, elem = 0, hits = 2 },   -- Pummel
   [0x5E] = {},                                     -- Aura Bolt
-  [0x5F] = { class = 0x04 },                       -- Suplex
+  [0x5F] = { class = true },                       -- Suplex
   [0x62] = { aoe = true },                         -- Air Blade
-  [0x64] = { class = 0x04, elem = 0, hits = 4 },   -- Bum Rush (#388: bludgeon x4, Ot6HitCountTbl's +3)
+  [0x64] = { class = true, elem = 0, hits = 4 },   -- Bum Rush (#388: x4, Ot6HitCountTbl's +3)
 }
+-- a shaped Blitz's class: its Ot6SkillClassTbl row's (class = true), else none
+function M.blitzClass(id)
+  local b = BATTLE.BLITZ_SHAPE[id]
+  return b and b.class and M.skillClass(id) or 0
+end
 M.BUMRUSH, M.CLEAVE = 0x64, 0x5C      -- the two divines Driver:divineLine plays (#388)
 function M.blitzChips(slot, id)
   local b = BATTLE.BLITZ_SHAPE[id]
-  return (b.hits or 1) * hitChips(slot, b.class or 0, b.elem or M.spellElement(id))
+  return (b.hits or 1) * hitChips(slot, M.blitzClass(id), b.elem or M.spellElement(id))
+end
+
+-- #566's instrument: the weapon keys the party holds as a battle opens, one
+-- [keys] line a battle (log only; nothing reads it back into play), said by
+-- the run loop twelve frames after M.battleActive first holds, so a leg's own
+-- battle loop (the Lete's raft, the falls) is counted as the Driver's are.
+M.keysState = { live = false, since = 0, said = false }
+function M.keysWatch()
+  local k = M.keysState
+  local ok, live = pcall(M.battleActive)
+  if not (ok and live) then k.live, k.said = false, false; return end
+  if not k.live then k.live, k.since = true, M.frame end
+  if not k.said and M.frame - k.since >= 12 then
+    k.said = true
+    local ok2, line = pcall(M.keyLine, "battle")
+    M.log(ok2 and line or ("[battle] [keys] unread: " .. tostring(line)))
+  end
+end
+--   hands  the classes of the weapons in the seated members' hands (an empty
+--          main hand is a fist; a member in Magitek armor swings none)
+--   kit    hands, plus the class-bearing skills they could use now: Pummel
+--          (Blitz), Dispatch (SwdTech), TERRA's TekMissile (Magitek), the
+--          Tools and thrown stars and skeans in the bag (Tools, Throw), and
+--          LOCKE's Trickshot or Dismantle once he knows one (Mug swings his weapon)
+-- and each standing gauged body's class row (the ROM's, $3EA4), with whether
+-- hands and kit hold one of its classes.  A body with no class row at all
+-- counts in neither tally.
+function M.keyLine(tag)
+  local hands, kit, who = 0, 0, {}
+  -- what the masks were read from, so a log can be re-read under another
+  -- class table: each member's hand items and skill letters (B Blitz, S
+  -- SwdTech, M TekMissile, T a thief's hit), and the bag's Tools, stars and
+  -- skeans a Tools or Throw owner could use
+  local src, bagSaid = {}, {}
+  local function bag(id)
+    for s = 0, 255 do
+      if M.readByte(0x1869 + s) == id and M.readByte(0x1969 + s) > 0 then return true end
+    end
+    return false
+  end
+  for e = 0, 3 do
+    local c = M.readByte(BATTLE.BCHID + e * 2)
+    local mx = M.readWord(0x3C1C + e * 2)
+    if c < 16 and mx > 0 and mx ~= 0xFFFF then
+      local h, k, s = 0, 0, string.format("c%d", c)
+      if cmdRow(e, BATTLE.CMD_MAGITEK) then
+        if c == 0 then k = k | M.skillClass(0x8A); s = s .. ":M" end
+      else
+        local r, l = handsOf(e)
+        h = M.handClass(c, r, false) | (l and M.handClass(c, l, false) or 0)
+        s = s .. string.format(":r%02X", r) .. (l and string.format(":l%02X", l) or "")
+      end
+      if cmdRow(e, BATTLE.CMD_BLITZ) then k = k | M.skillClass(0x5D); s = s .. ":B" end
+      if cmdRow(e, BATTLE.CMD_SWDTECH) then k = k | M.skillClass(0x55); s = s .. ":S" end
+      if cmdRow(e, BATTLE.CMD_TOOLS) then
+        for id = 0xA3, 0xAA do
+          if bag(id) then k = k | M.weaponClass(id); bagSaid[id] = true end
+        end
+        s = s .. ":tools"
+      end
+      if cmdRow(e, BATTLE.CMD_THROW) then
+        for id = 0x41, 0x43 do
+          if bag(id) then k = k | M.weaponClass(id); bagSaid[id] = true end
+        end
+        for id = 0xAB, 0xAD do
+          if bag(id) then k = k | M.skillClass(0x51 + id - 0xAB); bagSaid[id] = true end
+        end
+        s = s .. ":throw"
+      end
+      if c == 1 and cmdRow(e, BATTLE.LOCKE.CMD)
+         and (M.lockeKnows(BATTLE.LOCKE.TRICK) or M.lockeKnows(BATTLE.LOCKE.DISMANTLE)) then
+        k = k | M.kitClass("thief"); s = s .. ":T"
+      end
+      hands, kit = hands | h, kit | h | k
+      who[#who + 1] = string.format("e%d:c%d:$%02X/$%02X", e, c, h, h | k)
+      src[#src + 1] = s
+    end
+  end
+  local bodies, n, noHand, noKit = {}, 0, 0, 0
+  for s = 0, 5 do
+    if M.monStanding(s) then
+      local row, sh = M.readByte(0x3EA4 + s * 2) & 0x7F, M.readByte(0x3E41 + s * 2)
+      local sp = M.readWord(0x57C0 + s * 2)
+      if sh > 0 and row ~= 0 then
+        n = n + 1
+        if (row & hands) == 0 then noHand = noHand + 1 end
+        if (row & kit) == 0 then noKit = noKit + 1 end
+      end
+      bodies[#bodies + 1] = string.format("s%d:$%03X:row$%02X:sh%d", s, sp, row, sh)
+    end
+  end
+  local bagIds = {}
+  for id = 0x41, 0xAD do if bagSaid[id] then bagIds[#bagIds + 1] = string.format("%02X", id) end end
+  return string.format("[%s] [keys] form=$%03X hands=$%02X kit=$%02X party=%s bodies=%s gauged=%d nohand=%d nokit=%d"
+    .. " src=%s bag=%s", tag, M.readWord(0x11E0) & 0x3FF, hands, kit, table.concat(who, ","),
+    table.concat(bodies, ","), n, noHand, noKit, table.concat(src, ","), table.concat(bagIds, "/"))
+end
+
+-- The classes the hands of the seated members still standing hold now (keyLine's `hands`, the living only), for a
+-- leg's own fighter that asks whether a costed skill brings a key no hand holds (gen_scenario's EDGAR, #566).
+function M.partyHandMask()
+  local hands = 0
+  for e = 0, 3 do
+    local c = M.readByte(BATTLE.BCHID + e * 2)
+    local hp = M.readWord(0x3BF4 + e * 2)
+    if c < 16 and hp > 0 and hp ~= 0xFFFF and not cmdRow(e, BATTLE.CMD_MAGITEK) then
+      local r, l = handsOf(e)
+      hands = hands | M.handClass(c, r, false) | (l and M.handClass(c, l, false) or 0)
+    end
+  end
+  return hands
+end
+
+-- EDGAR's AutoCrossbow, for a leg's own fighter whose Tools turn would otherwise confirm whatever cell the cursor
+-- rests on (#566): the crossbow's id and the cursor moves from the Tools window's resting cell to its cell, when it
+-- brings a key -- an event battle with a standing, shielded body weak to its class, or a random one where such a
+-- body is keyed by no living hand (M.partyHandMask) -- else nil, and the fighter keeps his MP.  Reads only.
+function M.crossbowPlan(slot)
+  local cell = M.toolCell(M.AUTOCROSSBOW)
+  if cell == nil then return nil end
+  local cls, hands = M.weaponClass(M.AUTOCROSSBOW), M.partyHandMask()
+  local event = M.readByte(M.RANDBTL) == 0
+  local pays = false
+  for s = 0, 5 do
+    if M.monStanding(s) and M.readByte(0x3E41 + s * 2) > 0 then
+      local row = M.readByte(0x3EA4 + s * 2) & 0x7F
+      if (row & cls) ~= 0 and (event or (row & hands) == 0) then pays = true end
+    end
+  end
+  if not pays then return nil end
+  local cc, cr = M.readByte(0x8963 + slot), M.readByte(0x8967 + slot)
+  local tr, tc = cell // 2, cell % 2
+  local moves = {}
+  for _ = 1, math.abs(tr - cr) do moves[#moves + 1] = tr > cr and "down" or "up" end
+  for _ = 1, math.abs(tc - cc) do moves[#moves + 1] = tc > cc and "right" or "left" end
+  return M.AUTOCROSSBOW, moves
 end
 
 -- The one monster an untargeted attack lands on: the focus list's first
@@ -9876,7 +10068,7 @@ function Driver:setzerLine(actor, have)
     local n, most = 0, 0
     for s = 0, 5 do
       if monAlive(s) and M.readByte(BATTLE.SH_CUR + s * 2) > 0
-         and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 and hitChips(s, 0x08, 0) > 0 then
+         and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 and hitChips(s, M.kitClass("coin"), 0) > 0 then
         n = n + 1
         most = math.max(most, M.readByte(BATTLE.SH_CUR + s * 2))
       end
@@ -9896,7 +10088,7 @@ function Driver:setzerLine(actor, have)
   -- still want (and the bank and the purse allow)
   local fee = M.setzerGil(level, 50, 0)
   if o.hire ~= false and gilRows and gil - fee >= floorGil and sh > 0 and not broken
-     and hitChips(slot, 0x07, 0) > 0 and fightChips(actor, slot, have) == 0 then
+     and hitChips(slot, M.kitClass("hire"), 0) > 0 and fightChips(actor, slot, have) == 0 then
     local b = math.max(0, math.min(have, 3, sh - 1))
     while b > 0 and gil - fee * (1 + b) < floorGil do b = b - 1 end
     M.log(string.format("[%s] actor=%d SETZER Hired Help on slot %d at %d BP: %d hire(s) at %d gil of %d; his "
@@ -10013,7 +10205,7 @@ function Driver:lockeLine(actor, have)
   end
   if o.trickshot ~= false and M.lockeKnows(L.TRICK) and mp - L.PRICE[L.TRICK] >= floor
      and M.readByte(BATTLE.SH_CUR + slot * 2) > 0 and M.readByte(BATTLE.BRK_TICKS + slot * 2) == 0
-     and hitChips(slot, 0x02, 0) > 0 and fightChips(actor, slot, 0) == 0 then
+     and hitChips(slot, M.kitClass("thief"), 0) > 0 and fightChips(actor, slot, 0) == 0 then
     return plan(L.TRICK, 0, slot, "pierce-weak, and his Fight keys nothing there")
   end
   return nil
@@ -10411,7 +10603,7 @@ function Driver:rageLine(actor, have)
             v = power
             if elem ~= 0 and (weak & elem) ~= 0 then v = v * 2
             elseif elem ~= 0 and (half & elem) ~= 0 then v = v // 2 end
-            v = v + 1000 * hitChips(s, phys and 0x04 or 0, elem)
+            v = v + 1000 * hitChips(s, phys and M.handClass(0x0B, 0xFF, true) or 0, elem)
             if all then score = score + v elseif v > top then top = v end
           end
         end
@@ -13133,7 +13325,7 @@ function Driver:dodgePlan(actor, plan)
     or string.format("slot %d is under %s and the re-aim filter refuses every body a swing can hit (slot %s)",
       aim, why, table.concat(refused, ", "))
   if plan.kind == "skill" then
-    local cls = plan.cmd == BATTLE.CMD_TOOLS and M.weaponClass(plan.skill) or BATTLE.BLITZ_SHAPE[plan.skill].class
+    local cls = plan.cmd == BATTLE.CMD_TOOLS and M.weaponClass(plan.skill) or M.blitzClass(plan.skill)
     if (cls or 0) == 0 then return plan end
   end
   if cmdRow(actor, BATTLE.CMD_MAGIC) then
@@ -13857,13 +14049,31 @@ function Driver:zingerPlan(actor, plan)
   if M.readWord(0x3BF4 + host * 2) == 0 then return plan end
   local care = plan.kind == "item" or plan.kind == "heal" or plan.kind == "raise" or plan.kind == "defer"
     or plan.kind == "switch" or (plan.ally and plan.reason ~= "zinger")
-  if care and (plan.target ~= host or plan.all) then return plan end
+  -- a party-wide cure refills the host as well, which undoes the line (two of ten keys took 23,624 and 30,132
+  -- frames against 4,690-12,225, build/attempts/wt/v051-tg-wob1/zgrid/summary.txt): it stands only when another
+  -- member is in danger (down, or under 40% of max HP); else the turn is the host Fight.  Care aimed at the host
+  -- alone is held for the Fight below, as before.
+  local function otherInDanger()
+    for e = 0, 3 do
+      if e ~= host then
+        local mx, hp = M.readWord(0x3C1C + e * 2), M.readWord(0x3BF4 + e * 2)
+        if mx > 0 and mx ~= 0xFFFF and (hp == 0 or hp * 100 < mx * 40) then return true end
+      end
+    end
+    return false
+  end
+  if care and plan.all and otherInDanger() then return plan end
+  if care and not plan.all and plan.target ~= host then return plan end
   if actor == host and not (care and plan.kind ~= "defer" and plan.kind ~= "switch") then
     return plan
   end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   if fight == nil then return plan end
-  local boost = actor ~= host and plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
+  -- the bank (up to three points) goes into the host Fight, whatever the plan it replaces: Fight costs no MP, and
+  -- each point is another swing (#566: on the regrouped replay's wor_doma_throne the host, RELM at 4927 HP, took
+  -- unboosted Fights in place of heals and stood at 936 HP 21,000 frames after the plan, past the line's measured
+  -- 3,544-13,921: build/attempts/wt/v051-six-classes/suites/suite_battle_zinger.log)
+  local boost = actor ~= host and math.min(3, M.readByte(BATTLE.BP + actor * 2)) or 0
   local target = host
   M.zingers[#M.zingers + 1] = { actor = actor, host = host, target = target, slot = (za - 8) // 2,
     frame = M.frame, over = plan.kind, boost = boost, own = actor == host }
@@ -19584,12 +19794,23 @@ function M.fuseCases(cfg)
     cfg.write.byte(0x3E38 + e, n)
     say(string.format("the gauge staged to %d (%s)", n, why))
   end
+  -- The gauge held at 63 whenever a wait begins with the boss up and unbroken: the party Defends, but a member's
+  -- counter (a Black Belt: SABIN's Fight countered Rizopas's blows at the falls and broke him, x=00 with $B1 bit 0,
+  -- build/attempts/wt/v051-six-classes/suites/riz_dbg2.log) and a Fight in flight at the snapshot (the falls' open:
+  -- two shields gone before any input) chip it, so only a case's own staged hit breaks it.  A Broken boss's gauge
+  -- is left alone.
+  local function hold(why)
+    local c = W.cells()
+    if c == nil or c.ticks ~= 0 or c.shields == 63 then return end
+    stage(63, why)
+  end
   -- (the party sits a phase out by Defending: a window left open with no input can hold the battle still)
   -- (max frames at most: the caller's assert names what did not come)
   local function idle(pred, max, what)
     local t0 = nil
     return M.lazy(function()
       t0 = M.frame
+      hold("the party waits: a counter or a hit in flight is not to break the boss")
       return M.kitBattle({}, { idle = "defend", care = false, maxFrames = max + 600,
         giveUp = function() return pred() or M.frame - t0 >= max end })
     end)
@@ -19764,7 +19985,7 @@ function M.fuseCases(cfg)
   -- the cursor rests on the boss until then), the staging made at that moment; without it everyone Fights.
   local function stageBreak(why)
     local e = W.ent()
-    cfg.write.byte(0x3E9C + e, 0x0F)
+    cfg.write.byte(0x3E9C + e, 0x3F)      -- every class: the six (#566; $0F was the four)
     stage(1, why .. "; every class a key")
   end
   -- `via` (optional): { name, who, cmd, row or spell } -- the breaking action is that character's command instead
@@ -19780,6 +20001,7 @@ function M.fuseCases(cfg)
         standing()
         C.nBreaks = #W.breaks
         if when == nil then stageBreak(why); return end
+        hold("the breaker waits for its moment: nothing else is to break the boss first")
         for i = 0, 3 do
           local id = M.readByte(0x3ED8 + 2 * i)
           if id ~= 0xFF and (via == nil or id == via.who) and M.readWord(0x3BF4 + 2 * i) > 0
@@ -19833,7 +20055,7 @@ function M.fuseCases(cfg)
         C.missed = nil
         if #W.breaks == C.nBreaks and miss ~= nil and miss() then
           C.missed = true
-          stage(63, "the fuse's move came before the break: the hit still in flight only chips")
+          stage(63, "the moment passed with no break: the hit still in flight only chips")
           return
         end
         M.assertEq(#W.breaks > C.nBreaks, true, string.format("%s: a %s took the boss's last shield (%s)", tag,
@@ -20053,19 +20275,57 @@ function M.fuseCases(cfg)
     M.call(function() say(measure and "MEASURED broken" or "PASS broken") end),
   })
 
+  -- (up to three tries, as the broken case: a draw can bring the announce before the breaking hit lands -- the
+  -- Marshal's on this branch's gates, LOCKE's aimed Fight confirmed at f36141 with no shield taken by his turn 3's
+  -- announce, the break only after the fuse had fired, battle_marshal-gate11.log -- and the case then waits out
+  -- that fuse's move and aims again once the trigger is part earned; FUSE_OUTSIDE_TRIES, a lab's global, lowers the
+  -- count, the negative)
+  local outsideTries = rawget(_G, "FUSE_OUTSIDE_TRIES") or 3
   local outside = M.seqStep({
     open("outside"),
-    arm(function() return gone() or cfg.partway(W) end, 30000, "the trigger part earned"),
+    M.call(function() C.brk, C.tries = nil, 0 end),
+    (function()
+      local tries = {}
+      for k = 1, outsideTries do
+        tries[k] = M.cond(function() return C.brk == nil end, {
+          M.call(function() C.tries = k end),
+          -- (a fuse lit by a missed try burns out first: its move)
+          idle(function()
+            local li = C.from and lineAfter(C.from)
+            return gone() or li == nil or moveAfter(li) ~= nil
+          end, 12000, "the missed try's fuse fires"),
+          arm(function() return gone() or cfg.partway(W) end, 30000, "the trigger part earned"),
+          M.call(function()
+            standing()
+            -- (a prelude's play, or a missed try, can run a whole fuse first, Vargas's: the case counts from its last
+            -- move, if any)
+            local li = lineAfter(1)
+            while li ~= nil and moveAfter(li) ~= nil and lineAfter(moveAfter(li)) ~= nil do
+              li = lineAfter(moveAfter(li))
+            end
+            C.from = (li ~= nil and moveAfter(li) ~= nil) and moveAfter(li) + 1 or 1
+            M.assertEq(lineAfter(C.from) == nil and not W.litBit(), true, tag .. ": no fuse is lit yet (the case's "
+              .. "precondition: no announce since the case's open or its last move)")
+          end),
+          breakIt("a break outside the fuse", nil, nil, nil, function() return lineAfter(C.from) ~= nil end),
+          M.call(function()
+            if C.missed then
+              say(string.format("try %d: the announce came before the breaking hit; the case waits out that fuse and "
+                .. "aims again", k))
+              C.brk = nil
+            end
+          end),
+        }, {})
+      end
+      return M.seqStep(tries)
+    end)(),
     M.call(function()
-      standing()
-      -- (a prelude's play can run a whole fuse first, Vargas's: the case counts from its last move, if any)
-      local li = lineAfter(1)
-      while li ~= nil and moveAfter(li) ~= nil and lineAfter(moveAfter(li)) ~= nil do li = lineAfter(moveAfter(li)) end
-      C.from = (li ~= nil and moveAfter(li) ~= nil) and moveAfter(li) + 1 or 1
-      M.assertEq(lineAfter(C.from) == nil and not W.litBit(), true, tag .. ": no fuse is lit yet (the case's "
-        .. "precondition: no announce since the case's open or its last move)")
+      M.assertEq(C.brk ~= nil, true, string.format("%s: a break landed outside the fuse in one of %d tries", tag,
+        outsideTries))
+      local li = lineAfter(C.from)
+      M.assertEq(li == nil or W.cmds[li].f > C.brk.f, true, tag .. ": the break landed before any announce (the "
+        .. "case's precondition)")
     end),
-    breakIt("a break outside the fuse"),
     M.call(function()
       local a, b = C.brk.pre, C.brk.post
       say("before the break: " .. W.cellsLine(a))
@@ -20700,19 +20960,26 @@ end
 -- 151 (Mad Oscar; Mad Oscar + Exoray; PowerDemon + 2 Exorays twice), only
 -- the PowerDemon slots qualify, and the worst state needs 19 (kit-setzer
 -- round 5 review: 8 covered 95.7%).  Logs the decode.
-function M.setzerCrowdBudget(group, tag)
+-- o (#566, wt/v051-six-suites): { bodies = N } the fewest bodies a crowd
+-- deals (default 2), { weak = false } a crowd that needs no coin-weak body.
+-- The aim and pass suites (battle_setzeraim, battle_passside,
+-- battle_passretarget) read no chip and ask for the room's three-body
+-- formation, whatever its rows hold (the split moves which bodies answer to
+-- the coins' class, and with them which formations are the default crowd).
+function M.setzerCrowdBudget(group, tag, o)
   local pool = M.encounterPool(group)
   local ok, parts = {}, {}
+  local bodies, needWeak = o and o.bodies or 2, not (o and o.weak == false)
   for slot = 1, 4 do
     ok[slot] = true
     local names = {}
     for _, f in ipairs(pool[slot].formations) do
       local weak = 0
       for _, sp in ipairs(f.species) do
-        if (M.speciesClassRow(sp) & 0x08) ~= 0 then weak = weak + 1 end
+        if (M.speciesClassRow(sp) & M.kitClass("coin")) ~= 0 then weak = weak + 1 end
       end
-      ok[slot] = ok[slot] and #f.species >= 2 and weak >= 1
-      names[#names + 1] = string.format("%d (%d bodies, %d special-weak)", f.id, #f.species, weak)
+      ok[slot] = ok[slot] and #f.species >= bodies and (weak >= 1 or not needWeak)
+      names[#names + 1] = string.format("%d (%d bodies, %d coin-weak)", f.id, #f.species, weak)
     end
     parts[#parts + 1] = string.format("slot %d (%d/256) %s%s", slot, pool[slot].odds, table.concat(names, ", "),
       ok[slot] and " a crowd" or "")
@@ -20723,7 +20990,8 @@ function M.setzerCrowdBudget(group, tag)
   M.log(string.format("[%s] budget: group %d: %s -- the worst of the 65536 encounter-counter states needs %d "
     .. "encounter(s) to the next crowd; %.1f%% need no more than 8", tag, group, table.concat(parts, "; "), worst,
     100 * M.encounterShare(hist, 8)))
-  M.assertEq(worst < 1024, true, string.format("group %d deals a crowd at all", group))
+  M.assertEq(worst < 1024, true, string.format("group %d deals a crowd at all (%d or more bodies%s)", group, bodies,
+    needWeak and string.format(", one weak to the coins' class $%02X", M.kitClass("coin")) or ""))
   return worst
 end
 
@@ -20775,7 +21043,9 @@ function M.setzerCrowdBattles(o)
     for b = 0, 5 do
       if (mask >> b) & 1 == 1 then
         alive = alive + 1
-        if (M.readByte(0x3EA4 + b * 2) & 0x08) ~= 0 and M.readByte(0x3E40 + b * 2) > 0 then weak = weak + 1 end
+        if (M.readByte(0x3EA4 + b * 2) & M.kitClass("coin")) ~= 0 and M.readByte(0x3E40 + b * 2) > 0 then
+          weak = weak + 1
+        end
       end
     end
     local yes = alive >= 2 and weak >= 1
@@ -21052,13 +21322,26 @@ end
 local HC = nil
 M.HIRE_FIG_GFX = { [0] = 0x13, [1] = 0x0E, [2] = 0x0F, [3] = 0x03, [5] = 0x14 }
 M.HIRE_FIG_NAME = { [0] = "merchant", [1] = "soldier", [2] = "Imp", [3] = "Shadow", [4] = "Interceptor", [5] = "ghost" }
--- the weapon a figure swings by class (none, slashing, piercing, bludgeoning),
--- item ids from kits.md; the Fight animation's number is id + 1
+-- the weapon a figure swings by the class's weapon family, the two bits
+-- Ot6CoinPrice puts in the hire's mark (#566: none; a blade, Sword or Katana;
+-- a point, Dagger, Spear or Ranged; a blow, Blunt -- under four classes
+-- none, slashing, piercing, bludgeoning), item ids from kits.md; the Fight
+-- animation's number is id + 1
 M.HIRE_FIG_WEAPON = {
   [0] = { 0x00, 0x0B, 0x00, 0x34 }, [1] = { 0x0A, 0x0A, 0x1D, 0x46 },
   [2] = { 0x24, 0x24, 0x24, 0x46 }, [3] = { 0x26, 0x2B, 0x26, 0x44 },
   [5] = { 0x00, 0x0A, 0x1D, 0x4A },
 }
+-- #566 (wt/v051-six-suites): a class's weapon family as Ot6CoinPrice's @fam
+-- arm counts it (ot6_setzer.asm): 0 none, 1 a blade (Sword $01, Katana $10),
+-- 2 a point (Dagger $02, Spear $20, Ranged $08), 3 a blow (Blunt $04)
+function M.hireFamily(class)
+  class = class & 0x3F
+  if class == 0 then return 0 end
+  if (class & 0x11) ~= 0 then return 1 end
+  if (class & 0x2A) ~= 0 then return 2 end
+  return 3
+end
 local function romB(a) return M.readRomByte(a & 0x3FFFFF) end
 local hcSheets = {}
 local function hcSheet(g)
@@ -21377,6 +21660,13 @@ function M.hireCrewCheck(r, tag)
   end
   M.assertEq(#strikes, #r.costs, string.format("%s: every paid hire was drawn as its figure's strike (%d strikes, %d paid)",
     tag, #strikes, #r.costs))
+  -- #566 (wt/v051-six-suites): the class each paying pass swung, read where
+  -- the coin checks read it (r.seq: a pass's TakeGil, then its chip calls)
+  local swung, paidN = {}, 0
+  for _, ev in ipairs(r.seq or {}) do
+    if ev.t == "pay" then paidN = paidN + 1
+    elseif ev.t == "hit" and ev.y >= 8 and paidN > 0 and swung[paidN] == nil then swung[paidN] = ev.class end
+  end
   for j, s in ipairs(strikes) do
     local fig = (s.pass.mark >> 4) & 7
     local cls = (s.pass.mark >> 2) & 3
@@ -21391,6 +21681,12 @@ function M.hireCrewCheck(r, tag)
       M.assertEq(s.off, 0, string.format("%s strike %d: the slot's graphics buffer is the %s's sheet", tag, j, NAME[fig]))
       M.assertEq(s.weapon, M.HIRE_FIG_WEAPON[fig][cls + 1] + 1, string.format("%s strike %d: the %s's weapon for class %d",
         tag, j, NAME[fig], cls))
+      -- #566: and that family is the swung class's (a blade for Sword or
+      -- Katana, a point for Dagger, Spear or Ranged, a blow for Blunt)
+      M.assertEq(swung[j] ~= nil, true, string.format("%s strike %d: paid hire %d's class was read at its chip call",
+        tag, j, j))
+      M.assertEq(cls, M.hireFamily(swung[j]), string.format("%s strike %d: the mark's class bits (%d) are the weapon "
+        .. "family of the class the hire swung ($%02X)", tag, j, cls, swung[j]))
     end
   end
   M.assertEq(done ~= nil, true, tag .. ": SETZER's slot read at Ot6ActionEnd")
@@ -25608,6 +25904,7 @@ function M.run(opts, steps)
       return
     end
     M.frame = M.frame + 1
+    M.keysWatch()       -- #566: one [keys] line a battle, whoever drives it
     if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
     if M.frame % M.PROG_IVL == 0 then M.progressSample() end
     -- The run's heartbeat (docs/TOOLING.md "The run's heartbeat"): the

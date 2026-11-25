@@ -14,8 +14,8 @@
 --      master (event group 82) -- has an authored row, and every gauged one
 --      a key for the four who walk it (TERRA, CELES, RELM and GAU, as
 --      wor-veldt-cave-v1 seats them);
---   3. the lesson: GAU alone holds a key to every body here (his fists and
---      his beasts' bludgeon, Were-Rat's poison), and the cave drinks
+--   3. the lesson: GAU alone holds a key to every body here (his own body's class, in
+--      his bare hand and in a rage's Fight; Were-Rat's poison), and the cave drinks
 --      CELES's ice (Toe Cutter, the SrBehemoth);
 --   4. the Veldt's fourteen: each carries its designed row, keeps the floor's
 --      shields and class (the World of Balance parties that meet them at
@@ -24,42 +24,45 @@
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x08F] = { "Toe Cutter", 3, PIERCE | BLUDG, FIRE | WIND, ICE },
-  [0x07E] = { "Rhyos", 4, BLUDG, 0, 0 },
-  [0x0BB] = { "Allo Ver", 3, SLASH | BLUDG, FIRE | HOLY, POISON },
-  [0x119] = { "SrBehemoth", 6, PIERCE | BLUDG, FIRE | POISON, ICE },
+  [0x08F] = { "Toe Cutter", 3, DAGGER | BLUNT, FIRE | WIND, ICE },
+  [0x07E] = { "Rhyos", 4, DAGGER, 0, 0 },
+  [0x0BB] = { "Allo Ver", 3, DAGGER | KATANA, FIRE | HOLY, POISON },
+  [0x119] = { "SrBehemoth", 6, DAGGER | BLUNT, FIRE | POISON, ICE },
 }
 
 -- the hands (wor-veldt-cave-v1's kit: build/attempts/wt/v033-wor-gau/data/):
--- TERRA (a dagger; Fire, Pearl), CELES (two blades; Ice, bolt and poison),
--- RELM (a rod; earth), GAU (no weapon: his fists; his beasts: Were-Rat's
+-- TERRA (a dagger, the Man Eater $06; Fire, Pearl), CELES (two blades, the Falchion $15; Ice, bolt and poison),
+-- RELM (a rod, the Pearl Rod $39; earth), GAU (no weapon: H.handClass, his own body; his beasts: Were-Rat's
 -- Poison, Rhinotaur's Mega Volt, the physical specials)
-local TERRA = { "TERRA", PIERCE, FIRE | HOLY }
-local CELES = { "CELES", SLASH, ICE | BOLT | POISON }
-local RELM = { "RELM", BLUDG, EARTH }
-local GAU = { "GAU", BLUDG, POISON | BOLT }
+local TERRA = { "TERRA", W(0x06), FIRE | HOLY }
+local CELES = { "CELES", W(0x15), ICE | BOLT | POISON }
+local RELM = { "RELM", W(0x39), EARTH }
+local GAU = { "GAU", H.handClass(0x0B, 0xFF, true), POISON | BOLT }
 -- the Veldt's fourteen: species -> { name, shields, classes, the floor's class
 -- (OT6_FLOOR_CLASS), vanilla weak, vanilla absorb, element added }
 local VELDT = {
-  [0x013] = { "Were-Rat", 2, SLASH | PIERCE, SLASH, FIRE, POISON, 0 },
-  [0x017] = { "Leafer", 2, SLASH | BLUDG, SLASH, FIRE | WATER, ICE, 0 },
-  [0x01B] = { "Vomammoth", 2, SLASH | BLUDG, SLASH, FIRE, 0, 0 },
-  [0x028] = { "Dark Wind", 2, SLASH | PIERCE, SLASH, FIRE, 0, 0 },
-  [0x042] = { "M-TekArmor", 3, PIERCE | BLUDG, PIERCE, BOLT, 0, POISON },
-  [0x04D] = { "Repo Man", 2, SLASH | PIERCE, SLASH, POISON, 0, 0 },
-  [0x05D] = { "Areneid", 2, SLASH | BLUDG, SLASH, ICE | WATER, 0, POISON },
-  [0x018] = { "Stray Cat", 3, SLASH | PIERCE, SLASH, 0, 0, POISON },
-  [0x029] = { "Beakor", 3, SLASH | PIERCE, SLASH, FIRE, 0, 0 },
-  [0x02F] = { "CrassHoppr", 3, PIERCE | BLUDG, PIERCE, FIRE | WIND, 0, 0 },
-  [0x04F] = { "Bomb", 3, SLASH | BLUDG, SLASH, ICE | WATER, FIRE, 0 },
-  [0x05A] = { "Ghost", 3, SLASH | SPECIAL, SLASH, FIRE | HOLY, POISON, 0 },
-  [0x076] = { "Rhobite", 3, SLASH | BLUDG, SLASH, WATER, 0, 0 },
-  [0x0A2] = { "Poplium", 3, SLASH | PIERCE, SLASH, FIRE | HOLY, POISON, 0 },
+  [0x013] = { "Were-Rat", 2, SWORD | DAGGER, SWORD, FIRE, POISON, 0 },
+  [0x017] = { "Leafer", 2, SWORD | DAGGER, SWORD, FIRE | WATER, ICE, 0 },
+  [0x01B] = { "Vomammoth", 2, SWORD | BLUNT, SWORD, FIRE, 0, 0 },
+  [0x028] = { "Dark Wind", 2, DAGGER | RANGED, DAGGER, FIRE, 0, 0 },
+  [0x042] = { "M-TekArmor", 3, DAGGER | RANGED, DAGGER, BOLT, 0, POISON },
+  [0x04D] = { "Repo Man", 2, SWORD | DAGGER, SWORD, POISON, 0, 0 },
+  [0x05D] = { "Areneid", 2, DAGGER, DAGGER, ICE | WATER, 0, POISON },
+  [0x018] = { "Stray Cat", 3, DAGGER | BLUNT, DAGGER, 0, 0, POISON },
+  [0x029] = { "Beakor", 3, KATANA | RANGED, RANGED, FIRE, 0, 0 },
+  [0x02F] = { "CrassHoppr", 3, DAGGER | BLUNT, DAGGER, FIRE | WIND, 0, 0 },
+  [0x04F] = { "Bomb", 3, KATANA | RANGED, RANGED, ICE | WATER, FIRE, 0 },
+  [0x05A] = { "Ghost", 3, KATANA | BLUNT, BLUNT, FIRE | HOLY, POISON, 0 },
+  [0x076] = { "Rhobite", 3, KATANA | BLUNT, BLUNT, WATER, 0, 0 },
+  [0x0A2] = { "Poplium", 3, DAGGER | KATANA, DAGGER, FIRE | HOLY, POISON, 0 },
 }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }

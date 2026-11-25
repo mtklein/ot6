@@ -319,9 +319,18 @@ keep:  rts
 ; The title screen's Continue (field_menu.asm MenuState_23, on the confirm):
 ; vanilla loads the slot there and never passes LoadSavedGame, which only the
 ; reload after a game over calls.  A (a8) = the slot.  rtl.
+; #566: the same call as that reload's (Ot6CodexLoaded: Ot6EsperLoaded, then
+; the slot's codex page ensured), so a four-class page becomes a six-class
+; one here, while the load menu owns the machine, and every loaded game's
+; page carries today's magic before its first battle.  x/y and widths saved.
 .proc Ot6EsperContinue
         php
-        jsr     Ot6EsperLoaded
+        longi
+        phx
+        phy
+        jsl     Ot6CodexLoaded
+        ply
+        plx
         plp
         rtl
 .endproc

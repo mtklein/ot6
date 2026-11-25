@@ -172,10 +172,10 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(H.readByte(ACTIVE), 0,
       "lifecycle 0: this chain has never saved, the transient page is active")
     H.assertEq(sram(TEMP), 0x4f, "transient codex magic 'O' (Ot6CodexEnsure)")
-    H.assertEq(sram(TEMP + 1), 0x38, "transient codex magic '8'")
+    H.assertEq(sram(TEMP + 1), 0x39, "transient codex magic '9'")
     H.assertEq(sram(0x307ff0) ~= 3, true,
       "no save has ever claimed slot 3 (SRAM last-saved-slot marker)")
-    H.assertEq(sram(SLOT3) ~= 0x4f or sram(SLOT3 + 1) ~= 0x38, true,
+    H.assertEq(sram(SLOT3) ~= 0x4f or sram(SLOT3 + 1) ~= 0x39, true,
       "slot 3's codex page is really unformatted -- read, not zeroed")
     local known = 0
     for off = 0x10, PAGE_USED - 1 do
@@ -253,7 +253,7 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     H.assertEq(sram(0x307ff0), 3, "SRAM last-saved-slot marker is 3")
     H.assertEq(sram(SLOT3), 0x4f, "slot 3 codex magic 'O'")
-    H.assertEq(sram(SLOT3 + 1), 0x38, "slot 3 codex magic '8'")
+    H.assertEq(sram(SLOT3 + 1), 0x39, "slot 3 codex magic '9'")
     -- the transfer: every byte the transient page holds, both the chain's
     -- inherited reveals and the byte this run earned, must
     -- appear in slot 3, and the source page must survive intact.

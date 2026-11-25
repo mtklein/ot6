@@ -54,13 +54,32 @@
 -- Reads only, save for the coherent battle snapshot the A/B branches from
 -- (requestSaveState / requestLoadState); no RAM is edited, so this is a
 -- measured fight, not a synthetic setup.
+--
+-- Six classes (#566).  The text above is the four-class picture, where the
+-- Cirpius's key was pierce, the keyed hand TERRA's MithrilKnife and the
+-- unkeyed one LOCKE's MithrilBlade.  The split has moved the Cirpius's row
+-- more than once, and the generators choose the party's weapons, so the
+-- suite now picks its hands after the boot (pickHands): the KEYER is the
+-- seated member whose main-hand class is in the Cirpius's Ot6ShieldTbl row
+-- and not in the Tusker's, the OTHER a member whose class is in neither
+-- row, and KEY the Cirpius row's bit the keyer's weapon holds.  Where the
+-- text says "the pierce hand (TERRA)", "a slash hand (LOCKE)" and
+-- "pierce", read the keyer, the other and KEY.  When no seated member's
+-- weapon fits either part the suite fails there, naming the rows and the
+-- hands: the premise (a hand that keys the Cirpius beside one that keys
+-- nothing) is then not in this fixture.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 local MAP = 96
 
 local TUSKER, CIRPIUS = 0x07A, 0x086
-local PIERCE = 0x02
+local CLASSES = 0x3F       -- OT6_CLASSES: every class bit a row or a reveal can hold
+-- the hands (pickHands, after the boot): character ids, the keyer's and the
+-- other's main-hand class bytes, and the key
+local KEYER, OTHER, KEYER_CLS, OTHER_CLS, KEY = nil, nil, 0, 0, 0
+local CHAR_NAME = { [0] = "TERRA", [1] = "LOCKE", [4] = "EDGAR", [5] = "SABIN" }
+local function nameOf(c) return c and (CHAR_NAME[c] or ("char " .. c)) or "nobody" end
 
 -- ---- the lane's pool, and the encounter budget it implies ------------------
 -- A slot is MIXED when every formation it can deal holds a Tusker and a
@@ -141,7 +160,7 @@ emu.addMemoryCallback(function(addr, value)
   if pc < CLASSCHIP or pc >= CLASSCHIP_END then return end
   local slot = off // 2
   if speciesAt(slot) ~= CIRPIUS then return end
-  if (H.readByte(ATKCLASS) & H.readByte(BP_CLASS + slot * 2) & PIERCE) == 0 then return end
+  if (H.readByte(ATKCLASS) & H.readByte(BP_CLASS + slot * 2) & KEY) == 0 then return end
   branchRecord.chips = branchRecord.chips + 1
   branchRecord.on[slot] = (branchRecord.on[slot] or 0) + 1
   -- the chip that empties the gauge is the break, read at its own store, so
@@ -158,7 +177,7 @@ end, emu.callbackType.write, 0x7E0000 + SH_CUR, 0x7E0000 + SH_CUR + 11)
 -- TERRA confirms is recorded with the monster it was aimed at and whether
 -- a pierce-keyed Cirpius stood at that moment -- the input the aim
 -- changes, read at the engine's own hand-off.
-local TERRA_ENT = nil       -- TERRA's entity offset, set when the fight is found
+local TERRA_ENT = nil       -- the keyer's entity offset (TERRA's, under four classes), set when the fight is found
 -- Is a confirmed Fight set apart as "the aimed monster fell during the
 -- cursor walk"?  Only when the plan aimed a monster that was alive at the
 -- moment of aiming, the confirm landed elsewhere, and that monster is now
@@ -178,7 +197,7 @@ do
     for s = 0, 5 do if mons == (1 << s) then slot = s end end
     local keyed = false
     for s = 0, 5 do
-      if alive(s) and speciesAt(s) == CIRPIUS and (classRev(s) & PIERCE) ~= 0 then keyed = true end
+      if alive(s) and speciesAt(s) == CIRPIUS and (classRev(s) & KEY) ~= 0 then keyed = true end
     end
     local at = slot and speciesAt(slot) or nil
     -- the monster the driver's plan aimed this Fight at (plan.aim, read each
@@ -228,7 +247,7 @@ end
 -- codex pre-reveal, taught by an earlier fight on this lane)?
 local function pierceKnown()
   local c = firstSlot(CIRPIUS)
-  return c ~= nil and (classRev(c) & PIERCE) == PIERCE
+  return c ~= nil and KEY ~= 0 and (classRev(c) & KEY) == KEY
 end
 
 -- ---- state carried across the step list ----------------------------------
@@ -276,8 +295,8 @@ local function measure(name, aim)
       for s = 0, 5 do
         if out.on[s] then per[#per + 1] = string.format("s%d:%d", s, out.on[s]) end
       end
-      H.log(string.format("[classtarget] %s: pierce chips on a Cirpius=%d (%s), cirpius "
-        .. "broken=%d, fight took %d frames from the restored snapshot (f%d..f%d); TERRA's "
+      H.log(string.format("[classtarget] %s: key chips on a Cirpius=%d (%s), cirpius "
+        .. "broken=%d, fight took %d frames from the restored snapshot (f%d..f%d); the keyed hand's "
         .. "Fights aimed at: %s -- %d off the key while a keyed Cirpius stood, %d more where "
         .. "the aimed monster fell during the cursor walk", name,
         out.chips, #per > 0 and table.concat(per, " ") or "none", out.nbroke, out.frames,
@@ -302,14 +321,14 @@ local function huntStep(i)
     H.call(function()
       local mixed, known = mixedNow(), pierceKnown()
       S.seen[#S.seen + 1] = string.format("%d:%s%s", i, mixed and "mixed" or "uniform",
-        known and "+pierce" or "")
-      H.log(string.format("[classtarget] encounter %d: %s mixed=%s pierce-known=%s%s",
+        known and "+key" or "")
+      H.log(string.format("[classtarget] encounter %d: %s mixed=%s key-known=%s%s",
         i, formationText(), tostring(mixed), tostring(known),
         (mixed and not known) and " -- fought to teach, not taken" or ""))
       if mixed and known then
         S.found = true
         S.at = i
-        S.terra = actorOf(0); S.locke = actorOf(1)
+        S.terra = actorOf(KEYER); S.locke = actorOf(OTHER)    -- the keyer's and the other's seats
         S.cirp = firstSlot(CIRPIUS); S.tusk = firstSlot(TUSKER)
         H.screenshot("classtarget_mixed")
         S.req = H.requestSaveState()
@@ -334,11 +353,29 @@ local steps = {
   H.waitFrames(20), H.loadState(STATE), H.waitFrames(20),
   H.call(function()
     H.assertEq(H.mapId() & 0x1ff, MAP, "booted in the Mt. Kolts cave (map 96)")
-    -- the hands this fixture carries to the mountain
-    H.assertEq(H.weaponClass(H.readByte(0x1600 + 37 * 0 + 0x1F)), PIERCE,
-      "TERRA holds a pierce weapon (MithrilKnife)")
-    H.assertEq(H.weaponClass(H.readByte(0x1600 + 37 * 1 + 0x1F)), 0x01,
-      "LOCKE holds a slash weapon (MithrilBlade)")
+    -- the hands this fixture carries to the mountain, against the rows the ROM authors (pickHands)
+    local row, trow = H.speciesClassRow(CIRPIUS) & CLASSES, H.speciesClassRow(TUSKER) & CLASSES
+    local active, said = H.readByte(0x1A6D) & 7, {}
+    for c = 0, 13 do
+      if (H.readByte(0x1850 + c) & 7) == active then
+        local item = H.readByte(0x1600 + 37 * c + 0x1F)
+        local cls = H.handClass(c, item)
+        said[#said + 1] = string.format("%s $%02X class $%02X", nameOf(c), item, cls)
+        if KEYER == nil and (cls & row) ~= 0 and (cls & trow) == 0 then
+          KEYER, KEYER_CLS, KEY = c, cls, cls & row
+        elseif OTHER == nil and cls ~= 0 and (cls & (row | trow)) == 0 then
+          OTHER, OTHER_CLS = c, cls
+        end
+      end
+    end
+    H.log(string.format("[classtarget] rows: Cirpius $%02X, Tusker $%02X; hands: %s -- the keyed hand is %s's "
+      .. "(key $%02X), the unkeyed one %s's", row, trow, table.concat(said, ", "), nameOf(KEYER), KEY,
+      nameOf(OTHER)))
+    H.assertEq(row ~= 0, true, "the Cirpius's Ot6ShieldTbl row holds a weapon class")
+    H.assertEq(KEYER ~= nil, true, string.format("a seated member's main hand keys the Cirpius (row $%02X) and not "
+      .. "the Tusker (row $%02X): %s", row, trow, table.concat(said, ", ")))
+    H.assertEq(OTHER ~= nil, true, string.format("another seated member's main hand keys neither the Cirpius (row "
+      .. "$%02X) nor the Tusker (row $%02X): %s", row, trow, table.concat(said, ", ")))
     -- the pool, as the ROM deals it, and the budget it implies
     local anyMixed, anyTeach = false, false
     for slot = 1, 4 do
@@ -366,18 +403,19 @@ for i = 1, BUDGET do steps[#steps + 1] = huntStep(i) end
 
 steps[#steps + 1] = H.call(function()
   H.assertEq(S.found, true, string.format(
-    "the mixed Cirpius formation, with pierce already known, was reached within %d lane "
+    "the mixed Cirpius formation, with its key already known, was reached within %d lane "
     .. "encounters, the most any encounter-counter state needs (encounters: %s) -- "
-    .. "an all-Cirpius fight that did not teach pierce shows here as a uniform with no "
-    .. "+pierce after it", BUDGET, table.concat(S.seen, " ")))
-  H.assertEq(S.terra ~= nil and S.locke ~= nil, true, "TERRA and LOCKE are in the fight")
+    .. "an all-Cirpius fight that did not teach the key shows here as a uniform with no "
+    .. "+key after it", BUDGET, table.concat(S.seen, " ")))
+  H.assertEq(S.terra ~= nil and S.locke ~= nil, true, string.format("%s (the keyed hand) and %s (the unkeyed "
+    .. "one) are in the fight", nameOf(KEYER), nameOf(OTHER)))
   H.assertEq(S.cirp ~= nil and S.tusk ~= nil, true,
     "the formation pairs a Cirpius with a Tusker")
   -- the pierce key is shown on the Cirpius, and the Tusker shows no class
-  H.assertEq(classRev(S.cirp) & PIERCE, PIERCE,
-    "the Cirpius opens with its pierce class revealed (the codex, taught on this lane)")
-  H.assertEq(classRev(S.tusk) & 0x0F, 0,
-    "the Tusker shows no revealed class -- nothing a hand can break")
+  H.assertEq(classRev(S.cirp) & KEY, KEY,
+    "the Cirpius opens with its key class revealed (the codex, taught on this lane)")
+  H.assertEq(classRev(S.tusk) & (KEYER_CLS | OTHER_CLS), 0,
+    "the Tusker shows no revealed class either hand holds -- nothing they can break")
 end)
 
 steps[#steps + 1] = H.waitFrames(5)
@@ -403,13 +441,14 @@ steps[#steps + 1] = H.call(function()
   local pickOn = on.driver:chipAim(S.terra, 0)
   local pickOff = off.driver:chipAim(S.terra, 0)
   local slashPick = on.driver:chipAim(S.locke, 0)
-  H.log(string.format("[classtarget] chipAim(TERRA) aim-on=%s aim-off=%s ; chipAim(LOCKE)=%s ; cirp slot=%s tusk slot=%s",
-    tostring(pickOn), tostring(pickOff), tostring(slashPick), tostring(S.cirp), tostring(S.tusk)))
+  H.log(string.format("[classtarget] chipAim(%s) aim-on=%s aim-off=%s ; chipAim(%s)=%s ; cirp slot=%s tusk slot=%s",
+    nameOf(KEYER), tostring(pickOn), tostring(pickOff), nameOf(OTHER), tostring(slashPick), tostring(S.cirp),
+    tostring(S.tusk)))
 
   -- the pick aims the pierce hand at a pierce-keyed Cirpius, never the Tusker
   local function aimsAtCirpius(pick)
-    H.assertEq(pick ~= nil and speciesAt(pick) == CIRPIUS and (classRev(pick) & PIERCE) == PIERCE, true,
-      "the pierce hand is aimed at a pierce-keyed Cirpius")
+    H.assertEq(pick ~= nil and speciesAt(pick) == CIRPIUS and (classRev(pick) & KEY) == KEY, true,
+      "the keyed hand is aimed at a Cirpius that shows its key")
   end
   aimsAtCirpius(pickOn)
 
@@ -427,7 +466,8 @@ steps[#steps + 1] = H.call(function()
   H.assertEq(pickOn ~= S.tusk, true, "and NOT at the unkeyed Tusker")
 
   -- a slash hand has no key in this formation, so it keeps the default cursor
-  H.assertEq(slashPick, nil, "a slash hand (LOCKE) is given no class target here")
+  H.assertEq(slashPick, nil, string.format("the unkeyed hand (%s, class $%02X) is given no class target here",
+    nameOf(OTHER), OTHER_CLS))
 
   -- negative control: the stub (aim=false) reverts the pick to nil (default
   -- cursor), and the same assertion that passes for the new pick goes red.
@@ -493,18 +533,18 @@ steps[#steps + 1] = (function()
     measure("aim-off", false),
     H.call(function()
       local a, b = S.ab["aim-on"], S.ab["aim-off"]
-      H.log(string.format("[classtarget] A/B: TERRA Fights aimed off the key while a keyed "
+      H.log(string.format("[classtarget] A/B: the keyed hand's Fights aimed off the key while a keyed "
         .. "Cirpius stood %d of %d counted (%d more set apart: the aimed monster fell during "
         .. "the cursor walk; %d Fights in all) vs %d of %d counted (%d set apart; %d in all); "
-        .. "pierce chips on a Cirpius %d vs %d; cirpius broken %d vs %d; frames from the "
+        .. "key chips on a Cirpius %d vs %d; cirpius broken %d vs %d; frames from the "
         .. "restore %d vs %d (on/off %.3f)", a.offKey, a.counted, a.fellOff, #a.fights,
         b.offKey, b.counted, b.fellOff, #b.fights, a.chips, b.chips, a.nbroke, b.nbroke,
         a.frames, b.frames, a.frames / b.frames))
       H.assertEq(a.counted > 0, true, "aim-on had at least one Fight confirmed while a keyed "
         .. "Cirpius stood and not set apart as fallen during the cursor walk (the count below "
         .. "is not vacuous)")
-      H.assertEq(a.offKey, 0, string.format("aim-on never aims TERRA's Fight at the unkeyed "
-        .. "Tusker while a pierce-keyed Cirpius stands, outside Fights whose aimed monster "
+      H.assertEq(a.offKey, 0, string.format("aim-on never aims the keyed hand's Fight at the unkeyed "
+        .. "Tusker while a keyed Cirpius stands, outside Fights whose aimed monster "
         .. "fell during the cursor walk (%d counted, %d set apart)", a.counted, a.fellOff))
       H.assertEq(#b.fights > 0, true, "the same hook saw the aim-off branch's Fights "
         .. "(the count above is a reading, not a default)")

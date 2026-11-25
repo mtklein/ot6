@@ -1140,6 +1140,20 @@ local function decide()
       local p = {}
       for k, v in pairs(en.eFn and en.eFn(s) or en.e) do p[k] = v end
       p.who = p.who or GOGO
+      -- the throws the staging Breaks (assassinate, assassinate2) are aimed
+      -- at a body it can stage: standing, no Death ward ($3AA1 bit 2).  An
+      -- unaimed throw went where the cursor stood, at a warded body beside
+      -- the staged one, on the six-class replay: "R3: and marks Death on the
+      -- Broken non-boss it hits (0 mark(s), staged $02)"
+      -- (build/attempts/wt/v051-six-classes/suites/gogokits-gate2.log)
+      if en.tag == "assassinate" or en.tag == "assassinate2" then
+        for m = 0, 5 do
+          local e = 8 + m * 2
+          if p.slot == nil and present(m) and H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3AA1 + e) & 0x04) == 0 then
+            p.slot = m
+          end
+        end
+      end
       plan[#plan + 1] = p
       entryOf[p] = en
     end

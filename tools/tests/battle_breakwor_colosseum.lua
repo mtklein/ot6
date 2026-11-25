@@ -12,19 +12,23 @@
 --   3. every species of every formation of the plain by Maranda's Falcon (world group 49, where SHADOW's first
 --      fights are; the Cyan arc's rows, checked there) has an authored row and a key for the four the cabin
 --      seats (SHADOW, CELES, CYAN, TERRA); and the lesson: among the four's blades, SHADOW's alone keys the
---      Crawler;
---   4. #383: the skeans' spells ($51-$53, ThrowToolsOffsetTbl) carry the pierce class in Ot6SkillClassTbl.
+--      Crawler (his Striker, a ninja blade; not the swords, not the katanas);
+--   4. #383: the skeans' spells ($51-$53, ThrowToolsOffsetTbl) carry, in Ot6SkillClassTbl, the class of the
+--      thrown stars (the Shuriken $41's).
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x037] = { "Siegfried (the Colosseum's)", 6, SLASH | PIERCE, 0xFF, 0 },
+  [0x037] = { "Siegfried (the Colosseum's)", 6, SPEAR | KATANA, 0xFF, 0 },
   [0x040] = { "Chupon (the Colosseum's)", 0, 0, ICE | WATER, FIRE },
-  [0x07F] = { "SrBehemoth (the Colosseum's)", 6, PIERCE | BLUDG, FIRE | HOLY, POISON },
+  [0x07F] = { "SrBehemoth (the Colosseum's)", 6, SPEAR | RANGED, FIRE | HOLY, POISON },
 }
 -- the route's wagers (gen_wor_colosseum's STRIKER and WAGERS): item -> { opponent species, prize }.  The
 -- Striker's record names Chupon and the Striker back; with SHADOW waiting ($01EF) the fight is his
@@ -37,13 +41,13 @@ local WAGERS = {
   { 0x16, "Soul Sabre", 0x0C8, 0x15 },
   { 0xD8, "Gem Box", 0x07F, 0xCE },
 }
--- the hands the cabin seats after the Colosseum (route-wor-colosseum.md section 3): SHADOW (the Striker:
--- pierce; his skeans fire, water, bolt), CELES (a blade; Ice), CYAN (katanas; Quadra Slice wind), TERRA (a
--- blade; Fire, Ice, Bolt)
-local SHADOW = { "SHADOW", PIERCE, FIRE | WATER | BOLT }
-local CELES = { "CELES", SLASH, ICE }
-local CYAN = { "CYAN", SLASH, WIND }
-local TERRA = { "TERRA", SLASH, FIRE | ICE | BOLT }
+-- the hands the cabin seats after the Colosseum (route-wor-colosseum.md section 3): SHADOW (the Striker $29,
+-- and what he throws: the Shuriken $41 and the skeans $51-$53, fire, water, bolt), CELES (a blade, the Falchion
+-- $15; Ice), CYAN (katanas, the Strato $31; Quadra Slice wind), TERRA (a blade, the Falchion; Fire, Ice, Bolt)
+local SHADOW = { "SHADOW", W(0x29) | W(0x41) | SK(0x51), FIRE | WATER | BOLT }
+local CELES = { "CELES", W(0x15), ICE }
+local CYAN = { "CYAN", W(0x31), WIND }
+local TERRA = { "TERRA", W(0x15), FIRE | ICE | BOLT }
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),
@@ -159,17 +163,17 @@ H.run({ maxFrames = 600 }, {
     H.log(string.format("checked %d formation-species pairs of world group 49 (%d species)", n, #plain))
     local crawler = 0x05B
     if not seen[crawler] then problem("world group 49 no longer deals the Crawler") end
-    if (classOf(crawler) & PIERCE) == 0 then problem("$05B Crawler: SHADOW's blade (pierce) holds no key") end
-    if (classOf(crawler) & SLASH) ~= 0 then problem("$05B Crawler: the others' blades (slash) key it too") end
+    if (classOf(crawler) & W(0x29)) == 0 then problem("$05B Crawler: SHADOW's blade (the Striker) holds no key") end
+    if (classOf(crawler) & (W(0x15) | W(0x31))) ~= 0 then problem("$05B Crawler: the others' blades (the swords, the katanas) key it too") end
     H.log("the Crawler: SHADOW's blade keys it, and the blades of CELES, CYAN and TERRA do not")
 
-    -- 4. the skeans pierce (#383)
+    -- 4. the skeans carry the thrown stars' class (#383)
     local tbl, got = H.sym("Ot6SkillClassTbl") & 0x3FFFFF, {}
     local a = tbl
     while H.readRomByte(a) ~= 0xFF do got[H.readRomByte(a)] = H.readRomByte(a + 1); a = a + 2 end
     for _, sp in ipairs({ { 0x51, "Fire Skean" }, { 0x52, "Water Edge" }, { 0x53, "Bolt Edge" } }) do
-      if got[sp[1]] ~= PIERCE then
-        problem("spell $%02X %s: Ot6SkillClassTbl class $%02X, want pierce ($02)", sp[1], sp[2], got[sp[1]] or 0)
+      if got[sp[1]] ~= W(0x41) then
+        problem("spell $%02X %s: Ot6SkillClassTbl class $%02X, want the Shuriken's ($%02X)", sp[1], sp[2], got[sp[1]] or 0, W(0x41))
       end
     end
     H.assertEq(#problems, 0, "WoR Colosseum & Shadow arc break row and data mismatches")

@@ -56,8 +56,9 @@ Celes's tables below are the natural magic the ROM ships ("join" is
 level 1): `tools/check_spell_grants.py` fails the build when
 `NaturalMagic` differs from them (#305).
 
-Physical chip classes are **slashing / piercing / bludgeoning /
-special ¤** (see weapon-classes.md). The weapon sets Fight's
+Physical chip classes are **Sword / Dagger / Spear / Katana / Blunt /
+Ranged** (see weapon-classes.md; through v0.50 they were slashing,
+piercing, bludgeoning and special ¤). The weapon sets Fight's
 class while abilities carry their own. Some attacks are
 **null-break**: they deal large damage but chip nothing, which is
 the physical equivalent of non-elemental magic.
@@ -111,7 +112,7 @@ open the same divines: [kit-gogo.md](kit-gogo.md).
 | Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: it strikes every enemy; each killable one dies, each death-immune one loses four shields (Break's 3-BP ceiling) and takes a power-255 cut | yes (`ot6_divine.asm`, learned by story since #379; the strip and every body read #388) |
 | Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
 | Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
-| Sabin | Bum Rush | the Blitz list's eighth row at three points pending only: four bludgeon blows, each at the boost's x8 and each taking a shield whatever the body's keys, 99 MP | yes (`ot6_divine.asm`, #388) |
+| Sabin | Bum Rush | the Blitz list's eighth row at three points pending only: four Blunt blows, each at the boost's x8 and each taking a shield whatever the body's keys, 99 MP | yes (`ot6_divine.asm`, #388) |
 | Locke | Master's Mark | every enemy robbed (its rare item, else its common, no roll) and read, 99 MP | yes (`ot6_thief.asm`) |
 | Mog | (open: none of his dances stands above the others, owner 2026-10-26, #478) | — | no |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
@@ -146,18 +147,18 @@ three points, which only being hurt makes (`Ot6UmaroArm`).
 
 ## The constrained three
 
-### Edgar — Machinist (piercing: spear)
+### Edgar — Machinist (Spear; his tools Ranged, Spear and Sword)
 
 The 8 Tools, verbatim ✦, learned by acquisition.
 
 | # | Tool | MP | Chip | Source (WoB) |
 |---|---|---|---|---|
-| 1 | AutoCrossbow ✦ | 4 | piercing, whole side (one hit per body) | join (signature) |
+| 1 | AutoCrossbow ✦ | 4 | Ranged, whole side (one hit per body) | join (signature) |
 | 2 | NoiseBlaster | 6 | — (confuse; takes no boost) | Figaro shop |
 | 3 | Bio Blaster | 8 | poison | Figaro shop |
 | 4 | Flash | 6 | — (blind) | Figaro's tool merchant (shop 82), restocked at South Figaro (shop 5) |
-| 5 | Drill | 16 | piercing ×2 | Figaro castle, after the sand dive |
-| 6 | Chain Saw | 18 | slashing | Zozo chest (vanilla) |
+| 5 | Drill | 16 | Spear ×2 | Figaro castle, after the sand dive |
+| 6 | Chain Saw | 18 | Sword | Zozo chest (vanilla) |
 | 7 | Debilitator | 10 a weakness | adds + reveals a random weakness, one more a point ✦ | Vector's weapon shop (shop 27), open during the banquet |
 | 8 | **Overclock** ✦ (divine) | Σ | the Tool's own, twice | Magitek factory (story: switch `$0068`) |
 
@@ -200,33 +201,38 @@ no single price; its cost is the **sum (Σ)** of the two it fires.
   takes no boost: its Confuse lands at a tool's hit rate of 255 wherever an
   immunity does not stop it, so there is no certainty left to buy, and R is
   refused on its row (`Ot6ToolNoBoost`).  Air Anchor's hit (power 128,
-  pierce) takes the multiplier as the other damaging Tools do.
-- AutoCrossbow's piercing clears waves: one chip per body across a
+  Ranged) takes the multiplier as the other damaging Tools do.
+- AutoCrossbow's Ranged clears waves: one chip per body across a
   whole side, and exactly one chip against a solo boss. Drill answers armored
-  bosses. Chain Saw covers slashing, so Edgar alone spans two physical
-  classes through tools.
+  bosses (Spear, as his pike). Chain Saw is Sword, so Edgar alone spans
+  three physical classes through tools: Ranged, Spear and Sword.
 
-### Sabin — Monk (bludgeoning: fists; claws buy slashing)
+### Sabin — Monk (Blunt: fists, knuckles; claws buy Dagger)
 
 The 8 Blitzes, verbatim ✦, with the vanilla level table preserved ✦,
 selected from a menu. Fists are
-the core of the **bludgeoning** class (fists, staves, rods). Equipping
-claws switches his *Fight* to slashing ✦, but blitz classes are
-immutable: Pummel with claws on is still bludgeoning. His ability list
-sets his first class and his weapon slot sets his second.
+the core of the **Blunt** class (fists, knuckles, rods, flails, clubs).
+Equipping a claw (Mithril Claw, Poison Claw, Dragon Claw, Tiger Fangs)
+switches his *Fight* to Dagger ✦ (owner, 2026-11-24: "claws just feels
+like daggers"), but blitz classes are immutable: Pummel with claws on
+is still Blunt. His ability list sets his first class and his weapon slot sets his second, as slash and
+bludgeon were through v0.50 (owner, 2026-11-23: he "has been very
+versatile for having slashing and pummel"). The three knuckles
+(MetalKnuckle, Kaiser, Fire Knuckle) strike, so they are Blunt like his
+bare fists.
 
 Levels below are `BlitzLevelTbl` (`field/event.asm:1240`).
 
 | # | Blitz | MP | Chip | Level |
 |---|---|---|---|---|
-| 1 | Pummel ✦ | 4 | bludgeoning ×2 | 1 (has it at join) |
+| 1 | Pummel ✦ | 4 | Blunt ×2 | 1 (has it at join) |
 | 2 | AuraBolt | 10 | holy | 6 |
-| 3 | Suplex | 13 | bludgeoning | 10 |
+| 3 | Suplex | 13 | Blunt | 10 |
 | 4 | Fire Dance | 17 | fire | 15 |
 | 5 | Mantra | 16 | — (heal) | 23 |
 | 6 | Air Blade | 28 | wind | 30 |
 | 7 | Spiraler | 50 | — | 42 |
-| 8 | **Bum Rush** (divine, 3 BP) | **99** | bludgeoning ×4 | 70 / Duncan |
+| 8 | **Bum Rush** (divine, 3 BP) | **99** | Blunt ×4 | 70 / Duncan |
 
 The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
 
@@ -235,9 +241,9 @@ The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
   it essential).  The list draws it at every boost and greys it under three
   points pending; the A button buzzes there (`Ot6BushidoRowGrey`'s blitz
   arm, Master's Mark's grey).  At three it is the row at the full boost:
-  four bludgeon blows (`Ot6HitCountTbl`), each at `Ot6BoostDmg`'s x8, for
+  four Blunt blows (`Ot6HitCountTbl`), each at `Ot6BoostDmg`'s x8, for
   99 MP; each landed blow takes a shield whatever the body's keys
-  (`Ot6BumRushTake`, keyless like OT6's Break; a body that keys bludgeon
+  (`Ot6BumRushTake`, keyless like OT6's Break; a body that keys Blunt
   loses it to the class chip instead, so a blow never takes two), so one
   Bum Rush breaks a body at four or fewer shields and the blows after the
   break land Broken.  *Reason (#388's second call, the TLM's on the owner's
@@ -256,7 +262,7 @@ The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
   boost its four blows each carry the x8.*  `battle_bumrush` (the list's
   gate, the four blows and a shield a blow), `battle_bumrushmimic` (the
   Mimic's Pummel, and the keyless take on a staged body that does not key
-  bludgeon: six shields to two).
+  Blunt: six shields to two).
 Bum Rush is Sabin's ultimate and is
 fixed at **99**, which is 13.0% of his L70 pool of 760 and the same fraction
 Cleave is of Cyan's pool; both are pinned there so the fractions match. Mantra
@@ -264,12 +270,15 @@ is priced under Fire Dance because it is a utility option rather than a damage
 tier. The full per-row derivation, and the baseline it is measured against,
 are in mp-economy.md's "The baseline".
 
-### Cyan — Samurai (slashing: katana)
+### Cyan — Samurai (Katana)
 
-The 8 SwdTechs priced in BP ✦ (charge gauge deleted ✦). Katana now
-lives inside **slashing** with swords. Cyan is a slashing
-*specialist*, with multi-hit slash chips nobody else matches; he is not
-a mandatory key for katana-only locks. Vanilla level schedule kept.
+The 8 SwdTechs priced in BP ✦ (charge gauge deleted ✦). Katana is
+a class of its own since v0.51 (it lived inside slashing with swords).
+Cyan is its *specialist*, with multi-hit Katana chips nobody else matches;
+he is not the only Katana key: the five curved swords (RegalCutlass,
+Flame Sabre, Falchion, Soul Sabre, Scimitar) are Katana, so Terra and
+Celes hold it by their choice of sword (owner, 2026-11-24). Vanilla
+level schedule kept.
 
 Names below are the ones the game prints (`BushidoName`, the table the SwdTech
 window renders from). The internal disassembly labels `Bushido*`, `Fang` and
@@ -278,12 +287,12 @@ against upstream for something a comment already handles.
 
 | # | Tech | BP | MP | Chip | Level |
 |---|---|---|---|---|---|
-| 1 | Dispatch ✦ | 1 | 4 | slashing | join |
+| 1 | Dispatch ✦ | 1 | 4 | Katana | join |
 | 2 | Retort | 1 | 10 | — (counter stance) | 6 |
-| 3 | Slash | 1 | 13 | slashing | 12 |
-| 4 | Quadra Slam | 2 | 16 | slashing ×4 | 15 |
+| 3 | Slash | 1 | 13 | Katana | 12 |
+| 4 | Quadra Slam | 2 | 16 | Katana ×4 | 15 |
 | 5 | Empowerer | 2 | 18 | — (drain; strikes ×2 at quarter power) | 24 |
-| 6 | Stunner | 3 | 28 | slashing, all enemies | 34 |
+| 6 | Stunner | 3 | 28 | Katana, all enemies | 34 |
 | 7 | Quadra Slice | 3 | 50 | wind ×4 | 44 |
 | 8 | **Cleave** (divine) | 3 | **99** | — (instant death; a boss loses four shields and takes a power-255 cut) | Phantom Train farewell (story, #379) |
 
@@ -416,7 +425,7 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   3-BP ceiling, whatever its keys (`Ot6CleaveStrip`, through
   `Ot6TakeShields`, the leaf OT6's Break takes shields with); a body that
   breaks takes the cut Broken.  *Reason (the TLM's call on the owner's
-  direction, 2026-11-09): at a boss the one cut and one slash chip were
+  direction, 2026-11-09): at a boss the one cut and one class chip were
   less than a keyed 3-BP Fight earns (wor-coverage.md 13.8), so learning
   Cleave paid nowhere against a boss; four shields is what a full boost
   buys OT6's Break.*  Measured since (wor-coverage.md 13.9): the strip
@@ -500,7 +509,7 @@ that is no longer learned (`$1cf7` bit clear) falls back to the auto window for
 that slot.
 
 The Chip column is what ships (#379): `Ot6SkillClassTbl` (`ot6_class.asm`)
-marks Dispatch, Slash, Quadra Slam, Stunner and Cleave slashing; Retort (a
+marks Dispatch, Slash, Quadra Slam, Stunner and Cleave Katana; Retort (a
 counter stance) and Empowerer (a drain) are classless and chip nothing; and
 Quadra Slice is wind, its MagicProp element (battle_main.asm's override 7),
 which also moves its damage as any wind attack's (double on a wind-weak body,
@@ -514,7 +523,7 @@ L40, the katana Aura beside his Strato, the dream train's Genji Glove (the
 relic rule hands the spare two-weapon relic to the main boost-Fighter
 without one) and the stone Alexandr (its stat package is a front-liner's,
 magicite.md).  The Ancient Castle's bodies wear Reflect behind mdef 250, and
-his slash keys every one of them (`battle_breakwor_dreams`: "CYAN alone (the
+his katana keys every one of them (`battle_breakwor_dreams`: "CYAN alone (the
 Ancient Castle) keys 12 of 12").
 
 Test: `tools/tests/battle_bushido.lua`.
@@ -523,7 +532,10 @@ Test: `tools/tests/battle_bushido.lua`.
 
 ## The middle three
 
-### Terra — Esper mage (slashing: sword, fire lean)
+### Terra — Esper mage (Sword, fire lean)
+
+Her weapon is Sword, or Katana when she holds a curved sword (the
+RegalCutlass from South Figaro's shop on; weapon-classes.md).
 
 Vanilla's natural-magic table, trimmed to base tiers with the levels
 compressed so the list completes late-WoB. Vanilla makes her the
@@ -627,7 +639,7 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   CELES refills her own pool with Runic.  The relic rule does not rank it,
   so it stays where the route puts it (route-wor-colosseum.md section 5).
 
-### Locke — Thief (piercing: dagger)
+### Locke — Thief (Dagger)
 
 Story-verb learner. His kit covers more than repeated stealing: he
 probes, redistributes and corrodes, with some merchant work as well
@@ -637,10 +649,10 @@ probes, redistributes and corrodes, with some merchant work as well
 |---|---|---|---|
 | 1 | Steal ✦ (4 MP) | vanilla steal; boost buys certainty | join |
 | 2 | Mug (4 MP) | Capture: a swing that steals on each hit; boost buys swings | South Figaro escape (`$001E`) |
-| 3 | Trickshot (4 MP, escalates) | a thrown coin: piercing, past defense; boost multiplies | Lete River (`$001A`) |
+| 3 | Trickshot (4 MP, escalates) | a thrown coin: Dagger class, past defense; boost multiplies | Lete River (`$001A`) |
 | 4 | Filch ✦ (6 MP a shield) | take one shield, class-blind, and bank it as 1 BP; boost takes one more shield a point | join (was: Opera house) |
 | 5 | Bestow ✦ (5 MP) | give an ally 1 BP; boost hands as many as are pending | join (was: Vector) |
-| 6 | Dismantle (8 MP) | defense corrode, then a piercing stab; boost buys steps | Sealed Gate (`$0079`) |
+| 6 | Dismantle (8 MP) | defense corrode, then a Dagger stab; boost buys steps | Sealed Gate (`$0079`) |
 | 7 | Appraise (3 MP) | Scan's read of one enemy; boost reads them all | Thamasa, Strago met (`$008D`) |
 | 8 | **Master's Mark** (divine, 3 BP, 99 MP) | every enemy robbed and read | Floating Continent, the Air Force (`$00A0`) |
 
@@ -683,8 +695,8 @@ whole effect is +1 BP is strictly worse than Fight.
 Filch instead takes the resource the enemy does have: **one shield, which Locke
 keeps as a boost point.** The chip is **class-blind and
 element-blind**, whereas `Ot6ClassChip` only fires when the attack's class matches
-the target's weakness row, so Locke's piercing dagger does nothing against anything
-not weak to piercing. Filch is the party's only weakness-independent shield
+the target's weakness row, so Locke's dagger does nothing against anything
+not weak to Dagger. Filch is the party's only weakness-independent shield
 remover. It reveals nothing (it takes the shield without teaching the row, so it
 complements Debilitator rather than replacing it) and deals no damage. A landed
 Filch gives Locke **+2 BP on the turn**, the filched pip plus his own unboosted
@@ -710,7 +722,7 @@ refused at execution, charging no pip. `battle_bestowrefuse` is the suite;
 `battle_boostkeep` holds the boosted cases.
 
 **Break class: none of the first three takes one** (Mug's is his weapon's;
-Trickshot and Dismantle pierce). Steal and Bestow deal no damage,
+Trickshot and Dismantle are Dagger). Steal and Bestow deal no damage,
 and Filch deals none either. A class glyph on Filch's row would be wrong about
 the property that matters: it chips whatever the row says.
 
@@ -738,7 +750,8 @@ letters, so its price keeps a gap); the banner prints "Master's Mark".
 
 - **Mug** is vanilla's Capture as a row (FF3-US prints the Thief Glove's
   verb as Capture): `Ot6MugCheck` sends the action to `Cmd_06`, so it is a
-  Fight swing with his weapon's class (the dagger pierces) whose landing hits
+  Fight swing with his weapon's class (Dagger with a dagger, Sword with a
+  sword) whose landing hits
   each run Steal's effect, and the boost buys swings, two a point, as a
   Fight's does. The boost pays once: the steal on a Capture's or Mug's hit
   rolls vanilla's odds whatever is pending (`Ot6StealBoostLevel`,
@@ -746,16 +759,16 @@ letters, so its price keeps a gap); the banner prints "Master's Mark".
   Steal's price: the swing is the Fight he would take anyway.
 - **Trickshot** is one thrown coin by Fight's own formula at battle power
   40, whatever he holds, physical, ignoring defense (and with it the
-  target's row and Defend), class pierce. It runs under GP Rain's animation
+  target's row and Defend), class Dagger. It runs under GP Rain's animation
   command `$18`, which `Ot6BoostDmg` does not gate, so the boost multiplies
   it x2/x4/x8 and its 4 MP escalates with it (`Ot6ThiefCharge`,
   `Ot6ThiefRowCost`): the one test, a price escalates exactly when the boost
-  multiplies. It is the pierce key a sword-holding Locke still has, and a
+  multiplies. It is the Dagger key a sword-holding Locke still has, and a
   hit that defense does not blunt.
 - **Dismantle** corrodes first, then stabs: each step takes a quarter of the
   target's defense (`$3BB8`, at least one point), for the rest of the
   battle, and the boost buys steps (one at 0 BP, four at 3 BP, about a third
-  of the defense left). The stab (power 20, class pierce) stays under Steal's
+  of the defense left). The stab (power 20, class Dagger) stays under Steal's
   gated command, so the boost buys no multiplier and 8 MP is flat. The
   corrode is for the party's physical hits that follow.
 - **Appraise** is Strago's Scan read (`Ot6AnalyzeOne`): the target's weak
@@ -783,7 +796,7 @@ that still carries loot, in event battles only (each landing hit shows its
 steal message, so a Mug in every battle cost the legs 5-7% more frames for
 loot that random battles do not need); Appraise on a body the HUD cannot key yet, in an
 event battle or with 1,500 HP or more; Dismantle once a body in an event
-battle with 3,000 HP and 64 defense or more; Trickshot on a pierce-weak body
+battle with 3,000 HP and 64 defense or more; Trickshot on a Dagger-weak body
 his Fight keys nothing on; Master's Mark in an event battle with loot on the
 field, or a random one with three bodies carrying it.
 
@@ -830,7 +843,9 @@ Rulings that fall out of the vanilla math (see `tools/tests/battle_steal.lua`):
   guarantee, not the ×2/×4/×8 a damage verb takes. That keeps the two
   axes separate.
 
-### Celes — Rune Knight (slashing: sword, ice lean)
+### Celes — Rune Knight (Sword, ice lean)
+
+Her weapon is Sword, or Katana with a curved sword, as Terra's.
 
 A spellblade, as FF5's Mystic Knight is (owner, 2026-11-23, #563): her
 command is a list, **RuneKnt**, whose rows put magic on her sword.  Runic,
@@ -1168,11 +1183,11 @@ the divine in the eighth:
   `build/attempts/wt/v051-spellblade/mutants/mutants.py`, and the page's in
   `build/attempts/wt/v051-spellblade/sb4/mutants.py`.
 
-### Setzer — Gambler/Merchant (special ¤: cards, dice; darts = piercing)
+### Setzer — Gambler/Merchant (Ranged: cards, dice, darts)
 
 Slot ✦ is the signature; Coin Toss and Hired Help carry the merchant house
 (paid in gil, not MP); the divine is **Jackpot**, a Fixed-Dice triple
-payoff, never Slot itself ✦. His cards, Trump and Dice chip ¤ on Fight;
+payoff, never Slot itself ✦. His cards, Trump, Dice and Darts chip Ranged on Fight;
 the Fixed Dice are null-break (large numbers, no chip, row ignored, vanilla
 behaviour preserved ✦). Decisions below were made as the TLM's delegate
 for #319 (2026-10-02), each with its reason.
@@ -1180,8 +1195,8 @@ for #319 (2026-10-02), each with its reason.
 | # | Ability | Price | Chip | Boost buys | Source |
 |---|---|---|---|---|---|
 | 1 | Slot ✦ | free | the reel's attack | the rig's certainty (see Steal's ladder; `ot6_slot.asm`) | join |
-| 2 | Coin Toss | level × 30 gil a toss | ¤, one per body a toss (every enemy) | another toss a point (1 + boost tosses, each its own gil, hit and chip) | join |
-| 3 | Hired Help | level × 50 gil a hire | the target's own physical class (slashing, else piercing, else bludgeoning), one a hire | another hire a point (1 + boost hires, each its own fee, hit and chip) | join |
+| 2 | Coin Toss | level × 30 gil a toss | Ranged, one per body a toss (every enemy) | another toss a point (1 + boost tosses, each its own gil, hit and chip) | join |
+| 3 | Hired Help | level × 50 gil a hire | a class the target is weak to (the first of Sword, Dagger, Blunt, Ranged, Katana, Spear in its row), one a hire | another hire a point (1 + boost hires, each its own fee, hit and chip) | join |
 | 4 | **Jackpot** (divine) | 99 MP, at 3 BP | null-break | the divine itself: the full boost buys a throw of two rolls, each its own gamble and its own hit | his World of Ruin return (Kohlingen, switch `$00CA`) |
 
 **The table behind Slot.** Setzer's rows are FIGHT, SLOT, MAGIC, ITEM and
@@ -1202,14 +1217,16 @@ Cleave on). `ot6_setzer.asm` has the machinery.
 it takes level × 30 gil and deals twice that, ignoring defense, split over
 the targets (the enemy side). *Reason: the relic named Coin Toss already
 is this verb in FF6; the kit row makes it Setzer's own without a relic
-slot.* Coins are ¤, like his cards and dice, so it chips one shield on each
-body whose row holds ¤: the wide ¤ key the guideline asks for ("Special is
-a common key"). **Boost buys tosses** (owner, 2026-10-02: boost pays
+slot.* Coins are Ranged, like his cards and dice, so it chips one shield on each
+body whose row holds Ranged: the wide key the guideline asks for ("Special is
+a common key", written when the class was special ¤). **Boost buys tosses**
+(owner, 2026-10-02: boost pays
 through more hits, never a bigger one, so no point is lost to the 9,999 cap
 on one hit -- at L50 one doubled toss already capped on a lone unshielded
 target): 1 + boost tosses, one pass of the action each (`Ot6SetzerEffect`
 adds the boost to the attack count), each at level × 30 gil, each its own
-hit on every body and its own ¤ chip on every ¤-weak one. Three points are
+hit on every body and its own Ranged chip on every Ranged-weak one. Three
+points are
 four tosses and four chips a body. A toss after a body falls splits over
 the bodies left (`battle_passretarget`). Once the tosses have felled them
 all, the tosses left are not thrown (#545, the owner's trial; see
@@ -1222,11 +1239,13 @@ overwrites the damage). (Earlier the same day the boost doubled the coins,
 
 **Hired Help is a sellsword whose weapon fits the target.** One enemy; a
 hire costs level × 50 gil and lands twice its fee, and its break class is
-the first physical class in the target's weakness row (slashing, then
-piercing, then bludgeoning); a target with none takes an unkeyed hit.
+the first class in the target's weakness row, in the order Sword, Dagger,
+Blunt, Ranged, Katana, Spear; a target with none takes an unkeyed hit.
 *Reason: the merchant buys the key the party lacks; it is priced in the
 resource a WoR party has a lot of, but a player feels (1,550 gil a hire at
-L31), and it is never ¤ (that is Coin Toss's and the cards').* It reveals
+L31).* Through v0.50 it was never special ¤ (Coin Toss's and the cards');
+under six classes a hire swings Ranged where that is the first class in
+the row (`Ot6HireClass` takes the row's lowest bit). It reveals
 the class it chips, as any chip does. **Boost buys hires** (owner,
 2026-10-02: boost pays through more hits, so it never runs into the 9,999
 cap on one hit): 1 + boost hires, one pass of the action each
@@ -1366,7 +1385,7 @@ body pays nothing) and `battle_passretarget` (a hire, roll or swing whose
 body fell ends its action and moves to no other body, and a toss re-splits
 over the survivors). The
 coin suites throw in the battles that deal a
-special-weak crowd (the engine's alive mask, so a petrified body is out)
+Ranged-weak crowd (the engine's alive mask, so a petrified body is out)
 and assert that a toss split and chipped; the other battles are fought out
 by the route's fight driver with field care after, within a budget decoded
 from the room's pool (the worst encounter-counter state's encounters to
@@ -1391,7 +1410,7 @@ six faces after the shields' halving or the Broken double, capped at 9,999
 and the target's HP), when the throw's two rolls are expected to land 4,000
 on a target of 4,000 HP or more; Slot
 at 3 BP in a random battle against two or more (a chosen triple); Coin
-Toss when its revealed ¤ chips two or more bodies, with a toss a point up
+Toss when its revealed Ranged chips two or more bodies, with a toss a point up
 to the most shields among them; Hired Help when the
 target's revealed row holds a physical class his own Fight does not key,
 with a hire a point up to the shields left (bank and purse allowing).
@@ -1402,7 +1421,7 @@ cost some 30,000 gil a run against the control and bought no fewer deaths
 old behaviour (the control arm of the Falcon arc's labs,
 route-wor-falcon.md 13.10).
 
-### Shadow — Assassin (piercing: thrown edges, daggers, ninja blades) (#383)
+### Shadow — Assassin (Dagger: ninja blades, daggers; Ranged: Throw) (#383)
 
 Learned by acquisition, as Edgar's Tools are: his eight skills are the
 eight throwing items, all behind Throw, his signature, and the divine is
@@ -1412,12 +1431,12 @@ weapon in the bag, as in vanilla.
 | # | Skill | Effect | Break key | Source |
 |---|---|---|---|---|
 | ✦ | Throw | the signature verb: throws the item picked, which is spent; boost multiplies a damaging throw x2/x4/x8 | the item's | join |
-| 1 | Shuriken | a thrown star | pierce | World of Balance weapon counters (Kohlingen, shop 17; Albrook, 25; the Phantom Train's ghost merchant, 85; and shop 39), then the World of Ruin's Thamasa arsenal (72); ten in the bag at `wor-ancient-v1` |
-| 2 | Ninja Star | a thrown star | pierce | the World of Ruin's Thamasa arsenal (shop 72) |
-| 3 | Tack Star | a thrown star | pierce | the Colosseum (the Ninja Star's prize, against the Chaos Drgn) |
-| 4 | Fire Skean | fire on every enemy | pierce and fire | World of Balance counters (Kohlingen, shop 17; Jidoor, 20; Albrook, 25; the Phantom Train's ghost merchant, 85; and shop 44), then the World of Ruin's Maranda (80) |
-| 5 | Water Edge | water on every enemy | pierce and water | the same, less the ghost merchant |
-| 6 | Bolt Edge | bolt on every enemy | pierce and bolt | the same, less the ghost merchant |
+| 1 | Shuriken | a thrown star | Ranged | World of Balance weapon counters (Kohlingen, shop 17; Albrook, 25; the Phantom Train's ghost merchant, 85; and shop 39), then the World of Ruin's Thamasa arsenal (72); ten in the bag at `wor-ancient-v1` |
+| 2 | Ninja Star | a thrown star | Ranged | the World of Ruin's Thamasa arsenal (shop 72) |
+| 3 | Tack Star | a thrown star | Ranged | the Colosseum (the Ninja Star's prize, against the Chaos Drgn) |
+| 4 | Fire Skean | fire on every enemy | Ranged and fire | World of Balance counters (Kohlingen, shop 17; Jidoor, 20; Albrook, 25; the Phantom Train's ghost merchant, 85; and shop 44), then the World of Ruin's Maranda (80) |
+| 5 | Water Edge | water on every enemy | Ranged and water | the same, less the ghost merchant |
+| 6 | Bolt Edge | bolt on every enemy | Ranged and bolt | the same, less the ghost merchant |
 | 7 | Shadow Edge, the smoke | Image (a double that turns physical hits aside) on the thrower; boost reaches allies | none | Jidoor (shop 20), shop 39, Maranda (80) |
 | 8 | Inviz Edge, the exit | Vanish (physical hits miss) on the thrower; boost reaches allies | none | Kohlingen (shop 17), shop 39, Maranda (80) |
 | divine | **Assassinate** (3 BP) | a hit of his that breaks a non-boss, or lands on a Broken one, kills it | — | join |
@@ -1451,16 +1470,18 @@ source; it changes with the hit's numeral and clears when the status ends
 The driver throws for it in event battles only (`M.shadowPolicy`,
 `shadowpin_policy_selftest`).
 
-**The skeans pierce (#383).**  A Fire Skean, Water Edge or Bolt Edge
+**The skeans are Ranged (#383; pierce through v0.50).**  A Fire Skean,
+Water Edge or Bolt Edge
 resolves as its spell (`$51`-`$53`: `ThrowToolsOffsetTbl` maps the items
-`$AB`-`$AD` there), and `Ot6SkillClassTbl` gives those spells the pierce
-class, so a thrown skean chips a pierce-weak body by its class (Ot6ClassChip)
+`$AB`-`$AD` there), and `Ot6SkillClassTbl` gives those spells the Ranged
+class, so a thrown skean chips a Ranged-weak body by its class (Ot6ClassChip)
 and an element-weak one by its element (Ot6Chip): both on a body weak to
 both, as a Flame Knife chips both.  *Reason: a thrown edge is a thrown
-edge (weapon-classes.md: "thrown edges" pierce), and before this the skeans
-were the one damaging throw that taught no class.*  The stars were already
-pierce through `Ot6WeapClassTbl` (a thrown weapon takes its item's class,
-`Ot6ItemClass`).
+edge (weapon-classes.md: what is thrown is Ranged), and before
+this the skeans
+were the one damaging throw that taught no class.*  The stars already had
+their class through `Ot6WeapClassTbl` (a thrown weapon takes its item's class,
+`Ot6ItemClass`: a thrown sword is Sword, a thrown ninja blade Dagger).
 
 **The smoke and exit tricks: boost buys reach.**  The Shadow Edge (Image)
 and the Inviz Edge (Vanish) deal no damage, so the multiplier bought
@@ -1480,15 +1501,16 @@ that hides the whole party is the assassin's way of covering a retreat, and
 targets are what a boost on a status item can buy.*
 
 `battle_shadowkit` (the leg's end state, `wor_colosseum`): a thrown Fire
-Skean's class chip on a pierce-keyed body; the smoke at 0 BP covers SHADOW
+Skean's class chip on a body keyed to it; the smoke at 0 BP covers SHADOW
 alone; the exit at 1 BP SHADOW and the next ally, each vanished; the smoke
 at 2 BP SHADOW and the next two allies it can land on (the vanished ally
 passed over), each doubled.  Red on main and on three mutants (no reach;
 no skean rows; vanilla targeting): route-wor-colosseum.md section 5.
 
-**The driver.**  SHADOW's Fight (his blade pierces) and the elemental
+**The driver.**  SHADOW's Fight (Dagger: his ninja blade) and the elemental
 skean line (a skean whose element a revealed weakness takes) stand.  A
-sweep line (a skean when two or more standing bodies show pierce) was
+sweep line (a skean when two or more standing bodies show its class, pierce
+then) was
 measured and kept out: on the plain by Maranda the Crawler trio took a
 median 3101 ticks with it and 2856 without (15 and 14 keys; route-wor-
 colosseum.md section 5).  The tricks have no driver line yet (section 8
@@ -1498,7 +1520,7 @@ there).
 
 ## Sketches (join order, WoB)
 
-- **Shadow — Assassin (piercing, thrown)**: built (#383); see "Shadow"
+- **Shadow — Assassin (Dagger in hand, Ranged thrown)**: built (#383); see "Shadow"
   below for the throwing kit and the smoke and exit tricks.  Throw ✦
   signature; divine **Assassinate** (built).  Its one gate is the
   rule's: an action of his boosted with all three points (no once-a-battle
@@ -1517,8 +1539,8 @@ there).
   break, every fourth turn.*  `battle_assassinate`.  Interceptor is a
   passive.
 - **Setzer — Gambler/Merchant**: built; see "Setzer" above (#319).
-- **Relm — Painter (special ¤: brushes)**: built (#538); see "Relm" below.
-- **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
+- **Relm — Painter (Blunt: brushes)**: built (#538); see "Relm" below.
+- **Mog — Dancer (Spear)**: the 8 Dances verbatim ✦,
   learned by fighting on each dance's terrain ✦, vanilla's rule.  No divine
   for now (owner, 2026-10-26, #478): none of his dances stands above the
   others, so Water Rondo is an ordinary dance, learned (the Serpent
@@ -1621,10 +1643,10 @@ there).
   3-BP start on every dance MOG knows, the stumble, the later steps, a
   boosted Mimic of a Dance and an engine start, and reads the rows and
   their odds from the ROM.
-- **Umaro — Berserker (bludgeoning: club, fists)**: see "Umaro" below
+- **Umaro — Berserker (Blunt: club, fists)**: see "Umaro" below
   (#380).
 
-## Relm — Painter (special ¤: brushes) (#538)
+## Relm — Painter (Blunt: brushes) (#538)
 
 Design, rulings and the owner's notes: [kit-relm.md](kit-relm.md).  Her
 kit buffs the party through OT6's own systems (boost points, shields,
@@ -1706,7 +1728,7 @@ the strongest ally whose weapon lacks a colour the target is weak to;
 Varnish when no ally holds a coat, on the lowest max HP; else her Fight.
 Each leaves 20 MP, and logs what it read (`[fight] actor=n RELM ...`).
 
-## Umaro — Berserker (bludgeoning: club, fists) (#380)
+## Umaro — Berserker (Blunt: club, fists) (#380)
 
 Umaro takes no orders: the game refuses him a command window by name, and
 each turn his chooser (`_163b`) rolls one of four arms.  His kit is those
@@ -1715,13 +1737,13 @@ what a full boost buys.
 
 | Arm | When the roll can pick it | Chip | What the boost buys |
 |---|---|---|---|
-| Fight | always | his weapon's class: Bone Club or bare fists, bludgeoning | swings (`Ot6FightBoost`) |
-| Charge | always | bludgeoning | the damage multiplier |
-| Throw | with the Rage Ring | bludgeoning (an ally hurled as a club) | one more throw per point (`Ot6ThrowBoost`) |
+| Fight | always | his weapon's class: Bone Club or bare fists, both Blunt | swings (`Ot6FightBoost`) |
+| Charge | always | Blunt | the damage multiplier |
+| Throw | with the Rage Ring | Blunt (an ally hurled as a club) | one more throw per point (`Ot6ThrowBoost`) |
 | Storm | with the Blizzard Orb | ice, every enemy | the damage multiplier |
 | **Storm** (divine) | a dump of all three points, relic or not | ice, every enemy | x8 |
 
-- **Charge and Throw bludgeon** (`Ot6UmaroCharge`, `Ot6UmaroThrow`, the
+- **Charge and Throw are Blunt** (`Ot6UmaroCharge`, `Ot6UmaroThrow`, the
   last writes before each runs ExecAttack).  Each loads the classless
   "battle" record and swings no weapon, so before #380 neither chipped
   anything (measured: class `$00` at every Charge pass,
@@ -1740,10 +1762,10 @@ what a full boost buys.
   should buy the arm that needs no aim, and an ice key on a whole
   formation.*  He has no MP (mp-economy.md: Umaro 0), so the price is the
   three points alone.
-- **On arrival** (Narshe, World of Ruin, v0.29, with Mog): bludgeoning on
+- **On arrival** (Narshe, World of Ruin, v0.29, with Mog): Blunt on
   every arm but Storm, and ice on Storm, which his first full dump brings
   whatever relics he wears.  Where the route picks up the Blizzard Orb and
-  the Rage Ring, and whether bludgeoning and ice are keys the party lacks in
+  the Rage Ring, and whether Blunt and ice are keys the party lacks in
   Narshe's mines and his cave, is the v0.29 route's to settle: neither relic
   is on v0.29 (the Rage Ring is in the Cave in the Veldt, the Blizzard Orb in
   the Ancient Castle; route-wor-narshe.md 6.3).
@@ -1809,8 +1831,8 @@ the pips pending are the plan's) with `MIMIC_OFF` as the control.
 Both learn an open-ended collection and equip a curated subset, so the
 player prunes the kit all game. Same model, different collection verbs:
 
-- **Gau — Beast Tamer (piercing: fangs)**: `kit-gau.md`.
-- **Strago — Scholar (bludgeoning: rod)**: Lores by observation ✦
+- **Gau — Beast Tamer (Dagger: his fangs, bare-handed or raging)**: `kit-gau.md`.
+- **Strago — Scholar (Blunt: rod)**: Lores by observation ✦
   (Cyrus/Hikari). Aqua Rake free ✦; **Analyze** cheap and early ✦
   (full weakness reveal, the party's scouting tool). Learns every lore
   he sees cast, **equips 5**: his lores are one verb inside an 8-row
@@ -1875,7 +1897,7 @@ player prunes the kit all game. Same model, different collection verbs:
     learns lores).  The sources and the reasons: magicite.md "Berserk".
     `battle_bserk`.
 
-- **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
+- **Relm — Painter (Blunt: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —
   the full owner ruling is in `vanilla-destructive-bugs.md`).  Built
   (#538, v0.47): the party's supporter, a list behind her Painter command

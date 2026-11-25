@@ -7,20 +7,23 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the basement's soldiers take both hands; the shell takes only LOCKE's point (pierce), the bear and the soft body only CELES's blade (slash).
+--   3. the lessons: the basement's soldiers take both hands; the shell takes only LOCKE's point, the bear and the soft body only CELES's blade.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x011] = { "Commander", 2, SLASH | PIERCE, POISON, 0, 0 },
-  [0x071] = { "Vector Pup", 2, SLASH | PIERCE, FIRE, 0, 0 },
-  [0x094] = { "Primordite", 2, SLASH | BLUDG, BOLT, 0, 0 },
-  [0x036] = { "Trilobiter", 2, PIERCE | BLUDG, 0, 0, 0 },
-  [0x0F5] = { "Gold Bear", 3, SLASH | BLUDG, 0, 0, 0 },
+  [0x011] = { "Commander", 2, SWORD | DAGGER, POISON, 0, 0 },
+  [0x071] = { "Vector Pup", 2, SWORD | DAGGER, FIRE, 0, 0 },
+  [0x094] = { "Primordite", 2, SWORD | BLUNT, BOLT, 0, 0 },
+  [0x036] = { "Trilobiter", 2, DAGGER | BLUNT, 0, 0, 0 },
+  [0x0F5] = { "Gold Bear", 3, SWORD | BLUNT, 0, 0, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -31,10 +34,12 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 5); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "LOCKE, CELES", { { "LOCKE", PIERCE, 0 }, { "CELES", SLASH, 0 } }, nil },
-  { "CELES, EDGAR, SABIN (the World of Ruin sweep)", { { "CELES", SLASH, 0 }, { "EDGAR", SLASH, 0 }, { "SABIN", BLUDG, FIRE } }, { 1 } },
+  -- LOCKE the two MithrilKnives $01 and CELES the MithrilBlade $0A (sfigaro_escape); wor-figaro-sweep-v1: CELES the
+  -- Enhancer $13, EDGAR the Blizzard $0E, SABIN the Fire Knuckles $57
+  { "LOCKE, CELES", { { "LOCKE", W(0x01), 0 }, { "CELES", W(0x0A), 0 } }, nil },
+  { "CELES, EDGAR, SABIN (the World of Ruin sweep)", { { "CELES", W(0x13), 0 }, { "EDGAR", W(0x0E), 0 }, { "SABIN", W(0x57), FIRE } }, { 1 } },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -144,12 +149,12 @@ H.run({ maxFrames = 600 }, {
     end
 
     -- 3. the lessons
-    if (classOf(0x036) & PIERCE) == 0 or (classOf(0x036) & SLASH) ~= 0 then problem("$036 Trilobiter: the shell should take LOCKE's point and turn CELES's blade") end
+    if (classOf(0x036) & W(0x01)) == 0 or (classOf(0x036) & (SWORD | KATANA)) ~= 0 then problem("$036 Trilobiter: the shell should take LOCKE's point and turn CELES's blade") end
     for _, sp in ipairs({ 0x094, 0x0F5 }) do
-      if (classOf(sp) & SLASH) == 0 or (classOf(sp) & PIERCE) ~= 0 then problem("$%03X %s: should take CELES's blade and not LOCKE's point", sp, WANT[sp][1]) end
+      if (classOf(sp) & W(0x0A)) == 0 or (classOf(sp) & W(0x01)) ~= 0 then problem("$%03X %s: should take CELES's blade and not LOCKE's point", sp, WANT[sp][1]) end
     end
     for _, sp in ipairs({ 0x011, 0x071 }) do
-      if (classOf(sp) & (SLASH | PIERCE)) ~= (SLASH | PIERCE) then problem("$%03X %s: the basement's soldiers should take both hands", sp, WANT[sp][1]) end
+      if (classOf(sp) & (W(0x0A) | W(0x01))) ~= (W(0x0A) | W(0x01)) then problem("$%03X %s: the basement's soldiers should take both hands", sp, WANT[sp][1]) end
     end
     H.log("the lessons: the basement's soldiers take both; the shell only LOCKE's point; the bear and the ooze only CELES's blade")
     H.assertEq(#problems, 0, "WoB escape break row mismatches")

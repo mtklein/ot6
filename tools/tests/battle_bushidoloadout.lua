@@ -72,7 +72,7 @@ end
 local function pinGuards()
   for _, s in ipairs(GUARDS) do
     H.writeByte(TM(s), 0)
-    H.writeByte(WKC(s), 0x01)
+    H.writeByte(WKC(s), H.skillClass(0x55))   -- weak to the techs' own class (Dispatch's row: Katana $10, #566; slash $01 until then)
     local st3 = ST3(8 + s * 2)
     H.writeByte(st3, H.readByte(st3) | 0x10)
     H.writeWord(MHP(s), 0xF000)

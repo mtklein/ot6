@@ -16,6 +16,15 @@ divine). What a character keeps is the ladder in
 learning this file once proposed were never built and are replaced by the
 ladder; the repository history has the old text.
 
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Blunt, Ranged
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are the
+> present ones. Quoted logs, dated measurements and "before" columns keep
+> the words they were recorded in: slash is now Sword or Katana, pierce
+> Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged or
+> Blunt.
+
 ## What one magicite carries
 
 1. **Spells** — 2–3 *base-tier* spells (boost folds the tiers, so a
@@ -37,7 +46,9 @@ authority for both, alongside the data in `ff6/src/menu/genju_prop.asm` and
 `Ot6EsperStatTbl` (`ff6/src/battle/ot6_progression.asm`). For every other
 row, the Spells and Stat columns are built (below). **The Passive and Permit
 columns were never built** and are superseded by the ladder
-(esper-rework.md); read them only as the themes the stones were given.
+(esper-rework.md); read them only as the themes the stones were given. The
+Permit column keeps the four-class words it was written in (claws are Dagger
+now).
 
 | Esper | Source | Spells (base) | Stat vig/spd/stm/mag | Passive | Permit | Notes |
 |---|---|---|---|---|---|---|

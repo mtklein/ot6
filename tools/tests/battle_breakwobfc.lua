@@ -1,15 +1,19 @@
 -- @suite
 -- battle_breakwobfc.lua -- the Floating Continent's monster box, its authored break row re-verified from the
 -- shipped ROM (the battle_breakgate discipline): Gigantos carries its Ot6ShieldTbl row, and its formation (170) is
--- chippable by the landing party, TERRA, LOCKE and EDGAR's blades (slash) and SHADOW's point (pierce).
+-- chippable by the landing party, TERRA, LOCKE and EDGAR's blades and SHADOW's point (his ninja blade).
 -- docs/design/wob-towns-boxes.md section 4 is the design these numbers come from.
 local H = dofile("tools/tests/lib/ot6.lua")
 
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local W = H.weaponClass   -- a hand: the class the built ROM gives the weapon
+
 local WANT = {                    -- species -> { shields, class mask }
-  [0x0AE] = { 5, 0x01 | 0x04 },   -- gigantos: slash|bludg
+  [0x0AE] = { 5, SWORD | RANGED },  -- gigantos: sword|ranged
 }
 local FORMS = { 170 }
-local PARTY_CLASSES = 0x01 | 0x02          -- slash+pierce on hand
+-- fc-alcove-v1: TERRA's Break Blade $11, LOCKE's Blizzards $0E, EDGAR's ThunderBlade $0F, SHADOW's Blossom $27
+local PARTY_CLASSES = W(0x11) | W(0x0E) | W(0x0F) | W(0x27)
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),

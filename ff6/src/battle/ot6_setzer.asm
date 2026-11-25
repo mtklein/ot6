@@ -542,10 +542,10 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; The class (OT6_ATKCLASS), set here because nothing on GP Rain's path loads
 ; one (no MagicProp, no weapon, no item) and the per-target chip runs after
 ; this effect:
-;   Coin Toss, and any character's GP Rain: special (coins are ¤, like
+;   Coin Toss, and any character's GP Rain: ranged (coins are thrown, like
 ;     Setzer's cards and dice), one chip on each body it hits;
 ;   Hired Help: the sellsword's weapon fits the target -- the first of
-;     slashing, piercing, bludgeoning in the target's weakness row, or none
+;     the six classes (bit order) in the target's weakness row, or none
 ;     (the hit lands unkeyed);
 ;   a monster's GP Rain: none (it is vanilla's, and hits the party).
 ;
@@ -575,16 +575,23 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         lda     f:$7e0000+OT6_SETZERROW
         cmp     #OT6_SETZER_HIRE
         beq     @hire
-@rain:  lda     #OT6_SPECIAL
+@rain:  lda     #OT6_CLS_COIN
         sta     f:$7e0000+OT6_ATKCLASS
         lda     #OT6_COIN_RATE
         bra     @price
 @hire:  jsr     Ot6HireClass
         lda     f:$7e0000+OT6_ATKCLASS  ; the sellsword's weapon fits it: the
-        cmp     #OT6_BLUDG              ;   class as two bits into $b7's cc
-        bne     :+                      ;   ($01/$02/$04 -> 1/2/3, none 0)
-        lda     #$03
-:       asl
+        beq     @fam                    ;   class's weapon family as two bits
+        bit     #OT6_SWORD|OT6_KATANA   ;   into $b7's cc (none 0, a blade 1,
+        beq     :+                      ;   a point 2, a blow 3)
+        lda     #$01
+        bra     @fam
+:       bit     #OT6_DAGGER|OT6_SPEAR|OT6_RANGED
+        beq     :+
+        lda     #$02
+        bra     @fam
+:       lda     #$03
+@fam:   asl
         asl
         tsb     $b7
         lda     #OT6_HIRE_RATE
@@ -621,7 +628,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 @done:  rtl
 .endproc
 
-; [ Hired Help's class: the first physical class the target is weak to ]
+; [ Hired Help's class: the first of the six the target is weak to ]
 ; $b9 = the monster half of the target mask (ChooseTarget has run).  a8, any
 ; index width.  writes OT6_ATKCLASS; preserves X and Y.
 .proc Ot6HireClass
@@ -641,20 +648,15 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         bcc     @mon
 @none:  lda     #$00
         bra     @sto
-@have:  lda     OT6_BP_CLASS,x  ; the monster's class weaknesses
-        lsr
-        bcs     @slash
-        lsr
-        bcs     @pierce
-        lsr
-        bcs     @bludg
-        bra     @none
-@slash: lda     #OT6_SLASH
-        bra     @sto
-@pierce:
-        lda     #OT6_PIERCE
-        bra     @sto
-@bludg: lda     #OT6_BLUDG
+@have:  lda     OT6_BP_CLASS,x  ; the monster's class weaknesses: the
+        and     #OT6_CLASSES    ;   lowest bit of them (a & -a)
+        beq     @none
+        pha
+        eor     #$ff
+        inc
+        and     $01,s
+        sta     $01,s
+        pla
 @sto:   sta     f:$7e0000+OT6_ATKCLASS
         plp
         plx
@@ -682,8 +684,8 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;                   Train ghost (owner, 2026-10-02: the fourth is never Shadow
 ;                   when Shadow could not be hired)
 ;               cc  the weapon's class (Ot6CoinPrice ors it in once the
-;                   target is known): 0 none, 1 slashing, 2 piercing,
-;                   3 bludgeoning
+;                   target is known): 0 none, 1 a blade (sword, katana),
+;                   2 a point (dagger, spear, ranged), 3 a blow (blunt)
 ;               L   the action's last pass (Setzer comes back after it)
 ;               F   its first (Setzer steps out before it)
 ; The pass is k = boost - $3a70: Ot6SetzerEffect adds the boost to the count
@@ -905,8 +907,8 @@ Ot6HireImpSeam = * + 2                  ; (a seam for the negative's mutant)
         .byte   CHAR_GFX::MERCHANT, CHAR_GFX::SOLDIER, CHAR_GFX::IMP, CHAR_GFX::SHADOW
         .byte   $ff, CHAR_GFX::GHOST
 
-; the weapon each figure swings, by class (none, slashing, piercing,
-; bludgeoning): the Fight animation's weapon number, item id + 1
+; the weapon each figure swings, by family (none, a blade, a point,
+; a blow): the Fight animation's weapon number, item id + 1
 Ot6HireWeapTbl:
         .byte   $00+1, $0b+1, $00+1, $34+1     ; merchant: dirk, regal cutlass, dirk, mithril rod
         .byte   $0a+1, $0a+1, $1d+1, $46+1     ; soldier: mithrilblade, mithrilblade, mithril pike, morning star
@@ -1410,7 +1412,7 @@ OT6_HIRE_YX    = $61d4-$61c7    ; a pincer walks with X this far back
 ; here, after CalcDmg), and the MP price is flat.
 ;
 ; Null-break (kits.md: the Fixed Dice are the outliers, large numbers and no
-; chip): OT6_ATKCLASS = special | null-break, and the element is clear.  The
+; chip): OT6_ATKCLASS = ranged | null-break, and the element is clear.  The
 ; triple can't be dodged.  The dice faces go to $b6/$b7 and $b5 = $26, the
 ; dice-roll animation vanilla's effect queues.
 ;
@@ -1511,7 +1513,7 @@ Ot6JackpotCubeTbl:
         stz     $3414           ; damage modification off (the effect's own)
         lda     #$20
         tsb     $11a4           ; can't dodge (the effect's own)
-        lda     #OT6_SPECIAL|OT6_NULLBRK
+        lda     #OT6_RANGED|OT6_NULLBRK
         sta     f:$7e0000+OT6_ATKCLASS  ; no chip: the Fixed Dice teach nothing
         lda     #$26
         sta     $b5             ; the dice-roll animation (last: a watcher

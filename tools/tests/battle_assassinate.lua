@@ -30,18 +30,18 @@
 -- attenuated and is doubled (ot6_break.asm, Ot6ShieldedMulW and
 -- Ot6BrokenDmg), and the divine used to resolve at the hook point only, before
 -- that hit's chip, so it could only take a body still standing AFTER its
--- own break: ~280 hp against the back-row Imperial, and every PIERCE-weak
+-- own break: ~280 hp against the back-row Imperial, and every dagger-weak
 -- body this pool deals (CrassHoppr, 243) died on its own break, four fights
 -- running (build/attempts/wt/harness-faults/lab/harness-faults/repro/
 -- assassinate_fixed_s0.log).  The instrument asked for two 280-hp
--- PIERCE-weak bodies and the pool could not deal them.  That floor is gone:
+-- dagger-weak bodies and the pool could not deal them.  That floor is gone:
 -- the divine now fires at the chip, whatever the doubled hit then does to
--- the HP, so any PIERCE-weak non-boss body with shields is a suitable one.
+-- the HP, so any dagger-weak non-boss body with shields is a suitable one.
 --
 -- Boots camp_escaped, the input-driven post-Magitek savestate at world
 -- (179,71), party SABIN + SHADOW + CYAN, Shadow's own record carrying Fight
--- and his Imperial ($25, PIERCE per Ot6WeapClassTbl), and walks into the
--- real local pool.  Shadow Fights the PIERCE-weak body his chips are
+-- and his Imperial ($25, Dagger per Ot6WeapClassTbl), and walks into the
+-- real local pool.  Shadow Fights the dagger-weak body his chips are
 -- furthest along on (the target cursor steered, not left at its default)
 -- from the back row (H.setRows, the real Order screen), while the bench
 -- answers its windows with real Defends: Right opens the Def. window
@@ -50,7 +50,7 @@
 -- Shadow is blocked and countered half the time, $fc/$fd), and his counters
 -- kill these bodies outright, so they are on the ledger; a fight that ends
 -- without the property is pressed out of its spoils and the next encounter
--- taken, up to FIGHTS of them.  A suitable draw has at least two PIERCE-weak
+-- taken, up to FIGHTS of them.  A suitable draw has at least two dagger-weak
 -- shielded non-boss bodies and at least three bodies in all (arm 2 needs
 -- hits to keep landing after the kill); the rest are fled.
 --
@@ -86,14 +86,14 @@
 --   3. the boss check: no boss shares a battle with Shadow anywhere in the
 --      generated tree, so the negative is an isolation arm, played at 3 BP
 --      (so the gate the boss check guards is open).  A fresh battle, a
---      PIERCE-weak body given $3aa1.2 -- the bit a boss
+--      dagger-weak body given $3aa1.2 -- the bit a boss
 --      carries -- and STAGED_HP hit points before any chip (this file's two
 --      writes), then Shadow breaks it by real chips: the break write comes,
 --      no mark.  Then his next attack on it reaches the hook
 --      point (Ot6Assassinate puts the Broken body to the gate before the hit
 --      roll, read off the gate's entry: caller, x = Shadow, y = the body,
 --      its OT6_BROKEN_TICKS nonzero) and draws no mark either.  The HP is
---      staged because no PIERCE-weak body this pool deals outlives its
+--      staged because no dagger-weak body this pool deals outlives its
 --      doubled break: the hook point half was never reached in 23 runs
 --      (#296; CrassHoppr, 243 HP, 143 left at the breaking hit, which does
 --      ~200), so it claimed a check it did not make.  It is required now.
@@ -123,7 +123,10 @@ local P = H.newPacer({ tag = "pace",
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_TRANS, ST_CMD, ST_DEF, ST_TGT = 0x01, 0x05, 0x27, 0x38
 local SHADOW = 0x03
-local OT6_PIERCE = 0x02
+-- SHADOW's key: the class of the blade in his hand.  His Imperial ($25) and the
+-- other ninja blades are Dagger under six classes (#566; pierce under four),
+-- asserted against his own record after the boot.
+local KEY = 0x02            -- OT6_DAGGER
 local BREAK_TICKS = 0x10   -- OT6_BREAK_TICKS (ot6_break.asm:1): the value
                            -- the "shields down: break" store writes; the
                            -- timer's own ticks write less
@@ -336,15 +339,15 @@ local function breaksAfter(s)
 end
 
 -- ---- Shadow's target ------------------------------------------------------
--- The PIERCE-weak body his chips are furthest along on: the fewest shields,
--- else the most HP.  nil when no PIERCE-weak body stands, which takes the
+-- The dagger-weak body his chips are furthest along on: the fewest shields,
+-- else the most HP.  nil when no dagger-weak body stands, which takes the
 -- default.  `forced` names one body for the isolation arm.
 local forced = nil
 local function pickTarget()
   if forced ~= nil and alive(forced) then return forced end
   local best, bs, bh = nil, nil, nil
   for _, m in ipairs(msPresent) do
-    if alive(m) and (weak(m) & OT6_PIERCE) ~= 0 then
+    if alive(m) and (weak(m) & KEY) ~= 0 then
       local s, h = sh(m), mhp(m)
       if best == nil or s < bs or (s == bs and h > bh) then
         best, bs, bh = m, s, h
@@ -522,20 +525,20 @@ local function leave()
 end
 
 -- ---- encounter selection --------------------------------------------------
--- suitable: at least two PIERCE-weak shielded non-boss bodies (one for the
+-- suitable: at least two dagger-weak shielded non-boss bodies (one for the
 -- kill, one for the fight to go on with) and at least three bodies in all
 -- (arm 2's control needs hits to land after the kill); else flee.
 local function suitableDraw()
-  local pierce, bodies = 0, 0
+  local keyed, bodies = 0, 0
   for _, m in ipairs(msPresent) do
     if alive(m) then
       bodies = bodies + 1
-      if (weak(m) & OT6_PIERCE) ~= 0 and sh(m) > 0 and (aa1(m) & 0x04) == 0 then
-        pierce = pierce + 1
+      if (weak(m) & KEY) ~= 0 and sh(m) > 0 and (aa1(m) & 0x04) == 0 then
+        keyed = keyed + 1
       end
     end
   end
-  return pierce >= 2 and bodies >= 3
+  return keyed >= 2 and bodies >= 3
 end
 local function walkSteps(n)
   return {
@@ -577,7 +580,7 @@ end
 -- regeneration of the chain deals camp_escaped a different one, so the
 -- budget is the most encounters ANY counter state needs to deal a slot whose
 -- every formation suits (suitableDraw's test, decoded from the ROM: three or
--- more bodies, two of them PIERCE-weak by their class row,
+-- more bodies, two of them dagger-weak by their class row,
 -- H.speciesClassRow, with shields -- an authored Ot6ShieldTbl count, else
 -- the level formula's 2 or more), over the group the paced stretch rolls
 -- (P.group).  Every draw asserts CheckBattleWorld rolled that group
@@ -601,15 +604,15 @@ worstFor = function(group)
     ok[slot] = true
     local names = {}
     for _, f in ipairs(pool[slot].formations) do
-      local pierce = 0
+      local keyed = 0
       for _, sp in ipairs(f.species) do
-        if (H.speciesClassRow(sp) & OT6_PIERCE) ~= 0 and speciesShields(sp) > 0 then
-          pierce = pierce + 1
+        if (H.speciesClassRow(sp) & KEY) ~= 0 and speciesShields(sp) > 0 then
+          keyed = keyed + 1
         end
       end
-      ok[slot] = ok[slot] and pierce >= 2 and #f.species >= 3
-      names[#names + 1] = string.format("%d (%d bodies, %d PIERCE-weak shielded)", f.id,
-        #f.species, pierce)
+      ok[slot] = ok[slot] and keyed >= 2 and #f.species >= 3
+      names[#names + 1] = string.format("%d (%d bodies, %d dagger-weak shielded)", f.id,
+        #f.species, keyed)
     end
     parts[#parts + 1] = string.format("slot %d (%d/256) %s%s", slot, pool[slot].odds,
       table.concat(names, ", "), ok[slot] and " suits" or "")
@@ -648,7 +651,7 @@ local function encounter(tag)
     end
   end
   steps[#steps + 1] = H.call(function()
-    H.assertEq(H.vars.suitable, true, string.format("%s: the pool dealt two PIERCE-weak "
+    H.assertEq(H.vars.suitable, true, string.format("%s: the pool dealt two dagger-weak "
       .. "shielded bodies among three or more within %d draws, the most any "
       .. "encounter-counter state needs from group %d", tag, budget, group))
     for s = 0, 3 do
@@ -678,6 +681,11 @@ add({
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),
+  H.call(function()
+    local hand = H.readByte(0x1600 + 37 * SHADOW + 0x1F)
+    H.assertEq(H.weaponClass(hand), KEY, string.format("SHADOW's right hand ($%02X) is a Dagger-class blade: the key "
+      .. "every dagger-weak body below is picked by", hand))
+  end),
   -- SHADOW to the back row, through the real Order screen (H.setRows): the
   -- back row halves his physical damage, so the bodies outlive more of
   -- his chips (arm 2's second break, arm 3's hook point half).
@@ -807,7 +815,7 @@ add({
 })
 
 -- ===================== battle 2: the gate, under three points ==============
--- SHADOW Fights unboosted until his own hit breaks a PIERCE-weak body: the
+-- SHADOW Fights unboosted until his own hit breaks a dagger-weak body: the
 -- break store comes (x = SHADOW, his pending boost 0) and no in-proc Death
 -- mark; then he Fights on, unboosted, until another hit of his lands on the
 -- Broken body (the hook point puts it to the gate): no mark either.
@@ -929,7 +937,7 @@ local function otherMarks(m)
 end
 
 -- The boss check, with the injected bit and HP; see the header.  A fresh
--- battle, the PIERCE-weak body with the most HP given $3aa1.2 and
+-- battle, the dagger-weak body with the most HP given $3aa1.2 and
 -- STAGED_HP before any chip, then Shadow's chips, at 3 BP, break it: the
 -- break write comes with no in-proc Death mark; then his
 -- next attack's hook point reads it Broken: no mark either.  The writes
@@ -951,11 +959,11 @@ add({
         handed = nil
         local best, bh = nil, nil
         for _, m in ipairs(msPresent) do
-          if alive(m) and (weak(m) & OT6_PIERCE) ~= 0 and sh(m) > 0
+          if alive(m) and (weak(m) & KEY) ~= 0 and sh(m) > 0
             and (best == nil or mhp(m) > bh) then best, bh = m, mhp(m) end
         end
         H.assertEq(best ~= nil, true, string.format("isolation arm fight %d: a "
-          .. "PIERCE-weak shielded body stands to wear the boss bit (a fresh "
+          .. "dagger-weak shielded body stands to wear the boss bit (a fresh "
           .. "battle's draw)", fights))
         H.vars.bossBody = best
         H.writeByte(0x3AA1 + ent(best), aa1(best) | 0x04)   -- the arm's writes (header)

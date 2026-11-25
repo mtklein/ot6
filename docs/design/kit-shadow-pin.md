@@ -220,7 +220,7 @@ hobble and the pin are what every throw does, at 0 BP.
 - *Passes* (a boosted throw throws again per point, as Umaro's dump does,
   so the second throw pins): one boosted turn would hobble and pin, which
   folds the two-step picture into one action. It would also make Throw a
-  multi-hit pierce chipper, a seventh entry in a list kept to six on purpose
+  multi-hit Ranged chipper, a seventh entry in a list kept to six on purpose
   (`tools/audit_multihit.py`), each pass spending an item, and it would
   replace his damage multiplier with Fight's ladder.
 - *Certainty*: a throw cannot be dodged, so there is no roll to load.
@@ -448,7 +448,8 @@ strong, it stays; §8 asks.
 
 **His World of Balance stretch.** Shadow is a hired sword who comes and
 goes: the Imperial Camp, the Phantom Forest and Train, and the Floating
-Continent. His Fight is a pierce key; until now Throw was a skean on a
+Continent. His Fight is a Dagger key (his ninja blade; pierce when this was
+written); until now Throw was a skean on a
 revealed weakness and little else. With the trap his turn always does
 something Fight cannot: the camp's Templars and M-TekArmor, the train's
 ghosts and the continent's crowds can be held, and AtmaWeapon hobbled. It

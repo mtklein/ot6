@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "9b36bea9b9fc09ec9a84b3b3020fe5158e9eab5f50b3745a51f3dd019aae0a02",
+  "sha256": "f2d7d8924b55043ca3eacaa5822c94f0b5bca9cdbfd2e19689f20f8c3f77de5f",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "9b36bea9b9fc09ec9a84b3b3020fe5158e9eab5f50b3745a51f3dd019aae0a02",
-    "generator_sig": "a645021f93848bb77ade8f6fa6f79ef06fd14b91db9d5c0bd5cc7b2f09ec5eeb gen_n024_save_checkpoint",
+    "payload_sha256": "f2d7d8924b55043ca3eacaa5822c94f0b5bca9cdbfd2e19689f20f8c3f77de5f",
+    "generator_sig": "34a139e9f5c46f812bdba73bad2a0d16be539369be76137b94887fabe546e6cd gen_n024_save_checkpoint",
     "ancestors": [
       {
         "path": "build/states/n024_entry.stamp",
-        "sha256": "26b105056661e75b6a0d188571b1ce87289ace34988d4f20d231b6cf0894511d"
+        "sha256": "745633c02ecf9396c666cb0a0f96032b75f0d7bc2a2875d1a48b39d9c20e3587"
       }
     ]
   }

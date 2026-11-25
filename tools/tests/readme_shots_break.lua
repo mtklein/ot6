@@ -11,8 +11,8 @@
 --   * fire-weak for real -- Ot6ElemAddTbl authors $0134 + fire
 --     (ff6/src/battle/ot6_break.asm:404-406, "the tutorial probe"), so the
 --     chip key is the one the game teaches rather than one this file writes;
---   * a real gauge -- Ot6ShieldTbl gives $0134 four shields and OT6_PIERCE
---     (ff6/src/battle/ot6_hud.asm:1730-1731);
+--   * a real gauge -- Ot6ShieldTbl gives $0134 four shields and a class
+--     row (ff6/src/battle/ot6_hud.asm, the head's row; #566: read from the ROM);
 --   * 1600 HP (monster_prop.dat $0134 +8) against a party that chips it for
 --     a few hundred a hit;
 --   * and only Terra beams.  Vicks and Wedge spend their turns on Heal
@@ -20,7 +20,7 @@
 --     one spell.
 --
 -- Asserts, in order:
---   1. the head seeds at 4 shields, fire-weak, class-weak PIERCE -- the
+--   1. the head seeds at 4 shields, fire-weak, with its class row -- the
 --      authored row, read not written.  This is the positive control for
 --      everything below: without a real weakness no beam would chip at all.
 --   2. a fire hit chips the head's shield and reveals the fire weakness
@@ -311,14 +311,14 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("head slot %d, shell slot %d, terra slot %d",
       hs, shell, terra))
 
-    -- Ot6ShieldTbl authors $0134 as 4 shields / OT6_PIERCE (ot6_hud.asm:1730)
+    -- Ot6ShieldTbl authors $0134 as 4 shields and a class row (ot6_hud.asm)
     H.assertEq(shields(), 4, "head seeded at its authored 4 shields")
     H.assertEq(maxShield(), 4, "and 4 is its max")
     -- Ot6ElemAddTbl authors $0134 + fire (ot6_break.asm:404-406)
     H.assertEq(H.readByte(WEAK + hs * 2) & 0x01, 0x01,
       "head is really fire-weak -- the authored tutorial probe, not a poke")
-    H.assertEq(H.readByte(CWEAK + hs * 2), 0x02,
-      "and class-weak PIERCE, the other authored axis")
+    H.assertEq(H.readByte(CWEAK + hs * 2) & 0x3F ~= 0 and H.readByte(CWEAK + hs * 2) == H.speciesClassRow(0x0134), true,
+      "and class-weak by its Ot6ShieldTbl row, the other authored axis")
     H.assertEq(revealed(), 0, "nothing revealed before the first chip")
     H.assertEq(headHp() > 1000, true,
       "the head carries the headroom this measurement needs (1600 authored)")

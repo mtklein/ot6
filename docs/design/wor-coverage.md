@@ -7,6 +7,14 @@ Balance audit (`build/attempts/wob-coverage/`, issues #279-#286, #350) and
 uses the same method: build the universe from the ROM, mark what the logs
 show was played, group the rest into issue-sized units.
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
+> keys below are the present ones. Quoted logs, dated measurements and
+> "before" columns keep the words they were recorded in: slash is now Sword
+> or Katana, pierce Dagger, Spear or Ranged, bludgeon Blunt or Ranged,
+> special Ranged or Blunt.
+
 The route state audited is `wor-colosseum-v1` (CELES L52, TERRA L53, CYAN
 and SHADOW L41), the end of the v0.37 line, built from `36907d28`.
 Kefka's Tower is the next arc and is listed apart (section 7). Evidence is
@@ -149,8 +157,9 @@ Gau's rage table, not a pool, and are not enumerated here.
 Tyranosaur (62.5%), slot 1 two Tyranosaurs (31.25%), slot 3 Brachosaur
 (6.25%). Tyranosaur is L57, 12,770 HP, weak to ice, immune to most
 statuses, and casts Meteor; Brachosaur is L77, 46,050 HP, with Disaster,
-Meteor, Sneeze and Ultima. Both rows are the generated floor (6 shields,
-pierce). A random pays XP x2 split four ways: 4,400 per member for one
+Meteor, Sneeze and Ultima. Both rows were the generated floor then (6
+shields, pierce); today the Tyranosaur is 3 · Dagger, Ranged and the
+Brachosaur 6 · Dagger, Ranged. A random pays XP x2 split four ways: 4,400 per member for one
 Tyranosaur, 8,800 for two, 7,198 for Brachosaur, against 3,168-4,178 for
 the grind groups `level-curve.md` names (49-52). The tiles are forest
 (`WorldTileProp` `$0166`): the Falcon cannot land on them, so a player
@@ -1462,14 +1471,15 @@ and 7: 12 of 12 PASS, with two development runs 14 keys, 14 won, "$0EB Pugs
 9aa26b7b with this branch rebased, `umaro/ub3_*`, the same 12 of 12, "$0EB Pugs
 ... 12 12 0 70% 54% 1 0.08"): one member down
 in two fights. Minervas: none in seven of the twelve, one in three, two in
-one and three in one (`umaro/minervas.txt`). The Pugs' row is the Pug's,
+one and three in one (`umaro/minervas.txt`). The Pugs' row was the Pug's,
 authored since v0.29 (4 · slash, special; `battle_breakwor_narshe` checks
-it with event group 152).
+it with event group 152). Under six both are 4 · Ranged, Katana.
 
 **The Ancient Castle.** The two boxes take new rows (route-wor-dreams.md
-section 3): the Master Pug 6 · slash, special (the Pugs' row; it has no
+section 3): the Master Pug 6 · Ranged, Katana (the Pugs' row; it has no
 weakness of its own and WallChange moves the one it takes), the KatanaSoul
-6 · slash, pierce (a swordsman's ghost, the Samurai's pair). Before, the
+6 · Spear, Katana (a swordsman's ghost; the Samurai's pair, slash and
+pierce, when it was authored: the Samurai is Sword, Katana now). Before, the
 floor gave the Master Pug 6 · bludgeon and the KatanaSoul 6 · slash. Neither
 species is dealt anywhere else (`where`: event groups 113 and 95 only; the
 Colosseum offers neither). `battle_breakwor_dreams` checks both ("checked
@@ -1649,7 +1659,7 @@ within 85% of the best. What the labs found:
   lores in place of his boosted Fight made them longer ($125 4,442 ticks at
   the median against 2,874, $123 2,928 against 2,052). An unbroken body
   takes half damage and the lores chip no shield of these species, where
-  his rod chips bludgeoning.
+  his rod chips bludgeoning (Blunt today; every row there takes it).
 - The Dirt Dragon (`opc`, the fixed order Aqua Rake then Aero, against
   `opb`, the picker, a copy of the generator with that one line changed,
   `opb_generator.diff`; both at `f993efeb`, from `eb2_s0`'s save with
@@ -1690,10 +1700,10 @@ clock and so the next fight's key.
   Mantodea+Spek Tor+Sprinter (`$143`) 0.09 deaths a fight against 0.36;
   Mantodea alone (`$145`) at worst 48% against 0%, three down at once.
   It gained on two Tyranosaurs (`$140`, 4,341.5 against 3,933 ticks).
-  Stunner chips one slash a body where the Fight breaks one body at a
-  time, and a broken body loses its turns. A Cleave wants a fight long
-  enough to bank three points: a boss, which takes the heavy cut and which
-  this line left to the Fight.
+  Stunner chips one slash (Katana today) a body where the Fight breaks one
+  body at a time, and a broken body loses its turns. A Cleave wants a fight
+  long enough to bank three points: a boss, which takes the heavy cut and
+  which this line left to the Fight.
 - **SABIN** (`27edc69d`, `3cd580f5`): against two or more standing bodies,
   Air Blade (or Fire Dance where more bodies are weak to fire) in place of
   Pummel, unless a body absorbs or nulls it. In Phoenix Cave (base 11 of 12
@@ -1780,9 +1790,9 @@ ticks, beA0 15,475 against 17,659, be2C 16,527 against 17,679; beB4 21,387
 against 20,651) and the deaths 3 against 7 over all keys. A GrandTrain
 lands 3,400 on the shielded statue and 9,999 once it breaks ("actor=1's
 lore took 3477 off the monsters", "took 9999"), but each one is a turn
-off his bludgeon, the statue's second key (section 6.2 of
-route-wor-kefka-tower.md). The line keeps the Fight; GrandTrain stays
-unslotted.
+off his bludgeon (the Pearl Rod, Blunt today), the statue's key
+(section 6.2 of route-wor-kefka-tower.md). The line keeps the Fight;
+GrandTrain stays unslotted.
 
 ### 13.8 Pearl Wind made worth learning; Cleave and Bum Rush measured (#388, v0.41)
 
@@ -1791,8 +1801,10 @@ Evidence under `build/attempts/wt/v041-wor-skills/`.
 **Cleave and Bum Rush, measured and dropped.** After the dream CYAN and
 SABIN sit together only in party 3 in Kefka's Tower, whose bosses are
 Inferno (pierce and bludgeon: Bum Rush's four blows key it) and Doom
-(slash: Cleave's cut keys it, and a 3-BP row wants a long fight). Each
-was labbed by its leg with a boss-fight prelude (`KT_BOSS_FIGHT`) from
+(slash: Cleave's cut keys it, and a 3-BP row wants a long fight). (Today
+Inferno is Ranged, Spear, which Bum Rush's Blunt does not key; Doom is
+Ranged, Katana, and Cleave is Katana.)
+Each was labbed by its leg with a boss-fight prelude (`KT_BOSS_FIGHT`) from
 the graph's captures at `955b7f9c` (`wor-kt-factory-v1`,
 `wor-kt-guardian-v1`), one attempt a run, paired by battle key (the arms
 share every battle before the boss): `ln` the line, `cl`/`cl2` CYAN's
@@ -1909,7 +1921,7 @@ on 9 of 11 keys, and the leg retries a wipe from Doom's save.
 
 **Bum Rush, the driver's model.** The chip model had no shape for it
 (`BATTLE.BLITZ_SHAPE`), so the line's labs above used it only where the
-keyed Fight had nothing to chip. With its shape (bludgeon x4,
+keyed Fight had nothing to chip. With its shape (bludgeon x4, Blunt today,
 `Ot6HitCountTbl` +3) at Inferno (`inf2/`, shifts 0-11, new ROM): "ARM
 inf2_br: 12 runs; distinct keys 10: won 9, lost 1; deaths over keys 5; won
 ticks 9176-17215 (median 11122)" against "ARM inf2_ln: ... won 10, lost 0;
@@ -1985,7 +1997,7 @@ each making at least one specific fight easier, quicker or more reliable
 without becoming essential. The TLM's calls, built in `581d7e45`
 (kits.md "Divines"): Cleave on a death-immune body also takes four
 shields before its cut, and Bum Rush is SABIN's 3-BP divine (refused
-under three points; at three, four bludgeon blows each at the boost's x8,
+under three points; at three, four bludgeon (Blunt today) blows each at the boost's x8,
 99 MP). Measured below: **a landed Bum Rush takes more than half of Doom's HP and
 the Bum Rush arms die less (61 and 52 deaths against 78), but no arm's win
 gain is outside chance and most of `both`'s flipped fights had no divine
@@ -2050,10 +2062,11 @@ br 61", "SUMMARY both vs wo: keys 28; won wo 26, both 27; gains 2, losses
   `cl_hold` and no `cleave=1`): the gain is CYAN's hold, banking with
   unboosted Fights, not the strip. Where it fired it was a 9,999 cut and
   four shields, and at Doom CYAN's keyed 3-BP Fight does more of both
-  (Doom keys slash, which his katana carries: "actor=0's fight took 27883
-  off the monsters (13090 shielded-equivalent over 6 hit(s) ...)", eight
-  chips, `doomH/d_clH_t46_s2`). At Inferno, whose body his katana does not
-  key, it fired on 5 of 28 keys and moved nothing (26 of 28 either way).
+  (Doom keys slash, Katana today, which his katana carries: "actor=0's
+  fight took 27883 off the monsters (13090 shielded-equivalent over 6
+  hit(s) ...)", eight chips, `doomH/d_clH_t46_s2`). At Inferno, whose body
+  his katana does not key, it fired on 5 of 28 keys and moved nothing (26
+  of 28 either way).
   Two variants measured the same: Cleave taking every shield (a variant
   ROM, `scripts/mutants.py` `cleave_break`, arms `clB`/`bothB` in
   `doomB/`: "SUMMARY clB vs wo: keys 31; won wo 23, clB 27; gains 5,
@@ -2238,7 +2251,8 @@ behavioural red is `battle_bumrushmimic`'s (landing, `v041-divines-3/dev/`): the
 too ("m0 as fielded: 4 shield(s) of 4, class $06 (keys bludgeon)"), so the suite stages each with its bludgeon key
 cleared and six shields, beside its HP write. On the branch's ROM: "m0 (does not key bludgeon): 4 blow(s) landed on
 6 shield(s) -> 2 shield(s) (want 2)", PASS; on main's ROM: "... -> 6 shield(s) (want 2)", red ("each landed Bum Rush
-blow took one shield, though it does not key bludgeon (Ot6BumRushTake): got 6 ($6), want 2 ($2)").
+blow took one shield, though it does not key bludgeon (Ot6BumRushTake): got 6 ($6), want 2 ($2)"). Today Bum Rush
+is Blunt, and no factory machine keys it: each is Ranged, Spear.
 
 *The grids*, one attempt a run from wt/v041-tower-laps's replayed captures (`wor-kt-guardian-v1`,
 `wor-kt-factory-v1`), paired by distinct battle key (`scripts/grid.py`): the Doom leg over `KT_TRAIN` 46-49 by

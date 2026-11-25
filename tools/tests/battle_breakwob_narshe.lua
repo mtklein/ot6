@@ -7,17 +7,20 @@
 --      Ot6ElemAddTbl row is the one it had (the plains' poison adds) or none;
 --   2. every species of every formation the area's pools deal has an authored row and a key for each party that
 --      meets it there;
---   3. the lessons: the Bio Blaster's poison keys the guard and heals the rat, which TERRA's Fire keys; BANON's rod (bludgeon) dents the guard's plate.
+--   3. the lessons: the Bio Blaster's poison keys the guard and heals the rat, which TERRA's Fire keys; BANON's rod dents the guard's plate.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte, Ot6ElemAddTbl elements (0: no row) }
 local WANT = {
-  [0x0EF] = { "1st Class", 2, PIERCE | BLUDG, POISON, 0, 0 },
-  [0x0F4] = { "Wild Rat", 2, SLASH | PIERCE, FIRE, POISON, 0 },
+  [0x0EF] = { "1st Class", 2, BLUNT | RANGED, POISON, 0, 0 },
+  [0x0F4] = { "Wild Rat", 2, SWORD | DAGGER, FIRE, POISON, 0 },
 }
 -- the pools: { "map", map, its SubBattleGroup, label } or { "world", RandBattleGroup index, label }, and the
 -- species each must deal
@@ -26,10 +29,16 @@ local POOLS = {
 }
 -- the parties that meet the area (their hands: weapon classes, and the elements their spells, tools and weapons
 -- reach), from the tracked checkpoints and the route's battle logs (break-coverage-wob.md section 7); the pools
--- each meets (nil: all)
+-- each meets (nil: all).  A hand is W(the weapon the design names for the member there)
 local PARTIES = {
-  { "TERRA, EDGAR, BANON", { { "TERRA", 0, FIRE }, { "EDGAR", PIERCE, POISON }, { "BANON", BLUDG, 0 } }, nil },
-  { "LOCKE, EDGAR, SABIN, MOG", { { "LOCKE", PIERCE, 0 }, { "EDGAR", SLASH, ICE }, { "SABIN", SLASH, 0 }, { "MOG", PIERCE, 0 } }, nil },
+  -- terra_clifftop: EDGAR the Mithril Pike $1D, BANON the Punisher $3B; water-rondo-v1: LOCKE the MithrilKnife
+  -- $01, EDGAR the Blizzard $0E, SABIN the Poison Claw $56, MOG the Mithril Pike $1D.  EDGAR's tools are his in
+  -- both: the Bio Blaster's poison (the first party's model always had it) and, from #566, the AutoCrossbow $AA
+  -- (Ranged), which battle_breakwob_events's banquet party already counts; under six classes they are the
+  -- second party's keys on the guard in plate (Blunt|Ranged, weak poison: opening.md 10a, "the bolt or
+  -- BANON's rod"), where through v0.50 the knife and the pikes were (pierce)
+  { "TERRA, EDGAR, BANON", { { "TERRA", 0, FIRE }, { "EDGAR", W(0x1D), POISON }, { "BANON", W(0x3B), 0 } }, nil },
+  { "LOCKE, EDGAR, SABIN, MOG", { { "LOCKE", W(0x01), 0 }, { "EDGAR", W(0x0E) | W(0xAA), ICE | POISON }, { "SABIN", W(0x56), 0 }, { "MOG", W(0x1D), 0 } }, nil },
 }
 
 H.run({ maxFrames = 600 }, {
@@ -142,7 +151,7 @@ H.run({ maxFrames = 600 }, {
     if (weakOf(0x0EF) & POISON) == 0 then problem("$0EF 1st Class: the Bio Blaster (poison) holds no key") end
     if (absorb(0x0F4) & POISON) == 0 then problem("$0F4 Wild Rat no longer absorbs poison") end
     if (weakOf(0x0F4) & FIRE) == 0 then problem("$0F4 Wild Rat: TERRA's Fire holds no key") end
-    if (classOf(0x0EF) & BLUDG) == 0 then problem("$0EF 1st Class: BANON's rod (bludgeon) holds no key") end
+    if (classOf(0x0EF) & W(0x3B)) == 0 then problem("$0EF 1st Class: BANON's rod holds no key") end
     H.log("the lessons: the Bio Blaster keys the guard and heals the rat, which Fire keys; BANON's rod keys the guard")
     H.assertEq(#problems, 0, "WoB narshe break row mismatches")
     H.log("WoB narshe break rows verified against the built ROM")

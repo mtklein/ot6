@@ -121,8 +121,8 @@ local W = nil                           -- the open window
 -- A window opens at his chooser, RESOLVES at SaveForMimic (no more passes
 -- or damage rolls belong to it), takes its charge record at Ot6ActionEnd's
 -- entry (which runs after SaveForMimic on the action-end path,
--- battle_main.asm:324/344), reads the bank Ot6ActionEnd LEFT on the next
--- frame start, and only then is finalized into the ledger.
+-- battle_main.asm:324/344), reads the bank Ot6ActionEnd LEFT at its return
+-- (EndAction), and is finalized into the ledger on the next frame start.
 local function newWindow()
   return { f = H.frame, subj = SUBJ, bankBefore = bp(SUBJ), pendBefore = pend(SUBJ),
     hp = hp(SUBJ), mark = L.markAtStart, arm = nil, pendAtRoll = nil,
@@ -238,6 +238,25 @@ local function installObservers()
       .. "(hp %d)", H.frame, SUBJ, b, p, p > 0 and "CHARGE" or "gain", hp(SUBJ)))
   end, emu.callbackType.exec, sAE, sAE)
 
+  -- the bank Ot6ActionEnd LEFT, read where it returns: its one caller
+  -- (battle_main.asm @01c6) is `jsl Ot6ActionEnd / jmp EndAction`, so the
+  -- first EndAction after the charge record is that return.  It used to be
+  -- read at the next frame start, which is not the same moment: the battle
+  -- loop runs Ot6ActionEnd wherever in the frame the action ends, and its
+  -- flush and reveal commit come before the charge or gain arm, so when the
+  -- frame boundary fell inside it the read saw the bank before the arm
+  -- (the v0.51 line's gate9 draw: "f913 unprovoked Throw: and took its gain
+  -- arm, 1 -> 1", with the bank at 2 by the next heartbeat).  A lab ROM that
+  -- puts a few frames inside Ot6ActionEnd ahead of its arms turns the old
+  -- read red the same way on today's fixture and leaves this one green
+  -- (build/attempts/wt/v051-six-classes/suites4/umaro/lateend_*.log)
+  local sEnd = H.sym("EndAction")
+  emu.addMemoryCallback(function()
+    if W ~= nil and W.charge ~= nil and W.bankAfter == nil then
+      W.bankAfter = bp(SUBJ)
+    end
+  end, emu.callbackType.exec, sEnd, sEnd)
+
   local function finalizeWindow()
     L.windows[#L.windows + 1] = W
     if W.provoked and W.arm ~= 3 then
@@ -344,11 +363,7 @@ local function installObservers()
     if lastHp ~= nil and h < lastHp then L.hurts = L.hurts + 1 end
     lastHp = h
     L.markAtStart = H.readWord(D.mark)
-    if W ~= nil and W.charge ~= nil and W.bankAfter == nil
-       and H.frame ~= W.charge.f then
-      W.bankAfter = bp(SUBJ)
-      finalizeWindow()
-    end
+    if W ~= nil and W.bankAfter ~= nil then finalizeWindow() end
     if H.frame - hb >= 300 then
       hb = H.frame
       local seats = {}

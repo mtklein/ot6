@@ -265,8 +265,17 @@ local function seqFor(id, tier, slot)
   -- Tools cursor is unsteered, so the claim is the dearest tool in the bag;
   -- SABIN's is steered nowhere and the Blitz grid's cell (0,0) is Pummel at
   -- every level (BlitzLevelTbl), so that one names itself.
-  local costed = nil
-  if id == 4 and tier >= 2 then
+  -- #566: EDGAR's AutoCrossbow, steered to (H.crossbowPlan), at any tier
+  -- where it brings a key the hands lack (or on a boss weak to it); else the
+  -- tier rule below, whose Tools turn confirms the cell the cursor rests on
+  local costed, xbow = nil, nil
+  if id == 4 then
+    local xid, moves = H.crossbowPlan(slot)
+    if xid then costed, xbow = xid, moves end
+  end
+  if xbow then
+    -- the crossbow (priced below)
+  elseif id == 4 and tier >= 2 then
     costed = H.namedTool(slot)
     if costed == nil then tier = 0 end   -- no tool in the bag: Fight
   elseif id == 5 and tier >= 3 then costed = 0x5D           -- Pummel
@@ -274,15 +283,20 @@ local function seqFor(id, tier, slot)
   local ok
   boost, ok = H.boostPlan({ slot = slot, id = costed, want = boost,
                             tag = "dadaluma" })
-  if not ok then tier = 0 end          -- cannot pay even unboosted: Fight
+  if not ok then tier = 0; xbow = nil end   -- cannot pay even unboosted: Fight
   local seq = {}
   for _ = 1, boost do seq[#seq + 1] = "r" end
   local function push(...)
     for _, b in ipairs({ ... }) do seq[#seq + 1] = b end
     return seq
   end
+  if xbow then                                                -- AutoCrossbow, steered
+    push("down", "a")
+    for _, m in ipairs(xbow) do push(m) end
+    return push("a", "a")
+  end
   if id == 4 and tier >= 2 then
-    return push("down", "a", "a", "a")                        -- AutoCrossbow
+    return push("down", "a", "a", "a")                        -- the cursor's tool
   end
   if id == 5 and tier >= 3 then
     return push("down", "a", "a", "a")                        -- Pummel

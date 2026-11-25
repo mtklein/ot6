@@ -97,39 +97,53 @@ H.run({ maxFrames = 600 }, {
       end
       return k
     end
-    local holder, hslot, key = nil, nil, nil
+    -- the sole holder of a class, chosen among every seated hand whose key is its own for one the ROM offers both
+    -- a weaker-by-less-than-a-key weapon that drops the key and a stronger one that keeps it (the fixture's dress
+    -- decides which hands hold what: on the area-dressed replay the first unique hand held the strongest weapon of
+    -- its keys, "the ROM holds a stronger weapon that keeps the class: got false",
+    -- build/attempts/wt/v051-six-classes/suites/field_gearplan-gate9.log)
+    -- each half of the case on a sole holder whose premise the fixture holds: one whose hand the ROM offers a
+    -- weaker-by-less-than-a-key weapon that drops its key, one it offers a stronger weapon that keeps it (on the
+    -- area-dressed replay no hand had both: EDGAR's Blizzard keys ice alone and nothing stronger keeps ice, SETZER's
+    -- Trump keys Ranged and no weaker weapon drops it without a key of its own)
+    local D, K, uniques = nil, nil, 0
     for _, ch in ipairs(seated) do
       if ch ~= runic then
         for s = 0, 1 do
           local id = worn(ch, s)
-          if holder == nil and id ~= 0xFF and isWeapon(id) then
+          if id ~= 0xFF and isWeapon(id) then
             local own = H.gearWeaponKeys(id) & ~others(ch, s)
-            if own ~= 0 then holder, hslot, key = ch, s, own end
+            if own ~= 0 then
+              uniques = uniques + 1
+              local d, k = {}, {}
+              for w = 0, 0xFE do
+                if isWeapon(w) and wears(ch, w) and w ~= id then
+                  local cls, gain = H.gearWeaponKeys(w), H.gearValue(ch, w) - H.gearValue(ch, id)
+                  local new = cls & ~others(ch, s) & ~own
+                  if (cls & own) == 0 and new == 0 and gain > 0 and gain < H.GEAR_KEY then d[#d + 1] = w end
+                  if (cls & own) == own and gain > 0 then k[#k + 1] = w end
+                end
+              end
+              if D == nil and #d > 0 then D = { ch = ch, s = s, id = id, key = own, list = d } end
+              if K == nil and #k > 0 then K = { ch = ch, s = s, id = id, key = own, list = k } end
+            end
           end
         end
       end
     end
-    H.assertEq(holder ~= nil, true, "a seated member's hand holds a break class no other hand holds")
-    local held = worn(holder, hslot)
-    local drop, keep = {}, {}
-    for id = 0, 0xFE do
-      if isWeapon(id) and wears(holder, id) and id ~= held then
-        local cls, gain = H.gearWeaponKeys(id), H.gearValue(holder, id) - H.gearValue(holder, held)
-        local new = cls & ~others(holder, hslot) & ~key
-        if (cls & key) == 0 and new == 0 and gain > 0 and gain < H.GEAR_KEY then drop[#drop + 1] = id end
-        if (cls & key) == key and gain > 0 then keep[#keep + 1] = id end
-      end
-    end
-    H.log(string.format("[gearplan] 3: char %d slot %d holds $%02X, the only class $%X; %d stronger-by-less-than-a-key "
-      .. "weapons without it, %d stronger with it", holder, hslot, held, key, #drop, #keep))
-    H.assertEq(#drop > 0, true, "the ROM holds a weapon worth less than a key more that drops the class")
-    plan = H.gearPlan(stockOf(drop), { tag = "gearplan drop", reserve = UNBOUNDED })
-    H.assertEq(planned(plan, holder, hslot) == nil, true,
+    H.assertEq(uniques > 0, true, "a seated member's hand holds a break class no other hand holds")
+    H.assertEq(D ~= nil, true, "the ROM holds a weapon worth less than a key more that drops a sole holder's class")
+    H.log(string.format("[gearplan] 3: char %d slot %d holds $%02X, the only key $%X; %d stronger-by-less-than-a-key "
+      .. "weapons without it", D.ch, D.s, D.id, D.key, #D.list))
+    plan = H.gearPlan(stockOf(D.list), { tag = "gearplan drop", reserve = UNBOUNDED })
+    H.assertEq(planned(plan, D.ch, D.s) == nil, true,
       "the sole holder of a break class is not planned a weapon that drops it for less than a key")
-    H.assertEq(#keep > 0, true, "the ROM holds a stronger weapon that keeps the class")
-    plan = H.gearPlan(stockOf(keep), { tag = "gearplan keep", reserve = UNBOUNDED })
-    local k = planned(plan, holder, hslot)
-    H.assertEq(k ~= nil and (H.gearWeaponKeys(k.item) & key) == key, true,
+    H.assertEq(K ~= nil, true, "the ROM holds a stronger weapon that keeps a sole holder's class")
+    H.log(string.format("[gearplan] 3: char %d slot %d holds $%02X, the only key $%X; %d stronger weapons with it",
+      K.ch, K.s, K.id, K.key, #K.list))
+    plan = H.gearPlan(stockOf(K.list), { tag = "gearplan keep", reserve = UNBOUNDED })
+    local k = planned(plan, K.ch, K.s)
+    H.assertEq(k ~= nil and (H.gearWeaponKeys(k.item) & K.key) == K.key, true,
       "the sole holder is planned a stronger weapon that keeps the class")
     H.log("[gearplan] ok")
   end),

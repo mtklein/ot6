@@ -10,18 +10,20 @@
 --      LoadItemProp, the Ot6EquipWord site) lets his seat take the bag's other spear and refuses it to a seat
 --      without the boots and without a spear bit of its own (TERRA); and every weapon and shield row's byte is
 --      the rule for each seat (the plain loads, not only the permit's);
---   3. if a live, unbroken body holds a shield and a pierce class weakness ($3E9C+e & OT6_PIERCE), he Jumps at it
+--   3. if a live, unbroken body holds a shield and a Spear class weakness ($3E9C+e & OT6_SPEAR), he Jumps at it
 --      through the real menu (H.kitBattle; the others Defend).  His landing swing loads OT6_ATKCLASS from
---      Ot6WeapClassTbl for the spear in his hand ($3CA8+seat*2) and that class is pierce ($02) and only
---      pierce; vanilla's spear bonus runs (SpearEffect with the spear in A takes its `sta $bd` of 2); and the
+--      Ot6WeapClassTbl for the spear in his hand ($3CA8+seat*2) and that class is Spear ($20) and only
+--      Spear; vanilla's spear bonus runs (SpearEffect with the spear in A takes its `sta $bd` of 2); and the
 --      body's shields fall when the swing lands.  A battle with no such body is fought out and the next taken.
--- PACE_BURN = K (a lab's global) fights out K battles before the measured one.  Nothing is written.
+-- PACE_BURN = K (a lab's global) fights out K battles before the measured one.  One write, declared: where the
+-- battle holds no Spear-weak body (under six classes this plain deals none), a body's live class row gets the
+-- Spear bit (state_write_waivers.txt).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local STRAGO, TERRA, BOOTS = 7, 0, 0xBF
 local REC = 0x1600 + 37 * STRAGO
 local CMD_JUMP = 0x16
-local OT6_PIERCE = 0x02                       -- ot6_class.asm
+local OT6_SPEAR = 0x20                        -- ot6_class.asm (#566: spears are Spear, $20; pierce $02 under four)
 local ATKCLASS = 0x7E57B8                     -- OT6_ATKCLASS (ot6_memory.inc)
 local function isSpear(id) return id ~= nil and id >= 0x1D and id <= 0x24 end
 local function itemProp(id, off) return H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) + id * 30 + off) end
@@ -219,17 +221,35 @@ local function decide()
   end
   for m = 0, 5 do
     if target == nil and present(m) and mhp(m) > 0 and (H.readByte(0x3EEC + m * 2) & 0xC2) == 0 and not broken(m)
-        and shields(m) > 0 and (clsweak(m) & OT6_PIERCE) ~= 0 then
+        and shields(m) > 0 and (clsweak(m) & OT6_SPEAR) ~= 0 then
       target = m
+    end
+  end
+  -- (#566) under six classes the plain by Thamasa deals no Spear-weak body (the $08A and $0D4 rows are
+  -- Dagger|Blunt and Sword|Blunt; build/attempts/wt/v051-six-classes/suites/battle_dragoonspear-gate8.log, 480,000
+  -- frames of none): the declared staging (state_write_waivers.txt) gives the first live, unbroken, shielded body
+  -- the Spear bit in its live class row ($3EA4+2m, the byte Ot6ClassChip reads), so the swing under test has a
+  -- body its class keys.  The swing, its class load and the chip are the game's own.
+  if target == nil then
+    for m = 0, 5 do
+      if target == nil and present(m) and mhp(m) > 0 and (H.readByte(0x3EEC + m * 2) & 0xC2) == 0 and not broken(m)
+          and shields(m) > 0 then
+        target = m
+      end
+    end
+    if target ~= nil then
+      H.writeByte(0x3EA4 + target * 2, clsweak(target) | OT6_SPEAR)
+      H.log(string.format("[spear] staged: slot %d's class row -> $%02X (the Spear bit, a declared write)", target,
+        clsweak(target)))
     end
   end
   if target == nil then
     mode = "fightout"
-    H.log("[spear] no live unbroken pierce-weak body with a shield: this battle is fought out")
+    H.log("[spear] no live unbroken Spear-weak body with a shield: this battle is fought out")
     return
   end
   jumps = jumps + 1
-  H.assertEq(jumps <= JUMPS, true, string.format("a landed Jump on a pierce-weak body within %d Jumps", JUMPS))
+  H.assertEq(jumps <= JUMPS, true, string.format("a landed Jump on a Spear-weak body within %d Jumps", JUMPS))
   pre = { sh = shields(target), hp = mhp(target), nswing = #swings, nbonus = #bonus }
   swings, bonus, landed = {}, {}, nil
   pre.nswing, pre.nbonus = 0, 0
@@ -248,14 +268,14 @@ local function judge()
   end
   for _, s in ipairs(swings) do
     H.assertEq(s.item, SPEAR, string.format("the swing is the spear in his hand ($%02X)", SPEAR))
-    H.assertEq(s.class, OT6_PIERCE, "the spear's swing loads the pierce class and only pierce")
+    H.assertEq(s.class, OT6_SPEAR, "the spear's swing loads the Spear class and only Spear")
   end
   H.assertEq(#bonus > 0, true, "the Jump ran vanilla's SpearEffect")
   H.assertEq(bonus[1].item, SPEAR, string.format("SpearEffect saw the spear ($%02X)", SPEAR))
   H.assertEq(bonus[1].taken, true, "and took the spear's damage multiplier ($bd = 2)")
   if mhp(target) < pre.hp then
     H.assertEq(shields(target) < pre.sh or broken(target), true,
-      string.format("the landed spear chipped the pierce-weak body's shields (%d -> %d)", pre.sh, shields(target)))
+      string.format("the landed spear chipped the Spear-weak body's shields (%d -> %d)", pre.sh, shields(target)))
     counted = counted + 1
   else
     H.log("[spear] the landing dealt no damage (a miss): not counted")
@@ -302,10 +322,10 @@ H.run({ maxFrames = 500000 }, {
         planDone = function() return landed ~= nil and H.frame > landed + 120 end }),
       H.call(function() judge() end),
     }),
-  }, "a landed spear Jump on a pierce-weak body"),
+  }, "a landed spear Jump on a Spear-weak body"),
   H.call(function()
     H.assertEq(invChecked > 0, true, "the battle bag's equippability was checked in a battle")
-    H.log(string.format("[spear] PASS: %d landed spear Jump(s) chipped as pierce over %d battle(s); the battle bag "
+    H.log(string.format("[spear] PASS: %d landed spear Jump(s) chipped as Spear over %d battle(s); the battle bag "
       .. "agreed in %d", counted, battles, invChecked))
   end),
 })

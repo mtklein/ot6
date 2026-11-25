@@ -13,7 +13,13 @@
 -- 114).  The party plays it with the lib's fight driver through the real menus.  For every arm restored after
 -- dying broken: its shields = max, OT6_BROKEN_TICKS 0, no hold, breaking-hit mark or mark, the break stays off
 -- until it is hit, and its shield line never draws the broken shield before that hit (battle_rejoin's S and D).
--- Precondition, asserted: an arm died broken and was restored before the battle ended.
+-- Precondition, asserted: an arm died broken and was restored before the battle ended.  DECLARED SYNTHETIC SETUP
+-- (tools/state_write_waivers.txt): until an arm has died broken, each living, unbroken arm's gauge is staged to 1,
+-- so its first keyed hit breaks it and the party's damage does not kill it unbroken first.  On the area-dressed
+-- line's draw (7b913eb1's gate) the arms died unbroken six times and the party wiped before one died broken
+-- (suites/battle_rejoin_inferno-gate13.log: "slot3 died unbroken" x4, "slot1 died unbroken" x2, then GAME OVER);
+-- the restore, its shields, its break state and its line are the ROM's and are read, never written, and nothing is
+-- staged once an arm has died broken.
 -- Mutants (build/attempts/wt/v049-prebroken/mut/): no_arrive red.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -48,6 +54,7 @@ local function line(s)
 end
 
 local watching, done = false, false
+local stagedOff = rawget(_G, "REJOIN_NO_STAGE") == true   -- (a lab's global: the staging off, the negative)
 local last, died, back = {}, {}, {}    -- per slot: last line; state at death; the restored body's watch
 local restored, brokenBack, failures = 0, 0, {}
 local function fail(msg)
@@ -63,8 +70,15 @@ local function watchFrame()
       if l ~= last[s] then H.log(string.format("[rejoin] f%d slot%d %s", H.frame, s, l)) end
       last[s] = l
       local h = hp(s)
+      -- the DECLARED staging (header): until an arm has died broken, a living, unbroken arm outside a restored
+      -- body's window has its gauge staged to 1, so its first keyed hit breaks it and its death lands broken
+      if not stagedOff and h > 0 and not died[s] and back[s] == nil and brk(s) == 0 and select(1, shields(s)) > 1 then
+        H.writeByte(0x3E38 + E(s), 1)
+        H.log(string.format("[rejoin] f%d slot%d gauge staged to 1 (no arm has died broken yet)", H.frame, s))
+      end
       if h == 0 and not died[s] then
         died[s] = { f = H.frame, broken = brk(s) ~= 0 or select(1, shields(s)) == 0 }
+        if died[s].broken then stagedOff = true end
         H.log(string.format("[rejoin] f%d slot%d died %s", H.frame, s, died[s].broken and "BROKEN" or "unbroken"))
         back[s] = nil
       elseif h ~= 0 and died[s] then

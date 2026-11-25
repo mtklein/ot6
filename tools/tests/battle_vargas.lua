@@ -2,8 +2,9 @@
 -- battle_vargas.lua -- Vargas's break gauge test.  Boots vargas_entry.mss,
 -- rides the scene into battle 66 (MOUNTAINS_EXT), and asserts:
 
---   1. the gauge seed: Vargas ($0103) 5/5 shields, class-weak OT6_BLUDG
---      ($04); both Ipoohs ($014D) 2/2, slash-weak.
+--   1. the gauge seed: Vargas ($0103) 5/5 shields, class-weak OT6_BLUNT
+--      ($04; #566: the six classes' Blunt, his v0.50 bludgeon); both
+--      Ipoohs ($014D) 2/2, sword-weak.
 --   2. Vargas's weak byte is $28 = poison|holy (vanilla poison only, holy
 --      added by Ot6ElemAddTbl).
 --   3. poison chips, and only poison does.  Edgar's Tools -> BioBlaster
@@ -13,7 +14,7 @@
 --      gauge is asserted untouched at that moment.
 --   4. holy chips.  Sabin's AuraBolt (Blitz 1, skill $5e, element $20)
 --      takes a shield and reveals holy in $3E89.
---   5. bludgeoning chips, twice.  Pummel (Blitz 0, skill $5d, OT6_BLUDG)
+--   5. blunt chips, twice.  Pummel (Blitz 0, skill $5d, OT6_BLUNT)
 --      takes two shields, 3 -> 1, and reveals class $04: Pummel hits twice
 --      (Ot6HitCountTbl), each hit its own gauge write.
 --   6. the fight ends to the script.  Vargas's reaction script answers
@@ -48,7 +49,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/vargas_entry.mss.lua"
 
 local VARGAS, IPOOH = 0x0103, 0x014D
-local OT6_BLUDG, OT6_SLASH = 0x04, 0x01
+local OT6_BLUNT, OT6_SWORD = 0x04, 0x01
 local HOLY, POISON = 0x20, 0x08
 local PUMMEL, AURABOLT = 0x5D, 0x5E
 local BIOBLASTER, BIO_ATK = 0xA4, 0x7D  -- item id -> the attack it resolves to
@@ -660,13 +661,14 @@ H.run({ maxFrames = 90000 }, {
     -- the gauge
     H.assertEq(H.readByte(SH(vSlot)), 5, "VARGAS seeds 5 shields (Ot6ShieldTbl)")
     H.assertEq(H.readByte(SMX(vSlot)), 5, "VARGAS max shields 5")
-    H.assertEq(H.readByte(WKC(vSlot)), OT6_BLUDG,
-      "VARGAS class row is OT6_BLUDG ($04)")
+    H.assertEq(H.readByte(WKC(vSlot)), OT6_BLUNT,
+      "VARGAS class row is OT6_BLUNT ($04)")
+    H.assertEq(H.skillClass(0x5D), OT6_BLUNT, "and Pummel ($5D) is a Blunt skill (Ot6SkillClassTbl)")
     H.assertEq(H.readByte(RVE(vSlot)), 0, "nothing revealed yet (elements)")
     H.assertEq(H.readByte(RVC(vSlot)), 0, "nothing revealed yet (classes)")
     for _, s in ipairs({ 1, 2 }) do
       H.assertEq(H.readByte(SH(s)), 2, "Ipooh slot " .. s .. " seeds 2 shields")
-      H.assertEq(H.readByte(WKC(s)), OT6_SLASH, "Ipooh slot " .. s .. " is slash-weak")
+      H.assertEq(H.readByte(WKC(s)), OT6_SWORD, "Ipooh slot " .. s .. " is sword-weak")
     end
 
     -- the element add: vanilla is poison only, and OT6 adds holy.
@@ -863,7 +865,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- ===================================================================== --
-  -- 5 + 6: bludgeoning and the finish.  Pummel (Blitz 0, attack id $5d);
+  -- 5 + 6: the blunt chips and the finish.  Pummel (Blitz 0, attack id $5d);
   -- VARGAS answers `if_attack PUMMEL` with battle_event $09 + kill_monsters
   -- ALL.
   -- ===================================================================== --
@@ -878,10 +880,10 @@ H.run({ maxFrames = 90000 }, {
   }, "PUMMEL's two hits both reach the gauge"),
   H.call(function() mode = "hold" end),
   H.driveUntil(function()
-    return H.readByte(RVC(vSlot)) & OT6_BLUDG == OT6_BLUDG
+    return H.readByte(RVC(vSlot)) & OT6_BLUNT == OT6_BLUNT
   end, 1800, {
     H.waitFrames(2),
-  }, "the bludgeoning reveal commits on its damage frame"),
+  }, "the blunt reveal commits on its damage frame"),
   H.call(function()
     snap("after PUMMEL")
     pummelVhp = H.readWord(MHP(vSlot))
@@ -889,8 +891,8 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(shields(), 1, "PUMMEL took TWO shields: 3 -> 1 (x2, one chip a hit)")
     H.assertEq(#shWrites - nBefore, 2,
       "and it was two separate gauge writes, one per hit, not one write of two")
-    H.assertEq(H.readByte(RVC(vSlot)) & OT6_BLUDG, OT6_BLUDG,
-      "and REVEALED the bludgeoning class ($04)")
+    H.assertEq(H.readByte(RVC(vSlot)) & OT6_BLUNT, OT6_BLUNT,
+      "and REVEALED the blunt class ($04)")
     H.assertEq(H.readByte(RVE(vSlot)), POISON | HOLY,
       "both elements stay revealed across the class chip")
   end),

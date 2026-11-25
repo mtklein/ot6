@@ -1,12 +1,13 @@
 -- @suite slow savestate=wor_colosseum
--- battle_shadowkit.lua -- SHADOW's throwing kit (#383, kits.md "Shadow"): the skeans pierce, and the smoke
+-- battle_shadowkit.lua -- SHADOW's throwing kit (#383, kits.md "Shadow"): the skeans are Ranged hits (#566: a
+-- thrown edge; pierce under four classes), and the smoke
 -- and exit tricks reach one more ally per boost point.
 --
 --   tools/tests/run.sh tools/tests/battle_shadowkit.lua
 --
 -- The rules.
 --   * A Fire Skean, Water Edge or Bolt Edge resolves as its spell ($51-$53, ThrowToolsOffsetTbl), and since
---     #383 that spell carries the pierce class (Ot6SkillClassTbl), so a thrown skean chips a pierce-weak body
+--     #383 that spell carries a class (Ot6SkillClassTbl: Ranged), so a thrown skean chips a ranged-weak body
 --     by its class as well as by its element.
 --   * A thrown Shadow Edge (the smoke: Image) or Inviz Edge (the exit: Vanish) covers the thrower and, per
 --     boost point, the next living ally in battle order after him (Ot6TrickReach, ot6_shadow.asm, between
@@ -15,10 +16,16 @@
 --
 -- Boots wor_colosseum (gen_wor_colosseum's end: SHADOW, CELES, CYAN and TERRA on the Falcon's tile by
 -- Maranda, the bag holding the skeans and edges Maranda's weapon counter sold), walks into the plain's pool
--- (world group 49: every formation holds a pierce-keyed body, the Crawler, Sprinter or Spek Tor) and plays
--- one battle through the real menu (H.kitBattle; the others Defend while the plan runs):
+-- (world group 49) and plays one battle through the real menu (H.kitBattle; the others Defend while the plan
+-- runs).  Which battle (#566): under four classes every formation of the pool held a pierce-keyed body (the
+-- Crawler, Sprinter or Spek Tor), so the first battle did; under six which species hold the skeans' class is
+-- the split's to say (and it has moved twice), so the suite takes the first battle that opens with a
+-- standing, shielded, unbroken body whose class row holds the skean's class, fights any other out with the
+-- route's driver (field care after), and bounds the walk by the pool as the ROM deals it: the most encounters
+-- any encounter-counter state needs to a slot whose every formation holds such a species
+-- (H.worstCaseEncounters over H.speciesClassRow).  The plan's steps:
 --   1. SHADOW throws a Fire Skean at 0 BP: a class chip lands (Ot6ClassChip's shield store, the attack's
---      class byte pierce, the queued action Throw of $AB) on a pierce-keyed body.
+--      class byte Ranged, the queued action Throw of $AB) on a ranged-keyed body.
 --   2. SHADOW throws a Shadow Edge at 0 BP: the mask Ot6TrickReach returns is SHADOW alone, and nobody
 --      else gains Image from it.
 --   3. SHADOW throws an Inviz Edge at 1 BP: the mask is SHADOW and the next standing ally after him; each
@@ -33,7 +40,8 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local TERRA, CYAN, SHADOW, CELES = 0, 2, 3, 6
 local STATE = "build/states/wor_colosseum.mss.lua"
 local FIRE_SKEAN, INVIZ, SMOKE = 0xAB, 0xAE, 0xAF
-local CLASS_PIERCE = 0x02
+local CLASS_RANGED = 0x08                          -- OT6_RANGED: a thrown edge (pierce until #566)
+local FIRE_SKEAN_SPELL = 0x51                      -- the spell a thrown Fire Skean resolves as
 local ATKCLASS = 0x7E57B8                          -- OT6_ATKCLASS
 local REACH, REACH_OUT = H.sym("Ot6TrickReach"), H.sym("Ot6TrickReachOut")
 local CLASSCHIP = H.sym("Ot6ClassChip")
@@ -145,6 +153,18 @@ local function heldAfter(t, bitName, untilF)
 end
 
 local A, B = nil, nil
+-- the hunt for a battle that holds a body keyed to the skean's class (#566)
+local HUNT = { found = false, n = 0, budget = nil, seen = {} }
+local function keyedNow()
+  for s = 0, 5 do
+    if (H.readByte(0x3AA8 + s * 2) & 1) == 1 and H.readWord(0x3BFC + s * 2) > 0
+        and (H.readByte(0x3EA4 + s * 2) & CLASS_RANGED) ~= 0 and H.readByte(0x3E40 + s * 2) > 0
+        and H.readByte(0x3E90 + s * 2) == 0 then
+      return s
+    end
+  end
+  return nil
+end
 -- BURN (a global a lab sets ahead of the lib; 0 in the suite): that many random battles on the plain fought
 -- first with the route's driver, to vary the encounter history the suite's battle comes from (TESTING.md)
 local burnN0 = 0
@@ -172,20 +192,79 @@ H.run({ maxFrames = 600000 }, {
     end
     H.assertEq(B ~= nil, true, "a passable tile beside the party")
     H.log(string.format("[kit] pacing (%d,%d) <-> (%d,%d) into the plain's pool", A[1], A[2], B[1], B[2]))
+    -- the skean's class, and the pool's budget to a body keyed to it, both from the ROM
+    H.assertEq(H.skillClass(FIRE_SKEAN_SPELL), CLASS_RANGED,
+      "a thrown Fire Skean ($51) is a Ranged hit (Ot6SkillClassTbl)")
+    local ga, gb = H.worldEncounterGroup(A[1], A[2]), H.worldEncounterGroup(B[1], B[2])
+    H.assertEq(ga ~= nil or gb ~= nil, true, "one of the pacing tiles rolls random battles")
+    H.assertEq(ga == nil or gb == nil or ga == gb, true, "both pacing tiles roll from one pool")
+    local pool = H.encounterPool(ga or gb)
+    local keyed, parts = {}, {}
+    for slot = 1, 4 do
+      keyed[slot] = true
+      local names = {}
+      for _, f in ipairs(pool[slot].formations) do
+        local n = 0
+        for _, sp in ipairs(f.species) do
+          if (H.speciesClassRow(sp) & CLASS_RANGED) ~= 0 then n = n + 1 end
+        end
+        keyed[slot] = keyed[slot] and n >= 1
+        names[#names + 1] = string.format("%d (%d of %d bodies ranged-keyed)", f.id, n, #f.species)
+      end
+      parts[#parts + 1] = string.format("slot %d (%d/256) %s%s", slot, pool[slot].odds, table.concat(names, ", "),
+        keyed[slot] and " keyed" or "")
+    end
+    local hist
+    HUNT.budget, hist = H.worstCaseEncounters(function() return function(slot) return keyed[slot] end end)
+    H.log(string.format("[kit] budget: group %d: %s -- the worst of the 65536 encounter-counter states needs %d "
+      .. "encounter(s) to a formation that holds a ranged-keyed body; %.1f%% need no more than 4", pool.group,
+      table.concat(parts, "; "), HUNT.budget, 100 * H.encounterShare(hist, 4)))
+    H.assertEq(HUNT.budget < 1024, true, string.format("group %d deals a body keyed to the skean's class at all "
+      .. "(Ot6ShieldTbl rows holding $%02X)", pool.group, CLASS_RANGED))
   end),
-  H.driveUntil(function() return H.battleLoadStarted() end, 60000, {
-    H.worldNavTo(function() return B[1] end, function() return B[2] end,
-      { maxFrames = 3000, arrive = function() return H.battleLoadStarted() end }),
-    H.call(function() A, B = B, A end),
-  }, "a random battle on the plain by Maranda"),
-  H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
-  H.call(function()
-    local ids, t = H.monsterIds(), {}
-    for s = 1, 6 do if ids[s] ~= 0xFFFF then t[#t + 1] = string.format("$%03X", ids[s]) end end
-    H.log(string.format("[kit] battle formation $%03X: %s", H.readWord(0x11E0), table.concat(t, " ")))
-    for e = 0, 7 do last[e] = H.readByte(0x3EE4 + e) end
-    watching = true
-  end),
+  H.driveUntil(function() return HUNT.found end, 900000, {
+    H.call(function()
+      HUNT.n = HUNT.n + 1
+      H.assertEq(HUNT.n <= HUNT.budget, true, string.format("a battle that holds a ranged-keyed body within %d "
+        .. "encounters, the most any encounter-counter state needs (encounters so far: %s)", HUNT.budget,
+        table.concat(HUNT.seen, " ")))
+    end),
+    H.driveUntil(function() return H.battleLoadStarted() end, 60000, {
+      H.worldNavTo(function() return B[1] end, function() return B[2] end,
+        { maxFrames = 3000, arrive = function() return H.battleLoadStarted() end }),
+      H.call(function() A, B = B, A end),
+    }, "a random battle on the plain by Maranda"),
+    H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
+    H.call(function()
+      local ids, t = H.monsterIds(), {}
+      for s = 1, 6 do if ids[s] ~= 0xFFFF then t[#t + 1] = string.format("$%03X", ids[s]) end end
+      local k = keyedNow()
+      HUNT.seen[#HUNT.seen + 1] = string.format("%d:$%03X%s", HUNT.n, H.readWord(0x11E0), k and "+keyed" or "")
+      H.log(string.format("[kit] battle %d, formation $%03X: %s -- %s", HUNT.n, H.readWord(0x11E0),
+        table.concat(t, " "), k and string.format("slot %d's row $%02X holds the skean's class: the plan runs here",
+          k, H.readByte(0x3EA4 + k * 2))
+        or "no standing shielded body keyed to the skean's class: fought out, then care"))
+      if k then
+        for e = 0, 7 do last[e] = H.readByte(0x3EE4 + e) end
+        watching = true
+        HUNT.found = true
+      end
+    end),
+    H.cond(function() return not HUNT.found end, {
+      (function()
+        local F = nil
+        return { tick = function()
+          if not H.battleLoadStarted() then F = nil; return "done" end
+          F = F or H.newFightDriver("shadowkit fight-out " .. HUNT.n,
+            { tactical = true, boost = true, items = true, bank = 0, healPercent = 55 })
+          F.frame()
+          return "frame"
+        end, reset = function() F = nil end }
+      end)(),
+      H.waitUntil(function() return H.worldMode() and H.worldSettled() end, 3000, "back on the plain", 5),
+      H.fieldCare({ threshold = 1.0, tag = "after a battle with no ranged-keyed body" }),
+    }, {}),
+  }, "a battle that holds a body keyed to the skean's class"),
   H.kitBattle({
     { who = SHADOW, cmd = 0x08, row = FIRE_SKEAN, boost = 0 },
     { who = SHADOW, cmd = 0x08, row = SMOKE, boost = 0, self = true },
@@ -195,12 +274,12 @@ H.run({ maxFrames = 600000 }, {
   H.call(function()
     watching = false
     -- 1. the skean's class chip
-    local pierceChip = nil
+    local rangedChip = nil
     for _, c in ipairs(chips) do
-      if c.cls == CLASS_PIERCE and (c.row & CLASS_PIERCE) ~= 0 then pierceChip = c end
+      if c.cls == CLASS_RANGED and (c.row & CLASS_RANGED) ~= 0 then rangedChip = c end
     end
-    H.assertEq(pierceChip ~= nil, true,
-      string.format("1. the thrown Fire Skean chips a pierce-keyed body by its class (%d class chip(s) under it)", #chips))
+    H.assertEq(rangedChip ~= nil, true,
+      string.format("1. the thrown Fire Skean chips a ranged-keyed body by its class (%d class chip(s) under it)", #chips))
     -- the tricks, in the order thrown
     H.assertEq(#tricks >= 3, true, string.format("three tricks reached Ot6TrickReach (%d)", #tricks))
     local plan = { { SMOKE, 0, "Image" }, { INVIZ, 1, "Vanish" }, { SMOKE, 2, "Image" } }
@@ -248,6 +327,6 @@ H.run({ maxFrames = 600000 }, {
       H.assertEq(allySlowed[e] == nil, true, string.format("party entity %d was not hobbled or pinned by the smoke "
         .. "or the exit", e))
     end
-    H.log("[kit] PASS: the skean pierces; the smoke and exit reach one more ally per point")
+    H.log("[kit] PASS: the skean is a ranged hit; the smoke and exit reach one more ally per point")
   end),
 })

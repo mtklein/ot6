@@ -83,7 +83,7 @@ OT6_THIEF_BESTOW = $58
 ; byte is this menu's own (see above), so any id outside the three rows above
 ; and the $ff of a Steal nobody chose is free; $e0-$e4 are clear of both.
 OT6_THIEF_MUG       = $e0       ; Capture, as a row: a swing that steals
-OT6_THIEF_TRICK     = $e1       ; a thrown coin: piercing, past defense
+OT6_THIEF_TRICK     = $e1       ; a thrown coin: dagger, past defense
 OT6_THIEF_DISMANTLE = $e2       ; a stab that corrodes defense
 OT6_THIEF_APPRAISE  = $e3       ; Scan's read, Locke's way
 OT6_THIEF_MARK      = $e4       ; the divine: steal from all, read all
@@ -398,7 +398,7 @@ Ot6ThiefBanner:
 ; Mug is Capture as a row of the kit (vanilla's Thief Glove verb, which FF3-US
 ; prints as Capture): a Fight swing whose every landing hit also tries a
 ; Steal.  So it runs as Capture runs, through Cmd_06: the weapon's swing and
-; its class (Locke's dagger pierces), the steal on the hit (ExecAttack's
+; its class (a dagger's, in his hand), the steal on the hit (ExecAttack's
 ; `$b5 = $06` arm sets special effect $52), and the boost buying swings
 ; (Ot6FightBoost), which is what a boosted Fight or Capture buys.  The boost
 ; pays once (guidelines.md): the steal on a Mug's hit rolls vanilla's odds at
@@ -539,8 +539,8 @@ Ot6ThiefBanner:
 ;
 ; So Filch takes the resource the enemy does have: one shield, which Locke
 ; keeps as a boost point.  Ot6ClassChip only chips when the attack's class
-; matches the target's weakness row, so Locke's piercing dagger does nothing
-; against anything not weak to piercing.  Filch ignores class and element:
+; matches the target's weakness row, so Locke's dagger does nothing
+; against anything not weak to daggers.  Filch ignores class and element:
 ; it removes a shield whatever the row says, which makes it the party's only
 ; answer to an enemy whose weakness is unknown or unmatched.  It is not a
 ; reveal: it takes the shield without recording the row, so it complements
@@ -785,12 +785,12 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
-; [ Trickshot: a thrown coin, piercing, past defense ]
+; [ Trickshot: a thrown coin, dagger class, past defense ]
 ;
 ; One hit on one enemy by Fight's own physical formula (CalcDmg: Locke's
 ; level and vigor) at a fixed battle power, OT6_TRICK_POWER, whatever he
-; holds: the coin is the weapon, so the hit pierces (OT6_PIERCE, one chip on a
-; pierce-weak body) with a sword in his hand as with a dagger.  It ignores
+; holds: the coin is the weapon, so the hit is OT6_CLS_THIEF (one chip on a
+; dagger-weak body) with a sword in his hand as with a dagger.  It ignores
 ; defense ($11a2 bit 5), which in the damage modification also skips the
 ; target's row and its Defend, and it cannot be dodged (_c2298d's $11a4).
 ; The animation is GP Rain's coin ($b5 = $18), and $b5 is also the command
@@ -810,7 +810,7 @@ done:   plp
 
 ; [ Dismantle: a stab that corrodes the target's defense ]
 ;
-; The corrode lands first, then a weak piercing stab at the lowered defense.
+; The corrode lands first, then a weak dagger stab at the lowered defense.
 ; Each step takes a quarter of the target's defense (at least one point), and
 ; the boost buys steps: one at 0 BP, four at 3 BP (x3/4 each, so about a third
 ; of it left).  It lasts the battle.  The boost buys the corrode, so the stab
@@ -851,7 +851,7 @@ done:   plp
         ; fall through
 .endproc
 
-; [ the rest of a thief hit's props: Fight's formula, piercing ]
+; [ the rest of a thief hit's props: Fight's formula, dagger class ]
 ; a8/i8, x = attacker.  $11a6 and $11a2 are the caller's.
 .proc Ot6ThiefHit
         .a8
@@ -861,7 +861,7 @@ done:   plp
         sta     $11ae
         lda     $3b18,x         ; level, as InitAttackerLevel loads it
         sta     $11af
-        lda     #OT6_PIERCE
+        lda     #OT6_CLS_THIEF
         sta     f:$7e0000+OT6_ATKCLASS
         lda     $b6
         cmp     #OT6_THIEF_TRICK

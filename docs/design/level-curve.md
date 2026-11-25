@@ -8,6 +8,15 @@
 > Regenerate with `tools/savestate_party.py`'s `read_party_sram` (the snippet
 > at the bottom).
 
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Blunt, Ranged
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are the
+> present ones. Quoted logs, dated measurements and "before" columns keep
+> the words they were recorded in: slash is now Sword or Katana, pierce
+> Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged or
+> Blunt.
+
 ## The curve (active party at each checkpoint)
 
 Read from the tracked checkpoints (`tools/tests/checkpoints/*-v1`) with
@@ -206,7 +215,8 @@ EDGAR L17 / SABIN L17, so exactly the two L16s take a **745..848** roll
 (measured off `_writedamage`, 15 seeds x 5 policies) against 447 / 443
 max HP; the L17s cannot be touched by any of the trio's three level
 spells.  Rows and boost do not move it; the party's kill speed does
-(LOCKE's ThunderBlade and SABIN's Pummel are the bolt and bludgeon keys).
+(LOCKE's ThunderBlade is the bolt key and EDGAR's AutoCrossbow the Ranged
+one; SABIN's Pummel, Blunt, does not key the Trapper).
 The as-shipped leg walked in with SABIN dead from battle 70 and drew the
 double kill in 9/15 fights; cared (the fix now in `gen_n024_entry`) draws
 it in 4/15.  L17 for the pair would be immune -- 1055 / 1119 XP, three or

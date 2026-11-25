@@ -171,7 +171,7 @@ local function attempt(n)
   local deathSlot, deathFrame, deathTicks = nil, nil, nil
   local startFrame = nil           -- first frame of THIS attempt's battle
   local hb = 0
-  -- CELES chips IFRIT with Ice (the b70 design: ice + piercing is his row),
+  -- CELES chips IFRIT with Ice (the b70 design: ice + a pierce child is his row; #566),
   -- so the break lands before the kill.  Under the one-care-per-round
   -- driver the party attacks harder, and without a chip key IFRIT died
   -- through his shields unbroken -- the ladder then had no observation.
@@ -180,15 +180,16 @@ local function attempt(n)
   -- off on this fight (#235).  Either sibling can take the killing blow,
   -- so the test needs a key on BOTH gauges or the rung is a coin flip.
   -- With the tactical kit on, EDGAR spends his turn on AutoCrossbow
-  -- (pierce) and SABIN on Pummel (bludgeon), and neither reaches SHIVA's
-  -- six SLASH shields: only CELES's sword chips her, one a turn, while
+  -- (Ranged; pierce under four classes) and SABIN on Pummel (Blunt), and neither
+  -- reaches SHIVA's six sword shields: only CELES's sword chips her, one a turn, while
   -- four characters pour damage into her 3000 HP -- so SHIVA reliably
   -- died UNBROKEN and the attempt produced nothing (measured: 2 of the 3
   -- rungs at the default shift ended that way both before and after
   -- #235's fix, build/lab/fight-swings/brokendeath/).  With it off,
-  -- EDGAR's MithrilBlade and SABIN's MetalKnuckle are both SLASH Fights
-  -- and SHIVA has three keys on her, while IFRIT keeps LOCKE's pierce
-  -- pair and CELES's Ice.  The gate under test is untouched; what changes
+  -- EDGAR's MithrilBlade is a sword Fight like CELES's (under four classes
+  -- SABIN's MetalKnuckle was slash too, three keys; under six a knuckle is
+  -- Blunt and SHIVA has two keys on her), while IFRIT keeps the keys his
+  -- row gives LOCKE's dagger pair, and CELES's Ice.  The gate under test is untouched; what changes
   -- is that the observation stops depending on which sibling the tag-team
   -- happens to leave standing.
   local F = H.newFightDriver("brokendeath", { tactical = false, boost = true,
@@ -229,7 +230,7 @@ local function attempt(n)
       end
       H.assertEq(slotOf[CELES] ~= nil, true, "CELES present (#21 roster)")
       H.assertEq(slotOf[EDGAR] ~= nil, true,
-        "EDGAR present (#21 roster; his AutoCrossbow is the tactical pierce)")
+        "EDGAR present (#21 roster; his sword is one of SHIVA's keys)")
       for m = 5, 0, -1 do                -- lowest live slot wins (header)
         if species(m) == IFRIT then ISLOT = m end
         if species(m) == SHIVA then SSLOT = m end
@@ -356,7 +357,7 @@ H.run({ maxFrames = 120000 + 16000 * ATTEMPTS }, {
   --    (H.fieldCare).  The old arm asked this independent run for the
   --    checkpoint run's two ThunderBlades; neither exists in this save,
   --    so that was a fixture fabrication disguised as menu input.  EDGAR's
-  --    MithrilBlade supplies slash, while the daggers and Tools cover pierce.
+  --    MithrilBlade supplies the sword, while the daggers and Tools cover the dagger, ranged and spear keys.
   -- Best-effort, like the wave-4 kits: each slot conds on the bag
   -- (present -> worn, absent -> keep current gear, logged).  LOCKE wears
   -- the Genji Glove, so his left hand is a DAGGER ladder, never a shield

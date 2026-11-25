@@ -404,8 +404,8 @@ Ot6MenuIconArt:
         rts
 .endproc
 
-; element index -> tilemap palette bits (palette << 2); indices 8-11 are
-; the four weapon classes (Ot6ElemGlyphFor's class fallback): menu-white,
+; element index -> tilemap palette bits (palette << 2); indices 8-13 are
+; the six weapon classes (Ot6ElemGlyphFor's class fallback): menu-white,
 ; the same way these icons render as item-name leading glyphs
 Ot6ElemPalTbl:
         .byte   7 << 2          ; fire: red
@@ -416,10 +416,12 @@ Ot6ElemPalTbl:
         .byte   2 << 2          ; holy: yellow (star shape vs bolt zigzag)
         .byte   1 << 2          ; earth: gray
         .byte   3 << 2          ; water: blue (wave shape vs ice crystal)
-        .byte   0 << 2          ; slash: white
-        .byte   0 << 2          ; pierce: white
-        .byte   0 << 2          ; bludgeon: white
-        .byte   0 << 2          ; special ¤: white
+        .byte   0 << 2          ; sword: white
+        .byte   0 << 2          ; dagger: white
+        .byte   0 << 2          ; blunt: white
+        .byte   0 << 2          ; ranged: white
+        .byte   0 << 2          ; katana: white
+        .byte   0 << 2          ; spear: white
 
 ; generic battle lists ($2c already holds a global ability id)
 .proc Ot6ListIcon_ext
@@ -538,12 +540,12 @@ Ot6ElemPalTbl:
 ; a = ability id (0-255) -> a = element icon glyph, or the ability's
 ; class icon glyph when it has no element (Ot6SkillClassTbl: physical
 ; skills show their class where spells show their element, so
-; TekMissile shows pierce in the magitek list, Pummel bludgeon, and quadra
-; slam slash), or $ff when it has neither. first set
+; TekMissile shows ranged in the magitek list, Pummel blunt, and quadra
+; slam katana), or $ff when it has neither. first set
 ; bit wins on both axes; an element takes priority over the class (the design:
 ; "consult the class when the ability has no element"). null-break rows
 ; would show a class they never chip, so bit 7 hides the icon too.
-; OT6_SCR_COLS = palette index: 0-7 element hues, 8-11 the class rows.
+; OT6_SCR_COLS = palette index: 0-7 element hues, 8-13 the class rows.
 ; preserves x/y.
 
 .proc Ot6ElemGlyphFor
@@ -599,7 +601,7 @@ Ot6ElemPalTbl:
 @cidx:  txa
         clc
         adc     #$08
-        sta     OT6_SCR_COLS    ; palette index 8-11: the class rows
+        sta     OT6_SCR_COLS    ; palette index 8-13: the class rows
         pla                     ; (discard the stashed id)
         lda     f:Ot6ClassGlyphTbl,x
         plx
@@ -653,16 +655,20 @@ Ot6ElemPalTbl:
         rtl
 .endproc
 
-; class bit index (slash 0 .. special 3) -> small font glyph. these four
-; cells ship in the vanilla small font (they are the item icons the m3
-; weapon renames use), so unlike the element icons they need no
+; class bit index (sword 0 .. spear 5) -> small font glyph. these six
+; cells are in the small font itself (they are the item icons the
+; weapons' names wear), so unlike the element icons they need no
 ; upload: every battle text system and the bg3 field map index the same
-; $5800 font tiles.
+; $5800 font tiles.  each blade is on its own axis (font.py's header).
 Ot6ClassGlyphTbl:
-        .byte   $d9             ; slash: the sword icon
-        .byte   $da             ; pierce: the spear icon
-        .byte   $dc             ; bludgeon: the staff icon
-        .byte   $df             ; special ¤: the sparkle icon
+        .byte   $d9             ; sword: the sword icon
+        .byte   $d8             ; dagger: the dirk cell, redrawn level
+        .byte   $dc             ; blunt: the staff cell, redrawn a mallet
+        .byte   $de             ; ranged: the thrown star
+        .byte   $db             ; katana: the katana icon, mirrored in
+                                ;   the font so it reads apart from the
+                                ;   sword (tools/six_classes/font.py)
+        .byte   $da             ; spear: the spear cell, redrawn upright
 
 ; 8x8 2bpp element icons, element-bit order (fire $01 ... water $80)
 Ot6FontIcons:

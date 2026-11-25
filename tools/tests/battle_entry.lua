@@ -42,11 +42,16 @@ H.run({ maxFrames = 8000 }, {
       H.log(string.format("guard shields $7E3E44,$7E3E46 = %d,%d",
         H.readByte(0x3E44), H.readByte(0x3E46)))
       -- Ot6SeedShields seeds this fixture's opening guard pair with 2
-      -- shields each and class row PIERCE ($02).
+      -- shields each and its Ot6ShieldTbl class row (#566: six classes;
+      -- pierce $02 under four.  The row is the split's and is read from the
+      -- ROM; what the seed must do is put it there, and the guards must
+      -- answer to some weapon class).
       H.assertEq(H.readByte(0x3E44), 2, "guard 1 shields seeded (Ot6SeedShields ran)")
       H.assertEq(H.readByte(0x3E46), 2, "guard 2 shields seeded (Ot6SeedShields ran)")
-      H.assertEq(H.readByte(0x3EA8), 0x02, "guard 1 authored piercing-weak")
-      H.assertEq(H.readByte(0x3EAA), 0x02, "guard 2 authored piercing-weak")
+      local row = H.speciesClassRow(0x0000)
+      H.assertEq(row & 0x3F ~= 0, true, string.format("the guard's authored row holds a weapon class ($%02X)", row))
+      H.assertEq(H.readByte(0x3EA8), row, "guard 1 seeded with its authored class row")
+      H.assertEq(H.readByte(0x3EAA), row, "guard 2 seeded with its authored class row")
     end),
   }, {
     H.call(function()

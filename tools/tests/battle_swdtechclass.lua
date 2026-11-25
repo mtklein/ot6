@@ -1,10 +1,11 @@
 -- @suite
 -- battle_swdtechclass.lua -- Cyan's SwdTech chip classes as built (#379):
--- Retort and Empowerer classless, Quadra Slice wind, the rest slashing
+-- Retort and Empowerer classless, Quadra Slice wind, the rest Katana (#566:
+-- the six classes' child of v0.50's slash; a sword does not answer for them)
 -- (the battle_breakgate shape: pure ROM bytes, no savestate).
 --
 -- kits.md "Cyan" carries the plan's chip column: Dispatch, Slash, Quadra
--- Slam, Stunner and Cleave slash; Retort is a counter stance and Empowerer a
+-- Slam, Stunner and Cleave are Katana hits; Retort is a counter stance and Empowerer a
 -- drain, so neither chips ("—"); Quadra Slice is wind x4.  The ROM carries a
 -- skill's class in Ot6SkillClassTbl (ot6_class.asm: (id, class) pairs,
 -- $ff-ended; an absent id is classless and its element is its probe) and its
@@ -18,17 +19,17 @@
 -- build/attempts/wt/v028-kits/px13-lab/old/battle_swdtechclass.out.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, WIND = 0x01, 0x10
+local KATANA, WIND = 0x10, 0x10    -- OT6_KATANA (a class byte); wind (an element byte)
 local MAGIC_REC = 14
 local TECHS = {
-  { 0x55, "Dispatch",     SLASH, 0 },
+  { 0x55, "Dispatch",     KATANA, 0 },
   { 0x56, "Retort",       nil,   0 },
-  { 0x57, "Slash",        SLASH, 0 },
-  { 0x58, "Quadra Slam",  SLASH, 0 },
+  { 0x57, "Slash",        KATANA, 0 },
+  { 0x58, "Quadra Slam",  KATANA, 0 },
   { 0x59, "Empowerer",    nil,   0 },
-  { 0x5A, "Stunner",      SLASH, 0 },
+  { 0x5A, "Stunner",      KATANA, 0 },
   { 0x5B, "Quadra Slice", nil,   WIND },
-  { 0x5C, "Cleave",       SLASH, 0 },
+  { 0x5C, "Cleave",       KATANA, 0 },
 }
 
 H.run({ maxFrames = 600 }, {

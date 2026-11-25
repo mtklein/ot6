@@ -7,6 +7,14 @@ Falcon outside Narshe. Sections 0-10 are the plan as written before play;
 section 11 is what the route built and measured; section 12 is Narshe with
 LOCKE (v0.32, #447).
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and
+> keys below are the present ones. Quoted logs, dated measurements and
+> "before" columns keep the words they were recorded in: slash is now Sword
+> or Katana, pierce Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged
+> or Blunt.
+
 Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v029-plan/`, read from `build/ot6.sfc`
 built at cc088b02 (`rom_commit.txt`) by `tools/route_data.py` and the
@@ -206,33 +214,35 @@ Vanilla stats (`species.txt`; identical to vanilla, `vanilla_cmp.txt`).
 Shields follow ot6_hud.asm's tiers: trash 1-3, tanks and minibosses 4, bosses
 by HP and fight length (the Storm Drgn's 14 at 42,000 HP, Phunbaba's 4-12).
 Only one of these species appears anywhere else (Nastidon, random group 86,
-`sharing.txt`). The party here holds slash (TERRA, CELES, CYAN, SABIN's claw),
-pierce (MOG's spear) and fire; bludgeon arrives with UMARO at the end.
+`sharing.txt`). The party here holds Sword (TERRA, CELES), Katana (CYAN;
+TERRA's or CELES's curved sword), Spear (MOG's spear) and fire; UMARO
+brings Blunt at the end. (SABIN's claw, named here before, is Dagger
+since 2026-11-24, and SABIN waits aboard: section 5.4.)
 **Counts and keys are a proposal**; the route agent's play sets them.
 (Built as proposed but for the Wizard, the Pugs and the Test Rider's
 lesson: section 11.3.)
 
 | species | where | L / HP | vanilla elements; notes | shields | classes | why |
 |---|---|---|---|---|---|---|
-| Red Wolf `$0F8` | 32-35, 37, 38 | 32 / 1,510 | none; Rush | 2 | slash, pierce | a wolf, as the WoB Lobo |
-| Nastidon `$0CE` | 32, 33 | 32 / 1,877 | weak fire; starts Safe | 2 | slash, bludg | a hide; fire is the party's other key |
-| Test Rider `$09C` | 32, 33 | 32 / 3,100 | weak poison; Gold Lance (x3), counters | 3 | pierce | the lance-rider: MOG's spear unseats it (the recruit's key) |
-| Wizard `$0C4` | 34, 35, 37, 38 | 32 / 1,677 | weak bolt, poison; six Runic-able spells, def 50 | 2 | pierce, special | a caster; CELES's Runic eats its whole list |
-| Psychot `$0DA` | 34, 35, 37, 38 | 32 / 900 | weak ice, **absorbs fire**; Float | 1 | pierce, special | the one body here fire heals |
-| Mag Roader `$0E7` | 36 | 32 / 1,777 | none; Ice, Ice 2 | 2 | pierce, bludg | a wheel: puncture or crush |
-| Mag Roader `$0F3` | 36 | 32 / 1,380 | none; Fire, Fire 2, counter Fire Ball | 2 | pierce, bludg | the same body |
-| Poppers `$0C9` | 281 | 33 / 1,000 | weak fire; starts Safe; Stone (Muddle) | 1 | slash, pierce | in fours |
-| Kiwok `$0CD` | 281 | 33 / 2,000 | weak ice; Pick (Imp) | 2 | slash, pierce | a bird |
-| Ceritops `$0C6` | 281-283 | 33 / 2,000 | weak fire, absorbs bolt; starts Safe; Pal Maker (Imp) | 3 | pierce, bludg | horned and plated: the cave's tank |
-| Anemone `$0B4` | 282, 283 | 33 / 2,000 | weak fire; absorbs bolt and water (its bolt weakness never applies); Giga Volt | 2 | slash | a plant; the Thunder Shld or Runic for Giga Volt |
-| Tomb Thumb `$09E` | 282, 283 | 33 / 2,000 | weak bolt, water; Imp Song | 2 | pierce, special | a cursed body (guidelines.md: ¤ for cursed bodies) |
-| Pug `$054` | 281 (16/256) | 27 / 8,000 | weak fire, bolt; absorbs water; evade 50; Step Mine only | 4 | slash, special | a rare miniboss-grade body |
-| Umaro `$110` | event 117 | 33 / 17,200 | weak fire, poison; absorbs ice | 6 | slash, pierce | the boss under the party; break it before his Green Cherry |
-| Tritoch `$144` | event 119 | 62 / 30,000 | weak fire; absorbs ice; nulls bolt, poison, wind, holy, earth, water; **def 254**; Float | 10 | slash, pierce | blades and the spear chip what they barely hurt (DESIGN.md: any damaging hit on a weakness chips; measure that a 1-damage hit does); fire burns it |
-| Ice Dragon `$149` | event 132 | 74 / 24,400 | weak fire; absorbs ice | 10 | pierce, bludg | MOG's spear is the class key; fire is everyone's |
+| Red Wolf `$0F8` | 32-35, 37, 38 | 32 / 1,510 | none; Rush | 2 | Sword, Dagger | a wolf (the WoB Lobo, its model, is Dagger, Spear now) |
+| Nastidon `$0CE` | 32, 33 | 32 / 1,877 | weak fire; starts Safe | 2 | Sword, Ranged | a hide; fire is the party's other key |
+| Test Rider `$09C` | 32, 33 | 32 / 3,100 | weak poison; Gold Lance (x3), counters | 3 | Spear | the lance-rider: MOG's spear unseats it (the recruit's key) |
+| Wizard `$0C4` | 34, 35, 37, 38 | 32 / 1,677 | weak bolt, poison; six Runic-able spells, def 50 | 2 | Dagger, Ranged, Katana | a caster; CELES's Runic eats its whole list |
+| Psychot `$0DA` | 34, 35, 37, 38 | 32 / 900 | weak ice, **absorbs fire**; Float | 1 | Dagger, Ranged | the one body here fire heals; no hand here holds its classes, so CELES's ice is its key |
+| Mag Roader `$0E7` | 36 | 32 / 1,777 | none; Ice, Ice 2 | 2 | Ranged, Spear | a wheel: MOG's spear punctures it |
+| Mag Roader `$0F3` | 36 | 32 / 1,380 | none; Fire, Fire 2, counter Fire Ball | 2 | Ranged, Spear | the same body |
+| Poppers `$0C9` | 281 | 33 / 1,000 | weak fire; starts Safe; Stone (Muddle) | 1 | Katana, Spear | in fours |
+| Kiwok `$0CD` | 281 | 33 / 2,000 | weak ice; Pick (Imp) | 2 | Katana, Spear | a bird |
+| Ceritops `$0C6` | 281-283 | 33 / 2,000 | weak fire, absorbs bolt; starts Safe; Pal Maker (Imp) | 3 | Ranged, Spear | horned and plated: the cave's tank |
+| Anemone `$0B4` | 282, 283 | 33 / 2,000 | weak fire; absorbs bolt and water (its bolt weakness never applies); Giga Volt | 2 | Katana | a plant; the Thunder Shld or Runic for Giga Volt |
+| Tomb Thumb `$09E` | 282, 283 | 33 / 2,000 | weak bolt, water; Imp Song | 2 | Ranged, Spear | a cursed body (guidelines.md: ¤ for cursed bodies; Ranged now); MOG's spear |
+| Pug `$054` | 281 (16/256) | 27 / 8,000 | weak fire, bolt; absorbs water; evade 50; Step Mine only | 4 | Ranged, Katana | a rare miniboss-grade body |
+| Umaro `$110` | event 117 | 33 / 17,200 | weak fire, poison; absorbs ice | 6 | Sword, Spear | the boss under the party; break it before his Green Cherry |
+| Tritoch `$144` | event 119 | 62 / 30,000 | weak fire; absorbs ice; nulls bolt, poison, wind, holy, earth, water; **def 254**; Float | 10 | Sword, Katana, Spear | the swords, CYAN's katana and the spear chip what they barely hurt (DESIGN.md: any damaging hit on a weakness chips; measure that a 1-damage hit does); fire burns it |
+| Ice Dragon `$149` | event 132 | 74 / 24,400 | weak fire; absorbs ice | 10 | Ranged, Spear | MOG's spear is the class key; fire is everyone's |
 
-Pugs `$0FF` (the chest) carries the Pug's row, 4 · slash, special, and
-`battle_breakwor_narshe` checks it with event group 152.
+Pugs `$0FF` (the chest) carried the Pug's row, 4 · slash, special. Under
+six classes both are 4 · Ranged, Katana. `battle_breakwor_narshe` checks it with event group 152.
 
 Tritoch `$144`'s row today is `0, $00` under "scripted set-pieces"
 (`ot6_hud.asm:2263`), beside the World of Balance records `$114` and `$115`
@@ -283,7 +293,8 @@ Dust on the attacker. Fight draws nothing.
   defence step), and its magic
   defence is 70. So: fire for damage (Rasp drains the caster's MP:
   Tinctures and the save point's Tent before it); Fight to break it (the
-  proposed slash/pierce row), which also stops its turns while it is Broken
+  proposed row, Sword, Katana and Spear now: MOG's spear, CYAN's katana and
+  TERRA's and CELES's swords), which also stops its turns while it is Broken
   and doubles the fire; CELES's Runic for Ice 3; no SwdTech or Blitz, which
   only draw Cold Dust. MOG's dance stumbles off its terrain and Snowman Jazz
   is ice (`dance_prop.asm`: Snowball, Surge, Snare, Ice Rabbit), so MOG
@@ -302,7 +313,10 @@ Haste, Regen (:4917-4932). The party's Magic counts up a monster variable
 draws Tackle or Blizzard; any hit can draw Tackle.
 
 - **Kit.** L33 against L38-40. Break him before 10,240 HP, while his Green
-  Cherry is unspent; Fight (blades and the spear), and fire on the break.
+  Cherry is unspent; Fight (his row is Sword, Spear in `ot6_hud.asm`:
+  MOG's spear and TERRA's and CELES's straight swords; CYAN's katana and
+  CELES's Flame Sabres, Katana since 2026-11-24, do not key it), and fire
+  on the break.
   The lair is a cave, MOG's terrain for Dusk Requiem (Elf Fire among its
   steps, `dance_prop.asm`).
 - **Expectation (estimate):** under the party, as Phunbaba's first visits.
@@ -331,24 +345,24 @@ Float (`species.txt`).
 
 ### 6.2 Mog on arrival
 
-- **His key:** the spear is the only pierce in the party, and the proposed
-  rows make pierce the Test Rider's only key and the Ice Dragon's class key
+- **His key:** the spear is the only Spear in the party, and the proposed
+  rows make Spear the Test Rider's only key and the Ice Dragon's class key
   (section 4).
-- **Gear:** the Ribbon from his own room; a Partisan (pow 150, pierce) from
+- **Gear:** the Ribbon from his own room; a Partisan (pow 150, Spear) from
   Jidoor's weapon counter (shop 76, 13,000 GP) bought before take-off; the
   bag's Mithril Pike (70) otherwise (`items.txt`, `shops.txt`).
 - **His divine:** not known on this route (finding 7).
 
 ### 6.3 Umaro on arrival
 
-Bludgeon on Fight and Charge, ice on Storm (kits.md "Umaro"). His Rage Ring
+Blunt on Fight and Charge, ice on Storm (kits.md "Umaro"). His Rage Ring
 is in the Cave in the Veldt (map 353 (18,20)) and his Blizzard Orb in the
 Ancient Castle (map 406 (53,23)) (`chest_find.txt`): neither on v0.29, so he
 Fights and Charges, and Storms only on a dump of three points. Every boss
 here absorbs ice, so he joins after the fights where his divine would heal
 them. His showcase is the regroup and the Narshe plain beside the Falcon
-(world group 51), where the cyan arc's Reach Frog (bludg) and Mantodea
-(slash, bludg) rows give him keys.
+(world group 51), where the cyan arc's Mantodea row (Sword, Blunt, Ranged)
+and the Reach Frog's (Blunt) give him a key.
 
 ## 7. Shops, supplies and items
 
@@ -487,10 +501,12 @@ The route plays the arc in two legs. Evidence is under
 ### 11.3 Break rows (built)
 
 As proposed in section 4, with four changes: the Ice Dragon has six
-shields, not ten (section 11.4); the Wizard takes slash as
+shields, not ten (section 11.4); the Wizard took slash as
 well (2, slash|pierce|special: the moogle cave's Wizards meet CYAN, TERRA
-and CELES before MOG joins, and none of them holds pierce or ¤), the Pugs
-get a row (4, slash|special, the Pug's), and the Test Rider keeps pierce
+and CELES before MOG joins, and none of them held pierce or ¤; the row is
+Dagger|Ranged|Katana now, and of the three only CYAN's katana keys it), the
+Pugs got a row (4, slash|special, the Pug's; both Ranged|Katana now), and
+the Test Rider keeps Spear
 alone on purpose: before MOG joins, the town's riders cannot be broken,
 only worn down, and his spear is what breaks them after. Tritoch's
 World of Ruin record `$144` has its row; `$114`/`$115` stay shieldless.
@@ -500,7 +516,9 @@ one declared exception), and the lessons (MOG's spear the Test Rider's only
 key and the Ice Dragon's class key; each of the four keys Tritoch and
 Umaro; every boss absorbs ice and is weak to fire): `PASS` on this ROM,
 `got 65 ($41)` mismatches on main's, and three row mutants each red by name
-(`rows/`).
+(`rows/`). Under six classes Tritoch's and Umaro's rows are Spear, Katana:
+CYAN's katana and MOG's spear key them by class, and TERRA's and CELES's
+swords do not.
 
 **Tritoch's defense 254**: a 1-damage Fight chips. Without fire the party
 broke it three times on Fight and took 485 of its 30,000 HP in 17,100
@@ -675,10 +693,11 @@ Rider; rows from v0.29, section 11.3) and the plain at the gate (world
 group 51; rows from v0.28); the K battles of the sweep add the plain beside
 Kohlingen (Harpiai, Bogy, Deep Eye, Muus). `tools/audit_break_coverage.py`
 lists none of them unauthored, so no row changes. The Test Rider's one key
-is pierce, which this party holds only in LOCKE's Trickshot: the driver
-throws it at pierce-weak bodies his Fight does not key (`[navTo] actor=0
+was pierce, which this party held only in LOCKE's Trickshot: the driver
+threw it at pierce-weak bodies his Fight did not key (`[navTo] actor=0
 LOCKE Trickshot at 0 BP on slot 1: pierce-weak, and his Fight keys nothing
-there`), 56 times over the sweep (`who_acts_sw.txt`).
+there`), 56 times over the sweep (`who_acts_sw.txt`). The rider's row is
+Spear now and Trickshot is Dagger, so Trickshot no longer keys it.
 
 ### 12.4 The sweep
 
@@ -904,7 +923,8 @@ in the front row, and `UpdateFacingDirection` marks a monster's blow on a
 member as from behind, half again as much (`inc $bc`). OT6 does lengthen
 the fight: a Mantodea takes half from a hit that keys none of its three
 shields (slash, bludgeon, special), and TERRA's spear and LOCKE's Wing
-Edge key none. But the lost key was decided by the opening blows, not the
+Edge key none (the row is Sword, Blunt, Ranged today, which the Wing Edge,
+Ranged, keys). But the lost key was decided by the opening blows, not the
 length. So this is vanilla difficulty, and the answer is how the route
 plays.
 

@@ -1,15 +1,19 @@
 -- @suite
 -- battle_breakwobtrain.lua -- the Phantom Train's monster box, its authored break row re-verified from the shipped
 -- ROM (the battle_breakgate discipline): Specter carries its Ot6ShieldTbl row, and its formation (476) is chippable
--- by the train's party, CYAN's blade (slash), SHADOW's point (pierce) and SABIN's blitzes (bludg).
+-- by the train's party, CYAN's katana, SHADOW's point (his ninja blade) and SABIN's blitzes.
 -- docs/design/wob-towns-boxes.md section 4 is the design these numbers come from.
 local H = dofile("tools/tests/lib/ot6.lua")
 
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local W, SK = H.weaponClass, H.skillClass   -- a hand: the class the built ROM gives a weapon, a skill
+
 local WANT = {                    -- species -> { shields, class mask }
-  [0x156] = { 3, 0x01 | 0x08 },   -- specter: slash|special
+  [0x156] = { 3, KATANA | BLUNT },  -- specter: katana|blunt
 }
 local FORMS = { 476 }
-local PARTY_CLASSES = 0x01 | 0x02 | 0x04   -- slash+pierce+bludg on hand
+-- camp-escaped-v1: CYAN's Ashura $2B, SHADOW's Imperial $25, SABIN's MetalKnuckle $53 and Pummel $5D
+local PARTY_CLASSES = W(0x2B) | W(0x25) | W(0x53) | SK(0x5D)
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),

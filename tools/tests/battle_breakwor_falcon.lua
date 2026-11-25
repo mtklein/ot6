@@ -30,44 +30,50 @@
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   -- the Kohlingen continent (world groups 45-47)
-  [0x089] = { "Harpiai",    3, SLASH | PIERCE,   WIND },
-  [0x0DB] = { "Muus",       2, SLASH | BLUDG,    0 },
-  [0x0A7] = { "Deep Eye",   2, PIERCE | SPECIAL, FIRE },
-  [0x0D3] = { "Bogy",       3, SLASH | SPECIAL,  0 },
+  [0x089] = { "Harpiai",    3, SWORD | RANGED,   WIND },
+  [0x0DB] = { "Muus",       2, SWORD | BLUNT,    0 },
+  [0x0A7] = { "Deep Eye",   2, BLUNT | RANGED, FIRE },
+  [0x0D3] = { "Bogy",       3, SWORD | BLUNT | RANGED, 0 },
   -- Darill's Tomb (groups 149-151)
-  [0x005] = { "Orog",       3, SLASH | BLUDG | SPECIAL,  FIRE | HOLY },
-  [0x010] = { "Osteosaur",  3, BLUDG | SPECIAL,          FIRE | HOLY },
-  [0x06F] = { "PowerDemon", 3, SLASH | PIERCE | SPECIAL, FIRE | HOLY },
-  [0x061] = { "Mad Oscar",  4, SLASH,            FIRE },
-  [0x091] = { "Exoray",     2, SLASH | PIERCE,   FIRE | HOLY },
+  [0x005] = { "Orog",       3, SWORD | BLUNT | RANGED,   FIRE | HOLY },
+  [0x010] = { "Osteosaur",  3, BLUNT | RANGED,           FIRE | HOLY },
+  [0x06F] = { "PowerDemon", 3, SWORD | BLUNT | RANGED, FIRE | HOLY },
+  [0x061] = { "Mad Oscar",  4, SWORD,            FIRE },
+  [0x091] = { "Exoray",     2, SWORD | RANGED,   FIRE | HOLY },
   -- the grave (event group 85)
-  [0x11C] = { "Dullahan",  10, PIERCE | BLUDG | SPECIAL, FIRE },
+  [0x11C] = { "Dullahan",  10, DAGGER | BLUNT | RANGED, FIRE },
   -- the monster chest beside the save point (event group 116)
   [0x101] = { "Presenter",  0, 0,                FIRE },
-  [0x135] = { "Whelk Head", 6, PIERCE,           FIRE },
+  [0x135] = { "Whelk Head", 6, RANGED,           FIRE },
 }
 
--- the hands (route-wor-falcon.md 8.1).  SABIN's wind is Air Blade (L30),
--- held at wor-edgar-v1; his holy is AuraBolt.
-local CELES  = { "CELES", SLASH, FIRE | ICE | BOLT }
-local SABIN  = { "SABIN", SLASH | BLUDG, FIRE | HOLY | WIND }
-local EDGAR  = { "EDGAR", SLASH | PIERCE, BOLT | POISON }
-local CARDS  = { "SETZER (Cards)", SPECIAL, 0 }
-local DARTS  = { "SETZER (Darts)", PIERCE, 0 }
+-- the hands (route-wor-falcon.md 8.1): CELES's Enhancer $13 and ThunderBlade
+-- $0F; SABIN's Fire Knuckles $57, Pummel $5D and Suplex $5F; EDGAR's Break
+-- Blade $11, or his Mithril Pike $1D, Gold Lance $22 or Man Eater $06, and his
+-- AutoCrossbow $AA; SETZER's Cards $4D, or his Darts $4E.  SABIN's wind is
+-- Air Blade (L30), held at wor-edgar-v1; his holy is AuraBolt.
+local CELES  = { "CELES", W(0x13) | W(0x0F), FIRE | ICE | BOLT }
+local SABIN  = { "SABIN", W(0x57) | SK(0x5D) | SK(0x5F), FIRE | HOLY | WIND }
+local EDGAR  = { "EDGAR", W(0x11) | W(0x1D) | W(0x22) | W(0x06) | W(0xAA), BOLT | POISON }
+local CARDS  = { "SETZER (Cards)", W(0x4D), 0 }
+local DARTS  = { "SETZER (Darts)", W(0x4E), 0 }
 local function union(what, ...)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs({ ... }) do h.cls = h.cls | m[2]; h.el = h.el | m[3] end
   return h
 end
-local TRIO = union("CELES + SABIN + EDGAR (slash, pierce, bludg; fire, ice, bolt, poison, holy, wind)",
+local TRIO = union("CELES + SABIN + EDGAR (their weapons and skills; fire, ice, bolt, poison, holy, wind)",
   CELES, SABIN, EDGAR)
-local FOUR = union("the four (+ SETZER: special or pierce)", CELES, SABIN, EDGAR, CARDS, DARTS)
+local FOUR = union("the four (+ SETZER: his Cards or his Darts)", CELES, SABIN, EDGAR, CARDS, DARTS)
 
 -- where the arc draws from (section 3), and who meets it there.  Group 44
 -- is the castle's desert on both sides (rows from the Edgar arc); groups
@@ -240,7 +246,7 @@ H.run({ maxFrames = 600 }, {
       problem("Dullahan absorb byte $%02X has lost vanilla ice", absorb(0x11C))
     end
     local narshe = { [0x100] = { "Whelk (Narshe shell)", 0, 0 },
-                     [0x134] = { "Head (Narshe Whelk)", 4, PIERCE } }
+                     [0x134] = { "Head (Narshe Whelk)", 4, RANGED } }
     for sp, w in pairs(narshe) do
       local got = shield[sp]
       if got == nil or got[1] ~= w[2] or got[2] ~= w[3] then

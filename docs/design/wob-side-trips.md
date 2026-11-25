@@ -11,6 +11,12 @@ each walks its zone until every formation of its pool has been won. No leg
 boots what they leave: the main line, the middle-path playthrough, does not
 move for them (docs/TESTING.md, "the canon playthrough").
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> below are the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in.
+
 Evidence is under `build/attempts/wt/v043-wob-zones/` (section 5 quotes the
 lines behind each number).
 
@@ -62,26 +68,27 @@ That leaves four species first met in these zones and on the generated
 floor; every other body here is #254's or already authored (section 4).
 
 The party that first meets the forests is the post-opera four: CELES (the
-RegalCutlass: slash), LOCKE (the MithrilKnife: pierce), EDGAR (the Mithril
-Pike and AutoCrossbow: pierce) and SABIN (the Kaiser and Pummel: bludgeon).
-The islands' party is the four the wheel is handed to: LOCKE, EDGAR (the
-Blizzard, a blade: slash; his tools: pierce), SABIN (the Poison Claw: slash;
-Pummel: bludgeon) and SETZER (cards and dice: special). Vanilla elements
-stay.
+RegalCutlass: Katana since 2026-11-24), LOCKE (the MithrilKnife: Dagger), EDGAR (the Mithril
+Pike: Spear; the AutoCrossbow: Ranged) and SABIN (the Kaiser and Pummel:
+Blunt). The islands' party is the four the wheel is handed to: LOCKE, EDGAR
+(the Blizzard, a blade: Sword; the AutoCrossbow: Ranged), SABIN (the Poison
+Claw: Dagger since 2026-11-24; Pummel: Blunt) and SETZER (cards and dice: Ranged). Vanilla
+elements stay.
 
 | species | where | L / HP | vanilla | shields | classes | why |
 |---|---|---|---|---|---|---|
-| Bug `$0E8` | forest east of Albrook (20) | 16 / 310 | weak ice, water; alone, it answers a Fight with a petrifying spine | 2 | slash, pierce | a shell on wings: cut or spear it; trash in packs of three to six |
-| ChickenLip `$03D` | forests north-west of Albrook and by Maranda (17, 18) | 18 / 545 | weak ice; Quake when alone | 2 | slash, bludgeon | a heavy bird in packs of five: the blade or the fist |
-| Grenade `$0AA` | the bomb isle (27) | 17 / 3,000 | weak ice, water; absorbs fire; answers a Fight with Exploder (its own HP) | 3 | pierce, bludgeon | a broken body does not counter, so the Fight that breaks it draws no Exploder: break it in one swing (LOCKE's boosted knife did it in both of the replay's meetings, "KEYED: Fight at 1 BP lands 4 chip(s)"), or use what it does not answer, EDGAR's tools (pierce) and SABIN's blitzes (bludgeon). The blades stay off it, so a blade's Fight is the one that draws the explosion |
-| Intangir `$0A3` | Triangle Island (124, 28) | 26 / 32,000 | absorbs every element; starts Vanished, Hasted, Shelled, Safe, Floating; Meteo on its turn after a hit, Meteo as it dies, escapes under 1,280 HP | 2 | slash, pierce, bludgeon, special | absorbs every element, so every class keys it, SETZER's special among them (the trip his airship opens), but a blade that carries an element heals it (EDGAR's Blizzard, SABIN's Poison Claw): LOCKE's knife, EDGAR's tools, SABIN's blitzes and SETZER's cards break it. Its Meteo and its escape run through its turns, and a broken body has none (`Ot6Gate`; nor counters, the CheckRetal hook): break it to bring it down. Two shields, under the house curve's miniboss count, because its Meteo takes the whole L18-22 four that first meets it; with two, one double strike breaks it again as it recovers (section 3) |
+| Bug `$0E8` | forest east of Albrook (20) | 16 / 310 | weak ice, water; alone, it answers a Fight with a petrifying spine | 2 | Sword, Spear | a shell on wings, trash in packs of three to six. EDGAR's pike keys it; LOCKE's knife, which keyed it when the row was authored, does not, nor (since 2026-11-24, a Katana) CELES's cutlass |
+| ChickenLip `$03D` | forests north-west of Albrook and by Maranda (17, 18) | 18 / 545 | weak ice; Quake when alone | 2 | Sword, Blunt | a heavy bird in packs of five: SABIN's Kaiser and Pummel key it (CELES's cutlass did until it became a Katana, 2026-11-24) |
+| Grenade `$0AA` | the bomb isle (27) | 17 / 3,000 | weak ice, water; absorbs fire; answers a Fight with Exploder (its own HP) | 3 | Blunt, Ranged | a broken body does not counter, so the Fight that breaks it draws no Exploder: break it in one swing (SETZER's boosted cards; LOCKE's boosted knife did it in both of the replay's meetings under the four classes, "KEYED: Fight at 1 BP lands 4 chip(s)", and keys it no longer), or use what it does not answer, SABIN's blitzes (Blunt) and EDGAR's AutoCrossbow (Ranged). Swords, knives and claws stay off it, so their Fight is the one that draws the explosion |
+| Intangir `$0A3` | Triangle Island (124, 28) | 26 / 32,000 | absorbs every element; starts Vanished, Hasted, Shelled, Safe, Floating; Meteo on its turn after a hit, Meteo as it dies, escapes under 1,280 HP | 2 | all six | absorbs every element, so it was keyed by all four classes and is keyed by all six, SETZER's Ranged among them (the trip his airship opens), but a weapon that carries an element heals it (EDGAR's Blizzard, SABIN's Poison Claw): LOCKE's knife, SABIN's blitzes, EDGAR's AutoCrossbow and SETZER's cards break it |
 
 `battle_breakwob_sidetrips` checks the four rows in the built ROM, their
 vanilla weak and absorb bytes, that every species of world groups 20, 17,
 18, 15, 26 (the other groups that deal the Bug and the ChickenLip), 27, 124
 and 28 has a key in the hands of the four that first meets it, and the
-lessons (the Grenade takes pierce and bludgeon and not slash; the Intangir
-still absorbs every element and takes every hand the islands' four hold).
+lessons (the Grenade takes Blunt and Ranged and neither Sword, Dagger nor
+Katana; the Intangir still absorbs every element and takes every hand the
+islands' four hold).
 
 ## 3. The play
 

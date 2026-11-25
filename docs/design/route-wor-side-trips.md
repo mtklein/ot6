@@ -8,6 +8,15 @@ Kefka's Tower's target level, then the desert beside Maranda for its gil, and
 a save back on the Falcon's tile by Maranda where the line left it. Their XP
 and gil carry into Kefka's Tower, the next arc.
 
+> Weapon classes: v0.51 replaced the four classes this document was
+> written under (slash, pierce, bludgeon, special ¤) with six: Sword,
+> Dagger, Spear, Katana, Blunt, Ranged
+> ([weapon-classes.md](weapon-classes.md)). Rows and keys below are the
+> present ones. Quoted logs, dated measurements and "before" columns keep
+> the words they were recorded in: slash is now Sword or Katana, pierce
+> Dagger, Spear or Ranged, bludgeon Blunt or Ranged, special Ranged or
+> Blunt.
+
 Evidence is under `build/attempts/wt/v038-dino-desert/` (section 7 quotes
 the lines behind each number).
 
@@ -87,22 +96,22 @@ starts from the new save.
 
 Four rows, all of them new (the generated floor stood for each: six shields,
 pierce for the dinosaurs, slash for the desert's two). The cabin at
-`wor-colosseum-v1` seats three blades (CELES, CYAN, TERRA: slash) and
-SHADOW's Striker (pierce), with his skeans (fire, water, bolt) and the mages'
-Fire, Ice and Bolt. Vanilla elements stay.
+`wor-colosseum-v1` seats two swords (CELES, TERRA: Sword), CYAN's katana and
+SHADOW's Striker (Dagger), with his thrown skeans and stars (Ranged, the
+skeans with fire, water, bolt) and the mages' Fire, Ice and Bolt. Vanilla elements stay.
 
 | species | L / HP | vanilla | shields | classes | why |
 |---|---|---|---|---|---|
-| Hoover `$03E` | 49 / 12,018 | weak ice, water; counters every hit with Sand Storm (wind) | 2 | slash, bludgeon | a soft sand-eater: cut it or crush it. The desert keys the blades; its counter answers every hit, so a break by element (Ice, the Water Edge) saves hits |
-| Cactrot `$04C` | 27 / 3 | weak ice, water; evade 250, MBlock 250, defence 255 | 1 | pierce | three HP behind an evade almost nothing beats: a hit that lands does 1, and 0 while it shields, so the break is the kill. SHADOW's thrown point (pierce, and it cannot be dodged), or ice and water |
-| Tyranosaur `$027` | 57 / 12,770 | weak ice; Meteor | 3 | pierce, bludgeon | a dinosaur's hide, as the Allosaurus's (Cyan's dream): a point or a blow, not an edge. The forest's lesson is the reverse of the desert's: the blades skid, SHADOW's point and the mages' Ice find it |
-| Brachosaur `$026` | 77 / 46,050 | weak ice; Disaster, Meteor, Sneeze, Ultima | 6 | pierce, bludgeon | the same hide on a body four times the size; six, so a break holds its turns, Ultima among them |
+| Hoover `$03E` | 49 / 12,018 | weak ice, water; counters every hit with Sand Storm (wind) | 2 | Katana, Ranged | a soft sand-eater: cut it or shoot it. The desert keys CYAN's katana and SHADOW's throws, not CELES's and TERRA's swords or his Striker; its counter answers every hit, so a break by element (Ice, the Water Edge) saves hits |
+| Cactrot `$04C` | 27 / 3 | weak ice, water; evade 250, MBlock 250, defence 255 | 1 | Ranged | three HP behind an evade almost nothing beats: a hit that lands does 1, and 0 while it shields, so the break is the kill. SHADOW's throw (Ranged, and it cannot be dodged), or ice and water |
+| Tyranosaur `$027` | 57 / 12,770 | weak ice; Meteor | 3 | Dagger, Ranged | a dinosaur's hide, as the Allosaurus's (Cyan's dream; Ranged, Spear now): a dagger or a throw, not a sword or a katana. The forest's lesson is the reverse of the desert's: the blades skid and the mages' Ice finds it. SHADOW's Striker (Dagger) and his thrown stars and skeans (Ranged) key it |
+| Brachosaur `$026` | 77 / 46,050 | weak ice; Disaster, Meteor, Sneeze, Ultima | 6 | Dagger, Ranged | the same hide on a body four times the size, and the same keys: SHADOW's Striker and throws, and Ice; six, so a break holds its turns, Ultima among them |
 
 `battle_breakwor_sidetrips` checks the four rows in the built ROM, their
 vanilla weak and absorb bytes, that every species of world groups 54 and 111
 has an authored row and a key for the four, and the lessons (the Hoover takes
-slash and the Water Edge; neither dinosaur takes slash, both take pierce and
-Ice; the Cactrot has one shield). Red on main's rows (`rows/final/main.log`: 14 mismatches, "$026
+Katana and the Water Edge; neither dinosaur takes Sword or Katana, both
+take SHADOW's Striker (Dagger) and Ice; the Cactrot has one shield). Red on main's rows (`rows/final/main.log`: 14 mismatches, "$026
 Brachosaur has no Ot6ShieldTbl row (want 6, class $06)") and on two mutants:
 the Tyranosaur keyed by slash (`mutA`: "$027 Tyranosaur class mask $07, want
 $06") and the Cactrot on two shields (`mutB`: "$04C Cactrot shields 2, want

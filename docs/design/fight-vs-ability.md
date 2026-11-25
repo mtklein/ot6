@@ -13,6 +13,12 @@ arm; `build/lab/fight-vs-ability/aggregate.txt`,
 `build/lab/fight-vs-ability/mechanic.txt` and
 `build/lab/fight-vs-ability/reach.txt` are those three outputs.
 
+> Weapon classes: v0.51 replaced the four classes this document was written
+> under (slash, pierce, bludgeon, special ¤) with six: Sword, Dagger, Spear,
+> Katana, Blunt, Ranged ([weapon-classes.md](weapon-classes.md)). Rows and keys
+> below are the present ones. Quoted logs, dated measurements and "before"
+> columns keep the words they were recorded in.
+
 **Nothing here changes the ROM.** The 2.5x rate, the 99 cap and the Fight
 exemption are the owner's design, and he has settled them for this
 release: "we'll stick with this 2.5x cost scaling for abilities for this
@@ -33,7 +39,7 @@ Five places, all measured, and one that is honestly nowhere:
 
 | the ability's job | does it still earn the MP | where |
 |---|---|---|
-| a shield class no weapon in the party reaches | **yes, and it is the only key** | 7 of 32 WoB bodies; Flan and Rhinox measured |
+| a shield class no weapon in the party reaches | **yes, and it is the only key** | 7 of 32 WoB bodies under four classes (section 2.1 has today's reach); Flan and Rhinox measured |
 | a status a weapon cannot answer | **yes, and it is the only answer** | Vanish, Zozo's Gabbldegak |
 | an element the weapon delivers backwards | **yes** | Rhinox absorbs bolt; LOCKE's blade heals it |
 | whole-group damage | **yes** | Bio Blaster, 2.53 chips and 296 damage in one 8-MP turn |
@@ -207,18 +213,26 @@ against a body whose class and element the weapon does not carry they buy
 
 This is the sharpest one and it is structural, not situational. In all four
 stretch fixtures the static arm reads, **the routed party wields no
-bludgeoning weapon at all**: SABIN's MetalKnuckle is a *slashing* weapon
-(`weapon-classes.md`: "claws are how the monk buys into a second class"),
+bludgeoning weapon at all**: SABIN's MetalKnuckle was a *slashing* weapon
+(`weapon-classes.md` then: "claws are how the monk buys into a second class"),
 and LOCKE, EDGAR, CELES and TERRA carry swords, spears and daggers.
-`Ot6SkillClassTbl` gives Pummel, Suplex and Bum Rush the bludgeoning class
-whatever is equipped, so for that whole span the class exists in the party
+`Ot6SkillClassTbl` gave Pummel, Suplex and Bum Rush the bludgeoning class
+whatever was equipped, so for that whole span the class existed in the party
 only as an ability.
 
-(The first bludgeoning weapon the route actually carries is STRAGO's Ice
+Under six classes this no longer holds as measured. The MetalKnuckle is
+Blunt, the class Pummel, Suplex and Bum Rush carry, but six of the seven
+bodies below are Ranged today (the HadesGigas Blunt and Ranged): EDGAR's
+AutoCrossbow keys them, and SABIN's Fight and Blitzes key only the
+HadesGigas. The numbers below are the four-class ROM's.
+
+(The first bludgeoning weapon the route actually carried was STRAGO's Ice
 Rod, at `esper_mtn_save` — a stretch `check_break_reach.py`'s areas do not
 cover, so it is outside this arm. Whoever extends the areas to Esper
 Mountain should expect section 2.1 to get smaller there: map 375's Slurm
-and Adamanchyt are both bludgeon-keyed, and his rod is the key.)
+and Adamanchyt were both bludgeon-keyed, and his rod was the key. Rods are
+Blunt today, Slurm is Blunt, Ranged and Adamanchyt Dagger, Blunt, so his rod
+still keys both.)
 
 Cross-referencing each stretch's own fixture gear and bag against the
 formations its maps and event battles actually roll — the areas and the
@@ -246,8 +260,8 @@ The seven, with the key that opens them:
 | Mag Roader `$0AF` | 2 | bludg | ice | Pummel; Suplex |
 | HadesGigas `$053` | 2 | bludg | poison | EDGAR Bio Blaster 8 MP; Pummel; Suplex |
 
-Every one is bludgeon-keyed, and **SABIN's Pummel at 4 MP is on every
-row**. Measured against Flan, on the whole `ifrit_entry` spread
+Every one was bludgeon-keyed (Ranged today, the HadesGigas Blunt and
+Ranged), and **SABIN's Pummel at 4 MP was on every row**. Measured against Flan, on the whole `ifrit_entry` spread
 (`build/lab/fight-vs-ability/ifrit_entry/`, 28 logs, tabulated in
 `build/lab/fight-vs-ability/mechanic-ifrit_entry.txt`):
 
@@ -266,7 +280,8 @@ any boost, with or without the Genji pair. An unboosted Pummel takes two
 shields for four MP. That is the role, and it costs base price.
 
 The same thing measured on a body with real HP — Rhinox, 800 HP, bludgeon
-key, **absorbs bolt** (`n024_won`, party LOCKE / EDGAR / SABIN / CELES):
+key (Ranged today), **absorbs bolt** (`n024_won`, party LOCKE / EDGAR / SABIN /
+CELES):
 
 ```
 [fva-act] n=1 f8080 slot=1 char=05 Blitz($0A) atk=$5D bp=1 rev=0 hands=1
@@ -450,8 +465,9 @@ claim either way would be invented.
 
 ### 3.1 Breaking a class the weapon already reaches
 
-Dadaluma is six shields, class `pierce|bludg`, and LOCKE arrives at Zozo
-with a Genji pair of Guardian and MithrilKnife — **two piercing weapons**.
+Dadaluma is six shields, class Dagger, Blunt (`pierce|bludg` when measured),
+and LOCKE arrives at Zozo with a Genji pair of Guardian and MithrilKnife —
+**two Dagger weapons**.
 His Fight at one pip is four hits and four chips. Over eight Dadaluma
 fights (`build/lab/fight-vs-ability/dadaluma_entry/`, two seeds x four
 battles):
@@ -467,8 +483,8 @@ battles):
 
 **A boost-1 Genji Fight matches the ability turn for turn on this boss and
 pays nothing** — same nine turns, same six chips, same 3270 damage. That is
-the feature working exactly as intended: a pierce gauge in front of a
-piercing pair is the boosted Fight's fight.
+the feature working exactly as intended: a Dagger gauge in front of a
+Dagger pair is the boosted Fight's fight.
 
 It costs something the table does show: `fight1` took **1166** damage
 getting there against the unboosted kit arm's **54**, because the kit arm

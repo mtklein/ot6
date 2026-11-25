@@ -271,9 +271,9 @@ M.contracts["post-opera-v1"] = {
   -- zero codex rows by this point.
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex row (ULTROS2; measured EMPTY, unseeded)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex row (ULTROS2; the fighting run revealed slash|pierce at the Lete -- re-measured 2026-08-31)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex row (ULTROS2; the opera's fight revealed what its party chips him with: of his Sword|Ranged row (#566) only EDGAR's AutoCrossbow keys him -- LOCKE's daggers, EDGAR's pike and SABIN's knuckles do not; through v0.50 slash|pierce, 0x03)" },
   },
 }
 
@@ -320,9 +320,9 @@ M.contracts["mrf-save-room-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -351,9 +351,9 @@ M.contracts["n024-entry-save-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -380,9 +380,9 @@ M.contracts["minecart-platform-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -409,9 +409,9 @@ M.contracts["vector-escape-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -454,9 +454,9 @@ M.contracts["terra-returned-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -519,9 +519,9 @@ M.contracts["narshe-mission-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -568,7 +568,7 @@ M.contracts["water-rondo-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -608,9 +608,9 @@ M.contracts["gate-cave-save-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -661,9 +661,9 @@ M.contracts["vector-crash-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -730,9 +730,9 @@ M.contracts["banquet-done-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -790,9 +790,9 @@ M.contracts["crescent-landing-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -852,9 +852,9 @@ M.contracts["thamasa-night-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -908,9 +908,9 @@ M.contracts["fire-out-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -963,9 +963,9 @@ M.contracts["esper-mtn-save-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -1028,9 +1028,9 @@ M.contracts["ultros-won-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -1082,9 +1082,9 @@ M.contracts["thamasa-done-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
+    { 0x316990 + 0x012d, function() return M.speciesClassRow(0x012d) & M.weaponClass(M.AUTOCROSSBOW) end, "bank-31 class-codex witness (ULTROS2; the Ranged of his row, revealed by EDGAR's AutoCrossbow at the opera and carried by the codex, #566)" },
   },
 }
 
@@ -1123,7 +1123,7 @@ M.contracts["fc-landing-v1"] = {
   items = {},
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1161,7 +1161,7 @@ M.contracts["fc-alcove-v1"] = {
   items = {},
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1190,7 +1190,7 @@ M.contracts["wor-island-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1216,7 +1216,7 @@ M.contracts["wor-start-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1261,7 +1261,7 @@ M.contracts["wor-tzen-door-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1306,7 +1306,7 @@ M.contracts["wor-sabin-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1348,7 +1348,7 @@ M.contracts["wor-nikeah-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1395,7 +1395,7 @@ M.contracts["wor-south-figaro-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1438,7 +1438,7 @@ M.contracts["wor-edgar-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1494,7 +1494,7 @@ M.contracts["wor-figaro-sweep-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1549,7 +1549,7 @@ M.contracts["wor-kohlingen-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1601,7 +1601,7 @@ M.contracts["wor-tomb-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1652,7 +1652,7 @@ M.contracts["wor-falcon-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1701,7 +1701,7 @@ M.contracts["wor-terra-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1752,7 +1752,7 @@ M.contracts["wor-mtzozo-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1792,7 +1792,7 @@ M.contracts["wor-cyan-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1834,7 +1834,7 @@ M.contracts["wor-narshe-cliffs-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1879,7 +1879,7 @@ M.contracts["wor-narshe-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1914,7 +1914,7 @@ M.contracts["wor-owzer-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1958,7 +1958,7 @@ M.contracts["wor-tower-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -1995,7 +1995,7 @@ M.contracts["wor-thamasa-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2032,7 +2032,7 @@ M.contracts["wor-phoenix-v1"] = {
   walking = 1,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2068,7 +2068,7 @@ M.contracts["wor-locke-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2112,7 +2112,7 @@ M.contracts["wor-ragnarok-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2150,7 +2150,7 @@ M.contracts["wor-veldt-cave-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2193,7 +2193,7 @@ M.contracts["wor-gau-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2226,7 +2226,7 @@ M.contracts["wor-belly-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2265,7 +2265,7 @@ M.contracts["wor-gogo-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2301,7 +2301,7 @@ M.contracts["wor-ebot-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2337,7 +2337,7 @@ M.contracts["wor-opera-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2373,7 +2373,7 @@ M.contracts["wor-dream-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2410,7 +2410,7 @@ M.contracts["wor-doma-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2450,7 +2450,7 @@ M.contracts["wor-ancient-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2485,7 +2485,7 @@ M.contracts["wor-colosseum-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2519,7 +2519,7 @@ M.contracts["wor-desert-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2549,7 +2549,7 @@ M.contracts["wor-kt-factory-v1"] = {
   walking = 3,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2571,7 +2571,7 @@ M.contracts["wor-kt-inferno-v1"] = {
   walking = 3,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2595,7 +2595,7 @@ M.contracts["wor-kt-atma-v1"] = {
   walking = 2,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2625,7 +2625,7 @@ M.contracts["wor-kt-guardian-v1"] = {
   walking = 2,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2649,7 +2649,7 @@ M.contracts["wor-kt-doom-v1"] = {
   walking = 3,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2678,7 +2678,7 @@ M.contracts["wor-kt-poltergeist-v1"] = {
   walking = 2,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2698,7 +2698,7 @@ M.contracts["wor-kt-goddess-v1"] = {
   walking = 1,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2724,7 +2724,7 @@ M.contracts["wor-kt-plates-v1"] = {
   walking = 2,
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2759,7 +2759,7 @@ M.contracts["wor-dino-v1"] = {
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
-    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316801, 0x39, "slot 3 codex magic '9'" },
   },
 }
 
@@ -2783,6 +2783,7 @@ end
 function M.contractDiffs(c)
   local diffs, held = {}, 0
   local function field(label, want, got, hex)
+    if type(want) == "function" then want = want() end   -- #566: a value the ROM's tables give
     local fmt = hex and function(v) return string.format("0x%02X", v) end
                      or tostring
     if got == want then

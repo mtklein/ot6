@@ -474,6 +474,14 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.log(string.format("[deck] the Ultros teaser is up ($01F0) at f%d, at (%d,%d); walking to (22,6)", H.frame, H.fieldX(), H.fieldY()))
   end),
+  -- #566: the three arm for Ultros IV from the bag, his row read from the ROM (Sword|Ranged): the gear rule's own
+  -- dress with his classes favoured.  The deck kit's ladder puts EDGAR in the RegalCutlass first, a Katana since the
+  -- six classes (a slash, so a key for him, under four), and with it he swung no key: battle_ultros4 went red on
+  -- 54143478 and 05150ed5 ("timeout after 900 frames driving toward Chupon's entry", [keys] "hands=$11 ...
+  -- e2:c4:$10/$18 ... src=c0:r11,c1:r0E:l0E:T,c4:r0B:tools", suites/battle_ultros4-gate12.log).  Dressed so from the
+  -- fixture, "[arm for Ultros IV] EDGAR slot 0: $0B (score 84) -> $11 (score 177)", TERRA $11 -> $0F, and the suite
+  -- passes on four keys (suites/u4_dress-s{0,3,6,9}.log).  Before the absorb check, which then has the last word.
+  H.gearDress({ tag = "arm for Ultros IV", favor = function() return H.speciesClassRow(0x168) end }),
   H.absorbSafeArms(nil, fcAhead, { tag = "arms for Ultros IV and the continent" }),
   -- ultros4_entry: the deck, controllable, one walk from arming Ultros IV
   -- (battle_ultros4 boots it).  Captured with no frames spent (H.saveState

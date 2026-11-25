@@ -144,6 +144,8 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         ora     OT6_REVEALED_ELEM,y
         sta     OT6_REVEALED_ELEM,y
         lda     f:OT6_CODEX_CLASS,x
+SixMask:                        ; (mutant_rom.py's seam, #566: the row's mask)
+        and     OT6_BP_CLASS,y  ; six classes: only what the body answers to
         ora     OT6_BOOST_REVEALED,y
         sta     OT6_BOOST_REVEALED,y
         shorta0
@@ -885,13 +887,7 @@ done:   rts
         eor     #$ff
         and     OT6_SCR_BIT
         beq     merge           ; matched class already revealed
-        lda     #$45            ; "Weak against slashing" etc. ($45 + class)
-        sta     $3401
-        lda     OT6_SCR_BIT
-@bit:   lsr
-        bcs     merge           ; message index for the matched class
-        inc     $3401
-        bra     @bit
+        jsr     Ot6ClassMsg     ; "Weak against swords" etc.
 merge:  jsr     Ot6Hold         ; #539: the gauge shows this hit with its hit
         lda     OT6_SCR_BIT     ; bank the matched class as pending:
         ora     OT6_RVPEND_CLS-8,y      ;   committed to the revealed byte on
@@ -924,6 +920,30 @@ done:   rts
 .endproc
 
 ; ------------------------------------------------------------------------------
+
+; class bit index -> attack message (attack_msg_en.json): sword, dagger, blunt,
+; ranged ($45-$48, the four v0.50 lines' slots), katana, spear ($4a, $4b;
+; $49 is the esper rank line)
+Ot6ClassMsgTbl:
+        .byte   $45, $46, $47, $48, $4a, $4b
+
+; OT6_SCR_BIT = the matched class bit -> $3401 = its message.  a8/i16, db=$7e.
+; clobbers a; preserves x/y.
+.proc Ot6ClassMsg
+        .a8
+        .i16
+        phx
+        ldx     #$0000
+        lda     OT6_SCR_BIT
+@bit:   lsr
+        bcs     @msg
+        inx
+        bra     @bit
+@msg:   lda     f:Ot6ClassMsgTbl,x
+        sta     $3401
+        plx
+        rts
+.endproc
 
 ; [ commit pending reveals on the damage frame: per-species, one frame ]
 ;
@@ -1214,8 +1234,10 @@ done:   rts
         lda     OT6_RVPEND_ELEM-8,y
         sta     OT6_EVQ+3,x
         jsr     Ot6PendMark     ; the mark after this hit (#546), in the
-        asl                     ;   class byte's bits 4-5 (the four
-        asl                     ;   classes are bits 0-3)
+        asl                     ;   class byte's bits 6-7 (the six
+        asl                     ;   classes are bits 0-5)
+        asl
+        asl
         asl
         asl
         ora     OT6_RVPEND_CLS-8,y
@@ -1293,7 +1315,9 @@ done:   rts
         lda     #$ff
         sta     OT6_BRKTICK,y   ; this hit broke it: the flash and the cleave
 @kept:  pla
-        lda     OT6_EVQ+4,x     ; the mark after this hit (#546): bits 4-5
+        lda     OT6_EVQ+4,x     ; the mark after this hit (#546): bits 6-7
+        lsr
+        lsr
         lsr
         lsr
         lsr
@@ -1302,7 +1326,7 @@ done:   rts
         lda     OT6_EVQ+3,x
         xba
         lda     OT6_EVQ+4,x
-        and     #$0f            ; the classes alone
+        and     #OT6_CLASSES    ; the classes alone
         jsr     Ot6RevealSibs
 @skip:  ply
         rts
@@ -1892,9 +1916,9 @@ done:   rts
 ; called right after _magicpunch banks the hand's weapon element, so
 ; $3ca8,x is the swinging hand's item id. monsters keep a graphics code
 ; there (MonsterProp+26) rather than an item, so their swings carry no class.
-; (raged gau inherits the rage monster's graphics code into both hands
-; through SetRage, so his raged fights can read a junk class: a known
-; defect until rage is retired for capture. plain gau punches bludgeon, $ff.)
+; (a raging gau's hands hold the rage monster's graphics code, SetRage, which
+; through v0.50 read here as whatever item that code numbered; since #566
+; his own body is his fangs, OT6_CLS_FANG, raging or bare-handed.)
 
 .proc Ot6WeaponClass
         .a8
@@ -1906,6 +1930,26 @@ done:   rts
         bcs     @none
         lda     $3ca8,x         ; the swinging hand's item id
         phx
+        pha                     ; [1,s] the item, [2,s] x
+        longa
+        txa
+        and     #$0006
+        tax                     ; the character, either hand
+        shorta0
+        lda     $3ed8,x
+        cmp     #CHAR::GAU
+        bne     @item
+        lda     $3ef9,x         ; #566: Gau's own body is his fangs -- a
+        lsr                     ;   raging Gau (status 4 bit 0: his hands
+        bcs     @fang           ;   hold the rage's graphics code, SetRage),
+        lda     $01,s           ;   or his empty hand
+        cmp     #$ff
+        bne     @item
+@fang:  pla
+        plx
+        lda     #OT6_CLS_FANG
+        bra     @store
+@item:  pla
         longa
         and     #$00ff
         tax

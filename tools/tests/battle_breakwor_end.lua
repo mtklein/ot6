@@ -8,29 +8,29 @@
 --      no Ot6ElemAddTbl row;
 --   2. event battle 101 deals formation 471, and FinalBattleIDTbl chains 471 -> 512 -> 513 -> 514; every species of
 --      the four has an authored row;
---   3. the lessons: each tier between its bodies takes every hand (slash, pierce, bludgeon, special), so any four the
+--   3. the lessons: each tier between its bodies takes every hand (sword, dagger, spear, katana, blunt, ranged), so any four the
 --      order menu puts in front hold a key in every tier; Kefka takes every hand, and holds more shields than any
 --      other species' row in Ot6ShieldTbl (the most of any boss, #514).
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
-local HANDS = SLASH | PIERCE | BLUDG | SPECIAL
+local HANDS = SWORD | DAGGER | SPEAR | KATANA | BLUNT | RANGED
 local ALL = 0xFF
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x157] = { "Short Arm", 6, PIERCE | BLUDG, WATER, 0 },
-  [0x158] = { "Long Arm", 6, SLASH | PIERCE, WIND, 0 },
-  [0x159] = { "Face", 8, BLUDG | SPECIAL, FIRE, 0 },
-  [0x15D] = { "Hit", 6, SLASH | BLUDG, POISON, 0 },
-  [0x15A] = { "Tiger", 6, SLASH | PIERCE, ICE, EARTH },
-  [0x15B] = { "Tools", 6, PIERCE | BLUDG, BOLT, 0 },
-  [0x15C] = { "Magic", 8, SLASH | SPECIAL, EARTH, 0 },
-  [0x15E] = { "Girl", 3, SLASH | PIERCE, ALL, ALL },
-  [0x15F] = { "Sleep", 8, BLUDG | SPECIAL, 0, 0 },
-  [0x12A] = { "Kefka", 16, HANDS, 0, 0 },
+  [0x157] = { "Short Arm", 6, SPEAR | BLUNT, WATER, 0 },
+  [0x158] = { "Long Arm", 6, SWORD | DAGGER | KATANA, WIND, 0 },
+  [0x159] = { "Face", 8, BLUNT | RANGED, FIRE, 0 },
+  [0x15D] = { "Hit", 6, SWORD | BLUNT, POISON, 0 },
+  [0x15A] = { "Tiger", 6, DAGGER | KATANA, ICE, EARTH },
+  [0x15B] = { "Tools", 6, SPEAR | RANGED, BOLT, 0 },
+  [0x15C] = { "Magic", 8, KATANA | RANGED, EARTH, 0 },
+  [0x15E] = { "Girl", 3, SWORD | DAGGER | SPEAR | KATANA | RANGED, ALL, ALL },
+  [0x15F] = { "Sleep", 8, BLUNT | RANGED, 0, 0 },
+  [0x12A] = { "Kefka", 16, SWORD | DAGGER | SPEAR | KATANA | BLUNT | RANGED, 0, 0 },
 }
 local TIERS = { 0x1D7, 0x200, 0x201, 0x202 }
 

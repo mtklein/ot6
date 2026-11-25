@@ -3,24 +3,30 @@
 -- re-verified from the shipped ROM (the battle_breakvector discipline):
 -- every cave species carries its authored Ot6ShieldTbl row, and every
 -- formation the maps 382-386 can draw is chippable by the mission
--- party's classes (slash/pierce/bludg).  docs/design/break-coverage-gate.md
+-- party's hands (TERRA's and EDGAR's blades, LOCKE's daggers, EDGAR's
+-- AutoCrossbow, SABIN's fists).  docs/design/break-coverage-gate.md
 -- is the survey these numbers came from.
 local H = dofile("tools/tests/lib/ot6.lua")
 
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+local W, SK = H.weaponClass, H.skillClass   -- a hand: the class the built ROM gives a weapon, a skill
+
 local WANT = {                    -- species -> { shields, class mask }
   -- audit_break_coverage.py's break-dark findings (kolts + zozo):
-  [0x086] = { 2, 0x02 },          -- cirpius: pierce
-  [0x053] = { 2, 0x04 },          -- hadesgigas: bludg
-  [0x052] = { 2, 0x01 | 0x02 },   -- slamdancer: slash|pierce
-  [0x04E] = { 2, 0x01 | 0x02 },   -- harvester: slash|pierce
-  [0x0DF] = { 2, 0x02 },          -- gabbldegak: pierce
-  [0x06E] = { 2, 0x02 | 0x01 },   -- ninja: pierce|slash
-  [0x0E5] = { 2, 0x01 | 0x04 | 0x08 }, -- spirit: slash|bludg|special (#347)
-  [0x0B3] = { 2, 0x01 },          -- soft flier: slash
-  [0x048] = { 3, 0x02 | 0x04 },   -- shelled tank: pierce|bludg
-  [0x082] = { 4, 0x04 | 0x01 },   -- brute: bludg|slash
+  [0x086] = { 2, DAGGER | RANGED }, -- cirpius: dagger|ranged
+  [0x053] = { 2, BLUNT | RANGED },  -- hadesgigas: blunt|ranged
+  [0x052] = { 2, SWORD | KATANA },  -- slamdancer: sword|katana
+  [0x04E] = { 2, SWORD | SPEAR },   -- harvester: sword|spear
+  [0x0DF] = { 2, DAGGER | RANGED }, -- gabbldegak: dagger|ranged
+  [0x06E] = { 2, SWORD | DAGGER },  -- ninja: sword|dagger
+  [0x0E5] = { 2, KATANA | BLUNT | RANGED }, -- spirit: katana|blunt|ranged (#347)
+  [0x0B3] = { 2, SWORD },           -- soft flier: sword
+  [0x048] = { 3, DAGGER | BLUNT },  -- shelled tank: dagger|blunt
+  [0x082] = { 4, SWORD | RANGED },  -- brute: sword|ranged
 }
-local PARTY_CLASSES = 0x01 | 0x02 | 0x04   -- slash+pierce+bludg on hand
+-- the mission party's hands (gate-cave-save-v1): TERRA's ThunderBlade $0F and EDGAR's Blizzard $0E, LOCKE's
+-- MithrilKnives $01, EDGAR's AutoCrossbow $AA, SABIN's Pummel $5D and his Poison Claw $56
+local PARTY_CLASSES = W(0x0F) | W(0x0E) | W(0x01) | W(0xAA) | SK(0x5D) | W(0x56)
 
 H.run({ maxFrames = 600 }, {
   H.waitFrames(30),

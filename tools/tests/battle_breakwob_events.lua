@@ -9,28 +9,38 @@
 --   2. every species of every formation each fight deals (the event battle groups a script calls, read from
 --      EventBattleGroup; map 149's pool) has an authored row and a key for each party that meets it there;
 --   3. the cutscene bodies and the unreached markers are 0-shield rows (no gauge);
---   4. the lessons: on the raft each hand keys two of the three and TERRA's Fire all three; in the sparkle trap one
---      spirit to each hand, Fire to all, and poison heals them; the raiders take the troopers' keys; any weapon
---      breaks Siegfried.
+--   4. the lessons: on the raft each hand (TERRA's blade, EDGAR's AutoCrossbow, BANON's rod) keys two of the three
+--      and TERRA's Fire all three; in the sparkle trap the crossbow keys all three spirits, the blade the Dark Side
+--      and the rod the Spectre and the Rinn, Fire all, and poison heals them; the raiders take the troopers' keys;
+--      each hand of the train's three breaks Siegfried.  (docs/design/opening.md 9-11 and 10c.  Through v0.50 the
+--      raft's third hand was EDGAR's pike, the trap gave one spirit to each hand, and every weapon class broke
+--      Siegfried: his row was the three weapon hands of four.)
+--
+-- One declared lesson (opening.md "Where the holder rule binds"): the HeavyArmor at the defense takes only a
+-- dagger (bolt, water and the poison add fill the HUD's other cells), so the squad of CYAN and SABIN holds no key
+-- on it; the troopers beside it take CYAN's katana.
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
+local SWORD, DAGGER, BLUNT, RANGED, KATANA, SPEAR = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20   -- ot6_class.asm (#566)
+-- a hand is W(item): the class the built ROM gives the weapon (Ot6WeapClassTbl); SK(ability) a skill's own
+-- (Ot6SkillClassTbl).  Read from the ROM, so a hand follows the classes the build has.
+local W, SK = H.weaponClass, H.skillClass
 local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x022] = { "Pterodon", 2, SLASH | PIERCE, FIRE, 0 },
-  [0x038] = { "Nautiloid", 2, PIERCE | BLUDG, FIRE | BOLT, WATER },
-  [0x039] = { "Exocite", 2, SLASH | BLUDG, FIRE | BOLT, WATER },
-  [0x060] = { "Dark Side", 2, SLASH | SPECIAL, FIRE | HOLY, POISON },
-  [0x0B6] = { "Spectre", 2, BLUDG | SPECIAL, FIRE | HOLY, POISON },
-  [0x0CF] = { "Rinn", 1, PIERCE | SPECIAL, FIRE | HOLY, POISON },
-  [0x079] = { "Bounty Man", 2, SLASH | PIERCE, FIRE, 0 },
-  [0x01C] = { "Fidor", 2, SLASH | PIERCE, FIRE, 0 },
-  [0x0C2] = { "Sp.Forces", 3, SLASH | PIERCE, POISON, 0 },
-  [0x00F] = { "Over-Mind", 2, SLASH | SPECIAL, FIRE | HOLY, POISON },
-  [0x131] = { "Siegfried", 1, SLASH | PIERCE | BLUDG, 0, 0 },
+  [0x022] = { "Pterodon", 2, SWORD | RANGED, FIRE, 0 },
+  [0x038] = { "Nautiloid", 2, BLUNT | RANGED, FIRE | BOLT, WATER },
+  [0x039] = { "Exocite", 2, SWORD | BLUNT, FIRE | BOLT, WATER },
+  [0x060] = { "Dark Side", 2, SWORD | RANGED, FIRE | HOLY, POISON },
+  [0x0B6] = { "Spectre", 2, BLUNT | RANGED, FIRE | HOLY, POISON },
+  [0x0CF] = { "Rinn", 1, BLUNT | RANGED, FIRE | HOLY, POISON },
+  [0x079] = { "Bounty Man", 2, SWORD | DAGGER | KATANA, FIRE, 0 },
+  [0x01C] = { "Fidor", 2, SWORD | DAGGER | KATANA, FIRE, 0 },
+  [0x0C2] = { "Sp.Forces", 3, SWORD | DAGGER, POISON, 0 },
+  [0x00F] = { "Over-Mind", 2, KATANA | RANGED, FIRE | HOLY, POISON },
+  [0x131] = { "Siegfried", 1, DAGGER | KATANA | BLUNT, 0, 0 },
 }
 -- 0-shield rows: the cutscene bodies a called battle deals, and the markers for bodies no reachable formation holds
 -- (tools/check_shield_rows.py proves the second list unreached; break-coverage-wob.md section 18 has the evidence)
@@ -42,21 +52,26 @@ local NO_GAUGE = {
   [0x178] = "$178", [0x17F] = "$17F",
 }
 -- the parties (their hands: weapon classes, and the elements their spells, tools and weapons reach), from the
--- tracked checkpoints' gear and the route's battle logs (break-coverage-wob.md sections 13-17)
-local TERRA = { "TERRA", SLASH, FIRE }
-local EDGAR = { "EDGAR", PIERCE, POISON }
-local BANON = { "BANON", BLUDG, 0 }
-local SABIN = { "SABIN", BLUDG, FIRE | HOLY }
+-- tracked checkpoints' gear and the route's battle logs (break-coverage-wob.md sections 13-17).  A hand is W(the
+-- weapon named for the member): TERRA's MithrilBlade $0A, EDGAR's Mithril Pike $1D (and, in the squads and at
+-- the banquet, his AutoCrossbow $AA), BANON's Punisher $3B, SABIN's fists $FF, CELES's blade (the RegalCutlass
+-- $0B), CYAN's Ashura $2B, SHADOW's Imperial $25, LOCKE's MithrilKnife $01, and GAU's bare hand, which the ROM
+-- makes his fangs (H.handClass)
+local TERRA = { "TERRA", W(0x0A), FIRE }
+local EDGAR = { "EDGAR", W(0x1D) | W(0xAA), POISON }   -- the pike, and the AutoCrossbow the river's fighter steers to
+local BANON = { "BANON", W(0x3B), 0 }
+local SABIN = { "SABIN", W(0xFF), FIRE | HOLY }
 local P = {
   raftUp = { "TERRA, EDGAR, SABIN, BANON", { TERRA, EDGAR, SABIN, BANON } },
   raft = { "TERRA, EDGAR, BANON", { TERRA, EDGAR, BANON } },
-  squad1 = { "TERRA, EDGAR, CELES", { TERRA, EDGAR, { "CELES", SLASH, ICE } } },
-  squad2 = { "CYAN, SABIN", { { "CYAN", SLASH, 0 }, SABIN } },
-  squad3 = { "LOCKE, GAU", { { "LOCKE", PIERCE, 0 }, { "GAU", BLUDG, 0 } } },
+  squad1 = { "TERRA, EDGAR, CELES", { TERRA, { "EDGAR", W(0x1D) | W(0xAA), POISON }, { "CELES", W(0x0B), ICE } } },
+  squad2 = { "CYAN, SABIN", { { "CYAN", W(0x2B), 0 }, SABIN } },
+  squad3 = { "LOCKE, GAU", { { "LOCKE", W(0x01), 0 }, { "GAU", H.handClass(0x0B, 0xFF, false), 0 } } },
   -- battle 30 is fought during the banquet, before the roster rewrite, by vector-crash-v1's party
-  banquet = { "TERRA, LOCKE, EDGAR, SABIN", { { "TERRA", SLASH, FIRE | BOLT }, { "LOCKE", PIERCE, 0 },
-    { "EDGAR", SLASH | PIERCE, ICE | POISON }, { "SABIN", BLUDG, FIRE | HOLY | POISON } } },
-  train = { "SABIN, CYAN, SHADOW", { SABIN, { "CYAN", SLASH, 0 }, { "SHADOW", PIERCE, 0 } } },
+  banquet = { "TERRA, LOCKE, EDGAR, SABIN", { { "TERRA", W(0x0F), FIRE | BOLT }, { "LOCKE", W(0x01), 0 },   -- the ThunderBlade
+    { "EDGAR", W(0x0E) | W(0xAA), ICE | POISON },           -- the Blizzard and the AutoCrossbow
+    { "SABIN", W(0x56) | W(0x55), FIRE | HOLY | POISON } } },   -- the Poison Claw and the Kaiser
+  train = { "SABIN, CYAN, SHADOW", { { "SABIN", W(0x53), FIRE | HOLY }, { "CYAN", W(0x2B), 0 }, { "SHADOW", W(0x25), 0 } } },
 }
 -- the fights: { label, "event", { event battle groups } | "map", map, its SubBattleGroup, parties, species dealt }
 local FIGHTS = {
@@ -95,6 +110,8 @@ H.run({ maxFrames = 600 }, {
     local function weak(sp) return H.readRomByte(prop + sp * 32 + 25) end
     local function absorb(sp) return H.readRomByte(prop + sp * 32 + 23) end
     local function classOf(sp) return shield[sp] and shield[sp][2] or 0 end
+    -- what chips: the vanilla weak byte and an Ot6ElemAddTbl add (the HeavyArmor's poison)
+    local function weakOf(sp) return weak(sp) | (elemAdd[sp] and elemAdd[sp][1] or 0) end
     local rbg = H.sym("RandBattleGroup") & 0x3FFFFF
     local sbg = H.sym("SubBattleGroup") & 0x3FFFFF
     local ebg = H.sym("EventBattleGroup") & 0x3FFFFF
@@ -145,6 +162,8 @@ H.run({ maxFrames = 600 }, {
     H.log(string.format("checked %d designed rows", #ids))
 
     -- 2. each fight's formations against the parties that meet it
+    local LESSON = { [0x09F] = P.squad2[1] }
+    local lessons = 0
     for _, fight in ipairs(FIGHTS) do
       local label, forms, parties, dealt = fight[1], {}, nil, fight[#fight]
       if fight[2] == "event" then
@@ -169,9 +188,18 @@ H.run({ maxFrames = 600 }, {
             for _, party in ipairs(parties) do
               local cls, el = 0, 0
               for _, m in ipairs(party[2]) do cls, el = cls | m[2], el | m[3] end
-              if (classOf(sp) & cls) == 0 and (weak(sp) & el) == 0 then
-                problem("formation %d (%s): species $%03X (class $%02X, weak $%02X) has no key for %s", f, label, sp,
-                  classOf(sp), weak(sp), party[1])
+              if (classOf(sp) & cls) == 0 and (weakOf(sp) & el) == 0 then
+                if LESSON[sp] == party[1] then
+                  lessons = lessons + 1
+                  H.log(string.format("formation %d (%s): $%03X has no key for %s: the declared lesson", f, label,
+                    sp, party[1]))
+                else
+                  problem("formation %d (%s): species $%03X (class $%02X, weak $%02X) has no key for %s", f, label,
+                    sp, classOf(sp), weakOf(sp), party[1])
+                end
+              elseif LESSON[sp] == party[1] then
+                problem("formation %d (%s): $%03X is keyed for %s, against the declared lesson", f, label, sp,
+                  party[1])
               end
             end
           end
@@ -182,6 +210,8 @@ H.run({ maxFrames = 600 }, {
       end
       H.log(string.format("checked %d formation-species pairs of %s", n, label))
     end
+
+    if lessons == 0 then problem("the HeavyArmor lesson was never met: is $09F still in the raiders' formations?") end
 
     -- 3. the bodies with no gauge
     local nNo = 0
@@ -197,7 +227,7 @@ H.run({ maxFrames = 600 }, {
 
     -- 4. the lessons
     local raft = { 0x022, 0x038, 0x039 }
-    for _, hand in ipairs({ { "TERRA's blade", SLASH }, { "EDGAR's pike", PIERCE }, { "BANON's rod", BLUDG } }) do
+    for _, hand in ipairs({ { "TERRA's blade", W(0x0A) }, { "EDGAR's AutoCrossbow", W(0xAA) }, { "BANON's rod", W(0x3B) } }) do
       local k = 0
       for _, sp in ipairs(raft) do if (classOf(sp) & hand[2]) ~= 0 then k = k + 1 end end
       if k ~= 2 then problem("the raft: %s keys %d of the three, want two", hand[1], k) end
@@ -205,10 +235,13 @@ H.run({ maxFrames = 600 }, {
     for _, sp in ipairs(raft) do
       if (weak(sp) & FIRE) == 0 then problem("the raft: $%03X is not fire-weak; TERRA's Fire keys all three", sp) end
     end
-    local trap = { [0x060] = SLASH, [0x0B6] = BLUDG, [0x0CF] = PIERCE }
+    -- among the three hands (TERRA's blade, EDGAR's AutoCrossbow, BANON's rod): the crossbow keys every spirit,
+    -- the blade the Dark Side, the rod the Spectre and the Rinn (opening.md 11)
+    local trap = { [0x060] = W(0x0A) | W(0xAA), [0x0B6] = W(0x3B) | W(0xAA), [0x0CF] = W(0x3B) | W(0xAA) }
+    local THREE = W(0x0A) | W(0xAA) | W(0x3B)
     for sp, hand in pairs(trap) do
-      if (classOf(sp) & (SLASH | PIERCE | BLUDG)) ~= hand then
-        problem("the trap: $%03X's one weapon key is $%02X, want $%02X", sp, classOf(sp) & 7, hand)
+      if (classOf(sp) & THREE) ~= hand then
+        problem("the trap: $%03X's keys among the three hands are $%02X, want $%02X", sp, classOf(sp) & THREE, hand)
       end
       if (weak(sp) & FIRE) == 0 or (absorb(sp) & POISON) == 0 then
         problem("the trap: $%03X should be fire-weak and drink poison", sp)
@@ -219,9 +252,13 @@ H.run({ maxFrames = 600 }, {
         problem("$%03X: a raider should take the troopers' keys ($%02X), not $%02X", sp, classOf(0x065), classOf(sp))
       end
     end
-    if classOf(0x131) ~= (SLASH | PIERCE | BLUDG) then problem("Siegfried: every weapon hand should break him") end
-    H.log("the lessons: the raft splits its hands two-and-two, the trap one spirit to each hand, the raiders take "
-      .. "the troopers' keys, any weapon breaks Siegfried")
+    for _, m in ipairs(P.train[2]) do
+      if (classOf(0x131) & m[2]) == 0 then
+        problem("Siegfried: %s's hand should break him (class $%02X, the hand $%02X)", m[1], classOf(0x131), m[2])
+      end
+    end
+    H.log("the lessons: the raft splits its hands two-and-two, the crossbow keys the trap's three and the blade and "
+      .. "the rod split them, the raiders take the troopers' keys, each of the train's three hands breaks Siegfried")
     H.assertEq(#problems, 0, "WoB event-fight break row mismatches")
     H.log("WoB event-fight break rows verified against the built ROM")
   end),
