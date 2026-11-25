@@ -78,7 +78,7 @@ inhales!"), Number 024 ("Its wall glows!"; his wall holds until the spell),
 Number 128 ("Its core heats!", when one of his blades falls), each of the
 Cranes ("Deck groans!"), Ultros at Esper Mountain ("He looms over you!",
 once he has crept all the way forward; enough hits push him back a step),
-FlameEater ("It drinks the fire!", after fire hits it), Chupon on the
+FlameEater ("It swells with flame!"), Chupon on the
 airship ("It inhales!", after he has been hit three times), the Air Force's
 MissileBay ("Missiles lock on!"; breaking the bay stops it, breaking the
 Air Force does not), AtmaWeapon once it is badly hurt ("Vast energy

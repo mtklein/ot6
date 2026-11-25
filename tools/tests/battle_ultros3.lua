@@ -132,11 +132,13 @@ function held()
       waveF = mc.f
       H.log(string.format("[ultros3] held: the wave at f%d; from the arming %d blow(s) dispatched, the tally at %d "
         .. "or more, the steps at %d at the least", waveF, blows, minTally, minSteps))
+      -- (the steps first: a step back also clears the tally, so on a ROM without the hold the precondition below
+      -- would be what went red -- the u3_no_hold mutant's first run, build/attempts/wt/v052-tg-wob3/mutants-a/)
+      H.assertEq(minSteps, EDGE, "held: his steps stayed at 4 from the arming to the wave (no blow pushed him back "
+        .. "while he held the edge)")
       H.assertEq(blows >= 1 and minTally >= 8, true, string.format("held: blows landed between the arming and the "
         .. "wave with his tally at 8 or more (%d blow(s), the tally at least %d; the case's precondition)", blows,
         minTally))
-      H.assertEq(minSteps, EDGE, "held: his steps stayed at 4 from the arming to the wave (no blow pushed him back "
-        .. "while he held the edge)")
     end),
     H.kitBattle({}, { idle = "defend", care = false, maxFrames = 8000,
       giveUp = function()

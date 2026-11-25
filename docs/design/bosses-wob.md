@@ -41,9 +41,10 @@ Stated once, assumed by every block:
   (the Whelk to TunnelArmr, wt/v051-tg-wob1), 7-10 (Telstar, the
   GhostTrain, Rizopas, Kefka at Narshe, wt/v051-tg-wob2) and 11-16
   (Dadaluma, the opera Ultros, Ifrit and Shiva, Number 024, Number 128,
-  the Cranes, wt/v052-tg-wob2) are built too (each block's **Built**
-  line). Every other **Telegraph** line below is
-  design text: the scripts do not announce those moves yet. The fuse
+  the Cranes, wt/v052-tg-wob2) and 17-22 (the bridge Ultros, FlameEater,
+  Chupon on the deck, the MissileBay, AtmaWeapon's last phase, Nerapa,
+  wt/v052-tg-wob3) are built too (each block's **Built** line), so every
+  World of Balance boss block is. The fuse
   block's idiom for writing them, and its worked example, are in
   `ot6_fuse.asm` and `battle_fuse`.
 - **Not every boss races** (owner, 2026-11-24: "not every move needs to
@@ -72,6 +73,12 @@ Stated once, assumed by every block:
   | 14 | Number 024 | 1 turn | Warning for the line (broken before any line, 4 of 5); a banked party 2 of 5 |
   | 15 | Number 128 | 1 turn | Warning: banked 1 of 4; the line never cuts a blade, so never meets the ray |
   | 16 | Cranes | 1 turn each | The line kills both before either clock (4 of 4 keys); banked, the left Crane's quake stopped on the 3 keys that announced |
+  | 17 | Ultros ③ | 1 turn | Warning: the line keeps him back and breaks him first (5 of 5); a party that holds lets him reach the edge and takes the wave at 7 shields (5 of 5) |
+  | 18 | FlameEater | 1 turn | Race: banked, broken in the fuse on 4 of 5 keys; the line broke it before any line on 3, in the fuse on 1 |
+  | 19 | Chupon | 1 turn | Race: the line broke him in the fuse on 3 of 5 keys (before any line on 2); banked, 4 of 4 |
+  | 20 | MissileBay | 1 turn | Race for a party that aims at the bay: banked, 3 of 3 that ran to a result; the line works on the body and took the Launcher on 4 of 5 |
+  | 21 | AtmaWeapon, last phase | 1 turn | The line ends the fight in the break window that crosses 6,144 (5 of 5); banked, broken in the fuse on the 2 keys that announced |
+  | 22 | Nerapa | 1 turn | Warning the line never meets: broken before six Fights are counted (5 of 5) |
 
   Ultros and TunnelArmr stay at one turn: their warnings fit the feel,
   and a longer fuse would only lengthen fights the party usually ends
@@ -1390,12 +1397,41 @@ Party: the factory four (Setzer is flying the airship).
 
 ### 17. Ultros ③ — the rope bridge
 
-Party: Terra + three.
+Party: TERRA, LOCKE, STRAGO and RELM (battle 125; RELM is seated at the
+open).
 
 **Shields:** 7 · **Weak:** the row ✦, third verse.
 
-- **Telegraph:** tentacles again. By this point the player knows the
-  pattern and breaks him without probing.
+- **Telegraph:** his advance. Each rotation of two turns he creeps a
+  step toward the party, and the party's blows push him back a step
+  (vanilla: his counter's tally, a Fight 1 and a spell 4, steps him back
+  at 8 once he stands two steps out). When he reaches the edge he
+  announces a wave. The four Ultros fights each announce differently:
+  the Lete's rotation and Tentacle on BANON, the opera's battle timer
+  and Imp Song, the bridge's advance that hits hold back, and the
+  deck, where Chupon carries the telegraph (block 19).
+- **Built (wt/v052-tg-wob3, `battle_ultros3`).** Vanilla's edge was 8
+  steps, where he quaked (Magnitude8, Aqua Rake or Magnitude8) and sank
+  back to the start; a party that hits him never let him get there. The
+  edge is now 4 steps (battle variable 1). The turn that finds him there
+  arms the fuse (monster switches 0 and 1); "He looms over you!"
+  (dialogue `$96`) and a glow announce it on his next turn, and Aqua
+  Rake on the whole party comes on the turn after (the wave alone:
+  Aqua Rake is the lore STRAGO studies from him, and Magnitude8 is gone
+  from his script). His turn after the wave is vanilla's sink back to
+  the start (four steps back, his steps 0). While he holds the edge no
+  blow steps him back (the counter's step back waits on switch 1), so
+  the steps he sinks are the steps he took. A break in between cancels
+  the wave (`Ot6FuseTbl` row `$012E`: switch 0 goes, switch 1 stays) and
+  his first turn back is the sink: the break knocks him back to the
+  start, and four more steps earn the wave again.
+  Lab (one turn, 7 shields, the route's four, keys `$37 $47 $67 $77
+  $97`, `build/attempts/wt/v052-tg-wob3/F-ultros3/`): a **warning**.
+  The line's own fighter breaks him 5-7 actions in and keeps him back,
+  and never meets the wave, 5 of 5 keys. A party that holds its turns
+  to bank lets him reach the edge and took the wave with all 7 shields
+  up, 3 actions after the line, 5 of 5. Kept at 7: the lesson is to
+  keep hitting him, not to race the wave.
 - **Break story:** the espers interrupt and end the fight on the
   script's schedule, regardless of break state. Breaking him before
   they arrive has no mechanical effect.
@@ -1415,8 +1451,26 @@ Balloons: 1 · ice, water.
 bolt|poison|holy|earth and +23 `$01` **absorbing fire**. Water above is
 an OT6 add, not vanilla. `$0de` Balloon weak = `$82` = ice|water.)
 
-- **Telegraph:** it absorbs the room's fire and turns white →
+- **Telegraph:** it swells with the room's fire →
   **Fireball** across the party. Break during the fuse to cancel it.
+- **Built (wt/v052-tg-wob3, `battle_flameeater`).** The last turn of its
+  rotation of three arms the fuse (monster switch 2; 0 and 1 are its
+  opening and its Bomblet calls); "It swells with flame!" (dialogue
+  `$9D`) and a glow announce it on its next turn, and Fire Ball on the
+  whole party comes on the turn after. A break in between cancels it
+  (`Ot6FuseTbl` row `$0116`) and the rotation earns it again. Fire Ball
+  comes only announced (its rotation casts Fire where vanilla could
+  pick it). A first cut armed it when fire struck it, from its counter;
+  an absorbed spell starts no counter, so it never armed
+  (`build/attempts/wt/v052-tg-wob3/regen2/suites/battle_flameeater-red.log`).
+  Lab (one turn, 7 shields, STRAGO, TERRA and LOCKE, keys `$4C $5C $7C
+  $8C $AC`, `build/attempts/wt/v052-tg-wob3/F-flameeater/`): a **race**.
+  A party that Defends to the line and then plays its chips (TERRA's
+  Ice, the others' Fights, at their whole bank) broke it in the fuse on
+  4 of 5 keys, 2-3 actions after the line, and took the Fire Ball with
+  3 shields left on `$8C`. The line's own fighter broke it before any
+  line on 3 keys, in the fuse on `$4C`, and on `$8C` met the line just
+  after a break and took the Fire Ball with 4 left. Kept at 7.
 - **Break story:** this is Strago's first fight. **Analyze** reads the
   full row on turn one, and Aqua Breath is both the water chip *and*
   the AoE that clears the Balloons before they chain Exploder. The
@@ -1450,11 +1504,35 @@ is an `Ot6ElemAddTbl` row, `$0168` `.byte $04`. Water is NOT added and
 must not be — `$168` absorbs water, as does every Ultros record
 (`+23 = $80`, all four). `$12f` Chupon weak = `$82` = ice|water.)
 
-- **Telegraph:** Ultros's tentacles, for the last time. Chupon has no
-  telegraph of his own. When Ultros has taken enough damage, Chupon
-  inhales → **Sneeze**, and a character leaves the battle with no
-  saving throw and no way to prevent it. The script runs regardless of
-  break state, so the fight ends by script rather than by winning.
+- **Telegraph:** Chupon's temper. Ultros announces nothing on the deck
+  (his tentacles are the Lete's telegraph); "Better not irritate him!",
+  his own line, is the tutorial. Chupon's dying Sneeze, which sneezes
+  the whole party out and ends the battle (vanilla's `if_self_dead`
+  counter), is unchanged: it is the unit's one dying counterattack, and
+  no fuse touches it. (The airship Chupon, `$12F`, has no Sneeze
+  before that: Battle and Fire Ball.)
+- **Built (wt/v052-tg-wob3, `battle_chupon`).** Every blow that strikes
+  Chupon is counted (his counter, battle variable 3, which nothing else
+  in this fight uses); on his first turn with three counted, "It
+  inhales!" (dialogue `$94`, Ifrit's line) and a glow announce it, and
+  Fire Ball on the whole party comes on his next turn. The count is the
+  fuse block's own condition and only climbs until the move's turn
+  clears it. A break in between cancels it and clears the count
+  (`Ot6FuseTbl` row `$012F`, `OT6_FUSE_VAR3`): three more blows earn it
+  again. Blows on a Broken Chupon count nothing. Fire Ball comes only
+  announced (his rotation's second turn Fights where vanilla could pick
+  it). Hitting him starts the clock, and only Ranged breaks him, so
+  the race is the deck's: chip him down with EDGAR's AutoCrossbow and
+  break him in the fuse.
+  Lab (one turn, 4 shields, TERRA, LOCKE and EDGAR, from the deck: the
+  line's own fighter plays until Chupon comes down, keys `$35 $8C $97
+  $EF $F1`, `build/attempts/wt/v052-tg-wob3/F-chupon/`): a **race**. The
+  line's own fighter broke him in the fuse on 3 of 5 keys, 1-3 actions
+  after the line, and before any line on the other 2; a party that
+  Defends to the line (its arming blows aimed at him) and then chips
+  broke him in the fuse on 4 of 4 keys that ran, 1-5 actions after it
+  (the fifth run, `$EF`, stopped on the lab's own cursor: "the target
+  select never reached monster 0"). Kept at 4.
   Chupon's arrival is Ultros's counter under 12,800 HP, and it comes on
   cue even if Ultros is Broken (#329): `battle_ultros4.lua` breaks him
   with unboosted Fights (one chip a hand) and dumps into the window;
@@ -1498,6 +1576,30 @@ the Speck's purpose is to absorb spells.)
 - **Telegraph:** the missile bay racks and locks → **Launcher**
   barrage. Breaking the *bay* cancels it; breaking the body does not.
   This is one step up from Number 128.
+- **Built (wt/v052-tg-wob3, `battle_airforce`).** The MissileBay's
+  second Missile turn arms the fuse (its monster switch 0; under 1,536
+  HP every Missile turn does); "Missiles lock on!" (dialogue `$9E`) and
+  a glow announce it on its next turn, and the Launcher comes on the
+  turn after. A break of the bay in between cancels it (`Ot6FuseTbl`
+  row `$0147`) and two more Missile turns earn it again; a break of the
+  Air Force's body leaves it lit and the Launcher comes on the bay's
+  next turn (`battle_airforce`'s body case). The Launcher comes only
+  announced: vanilla's bay fired only Missiles above 1,536 HP and the
+  Launcher twice in three turns below it; now the barrage is announced
+  every fourth bay turn from the open (every third below 1,536). The
+  Air Force's own Wave Cannon countdown ("Count 6!" to "Count 1!", once
+  the Laser Gun has fallen) is vanilla's and unchanged: it has no row
+  in `Ot6FuseTbl`, so a break of the body does not cancel it.
+  Lab (one turn, 3 shields on the bay, TERRA, LOCKE and EDGAR, from the
+  deck through Ultros IV, keys `$19 $3D $45 $C9 $ED`,
+  `build/attempts/wt/v052-tg-wob3/F-bay/`): a **race** for a party that
+  aims at the bay. A party that Defends to the line and then chips the
+  bay (EDGAR's AutoCrossbow, the others' Fights aimed at it) broke it in
+  the fuse on 3 of the 3 keys that ran to a result, 3-8 actions after
+  the line (`$C9`: the battle ended in the fuse; `$19` stopped on the
+  lab's cursor). The line's own fighter, which works on the body, broke
+  the bay in the fuse once (`$C9`) and took the Launcher with the bay's
+  3 shields up on the other 4. Kept at 3.
 - **Break story:** kill both pods and it deploys the Speck, which
   absorbs every spell you cast. That is vanilla behaviour and is
   preserved whole ✦. The answer is the Speck's single shield: any
@@ -1537,6 +1639,26 @@ roster.
   (build/attempts/wt/v051-fuse/measure/atmaweapon.log). Under 6,144 HP
   the rotation is a different one and no longer reaches Mind Blast, so a
   fuse not yet lit never comes; one already lit still fires.
+- **Built: the last phase (wt/v052-tg-wob3, `battle_atmaweapon`'s
+  `atmaweapon_low` cases).** The climax keeps its big move to the end:
+  under 6,144 HP the low rotation's second turn (Rasp, W.Wind or Blaze)
+  arms a second fuse (monster switch 2); "Vast energy focused" (the same
+  line) and a glow come on its next turn and Flare Star on the turn
+  after, one turn of warning where the first fuse gives two, and no
+  Shell, Safe or Haste. A break in between cancels it (`Ot6FuseTbl`'s
+  second `$0117` row) and the rotation's two turns earn it again. Its
+  `if_self_dead` counter is `boss_death` alone and its low-HP Flare
+  counter is unchanged. Flare Star took 520 of each member's HP
+  (39-49%) on the damage run (`build/attempts/wt/v052-tg-wob3/F-dmg/`).
+  Lab (the last phase, 11 shields, TERRA, LOCKE, EDGAR and SHADOW, the
+  line's own fighter playing until it is under 6,144 HP, keys `$36 $9C
+  $9E $9F $A0`, `build/attempts/wt/v052-tg-wob3/F-atma/`): the line's
+  fighter crosses 6,144 inside a break window and ends the fight there,
+  5 of 5 keys, so it never meets the last phase's line; a party that
+  then holds and banks met the line on 2 keys (`$9E`, `$A0`) and broke
+  it in the fuse 3 actions after it, all 11 shields; on 2 more the
+  break window's hits ended the fight first (`$36`, `$9C`; the fifth
+  run, `$9F`, stopped on the lab's own cursor). Kept at 11.
 - **Break story:** 11 shields takes two to three full break cycles,
   with the fuse returning every rotation. Bank BP, break *on* the
   fuse, dump during the ×2 window, survive Mind Blast, and rebuild.
@@ -1603,6 +1725,22 @@ its own `ExecCmd`; read that way, the ledgers say:
   or a Battle at t≈1,550-2,100 in almost every seed; the driver then
   raises her and she dies again (`control_i7`: 5 raises, 8 deaths, a
   "win" at 0:09). Nobody dies to Doom before t≈5,400.
+
+**Built (wt/v052-tg-wob3, `battle_nerapa`): Roulette is announced.**
+Vanilla spun Roulette on its first turn with six of the party's Fights
+counted (its counter: a Battle back, and the tally). Now that turn says
+"The wheel turns!" (dialogue `$9F`) and glows, and Roulette comes on its
+next turn. The tally moved to battle variable 3 so that a break can
+clear it (`Ot6FuseTbl` row `$0118`, `OT6_FUSE_VAR3`): a break in between
+cancels Roulette and six more Fights earn it again; Fights on a Broken
+Nerapa count nothing. Its Fight counter is no dying counter and is
+otherwise vanilla's. Lab (5 shields, TERRA, LOCKE, EDGAR and CELES at the
+doorstep, keys `$09 $41 $65 $71 $B1`,
+`build/attempts/wt/v052-tg-wob3/F-nerapa/`): a **warning** the line never
+meets. The line's own fighter breaks it 4-5 actions in, before six
+Fights are counted, 5 of 5 keys, and a party that Fights at its bank
+broke it 7-8 actions in, before any line, on 4 of 5 (on `$71` the
+battle ended first). Kept at 5: the escape's doorman stays a sprint.
 
 **Break story, corrected.** Reflect makes this a *physical* break, and
 the party has the tool: LOCKE's Genji pair (ThunderBlade, Sword + bolt;
