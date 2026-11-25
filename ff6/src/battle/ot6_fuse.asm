@@ -114,11 +114,18 @@ OT6_FUSE_HOLD   = $04           ; every break of this body, lit or not, sets
                                 ;   call, so a break sends a pending call away
                                 ;   and the Broken head stays out for its
                                 ;   whole window
-; Flags $20-$40 are free.  The contract's other break rule (the owner,
-; 2026-11-23: "a break releases whatever the broken body holds", unit B's
-; Tentacles) fits here as a flag and a row that applies at every break, lit
-; or not: the release itself is Discard's target effect (TargetEffect_44,
-; battle_main.asm) on the member the body's $3358 names.  Not built.
+OT6_FUSE_SETB0  = $20           ; the cancel also SETS battle switch 0 (a
+                                ;   lit row's once-flag: Umaro's cherry,
+                                ;   vanilla's "eaten" switch, so a break in
+                                ;   the fuse is the cherry gone for the fight;
+                                ;   wt/v052-tg-wor1)
+OT6_FUSE_RELEASE = $40          ; every break of this body, lit or not, frees
+                                ;   the member it holds (Ot6FuseRelease): the
+                                ;   contract's other break rule (the owner,
+                                ;   2026-11-23: "definitely breaking a
+                                ;   tentacle should free a party member"), the
+                                ;   Tentacles' Seize (wt/v052-tg-wor1)
+; No flag is free now.
 
 ; one row a fuse, 8 bytes:
 ;   +0 the species (word)
@@ -251,6 +258,51 @@ Ot6FuseTbl:
         ; (battle variable 3), which a break clears
         ot6_fuse $0118, Ot6FuseNerapa, Ot6FuseNerapa, $ff, $ff, OT6_FUSE_VAR3
         ; ---- end wt/v052-tg-wob3 ----
+        ; ---- wt/v052-tg-wor1: World of Ruin units B and C (bosses-wor.md blocks 1, 2, 4, 8, 9, 11) ----
+        ; the Tentacles: "It coils to seize!", Seize on the Slowed member it
+        ; names on its next turn; one row a body a seat (the seat's own
+        ; monster switch 0-3, set by the announce; switch 7, the hold, is
+        ; kept).  Every break of a Tentacle, lit or not, frees the member it
+        ; holds (OT6_FUSE_RELEASE, Ot6FuseRelease)
+        ot6_fuse $011B, Ot6FuseTent11B_1, Ot6FuseTent11B_1, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $011B, Ot6FuseTent11B_2, Ot6FuseTent11B_2, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $011B, Ot6FuseTent11B_3, Ot6FuseTent11B_3, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $011B, Ot6FuseTent11B_4, Ot6FuseTent11B_4, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013C, Ot6FuseTent13C_1, Ot6FuseTent13C_1, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013C, Ot6FuseTent13C_2, Ot6FuseTent13C_2, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013C, Ot6FuseTent13C_3, Ot6FuseTent13C_3, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013C, Ot6FuseTent13C_4, Ot6FuseTent13C_4, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013D, Ot6FuseTent13D_1, Ot6FuseTent13D_1, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013D, Ot6FuseTent13D_2, Ot6FuseTent13D_2, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013D, Ot6FuseTent13D_3, Ot6FuseTent13D_3, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013D, Ot6FuseTent13D_4, Ot6FuseTent13D_4, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013E, Ot6FuseTent13E_1, Ot6FuseTent13E_1, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013E, Ot6FuseTent13E_2, Ot6FuseTent13E_2, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013E, Ot6FuseTent13E_3, Ot6FuseTent13E_3, $f0, $ff, OT6_FUSE_RELEASE
+        ot6_fuse $013E, Ot6FuseTent13E_4, Ot6FuseTent13E_4, $f0, $ff, OT6_FUSE_RELEASE
+        ; Dullahan: "Its blade rimes over!", Absolute 0; armed by eight blows
+        ; counted (battle variable 3, vanilla 1), which a break clears
+        ot6_fuse $011C, Ot6FuseDullahan, Ot6FuseDullahan, $ff, $ff, OT6_FUSE_VAR3
+        ; Phunbaba's second visit: "He fills his lungs!" on a turn under
+        ; 20,480 HP, lit by battle switch 1 until the hit that takes him
+        ; under 15,360 brings two BabaBreaths (his counter's); a break clears
+        ; the switch, and that crossing then ends the battle with no breath
+        .word   $016C, 0
+        .byte   $02, $ff, $fd, OT6_FUSE_SWITCH
+        ; the demon Chadarnook: "The paint runs!", the swap to the goddess;
+        ; armed by his clock (which a break restarts); monster switch 0 holds
+        ; his counter's swap while lit, and battle variable 2 (vanilla 0), his
+        ; tally of hits, is cleared by a break
+        ot6_fuse $0148, Ot6FuseChadarnook, Ot6FuseChadarnook, $fe, $ff, OT6_FUSE_TIMER | OT6_FUSE_VAR2
+        ; Umaro: "He digs out a Green Cherry!", the cherry; armed under 10,240
+        ; HP (battle switch 2: his monster variable is his tally of spells,
+        ; and shares the byte with his monster switches); a break clears it
+        ; and sets battle switch 0, vanilla's "eaten": the cherry is gone
+        ot6_fuse $0110, Ot6FuseUmaro, Ot6FuseUmaro, $ff, $fb, OT6_FUSE_SETB0
+        ; Tritoch: "Frost climbs the cliff!" on its rotation's first turn,
+        ; Ice 3 on its second (its rotation again)
+        ot6_fuse $0144, Ot6FuseTritoch, Ot6FuseTritoch, $ff, $ff, 0
+        ; ---- end wt/v052-tg-wor1 ----
         .word   $ffff
 
 ; the announce lines a counter speaks (a `dlg` id, low byte; every id is
@@ -379,6 +431,7 @@ Ot6FuseLineTbl:
         bcc     @hold
         jsr     Ot6FuseSnuff
 @hold:  jsr     Ot6FuseHold     ; (after the cancel's clears: a hold wins)
+        jsr     Ot6FuseRelease  ; (lit or not: the held member goes free)
 @done:  plp
         plx
 @out:   rts
@@ -451,10 +504,62 @@ Ot6FuseLineTbl:
         stz     $3eb2           ; battle variable 2 (Dadaluma's tally)
 @btimer:
         lsr
-        bcc     @out
+        bcc     @setb0
         stz     $3a44           ; the battle timer, as reset_battle_timer
         stz     $3a45           ;   leaves it (MiscAIEffect_04)
+@setb0: lsr
+        bcc     @out
+        lda     #$01
+        tsb     $3eb0           ; battle switch 0 SET: the row's once-flag
+                                ;   (OT6_FUSE_SETB0: Umaro's cherry gone)
 @out:   rts
+.endproc
+
+; [ a break frees what the body holds ]
+; Its own proc so the suites can watch it.  y = the monster.  a8/i16, db=$7e.
+; For a body with an OT6_FUSE_RELEASE row, at every break, lit or not: the
+; member its $3358 names is let go, exactly as Discard lets go
+; (TargetEffect_44, battle_main.asm): the holder's seize target and the
+; member's seize attacker invalid ($3358,y / $3359,x = $ff), the holder's
+; switch 7 (it holds) clear, and the member's bit back in $3403 (not seized).
+; The member's turns are the game's own from there, as after a Discard.
+; preserves y; clobbers a/x (b = 0 out).
+.proc Ot6FuseRelease
+        .a8
+        .i16
+        ldx     #$0000
+@row:   longa
+        lda     f:Ot6FuseTbl,x
+        cmp     #$ffff
+        beq     @out
+        cmp     OT6_SPECIES-8,y
+        shorta                  ; (plain sep: z is the compare's)
+        bne     @next
+        lda     f:Ot6FuseTbl+7,x
+        and     #OT6_FUSE_RELEASE
+        bne     @free
+@next:  longa
+        txa
+        clc
+        adc     #$0008
+        tax
+        bra     @row
+@out:   shorta0
+        rts
+@free:  clr_a                   ; b = 0 for the tax
+        lda     $3358,y         ; the member it holds
+        bmi     @none           ; (none)
+        tax                     ; x = the member
+        lda     #$ff
+        sta     $3358,y         ; the holder's seize target invalid
+        sta     $3359,x         ; the member's seize attacker invalid
+        lda     $3dac,y
+        and     #$7f
+        sta     $3dac,y         ; the holder's switch 7 (it holds) clear
+        lda     $3018,x
+        tsb     $3403           ; the member is no longer seized
+@none:  clr_a
+        rts
 .endproc
 
 ; [ the hud's poll: one monster slot a frame ]

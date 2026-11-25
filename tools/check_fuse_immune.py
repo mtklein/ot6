@@ -83,6 +83,13 @@ def rows(rom, s):
                     cmd = rom[AI + x + 1]
                     move, mp = "command $%02X" % cmd, 0
                     break
+                # (an item is a move too: use_item / throw_item, $F6 -- Umaro's Green Cherry, wt/v052-tg-wor1: the
+                # Item command, $01, or Throw, $08, which costs no MP and which an Imp keeps where the command's
+                # flag says so)
+                if b == 0xF6:
+                    cmd = 0x08 if rom[AI + x + 1] else 0x01
+                    move, mp = "item $%02X, command $%02X" % (rom[AI + x + 2], cmd), 0
+                    break
                 if b == 0xF5 and rom[AI + x + 2] in (0, 1):
                     move, mp = "a call or a withdrawal (entry/exit)", 0
                     break

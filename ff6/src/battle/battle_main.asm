@@ -17086,6 +17086,8 @@ GHOSTTRAIN_HP_OT6    = 2600
 ;   $106 GhostTrain  (its max HP, #400, above)
 ;   $10A Number 024  +$14 $CF -> $EF (Imp: Ice 2, Fire 2, Bolt 2 cost MP)
 ;   $10B Number 128  $ED -> $FD (Berserk)
+;   $110 Umaro       $6B -> $7B (Berserk; wt/v052-tg-wor1: the Green
+;                    Cherry is an item, which Mute and an Imp keep)
 ;   $118 Nerapa      $CE -> $DE (Berserk)
 ;   $12F Chupon      $63 -> $7B (Berserk and Mute: Fire Ball costs 20)
 ;   $150 Gold Dragon $EB -> $FB (Berserk)
@@ -17104,7 +17106,9 @@ MonsterProp:
         ot6_imm2 $10A, $EF                      ; (+$14, blocked status 1: Imp)
         .incbin "monster_prop.dat", $10A * 32 + OT6_IMM1 + 1, $10B * 32 + OT6_IMM2 - ($10A * 32 + OT6_IMM1 + 1)
         ot6_imm2 $10B, $FD
-        .incbin "monster_prop.dat", $10B * 32 + OT6_IMM2 + 1, $118 * 32 - $10B * 32 - 1
+        .incbin "monster_prop.dat", $10B * 32 + OT6_IMM2 + 1, $110 * 32 - $10B * 32 - 1
+        ot6_imm2 $110, $7B                      ; (wt/v052-tg-wor1: Umaro, Berserk)
+        .incbin "monster_prop.dat", $110 * 32 + OT6_IMM2 + 1, $118 * 32 - $110 * 32 - 1
         ot6_imm2 $118, $DE
         .incbin "monster_prop.dat", $118 * 32 + OT6_IMM2 + 1, $12F * 32 - $118 * 32 - 1
         ot6_imm2 $12F, $7B
