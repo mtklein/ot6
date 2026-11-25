@@ -233,8 +233,9 @@ Ot6FuseTbl:
         ; of his advance (monster switch 0).  Switch 1 (he holds the edge) is
         ; kept: his first turn back is the sink to the start, the advance again
         ot6_fuse $012e, Ot6FuseUltros3, Ot6FuseUltros3, $fe, $ff, 0
-        ; FlameEater: "It drinks the fire!", Fire Ball; armed by fire that
-        ; strikes it (monster switch 2; 0 and 1 are its opening and its calls)
+        ; FlameEater: "It swells with flame!", Fire Ball; armed by its
+        ; rotation's last turn (monster switch 2; 0 and 1 are its opening and
+        ; its calls)
         ot6_fuse $0116, Ot6FuseFlameEater, Ot6FuseFlameEater, $fb, $ff, 0
         ; Chupon: "It inhales!" (Ifrit's line), Fire Ball; armed by three blows
         ; counted (battle variable 3), which a break clears

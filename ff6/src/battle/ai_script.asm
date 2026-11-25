@@ -5381,18 +5381,18 @@ AIScript::_277:
 ; ------------------------------------------------------------------------------
 
 ; flameeater
-; OT6 (bosses-wob.md block 18, wt/v052-tg-wob3): the fire it drinks is its telegraph.  It absorbs fire (vanilla); a
-; fire spell that strikes it now ARMS the fuse (its counter, monster switch 2: switches 0 and 1 are its opening and
-; its Bomblet calls).  "It drinks the fire!" (battle dialogue $9D) and a glow announce it on its next turn, and Fire
-; Ball on the whole party comes on the turn after.  A break in between cancels it (Ot6FuseTbl: switch 2 goes): the
-; next fire that strikes it arms it again.  A Broken FlameEater drinks nothing (a counter that only arms is skipped
-; while it is Broken, ot6_break.asm), and behind its Reflect the party's fire bounces and never strikes it.  The fuse
-; block comes first, so neither its clock, its Reflect nor its Bomblet calls can take the Fire Ball's turn.  Fire
-; Ball comes only announced: its rotation casts Fire where vanilla could pick it.  Everything else is vanilla's.
+; OT6 (bosses-wob.md block 18, wt/v052-tg-wob3): Fire Ball is its telegraph.  The last turn of its rotation of three
+; now ARMS the fuse (monster switch 2: switches 0 and 1 are its opening and its Bomblet calls); "It swells with
+; flame!" (battle dialogue $9D) and a glow announce it on its next turn, and Fire Ball on the whole party comes on the
+; turn after.  A break in between cancels it (Ot6FuseTbl: switch 2 goes): the rotation's three turns earn it again.
+; (A first cut armed it from its counter when fire struck it; an absorbed spell starts no counter, so the fuse never
+; armed: build/attempts/wt/v052-tg-wob3/regen2/suites/battle_flameeater-red.log.)  The fuse block comes first, so
+; neither its clock, its Reflect nor its Bomblet calls can take the Fire Ball's turn.  Fire Ball comes only
+; announced: its rotation casts Fire where vanilla could pick it.  Everything else is vanilla's.
 AIScript::_278:
         if_monster_switch_set 2
                 dlg $9d
-; It drinks the fire!
+; It swells with flame!
                 short_glow MONSTER_1
                 wait
 Ot6FuseFlameEater:              ; the fuse is lit here (Ot6FuseTbl's row)
@@ -5464,6 +5464,7 @@ Ot6FuseFlameEater:              ; the fuse is lit here (Ot6FuseTbl's row)
         wait                            ;   FIRE, FIRE_BALL, FIRE_BALL ...
         attack FIRE, FIRE, NOTHING      ;   ... and FIRE, FIRE_BALL, NOTHING)
         clr_monster_switch 1
+        set_monster_switch 2    ; ot6: arms the fuse block (above)
         end
 
         if_self_dead
@@ -5476,10 +5477,7 @@ Ot6FuseFlameEater:              ; the fuse is lit here (Ot6FuseTbl's row)
         if_hit
                 add_battle_var 2, 1
                 attack NOTHING, NOTHING, FIRE_2
-                if_element FIRE         ; ot6: the fire it drinks arms the fuse block
-                if_monster_switch_clr 2 ;   (above), behind vanilla's count and
-                set_monster_switch 2    ;   counter (a condition that fails skips
-                end_retal               ;   to the script's end)
+                end_retal
 
 ; ------------------------------------------------------------------------------
 

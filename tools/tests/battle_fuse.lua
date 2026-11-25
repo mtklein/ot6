@@ -275,8 +275,8 @@ local HAND = {
       .. "switches only, and the Relm scene (battle_event $16) touches no monster switch" },
   ["116@0000"] = { blocks = "earlier none; own [14 24 02]",
     why = "FlameEater: the fuse block is the script's first, ahead of its opening, its clock, its Reflect and its "
-      .. "Bomblet calls; monster switch 2 (0 and 1 are the opening's and the calls'), set only by its counter's "
-      .. "fire strike and cleared only by the move's turn or the cancel" },
+      .. "Bomblet calls; monster switch 2 (0 and 1 are the opening's and the calls'), set only by its rotation's last "
+      .. "turn and cleared only by the move's turn or the cancel; its counters touch none" },
   ["12F@0000"] = { blocks = "earlier none; own [0D 03 03]",
     why = "Chupon: the fuse block is the script's first; its condition is battle variable 3 at 3 or more, which only "
       .. "his counter adds to (one a blow) and only the move's turn or the cancel clears: it cannot fall between the "
