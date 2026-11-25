@@ -6460,9 +6460,10 @@ Ot6FuseUltros1:                 ; the fuse is lit here (Ot6FuseTbl's row)
 ; (Ot6FuseTbl, OT6_FUSE_BTIMER), so the next song is earned from the cancel.  His clock alone arms it, so the
 ; fuse block is his script's first and has no arming block; the timer only climbs until the song's own turn (or the
 ; cancel) resets it.  He moves between four slots by his counters; while the fuse is lit (monster switch 0, set by
-; the announce) none of those moves comes, so the body that announced is the body that sings (a swap brings in a
-; fresh body whose script starts from the top, and an announced song would never come).  The moves that wait come
-; on the first hit after the song.  Everything else is vanilla's.
+; the announce) none of those moves comes, so the body that announced is the body that sings on its next turn.
+; Without the hold a swap brings in a fresh body whose script starts from the top: the timer still stands at 60,
+; so that body announces the song again and sings it a turn later -- late, and announced twice.  The moves that
+; wait come on the first hit after the song.  Everything else is vanilla's.
 AIScript::_301:
         if_battle_timer 60
                 dlg $62

@@ -75,7 +75,7 @@ TunnelArmr ("Laser charges!"), Telstar ("It radios in!"), the GhostTrain
 Narshe ("Frost creeps!"), Dadaluma ("He crouches!", after three spells cast
 at him), Ultros at the opera ("Imp! Pal! Buddy!"), Ifrit and Shiva ("It
 inhales!"), Number 024 ("Its wall glows!"; his wall holds until the spell),
-Number 128 ("Its core heats!", once both blades are down) and each of the
+Number 128 ("Its core heats!", when one of his blades falls) and each of the
 Cranes ("Deck groans!"). Not every big move is announced.
 
 ### Weapon types

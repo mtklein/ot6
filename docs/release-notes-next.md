@@ -15,11 +15,13 @@ opera says "Imp! Pal! Buddy!" a turn before Imp Song. Ifrit and Shiva say
 says "Its wall glows!" a turn before Ice 2, Fire 2 or Bolt 2 on the whole
 party, the spell that goes with the wall he has just put up, and while the
 **!** stands his wall does not change. Number 128 says "Its core heats!" a
-turn before Atomic Ray on the whole party; he starts this once both blades
-are down. Each of the Cranes says "Deck groans!" a turn before it shakes
-the deck, each on its own clock. Ifrit's Fire 2, Shiva's Ice 2, Number
-024's second-tier spells and Number 128's Atomic Ray now come only after
-their line.
+turn before Atomic Ray on the whole party; each blade you cut down starts
+it. Each of the Cranes says "Deck groans!" a turn before it shakes the
+deck; each Crane now has its own clock (before, one clock served both),
+the left Crane's as long as before and the right Crane's half again as
+long. Ifrit's Fire 2, Shiva's Ice 2, Number 024's second-tier spells and
+Number 128's Atomic Ray now come only after their line. Ifrit has 7
+shields instead of 6.
 
 ## Saves
 

@@ -21,7 +21,9 @@
 --        outside   a break after his first turn, before his first slot move can come (his tally of turns, battle
 --                  variable 3, at most 1): nothing is cancelled and the cells stand, two aimed Fights in the window
 --                  wind nothing, and the fuse then lights and fires as in the first case.
---      Mutants (build/attempts/wt/v052-tg-wob2/mutants/): fuse_never (Ot6FuseCancel+3=80) is red at "the break during
+--   4. Held: his slot moves wait while the song is lit (below).
+--      Mutants (build/attempts/wt/v052-tg-wob2/mutants/): ultros2_no_hold (the eight slot-move gates read switch 7,
+--      never set) is red at "held: he stayed in the slot that announced"; fuse_never (Ot6FuseCancel+3=80) is red at "the break during
 --      the fuse cancels it"; ultros2_no_btimer (his row's flags byte 0) at "the battle timer reads 0 after the
 --      cancel".  A mechanism test, not play.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -46,9 +48,115 @@ local function MHP(s) return 0x3BFC + s * 2 end
 local uSlot = 0
 local aPh = 0
 
--- The cap: the seed check ends near f2,000 and three cases of about 12,000 frames each follow, so 90,000 is about
--- 2x.
-H.run({ maxFrames = 90000 }, {
+-- 4: held.  His slot moves are counter blocks (his tally of turns, battle variable 3, past a slot's threshold, that
+-- move's bit of battle switch byte 2 clear), each now behind `if_monster_switch_clr 0`, the switch his announce sets.
+-- After a line, with a move's conditions already met for the slot he stands in, one member's Fight lands on him
+-- inside the fuse (his gauge staged to 63, DECLARED, so it only chips; HP held through M.fuseWatch's pin): he must
+-- stay in that slot, no second line may come, and the song must come on his next turn from the same slot.  Up to
+-- four announces are waited for one whose slot has such a move due.
+-- the slot moves of his counter (ai_script.asm AIScript::_301): { slot, past, bit of $3EB2 }
+local MOVES = { { 1, 16, 7 }, { 3, 14, 6 }, { 0, 12, 5 }, { 1, 10, 4 }, { 3, 8, 3 }, { 1, 6, 2 }, { 2, 4, 1 },
+  { 0, 2, 0 } }
+local function moveDue(slot)
+  local v, b = H.readByte(0x3EB3), H.readByte(0x3EB2)
+  for _, m in ipairs(MOVES) do
+    if m[1] == slot and v > m[2] and (b >> m[3]) & 1 == 0 then return m end
+  end
+  return nil
+end
+function held()
+  local W, tries, done, from = nil, 0, false, 1
+  local bossCmds, hits = {}, {}
+  local function slotNow() return W.slot() end
+  local function one()
+    return H.cond(function() return not done and tries < 4 end, {
+      H.call(function() tries = tries + 1 end),
+      -- the next line, the party Defending
+      H.lazy(function()
+        local t0 = H.frame
+        return H.kitBattle({}, { idle = "defend", care = false, maxFrames = 12000,
+          giveUp = function() return W.find(0x21, 0x62, from) ~= nil or H.frame - t0 >= 10000 end })
+      end),
+      H.lazy(function()
+        local li, lc = W.find(0x21, 0x62, from)
+        H.assertEq(li ~= nil, true, "held: a line came within 10,000 frames")
+        local s0 = slotNow()
+        local due = moveDue(s0)
+        H.log(string.format("[ultros2] held try %d: the line at f%d from slot %d; battle variable 3 = %d, byte 2 = $%02X; "
+          .. "a move from slot %d %s", tries, lc.f, s0, H.readByte(0x3EB3), H.readByte(0x3EB2), s0,
+          due and string.format("is due (past %d, bit %d)", due[2], due[3]) or "is not due"))
+        if due == nil then
+          from = li + 1
+          return H.kitBattle({}, { idle = "defend", care = false, maxFrames = 6000,
+            giveUp = function() return W.find(0x0C, 0xA3, li) ~= nil end })
+        end
+        WRITE.byte(0x3E38 + 8 + 2 * s0, 63)   -- (DECLARED: the gauge held, so the Fight only chips)
+        local who = nil
+        for i = 0, 3 do
+          local id = H.readByte(0x3ED8 + 2 * i)
+          if id ~= 0xFF and H.readWord(0x3BF4 + 2 * i) > 0 and (H.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
+            who = id; break
+          end
+        end
+        local nHits = #hits
+        return H.seqStep({
+          H.kitBattle({ { who = who, cmd = 0x00, boost = 0, slot = s0 } }, { idle = "defend", care = false,
+            maxFrames = 8000, untilPlanDone = true,
+            giveUp = function() return W.find(0x0C, 0xA3, li) ~= nil end }),
+          H.kitBattle({}, { idle = "defend", care = false, maxFrames = 8000,
+            giveUp = function() return W.find(0x0C, 0xA3, li) ~= nil end }),
+          H.call(function()
+            local mi, mc = W.find(0x0C, 0xA3, li)
+            H.assertEq(mi ~= nil, true, "held: the song came after the line")
+            local hit = nil
+            for k = nHits + 1, #hits do if hits[k].f > lc.f and hits[k].f < mc.f then hit = hits[k] end end
+            if hit == nil then
+              H.log("[ultros2] held: the Fight did not land inside the fuse; another line")
+              from = mi + 1
+              return
+            end
+            local songSlot = nil
+            for _, c in ipairs(bossCmds) do if c.f == mc.f then songSlot = c.slot end end
+            local lines = 0
+            for k = li, mi do if W.cmds[k].cmd == 0x21 and W.cmds[k].arg == 0x62 then lines = lines + 1 end end
+            H.log(string.format("[ultros2] held: the Fight at f%d inside the fuse (line f%d from slot %d, a move due); "
+              .. "the song at f%d from slot %s, %d turn(s) after the line, %d line(s)", hit.f, lc.f, s0, mc.f,
+              tostring(songSlot), mc.turn - lc.turn, lines))
+            H.assertEq(songSlot, s0, "held: he stayed in the slot that announced, a slot move due and a hit landed "
+              .. "inside the fuse (the song came from it)")
+            H.assertEq(lines, 1, "held: no second line came before the song")
+            H.assertEq(mc.turn - lc.turn, 1, "held: the song came on his next turn")
+            done = true
+          end),
+        })
+      end),
+    }, {})
+  end
+  local steps = { H.call(function()
+    W = H.fuseWatch(ULTROS2, WRITE); W.on = true; W.pin = { boss = 1500, party = true }
+    local d = H.sym("_dispatcher")
+    emu.addMemoryCallback(function()
+      if not W.on then return end
+      local x = emu.getState()["cpu.x"] & 0xFF
+      if x < 8 then
+        if H.readByte(0xB5) == 0x00 then hits[#hits + 1] = { f = H.frame } end
+      elseif H.readWord(0x57C0 + (x - 8)) == ULTROS2 then
+        bossCmds[#bossCmds + 1] = { f = H.frame, slot = (x - 8) // 2 }
+      end
+    end, emu.callbackType.exec, d, d)
+  end) }
+  for k = 1, 4 do steps[#steps + 1] = one() end
+  steps[#steps + 1] = H.call(function()
+    H.assertEq(done, true, "held: a Fight landed inside a fuse with a slot move due, within four lines (the case's "
+      .. "precondition)")
+    W.on = false; W.pin = nil
+  end)
+  return H.seqStep(steps)
+end
+
+-- The cap: the seed check ends near f2,000, three cases of about 12,000 frames each follow, and the held case's up
+-- to four lines of about 3,000 frames each, so 150,000 is about 2x.
+H.run({ maxFrames = 150000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
 
@@ -130,5 +238,6 @@ H.run({ maxFrames = 90000 }, {
     end,
   }),
   H.call(function() btOn = false end),
-  H.logStep("[ultros2] PASS: the seed, and the song announced, cancelled by a break and earned again"),
+  held(),
+  H.logStep("[ultros2] PASS: the seed, and the song announced, held, cancelled by a break and earned again"),
 })

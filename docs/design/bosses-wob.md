@@ -1359,12 +1359,20 @@ Party: the factory four (Setzer is flying the airship).
   line's own fighter breaks the left Crane 5-8 actions in and kills
   both before either clock comes due, 4 of 4 keys: the line meets no
   quake. A party that Defends to the left Crane's line and then chips
-  stopped its quake on the 3 keys that announced (`$9B` by the cancel
-  inside the fuse; on `$7F` and `$B7` the break came with no cancel and
-  no quake after it, read as a break on the quake's own turn, which
-  purges the queued quake -- not traced), a second run on `$9B` ended
-  the battle before the quake, and `$77` never announced; the right
-  Crane's slower clock announced on 1 of 4 keys. At 120
+  broke the left Crane inside its fuse and cancelled the quake on the 3
+  keys that announced (`$7F`, `$9B`, `$B7`). The lab's summaries for
+  `$7F` and `$B7` read "cancel NOT fired" because the lab stopped
+  watching on the break's own frame; the review's replays of those two
+  runs with exec loggers show `Ot6FuseCancel` on the break's frame and
+  `Ot6FuseSnuff` one frame later (f16909 on `$7F`, f22134 on `$B7`):
+  ordinary cancels (`build/attempts/wt/v052-tg-wob2/review/
+  trace_crane_l_0.log`, `trace_crane_l_23.log`; the race template now
+  waits 10 frames before its summary). A second run on `$9B`, holding
+  for the line, ended in a wipe before the quake (at f17239 LOCKE and
+  SETZER were down, EDGAR at 95 HP and SABIN at 35; the lab watches only
+  the left Crane, so which body dealt the last blows is not logged), and
+  `$77` never announced; the right Crane's slower clock announced on 1
+  of 4 keys. At 120
   (`lab-v3/L3d-cranes/`) the line met no quake either, and a party that
   held for it wiped first. The quake took 34-46% of each member's HP
   (`build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`).

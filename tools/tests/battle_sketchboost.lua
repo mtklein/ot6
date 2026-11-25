@@ -232,6 +232,13 @@ local function runTry(t)
       if not t.void and t.drawn == nil and t.tgtAlive == false then
         t.void = t.endF or H.frame
         t.voidWhy = string.format("the target m%d fell between the confirm and the Sketch", tgtMon)
+        -- what holds there, asserted: the boosted Sketch fizzled on no body (nothing drawn, the target down at its
+        -- turn's end) and its pips were not spent -- the bank ends no lower than it stood at the confirm
+        H.log(string.format("[sketch] try %d fizzled on a fallen target: drawn nothing, m%d down at f%d, bank %s -> %s",
+          t.n, tgtMon, t.endF or -1, tostring(t.bank0), tostring(t.bankEnd)))
+        H.assertEq(t.bank0 ~= nil and t.bankEnd ~= nil and t.bankEnd >= t.bank0, true, string.format("try %d: a "
+          .. "boosted Sketch that fizzled on a fallen target spent no pips (bank %s -> %s)", t.n, tostring(t.bank0),
+          tostring(t.bankEnd)))
       end
       if t.void then
         H.log(string.format("[sketch] try %d (%s): %s at f%d before RELM's Sketch ran (sent %s, drawn %s): "
