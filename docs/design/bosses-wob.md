@@ -71,7 +71,7 @@ Stated once, assumed by every block:
   | 13 | Ifrit / Shiva | 1 turn each | Ifrit, race at 7: banked 5 of 5, the line's fighter 1 of 4. Shiva, warning: only EDGAR's sword keys her; banked, 1-2 shields left, 0 of 5 |
   | 14 | Number 024 | 1 turn | Warning for the line (broken before any line, 4 of 5); a banked party 2 of 5 |
   | 15 | Number 128 | 1 turn | Warning: banked 1 of 4; the line never cuts a blade, so never meets the ray |
-  | 16 | Cranes | 1 turn each | The line kills both before either clock (4 of 4); banked, the left Crane's quake stopped on 3 of 4 |
+  | 16 | Cranes | 1 turn each | The line kills both before either clock (4 of 4 keys); banked, the left Crane's quake stopped on the 3 keys that announced |
 
   Ultros and TunnelArmr stay at one turn: their warnings fit the feel,
   and a longer fuse would only lengthen fights the party usually ends
