@@ -1359,10 +1359,12 @@ Party: the factory four (Setzer is flying the airship).
   line's own fighter breaks the left Crane 5-8 actions in and kills
   both before either clock comes due, 4 of 4 keys: the line meets no
   quake. A party that Defends to the left Crane's line and then chips
-  stopped its quake on 3 of the 4 keys that announced (once by the
-  cancel inside the fuse, twice by a break on the quake's own turn,
-  which purges the queued quake), and on the fourth the battle ended
-  first; the right Crane's slower clock announced on 1 of 4. At 120
+  stopped its quake on the 3 keys that announced (`$9B` by the cancel
+  inside the fuse; on `$7F` and `$B7` the break came with no cancel and
+  no quake after it, read as a break on the quake's own turn, which
+  purges the queued quake -- not traced), a second run on `$9B` ended
+  the battle before the quake, and `$77` never announced; the right
+  Crane's slower clock announced on 1 of 4 keys. At 120
   (`lab-v3/L3d-cranes/`) the line met no quake either, and a party that
   held for it wiped first. The quake took 34-46% of each member's HP
   (`build/attempts/wt/v052-tg-wob2/lab-v4/L4-dmg/`).
