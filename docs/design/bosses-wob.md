@@ -1086,6 +1086,16 @@ AutoCrossbow (opening.md 11).
 - **Telegraph:** he crouches to jump → **Jump**, which is
   untargetable and lands on one character. Break him during the
   crouch and he does not leave the ground.
+- **Built (wt/v052-tg-wob2, `battle_dadaluma`).** Vanilla's trigger
+  stays: he leaps once the party has used Magic on him three times
+  (battle variable 2, his counter's tally) and he is not Slowed. The
+  knife fan at the whole party that came first now arms the fuse
+  (monster switch 0); "He crouches!" (dialogue `$93`) and a glow announce
+  it on his next turn, and Jump comes on the turn after. A break in
+  between cancels it and clears the tally (`Ot6FuseTbl` row `$0107`,
+  `OT6_FUSE_VAR2`, a new flag): three more spells earn it again. A party
+  that casts nothing at him never sees the leap, as in vanilla.
+  @RACE11@
 - **Break story:** he calls in Iron Fists at half health and uses his
   own potions. Chip through the adds with AoE Ranged
   (AutoCrossbow), bank BP, and break him during the crouch.
@@ -1102,9 +1112,23 @@ Party: Locke + three (Celes is mid-aria).
 ranged — revealed at the Lete, still revealed; the codex working
 as designed).
 
-- **Telegraph:** the same tentacle wind-up as before. He is a
-  recurring boss with a remembered weakness row and a higher shield
-  count each time.
+- **Telegraph:** his song. Vanilla sang Imp Song on the whole party
+  when the battle timer reached 60, with "Imp! Pal! Buddy!" in the
+  same turn; that line is now the announce, a turn ahead (the Lete
+  River fight already has his tentacle wind-up, so the opera's is
+  the song). He is a recurring boss with a remembered weakness row
+  and a higher shield count each time.
+- **Built (wt/v052-tg-wob2, `battle_ultros2`).** "Imp! Pal! Buddy!"
+  (vanilla's line, dialogue `$62`) and a glow come on the turn the
+  timer reaches 60, Imp Song on his next. A break in between cancels
+  the song and restarts the battle timer (`Ot6FuseTbl` row `$012D`,
+  `OT6_FUSE_BTIMER`, a new flag), so the next song is earned from the
+  cancel. His slot moves (the counters that hide one body and show
+  another) wait while it is lit (monster switch 0, set by the
+  announce): a fresh body starts its script from the top and would
+  drop an announced song. The moves that waited come on the first hit
+  after the song.
+  @RACE12@
 - **Break story:** there is no Banon to protect this time, and the
   tentacle targets whoever is most costly to lose. One more shield
   than the Lete River fight, and no free healer.
@@ -1136,6 +1160,19 @@ Party: Locke, Celes + two.
 - **Telegraph:** Ifrit inhales and the air shimmers → **Fire 2**;
   Shiva does the same with **Ice 2**. Whichever one is on the field
   runs its own fuse.
+- **Built (wt/v052-tg-wob2, `battle_ifrit`).** Each sibling's rotation
+  is vanilla's two turns, and the second now arms the fuse (Ifrit
+  battle switch 0, Shiva battle switch 1: their monster variable is
+  their counter's tally of spells); "It inhales!" (dialogue `$94`,
+  both) and a glow announce it on the sibling's next turn, and Fire 2
+  (Ifrit) or Ice 2 (Shiva) on the whole party comes on the turn after.
+  A break in between cancels it (`Ot6FuseTbl` rows `$0109`, `$0108`):
+  the rotation's two turns earn it again. Fire 2 and Ice 2 no longer
+  come from the ordinary rotations (Fire and Ice in their place), so
+  the line always means them. The fuse block comes first, so the swap
+  after six hits and the Fire 3 and Rflect blocks wait until the spell
+  has fired.
+  @RACE13@
 - **Break story:** this is the first fight that requires reading
   absorbs, because fire heals Ifrit. Celes can chip both siblings by
   herself, with Ice into Ifrit and her sword into Shiva. The fight
@@ -1155,6 +1192,23 @@ wall spins.
   spell (Fire 2 / Ice 2 / Bolt 2). The fuse also tells you the current
   wall, and therefore the current absorb, so probe with a different
   element.
+- **Built (wt/v052-tg-wob2, `battle_number024`).** His clock's
+  WallChange (the monster timer at 30) arms the fuse (monster switch
+  0). On his next turn, on a wall whose vanilla answer held a tier-2
+  spell, he says "Its wall glows!" (dialogue `$95`) and glows, and the
+  spell comes on the whole party on the turn after: weak to fire, Ice
+  2; to ice, Fire 2; to water, Bolt 2. On the other five walls the
+  arming lapses. From the line to the spell the wall holds (monster
+  switch 1: his counters change no wall while it is set), so the wall
+  the line came on is the wall to hit: its weakness chips him and
+  does not move it. A break in between cancels the spell (`Ot6FuseTbl`
+  rows `$010A`, one a wall); the next WallChange of his clock arms it
+  again. His ordinary turns on those three walls cast the tier-1 spell
+  (vanilla could pick the tier 2), so the tier 2 comes only announced.
+  The wall's spell is new in kind (WallChange makes a random element
+  his weakness, nulls the rest and absorbs one at random,
+  `TargetEffect_26`), so the line names the wall, not his absorb.
+  @RACE14@
 - **Break story:** this boss works against the codex. Physical chip is
   steady, magic requires reading the current wall, and a break keeps
   the current wall revealed until the next WallChange re-rolls it. It
@@ -1184,13 +1238,24 @@ takes LOCKE's dagger, SABIN's claw and Bolt.
 
 - Blades regenerate a few turns after dying (vanilla ✦), and regrown
   blades return at full shields. Their weakness row stays revealed.
-- **Telegraph:** In `AIScript::_267` (`ff6/src/battle/ai_script.asm:4725-4746`;
-  the label index is the monster id, 267 = `$010B`), Gale Cut sits behind
-  `if_num_monsters 1`: the body Hastes itself and then runs Gale Cut,
-  Atomic Ray, Blaster and Shock Wave **once both blades are dead**. While
-  a blade is alive it runs `BATTLE, BATTLE, ICE` and `BATTLE, SPECIAL,
-  NET`. Killing the blades is what turns the sweep on, so a party that
-  leaves them standing keeps the body on its mild script.
+- **Vanilla:** In `AIScript::_267` (the label index is the monster id,
+  267 = `$010B`), Gale Cut sits behind `if_num_monsters 1`: the body
+  Hastes itself and then runs Gale Cut, Atomic Ray, Blaster and Shock
+  Wave **once both blades are dead**. While a blade is alive it runs
+  `BATTLE, BATTLE, ICE` and `BATTLE, SPECIAL, NET`. The blades regrow
+  within a few hundred frames, so an alone turn is rare.
+- **Telegraph: a falling blade heats the core.** Each blade's death (its
+  `if_self_dead` block, `_319` and `_320`) sets battle switch 0; on the
+  body's next turn "Its core heats!" (dialogue `$97`) and a glow
+  announce Atomic Ray, which comes on the whole party on the turn after,
+  whatever the blades do meanwhile.
+- **Built (wt/v052-tg-wob2, `battle_number128`).** A break in between
+  cancels the ray (`Ot6FuseTbl` row `$010B`): another blade has to
+  fall. Atomic Ray no longer comes from his sweep (Gale Cut and Shock
+  Wave in its place), so it comes only announced. A party that leaves
+  the blades standing (the line steers every attack at the body) never
+  sees it; a party that cuts the blades meets a ray for each.
+  @RACE15@
 - **Break story:** this is the first battle after Zozo gives you four
   espers, and a Ramuh bearer casting Bolt into the body is the first
   use of the sub-job system (magicite.md's storm-lancer).
@@ -1226,6 +1291,19 @@ Party: the factory four (Setzer is flying the airship).
   Volt**. There is a separate timer move (`if_battle_timer 60` →
   Magnitude8). This is not the one-ATB-cycle fuse the boss contract
   defines above.
+- **Built (wt/v052-tg-wob2, `battle_cranes`): the quake is the
+  telegraph.** Vanilla's Magnitude8 ("The crane shook the deck!") came
+  on whichever Crane's turn came once the battle timer reached 60, one
+  quake for the pair a cycle. Now each Crane's own timer arms it at 120
+  (twice the length: two Cranes, about vanilla's rate) on one of its
+  ordinary turns (monster switch 1); "Deck groans!" (dialogue `$9C`)
+  and a glow announce it on its next turn, and the quake comes on the
+  turn after. A break in between cancels that Crane's quake and
+  restarts its clock (`Ot6FuseTbl` rows `$010D`, `$010E`); the other
+  Crane's clock runs on. The element charges (Giga Volt, Fire 3) are
+  vanilla's and unannounced. The battle is a pincer: the Cranes stand
+  on both sides of the party.
+  @RACE16@
 - **Break story:** this is the WoB's effective 12-shield fight: two
   live gauges with two fuses on independent clocks. Focus one Crane
   and the other's charge lands. Use the wrong element and you heal its

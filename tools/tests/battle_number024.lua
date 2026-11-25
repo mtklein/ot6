@@ -62,8 +62,9 @@ local function checkWall(W, l, mvI, what)
     .. "names ($%02X) -- %s", mv.arg, w0, SPELL_OF[w0], what))
 end
 
--- The cap: three cases of about 10,000 frames each and the held tries, so 100,000 is about 2x.
-H.run({ maxFrames = 100000 }, {
+-- The cap: three cases of about 21,000 frames (wt/v052-tg-wob2's run) and the held tries, about 11,000 frames an
+-- announce, a third of them castable: 300,000 covers sixteen.
+H.run({ maxFrames = 300000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),
@@ -107,28 +108,41 @@ H.run({ maxFrames = 100000 }, {
         .. "second line (%d)", wc))
     end,
   }),
-  -- held: a weakness cast at him while his spell is named, up to six announces
+  -- held: a weakness cast at him while his spell is named, up to TRIES announces (his clock's WallChange arms one a
+  -- clock about one time in three -- fire, ice or water of eight walls -- and a member casts the weakness of about
+  -- one in three of those: CELES's Ice, and Fire where a member knows it; about 11,000 frames an announce)
   (function()
+    local TRIES = 16
     local W = nil
     local tries, done, from = 0, false, 1
+    local function waitFor(pred, budget)
+      local t0 = nil
+      return H.lazy(function()
+        t0 = H.frame
+        return H.kitBattle({}, { idle = "defend", care = false, maxFrames = budget + 2000,
+          giveUp = function() return pred() or not H.battleLoadStarted() or H.frame - t0 >= budget end })
+      end)
+    end
     local function one()
-      return H.cond(function() return not done and tries < 6 end, {
+      return H.cond(function() return not done and tries < TRIES end, {
         H.call(function() tries = tries + 1 end),
-        -- the next announce on a wall the party can cast at
+        -- the next announce
+        waitFor(function() return W.find(0x21, 0x95, from) ~= nil end, 30000),
         H.lazy(function()
-          return H.kitBattle({}, { idle = "defend", care = true, maxFrames = 20000,
-            giveUp = function() return W.find(0x21, 0x95, from) ~= nil or not H.battleLoadStarted() end })
-        end),
-        H.lazy(function()
+          H.assertEq(H.battleLoadStarted(), true, "held: the battle is still up")
           local li, lc = W.find(0x21, 0x95, from)
-          H.assertEq(li ~= nil, true, "held: an announce came")
+          if li == nil then
+            H.log(string.format("[number024] held try %d: no announce in 30,000 frames", tries))
+            return H.waitFrames(1)
+          end
           local w = wallAt(lc.f)
           local sp = CAST_FOR[w or 0]
           local who = nil
           if sp then
             for i = 0, 3 do
               local id = H.readByte(0x3ED8 + 2 * i)
-              if id ~= 0xFF and H.readWord(0x3BF4 + 2 * i) > 0 and H.readByte(0x1A6E + 54 * id + sp) == 0xFF then
+              if id ~= 0xFF and H.readWord(0x3BF4 + 2 * i) > 0 and H.readByte(0x1A6E + 54 * id + sp) == 0xFF
+                 and H.readWord(0x3C08 + 2 * i) >= 10 then
                 who = id
               end
             end
@@ -137,18 +151,17 @@ H.run({ maxFrames = 100000 }, {
             who and string.format("character %d casts spell $%02X", who, sp) or "no member casts its weakness"))
           if who == nil then
             from = li + 1
-            return H.kitBattle({}, { idle = "defend", care = true, maxFrames = 8000,
-              giveUp = function() return W.find(0x02, nil, li) ~= nil or not H.battleLoadStarted() end })
+            return waitFor(function() return W.find(0x02, nil, li) ~= nil end, 8000)
           end
           local e = 8 + 2 * slot()
           WRITE.byte(0x3E38 + e, 63)   -- (DECLARED: the gauge held, so the cast chips and cannot break him)
           local plan = { { who = who, cmd = 0x02, spell = sp, boost = 0, slot = slot() } }
-          local cast = false
+          local t0 = H.frame
           return H.seqStep({
-            H.kitBattle(plan, { idle = "defend", care = false, maxFrames = 8000, untilPlanDone = true,
-              giveUp = function() return W.find(0x02, nil, li) ~= nil or not H.battleLoadStarted() end }),
-            H.kitBattle({}, { idle = "defend", care = false, maxFrames = 8000,
-              giveUp = function() return W.find(0x02, nil, li) ~= nil or not H.battleLoadStarted() end }),
+            H.kitBattle(plan, { idle = "defend", care = false, maxFrames = 10000, untilPlanDone = true,
+              giveUp = function() return W.find(0x02, nil, li) ~= nil or not H.battleLoadStarted()
+                or H.frame - t0 >= 8000 end }),
+            waitFor(function() return W.find(0x02, nil, li) ~= nil end, 8000),
             H.call(function()
               local mi = W.find(0x02, nil, li)
               if mi == nil then
@@ -177,12 +190,15 @@ H.run({ maxFrames = 100000 }, {
         end),
       }, {})
     end
-    local steps = { H.call(function() W = H.fuseWatch(N024, WRITE); W.partyCmd = 0x02; W.on = true end) }
-    for k = 1, 6 do steps[#steps + 1] = one() end
+    -- (W.pin: the DECLARED holds of the mechanism suites, M.fuseWatch: his HP at 3,000 and the party's at 9,999)
+    local steps = { H.call(function()
+      W = H.fuseWatch(N024, WRITE); W.partyCmd = 0x02; W.on = true; W.pin = { boss = 3000, party = true }
+    end) }
+    for k = 1, TRIES do steps[#steps + 1] = one() end
     steps[#steps + 1] = H.call(function()
-      H.assertEq(done, true, "held: a weakness cast landed inside a fuse within six announces (the case's "
-        .. "precondition: a member knows Fire or Ice and the wall named one)")
-      W.on = false
+      H.assertEq(done, true, string.format("held: a weakness cast landed inside a fuse within %d announces (the "
+        .. "case's precondition: a member knows Fire or Ice and the wall named one)", TRIES))
+      W.on = false; W.pin = nil
     end)
     return H.seqStep(steps)
   end)(),

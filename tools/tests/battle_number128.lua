@@ -37,10 +37,18 @@ local function present(sp)
   end
   return nil
 end
+-- a blade standing: its slot in the formation's alive mask ($3A75; a fallen blade restores itself hidden, so its
+-- slot stays present while it regrows)
+local function bladeAt(sp)
+  for s = 0, 5 do
+    if H.readWord(0x57C0 + s * 2) == sp and H.readByte(0x3A75) & (1 << s) ~= 0 then return s end
+  end
+  return nil
+end
 local function bladesUp()
   local n = 0
-  if present(RBLADE) then n = n + 1 end
-  if present(LBLADE) then n = n + 1 end
+  if bladeAt(RBLADE) then n = n + 1 end
+  if bladeAt(LBLADE) then n = n + 1 end
   return n
 end
 
@@ -61,8 +69,8 @@ local function armByBlades(pred, max, W)
     local plan = {}
     for k = 1, 24 do
       plan[#plan + 1] = { who = seats[(k - 1) % #seats + 1], cmd = 0x00, boost = 0,
-        slot = present(RBLADE) or present(LBLADE) or 0,
-        slotFn = function() return present(RBLADE) or present(LBLADE) end }
+        slot = bladeAt(RBLADE) or bladeAt(LBLADE) or 0,
+        slotFn = function() return bladeAt(RBLADE) or bladeAt(LBLADE) end }
     end
     return H.kitBattle(plan, { idle = "defend", care = false, maxFrames = max + 600,
       giveUp = function() return pred() or H.frame - t0 >= max end })

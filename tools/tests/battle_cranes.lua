@@ -123,6 +123,23 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(present(LEFT) and present(RIGHT), true, "both Cranes stand at the open")
   end),
   cases("crane_left", "the left Crane", LEFT),
+  -- (the right Crane's cases open on a snapshot of their own, taken with its quake neither armed nor lit: the party
+  -- Defends, with care, until its armed switch is clear)
+  H.lazy(function()
+    local function armed()
+      for sl = 0, 5 do
+        if H.readByte(0x3AA8 + sl * 2) & 1 == 1 and H.readWord(0x57C0 + sl * 2) == RIGHT then
+          return H.readByte(0x3DAC + 8 + 2 * sl) & 0x02 ~= 0
+        end
+      end
+      return false
+    end
+    return H.kitBattle({}, { idle = "defend", care = true, maxFrames = 20000,
+      giveUp = function() return not armed() or not H.battleLoadStarted() end })
+  end),
+  H.call(function()
+    H.assertEq(present(RIGHT), true, "the right Crane still stands for its cases")
+  end),
   cases("crane_right", "the right Crane", RIGHT),
   H.logStep("[cranes] PASS: each Crane's quake announced on its own clock, cancelled by a break and earned again"),
 })
