@@ -805,5 +805,8 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
     H.screenshot("wor_landing")
   end),
   H.saveState("wor_landing.mss"),
+  -- nerapa_entry (also= in the graph): the doorstep savestate the Nerapa sweep reloads, under the escape clock --
+  -- battle_nerapa's fixture (wt/v052-tg-wob3).  Emitted after the play: the capture spends no frames of its own.
+  H.call(function() H.emitBlob("nerapa_entry.mss", nerapaBlob) end),
   H.logStep(function() return "wor_landing generated: the World of Balance is played through" end),
 })

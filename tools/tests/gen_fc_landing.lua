@@ -112,6 +112,7 @@ local function kitSteps(char, name, pairs_)
 end
 
 local u4Req = nil                         -- the ultros4_entry capture
+local afReq = nil                         -- the airforce_entry capture (wt/v052-tg-wob3)
 local DECK = { S = H.newPartySelect(PICK), helmT = 0, formed = false, careD = nil }
 -- The fights after the IAF waves (#404): Ultros IV ($168) and Chupon
 -- ($12F), who steps into his fight (battle_ultros4), then the Floating
@@ -185,6 +186,10 @@ local function deckDrive(untilKit)
         end
         lastActive = active
         if active or H.battleLoadStarted() then
+          -- airforce_entry (also= in the graph): the Air Force's battle as it comes up, before any input --
+          -- battle_airforce's fixture (wt/v052-tg-wob3).  Captured with no frames spent, emitted after the landing
+          -- save.
+          if afReq == nil and active and airForceUp() then afReq = H.requestSaveState() end
           if airForceUp() then FAF.frame() else F.frame() end
           return
         end
@@ -487,7 +492,7 @@ H.run({ maxFrames = 600000 }, flatten({
   -- (battle_ultros4 boots it).  Captured with no frames spent (H.saveState
   -- waits 2, which moved every IAF battle after it and changed the play;
   -- #329 review) and emitted after the landing save.
-  H.call(function() u4Req = H.requestSaveState() end),
+  H.call(function() u4Req = H.requestSaveState(); afReq = nil end),
   H.navTo(22, 6, { maxFrames = 6000, playBattles = "tactical", healer = TERRA, magic = FIGHT.magic,
                    nuke = FIGHT.nuke, items = true, bank = FIGHT.bank, healPercent = FIGHT.healPercent,
                    care = false, arrive = function() return not H.hasControl() or H.fieldX() == 22 end }),
@@ -532,6 +537,8 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.checkReq(u4Req, "ultros4_entry capture")
     H.emitBlob("ultros4_entry.mss", u4Req.blob)
+    H.checkReq(afReq, "airforce_entry capture")
+    H.emitBlob("airforce_entry.mss", afReq.blob)
   end),
   H.saveGame({ slot = 3, tag = "fc-landing-v1 save" }),
   H.call(function()
