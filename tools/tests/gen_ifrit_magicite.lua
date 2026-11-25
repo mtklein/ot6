@@ -272,7 +272,7 @@ local function ifritAttempt(n)
       end
       H.assertEq(ISLOT ~= nil, true, "an IFRIT slot resolved")
       H.assertEq(SSLOT ~= nil, true, "a SHIVA slot resolved")
-      H.assertEq(mshields(ISLOT), 6, "ifrit opens with his authored 6 shields")
+      H.assertEq(mshields(ISLOT), 7, "ifrit opens with his authored 7 shields (6 before wt/v052-tg-wob2)")
       H.assertEq(mshields(SSLOT), 6, "shiva opens with her authored 6 shields")
       H.assertEq(mhp(ISLOT), 3300, "ifrit opens at his authored 3300 HP")
       H.assertEq(mhp(SSLOT), 3000, "shiva opens at her authored 3000 HP")
