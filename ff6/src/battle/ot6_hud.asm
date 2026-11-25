@@ -2239,7 +2239,9 @@ Ot6ShieldTbl:
         .word   $012d
         .byte   6, OT6_SWORD|OT6_RANGED ; ultros 2: same row, one more shield
         .word   $0109
-        .byte   6, OT6_DAGGER ; ifrit
+        .byte   7, OT6_DAGGER ; ifrit: 7 since wt/v052-tg-wob2 (his race: at 6 the line's own
+                                ;   fighter broke him inside his announced Fire 2's fuse 4 times in 5;
+                                ;   at 7 a party that banks still does, 5 in 5, and the line's 1 in 4)
         .word   $0108
         .byte   6, OT6_SWORD ; shiva
         .word   $010a

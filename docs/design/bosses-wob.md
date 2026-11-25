@@ -166,7 +166,7 @@ then on; only his shield count grows.
 | 10 | Kefka | Narshe defense | 6 |
 | 11 | Dadaluma | Zozo | 6 (Iron Fists 2) |
 | 12 | Ultros ② | Opera house | 6 |
-| 13 | Ifrit & Shiva | Magitek factory | 6 + 6 |
+| 13 | Ifrit & Shiva | Magitek factory | 7 + 6 |
 | 14 | Number 024 | Magitek factory | 7 |
 | 15 | Number 128 | minecart escape | 7 (blades 3 each) |
 | 16 | Left & Right Cranes | airship escape | 6 + 6 |
@@ -1141,7 +1141,7 @@ Party: Locke, Celes + two.
 
 | part | shields | weak |
 |---|---|---|
-| Ifrit | 6 | ice + dagger |
+| Ifrit | 7 | ice + dagger |
 | Shiva | 6 | fire + sword |
 
 - This is vanilla's tag fight: they swap in and out. Each keeps its
@@ -1294,9 +1294,9 @@ Party: the factory four (Setzer is flying the airship).
 - **Built (wt/v052-tg-wob2, `battle_cranes`): the quake is the
   telegraph.** Vanilla's Magnitude8 ("The crane shook the deck!") came
   on whichever Crane's turn came once the battle timer reached 60, one
-  quake for the pair a cycle. Now each Crane's own timer arms it at 120
-  (twice the length: two Cranes, about vanilla's rate) on one of its
-  ordinary turns (monster switch 1); "Deck groans!" (dialogue `$9C`)
+  quake for the pair a cycle. Now each Crane's own timer arms it, the
+  left Crane's at 60 (vanilla's length) and the right's at 90, on one of
+  its ordinary turns (monster switch 1); "Deck groans!" (dialogue `$9C`)
   and a glow announce it on its next turn, and the quake comes on the
   turn after. A break in between cancels that Crane's quake and
   restarts its clock (`Ot6FuseTbl` rows `$010D`, `$010E`); the other

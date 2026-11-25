@@ -4,9 +4,9 @@
 --
 -- The scripts (ai_script.asm AIScript::_269 the left Crane $010D, _270 the right $010E): vanilla quaked
 -- (Magnitude8, "The crane shook the deck!") on whichever Crane's turn came once the battle timer reached 60.  Now
--- each Crane's own timer arms it at 120 on one of its ordinary turns (monster switch 1); "Deck groans!" (battle
--- dialogue $9C) and a glow announce it on its next turn, and the quake (attack $BC, command $0C) follows on the turn
--- after.  Under the contract (Ot6FuseTbl's rows $010D and $010E, OT6_FUSE_TIMER) a break while one is lit cancels
+-- each Crane's own timer arms it, the left's at 60 and the right's at 90, on one of its ordinary turns (monster
+-- switch 1); "Deck groans!" (battle dialogue $9C) and a glow announce it on its next turn, and the quake (attack
+-- $BC, command $0C) follows on the turn after.  Under the contract (Ot6FuseTbl's rows $010D and $010E, OT6_FUSE_TIMER) a break while one is lit cancels
 -- that Crane's quake: the script waits nowhere, switch 1 is clear, its clock restarts, and the other Crane's clock
 -- runs on.
 --
@@ -40,7 +40,7 @@ local function present(sp)
   return false
 end
 
-local function cases(tag, name, species)
+local function cases(tag, name, species, clock)
   return H.fuseCases({
     tag = tag, species = species, write = WRITE,
     line = 0x9C, move = { cmd = 0x0C, atk = 0xBC }, turns = 1, glows = 1,
@@ -56,8 +56,8 @@ local function cases(tag, name, species)
       H.assertEq(post.mvar & 0x02, 0, string.format("%s: monster switch 1 is clear after the cancel", name))
       H.assertEq(post.timer < 4, true, string.format("%s's timer reads 0 after the cancel (%d): its clock restarts",
         name, post.timer))
-      H.assertEq(l2.cells.timer >= 240, true, string.format("%s: the second line came once its clock had run again "
-        .. "(its timer %d at the line)", name, l2.cells.timer))
+      H.assertEq(l2.cells.timer >= 2 * clock, true, string.format("%s: the second line came once its clock had run "
+        .. "again (its timer %d at the line, %d its arming)", name, l2.cells.timer, 2 * clock))
     end,
   })
 end
@@ -122,7 +122,7 @@ H.run({ maxFrames = 150000 }, {
   H.call(function()
     H.assertEq(present(LEFT) and present(RIGHT), true, "both Cranes stand at the open")
   end),
-  cases("crane_left", "the left Crane", LEFT),
+  cases("crane_left", "the left Crane", LEFT, 60),
   -- (the right Crane's cases open on a snapshot of their own, taken with its quake neither armed nor lit: the party
   -- Defends, with care, until its armed switch is clear)
   H.lazy(function()
@@ -140,6 +140,6 @@ H.run({ maxFrames = 150000 }, {
   H.call(function()
     H.assertEq(present(RIGHT), true, "the right Crane still stands for its cases")
   end),
-  cases("crane_right", "the right Crane", RIGHT),
+  cases("crane_right", "the right Crane", RIGHT, 90),
   H.logStep("[cranes] PASS: each Crane's quake announced on its own clock, cancelled by a break and earned again"),
 })

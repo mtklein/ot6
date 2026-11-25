@@ -5053,8 +5053,8 @@ AIScript::_268:
 ; crane (left, $010D)
 ; OT6 (bosses-wob.md block 16, wt/v052-tg-wob2): the quake is each Crane's telegraph, on its own clock.  Vanilla
 ; quaked (Magnitude8, "The crane shook the deck!") on whichever Crane's turn came once the battle timer reached 60,
-; one quake for the pair a cycle.  Now each Crane's own timer arms it at 120 (twice the length: two Cranes, about
-; vanilla's rate) on one of its ordinary turns (monster switch 1); "Deck groans!" (battle dialogue $9C) and a
+; one quake for the pair a cycle.  Now each Crane's own timer arms it, the left Crane's at 60 (vanilla's length)
+; and the right's at 90, on one of its ordinary turns (monster switch 1); "Deck groans!" (battle dialogue $9C) and a
 ; glow announce it on its next turn, and the quake follows on the turn after.  A break in between cancels that
 ; Crane's quake: switch 1 goes and its clock restarts (Ot6FuseTbl), and the other Crane's clock runs on.  The
 ; clock's reset and the switch come before the quake (ot6_fuse.asm, the idiom); the fuse block comes first, so the
@@ -5083,7 +5083,7 @@ Ot6FuseCraneL:                  ; the fuse is lit here (Ot6FuseTbl's row)
                 attack TEKBARRIER
                 set_monster_switch 0
                 end_if
-        if_monster_timer 120
+        if_monster_timer 60
                 attack BATTLE, BOLT, BOLT
                 set_monster_switch 1    ; ot6: arms the fuse block (above)
                 end_if
@@ -5122,7 +5122,7 @@ Ot6FuseCraneL:                  ; the fuse is lit here (Ot6FuseTbl's row)
 ; ------------------------------------------------------------------------------
 
 ; crane (right, $010E)
-; OT6 (bosses-wob.md block 16, wt/v052-tg-wob2): as the left Crane (_269), on its own clock.
+; OT6 (bosses-wob.md block 16, wt/v052-tg-wob2): as the left Crane (_269), on its own clock, at 90.
 AIScript::_270:
         if_monster_switch_set 1
                 dlg $9c
@@ -5147,7 +5147,7 @@ Ot6FuseCraneR:                  ; the fuse is lit here (Ot6FuseTbl's row)
                 attack TEKBARRIER
                 set_monster_switch 0
                 end_if
-        if_monster_timer 120
+        if_monster_timer 90
                 attack BATTLE, FIRE, FIRE
                 set_monster_switch 1    ; ot6: arms the fuse block (above)
                 end_if
