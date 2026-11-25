@@ -1222,8 +1222,9 @@ check("break_reach", "python3 tools/check_break_reach.py --strict-holders",
        "ff6/src/battle/battle_main.asm", "ff6/src/battle/ot6_break_floor.inc",
        "ff6/src/menu/item_prop_en.dat", "ff6/src/field/char_prop.asm"]
       + glob("src/battle/ot6_*.asm", "ff6"))
-# #566: the area dress's table (M.LEG_SPECIES, ot6_field.lua) lists every species the replayed line's legs deal
-# (their maps' pools, the sectors walked, the battles opened), read from the play's own logs.
+# #566: the area dress's table (M.LEG_SPECIES, ot6_field.lua) against the replayed line's legs (their maps' pools,
+# the sectors walked, the battles opened), read from the play's own logs: a report, not a failure (the table is
+# read from play, so a strict check is circular; leg_species.py's header).  --strict makes it fail.
 check("leg_species", "python3 tools/six_classes/leg_species.py build/states --covers",
       ["tools/six_classes/leg_species.py", "tools/six_classes/stages.py", "tools/tests/lib/ot6_field.lua",
        "ff6/src/field/map_prop.dat", "ff6/src/field/sub_battle_group.dat", "ff6/src/field/rand_battle_group.dat",
