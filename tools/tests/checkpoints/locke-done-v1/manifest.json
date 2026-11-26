@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "a7adda7b43bb7c0ad7a3149be417578d52b0214273746fb07621ed97b602ca56",
+  "sha256": "8d8bc15b1b2276424f26bfb84bd0a0988bfd8485f7d7541498ada8f0126336cd",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "a7adda7b43bb7c0ad7a3149be417578d52b0214273746fb07621ed97b602ca56",
-    "generator_sig": "5322e72b02afdd2581f4b6f607dc05586a95b6fb715fd3be7aa7587480897799 gen_tunnelarmr",
+    "payload_sha256": "8d8bc15b1b2276424f26bfb84bd0a0988bfd8485f7d7541498ada8f0126336cd",
+    "generator_sig": "f755475ff9e798aff6523c31a1ee36ad7343a7729ea11d0981ce750c2e0af9f9 gen_tunnelarmr",
     "ancestors": [
       {
         "path": "build/states/celes_freed.stamp",
-        "sha256": "85b09b28d2c810172180569a08680f0c85e037e29ccb4ed92ff68c04bec4d0df"
+        "sha256": "bf139a1309026ee9dc000afae8608c1c72ce2167cb71f76bff7f37f60a017327"
       }
     ]
   }

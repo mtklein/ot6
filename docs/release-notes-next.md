@@ -75,8 +75,7 @@ digs out a Green Cherry!" a turn before he eats it; break him while the
 **!** is up and the cherry is gone for the rest of the fight (a Green
 Cherry you use on him then does nothing for him either). Tritoch says
 "Frost climbs the cliff!" at the start of each round of its attacks, and
-casts Rasp with it; Ice 3 comes on its next turn (up to about a quarter of
-a member's HP), and at no other time: Tritoch no longer casts Ice 3 unannounced
+casts Rasp with it; Ice 3 comes on its next turn, and at no other time: Tritoch no longer casts Ice 3 unannounced
 on the round's third turn. A break stops it.
 
 A boss that announces a move can no longer have it taken away by a
