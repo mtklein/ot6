@@ -371,6 +371,47 @@ wt/v052-tg-wor1 (#561): six bosses' telegraphs (blocks 1, 2, 4, 8, 9 and
   formation staged from Kefka's Tower: no four-member party meets them on the
   line).
 
+### 1.6 What unit D built
+
+wt/v052-tg-wor2 (#561): the Storm, Ice and Red Dragons' telegraphs (blocks
+6, 7 and 14, each with its **Built** paragraph and its suite:
+`battle_stormdrgn`, `battle_icedragon`, `battle_reddragon`), three rows of
+`Ot6FuseTbl`, and one new mechanism:
+
+- **A gauge that grows** (`Ot6GrowTbl`, `Ot6GaugeGrow`, `ot6_break.asm`):
+  a species in the table comes back from each break's recovery with the
+  table's step more shields, to its cap, and stays at the cap. The growth is
+  made in `Ot6Tick`'s restore and nowhere else, one instruction before the
+  count is set to the maximum, so the count the HUD draws (`Ot6ShownGauge`
+  reads the count) is the new maximum from the frame the break ends; a break
+  Still Life holds on grows nothing until it really ends. The maximum is
+  battle-only state, seeded at every battle (`Ot6SeedShields`): no save holds
+  it. Every cap is under 64 (the gauge byte's bit 6 is the HUD's dead flag;
+  `battle_stormdrgn` reads the table), and a maximum at or above its cap is
+  left alone. Only the Storm Dragon has a row (10, 12, 14). The first cut
+  compared the body's offset as a 16-bit word and hung every recovery in the
+  game: `DecCounters` runs `Ot6Tick` with 8-bit index registers
+  (`build/attempts/wt/v052-tg-wor2/dev/gen_wor_storm-brk-hang.log`).
+- **The roll on the arming turn, CzarDragon's way.** The Storm and Red
+  Dragons' moves were one pick in three in vanilla; a roll of 85 in 256
+  (`if_roll`) on the turn that arms the fuse keeps that share, and the fuse
+  block (the script's first, conditioned on the switch the arming sets)
+  announces on the next turn and fires on the one after, so nothing rolls
+  between the line and the move. Each move now comes only announced, never
+  more often than vanilla's and never sooner.
+- **A fresh clock after a cancel.** The Red Dragon's clock (its monster
+  timer) counts while it is Broken, and a break outlasts a 40-count clock,
+  so clearing the timer at the cancel would have the burst due on its first
+  turn back. Its row sets battle switch 0 at the cancel (`OT6_FUSE_SETB0`)
+  and its script's first block, conditioned on that switch, restarts the
+  clock on its first turn back.
+- **The Ice Dragon immune to Berserk and Mute** (`MonsterProp` splice,
+  `battle_main.asm`; `check_fuse_immune`): Absolute 0 costs 20 MP. The Storm
+  and Red Dragons were immune already.
+
+The dying-attack rule (question 4) is not in this unit: the Ice Dragon's
+dying Surge is vanilla's.
+
 ## 2. Hooks at a glance
 
 "Vanilla" in the telegraph column means the announce is already in the

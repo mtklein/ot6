@@ -78,6 +78,23 @@ Cherry you use on him then does nothing for him either). Tritoch says
 casts Rasp with it; Ice 3 comes on its next turn, and at no other time: Tritoch no longer casts Ice 3 unannounced
 on the round's third turn. A break stops it.
 
+Three of the eight dragons announce a move the same way. The Storm
+Dragon, once it has lost a little under two thirds of its HP, sometimes
+says "It swallows the wind!" and uses Cyclonic on its next turn (CYCLONIC_DMG);
+about one round of its attacks in three ends this way, as often as before,
+and it no longer uses Cyclonic without the line. The Ice Dragon says "The
+air goes still!" at the start of each round of its attacks and uses
+Absolute 0 on its next turn (ABS0_DMG); it no longer uses Absolute 0 on a
+round's third turn. The Red Dragon still bursts into fire whenever its
+clock runs out; when the burst is to be Flare Star (one time in three, as
+before) it says "Its scales turn white!" a turn ahead and Flare Star comes
+on the turn after (FLARE_DMG), two turns later than it used to. Break it while
+the **!** is up and its clock starts over from the beginning when it
+recovers. The Storm Dragon's shields now grow: it starts with 10 instead
+of 14, and each time it recovers from a break it comes back with two more,
+up to 14. RED_SHIELDS
+The Ice Dragon can no longer be Berserked or Muted.
+
 A boss that announces a move can no longer have it taken away by a
 status: the Marshal, Number 128, the Gold Dragon, Rizopas, Chupon and
 Nerapa can no longer be Berserked, Chupon can no longer be Muted, and

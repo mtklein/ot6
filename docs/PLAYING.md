@@ -106,6 +106,16 @@ out for the break, and the count of blows that sends him back starts over.
 Breaking Umaro while the **!** is up costs him the cherry for the rest of
 the fight (a Green Cherry you use on him then does nothing for him either).
 Breaking a Tentacle, at any time, frees the member it holds.
+Three of the dragons work this way too. The Storm Dragon, once it is badly
+hurt, sometimes says "It swallows the wind!" and uses Cyclonic on its next
+turn; it never uses Cyclonic without the line. The Ice Dragon says "The air
+goes still!" at the start of each round of its attacks, and uses Absolute 0
+on its next turn and at no other time. The Red Dragon's clock still brings a
+burst of fire every so often; when the burst is to be Flare Star it says
+"Its scales turn white!" first, and Flare Star comes on its next turn.
+Breaking the Red Dragon while the **!** is up restarts its clock from the
+start when it recovers. The Storm Dragon's shields grow: it starts with 10,
+and each time it recovers from a break it comes back with two more, up to 14.
 A boss that announces a move cannot be Berserked, and cannot be Muted or
 turned into an Imp when that would stop its move. Not every big move is announced.
 

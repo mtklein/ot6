@@ -156,7 +156,13 @@ fight). One AI conditional is new: `if_seize_free` (`$00`, vanilla's unused
 on as its turn is read, so no two bodies announce on one member and none on a
 member who cannot be held; a member who falls or leaves inside the fuse
 snuffs it (`Ot6SeizeFell`, from the HUD's poll), the one cancel that is not a
-break.
+break. A gauge can grow (wt/v052-tg-wor2, the Storm Dragon's): a species in
+`Ot6GrowTbl` comes back from each break's recovery with the table's step more
+shields, to its cap (`Ot6GaugeGrow`, called from `Ot6Tick`'s restore, so the
+count the HUD draws is the new maximum from the frame the break ends). The
+maximum is battle-only state, seeded fresh at every battle; nothing of it is
+saved. The Red Dragon's row uses `OT6_FUSE_SETB0` as the cancel's mark: its
+clock runs through a break, so its first turn back restarts the clock.
 
 **Shielded resistance.** Every hit is judged on the enemy's state before it
 lands. While an enemy still has shields it takes reduced damage (×0.5), and

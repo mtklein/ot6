@@ -39,7 +39,7 @@ local WANT = {
   [0x0DD] = { "Punisher", 3, DAGGER | KATANA, POISON, 0 },
   [0x0C5] = { "Scrapper", 2, KATANA | BLUNT, 0, POISON },
   [0x014] = { "Ursus", 2, KATANA | BLUNT, FIRE, 0 },
-  [0x14B] = { "Storm Drgn", 14, SWORD | DAGGER | KATANA, BOLT, WIND },
+  [0x14B] = { "Storm Drgn", 10, SWORD | DAGGER | KATANA, BOLT, WIND },  -- 10 at the open, growing to 14 (wt/v052-tg-wor2)
 }
 
 -- the hands (route-wor-cyan.md 6): the four who reach Mt. Zozo first
