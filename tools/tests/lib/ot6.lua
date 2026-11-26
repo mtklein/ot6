@@ -19828,7 +19828,14 @@ function M.fuseEngage(talk, species, what, tries)
       M.assertEq(tries < 4, true, what .. ": the talk opened its battle within four tries")
       return M.seqStep({
         M.logStep(string.format("[fuse] %s: a random battle opened on the talk's step; it is fought out", what)),
-        M.kitBattle({}, { maxFrames = 60000 }),
+        -- (by the tactical fight driver, as the routes fight their random battles: wt/v052-tg-wor1's replay drew
+        -- one below Atma that the plain Fights of M.kitBattle lost, every member at 0 HP,
+        -- build/attempts/wt/v052-tg-wor1/regen1/red/battle_atma-red.log)
+        M.lazy(function()
+          local F = M.fightDriverFor("fuseEngage", { tactical = true, boost = true, items = true, healPercent = 55 }, {})
+          return M.driveUntil(function() return not M.battleLoadStarted() end, 60000,
+            { M.call(function() F.frame() end) }, what .. ": the random battle fought out")
+        end),
         M.waitUntil(function() return not M.battleLoadStarted() and M.hasControl() and M.tileAligned() end, 9000,
           what .. ": the field again after the random battle", 2),
         M.fuseEngage(talk, species, what, tries + 1),
