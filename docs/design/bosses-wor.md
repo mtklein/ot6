@@ -4,11 +4,12 @@ Scope: every boss and event fight of the World of Ruin, from the Figaro
 Tentacles to Kefka, in the order the automated line meets them. It is the
 World of Ruin counterpart of [bosses-wob.md](bosses-wob.md) and assumes
 that document's boss contract. Issue #561. It began as a survey that
-changed no ROM byte; **units A, B and C of its build order are now built**
+changed no ROM byte; **units A, B, C and D of its build order are now built**
 (section 1.3: the cancel, the lit-fuse mark, and the fuses of Atma, the Gold
 Dragon and Kefka, with the World of Balance's AtmaWeapon; section 1.5: the
 Tentacles, Dullahan, Phunbaba's second visit, Chadarnook, Umaro and Tritoch,
-with the release and the denied buff). Every other telegraph here is design
+with the release and the denied buff; section 1.6: the Storm, Ice and Red
+Dragons, with the growing gauge). Every other telegraph here is design
 text. Each block says what is built, what the vanilla script
 offers as a wind-up, and what is proposed.
 
@@ -424,15 +425,15 @@ script. Shields are today's; an arrow is a proposal (section 3).
 | 3 | Presenter and its head (the tomb's chest) | The Narshe Whelk grown: the shell is the wrong answer. The same hook on purpose, a callback | a hit on the shell -> Giga Volt (vanilla counter) | 0 / 6 |
 | 4 | Phunbaba, the two visits | He ends the fight himself at an HP line. Crossed while Broken, the second visit ends without BabaBreath and nobody is blown out | "He fills his lungs!" under 20,480 HP -> BabaBreath x2 on his next turn; any break denies it. **Built** | 4 / 5 |
 | 5 | Phunbaba, TERRA's fight | The roster is whoever BabaBreath left, and her Trance is the key | none proposed | 12 |
-| 6 | Storm Drgn | Proposed (Octopath): the gauge grows after each break, 10, 12, 14 | "The Storm Dragon swallows the wind" -> Cyclonic | 14 -> 10 growing to 14 |
-| 7 | Ice Dragon | Freeze and thaw: N. Cross freezes members, and fire, its weakness, is also the thaw | "The air goes still" -> Absolute 0 | 6 |
+| 6 | Storm Drgn | The gauge grows (Octopath): 10 at the open, two more after each break, to 14 | "It swallows the wind!" -> Cyclonic, a roll of one in three a low rotation. **Built** | 10 growing to 14 (was 14) |
+| 7 | Ice Dragon | Freeze and thaw: N. Cross freezes members, and fire, its weakness, is also the thaw | "The air goes still!" -> Absolute 0, every rotation. **Built** | 6 |
 | 8 | Tritoch | It answers the command, not the hit: any skill command draws Cold Dust on its user, fire draws Rasp, plain Fight draws nothing, and defence 254 makes Fight a chip and nothing more | "Frost climbs the cliff!" -> Ice 3. **Built** | 10 |
 | 9 | Umaro | The recruit's audition: he Jumps at the third spell, Tackles at fire, and under 10,240 HP eats a Green Cherry | "He digs out a Green Cherry!" -> the cherry; a break denies it. **Built** | 6 |
 | 10 | Pugs x3 (Umaro's cave's chest) | A tug of war: each Pug steps forward every turn and stabs when it arrives; three Fights knock it back; a spell draws Pearl | the steps forward (vanilla) -> Knife | 4 each |
 | 11 | Chadarnook | Two bodies in one frame: the demon stands for four of the party's actions or 40 counts; bank on the goddess, spend on him | "The paint runs!" -> the swap. **Built** | 0 / 6 |
 | 12 | White Drgn | No weapons and no weakness: in the tower only the Break spell opens it, and every spell cast draws Dispel on the party | none natural | 6 |
 | 13 | MagiMaster | Every hit re-rolls his wall and a break freezes it; his death is Ultima | "MagiMaster gathers the last of his magic" -> Ultima (a dying move: open question 4) | 8 |
-| 14 | Red Dragon | A clock, not a counter: every 40 counts a fire burst on the party, whatever the party does | "The Red Dragon's scales turn white" -> Flare Star | 6 -> 8 |
+| 14 | Red Dragon | A clock, not a counter: every 40 counts a fire burst on the party, whatever the party does; a break in the fuse buys a fresh clock | "Its scales turn white!" -> Flare Star, a roll of one in three a clock. **Built** | 8 (was 6) |
 | 15 | Doom Gaze | The hunt: he flees on his third turn and keeps his wounds; Broken, he cannot flee | "Doom Gaze turns to flee" -> Escape | 8 |
 | 16 | SrBehemoth, twice | The fight turns round: the first beast's death brings its corpse in from behind, undead, with its elements inverted | Hypno Gas (Sleep) -> "4 attacks!!" (vanilla) | 6 + 6 |
 | 17 | Hidon | The fuse the party wants: GrandTrain comes only when he stands alone, and STRAGO has to see it | a glow (vanilla) -> GrandTrain | 6 (Hidonites 2) |
@@ -498,15 +499,15 @@ unbroken.
 | Phunbaba, first visit | 31 / 28,000 | 4 | 4,399; 1,460 | 4 |
 | Phunbaba, second visit | 31 / 26,000 | 5 | 2,922; 2,439 | 5 |
 | Phunbaba, TERRA's | 31 / 26,000 | **12** | 6,779; 2,858 | 12 |
-| Storm Drgn | 74 / 42,000 | **14** | 14,383; 8,027 at 36,202 HP | 10, 12, 14 |
-| Ice Dragon | 74 / 24,400 | 6 | 8,216; 4,577 | 6 |
+| Storm Drgn | 74 / 42,000 | **14** | 14,383; 8,027 at 36,202 HP | 10, 12, 14 (built, unit D) |
+| Ice Dragon | 74 / 24,400 | 6 | 8,216; 4,577 | 6 (kept, unit D) |
 | Tritoch | 62 / 30,000 | 10 | 7,804; 4,905 | 10 |
 | Umaro | 33 / 17,200 | 6 | 6,151; 3,533 | 6 |
 | Pugs x3 (chest) | 99 / 14,001 | 4 each | 8,065; 1,713 | 4 each |
 | Chadarnook (the demon) | 41 / 30,000 | 6 (goddess 0) | 12,576; 10,618 at 4,606 HP | 6 |
 | White Drgn | 71 / 18,500 | 6 | 21,014; never (lowest 3) | 6 |
 | MagiMaster | 68 / 50,000 | 8 | 31,262; never (lowest 1) | 8 |
-| Red Dragon | 67 / 30,000 | 6 | 4,836; never (lowest 1) | 8 |
+| Red Dragon | 67 / 30,000 | 6 | 4,836; never (lowest 1) | 8 (built, unit D) |
 | Doom Gaze | 68 / 55,555 | 8 | three meetings; 3,162 in the first | 8 |
 | SrBehemoth, then its corpse | 43, 49 / 19,000 each | 6, 6 | 6,737; 1,720 and 5,008 | 6, 6 |
 | Hidon | 43 / 25,000 | 6 (Hidonites 2) | 14,937; 5,560 | 6 |
@@ -562,7 +563,10 @@ By the body's role in its fight, not its level:
    Proposed: 8 for Red,
    Dirt, Blue, Gold and Skull; the Ice Dragon stays at its measured 6; the
    White Dragon stays at 6 because one spell is its only key. Each change
-   is a lab, not an edit.
+   is a lab, not an edit. **Unit D (section 1.6)**, by lab: the Storm
+   Dragon 10 growing to 14, the Ice Dragon kept at 6, the Red Dragon 8
+   (blocks 6, 7, 14). The ladder so far: 10-14, 6, 6 (White), 8 (Red),
+   then Dirt, Blue, Gold and Skull with units F to H.
 2. **Atma has fewer shields (10) than the AtmaWeapon it rematches (11).**
    Its row comment calls it "the atmaweapon's row, the rematch"
    (`ot6_hud.asm:3455-3458`). Proposed 12.
@@ -978,7 +982,42 @@ under 15,360, riding on that turn's attack; Cyclonic on the next, certain
 their HP (`attacks.txt`: "CYCLONIC ... st=-/nearfatal"). Stays verbatim:
 Wind Slash, Rage, the counter's Battle.
 
-**Shields.** 14 today (section 3.2, 5).
+**Built (wt/v052-tg-wor2, `battle_stormdrgn`).** Cyclonic is announced, and
+the gauge grows. Under 15,360 HP, on a low rotation's first turn, a roll of
+one in three (85 in 256, `if_roll`, on the arming block: the CzarDragon's
+idiom) arms monster switch 0 with that turn's Battle, Battle or Aero; its next
+turn, the fuse block (the script's first), attacks the same way, then says
+"It swallows the wind!" (dialogue `$A6`) and glows; the turn after casts
+Cyclonic, whatever its HP reads then (CYAN's Tempest heals it across the
+line: nothing changes). Unarmed, the low rotation is vanilla's with Battle in
+Cyclonic's place, so Cyclonic comes only announced, in a third of the low
+rotations as vanilla's did, and never sooner (an armed rotation is a turn
+longer). Monster switch 1 marks a low rotation's second turn due, so the roll
+is made once a rotation. A break between the line and Cyclonic cancels it
+(switch 0 cleared, `$3240` forgotten): the next low rotation rolls again. Not
+as proposed: the line comes on the turn after the arming turn, not "on the
+first turn under 15,360", because a certain Cyclonic on every low rotation
+would be three times vanilla's. The gauge opens at 10 and comes back from each
+break with two more, to 14 (`Ot6GrowTbl`, section 1.6); the HUD's count tile
+drew the new count 2-3 frames after each recovery (`battle_stormdrgn`'s grows
+and cap cases). Cyclonic took a target from 1,382 to 87 HP and another from 51
+to 4 (it leaves each target about a sixteenth of its HP: the suite's landed
+case, `[storm] effect`).
+Lab (one turn of fuse; the final ROM's own fixtures, seven shifts, six distinct
+keys `$46 $66 $7E $AC $02 $0A`; `build/attempts/wt/v052-tg-wor2/final/lab/F-storm/`,
+the same runs as on the development ROM, `.../d1/lab/F-storm*`): the line's
+fighter (`STORM_FIGHT`) broke it from 10 before any line on 5 of 7 and met
+Cyclonic on 2 (key `$AC`, both shifts); it WON 6 and LOST 1 (key `$AC`, shift
+23: seven deaths in a long fight, the last two after Cyclonic took TERRA to
+173 HP; the same key's shift 5 WON). A party that holds to the line and then
+chips broke it in the fuse on 5 of 7 (WON 7 of 7); one that keeps its bank for
+the line met it on 3 of 7 and broke it in the fuse on 2 (WON 7 of 7). At 14
+flat (the variant ROM, `build/attempts/wt/v052-tg-wor2/v1/lab/F-storm*`) the
+holding party broke it in the fuse on 2 of 7 and LOST 1 (key `$66`), and the
+line's fighter never met the line (WON 7 of 7). Kept at 10 growing to 14: the
+first break is cheap, and a party that watches for the line can answer it.
+
+**Shields.** 10, growing to 14 (was 14 flat; section 3.2, 5).
 
 **Break story.** Three blades: TERRA's and CELES's swords (straight or
 curved) and CYAN's katana key it; SABIN's claws did until they became
@@ -1019,6 +1058,30 @@ turn's N. Cross or Battle; Absolute 0 on the second, certain (vanilla:
 two picks in three). The rotation is three beats, so the fuse returns
 every rotation, as AtmaWeapon's does. Build: one `dlg` at :6923; the
 cancel store restarts the bar at its first beat.
+
+**Built (wt/v052-tg-wor2, `battle_icedragon`).** The first beat of its
+rotation of three attacks as vanilla's did (Battle, N. Cross or N. Cross),
+then says "The air goes still!" (dialogue `$A7`) and glows: the line rides that
+turn, after its attack. Absolute 0 comes on the second beat (vanilla rolled
+Battle, Absolute 0 or Absolute 0 there), and only there: the third picks
+Battle, Surge or N. Cross (vanilla's Battle, Surge or Absolute 0), so Absolute
+0 comes only announced, once a rotation (vanilla's average was one). A break in
+between cancels it (`$3240` forgotten): the rotation starts again from its
+first beat, the line with it. It is immune to Berserk and Mute now (Absolute 0
+costs 20 MP). Its counters, and its dying Surge, are vanilla's (question 4 is
+a later unit's). Absolute 0 took 39%, 16% and 50% of three members' maximum HP
+and nothing from MOG, all four its targets (the suite's landed case,
+`[icedragon] effect`). Close in shape to Tritoch's fuse on the next ledge (a
+line on the rotation's first turn, the ice spell on its second); what keeps
+the two apart is the gauge: six shields and a weakness everyone carries (fire)
+against Tritoch's ten behind defence 254.
+Lab (one turn of fuse, 6 shields, from the party arriving on the cliffs, seven
+shifts, six distinct keys `$FE $CA $6A $AE $DA $7A`;
+`build/attempts/wt/v052-tg-wor2/final/lab/F-ice/`): every run WON (21 of 21).
+The line's fighter (gen_wor_narshe's, the walk's on which the line meets it)
+met the line on its first turn every time and took Absolute 0 2-6 times a
+fight, and broke it in a fuse on 3 of 7; a party that holds and then chips broke
+it in a fuse on 3 of 7, and one that keeps its bank on 5 of 7. Kept at 6.
 
 **Shields.** 6 by measurement (route-wor-narshe.md 11.4).
 
@@ -1409,7 +1472,43 @@ the monster timer at the break: the break buys a whole fresh clock.
 Build: one block ahead of :7224 with its own switch. Stays verbatim:
 Eraser, the Flare phase, the counter.
 
-**Shields.** 6, the floor's number; proposed 8.
+**Built (wt/v052-tg-wor2, `battle_reddragon`).** Its clock's Flare Star is
+announced, and a break buys a fresh clock. On the turn its clock reaches 40 a
+roll of one in three (85 in 256, `if_roll`, on the arming block) arms monster
+switch 1 with that turn's Fire 2 or Fire Ball; its next turn, the fuse block,
+says "Its scales turn white!" (dialogue `$A8`) and glows, a turn of its own;
+the turn after restarts the clock and casts Flare Star. Unarmed, the burst is
+vanilla's at once, S. Cross or L.4 Flare (S. Cross takes Flare Star's place in
+the pick), so Flare Star comes only announced, in a third of the clocks as
+vanilla's did, and two turns later. A break between the line and Flare Star
+cancels it (switch 1 cleared, `$3240` forgotten) and sets battle switch 0
+(`OT6_FUSE_SETB0`): the clock counts through the break, which outlasts a
+40-count clock, so the script's first block restarts it on the dragon's first
+turn back (with that turn's Fire 2 or Fire Ball). The suite saw the timer read
+185 at its first turn back and 17 at its second, and the next line 3,680
+frames after its first turn back. Not as proposed: the line is not "when the
+clock passes 30" with the burst at 40, because between the two the dragon takes
+ordinary turns and a fuse lit by a `wait` cannot span them; the roll arms on the
+turn the clock runs out and the line follows, as the CzarDragon's worked
+example has it. Eraser and its line, the Flare phase, the rotation and the
+counter are vanilla's. Flare Star took 10-20% of each member's maximum HP, all
+four its targets (the suite's landed case on the development ROM, `[red]
+effect`).
+Lab (the final ROM's own fixtures, nine shifts, five distinct keys `$A2 $C2
+$C8 $F2 $F6`; `build/attempts/wt/v052-tg-wor2/final/lab/F-red/`): at 8 the
+line's fighter (gen_wor_locke's `BOSS_FIGHT`) broke it before any line on 9 of 9
+(7-10 party actions, frames 4,581-5,110 of the fight) and WON 9 of 9, as did a
+party that keeps its bank. A party that Defends until the line met it on 7 of 9
+(turn 5-10) and never broke it in the fuse (2-4 actions); it LOST 2 (keys `$C2`
+and `$F6`: no line came in three clocks, unannounced bursts and its own Fire
+2s wore down a party that only Defended). At 6 (the development ROM,
+`build/attempts/wt/v052-tg-wor2/d1/lab/F-red/`, keys `$A2 $C2 $C8 $F2`) the
+line's fighter broke it before any line on 7 of 7, in 4 actions on 6 of them (frames 2,667-4,925); the
+holding party LOST 1 (key `$C2`). Raised to 8, the section 3.2 proposal: at 6
+it was the line's shortest boss fight, and at 8 the line still breaks it first
+every time.
+
+**Shields.** 8 (was 6, the floor's number).
 
 **Break story.** MOG's spear is the only class key in this party; ice is
 CELES's. UMARO and RELM hold none unless RELM casts. A party of four with
@@ -2392,7 +2491,7 @@ key, before and after.
 | A (**built**, section 1.3) | Atma, Gold Drgn, Kefka (and the WoB's AtmaWeapon) | the machinery of 1.2 on fuses vanilla already wrote: the script block moved, the cancel store, the species table, the lit-fuse mark, the roll condition. No change to those scripts | `battle_fuse` (the table, the block, the worked example), `battle_atma`, `battle_golddrgn`, `battle_goner`, `battle_atmaweapon` |
 | B (**built**, section 1.5) | Tentacles, Dullahan, Phunbaba | the first authored lines; the hostage release; the hit counter cleared by a break | `battle_tentacles`, `battle_dullahan`, `battle_phunbaba` |
 | C (**built**, section 1.5) | Chadarnook, Umaro, Tritoch | a window fight, a buff denied, a command-keyed boss | `battle_chadarnook`, `battle_umaroboss` (`battle_umaro` is UMARO's own kit), `battle_tritoch` |
-| D | Storm, Ice and Red Dragons | the growing gauge; a rotation fuse; a clock reset by the break | `battle_stormdrgn`, `battle_icedragon`, `battle_reddragon` |
+| D (**built**, section 1.6) | Storm, Ice and Red Dragons | the growing gauge; a rotation fuse; a clock reset by the break | `battle_stormdrgn`, `battle_icedragon`, `battle_reddragon` |
 | E | MagiMaster, White Drgn, Doom Gaze | the dying move (after question 4); the flight held | `battle_magimaster`, `battle_whitedrgn`, `battle_doomgaze` |
 | F | SrBehemoth, Hidon, Dirt Drgn | vanilla lines given a beat; the fuse to leave alone | `battle_srbehemoth`, `battle_hidon`, `battle_dirtdrgn` |
 | G | Stooges, Wrexsoul, Blue Drgn | a shared clock; Zinger; Rippler | `battle_stooges`, `battle_wrexsoul` (beside `battle_zinger`), `battle_bluedrgn` |
