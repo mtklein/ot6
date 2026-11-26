@@ -53,7 +53,7 @@ Six World of Ruin bosses announce a move the same way. In Figaro
 Castle's engine room, a Tentacle that finds a member Slowed says "It coils
 to seize!" and Seizes that member on its next turn (before, it Seized at
 once); breaking a Tentacle, at any time, frees the member it holds, who can
-act again straight away. Dullahan says "Its blade rimes over!" once he has
+act again. Dullahan says "Its blade rimes over!" once he has
 been hit eight times, and on his next turn casts Absolute 0 on the whole
 party (about a quarter of each member's HP); a break while the **!** is up stops it and starts his count
 over. He no longer follows the count with N.Cross and Ice 2, and Absolute 0
@@ -61,8 +61,9 @@ comes only after the line. When Phunbaba returns to Mobliz, he says "He
 fills his lungs!" once he has lost about a fifth of his HP; the hit that
 drives him off then brings his two BabaBreaths, each of which blows a
 member out of the party for the fight that follows. Break him while the
-**!** is up, or drive him off before he says the line, and he leaves
-without them. Chadarnook's demon says "The paint runs!" a turn before he
+**!** is up and drive him off before he recovers, or drive him off before
+he says the line, and he leaves without them; if he recovers still
+standing, he fills his lungs again on his next turn. Chadarnook's demon says "The paint runs!" a turn before he
 hands the painting back to the goddess; break him while the **!** is up and
 he stays out for the break, his count of hits starting over.
 Umaro says "He digs out a Green Cherry!" a turn before he eats it; break

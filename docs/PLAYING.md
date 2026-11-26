@@ -95,7 +95,7 @@ Cherry!") and Tritoch ("Frost climbs the cliff!", a turn before Ice 3).
 Where a boss counts what you do to earn its move (Dadaluma your spells,
 Chupon your hits, Nerapa your Fights, Dullahan your hits), a break starts
 the count over. Breaking Phunbaba while the **!** is up means he leaves
-without his BabaBreaths. Breaking the demon while the **!** is up keeps him
+without his BabaBreaths if you drive him off before he recovers. Breaking the demon while the **!** is up keeps him
 out for the break, and his count of hits starts over. Breaking
 Umaro while the **!** is up costs him the cherry for the rest of the fight.
 Breaking a Tentacle, at any time, frees the member it holds.
