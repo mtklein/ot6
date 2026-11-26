@@ -50,6 +50,7 @@ end
 local function ent() local s = slotOf(); return s and 8 + 2 * s end
 
 local seen, unannounced = {}, 0
+local CW = nil
 local rollsSeen, gen = {}, 0
 local brks = {}
 -- each of its turns as its script is read: { f, timer (raw $3DC0), bsw }
@@ -110,9 +111,10 @@ local function effect(m)
 end
 
 local S = {}
--- The cap: the landed case is up to ~6,000 frames (a clock is ~1,300 and one in three arms); three cases of ~12,000
+-- The cap: the landed case is up to ~9,000 frames (a clock is ~2,700 and one in three arms); three cases of ~12,000
+-- and the clocks case (up to 50,000)
 -- each follow (the broken case waits out a whole fresh clock); 100,000 is about 2x.
-H.run({ maxFrames = 100000 }, {
+H.run({ maxFrames = 160000 }, {
   H.loadState(STATE),
   H.waitUntil(function() return H.battleActive() end, 3000, "the Red Dragon's battle is up", 2),
   H.call(function()
@@ -165,8 +167,22 @@ H.run({ maxFrames = 100000 }, {
       H.assertEq(back[2].timer < back[1].timer, true, string.format("red: its first turn back restarted its clock (the "
         .. "timer read %d at its first turn back and %d at its second)", back[1].timer, back[2].timer))
       H.assertEq(back[2].bsw & 0x01, 0, "red: battle switch 0 is clear by its second turn back (the restart's clear)")
-      H.assertEq(C.lines[2].f - back[1].f >= 1200, true, string.format("red: the line returns only a whole clock "
-        .. "after its first turn back (%d frames; a clock is 40 counts, about 1,280)", C.lines[2].f - back[1].f))
+      -- (the clock: `if_monster_timer 40` reads half the timer, so it is met at a raw count of 80; the timer climbed
+      -- 17 counts in 583 frames from the restart on the development ROM's run, about 34 frames a count, so a whole
+      -- clock is about 2,700 frames: build/attempts/wt/v052-tg-wor2/d1/suites/battle_reddragon-2.log.  The arming
+      -- turn is the turn before the line's)
+      local before = {}
+      for _, t in ipairs(back) do if t.f < C.lines[2].f then before[#before + 1] = t end end
+      local arm = before[#before - 1]
+      H.assertEq(arm ~= nil and arm ~= back[1], true, "red: an arming turn came after its first turn back, before the "
+        .. "line's")
+      H.log(string.format("[red] the arming turn at f%d read the timer at %d (raw), %d frames after its first turn back",
+        arm.f, arm.timer, arm.f - back[1].f))
+      H.assertEq(arm.timer >= 80, true, string.format("red: the arming turn read a whole clock since the restart (the raw "
+        .. "timer at 80 or more: %d)", arm.timer))
+      H.assertEq(arm.f - back[1].f >= 2560, true, string.format("red: the line returns only a whole clock after its "
+        .. "first turn back (the arming %d frames after it; a clock is 80 raw counts at about 34 frames, 2,560 at the "
+        .. "least)", arm.f - back[1].f))
       local won = 0
       for _, r in ipairs(rollsSeen) do
         if r.gen == gen and r.f > C.brk.f and r.f < C.lines[2].f and r.r < r.n then won = won + 1 end
@@ -174,6 +190,65 @@ H.run({ maxFrames = 100000 }, {
       H.assertEq(won >= 1, true, "red: a roll under the chance came between the cancel and the second line")
     end,
   }),
+  -- ---- clocks: an armed clock and an unarmed one, each seen on any draw (the review round's) ----
+  -- (DECLARED: the dragon's HP held at 20,000 and the party's at 9,999, through the suite's writers, so no draw ends
+  -- the case; the party Defends.  Played until a roll under the chance and a roll over it have both been seen, fifteen
+  -- clocks at the most)
+  H.fuseRestore(S, "red clocks"),
+  H.call(function()
+    gen = gen + 1
+    CW = H.fuseWatch(RED, WRITE)
+    CW.reset(); CW.on = true; CW.pin = { boss = 20000, party = true }
+    H.log("[red] case clocks, from the battle's open; DECLARED: its HP held at 20,000, the party's at 9,999")
+  end),
+  H.lazy(function()
+    local t0 = H.frame
+    local function both()
+      local u, o = false, false
+      for _, r in ipairs(rollsSeen) do
+        if r.gen == gen then if r.r < r.n then u = true else o = true end end
+      end
+      -- (the last roll's turn has played out: 600 frames)
+      local last = rollsSeen[#rollsSeen]
+      return u and o and last ~= nil and H.frame - last.f > 600
+    end
+    return H.kitBattle({}, { idle = "defend", care = false, maxFrames = 50600, giveUp = function()
+      return both() or H.frame - t0 >= 50000
+    end })
+  end),
+  H.call(function()
+    CW.on = false; CW.pin = nil
+    local over, under = nil, nil
+    for _, r in ipairs(rollsSeen) do
+      if r.gen == gen then
+        if r.r >= r.n and over == nil then over = r end
+        if r.r < r.n and under == nil then under = r end
+      end
+    end
+    H.assertEq(over ~= nil and under ~= nil, true, "red clocks: a roll under the chance and one over it, both seen "
+      .. "within fifteen clocks")
+    -- the burst and the line, by the dispatches after each roll
+    local function after(r, lim)
+      local burst, line = nil, nil
+      for _, c in ipairs(CW.cmds) do
+        if c.f >= r.f and c.f <= r.f + lim then
+          if c.cmd == 0x0C and (c.arg == 0xCC or c.arg == 0x95) and not c.retal and burst == nil then burst = c end
+          if c.cmd == 0x21 and c.arg == LINE and line == nil then line = c end
+        end
+      end
+      return burst, line
+    end
+    local ob, ol = after(over, 600)
+    local ub, ul = after(under, 3000)
+    H.log(string.format("[red] clocks: the roll %d/%d at f%d: burst %s, line %s; the roll %d/%d at f%d: burst %s, line %s",
+      over.r, over.n, over.f, ob and string.format("$%02X at f%d", ob.arg, ob.f) or "none", ol and ("at f" .. ol.f) or
+      "none", under.r, under.n, under.f, ub and string.format("$%02X at f%d", ub.arg, ub.f) or "none",
+      ul and ("at f" .. ul.f) or "none"))
+    H.assertEq(ob ~= nil and ol == nil, true, "red clocks: a roll over the chance does not arm: the clock's burst (S. "
+      .. "Cross or L.4 Flare) comes on that turn, unannounced, and no line")
+    H.assertEq(ul ~= nil and (ub == nil or ub.f > ul.f), true, "red clocks: a roll under the chance arms: no burst on "
+      .. "that turn, and the line comes")
+  end),
   H.call(function()
     local t, under, purged = {}, 0, 0
     for _, r in ipairs(rollsSeen) do

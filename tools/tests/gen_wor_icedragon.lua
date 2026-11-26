@@ -101,7 +101,7 @@ H.run({ maxFrames = 300000 }, {
   end, 120000, { playBattles = "tactical", fight = FIGHT }),
   H.call(function()
     local n = 0
-    for _, o in ipairs(H.outcomes or {}) do
+    for _, o in ipairs(H.outcomes) do
       if (o.form & 0x1FF) == ICEDRAGON_FORMATION then
         n = n + 1
         H.log(string.format("[boss] the Ice Dragon: battle $%03X %s after %d ticks, %d seated", o.form & 0x1FF,
@@ -109,6 +109,7 @@ H.run({ maxFrames = 300000 }, {
       end
     end
     H.assertEq(sw(0x0695), 0, "the Ice Dragon is beaten ($0695 clear, _cc36df)")
+    H.assertEq(n, 1, "the Ice Dragon's formation was fought once")
   end),
   CAP.emit(),
   H.saveState("wor_icedragon.mss"),

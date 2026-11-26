@@ -7715,24 +7715,50 @@ Ot6FuseChadarnook:              ; the fuse is lit here (Ot6FuseTbl's row)
 ; ------------------------------------------------------------------------------
 
 ; ice dragon
-; OT6 (bosses-wor.md block 7, wt/v052-tg-wor2): Absolute 0 is announced.  The first beat of its rotation of three
-; attacks as vanilla's first beat did (Battle, N. Cross or N. Cross), then says "The air goes still!" (battle dialogue
-; $A7) and glows: the line rides that turn, after its attack.  Absolute 0 comes on the second beat (vanilla rolled Battle, Absolute 0 or
-; Absolute 0 there), and only there: the third picks Battle, Surge or N. Cross (vanilla's Battle, Surge or Absolute 0),
-; so Absolute 0 comes only announced, once a rotation (vanilla's average was one: two thirds on the second beat, a
-; third on the third).  A break in between cancels it ($3240 forgotten): the rotation starts again from its first
-; beat, the line with it.  The counters (a Battle for every hit, Surge at its death) are vanilla's; its dying Surge is
-; unchanged (the dying-attack rule is a later unit's).
+; OT6 (bosses-wor.md block 7, wt/v052-tg-wor2's review round): freeze and thaw.  Its rotation of three no longer casts
+; Absolute 0 (vanilla rolled it on two of the three beats); N. Cross, which freezes those it hits, stays its first
+; beat's pick.  On a turn when a member is Frozen (an arming block a seat, the Red Dragon's Eraser idiom) it attacks
+; (Battle, Battle or Surge) and sets monster switch 0; its next turn, the fuse block (the script's first, conditioned on
+; the switch alone, never on the status), says "The air goes still!" (battle dialogue $A7) and glows, a turn of its
+; own; the turn after casts Absolute 0.  So the party has two answers: thaw the member (fire) before the dragon's turn,
+; and nothing arms; or break the dragon in the fuse (Ot6FuseTbl: switch 0 cleared, $3240 forgotten).  A member thawed
+; after the arming does not stop the line or the move.  Absolute 0 comes only announced.  The counters (a Battle for
+; every hit, Surge at its death) are vanilla's; its dying Surge is unchanged (the dying-attack rule is a later unit's).
 AIScript::_329:
-        attack BATTLE, N_CROSS, N_CROSS
-        dlg $a7
+        if_monster_switch_set 0         ; ot6: the fuse block (armed below)
+                dlg $a7
 ; The air goes still!
-        short_glow MONSTER_1
-        wait
+                short_glow MONSTER_1
+                wait
 Ot6FuseIceDragon:               ; the fuse is lit here (Ot6FuseTbl's row)
-        attack ABSOLUTE0
+                clr_monster_switch 0    ; the trigger's clear first, then the move
+                attack ABSOLUTE0
+                end_if
+        if_monster_switch_clr 0
+        if_status_set CHAR_SLOT_1, FROZEN
+                attack BATTLE, BATTLE, SURGE
+                set_monster_switch 0    ; ot6: armed: the fuse block (above) takes its next turn
+                end_if
+        if_monster_switch_clr 0
+        if_status_set CHAR_SLOT_2, FROZEN
+                attack BATTLE, BATTLE, SURGE
+                set_monster_switch 0
+                end_if
+        if_monster_switch_clr 0
+        if_status_set CHAR_SLOT_3, FROZEN
+                attack BATTLE, BATTLE, SURGE
+                set_monster_switch 0
+                end_if
+        if_monster_switch_clr 0
+        if_status_set CHAR_SLOT_4, FROZEN
+                attack BATTLE, BATTLE, SURGE
+                set_monster_switch 0
+                end_if
+        attack BATTLE, N_CROSS, N_CROSS
         wait
-        attack BATTLE, SURGE, N_CROSS   ; ot6: no Absolute 0 unannounced (vanilla BATTLE, SURGE, ABSOLUTE0)
+        attack BATTLE, BATTLE, SURGE    ; ot6: no Absolute 0 (vanilla BATTLE, ABSOLUTE0, ABSOLUTE0)
+        wait
+        attack BATTLE, SURGE, BATTLE    ; ot6: no Absolute 0 (vanilla BATTLE, SURGE, ABSOLUTE0)
         end_if
         end
 
@@ -8090,7 +8116,7 @@ AIScript::_338:
 ; block, as the CzarDragon's worked example has it): when it comes up that turn is its rotation's Fire 2 or Fire Ball
 ; and sets monster switch 1; its next turn says "Its scales turn white!" (battle dialogue $A8) and glows, a turn of
 ; its own; and the turn after that restarts the clock and casts Flare Star.  When the roll does not come up the burst
-; is vanilla's at once, S. Cross or L.4 Flare, so Flare Star comes only announced, as often as vanilla's (a third of
+; is vanilla's at once, S. Cross or L.4 Flare (L.4 Flare takes Flare Star's place in the pick), so Flare Star comes only announced, as often as vanilla's (a third of
 ; the clocks) and two turns later.  A break between the line and Flare Star cancels it (Ot6FuseTbl: switch 1 cleared,
 ; $3240 forgotten) and sets battle switch 0 (OT6_FUSE_SETB0); the clock runs through a break (it counts while the
 ; dragon is Broken), so its first turn back restarts it (the script's first block, with that turn's Fire 2 or Fire
@@ -8120,7 +8146,7 @@ Ot6FuseRedDragon:               ; the fuse is lit here (Ot6FuseTbl's row)
                 end_if
         if_monster_timer 40
                 reset_monster_timer
-                attack S_CROSS, L4_FLARE, S_CROSS       ; ot6: no Flare Star unannounced (vanilla S_CROSS, L4_FLARE,
+                attack S_CROSS, L4_FLARE, L4_FLARE      ; ot6: no Flare Star unannounced (vanilla S_CROSS, L4_FLARE,
                 end_if                                  ;   FLARE_STAR)
         if_monster_switch_clr 0
         if_status_set CHAR_SLOT_1, REFLECT

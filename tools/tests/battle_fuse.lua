@@ -393,9 +393,11 @@ local HAND = {
       .. "switch 1 clear, the roll) and both rotations; its own condition is monster switch 0, which only the arming "
       .. "block sets and only the move's turn or the cancel clears.  No HP line stands on the fuse block: a heal "
       .. "across 15,360 (CYAN's Tempest; it absorbs wind) between the line and Cyclonic changes nothing" },
-  ["149@0000"] = { blocks = "earlier none; own []",
-    why = "the Ice Dragon: the fuse is its rotation's first two beats, at the script's head, with no condition: its "
-      .. "next turn resumes there; its counters (a Battle for a hit, Surge at its death) touch nothing" },
+  ["149@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "the Ice Dragon (the review round's freeze and thaw): the fuse block is the script's first, ahead of the four "
+      .. "arming blocks (a seat's member Frozen, switch 0 clear) and the rotation; its own condition is monster switch "
+      .. "0 alone, never the status, which only an arming block sets and only the move's turn or the cancel clears: a "
+      .. "member thawed between the arming and the move changes nothing; its counters touch nothing" },
   ["153@0010"] = { blocks = "earlier [14 00 00]; own [14 24 01]",
     why = "the Red Dragon: the earlier block is the fresh clock after a cancel (battle switch 0, which only the cancel "
       .. "sets, OT6_FUSE_SETB0, and which that cancel's own clear of monster switch 1 makes moot until the fuse is "

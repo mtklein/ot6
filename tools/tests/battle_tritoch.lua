@@ -109,11 +109,15 @@ H.run({ maxFrames = 60000 }, {
     end,
   }),
   H.fuseRestore(S, "tritoch"),
+  -- (each case starts with no Ice 3 pending: a case cut short between a dispatch and its damage write must not hand
+  -- the next case a stale read; the review round's)
+  H.call(function() writes, pendingIce = {}, false end),
   H.fuseCases({
     tag = "tritoch", species = TRITOCH, write = WRITE,
     line = LINE, move = { cmd = 0x02, atk = ICE3 }, turns = 1, glows = 1,
     lineText = "Frost climbs the cliff!{wait}",
     arm = "idle", aim = true,
+    onOpen = function() writes, pendingIce = {}, false end,
     -- no fuse lit, and the window just opened: its Ice 3 has just been dispatched (the rotation's second turn), so
     -- two of its turns stand before the next line (any moment with no line lit is before one, but a moment late in
     -- that window drew the next line before the breaking hit on all three tries of the review round's first dev run,

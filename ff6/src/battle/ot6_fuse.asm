@@ -309,9 +309,9 @@ Ot6FuseTbl:
         ; 0, which its fire block takes; switch 1, the rotation's second turn
         ; due, is clear while lit)
         ot6_fuse $014B, Ot6FuseStorm, Ot6FuseStorm, $fe, $ff, 0
-        ; the Ice Dragon: "The air goes still!" on its rotation's first beat,
-        ; Absolute 0 on its second (its rotation again)
-        ot6_fuse $0149, Ot6FuseIceDragon, Ot6FuseIceDragon, $ff, $ff, 0
+        ; the Ice Dragon: armed on a turn a member is Frozen (monster switch 0),
+        ; "The air goes still!" on its next turn, Absolute 0 on the one after
+        ot6_fuse $0149, Ot6FuseIceDragon, Ot6FuseIceDragon, $fe, $ff, 0
         ; the Red Dragon: "Its scales turn white!" when its clock reaches 40
         ; (a roll of one in three), Flare Star on its next turn (monster
         ; switch 1; switch 0 is its Eraser's, kept).  The cancel also sets
