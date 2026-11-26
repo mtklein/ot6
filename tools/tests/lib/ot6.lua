@@ -19885,6 +19885,9 @@ end
 --                           its maximum, logged as a [fuse] damage line
 --   cfg.lineShot            (optional) a screenshot "fuse_<tag>_line" this many frames after the first announce
 --                           is dispatched (the line in its window), beside the "_lit" one (the mark)
+--   cfg.plainBreaker        (optional) the breaking Fight's member is one whose hands carry no weapon special effect
+--                           where one stands (a Fight that becomes its weapon's special takes no shield;
+--                           wt/v052-tg-wor1)
 --   cfg.never = { turns, check }   (optional) a move a cancel takes away for the fight (Umaro's Green Cherry,
 --                           wt/v052-tg-wor1): the broken case watches `turns` of the boss's turns back for no announce
 --                           and no move, then check(C, W), in place of earning it again
@@ -20154,7 +20157,29 @@ function M.fuseCases(cfg)
         C.nBreaks = #W.breaks
         if when == nil then stageBreak(why); return end
         hold("the breaker waits for its moment: nothing else is to break the boss first")
-        for i = 0, 3 do
+        -- (cfg.plainBreaker, wt/v052-tg-wor1: the seats in order, but a member whose hand's weapon carries a special
+        -- effect (ItemProp +27, the Tempest's Wind Slash) last: a Fight that turns into its weapon's special takes no
+        -- shield -- CYAN's Tempest came through Ot6ClassChip with no class three times running on the demon
+        -- Chadarnook's staged gauge, build/attempts/wt/v052-tg-wor1/dev/probe_chad3.log)
+        local seats = { 0, 1, 2, 3 }
+        if cfg.plainBreaker then
+          local function special(i)
+            local id = M.readByte(0x3ED8 + 2 * i)
+            if id == 0xFF then return false end
+            local base = M.sym("ItemProp") & 0x3FFFFF
+            for _, h in ipairs({ M.readByte(0x1600 + 37 * id + 0x1F), M.readByte(0x1600 + 37 * id + 0x20) }) do
+              if h ~= 0xFF and (M.readRomByte(base + 30 * h) & 0x07) == 1 and M.readRomByte(base + 30 * h + 27) ~= 0 then
+                return true
+              end
+            end
+            return false
+          end
+          local plain, other = {}, {}
+          for i = 0, 3 do if special(i) then other[#other + 1] = i else plain[#plain + 1] = i end end
+          seats = plain
+          for _, i in ipairs(other) do seats[#seats + 1] = i end
+        end
+        for _, i in ipairs(seats) do
           local id = M.readByte(0x3ED8 + 2 * i)
           if id ~= 0xFF and (via == nil or id == via.who) and M.readWord(0x3BF4 + 2 * i) > 0
              and (M.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
@@ -20185,28 +20210,11 @@ function M.fuseCases(cfg)
                 openWhen = (cfg.openHold or cfg.arm == "fight") and confirmWhen or nil }
               say(string.format("character %d (seat %d) aims the breaking Fight%s", id, i,
                 cfg.aim and string.format(" at slot %d", W.slot()) or ""))
-              -- (two more Fights, by the next standing members where there are any, played only while no break has
-              -- come: a Fight can take no shield -- wt/v052-tg-wor1: CYAN's Fight with the Tempest came through
-              -- Ot6ClassChip with no class three times running (OT6_ATKCLASS $00, $F2 $20) on the demon Chadarnook's
-              -- and Umaro's staged gauges, and the cases timed out: build/attempts/wt/v052-tg-wor1/dev/
-              -- dev_battle_umaroboss-4.log, probe_chad3.log)
-              local others = {}
-              for j = 1, 3 do
-                local i2 = (i + j) % 4
-                local id2 = M.readByte(0x3ED8 + 2 * i2)
-                if id2 ~= 0xFF and M.readWord(0x3BF4 + 2 * i2) > 0 and (M.readByte(0x3EE4 + 2 * i2) & 0xC2) == 0 then
-                  others[#others + 1] = id2
-                end
-              end
-              for j = 2, 3 do
-                plan[j] = { who = others[j - 1] or plan[1].who, cmd = 0x00, slot = plan[1].slot,
-                  confirmWhen = plan[1].confirmWhen, openWhen = plan[1].openWhen }
-              end
             end
             break
           end
         end
-        M.assertEq(#plan >= 1, true, via and string.format("%s: character %d stands to aim the breaking %s (the case's "
+        M.assertEq(#plan, 1, via and string.format("%s: character %d stands to aim the breaking %s (the case's "
           .. "precondition: the entry state seats them)", tag, via.who, via.name)
           or tag .. ": a member stands to aim the breaking Fight")
       end),

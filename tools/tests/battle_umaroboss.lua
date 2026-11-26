@@ -89,7 +89,7 @@ H.run({ maxFrames = 70000 }, {
     tag = "umaro", species = UMARO, write = WRITE,
     line = LINE, move = { cmd = 0x01, atk = CHERRY }, turns = 1,
     lineText = "He digs out a Green Cherry!{wait}",
-    arm = "idle", aim = true,
+    arm = "idle", aim = true, plainBreaker = true,
     bossHp = 9000, outsideHp = 12000,
     -- above the line (the outside case's HP), no line yet
     partway = function(W)

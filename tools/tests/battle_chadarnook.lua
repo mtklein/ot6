@@ -200,7 +200,7 @@ H.run({ maxFrames = 120000 }, {
     tag = "chadarnook", species = DEMON, write = WRITE,
     line = LINE, move = { cmd = 0x24 }, turns = 1, glows = 1,
     lineText = "The paint runs!{wait}",
-    arm = armTwo, aim = true,
+    arm = armTwo, aim = true, plainBreaker = true,
     bossHp = 12000,
     -- the demon on the field, no fuse lit, his clock short of 40 counts
     partway = function(W)
