@@ -123,6 +123,11 @@ WANT[0x148] = "the demon Chadarnook"
 WANT[0x110] = "Umaro"
 WANT[0x144] = "Tritoch"
 -- ---- end wt/v052-tg-wor1 ----
+-- ---- wt/v052-tg-wor2: World of Ruin unit D, the dragons (bosses-wor.md blocks 6, 7, 14) ----
+WANT[0x14B] = "the Storm Dragon"
+WANT[0x149] = "the Ice Dragon"
+WANT[0x153] = "the Red Dragon"
+-- ---- end wt/v052-tg-wor2 ----
 
 -- every command of the block at x from `from` (nil: its start) to `to` (nil: its end) that picks among three is one
 -- certain pick, and none of the block's conditions is a roll: returns the offences as text
@@ -382,6 +387,22 @@ local HAND = {
     why = "Tritoch: the fuse is its rotation's first two turns, at the script's head, with no condition: its next turn "
       .. "resumes there; its counters touch nothing" },
   -- ---- end wt/v052-tg-wor1 ----
+  -- ---- wt/v052-tg-wor2: World of Ruin unit D, the dragons (bosses-wor.md blocks 6, 7, 14) ----
+  ["14B@0000"] = { blocks = "earlier none; own [14 24 00]",
+    why = "the Storm Dragon: the fuse block is the script's first, ahead of the arming block (its HP under 15,360, "
+      .. "switch 1 clear, the roll) and both rotations; its own condition is monster switch 0, which only the arming "
+      .. "block sets and only the move's turn or the cancel clears.  No HP line stands on the fuse block: a heal "
+      .. "across 15,360 (CYAN's Tempest; it absorbs wind) between the line and Cyclonic changes nothing" },
+  ["149@0000"] = { blocks = "earlier none; own []",
+    why = "the Ice Dragon: the fuse is its rotation's first two beats, at the script's head, with no condition: its "
+      .. "next turn resumes there; its counters (a Battle for a hit, Surge at its death) touch nothing" },
+  ["153@0010"] = { blocks = "earlier [14 00 00]; own [14 24 01]",
+    why = "the Red Dragon: the earlier block is the fresh clock after a cancel (battle switch 0, which only the cancel "
+      .. "sets, OT6_FUSE_SETB0, and which that cancel's own clear of monster switch 1 makes moot until the fuse is "
+      .. "armed again); its own condition is monster switch 1, which only the arming block (its clock at 40, the "
+      .. "roll) sets and only the move's turn or the cancel clears: the clock, the Eraser blocks and the HP phase "
+      .. "all stand after it" },
+  -- ---- end wt/v052-tg-wor2 ----
 }
 -- (wt/v052-tg-wor1) a switch row's announce on a turn: the block of the turn script (start .. mainEnd) that sets
 -- battle switch 0's bit `len` (set_battle_switch 0, bit: $F9 $01 $00 bit) and speaks (a `dlg`, $F3); nil if none.

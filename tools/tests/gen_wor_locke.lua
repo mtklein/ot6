@@ -37,6 +37,11 @@ local FIGHT = { nukeLore = { AQUA_RAKE }, strago = { study = true, pearlWind = t
 -- route_data pool event 138)
 local RED_DRAGON = 0x153
 local BOSS_FIGHT = { nukeLore = { AQUA_RAKE } }
+-- reddragon_entry (also= in the graph): the Red Dragon's battle as it comes up, before any input -- battle_reddragon's
+-- fixture (wt/v052-tg-wor2), met in the corridor or touched in its room; reddragon_field, party 2 at the bridge's
+-- south end before the walk to it (the race labs' boot: the dragon wanders, so a capture a step before the touch
+-- would miss the corridor's meetings).  Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
+local RED_CAP = H.battleOpenCapture(RED_DRAGON, "reddragon_entry.mss")
 H.NAV_REFIRE_HOLD = true
 
 local function map() return H.mapId() & 0x1ff end
@@ -288,6 +293,8 @@ H.run({ maxFrames = 2400000 }, {
   -- @@stage bridge
   hold(23, 19, 0x02D2, "party 1 holds the bridge plate (23,19): the bridge north-south"),
   H.switchParty(2),
+  RED_CAP.arm(),
+  RED_CAP.field("reddragon_field.mss"),
   walk(19, 25, "party 2 over the bridge (19,22) -> (19,25)"),
 
   -- ---- 2. the Red Dragon ---------------------------------------------------------------
@@ -308,6 +315,7 @@ H.run({ maxFrames = 2400000 }, {
   H.advanceStory(function() return sw(0x069C) == 0 and map() == MAP_CAVE and settled() end, 200000,
     { playBattles = "tactical", fight = BOSS_FIGHT }),
   H.call(function() say("boss", "the Red Dragon beaten") end),
+  RED_CAP.emit(),
   H.saveState("wor_locke_dragon.mss"),
 
   -- ---- 3. the jump plate and the two steps ---------------------------------------------

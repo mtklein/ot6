@@ -2432,7 +2432,69 @@ one:    sep     #$41            ; carry and overflow
         bne     done
         jsr     Ot6StillHold            ; #538: Still Life holds it once more
         bcs     done
+        jsr     Ot6GaugeGrow            ; #561: a gauge that grows comes back larger
         lda     OT6_SHIELD_MAX,x         ; recovered: shields back to max
         sta     OT6_SHIELD_CUR,x         ; (revealed weaknesses stay revealed)
 done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a gauge that grows: each break's recovery adds to the body's max ]
+
+; #561 (docs/design/bosses-wor.md block 6, wt/v052-tg-wor2): the Storm Dragon's
+; hook, borrowed from Octopath.  Its gauge opens at its row's count
+; (Ot6ShieldTbl) and comes back from each break with Ot6GrowTbl's step more,
+; to the row's cap; at the cap it stays.  The growth is made here, at the
+; recovery and nowhere else: Ot6Tick's restore copies the max into the
+; count on the next instruction, so the count the hud draws (Ot6ShownGauge
+; reads OT6_SHIELD_CUR) is the new max from the frame the break ends.  A
+; break held on by Still Life grows nothing until it really ends (Ot6StillHold
+; returns first).  OT6_SHIELD_MAX is battle-only state, seeded at every
+; Ot6SeedShields (a fresh battle, a Cmd_20 reload): nothing of it is saved.
+; one row a species, 4 bytes: the species (word), the step, the cap; $ffff
+; ends the table.  Every cap is under 64 (the gauge byte's bit 6 is the
+; hud's dead flag, Ot6ShownGauge), and a max at or above the cap is left as
+; it is (a gauge never shrinks here).
+Ot6GrowTbl:
+        .word   $014b           ; the storm dragon: 10, 12, 14
+        .byte   2, 14
+        .word   $ffff
+
+; x = the body's entity offset.  a8/i16, db=$7e (Ot6Tick's).  preserves
+; x/y; clobbers a (b = 0).
+.proc Ot6GaugeGrow
+        .a8
+        .i16
+        cpx     #$0008
+        bcc     @out            ; a character: no gauge
+        phx
+        phy
+        txy                     ; y = the body (the table walks in x)
+        ldx     #$0000
+@row:   longa
+        lda     f:Ot6GrowTbl,x
+        cmp     #$ffff
+        beq     @none
+        cmp     OT6_SPECIES-8,y
+        beq     @grow
+        inx
+        inx
+        inx
+        inx
+        bra     @row
+@grow:  shorta0
+        lda     OT6_SHIELD_MAX,y
+        cmp     f:Ot6GrowTbl+3,x
+        bcs     @none           ; at its cap: as it is
+        clc
+        adc     f:Ot6GrowTbl+2,x
+        cmp     f:Ot6GrowTbl+3,x
+        bcc     @put
+        lda     f:Ot6GrowTbl+3,x ; no step past the cap
+@put:   sta     OT6_SHIELD_MAX,y
+@none:  shorta0
+        ply
+        plx
+@out:   rts
 .endproc

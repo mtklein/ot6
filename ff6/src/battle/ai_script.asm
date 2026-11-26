@@ -7715,12 +7715,24 @@ Ot6FuseChadarnook:              ; the fuse is lit here (Ot6FuseTbl's row)
 ; ------------------------------------------------------------------------------
 
 ; ice dragon
+; OT6 (bosses-wor.md block 7, wt/v052-tg-wor2): Absolute 0 is announced.  The first beat of its rotation of three
+; attacks as vanilla's first beat did (Battle, N. Cross or N. Cross), then says "The air goes still!" (battle dialogue
+; $A7) and glows: the line rides that turn, after its attack.  Absolute 0 comes on the second beat (vanilla rolled Battle, Absolute 0 or
+; Absolute 0 there), and only there: the third picks Battle, Surge or N. Cross (vanilla's Battle, Surge or Absolute 0),
+; so Absolute 0 comes only announced, once a rotation (vanilla's average was one: two thirds on the second beat, a
+; third on the third).  A break in between cancels it ($3240 forgotten): the rotation starts again from its first
+; beat, the line with it.  The counters (a Battle for every hit, Surge at its death) are vanilla's; its dying Surge is
+; unchanged (the dying-attack rule is a later unit's).
 AIScript::_329:
         attack BATTLE, N_CROSS, N_CROSS
+        dlg $a7
+; The air goes still!
+        short_glow MONSTER_1
         wait
-        attack BATTLE, ABSOLUTE0, ABSOLUTE0
+Ot6FuseIceDragon:               ; the fuse is lit here (Ot6FuseTbl's row)
+        attack ABSOLUTE0
         wait
-        attack BATTLE, SURGE, ABSOLUTE0
+        attack BATTLE, SURGE, N_CROSS   ; ot6: no Absolute 0 unannounced (vanilla BATTLE, SURGE, ABSOLUTE0)
         end_if
         end
 
@@ -7782,13 +7794,46 @@ Ot6FuseKefkaNarshe:             ; the fuse is lit here (Ot6FuseTbl's row)
 ; ------------------------------------------------------------------------------
 
 ; storm drgn
+; OT6 (bosses-wor.md block 6, wt/v052-tg-wor2): Cyclonic is announced.  Vanilla's second rotation, under 15,360 HP,
+; was Battle, Battle or Aero, then Battle, Special or Cyclonic: one rotation in three ended in Cyclonic.  Now a roll
+; is made on that rotation's first turn (one in three, 85 of 256: if_roll, on the arming block, as the CzarDragon's
+; worked example has it; monster switch 1 marks the rotation's second turn due, so the roll is made once a
+; rotation): when it comes up the turn attacks as that first turn did and sets monster switch 0; its next turn attacks
+; so again (Battle, Battle or Aero), then says "It swallows the wind!" (battle dialogue $A6) and glows; and the turn
+; after that casts Cyclonic, whatever its HP reads then (CYAN's Tempest heals it: it absorbs wind).  When the roll
+; does not come up the rotation is vanilla's with Battle in Cyclonic's place, so Cyclonic comes only announced, at
+; most as often as vanilla's (a third of the low rotations, each of those a turn longer) and never sooner.  A break
+; between the line and Cyclonic cancels it (Ot6FuseTbl: switch 0 cleared, $3240 forgotten): its next low rotation
+; rolls again.  Its first rotation, Wind Slash and the counter's Battle are vanilla's.  Its gauge grows with each
+; break (Ot6GrowTbl, ot6_break.asm).
 AIScript::_331:
+        if_monster_switch_set 0         ; ot6: the fuse block (armed below)
+                set_target NOTHING
+                attack BATTLE, BATTLE, AERO
+                dlg $a6
+; It swallows the wind!
+                short_glow MONSTER_1
+                wait
+Ot6FuseStorm:                   ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 0    ; the trigger's clear first, then the move
+                set_target NOTHING
+                attack CYCLONIC
+                end_if
         if_hp SELF, 15360
+        if_monster_switch_clr 1         ; ot6: a rotation's first turn (switch 1: its second is due)
+        if_roll 85                      ; ot6: a third of the low rotations, vanilla's share
+                set_target NOTHING
+                attack BATTLE, BATTLE, AERO
+                set_monster_switch 0    ; ot6: armed: the fuse block (above) takes its next turn
+                end_if
+        if_hp SELF, 15360
+                set_monster_switch 1    ; ot6: its second turn is due (the roll above waits)
                 set_target NOTHING
                 attack BATTLE, BATTLE, AERO
                 wait
+                clr_monster_switch 1
                 set_target NOTHING
-                attack BATTLE, SPECIAL, CYCLONIC
+                attack BATTLE, SPECIAL, BATTLE  ; ot6: no Cyclonic unannounced (vanilla BATTLE, SPECIAL, CYCLONIC)
                 end_if
         attack BATTLE, WIND_SLASH, RAGE
         wait
@@ -8039,11 +8084,44 @@ AIScript::_338:
 ; ------------------------------------------------------------------------------
 
 ; red dragon
+; OT6 (bosses-wor.md block 14, wt/v052-tg-wor2): its clock's Flare Star is announced, and a break buys a fresh clock.
+; Vanilla's clock, ahead of everything: at 40 counts the clock restarts and a burst lands, S. Cross, L.4 Flare or
+; Flare Star.  Now a roll is made on the turn the clock reaches 40 (one in three, 85 of 256: if_roll, on the arming
+; block, as the CzarDragon's worked example has it): when it comes up that turn is its rotation's Fire 2 or Fire Ball
+; and sets monster switch 1; its next turn says "Its scales turn white!" (battle dialogue $A8) and glows, a turn of
+; its own; and the turn after that restarts the clock and casts Flare Star.  When the roll does not come up the burst
+; is vanilla's at once, S. Cross or L.4 Flare, so Flare Star comes only announced, as often as vanilla's (a third of
+; the clocks) and two turns later.  A break between the line and Flare Star cancels it (Ot6FuseTbl: switch 1 cleared,
+; $3240 forgotten) and sets battle switch 0 (OT6_FUSE_SETB0); the clock runs through a break (it counts while the
+; dragon is Broken), so its first turn back restarts it (the script's first block, with that turn's Fire 2 or Fire
+; Ball): the break buys a whole fresh clock.  Eraser and its line, the Flare phase under 10,240 HP, the rotation and
+; the counter are vanilla's.
 AIScript::_339:
+        if_battle_switch_set 0, 0       ; ot6: a break cancelled its Flare Star (OT6_FUSE_SETB0)
+                clr_battle_switch 0, 0  ;   the clock restarts on its first turn back
+                reset_monster_timer
+                attack FIRE_2, FIRE_BALL, FIRE_2
+                end_if
+        if_monster_switch_set 1         ; ot6: the fuse block (armed below)
+                dlg $a8
+; Its scales turn white!
+                short_glow MONSTER_1
+                wait
+Ot6FuseRedDragon:               ; the fuse is lit here (Ot6FuseTbl's row)
+                clr_monster_switch 1    ; the trigger's clears first, then the move
+                reset_monster_timer
+                attack FLARE_STAR
+                end_if
+        if_monster_timer 40
+        if_monster_switch_clr 1
+        if_roll 85                      ; ot6: a third of the clocks, vanilla's share
+                attack FIRE_2, FIRE_BALL, FIRE_2
+                set_monster_switch 1    ; ot6: armed: the fuse block (above) takes its next turn
+                end_if
         if_monster_timer 40
                 reset_monster_timer
-                attack S_CROSS, L4_FLARE, FLARE_STAR
-                end_if
+                attack S_CROSS, L4_FLARE, S_CROSS       ; ot6: no Flare Star unannounced (vanilla S_CROSS, L4_FLARE,
+                end_if                                  ;   FLARE_STAR)
         if_monster_switch_clr 0
         if_status_set CHAR_SLOT_1, REFLECT
                 set_target CHAR_SLOT_1

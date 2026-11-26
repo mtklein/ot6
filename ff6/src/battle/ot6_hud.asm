@@ -2957,7 +2957,7 @@ Ot6ShieldTbl:
         .byte   2, OT6_KATANA|OT6_BLUNT ; ursus: two, so it breaks before it
                                 ;   runs.  fire vanilla
         .word   $014b
-        .byte   14, OT6_SWORD|OT6_DAGGER|OT6_KATANA ; storm drgn: 42000 hp; katanas cut
+        .byte   10, OT6_SWORD|OT6_DAGGER|OT6_KATANA ; storm drgn: 42000 hp; katanas cut
                                 ;   the hide (cyan's quadra slam chips four
                                 ;   a turn), bolt (vanilla) finds it; wind
                                 ;   it absorbs (cyan's tempest heals it)
