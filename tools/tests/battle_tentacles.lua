@@ -38,7 +38,7 @@
 --   outside   (DECLARED as broken) a body broken before any line of its own: nothing is cancelled and its cells stand;
 --             and the release on a body that holds no one is a no-op (Ot6FuseRelease ran; every seat's seize attacker
 --             and $3403 as they were).
---   release   (DECLARED as broken) once a body holds a member, that body's gauge staged to 1 with every class and
+--   release   (DECLARED as broken, and CELES's Slow written in seat 1, the others' cleared) once a body holds a member, that body's gauge staged to 1 with every class and
 --             another member's aimed Fight breaks it: Ot6FuseRelease runs and the Broken body's own Discard on that
 --             member is dispatched (queued as a counter at the break, Ot6QueueDiscard): the member's seize attacker
 --             is cleared, its seized bit ($3403) is back and the body's hold switch is clear; the freed member then
@@ -161,6 +161,14 @@ local function watchers()
       for _, W in ipairs(Ws) do
         local e = W.ent()
         if e and e ~= C.breaking and rb(0x3E88 + e) == 0 and rb(0x3E38 + e) ~= 63 then WRITE.byte(0x3E38 + e, 63) end
+      end
+    end
+    -- (DECLARED) the release case: CELES's Slow written in seat 1 and the other members' Slow cleared, so one member
+    -- is held and the others stay free to break its holder (the replay's draw had three bodies claim three seats and
+    -- seize all three before the break, build/attempts/wt/v052-tg-wor1/r2/gate1.log)
+    if C.unslow then
+      for i = 0, 3 do
+        if not slowSeats[i] and heldBy(i) == 0xFF and (rb(0x3EF8 + 2 * i) & 0x04) ~= 0 then WRITE.byte(0x3EF8 + 2 * i, rb(0x3EF8 + 2 * i) & 0xFB) end
       end
     end
     -- (DECLARED) a staged Slow
@@ -570,8 +578,8 @@ local function releaseTry(k)
 end
 local release = H.seqStep({
   open("release", true),
-  H.call(function() C.relAt = #releases; C.keepW = nil end),
-  releaseTry(1), releaseTry(2), releaseTry(3),
+  H.call(function() C.relAt = #releases; C.keepW = nil; C.unslow = true; slowSeats = { [0] = true } end),
+  releaseTry(1), releaseTry(2), releaseTry(3), releaseTry(4), releaseTry(5),
   H.waitFrames(2),
   H.call(function()
     local W = C.W
