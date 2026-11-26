@@ -186,6 +186,10 @@ H.run({ maxFrames = 100000 }, {
     end
     H.log(string.format("[red] the arming rolls (roll/chance, * armed): %s -- %d under the chance of %d (%d purged)",
       table.concat(t, " "), under, #rollsSeen, purged))
+    local off = 0
+    for _, r in ipairs(rollsSeen) do if r.n ~= 85 then off = off + 1 end end
+    H.assertEq(#rollsSeen >= 1 and off, 0, "red: its arming block rolled, and every roll's chance is 85 in 256 (a third "
+      .. "of the clocks, vanilla's share of Flare Star)")
     local n = 0
     for _, x in ipairs(seen) do if x.move then n = n + 1 end end
     H.log(string.format("[red] Flare Star dispatched %d time(s) over the suite, %d unannounced", n, unannounced))

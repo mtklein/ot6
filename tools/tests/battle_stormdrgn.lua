@@ -85,7 +85,7 @@ local function watchAll()
     local y = emu.getState()["cpu.y"] & 0xFF
     if y ~= ent() then return end
     rollsSeen[#rollsSeen + 1] = { f = H.frame, r = emu.getState()["cpu.a"] & 0xFF, n = H.readByte(0x3A2E), gen = gen,
-      armed = false, sw = H.readByte(0x3DAC + y) & 0x01 }
+      armed = false, sw = H.readByte(0x3DAC + y) & 0x01, sw1 = H.readByte(0x3DAC + y) & 0x02 }
   end, emu.callbackType.exec, ro, ro)
   emu.addMemoryCallback(function()
     local y = emu.getState()["cpu.y"] & 0xFF
@@ -334,6 +334,15 @@ H.run({ maxFrames = 140000 }, {
     end
     H.log(string.format("[storm] the arming rolls (roll/chance, * armed): %s -- %d under the chance of %d", table.concat(t,
       " "), under, #rollsSeen))
+    local off, mid = 0, 0
+    for _, r in ipairs(rollsSeen) do
+      if r.n ~= 85 then off = off + 1 end
+      if r.sw1 ~= 0 then mid = mid + 1 end
+    end
+    H.assertEq(#rollsSeen >= 1 and off, 0, "storm: its arming block rolled, and every roll's chance is 85 in 256 (a "
+      .. "third of the low rotations, vanilla's share of Cyclonic)")
+    H.assertEq(mid, 0, "storm: every roll comes on a low rotation's first turn (monster switch 1 clear: one roll a "
+      .. "rotation)")
     local n = 0
     for _, x in ipairs(seen) do if x.move then n = n + 1 end end
     H.log(string.format("[storm] Cyclonic dispatched %d time(s) over the suite, %d unannounced", n, unannounced))
