@@ -578,6 +578,35 @@ either, so the member stays held for the whole break (read from the turn
 rule; not measured). Unit A's table has room for the row (section 1.3). Stays verbatim: Seize, the drain, Discard's 30 counts, the
 counters, the absorbs, 0 XP.
 
+**Built (wt/v052-tg-wor1, `battle_tentacles`).** A Tentacle's turn that
+finds a Slowed member (Entwine's, from its rotation) with no hostage of its
+own now says "It coils to seize!" (dialogue `$A0`) and glows, a turn of its
+own, and sets the monster switch of that member's seat (0-3); on its next
+turn a fire block that stands first in its script Seizes that seat, whatever
+the member's Slow reads then (section 1.5: the announce block's own
+conditions can flip, so the fire block, conditioned on the switch alone,
+takes the move's turn). Vanilla Seized at once, on the first turn of any
+body that found a Slowed member: the Seize comes one of the body's turns
+later than vanilla's, never sooner. A break in between cancels it
+(`Ot6FuseTbl`, a row a body a seat: the seat's switch goes, `$3240`
+forgotten), and the body's next turn that finds a Slowed member announces
+again. Every break of a Tentacle, lit or not, frees the member it holds
+(`OT6_FUSE_RELEASE`, `Ot6FuseRelease`): the owner's rule, built. Several
+bodies can announce on one Slowed member, and each Seizes it, as vanilla's
+could. The rotation, the drain, Discard after 30 counts, the dying Discard
+(a dying counter, unchanged: the dying-attack rule is a later unit's) and
+the counters are vanilla's. Shields stay 5.
+Lab (one turn of fuse, 5 shields each, CELES, SABIN and EDGAR from the field
+below Gerad, five battle keys `$04 $24 $44 $54 $74`;
+`build/attempts/wt/v052-tg-wor1/lab/F-tentacles/`): the line's own fighter
+(gen_wor_edgar's: tactical, Air Blade, bank 3) WON 5 of 5; on every key a
+Tentacle announced on its first turns and the first Seize fired 3-4 party
+actions after the line, 2-7 Seizes a fight, 0-2 cancels, no release. A party
+that Defends to the first line and then chips that body at its bank WON 5 of
+5, broke the announcing body in the fuse on 2 of 5 (3 actions after the
+line) and freed a held member with a break on 2 of 5. Kept at 5: the
+release, not the cancel, is the lever a party reaches.
+
 **Shields.** 5 each, 20 across four gauges: the WoR's opening multi-body
 fight, on the band.
 
@@ -648,6 +677,36 @@ the rotation, the counter's Battle.
 
 The alternative, if the owner prefers a one-turn fuse: his Cure 2. "Light
 gathers in the wound", a `wait`, then the cure; a break denies the heal.
+
+**Built (wt/v052-tg-wor1, `battle_dullahan`).** Every blow that strikes him
+is counted (his counter, now in battle variable 3, vanilla's 1, so that the
+cancel can clear it: `OT6_FUSE_VAR3`); on his first turn with eight counted
+(vanilla's number) "Its blade rimes over!" (dialogue `$A1`) and a glow
+announce it, a turn of its own, and Absolute 0 comes on his next turn. The
+count is the fuse block's own condition and only climbs until the move's
+turn clears it. A break in between cancels Absolute 0 and clears the count:
+eight more blows earn it again. Blows on a Broken Dullahan count nothing.
+Not as proposed: vanilla's four-turn combo (N.Cross, Ice 2, then Absolute 0
+one time in three on each of two turns) is now the line and one certain
+Absolute 0, a one-turn fuse, because nothing may roll between the announce
+and the move, and a certain N.Cross and Ice 2 ahead of it would have been
+more than vanilla dealt; he no longer uses N.Cross, and Absolute 0 comes
+only announced. Absolute 0 took 20-27% of each member's maximum HP, all four
+its targets (`build/attempts/wt/v052-tg-wor1/lab/dmg/damage.txt`). Shields
+stay 10.
+Lab (one turn of fuse, 10 shields, from the grave, keys `$48 $58 $78 $88
+$A8`; `build/attempts/wt/v052-tg-wor1/lab/F-dullahan/`,
+`.../F-dullahan-chip/`): the line's fighter (`DULL_FIGHT`, Runic) broke him
+before any line and won on 5 of 5, and so did a party that chips from the
+open (5 of 5; its first four runs stopped on the lab's own cursor as he fell
+and were run again with the chips ending at his fall:
+`.../F-dullahan-chipA/`). A party that holds, its arming Fights only from
+the members whose hands chip nothing, met the line on his turn 9-11 on 4 of
+5 keys and took Absolute 0 0-4 actions after it with its gauge full (WON 4).
+On key `$58` it **LOST**: its one Fighter and the others' care spent the
+turns, the count never reached eight, and he wore the party down with no
+line and no break. Kept at 10: the race is his count, and a party that chips
+while it counts breaks him first.
 
 **Shields.** 10, the capstone band.
 
@@ -725,6 +784,31 @@ is within about 2,500 of the line; the fuse is that band of HP, not a
 turn. Build: a block at the head of the turn script (`if_hp` and a
 monster switch), nothing else. Stays verbatim: the rotation, the line at
 15,360, BabaBreath, the first visit's Escape under 20,480.
+
+**Built (wt/v052-tg-wor1, `battle_phunbaba`): the second visit.** On his
+first turn under 20,480 HP (the first visit's own line, so the band is 5,120
+HP above the line at 15,360) he says "He fills his lungs!" (dialogue `$A2`)
+and glows, a turn of its own, and sets battle switch 1: the fuse is lit
+(`Ot6FuseTbl`'s switch row) until a blow takes him under the line, and that
+blow's counter brings the two BabaBreaths and the battle's end, the switch
+cleared first. A break while it is lit cancels it (the switch goes): the
+blow that crosses the line then ends the battle with no breath, and if he is
+still above the line on his next turn after the break he fills his lungs
+again. A blow that crosses the line with no breath held -- none said yet, or
+a break since -- ends the battle with none: BabaBreath comes only announced.
+Not as proposed: the fuse is the switch, not a turn, because the crossing is
+the party's, and the line comes on any turn in the band, not once. So the
+hook holds as written, and now in the open: crossed while Broken, or crossed
+in one burst before his turn in the band, the fight ends and nobody is blown
+out. His dying BabaBreath is vanilla's (a dying counter; a later unit's
+rule). The first visit is unchanged. Shields stay 4 and 5.
+Lab (5 shields, from Katarin's room, keys `$2A $BA $CA $EA $FA`;
+`build/attempts/wt/v052-tg-wor1/lab/F-phunbaba/`): the line's fighter
+(gen_wor_terra's) broke him before any line and drove him off on 5 of 5 (WON
+5; no line and no BabaBreath, four seated for TERRA's fight). A party whose
+quiet members bring him into the band and that chips at the line broke him
+in the fuse on 5 of 5, 3-7 actions after it (WON 5): the breath cancelled
+every time. Kept at 5.
 
 **Shields.** 4 and 5, set by measurement.
 
@@ -883,6 +967,27 @@ the second, certain (vanilla: two in three). CELES's Runic eats it, so
 the fight has two answers, as TunnelArmor's has. Stays verbatim: the
 counters, Rasp.
 
+**Built (wt/v052-tg-wor1, `battle_tritoch`).** The first turn of its
+rotation of three says "Frost climbs the cliff!" (dialogue `$A5`), glows and
+Rasps (vanilla rolled Rasp, Rasp or Ice 3): the line rides that turn. Ice 3
+comes on the second (vanilla rolled Ice 3, Ice 3 or Rasp); the third is
+vanilla's (Rasp, Cold Dust or Ice 3). A rotation's count of Ice 3 is
+vanilla's on average (one certain and one in three, where vanilla's was one
+in three, two in three and one in three), and it never comes on the first
+turn. A break in between cancels it (`$3240` forgotten): the rotation starts
+again from its first turn, the line with it. Ice 3 struck one member for 12%
+of its maximum HP on the damage run
+(`build/attempts/wt/v052-tg-wor1/lab/dmg/damage.txt`; on a quick fixture,
+`build/attempts/wt/v052-tg-wor1/lab/Xdmg/`, it struck all four, 0-24%). The
+counters are vanilla's. Shields stay 10.
+Lab (one turn of fuse, 10 shields, from the ice below it, keys `$09 $29 $49
+$D9 $E9`; `build/attempts/wt/v052-tg-wor1/lab/F-tritoch/`): the line's
+fighter (`BOSS_FIGHT`) WON 5 of 5; the line came on its first turn every
+time and Ice 3 on its next, 4-5 party actions after it, before any break. A
+party that Defends to the line and then chips broke it in the fuse on 1 of 5
+(WON 5 of 5). Kept at 10: Ice 3 is a quarter of a member's HP at most, and
+the line survives it without the break.
+
 **Shields.** 10, the capstone band.
 
 **Break story.** All four hold a class key; MOG "lands half of Tritoch's
@@ -929,6 +1034,27 @@ the fuse and he drops it: the species table sets battle switch 0, the
 block's own once-flag, so it is gone for the fight (open question 1).
 Eaten, its Haste shortens his later breaks (bosses-wob.md:77-80). Stays
 verbatim: the Jump, the counters, the cherry's four statuses.
+
+**Built (wt/v052-tg-wor1, `battle_umaroboss`; `battle_umaro` is UMARO's own
+kit).** His first turn under 10,240 HP (vanilla's line) says "He digs out a
+Green Cherry!" (dialogue `$A4`) with vanilla's red flash, a turn of its own,
+and sets battle switch 2 (his monster variable is his tally of spells and
+shares its byte with his monster switches); on his next turn a fire block
+that stands first eats the cherry, whatever his HP reads then (he absorbs
+ice, and a Green Cherry used on him sets battle switch 1: section 1.5). A
+break in between cancels it and the cherry is gone for the fight:
+`OT6_FUSE_SETB0` sets battle switch 0, vanilla's "eaten", so neither his
+line nor a Green Cherry used on him brings it back. Vanilla's cherry set
+Protect, Shell, Haste and Regen; Regen does not stand on him (the suite
+reads status 3 `$68`), as in vanilla. He is now immune to Berserk (blocked
+status 2 `$6B` -> `$7B`: a Berserked monster runs no script). Shields stay
+6.
+Lab (one turn of fuse, 6 shields, from below the carving, keys `$09 $39 $C9
+$D9 $F9`; `build/attempts/wt/v052-tg-wor1/lab/F-umaro/`): the line's fighter
+broke him before any line and won on 5 of 5: the line never meets the
+cherry. A party whose quiet member (CYAN's katana, no key of his) brings him
+under the line and that chips at the line broke him in the fuse on 2 of 5,
+the cherry gone, and let him eat it on 3 (WON 5 of 5). Kept at 6.
 
 **Shields.** 6, a guard's count for the fight that ends in a recruit.
 
@@ -1014,6 +1140,26 @@ route-wor-thamasa.md 5.2 left that as a lab question. Proposed: the
 species table zeroes variable 0 at the break, so a break buys four more
 actions. Stays verbatim: Phantasm, Doom Kiss, Charm, the demon's Bolt 2
 counter, Flash Rain under 15,360.
+
+**Built (wt/v052-tg-wor1, `battle_chadarnook`).** The demon's turn with his
+clock run (40 counts) says "The paint runs!" (dialogue `$A3`) and glows, a
+turn of its own, and the swap comes on his next turn. While it is lit his
+counter's swap (the fifth hit of his tally) waits on monster switch 0, which
+the announce sets: the swap that comes is the announced one, and he cannot
+leave lit and come back with a stale fuse. A break in between cancels it:
+his clock restarts and his tally of hits (now battle variable 2, vanilla's
+0) is cleared (`OT6_FUSE_TIMER`, `OT6_FUSE_VAR2`), so the break holds him
+out for its window and five more hits (his clock, 1,280 frames, runs out
+inside the break's 2,159, so he says the line again on his first turn back).
+The swap's turn also clears the tally: each visit counts afresh (vanilla
+kept it). Everything else is vanilla's. Shields stay 6.
+Lab (one turn of fuse, 6 shields on the demon, from below Owzer, four keys
+`$55 $65 $95 $C5`, shifts 11 and 17 sharing `$95`;
+`build/attempts/wt/v052-tg-wor1/lab/F-chadarnook/`): the line's fighter
+(`BOSS_FIGHT`, its focus on the demon) WON 5 of 5, broke the demon in the
+fuse on 4 of 5 (1-13 actions after the line) and before any line on the
+fifth. A party that Defends to the line and then chips broke him in the fuse
+on 5 of 5, 1-2 actions after it (WON 5 of 5). Kept at 6.
 
 **Shields.** 6 on the demon.
 

@@ -55,7 +55,7 @@ to seize!" and Seizes that member on its next turn (before, it Seized at
 once); breaking a Tentacle, at any time, frees the member it holds, who can
 act again straight away. Dullahan says "Its blade rimes over!" once he has
 been hit eight times, and on his next turn casts Absolute 0 on the whole
-party (@ABS0@); a break while the **!** is up stops it and starts his count
+party (about a quarter of each member's HP); a break while the **!** is up stops it and starts his count
 over. He no longer follows the count with N.Cross and Ice 2, and Absolute 0
 comes only after the line. When Phunbaba returns to Mobliz, he says "He
 fills his lungs!" once he has lost about a fifth of his HP; the hit that
@@ -68,7 +68,7 @@ he stays out for the break, his count of hits starting over.
 Umaro says "He digs out a Green Cherry!" a turn before he eats it; break
 him while the **!** is up and the cherry is gone for the rest of the fight.
 Tritoch says "Frost climbs the cliff!" at the start of each round of its
-attacks and casts Ice 3 on its next turn (@ICE3@); a break stops it.
+attacks and casts Ice 3 on its next turn (up to about a quarter of a member's HP); a break stops it.
 
 A boss that announces a move can no longer have it taken away by a
 status: the Marshal, Number 128, the Gold Dragon, Rizopas, Chupon and

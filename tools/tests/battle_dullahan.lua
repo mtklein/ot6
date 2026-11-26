@@ -137,6 +137,20 @@ H.run({ maxFrames = 90000 }, {
       H.log(string.format("[dullahan] %d blow(s) counted between the cancel (f%d) and the second line (f%d)", n,
         C.brk.f, C.lines[2].f))
       H.assertEq(n >= 8, true, "dullahan: eight blows were counted afresh between the cancel and the second line")
+      -- (the gate itself, the fuse block's `if_battle_var_greater 3, 8`: the count read 8 or more as the second line's
+      -- turn began, and under 8 as his turn before it began -- else that turn would have said it; a gate at seven,
+      -- the dull_hand mutant, says the line with seven counted)
+      local function countAt(f)
+        local v = 0
+        for _, r in ipairs(count) do if r.f <= f then v = r.v end end
+        return v
+      end
+      local t2 = C.lines[2].turn
+      local atLine, before = countAt(W.turns[t2].f), (t2 > 1 and countAt(W.turns[t2 - 1].f) or 0)
+      H.log(string.format("[dullahan] the count as his turn %d (the second line's) began: %d; as his turn before it "
+        .. "began: %d", t2, atLine, before))
+      H.assertEq(atLine >= 8 and before < 8, true, "dullahan: his gate is eight blows (the count read 8 or more as the "
+        .. "line's turn began, under 8 as the turn before it began)")
     end,
   }),
   H.logStep("[dullahan] PASS: his count, the announce, Absolute 0, the cancel and the count again"),
