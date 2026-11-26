@@ -71,6 +71,9 @@ local AIR_BLADE = 0x62                              -- SABIN's blitz, learned at
 -- build/attempts/wt/v028-edgar-lab/).
 local TENTACLES_BANK = 3
 local TENTACLES_FORM = 454                          -- event battle 84
+-- tentacles_entry (also= in the graph): the Tentacles' battle as it comes up, before any input -- battle_tentacles's fixture (wt/v052-tg-wor1).
+-- Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
+local TENT_CAP = H.battleOpenCapture(0x11B, "tentacles_entry.mss")
 local B2_EXITS = { { 13, 12 }, { 14, 8 }, { 2, 13 }, { 4, 6 }, { 8, 18 }, { 8, 6 } }  -- map 62's doors
 local MAP_CAVE1, MAP_CAVE2, MAP_CAVE3, MAP_CAVE4 = 68, 90, 92, 53
 local MAP_B1, MAP_B2, MAP_B3, MAP_ENGINE = 61, 62, 63, 64
@@ -629,6 +632,8 @@ H.run({ maxFrames = 600000 }, {
   -- entering the Tentacles at 1129/1595 and 1263/1609 (build/attempts/wt/
   -- edgar-regress/before_snap/k7_s0.log), and a lab draw that met one lost
   -- the Tentacles from 1095/1319 (tent/new_base/er_k7_s0_e64p_w18.log)).
+  TENT_CAP.arm(),
+  TENT_CAP.field("tentacles_field.mss"),
   talkUp(29, 16, function() return sw(0x02F4) == 1 end, "Gerad at the engines (29,16)", true),
   H.advanceStory(function()
     return sw(0x00C6) == 1 and H.hasControl() and H.tileAligned() and not H.dialogWaiting()
@@ -647,6 +652,7 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(H.weaponElement(H.readByte(c(EDGAR, 0x1F))), 0, "EDGAR's Optimum blade carries no element")
   end),
   checkOutcomes("the Tentacles"),
+  TENT_CAP.emit(),
 
   -- ---- after the fight: care, the kits back, EDGAR dressed ------------------------------------
   H.fieldCare({ tag = "after the Tentacles" }),

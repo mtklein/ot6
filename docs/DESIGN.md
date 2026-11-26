@@ -144,7 +144,19 @@ is also Slowed or Stopped); the HUD re-reads one monster slot a frame
 (`Ot6FusePoll`) and only in a battle where a body with a row stands. Built
 on the four fuses vanilla wrote (AtmaWeapon's Flare Star, Atma's Ultima, the
 Gold Dragon's Bolt 3, Kefka's Goner); the AI script block loads in bank
-`$F1` with `$6000` bytes so later telegraphs have room.
+`$F1` with `$6000` bytes so later telegraphs have room. Two row flags act
+beyond the cancel (wt/v052-tg-wor1): every break of a body whose row has
+`OT6_FUSE_RELEASE`, lit or not, frees the member it holds by that body's own
+Discard, queued as a counter at the break (`Ot6FuseRelease`,
+`Ot6QueueDiscard`: the Tentacles' Seize; the Discard's animation carries the
+member back to its place), and a cancel of a row with `OT6_FUSE_SETB0` also
+sets battle switch 0, a once-flag (Umaro's Green Cherry, gone for the
+fight). One AI conditional is new: `if_seize_free` (`$00`, vanilla's unused
+"never"; `Ot6SeizeCond`), with which a Tentacle claims the seat it announces
+on as its turn is read, so no two bodies announce on one member and none on a
+member who cannot be held; a member who falls or leaves inside the fuse
+snuffs it (`Ot6SeizeFell`, from the HUD's poll), the one cancel that is not a
+break.
 
 **Shielded resistance.** Every hit is judged on the enemy's state before it
 lands. While an enemy still has shields it takes reduced damage (×0.5), and

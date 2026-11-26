@@ -19764,6 +19764,51 @@ function M.aiAttacks(species, atk)
   return out
 end
 
+-- M.battleOpenCapture(species, name): (wt/v052-tg-wor1) a generator's fixture of a boss battle as it comes up, before
+-- any input.  Returns C: C.arm() is a step that arms it (and drops any earlier capture: a retried attempt's), C.emit()
+-- a step that emits the capture as `name` ("<state>.mss", a literal at the call: the graph's also= names it, and
+-- compose's OT6_STACK rewrite prefixes it there).  Once armed, the capture is taken with no
+-- frames spent (M.requestSaveState) on the first frame a battle is up (M.battleActive) with `species` standing in a
+-- monster slot, so the play after it is the play without it.
+function M.battleOpenCapture(species, name)
+  local tag = name:gsub("%.mss$", "")
+  local C = { armed = false, req = nil }
+  emu.addEventCallback(function()
+    if not C.armed or C.req ~= nil or not M.battleActive() then return end
+    for s = 0, 5 do
+      if M.readByte(0x3AA8 + s * 2) & 1 == 1 and M.readWord(0x57C0 + s * 2) == species then
+        C.req = M.requestSaveState()
+        M.log(string.format("[fixture] f%d %s: the battle with $%03X in slot %d is up; captured", M.frame, tag, species,
+          s))
+        return
+      end
+    end
+  end, emu.eventType.endFrame)
+  function C.arm() return M.call(function() C.armed, C.req, C.fieldReq = true, nil, nil end) end
+  -- C.field(fieldName): a step, the party on the field a step or a press before the battle's trigger, captured with
+  -- no frames spent: the race labs' boot, where idle frames move the game clock and so the battle's key (InitBattle
+  -- seeds $be from it), as a fixture already in the battle cannot (wt/v052-tg-wor1).  C.emit() emits it too.
+  function C.field(fieldName)
+    return M.call(function()
+      C.fieldName, C.fieldReq = fieldName, M.requestSaveState()
+      M.log(string.format("[fixture] f%d %s: the field before the battle's trigger, (%d,%d) on map %d; captured",
+        M.frame, fieldName, M.fieldX(), M.fieldY(), M.mapId() & 0x3FF))
+    end)
+  end
+  function C.emit()
+    return M.call(function()
+      M.checkReq(C.req, tag .. " capture (the battle with $" .. string.format("%03X", species) .. " as it came up)")
+      M.emitBlob(name, C.req.blob)
+      if C.fieldName then
+        M.checkReq(C.fieldReq, C.fieldName .. " capture (the field before the trigger)")
+        M.emitBlob(C.fieldName, C.fieldReq.blob)
+      end
+      C.armed = false
+    end)
+  end
+  return C
+end
+
 -- M.fuseEngage(talk, species, what): the talk that opens a boss's battle, made again (four times at most) while
 -- the battle it opened is another: a random battle can open on the step the talk takes (lib T.touchBoss), and it
 -- is fought out (M.kitBattle: everyone Fights).  talk() returns the step.  Ends with the boss's battle up.
@@ -19783,7 +19828,14 @@ function M.fuseEngage(talk, species, what, tries)
       M.assertEq(tries < 4, true, what .. ": the talk opened its battle within four tries")
       return M.seqStep({
         M.logStep(string.format("[fuse] %s: a random battle opened on the talk's step; it is fought out", what)),
-        M.kitBattle({}, { maxFrames = 60000 }),
+        -- (by the tactical fight driver, as the routes fight their random battles: wt/v052-tg-wor1's replay drew
+        -- one below Atma that the plain Fights of M.kitBattle lost, every member at 0 HP,
+        -- build/attempts/wt/v052-tg-wor1/regen1/red/battle_atma-red.log)
+        M.lazy(function()
+          local F = M.fightDriverFor("fuseEngage", { tactical = true, boost = true, items = true, healPercent = 55 }, {})
+          return M.driveUntil(function() return not M.battleLoadStarted() end, 60000,
+            { M.call(function() F.frame() end) }, what .. ": the random battle fought out")
+        end),
         M.waitUntil(function() return not M.battleLoadStarted() and M.hasControl() and M.tileAligned() end, 9000,
           what .. ": the field again after the random battle", 2),
         M.fuseEngage(talk, species, what, tries + 1),
@@ -19840,6 +19892,14 @@ end
 --                           its maximum, logged as a [fuse] damage line
 --   cfg.lineShot            (optional) a screenshot "fuse_<tag>_line" this many frames after the first announce
 --                           is dispatched (the line in its window), beside the "_lit" one (the mark)
+--   cfg.outsideArm          (optional) fn(pred, max, W) as cfg.arm's function form, the outside case's arming in its
+--                           place (wt/v052-tg-wor1: the GhostTrain's)
+--   cfg.plainBreaker        (optional) the breaking Fight's member is one whose hands carry no weapon special effect
+--                           where one stands (a Fight that becomes its weapon's special takes no shield;
+--                           wt/v052-tg-wor1)
+--   cfg.never = { turns, check }   (optional) a move a cancel takes away for the fight (Umaro's Green Cherry,
+--                           wt/v052-tg-wor1): the broken case watches `turns` of the boss's turns back for no announce
+--                           and no move, then check(C, W), in place of earning it again
 --   cfg.lineText            (optional) the announce's text, as the json writes it ("He looms over you!{wait}"): the
 --                           unbroken case asserts the dialogue window read the line from the address the ROM's
 --                           pointer table gives it, inside the relocated dialogue block, and that it reads as this
@@ -19920,7 +19980,23 @@ function M.fuseCases(cfg)
     end)
   end
   -- the party's part while a fuse arms
+  local armDefault
   local function arm(pred, max, what)
+    -- (cfg.outsideArm: the outside case's own arming, wt/v052-tg-wor1 -- the GhostTrain's, whose Acid Rain clock
+    -- takes every turn once the party's Fights space its turns past 15 counts; chosen as the step is reached, when
+    -- the case in play is known)
+    if cfg.outsideArm then
+      return M.lazy(function()
+        if C ~= nil and C.name == "outside" then
+          return M.seqStep({ M.call(function() hold("the party arms the fuse (the outside case's own arming)") end),
+            cfg.outsideArm(pred, max, W) })
+        end
+        return armDefault(pred, max, what)
+      end)
+    end
+    return armDefault(pred, max, what)
+  end
+  function armDefault(pred, max, what)
     if type(cfg.arm) == "function" then
       return M.seqStep({ M.call(function() hold("the party arms the fuse: its play is not to break the boss") end),
         cfg.arm(pred, max, W) })
@@ -20106,7 +20182,29 @@ function M.fuseCases(cfg)
         C.nBreaks = #W.breaks
         if when == nil then stageBreak(why); return end
         hold("the breaker waits for its moment: nothing else is to break the boss first")
-        for i = 0, 3 do
+        -- (cfg.plainBreaker, wt/v052-tg-wor1: the seats in order, but a member whose hand's weapon carries a special
+        -- effect (ItemProp +27, the Tempest's Wind Slash) last: a Fight that turns into its weapon's special takes no
+        -- shield -- CYAN's Tempest came through Ot6ClassChip with no class three times running on the demon
+        -- Chadarnook's staged gauge, build/attempts/wt/v052-tg-wor1/dev/probe_chad3.log)
+        local seats = { 0, 1, 2, 3 }
+        if cfg.plainBreaker then
+          local function special(i)
+            local id = M.readByte(0x3ED8 + 2 * i)
+            if id == 0xFF then return false end
+            local base = M.sym("ItemProp") & 0x3FFFFF
+            for _, h in ipairs({ M.readByte(0x1600 + 37 * id + 0x1F), M.readByte(0x1600 + 37 * id + 0x20) }) do
+              if h ~= 0xFF and (M.readRomByte(base + 30 * h) & 0x07) == 1 and M.readRomByte(base + 30 * h + 27) ~= 0 then
+                return true
+              end
+            end
+            return false
+          end
+          local plain, other = {}, {}
+          for i = 0, 3 do if special(i) then other[#other + 1] = i else plain[#plain + 1] = i end end
+          seats = plain
+          for _, i in ipairs(other) do seats[#seats + 1] = i end
+        end
+        for _, i in ipairs(seats) do
           local id = M.readByte(0x3ED8 + 2 * i)
           if id ~= 0xFF and (via == nil or id == via.who) and M.readWord(0x3BF4 + 2 * i) > 0
              and (M.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
@@ -20377,7 +20475,25 @@ function M.fuseCases(cfg)
       M.assertEq(C.resumed, false, tag .. ": the move does not fire when the boss recovers (no dispatch of it "
         .. "before a new announce)")
     end),
-    M.cond(function() return W.fixed and not measure end, {
+    -- (cfg.never: the move is gone for the fight once a break cancels it -- Umaro's Green Cherry, wt/v052-tg-wor1:
+    -- the cancel sets its once-flag -- so the case watches cfg.never.turns of the boss's turns back for no announce
+    -- and no move, and cfg.never.check(C, W) asserts the boss's own cells)
+    M.cond(function() return W.fixed and not measure and cfg.never ~= nil end, {
+      idle(function() return gone() or #W.turns >= C.rec.turn + cfg.never.turns end, 20000,
+        "the boss's turns back with the move gone"),
+      M.call(function()
+        standing()
+        local li, mi = lineAfter(C.brk.cmdsAt + 1), moveAfter(C.brk.cmdsAt + 1)
+        say(string.format("%d of the boss's turns back: announce %s, move %s", #W.turns - C.rec.turn,
+          li and ("at f" .. W.cmds[li].f) or "none", mi and ("at f" .. W.cmds[mi].f) or "none"))
+        M.assertEq(#W.turns >= C.rec.turn + cfg.never.turns, true, string.format("%s: the boss took %d turns back "
+          .. "after the cancel (the case's watch)", tag, cfg.never.turns))
+        M.assertEq(li == nil and mi == nil, true, string.format("%s: no announce and no move in %d of the boss's "
+          .. "turns back: the cancelled move is gone for the fight", tag, cfg.never.turns))
+        cfg.never.check(C, W)
+      end),
+    }, {}),
+    M.cond(function() return W.fixed and not measure and cfg.never == nil end, {
       -- earned again: the next announce, and what it took
       M.lazy(function()
         C.earnFrom = C.brk.cmdsAt + 1
@@ -20627,6 +20743,173 @@ function M.fuseCases(cfg)
     M.call(function() W.on = false; W.pin = nil
       say(#vias > 0 and string.format("PASS: the three cases, and %d other route(s) to the break", #vias)
         or "PASS: the three cases") end),
+  })
+end
+
+-- M.fuseSnap(S) and M.fuseRestore(S, what): (wt/v052-tg-wor1) a suite's own snapshot of the battle's open, taken and
+-- restored as M.fuseCases does its own (a complete snapshot: TESTING.md), so a case played before M.fuseCases (the
+-- landed case, M.fuseLanded) leaves it the battle's open to snapshot.  S is a table the two share.
+function M.fuseSnap(S)
+  return M.call(function() S.req = M.requestSaveState() end)
+end
+function M.fuseRestore(S, what)
+  return M.seqStep({
+    M.call(function()
+      M.checkReq(S.req, what .. ": the suite's snapshot at the battle's open")
+      M.setPad({})
+      S.load = M.requestLoadState(S.req.blob)
+    end),
+    M.waitFrames(2),
+    M.call(function()
+      M.checkReq(S.load, what .. ": the battle's open restored")
+      M.rearmInputInjection()
+    end),
+  })
+end
+
+-- M.quietMembers(species, weak): (wt/v052-tg-wor1) the seated members whose Fight chips nothing on the species' shield
+-- row -- no hand's class in its class row (M.speciesClassRow), no hand's element in `weak` (its weaknesses, the
+-- elements that chip) -- so a case's own Fights earn a trigger without breaking the boss, and nothing need be
+-- staged.  Read from the ROM and the party's kit; logs each member.  Returns a list of character ids.
+function M.quietMembers(species, weak)
+  local row, out = M.speciesClassRow(species), {}
+  for i = 0, 3 do
+    local id = M.readByte(0x3ED8 + 2 * i)
+    if id ~= 0xFF then
+      local r, l = M.readByte(0x1600 + 37 * id + 0x1F), M.readByte(0x1600 + 37 * id + 0x20)
+      local cls = M.handClass(id, r) | M.handClass(id, l)
+      local el = M.weaponElement(r) | M.weaponElement(l)
+      local chips = (cls & row) ~= 0 or (el & weak) ~= 0
+      M.log(string.format("[quiet] $%03X: char $%02X, hands $%02X/$%02X, classes $%02X (row $%02X), elements $%02X "
+        .. "(weak $%02X): %s", species, id, r, l, cls, row, el, weak, chips and "chips the row" or "chips nothing"))
+      if not chips then out[#out + 1] = id end
+    end
+  end
+  return out
+end
+
+-- M.quietArm(species, weak): an arm step builder for M.fuseCases / M.fuseLanded: the quiet members (M.quietMembers)
+-- Fight the boss, aimed at its slot, until pred(); the others Defend.  Asserts one stands quiet.
+function M.quietArm(species, weak)
+  return function(pred, max, W)
+    return M.lazy(function()
+      local q = M.quietMembers(species, weak)
+      M.assertEq(#q >= 1, true, string.format("a member whose Fight chips nothing on $%03X's row stands (the case's "
+        .. "precondition: its own Fights are not to break the boss)", species))
+      local plan, t0 = {}, M.frame
+      for k = 1, 40 do for _, id in ipairs(q) do plan[#plan + 1] = { who = id, cmd = 0x00, boost = 0, slot = W.slot() } end end
+      return M.kitBattle(plan, { idle = "defend", care = true, maxFrames = max + 600,
+        giveUp = function() return pred() or M.frame - t0 >= max end })
+    end)
+  end
+end
+
+-- M.fuseLanded(cfg): (wt/v052-tg-wor1) the case with no staging at all, played from where the battle stands (a
+-- suite runs it from the battle's open, before M.fuseCases, which holds the boss's HP, stages its gauge and holds the
+-- party's HP): nothing is written, so the boss's HP is the game's own, in the band a player meets as the fight goes,
+-- and the move is seen to land as the game deals it.  The party plays cfg.arm(pred, max, W) (a step, as M.fuseCases'
+-- cfg.arm: aimed Fights, or nil to Defend) until the announce, then Defends; the move must be dispatched cfg.turns of
+-- the boss's turns after it.  A fuse the party's own play breaks (a hit in flight as the line comes) is cancelled as
+-- the game deals it, and the case plays on for the next (three at most).  cfg.landed(W, line, move) asserts what the
+-- move did.  The watcher's writers error: the case writes nothing.
+--   cfg.tag, cfg.species, cfg.line, cfg.move = { cmd, atk } (atk nil: any), cfg.turns, cfg.arm, cfg.landed,
+--   cfg.settle, cfg.settled(W) (optional: frames to watch after the move, 420 by default, ended early once
+--   settled(W) is true)
+function M.fuseLanded(cfg)
+  local NOWRITE = { byte = function() error(cfg.tag .. " landed: no writes") end,
+    word = function() error(cfg.tag .. " landed: no writes") end }
+  local W = M.fuseWatch(cfg.species, NOWRITE)
+  local tag = cfg.tag
+  local fuses, t0 = 0, nil
+  local function say(s) M.log(string.format("[fuse] f%d %s landed: %s", M.frame, tag, s)) end
+  local function lineFrom(i) return W.find(0x21, cfg.line, i) end
+  local function moveFrom(i)
+    for k = i or 1, #W.cmds do
+      local c = W.cmds[k]
+      if c.cmd == cfg.move.cmd and (cfg.move.atk == nil or c.arg == cfg.move.atk) and c.cmd ~= 0x21 then return k, c end
+    end
+    return nil
+  end
+  local function landedYet()
+    local i = 1
+    while true do
+      local li = lineFrom(i)
+      if not li then return nil end
+      local mi = moveFrom(li)
+      if mi then return li, mi end
+      i = li + 1
+    end
+  end
+  local function over() return not M.battleLoadStarted() or W.ent() == nil end
+  local function defend(pred, max, noCare)
+    local t1 = nil
+    return M.lazy(function()
+      t1 = M.frame
+      return M.kitBattle({}, { idle = "defend", care = not noCare, maxFrames = max + 600,
+        giveUp = function() return pred() or M.frame - t1 >= max end })
+    end)
+  end
+  local function oneFuse()
+    return M.cond(function() return landedYet() == nil and not over() end, {
+      M.call(function() fuses = fuses + 1; W.from = #W.cmds + 1; say(string.format("fuse %d: the party arms it", fuses)) end),
+      M.lazy(function()
+        local pred = function() return over() or lineFrom(W.from) ~= nil end
+        if cfg.arm then return cfg.arm(pred, 30000, W) end
+        return defend(pred, 30000)
+      end),
+      M.call(function()
+        local li, lc = lineFrom(W.from)
+        M.assertEq(li ~= nil, true, string.format("%s landed: the announce came (fuse %d), with nothing staged", tag,
+          fuses))
+        say(string.format("the announce on the boss's turn %d at f%d (HP %d, the game's own)", lc.turn, lc.f,
+          W.cells() and W.cells().hp or -1))
+        W.lineAt = li
+      end),
+      defend(function()
+        local li = W.lineAt
+        return over() or moveFrom(li) ~= nil or #W.snuffs > 0 and W.snuffs[#W.snuffs].f > W.cmds[li].f
+          or #W.turns > W.cmds[li].turn + cfg.turns + 1
+      end, 12000),
+      M.call(function()
+        local li = W.lineAt
+        local mi = moveFrom(li)
+        if mi == nil and #W.snuffs > 0 and W.snuffs[#W.snuffs].f > W.cmds[li].f then
+          say(string.format("fuse %d was broken by the party's own play (a hit in flight): cancelled; the case plays on",
+            fuses))
+          return
+        end
+        M.assertEq(mi ~= nil, true, string.format("%s landed: the move was dispatched after the announce (fuse %d)", tag,
+          fuses))
+      end),
+    }, {})
+  end
+  return M.seqStep({
+    M.call(function()
+      W.reset(); W.on = true; W.pin = nil; t0 = M.frame
+      say("from the battle's open; nothing staged, nothing held")
+    end),
+    M.waitUntil(function() return W.ent() ~= nil and M.battleActive() end, 3000, tag .. " landed: the boss on the field", 2),
+    oneFuse(), oneFuse(), oneFuse(),
+    M.call(function()
+      local li, mi = landedYet()
+      M.assertEq(mi ~= nil, true, string.format("%s landed: an announced move landed in one of %d fuses", tag, fuses))
+      local l, m = W.cmds[li], W.cmds[mi]
+      M.assertEq(m.turn - l.turn, cfg.turns, string.format("%s landed: the move came on the boss's turn %d after the "
+        .. "announce (announce on turn %d, move on turn %d)", tag, cfg.turns, l.turn, m.turn))
+      W.landed = { line = l, move = m }
+      say(string.format("the move ($%02X/$%02X) dispatched at f%d, %d frame(s) after the line", m.cmd, m.arg, m.f,
+        m.f - l.f))
+    end),
+    -- (no care while the move resolves: the party's HP after it is the move's doing; cfg.settle frames, 420 by
+    -- default, or until cfg.settled(W): a move whose effects follow its own dialogue, Umaro's cherry)
+    defend(function()
+      return over() or M.frame - W.landed.move.f >= (cfg.settle or 420) or (cfg.settled ~= nil and cfg.settled(W))
+    end, (cfg.settle or 420) + 180, true),
+    M.call(function()
+      cfg.landed(W, W.landed.line, W.landed.move)
+      W.on = false
+      say("PASS landed")
+    end),
   })
 end
 

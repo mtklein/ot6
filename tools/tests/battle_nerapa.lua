@@ -22,7 +22,7 @@
 --             the line returns only after six more Fights; Roulette follows.
 --   outside   a break with one to five Fights counted: nothing is cancelled and the cells (the tally among them)
 --             stand, two Fights in the window count nothing, and the fuse then lights and fires.
---   landed    (below, after the three) Nerapa's instant-death protection off: the party Fights to the line, and
+--   landed    (below, after the three) the party Fights to the line, then Nerapa's instant-death protection off, and
 --             Roulette, dispatched on its next turn, is seen to land: a body in the battle gains Death within 1,500
 --             frames of it (who it lands on is the draw's).
 -- Each case opens on the battle's snapshot; the escape's clocks are topped up (DECLARED, below) so none runs out
@@ -45,11 +45,8 @@ local function landed()
   local function dead(e) return H.readByte(0x3EE4 + e) & 0x80 ~= 0 end
   return H.seqStep({
     H.call(function()
-      protect = false
       W = H.fuseWatch(NERAPA, WRITE); W.on = true; W.pin = { boss = 30000, party = true }
       local e = W.ent()
-      local x = 0x3AA1 + e
-      WRITE.byte(x, H.readByte(x) & 0xFB)   -- (DECLARED: its protection back to the game's own, bit 2 clear)
       WRITE.byte(0x3E38 + e, 63)            -- (DECLARED: the gauge held, so the arming Fights do not break it)
       emu.addEventCallback(function()
         if rf == nil or H.frame > rf + 1500 then return end
@@ -60,22 +57,38 @@ local function landed()
     end),
     -- (the Fights by the members whose hands hold no Assassin, $05: its kill at random would end the battle before
     -- the spin, now that Nerapa is open to it; the others Defend)
-    H.lazy(function()
-      local plan = {}
+    -- (one round at a time, each round's plan made from the members standing as it begins: the case plays on from
+    -- the cases before it, and on wt/v052-tg-wor1's replay CELES fell to her Condemned count mid-plan and her entry
+    -- ended the plan two Fights short of the six, build/attempts/wt/v052-tg-wor1/regen1/red/battle_nerapa-red.log)
+    (function()
+      local rounds = {}
       for k = 1, 8 do
-        for i = 0, 3 do
-          local id = H.readByte(0x3ED8 + 2 * i)
-          local b = 0x1600 + 37 * (id ~= 0xFF and id or 0)
-          if id ~= 0xFF and H.readByte(b + 0x1F) ~= 0x05 and H.readByte(b + 0x20) ~= 0x05 then
-            plan[#plan + 1] = { who = id, cmd = 0x00, boost = 0, slot = W.slot() }
-          end
-        end
+        rounds[k] = H.cond(function() return W.find(0x21, 0x9F, 1) == nil and H.battleLoadStarted() end, {
+          H.lazy(function()
+            local plan = {}
+            for i = 0, 3 do
+              local id = H.readByte(0x3ED8 + 2 * i)
+              local b = 0x1600 + 37 * (id ~= 0xFF and id or 0)
+              if id ~= 0xFF and H.readByte(b + 0x1F) ~= 0x05 and H.readByte(b + 0x20) ~= 0x05
+                 and H.readWord(0x3BF4 + 2 * i) > 0 and (H.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 then
+                plan[#plan + 1] = { who = id, cmd = 0x00, boost = 0, slot = W.slot() }
+              end
+            end
+            return H.kitBattle(plan, { idle = "defend", care = false, maxFrames = 6000, untilPlanDone = true,
+              giveUp = function() return W.find(0x21, 0x9F, 1) ~= nil or not H.battleLoadStarted() end })
+          end),
+        }, {})
       end
-      return H.kitBattle(plan, { idle = "defend", care = false, maxFrames = 20000,
-        giveUp = function() return W.find(0x21, 0x9F, 1) ~= nil or not H.battleLoadStarted() end })
-    end),
+      return H.seqStep(rounds)
+    end)(),
     H.call(function()
       H.assertEq(W.find(0x21, 0x9F, 1) ~= nil, true, "landed: the line came (six Fights counted)")
+      -- (its protection back to the game's own only now, at the line, for Roulette: on wt/v052-tg-wor1's replay,
+      -- opened at the case's start, a member's fall sent the kit to fight the battle out and LOCKE's Assassin killed
+      -- it before the six, build/attempts/wt/v052-tg-wor1/regen1/red/battle_nerapa-red2.log)
+      protect = false
+      local x = 0x3AA1 + W.ent()
+      WRITE.byte(x, H.readByte(x) & 0xFB)   -- (DECLARED: its protection back to the game's own, bit 2 clear)
       -- (who stands dead already is not Roulette's)
       for _, e2 in ipairs({ 0, 2, 4, 6, 8, 10, 12, 14, 16, 18 }) do if dead(e2) then deaths[e2] = -1 end end
     end),

@@ -63,6 +63,12 @@
 -- turn that fires, the trigger's clears come before the move".
 -- wt/v051-tg-wob1's vargas_hand (Vargas's fuse condition, switch 0 -> 1) is red at "Vargas: the blocks before the
 -- fuse block and its own conditions are the ones read by hand" (build/attempts/wt/v051-tg-wob1/merged/mutants-merged/).
+-- wt/v052-tg-wor1's review round (build/attempts/wt/v052-tg-wor1/r2/mutants2/): a fuse block with no move after its
+-- label is read through its fire block (the earlier block conditioned on the switch its announce sets: the Tentacles',
+-- Umaro's, Phunbaba's second visit's); umaro_fire_roll (Umaro's fire block's cherry a rolled item, F6 00 F8 F0) is red
+-- at "the fire block that takes the move's turn rolls nothing", phun_fire_late (Phunbaba's fire block's clear moved
+-- behind his two breaths) at "in the turn that fires, the trigger's clears come before the move", and dull_hand
+-- (Dullahan's gate 8 -> 7) at his HAND reading.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }
@@ -106,6 +112,17 @@ WANT[0x12F] = "Chupon"
 WANT[0x147] = "the MissileBay"
 WANT[0x118] = "Nerapa"
 -- ---- end wt/v052-tg-wob3 ----
+-- ---- wt/v052-tg-wor1: World of Ruin units B and C (bosses-wor.md blocks 1, 2, 4, 8, 9, 11) ----
+WANT[0x11B] = "the Tentacle $11B"
+WANT[0x13C] = "the Tentacle $13C"
+WANT[0x13D] = "the Tentacle $13D"
+WANT[0x13E] = "the Tentacle $13E"
+WANT[0x11C] = "Dullahan"
+WANT[0x16C] = "Phunbaba's second visit"
+WANT[0x148] = "the demon Chadarnook"
+WANT[0x110] = "Umaro"
+WANT[0x144] = "Tritoch"
+-- ---- end wt/v052-tg-wor1 ----
 
 -- every command of the block at x from `from` (nil: its start) to `to` (nil: its end) that picks among three is one
 -- certain pick, and none of the block's conditions is a roll: returns the offences as text
@@ -294,7 +311,117 @@ local HAND = {
       .. "variable 3 at 6 or more, which only its counter adds to (one a Fight) and only the move's turn or the "
       .. "cancel clears" },
   -- ---- end wt/v052-tg-wob3 ----
+  -- ---- wt/v052-tg-wor1: World of Ruin units B and C (bosses-wor.md blocks 1, 2, 4, 8, 9, 11) ----
+  -- The Tentacles (four bodies, one row a seat each): the announce block for seat k (k = 1-4) is the k-th after
+  -- the four fire blocks and the Discard block.  Its own conditions (no hostage held, seat k Slowed, the seat's
+  -- claim: if_seize_free k CLAIM, [00 0k 00], last) CAN flip between the announce and the move (a cure of Slow, a
+  -- hostage held), so the move's turn is NOT this block's: the claim sets monster switch k-1 as the announce is read,
+  -- and the fire block for seat k ([14 24 0k-1 / 00 0k 01], earlier) takes the body's next turn and Seizes seat k
+  -- whatever its Slow reads then; only that turn, the cancel, and the fire block's own test (the member can no longer
+  -- be held: the claim dropped, the one cancel that is not a break, also Ot6SeizeFell's from the HUD's poll) clear
+  -- the switch.  The other fire blocks' switches are clear while this one is lit (one claim a body at a time: an
+  -- announce waits, and the turn after is the fire's); the Discard block ([14 24 07 / 0B 1E 00]) needs a hostage
+  -- held, which no Tentacle has from its announce to its Seize (its Seize is what sets switch 7); the earlier
+  -- announce blocks are not reached on that turn (the fire block's end_if ends it).  Nothing follows the label but
+  -- end_if (the fire block is read, wt/v052-tg-wor1's review).
+  ["11B@004A"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00]; own [15 24 07 / 08 48 12 / 00 01 00]",
+    why = "the Tentacle $11B, seat 1: its fire block (monster switch 0, claimed by this announce) takes the move's turn; see above" },
+  ["11B@005F"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00]; own [15 24 07 / 08 49 12 / 00 02 00]",
+    why = "the Tentacle $11B, seat 2: its fire block (monster switch 1, claimed by this announce) takes the move's turn; see above" },
+  ["11B@0074"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00] [15 24 07 / 08 49 12 / 00 02 00]; own [15 24 07 / 08 4A 12 / 00 03 00]",
+    why = "the Tentacle $11B, seat 3: its fire block (monster switch 2, claimed by this announce) takes the move's turn; see above" },
+  ["11B@0089"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00] [15 24 07 / 08 49 12 / 00 02 00] [15 24 07 / 08 4A 12 / 00 03 00]; own [15 24 07 / 08 4B 12 / 00 04 00]",
+    why = "the Tentacle $11B, seat 4: its fire block (monster switch 3, claimed by this announce) takes the move's turn; see above" },
+  ["13C@004A"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00]; own [15 24 07 / 08 48 12 / 00 01 00]",
+    why = "the Tentacle $13C, seat 1: its fire block (monster switch 0, claimed by this announce) takes the move's turn; see above" },
+  ["13C@005F"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00]; own [15 24 07 / 08 49 12 / 00 02 00]",
+    why = "the Tentacle $13C, seat 2: its fire block (monster switch 1, claimed by this announce) takes the move's turn; see above" },
+  ["13C@0074"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00] [15 24 07 / 08 49 12 / 00 02 00]; own [15 24 07 / 08 4A 12 / 00 03 00]",
+    why = "the Tentacle $13C, seat 3: its fire block (monster switch 2, claimed by this announce) takes the move's turn; see above" },
+  ["13C@0089"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00] [15 24 07 / 08 49 12 / 00 02 00] [15 24 07 / 08 4A 12 / 00 03 00]; own [15 24 07 / 08 4B 12 / 00 04 00]",
+    why = "the Tentacle $13C, seat 4: its fire block (monster switch 3, claimed by this announce) takes the move's turn; see above" },
+  ["13D@004A"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00]; own [15 24 07 / 08 48 12 / 00 01 00]",
+    why = "the Tentacle $13D, seat 1: its fire block (monster switch 0, claimed by this announce) takes the move's turn; see above" },
+  ["13D@005F"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00]; own [15 24 07 / 08 49 12 / 00 02 00]",
+    why = "the Tentacle $13D, seat 2: its fire block (monster switch 1, claimed by this announce) takes the move's turn; see above" },
+  ["13D@0074"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00] [15 24 07 / 08 49 12 / 00 02 00]; own [15 24 07 / 08 4A 12 / 00 03 00]",
+    why = "the Tentacle $13D, seat 3: its fire block (monster switch 2, claimed by this announce) takes the move's turn; see above" },
+  ["13D@0089"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00] [15 24 07 / 08 49 12 / 00 02 00] [15 24 07 / 08 4A 12 / 00 03 00]; own [15 24 07 / 08 4B 12 / 00 04 00]",
+    why = "the Tentacle $13D, seat 4: its fire block (monster switch 3, claimed by this announce) takes the move's turn; see above" },
+  ["13E@004A"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00]; own [15 24 07 / 08 48 12 / 00 01 00]",
+    why = "the Tentacle $13E, seat 1: its fire block (monster switch 0, claimed by this announce) takes the move's turn; see above" },
+  ["13E@005F"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00]; own [15 24 07 / 08 49 12 / 00 02 00]",
+    why = "the Tentacle $13E, seat 2: its fire block (monster switch 1, claimed by this announce) takes the move's turn; see above" },
+  ["13E@0074"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00] [15 24 07 / 08 49 12 / 00 02 00]; own [15 24 07 / 08 4A 12 / 00 03 00]",
+    why = "the Tentacle $13E, seat 3: its fire block (monster switch 2, claimed by this announce) takes the move's turn; see above" },
+  ["13E@0089"] = { blocks = "earlier [14 24 00 / 00 01 01] [14 24 01 / 00 02 01] [14 24 02 / 00 03 01] [14 24 03 / 00 04 01] [14 24 07 / 0B 1E 00] [15 24 07 / 08 48 12 / 00 01 00] [15 24 07 / 08 49 12 / 00 02 00] [15 24 07 / 08 4A 12 / 00 03 00]; own [15 24 07 / 08 4B 12 / 00 04 00]",
+    why = "the Tentacle $13E, seat 4: its fire block (monster switch 3, claimed by this announce) takes the move's turn; see above" },
+  ["11C@0000"] = { blocks = "earlier none; own [0D 03 08]",
+    why = "Dullahan: the fuse block is the script's first, ahead of L? Pearl, Cure 2, the Reflect answer and the "
+      .. "rotation; its condition is battle variable 3 at 8 or more, which only his counter adds to (one a blow) and "
+      .. "only the move's turn or the cancel clears: it cannot fall between the announce and the move" },
+  ["16C@0012"] = { blocks = "earlier [14 00 01]; own [15 00 00 / 06 36 A0]",
+    why = "Phunbaba's second visit: the announce block's own conditions (the breath not denied, battle switch 0; his HP "
+      .. "under 20,480: he absorbs bolt) CAN flip between the announce and the move, so the move's turn is not this "
+      .. "block's: the announce sets battle switch 1, and the fire block ([14 00 01], earlier, the script's first) "
+      .. "takes his next turn whatever they read then; only that turn and a break (the cancel, and the row's hold at "
+      .. "every break) clear it.  His counter's crossing block ends the battle only once the breath is denied "
+      .. "(battle switch 0), so no blow can end it while lit" },
+  ["148@0000"] = { blocks = "earlier none; own [0B 28 00]",
+    why = "the demon Chadarnook: the fuse block is the script's first, ahead of the Flash Rain rotation and his own; "
+      .. "its condition is his clock at 40, which only climbs (it runs only while he is on the field) until the "
+      .. "move's turn or the cancel resets it.  His counter's swap waits on monster switch 0, which the announce "
+      .. "sets, so he cannot leave the field another way while lit" },
+  ["110@0026"] = { blocks = "earlier [14 00 02]; own [15 00 00 / 15 00 01 / 06 36 50]",
+    why = "Umaro: the announce block's own conditions (the cherry not eaten nor fed him, his HP under 10,240: he "
+      .. "absorbs ice, and a Green Cherry used on him sets battle switch 1) CAN flip between the announce and the "
+      .. "move, so the move's turn is not this block's: the announce sets battle switch 2, and the fire block "
+      .. "([14 00 02], earlier) takes his next turn whatever they read then; only that turn and the cancel clear it.  "
+      .. "Nothing follows the label but end_if (the fire block is read)" },
+  ["144@0000"] = { blocks = "earlier none; own []",
+    why = "Tritoch: the fuse is its rotation's first two turns, at the script's head, with no condition: its next turn "
+      .. "resumes there; its counters touch nothing" },
+  -- ---- end wt/v052-tg-wor1 ----
 }
+-- (wt/v052-tg-wor1) a switch row's announce on a turn: the block of the turn script (start .. mainEnd) that sets
+-- battle switch 0's bit `len` (set_battle_switch 0, bit: $F9 $01 $00 bit) and speaks (a `dlg`, $F3); nil if none.
+-- Returns { at = the block's start, line = its dlg }
+local function turnAnnounce(AI, start, mainEnd, len)
+  local x, bstart, sets, line = start, start, false, nil
+  while x < mainEnd do
+    local b = rb(AI + x)
+    if b == 0xF9 and rb(AI + x + 1) == 0x01 and rb(AI + x + 2) == 0x00 and (1 << rb(AI + x + 3)) == len then
+      sets = true
+    end
+    if b == 0xF3 then line = rw(AI + x + 1) end
+    x = x + opSize(b)
+    if b == 0xFE then
+      if sets and line then return { at = bstart, line = line } end
+      bstart, sets, line = x, false, nil
+    end
+  end
+  return nil
+end
+-- (wt/v052-tg-wor1) as handCheck, for a move its counter fires: the counter's blocks before the fire block (one whose
+-- conditions hold on the crossing takes it instead) and the fire block's own, against the reading by hand.  Key:
+-- species@ctr+offset of the fire block in the counter script.
+local function handCheckCounter(sp, cstart, fireBlock)
+  local AI = H.sym("AIScript")
+  local earlier, x, bstart = {}, cstart, cstart
+  while x < fireBlock do
+    local b = rb(AI + x)
+    x = x + opSize(b)
+    if b == 0xFE then earlier[#earlier + 1] = "[" .. conds(AI, bstart) .. "]"; bstart = x end
+  end
+  local got = string.format("earlier %s; own [%s]", #earlier > 0 and table.concat(earlier, " ") or "none",
+    conds(AI, fireBlock))
+  local key = string.format("%03X@ctr+%04X", sp, fireBlock - cstart)
+  local h = HAND[key]
+  H.log(string.format("[fuse] %s, the counter's fire block at ctr+$%04X: %s (by hand: %s)", WANT[sp],
+    fireBlock - cstart, got, h and h.why or "NOT READ"))
+  H.assertEq(h ~= nil and h.blocks, got, string.format("%s: the counter's blocks before its fire block and its own "
+    .. "conditions are the ones read by hand (HAND[%q])", WANT[sp], key))
+end
 local function staticChecks()
   local AI, PTRS, TBL, LINES = H.sym("AIScript"), H.sym("AIScriptPtrs"), H.sym("Ot6FuseTbl"), H.sym("Ot6FuseLineTbl")
   H.assertEq(string.format("%02X", AI >> 16), "F1", "the AI script block loads in bank $F1")
@@ -374,18 +501,127 @@ local function staticChecks()
         if x >= hi and move == nil and b == 0xF5 and (rb(AI + x + 2) == 0x00 or rb(AI + x + 2) == 0x01) then
           move, moveAt = b, x
         end
+        -- (an item is a move too: use_item, $F6 -- Umaro's Green Cherry, wt/v052-tg-wor1)
+        if x >= hi and move == nil and b == 0xF6 then move, moveAt = rb(AI + x + 2), x end
         x = x + opSize(b)
       end
+      -- (wt/v052-tg-wor1) a fuse block with no move after its lit address: the move's turn is an EARLIER block's,
+      -- the fire block, conditioned on the switch the announce sets (set_monster_switch / set_battle_switch before
+      -- the `wait`, or the Tentacles' claim, if_seize_free seat CLAIM: monster switch seat-1).  That block is what
+      -- runs, so it is the one read: its move, its rolls (conditions and picks, all of it), its clears' order, and
+      -- its clear of that very switch before the move
+      local fire = nil
+      if move == nil then
+        local sets = {}
+        x = blockOf[lo]
+        while x < lo do
+          local b = rb(AI + x)
+          if b == 0xF9 and rb(AI + x + 1) == 0x01 then sets[#sets + 1] = { rb(AI + x + 2), rb(AI + x + 3) } end
+          if b == 0xFC and rb(AI + x + 1) == 0x00 and rb(AI + x + 2) ~= 0 and rb(AI + x + 3) == 0x00 then
+            sets[#sets + 1] = { 0x24, rb(AI + x + 2) - 1 }
+          end
+          x = x + opSize(b)
+        end
+        x = start
+        local bstart = start
+        while x < blockOf[lo] and fire == nil do
+          if x == bstart then
+            local y = x
+            while rb(AI + y) == 0xFC do
+              for _, sw in ipairs(sets) do
+                if rb(AI + y + 1) == 0x14 and rb(AI + y + 2) == sw[1] and rb(AI + y + 3) == sw[2] then
+                  fire = { at = bstart, v = sw[1], b = sw[2] }
+                end
+              end
+              y = y + 4
+            end
+          end
+          local b = rb(AI + x)
+          x = x + opSize(b)
+          if b == 0xFE then bstart = x end
+        end
+        if fire then
+          x = fire.at
+          local clearedAt = nil
+          while rb(AI + x) ~= 0xFE and rb(AI + x) ~= 0xFF and move == nil do
+            local b = rb(AI + x)
+            if b == 0xF9 and rb(AI + x + 1) == 0x02 and rb(AI + x + 2) == fire.v and rb(AI + x + 3) == fire.b then
+              clearedAt = x
+            end
+            if b < 0xF0 or (b == 0xF0 and rb(AI + x + 1) ~= 0xFE) then move, moveAt = b < 0xF0 and b or rb(AI + x + 1), x
+            elseif b == 0xF4 then move, moveAt = rb(AI + x + 1), x
+            elseif b == 0xF6 then move, moveAt = rb(AI + x + 2), x
+            elseif b == 0xF5 and (rb(AI + x + 2) == 0x00 or rb(AI + x + 2) == 0x01) then move, moveAt = b, x end
+            x = x + opSize(b)
+          end
+          H.log(string.format("[fuse] %s: the fuse block holds no move after its lit address; its fire block at "
+            .. "script+$%04X (switch $%02X bit %d) takes the move's turn: move $%02X at script+$%04X, the switch "
+            .. "cleared %s", WANT[sp], fire.at - start, fire.v, fire.b, move or 0, (moveAt or 0) - start,
+            clearedAt and string.format("at script+$%04X", clearedAt - start) or "NOT"))
+          H.assertEq(clearedAt ~= nil, true, string.format("%s: the fire block clears the switch the announce set, "
+            .. "before its move", WANT[sp]))
+        end
+      end
       H.assertEq(line ~= nil and move ~= nil, true, string.format("%s: the block announces (a dlg before the fuse) "
-        .. "and fires (an attack after it)", WANT[sp]))
-      H.assertEq(rolls(AI, blockOf[lo], lineAt, moveAt), "", string.format("%s: nothing rolls from the announce "
-        .. "to the move, and the block's conditions hold no roll (an announced move always fires)", WANT[sp]))
+        .. "and fires (an attack after it, or in the fire block its announce's switch conditions)", WANT[sp]))
+      H.assertEq(rolls(AI, blockOf[lo], lineAt, fire and nil or moveAt), "", string.format("%s: nothing rolls from "
+        .. "the announce to the move, and the block's conditions hold no roll (an announced move always fires)",
+        WANT[sp]))
+      if fire then
+        H.assertEq(rolls(AI, fire.at, nil, nil), "", string.format("%s: the fire block that takes the move's turn "
+          .. "rolls nothing, in its conditions or its picks (an announced move always fires)", WANT[sp]))
+      end
       H.assertEq(clearsAfter(AI, moveAt), "", string.format("%s: in the turn that fires, the trigger's clears come "
         .. "before the move (the idiom: a break after the move must not purge them)", WANT[sp]))
       handCheck(sp, start, blockOf[lo])
       H.log(string.format("[fuse] row %d: %s ($%03X), lit at script+$%04X for %d byte(s), announce dlg $%02X, move "
         .. "attack $%02X; a break keeps monster bits $%02X, battle switches $%02X, flags $%02X", rows, WANT[sp], sp,
         lo - start, len, line, move, mkeep, bkeep, flags))
+    elseif turnAnnounce(AI, start, mainEnd, len) then
+      -- a switch row whose announce is a TURN (wt/v052-tg-wor1: Phunbaba's second visit): a block of the turn script
+      -- sets the switch and speaks; the move is the counter's block that the switch conditions
+      -- (if_battle_switch_set 0, bit), which must roll nothing and clear the switch before its move; the counter's
+      -- blocks before it, and its own conditions, are pinned by hand (HAND, key species@ctr+offset)
+      local ta = turnAnnounce(AI, start, mainEnd, len)
+      H.assertEq(bkeep & len, 0, WANT[sp] .. ": a break clears the switch the row is lit by")
+      local cstart = mainEnd + 1
+      local fireBlock, moveAt, move = nil, nil, nil
+      x = cstart
+      local bstart = cstart
+      while rb(AI + x) ~= 0xFF do
+        local b = rb(AI + x)
+        if b == 0xFC and rb(AI + x + 1) == 0x14 and rb(AI + x + 2) == 0x00 and (1 << rb(AI + x + 3)) == len
+           and fireBlock == nil then
+          fireBlock = bstart
+        end
+        if fireBlock == bstart and moveAt == nil and (b < 0xF0 or (b == 0xF0 and rb(AI + x + 1) ~= 0xFE)) then
+          moveAt, move = x, b < 0xF0 and b or rb(AI + x + 1)
+        end
+        x = x + opSize(b)
+        if b == 0xFE then bstart = x end
+      end
+      H.assertEq(fireBlock ~= nil and moveAt ~= nil, true, string.format("%s: its counter has a block the switch "
+        .. "conditions, and it attacks (the move)", WANT[sp]))
+      H.assertEq(rolls(AI, fireBlock, fireBlock, moveAt), "", string.format("%s: the counter's fire block rolls "
+        .. "nothing (an announced move always fires)", WANT[sp]))
+      H.assertEq(clearsAfter(AI, moveAt), "", string.format("%s: in the counter's fire block the trigger's clear "
+        .. "comes before the move", WANT[sp]))
+      local clears = false
+      x = fireBlock
+      while x < moveAt do
+        local b = rb(AI + x)
+        if b == 0xF9 and rb(AI + x + 1) == 0x02 and rb(AI + x + 2) == 0x00 and (1 << rb(AI + x + 3)) == len then
+          clears = true
+        end
+        x = x + opSize(b)
+      end
+      H.assertEq(clears, true, string.format("%s: the counter's fire block clears the switch before its move",
+        WANT[sp]))
+      handCheckCounter(sp, cstart, fireBlock)
+      H.log(string.format("[fuse] row %d: %s ($%03X), lit by battle switch mask $%02X, announce dlg $%02X (a turn's, "
+        .. "script+$%04X), move attack $%02X (its counter's, ctr+$%04X); a break keeps monster bits $%02X, battle "
+        .. "switches $%02X, flags $%02X", rows, WANT[sp], sp, len, ta.line, ta.at - start, move, fireBlock - cstart,
+        mkeep, bkeep, flags))
     else
       -- a switch row: the counter sets the switch and speaks a listed line
       local sets, says = false, nil
@@ -454,6 +690,9 @@ local function staticChecks()
   H.assertEq(seen[0x10A], 3, "Number 024 has three rows (its fire, ice and water walls; wt/v052-tg-wob2)")
   H.assertEq(seen[0x117], 2, "AtmaWeapon has two rows (the Flare Star under 12,800 HP and the last phase's under "
     .. "6,144; wt/v052-tg-wob3)")
+  for _, t in ipairs({ 0x11B, 0x13C, 0x13D, 0x13E }) do
+    H.assertEq(seen[t], 4, string.format("the Tentacle $%03X has four rows (one a seat; wt/v052-tg-wor1)", t))
+  end
   -- ---- wt/v051-tg-wob1: the Whelk's shell no longer draws the head in (no `kill_monsters MONSTER_2`, $F5 $08 $01
   -- $02, in its script): it calls the head in (set_battle_switch 0, 1: $F9 $01 $00 $01), and only behind the head's
   -- hold, `if_battle_switch_clr 0, 0` ($FC $15 $00 $00), in the same block: else a Broken head could be called in

@@ -84,9 +84,28 @@ airship ("It inhales!", after he has been hit three times), the Air Force's
 MissileBay ("Missiles lock on!", once it is badly damaged; breaking the bay
 stops it, breaking the Air Force does not), AtmaWeapon once it is badly hurt ("Vast energy
 focused" again, one turn ahead this time) and Nerapa ("The wheel turns!",
-after you have used Fight on it six times). Where a boss counts what you do to
-earn its move (Dadaluma your spells, Chupon your hits, Nerapa your
-Fights), a break starts the count over.
+after you have used Fight on it six times). In the World of Ruin: the
+Tentacles in Figaro Castle ("It coils to seize!", a turn before that
+Tentacle Seizes a member who is Slowed; only one Tentacle goes for each
+member, and none goes for a member who is down, out of the fight or
+already held; if that member falls first, the **!** goes out and no Seize
+follows), Dullahan ("Its blade rimes over!", after he has been hit eight
+times), Phunbaba on his return to Mobliz ("He fills his lungs!", on his
+turn once he has lost about a fifth of his HP; his two BabaBreaths come on
+his next turn, and he leaves), Chadarnook's demon ("The paint runs!", a
+turn before he hands the painting back to the goddess when his time on
+the canvas is up; the fifth blow he takes still sends him back at once,
+with no line), Umaro ("He digs out a Green Cherry!") and Tritoch ("Frost
+climbs the cliff!", with a Rasp, a turn before Ice 3; it casts Ice 3 at
+no other time). Where a boss counts what you do to earn its move
+(Dadaluma your spells, Chupon your hits, Nerapa your Fights, Dullahan your
+hits), a break starts the count over. Breaking Phunbaba at any time before
+he breathes takes his breath away for the fight: when you drive him off,
+he leaves without it. Breaking the demon while the **!** is up keeps him
+out for the break, and the count of blows that sends him back starts over.
+Breaking Umaro while the **!** is up costs him the cherry for the rest of
+the fight (a Green Cherry you use on him then does nothing for him either).
+Breaking a Tentacle, at any time, frees the member it holds.
 A boss that announces a move cannot be Berserked, and cannot be Muted or
 turned into an Imp when that would stop its move. Not every big move is announced.
 

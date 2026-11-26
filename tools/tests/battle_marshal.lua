@@ -53,13 +53,16 @@ local LOCKE = 0x01
 -- (solo: LOCKE alone Fights it, the others Defend, so that no member's Fight queued behind the killing blow turns
 -- on the other Lobo as its target falls -- wt/v052-tg-wob2's gate draw: the third member's Fight killed Lobo 1
 -- after Lobo 0 fell, and the case that needs Lobo 1 standing had none)
-local function fightLobo(slot, when, what, solo)
+local function fightLobo(slot, when, what, solo, defends)
   return H.lazy(function()
     local plan = {}
     if solo then
       for round = 1, 8 do plan[#plan + 1] = { who = LOCKE, cmd = 0x00, slot = slot } end
     elseif when then
-      plan = { { who = LOCKE, defend = true }, { who = LOCKE, cmd = 0x00, slot = slot, boost = 2, openWhen = when } }
+      -- (defends: LOCKE's Defends before he waits for the moment, one by default; the dropped case's later tries
+      -- take more, so that his window and the Marshal's turns fall otherwise)
+      for k = 1, defends or 1 do plan[#plan + 1] = { who = LOCKE, defend = true } end
+      plan[#plan + 1] = { who = LOCKE, cmd = 0x00, slot = slot, boost = 2, openWhen = when }
     else
       for round = 1, 3 do
         for i = 0, 3 do
@@ -83,7 +86,9 @@ local function fightLobo(slot, when, what, solo)
     })
   end)
 end
-function aloneCase(kind)
+DROPPED = { met = false, tries = 0 }
+ANNOUNCED = { met = false, tries = 0 }
+function aloneCase(kind, defends)
   local W, t0
   local function lineAfter(i) return W.find(0x21, 0x8F, i) end
   local steps = {
@@ -100,6 +105,9 @@ function aloneCase(kind)
       W.on = true
       H.log(string.format("[marshal] f%d alone case %s, from the battle's open", H.frame, kind))
     end),
+    -- (MARSHAL_IDLE, a lab's global: idle frames after the restore, so the battle's draws fall otherwise -- the review
+    -- round's draws of the alone cases, build/attempts/wt/v052-tg-wor1/r2/marshal/; unset in the suite)
+    H.waitFrames(rawget(_G, "MARSHAL_IDLE") or 0),
   }
   if kind == "alone" then
     steps[#steps + 1] = fightLobo(0, nil, kind)
@@ -150,19 +158,41 @@ function aloneCase(kind)
           return true
         end
         return false
-      end, kind)
+      end, kind, false, defends)
+      -- (the precondition is a race the draw decides: LOCKE's Fight has to fell the last Lobo between his arming and
+      -- his next turn.  On wt/v052-tg-wor1's replay his turn came first ("the last Lobo fell before his next turn:
+      -- got 8, want 6", build/attempts/wt/v052-tg-wor1/regen1/red/battle_marshal-red.log), so the case is played
+      -- again from the battle's open with one more Defend before LOCKE waits, five tries at most; the precondition
+      -- is asserted over the tries, below)
       steps[#steps + 1] = H.call(function()
-        H.assertEq(#W.turns, armedAt.turn, "marshal (dropped): the last Lobo fell before his next turn (the "
-          .. "case's precondition)")
-        H.assertEq(lineAfter(armedAt.i), nil, "marshal (dropped): no announce since he armed when the last Lobo fell")
+        DROPPED.tries = DROPPED.tries + 1
+        -- (the review round's replay: the last Lobo can fall with no arming read while LOCKE waited -- another
+        -- member's blow, a counter -- and the try is then played again like a late one)
+        if armedAt == nil then
+          DROPPED.this = false
+          H.log(string.format("[marshal] dropped try %d (LOCKE's Defends %d): the last Lobo fell before he armed: "
+            .. "tried again", DROPPED.tries, defends or 1))
+          return
+        end
+        DROPPED.this = #W.turns == armedAt.turn
+        H.log(string.format("[marshal] dropped try %d (LOCKE's Defends %d): armed on his turn %d, the last Lobo fell "
+          .. "on turn %d: %s", DROPPED.tries, defends or 1, armedAt.turn, #W.turns, DROPPED.this and "before his next"
+          or "after his next: tried again"))
+        if DROPPED.this then
+          DROPPED.met = true
+          H.assertEq(lineAfter(armedAt.i), nil, "marshal (dropped): no announce since he armed when the last Lobo fell")
+        end
       end)
-      steps[#steps + 1] = H.kitBattle({}, { idle = "defend", care = true, maxFrames = 6000,
-        giveUp = function() return #W.turns >= armedAt.turn + 2 end })
-      steps[#steps + 1] = H.call(function()
-        H.assertEq(lineAfter(armedAt.i), nil, "marshal (dropped): no announce on his turns alone")
-        H.assertEq(marshalMvar() & 0x03, 0, "marshal (dropped): his armed fuse was dropped (switches 0 and 1 clear)")
-        H.log("[marshal] PASS dropped")
-      end)
+      steps[#steps + 1] = H.cond(function() return DROPPED.this end, {
+        H.kitBattle({}, { idle = "defend", care = true, maxFrames = 6000,
+          giveUp = function() return #W.turns >= armedAt.turn + 2 end }),
+        H.call(function()
+          H.assertEq(lineAfter(armedAt.i), nil, "marshal (dropped): no announce on his turns alone")
+          H.assertEq(marshalMvar() & 0x03, 0, "marshal (dropped): his armed fuse was dropped (switches 0 and 1 "
+            .. "clear)")
+          H.log("[marshal] PASS dropped")
+        end),
+      }, {})
     else
       -- announced (switch 1): the line said, the move to come
       steps[#steps + 1] = fightLobo(1, function()
@@ -171,19 +201,37 @@ function aloneCase(kind)
           return true
         end
         return false
-      end, kind)
+      end, kind, false, defends)
+      -- (the precondition is the same race as the dropped case's, and is tried again the same way: on
+      -- wt/v052-tg-wor1's replay "the last Lobo fell before his move's turn: got 8, want 7",
+      -- build/attempts/wt/v052-tg-wor1/regen1/red/battle_marshal-red2.log)
       steps[#steps + 1] = H.call(function()
-        H.assertEq(#W.turns, lined.turn, "marshal (announced): the last Lobo fell before his move's turn (the "
-          .. "case's precondition)")
+        ANNOUNCED.tries = ANNOUNCED.tries + 1
+        -- (as the dropped case's: no line read while LOCKE waited -- the last Lobo fell first, build/attempts/
+        -- wt/v052-tg-wor1/r2/gate1.log's battle_marshal "attempt to index a nil value (upvalue 'lined')" -- is a try
+        -- played again)
+        if lined == nil then
+          ANNOUNCED.this = false
+          H.log(string.format("[marshal] announced try %d (LOCKE's Defends %d): the last Lobo fell before the line: "
+            .. "tried again", ANNOUNCED.tries, defends or 1))
+          return
+        end
+        ANNOUNCED.this = #W.turns == lined.turn
+        H.log(string.format("[marshal] announced try %d (LOCKE's Defends %d): the line on his turn %d, the last Lobo "
+          .. "fell on turn %d: %s", ANNOUNCED.tries, defends or 1, lined.turn, #W.turns, ANNOUNCED.this and "before "
+          .. "his move's" or "after it: tried again"))
+        if ANNOUNCED.this then ANNOUNCED.met = true end
       end)
-      steps[#steps + 1] = H.kitBattle({}, { idle = "defend", care = true, maxFrames = 6000,
-        giveUp = function() return #W.turns >= lined.turn + 1 and W.find(0x30, 0x08, lined.i) ~= nil end })
-      steps[#steps + 1] = H.call(function()
-        local i = W.find(0x30, 0x08, lined.i)
-        H.assertEq(i ~= nil and W.cmds[i].turn == lined.turn + 1, true, "marshal (announced): the move (fill_atb, "
-          .. "$30/$08) came on his next turn, alone")
-        H.log("[marshal] PASS announced")
-      end)
+      steps[#steps + 1] = H.cond(function() return ANNOUNCED.this end, {
+        H.kitBattle({}, { idle = "defend", care = true, maxFrames = 6000,
+          giveUp = function() return #W.turns >= lined.turn + 1 and W.find(0x30, 0x08, lined.i) ~= nil end }),
+        H.call(function()
+          local i = W.find(0x30, 0x08, lined.i)
+          H.assertEq(i ~= nil and W.cmds[i].turn == lined.turn + 1, true, "marshal (announced): the move (fill_atb, "
+            .. "$30/$08) came on his next turn, alone")
+          H.log("[marshal] PASS announced")
+        end),
+      }, {})
     end
   end
   steps[#steps + 1] = H.call(function() W.on = false end)
@@ -236,7 +284,7 @@ end
 
 -- The cap: the waves, its three cases and the three alone cases ran to f42,801 (wt/v051-tg-wob1), so 90,000 is about
 -- 2x the longest.
-H.run({ maxFrames = 90000 }, {
+H.run({ maxFrames = 160000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),
@@ -363,7 +411,23 @@ H.run({ maxFrames = 90000 }, {
   -- Mutant: marshal_never_alone (his alone block's `if_num_monsters 1` made 0) is red at "alone: no announce".
   H.call(function() aloneW = H.fuseWatch(MARSHAL, WRITE) end),
   aloneCase("alone"),
-  aloneCase("dropped"),
-  aloneCase("announced"),
+  aloneCase("dropped", 1),
+  H.cond(function() return not DROPPED.met end, { aloneCase("dropped", 2) }, {}),
+  H.cond(function() return not DROPPED.met end, { aloneCase("dropped", 3) }, {}),
+  H.cond(function() return not DROPPED.met end, { aloneCase("dropped", 4) }, {}),
+  H.cond(function() return not DROPPED.met end, { aloneCase("dropped", 5) }, {}),
+  H.call(function()
+    H.assertEq(DROPPED.met, true, string.format("marshal (dropped): the last Lobo fell before his next turn (the "
+      .. "case's precondition) in one of %d tries", DROPPED.tries))
+  end),
+  aloneCase("announced", 1),
+  H.cond(function() return not ANNOUNCED.met end, { aloneCase("announced", 2) }, {}),
+  H.cond(function() return not ANNOUNCED.met end, { aloneCase("announced", 3) }, {}),
+  H.cond(function() return not ANNOUNCED.met end, { aloneCase("announced", 4) }, {}),
+  H.cond(function() return not ANNOUNCED.met end, { aloneCase("announced", 5) }, {}),
+  H.call(function()
+    H.assertEq(ANNOUNCED.met, true, string.format("marshal (announced): the last Lobo fell before his move's turn "
+      .. "(the case's precondition) in one of %d tries", ANNOUNCED.tries))
+  end),
   H.logStep("[marshal] PASS: the alone cases"),
 })

@@ -894,9 +894,11 @@ STATES = [
     # ~520k frames, ~6500 s at a loaded machine's ~80 frames/s.
     # Re-cut by checkpoint_drift.py --recut.
     # also: wor_edgar_shore, the two on the continent before the grind's
-    # shore lap (#488: the sweeps' boot).
+    # shore lap (#488: the sweeps' boot); tentacles_entry, the Tentacles'
+    # battle as it comes up (battle_tentacles, wt/v052-tg-wor1).
     S("wor_edgar", gen="gen_wor_edgar", prev="wor_south_figaro",
-      checkpoint="wor-south-figaro-v1", timeout=7200, also=["wor_edgar_shore"]),
+      checkpoint="wor-south-figaro-v1", timeout=7200,
+      also=["wor_edgar_shore", "tentacles_entry", "tentacles_field"]),
 
     # wor-edgar-v1 -> wor-figaro-sweep-v1, the Falcon arc's leg 1, on the
     # chain since 2026-10-01 (guidelines "Ribbons are worth going out of your
@@ -1011,8 +1013,10 @@ STATES = [
     # timeout=3600: an attempt ends at frame ~44k from the Continue (the
     # dev run `PASS (frame 43814)`); three are ~132k frames, ~1650 s at a
     # loaded machine's ~80 frames/s.  Re-cut by checkpoint_drift.py --recut.
+    # also: phunbaba_entry, the second visit's battle (130) as it comes up
+    # (battle_phunbaba, wt/v052-tg-wor1).
     S("wor_terra", gen="gen_wor_terra", prev="wor_falcon",
-      checkpoint="wor-falcon-v1", timeout=3600),
+      checkpoint="wor-falcon-v1", timeout=3600, also=["phunbaba_entry", "phunbaba_field"]),
 
     # wor-terra-v1 -> Mt. Zozo's save point (179 (40,15)): Maranda's letters
     # (Lola, the reply by carrier pigeon), Zozo's Rust-Rid and rusted door,
@@ -1080,10 +1084,13 @@ STATES = [
     # lost: the runner retries from the save point.  A cut.  wor_owzer
     # below boots its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     # also: wor_tritoch_cave, the party on the cave's landing (281), where
-    # the branch wor_umaro_hunt below begins (#488).
+    # the branch wor_umaro_hunt below begins (#488); tritoch_entry and
+    # umaro_entry, those two battles as they come up (battle_tritoch,
+    # battle_umaroboss, wt/v052-tg-wor1), and tritoch_field and umaro_field,
+    # the party a step or a press before each (the race labs' boots).
     S("wor_tritoch", gen="gen_wor_tritoch", prev="wor_narshe",
       checkpoint="wor-narshe-cliffs-v1", timeout=5400,
-      also=["wor_tritoch_cave"]),
+      also=["wor_tritoch_cave", "tritoch_entry", "umaro_entry", "tritoch_field", "umaro_field"]),
 
     # wor_tritoch_cave -> a branch (#488): Umaro's cave's two pools hunted
     # until each formation is won, the landing's (281) and the X-Ether's
@@ -1118,8 +1125,10 @@ STATES = [
     # `wor-tower-v1` checkpoint (docs/design/route-wor-thamasa.md).  A cut.
     # wor_tower below boots its checkpoint.  Re-cut by checkpoint_drift.py
     # --recut.
+    # also: chadarnook_entry, Chadarnook's battle as it comes up
+    # (battle_chadarnook, wt/v052-tg-wor1).
     S("wor_relm", gen="gen_wor_relm", prev="wor_owzer",
-      checkpoint="wor-owzer-v1", timeout=7200),
+      checkpoint="wor-owzer-v1", timeout=7200, also=["chadarnook_entry", "chadarnook_field"]),
 
     # wor-tower-v1 -> the World of Ruin map beside the Falcon at the
     # Fanatics' Tower (160,127): the climb (magic-only; the randoms fought

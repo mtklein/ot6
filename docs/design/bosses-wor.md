@@ -4,10 +4,12 @@ Scope: every boss and event fight of the World of Ruin, from the Figaro
 Tentacles to Kefka, in the order the automated line meets them. It is the
 World of Ruin counterpart of [bosses-wob.md](bosses-wob.md) and assumes
 that document's boss contract. Issue #561. It began as a survey that
-changed no ROM byte; **unit A of its build order is now built** (section
-1.3: the cancel, the lit-fuse mark, and the fuses of Atma, the Gold Dragon
-and Kefka, with the World of Balance's AtmaWeapon). Every other telegraph
-here is design text. Each block says what is built, what the vanilla script
+changed no ROM byte; **units A, B and C of its build order are now built**
+(section 1.3: the cancel, the lit-fuse mark, and the fuses of Atma, the Gold
+Dragon and Kefka, with the World of Balance's AtmaWeapon; section 1.5: the
+Tentacles, Dullahan, Phunbaba's second visit, Chadarnook, Umaro and Tritoch,
+with the release and the denied buff). Every other telegraph here is design
+text. Each block says what is built, what the vanilla script
 offers as a wind-up, and what is proposed.
 
 The owner's rulings on the contract (2026-11-23), written into
@@ -222,7 +224,7 @@ rule in one paragraph.
   frees what this body holds", applied at every break, lit or not. The
   release itself is what Discard does (`TargetEffect_44`,
   `battle_main.asm`): four stores on the holder and the member its `$3358`
-  names. Not built; block 1.
+  names. Built by unit B (section 1.5, `OT6_FUSE_RELEASE`).
 - **The suites.** `battle_fuse` (the table against the built scripts, the
   block's home, no roll after an announce, the worked example on a staged
   formation), `battle_atmaweapon`, `battle_atma`, `battle_golddrgn`,
@@ -296,6 +298,79 @@ respect:
   A) zero.** A dirty B there crashed the battle (`Ot6FusePoll` clears it
   after `Ot6FuseLit`'s word loads).
 
+### 1.5 What units B and C built
+
+wt/v052-tg-wor1 (#561): six bosses' telegraphs (blocks 1, 2, 4, 8, 9 and
+11, each with its **Built** paragraph and its suite), and two flags in
+`Ot6FuseTbl` (`ot6_fuse.asm`), its last free ones:
+
+- **`OT6_FUSE_RELEASE`: a break frees what the body holds.** Every break of
+  a body with such a row, lit or not, runs `Ot6FuseRelease`: if the body's
+  `$3358` names a member, the body's own Discard on that member is queued as
+  a counterattack (`Ot6QueueDiscard`) and runs once the breaking action is
+  done, though the body is Broken: vanilla's stores (the holder's seize
+  target and the member's seize attacker `$FF`, the holder's switch 7 clear,
+  the member's bit back in `$3403`) and vanilla's animation, which carries
+  the member's sprite back to its place. The first cut made the four stores
+  at the break, and the freed member, acting again, stood drawn in the
+  Tentacle's grip (the review round's screenshots,
+  `build/attempts/wt/v052-tg-wor1/r2/shots/before_fix/`; after the fix,
+  `.../r2/shots/`). The member's turns are the game's own from there. The Tentacles' rows carry it (block 1); no other
+  body of this unit holds a member. The Zone Eater's Engulf ends the battle
+  and is no hold (section 5).
+- **`OT6_FUSE_SETB0`: a cancel can take a buff for the fight.** A cancel of
+  such a row also sets battle switch 0, which is Umaro's vanilla "cherry
+  eaten" switch, so a break in his fuse is the cherry gone (block 9;
+  question 1's answer, "earned again", read as its own example: "Umaro's
+  cherry gone").
+- **An announce that does not wait in its own block.** Where the block that
+  notices the trigger has conditions that can flip between the announce and
+  the move (a member's Slow, Umaro's HP line and the cherry fed him,
+  Phunbaba's HP line), the announce sets a switch and waits, and a block
+  placed first in the script, conditioned on that switch, takes the move's
+  turn. Nothing follows the announce's label but its `end_if`: `battle_fuse`
+  and `check_fuse_immune` find the fire block (the earlier block conditioned
+  on the switch the announce sets) and read it -- its move, its conditions
+  and picks for any roll, its clear of that switch before the move -- and
+  `battle_fuse`'s `HAND` reading of each such row says so. (The first cut
+  left a copy of the move after the label, never reached, for the checkers to
+  read; the review round took the copies out: a check must read the block
+  that runs. Mutants: a roll planted in Umaro's fire block and Phunbaba's
+  clear moved behind his breaths are red in `battle_fuse`, and a Fire planted
+  in a Tentacle's fire block is red in `check_fuse_immune --selftest`.)
+- **`if_seize_free`: one body a member.** A new AI conditional (`$00`,
+  vanilla's unused "never", which no script used; `Ot6SeizeCond`). At a
+  Tentacle's announce it continues only if the seat's member can be held
+  (present, standing, not dead, stone, a zombie, out of the fight or held
+  already: `Ot6SeatHoldable`) and no other standing body that seizes has
+  claimed the seat, and then claims it at once (the body's monster switch for
+  the seat, set as the turn's script is read, so a body whose turn is read
+  next sees it before the announcing turn's commands run). A body that dies
+  with a claim claims nothing (the test skips it). At the fire block it
+  continues only if the member can still be held; if not, the claim is
+  dropped and the turn reads on to the rotation. And the HUD's poll snuffs a
+  lit Tentacle's fuse the frame its member can no longer be held
+  (`Ot6SeizeFell` -> `Ot6FuseSnuff`): the mark goes out and no Seize follows,
+  the one cancel that is not a break, as the body's own death is the one
+  loss. The first cut had no claim: several bodies announced on one Slowed
+  member, the first Seize held, and the others' announced Seizes did nothing
+  (a held member is masked out of targeting by `$3403`): announces of moves
+  that could not happen (the review's blocker).
+- **Phunbaba's turn fuse, denied by any break.** His second visit (block 4)
+  announces on his turn and breathes on his next, the fire block first; his
+  row carries `OT6_FUSE_HOLD` (the Whelk's), so every break of him, lit or
+  not, sets battle switch 0 (the breath denied for the fight) and clears
+  switch 1; his counter ends the battle at his line only once it is denied.
+- **The suites' landed case.** Each of the six suites plays one case with
+  nothing staged and nothing held (`M.fuseLanded`; the Tentacles' and
+  Phunbaba's own): the boss's HP is the game's, the party's own Fights earn
+  the trigger (`M.quietArm`: the members whose hands chip nothing on the
+  boss's row, so nothing of the case's own breaks it), and the move is seen
+  to land. The staged cases then hold HP in a band the landed case did not
+  play. `battle_tentacles4` plays the Tentacles' seat 4 with four seated (the
+  formation staged from Kefka's Tower: no four-member party meets them on the
+  line).
+
 ## 2. Hooks at a glance
 
 "Vanilla" in the telegraph column means the announce is already in the
@@ -303,17 +378,17 @@ script. Shields are today's; an arrow is a proposal (section 3).
 
 | # | Boss | Hook | Telegraph | Shields |
 |---|---|---|---|---|
-| 1 | Tentacles x4 | Hostages: a Slowed member is Seized and is out of the fight until its holder is Broken or dead; each body drinks a different element | Entwine (Slow) -> Seize on that body's next turn (vanilla) | 5 each |
-| 2 | Dullahan | The hit counter: every blow that lands outside a break winds the frost; eight wind it | "Dullahan's blade rimes over" -> the ice combo, Absolute 0 at its end | 10 |
+| 1 | Tentacles x4 | Hostages: a Slowed member is Seized and is out of the fight until its holder is Broken or dead; each body drinks a different element | Entwine (Slow); "It coils to seize!" -> Seize on that member, the body's next turn. **Built** | 5 each |
+| 2 | Dullahan | The hit counter: every blow that lands outside a break winds the frost; eight wind it | "Its blade rimes over!" -> Absolute 0. **Built** | 10 |
 | 3 | Presenter and its head (the tomb's chest) | The Narshe Whelk grown: the shell is the wrong answer. The same hook on purpose, a callback | a hit on the shell -> Giga Volt (vanilla counter) | 0 / 6 |
-| 4 | Phunbaba, the two visits | He ends the fight himself at an HP line. Crossed while Broken, the second visit ends without BabaBreath and nobody is blown out | "Phunbaba fills his lungs" just above the line -> BabaBreath x2 | 4 / 5 |
+| 4 | Phunbaba, the two visits | He ends the fight himself at an HP line. Crossed while Broken, the second visit ends without BabaBreath and nobody is blown out | "He fills his lungs!" under 20,480 HP -> BabaBreath x2 on his next turn; any break denies it. **Built** | 4 / 5 |
 | 5 | Phunbaba, TERRA's fight | The roster is whoever BabaBreath left, and her Trance is the key | none proposed | 12 |
 | 6 | Storm Drgn | Proposed (Octopath): the gauge grows after each break, 10, 12, 14 | "The Storm Dragon swallows the wind" -> Cyclonic | 14 -> 10 growing to 14 |
 | 7 | Ice Dragon | Freeze and thaw: N. Cross freezes members, and fire, its weakness, is also the thaw | "The air goes still" -> Absolute 0 | 6 |
-| 8 | Tritoch | It answers the command, not the hit: any skill command draws Cold Dust on its user, fire draws Rasp, plain Fight draws nothing, and defence 254 makes Fight a chip and nothing more | "Frost creeps up the cliff" -> Ice 3 | 10 |
-| 9 | Umaro | The recruit's audition: he Jumps at the third spell, Tackles at fire, and under 10,240 HP eats a Green Cherry | "Umaro digs out a Green Cherry" -> the cherry | 6 |
+| 8 | Tritoch | It answers the command, not the hit: any skill command draws Cold Dust on its user, fire draws Rasp, plain Fight draws nothing, and defence 254 makes Fight a chip and nothing more | "Frost climbs the cliff!" -> Ice 3. **Built** | 10 |
+| 9 | Umaro | The recruit's audition: he Jumps at the third spell, Tackles at fire, and under 10,240 HP eats a Green Cherry | "He digs out a Green Cherry!" -> the cherry; a break denies it. **Built** | 6 |
 | 10 | Pugs x3 (Umaro's cave's chest) | A tug of war: each Pug steps forward every turn and stabs when it arrives; three Fights knock it back; a spell draws Pearl | the steps forward (vanilla) -> Knife | 4 each |
-| 11 | Chadarnook | Two bodies in one frame: the demon stands for four of the party's actions or 40 counts; bank on the goddess, spend on him | "The paint runs" -> the swap | 0 / 6 |
+| 11 | Chadarnook | Two bodies in one frame: the demon stands for four of the party's actions or 40 counts; bank on the goddess, spend on him | "The paint runs!" -> the swap. **Built** | 0 / 6 |
 | 12 | White Drgn | No weapons and no weakness: in the tower only the Break spell opens it, and every spell cast draws Dispel on the party | none natural | 6 |
 | 13 | MagiMaster | Every hit re-rolls his wall and a break freezes it; his death is Ultima | "MagiMaster gathers the last of his magic" -> Ultima (a dying move: open question 4) | 8 |
 | 14 | Red Dragon | A clock, not a counter: every 40 counts a fire burst on the party, whatever the party does | "The Red Dragon's scales turn white" -> Flare Star | 6 -> 8 |
@@ -534,6 +609,44 @@ either, so the member stays held for the whole break (read from the turn
 rule; not measured). Unit A's table has room for the row (section 1.3). Stays verbatim: Seize, the drain, Discard's 30 counts, the
 counters, the absorbs, 0 XP.
 
+**Built (wt/v052-tg-wor1, `battle_tentacles`, `battle_tentacles4`).** A
+Tentacle's turn that finds a Slowed member (Entwine's, from its rotation)
+with no hostage of its own claims that member's seat (`if_seize_free`,
+section 1.5: the seat's monster switch, set as the turn is read), says "It
+coils to seize!" (dialogue `$A0`) and glows, a turn of its own; on its next
+turn a fire block that stands first in its script Seizes that seat, whatever
+the member's Slow reads then (section 1.5: the announce block's own
+conditions can flip, so the fire block, conditioned on the claim, takes the
+move's turn). Vanilla Seized at once, on the first turn of any body that
+found a Slowed member: the Seize comes one of the body's turns later than
+vanilla's, never sooner. One body a member: no body announces on a seat
+another standing body has claimed, or on a member who cannot be held (dead,
+stone, a zombie, gone, out of the fight, held already). Seize is not
+physical and never misses (`MagicProp` `$C8`: no hit roll), so an announced
+Seize holds its member. A break in between cancels it (`Ot6FuseTbl`, a row a
+body a seat: the claim goes, `$3240` forgotten), and the body's next turn
+that finds a Slowed member announces again; the member falling or leaving
+inside the fuse cancels it too (`Ot6SeizeFell`: the mark goes out, no Seize
+follows), and a body that dies with a claim claims nothing. Every break of a
+Tentacle, lit or not, frees the member it holds by the body's own Discard
+(`OT6_FUSE_RELEASE`, `Ot6FuseRelease`, `Ot6QueueDiscard`): the owner's rule,
+built, with vanilla's animation carrying the member back. The rotation, the
+drain, Discard after 30 counts, the dying Discard (a dying counter,
+unchanged: the dying-attack rule is a later unit's) and the counters are
+vanilla's. Shields stay 5.
+Lab (the review round: one turn of fuse, 5 shields each, CELES, SABIN and
+EDGAR from the field below Gerad, keys `$78 $88 $A8 $B8 $D8`;
+`build/attempts/wt/v052-tg-wor1/r2/lab/F-tentacles/`; holds counted, not
+Seize dispatches): the line's own fighter (gen_wor_edgar's: tactical, Air
+Blade, bank 3) WON 5 of 5, with 1-5 lines and 0-5 holds a fight (every
+announced Seize that came held its member; on key `$A8` three lines came and
+the battle ended before a Seize), no cancel, and 2 releases (key `$88`). A
+party that Defends to the first line and then chips that body at its bank
+WON 5 of 5, broke the announcing body in the fuse on 1 of 5 (key `$88`, 3
+actions after the line), held 2-5 a fight and freed a held member with a
+break 4 times over 3 keys. Kept at 5: the release, not the cancel, is the
+lever a party reaches.
+
 **Shields.** 5 each, 20 across four gauges: the WoR's opening multi-body
 fight, on the band.
 
@@ -604,6 +717,42 @@ the rotation, the counter's Battle.
 
 The alternative, if the owner prefers a one-turn fuse: his Cure 2. "Light
 gathers in the wound", a `wait`, then the cure; a break denies the heal.
+
+**Built (wt/v052-tg-wor1, `battle_dullahan`).** Every blow that strikes him
+is counted (his counter, now in battle variable 3, vanilla's 1, so that the
+cancel can clear it: `OT6_FUSE_VAR3`); on his first turn with eight counted
+(vanilla's number) "Its blade rimes over!" (dialogue `$A1`) and a glow
+announce it, a turn of its own, and Absolute 0 comes on his next turn. The
+count is the fuse block's own condition and only climbs until the move's
+turn clears it. A break in between cancels Absolute 0 and clears the count:
+eight more blows earn it again. Blows on a Broken Dullahan count nothing.
+Not as proposed: vanilla's four-turn combo (N.Cross, Ice 2, then Absolute 0
+one time in three on each of two turns) is now the line and one certain
+Absolute 0, a one-turn fuse, because nothing may roll between the announce
+and the move, and a certain N.Cross and Ice 2 ahead of it would have been
+more than vanilla dealt; he no longer uses N.Cross, and Absolute 0 comes
+only announced. Absolute 0 took 20-27% of each member's maximum HP, all four
+its targets (`build/attempts/wt/v052-tg-wor1/lab/dmg/damage.txt`; 19-28% on the review round's
+run, `build/attempts/wt/v052-tg-wor1/r2/lab/dmg/damage.txt`). Shields
+stay 10.
+Lab (the review round: one turn of fuse, 10 shields, from the grave, keys
+`$60 $70 $90 $A0 $C0`; `build/attempts/wt/v052-tg-wor1/r2/lab/F-dullahan/`):
+the line's fighter (`DULL_FIGHT`, Runic) broke him before any line and won
+on 5 of 5, and so did a party that chips from the open. A party that keeps
+its bank for the line -- the line's fighter with its boosts held until his
+first line, then as it is (the `bank` policy, the review round's, so that the
+race at 10 is measured with the line met) -- met his line on 4 of 5 keys (his
+turn 4-5) and broke him in the fuse 1 action after it every time; on key `$90`
+it broke him before any line (WON 5 of 5). A party that holds, its arming
+Fights only from the members whose hands chip nothing, met the line on his
+turn 9-11 on 5 of 5 keys and took Absolute 0 3-5 actions after it (WON 5 of
+5). Every run WON. Kept at 10: a party that meets the line with its bank in
+hand breaks him in the fuse at once, and one that chips while it counts
+breaks him first. (The first round's lab, `build/attempts/wt/v052-tg-wor1/
+lab/`: its five chip runs that won are `F-dullahan-chip/`, and
+`F-dullahan-chipA/` holds the four first runs that stopped on the lab's own
+cursor -- the first round's text had the two swapped; its chip+hold run on
+key `$58` LOST, the count never reaching eight.)
 
 **Shields.** 10, the capstone band.
 
@@ -681,6 +830,40 @@ is within about 2,500 of the line; the fuse is that band of HP, not a
 turn. Build: a block at the head of the turn script (`if_hp` and a
 monster switch), nothing else. Stays verbatim: the rotation, the line at
 15,360, BabaBreath, the first visit's Escape under 20,480.
+
+**Built (wt/v052-tg-wor1, `battle_phunbaba`): the second visit.** On his
+first turn under 20,480 HP (the first visit's own line, 5,120 HP above the
+line at 15,360) he says "He fills his lungs!" (dialogue `$A2`) and glows, a
+turn of its own, and sets battle switch 1; on his next turn a fire block that
+stands first breathes twice and ends the battle, whatever his HP reads then
+(he absorbs bolt: a heal above the band cannot take the breath away, nor can
+a blow that takes him under 15,360). Every break of him, lit or not, denies
+the breath for the fight (`OT6_FUSE_HOLD`: battle switch 0 set, switch 1
+cleared; a break in the fuse also cancels it, `$3240` forgotten), as Umaro's
+cherry is denied; once it is denied, the blow that takes him under 15,360
+ends the battle with no breath (his counter's block, a story block, which
+runs while he is Broken) and nobody is blown out. Not denied, that blow ends
+nothing: a burst from above 20,480 to under 15,360 between two of his turns
+no longer skips the breath (the review round's case: the first cut lit the
+fuse with a switch and fired the breath on the crossing blow, and a burst
+crossing both lines before his turn in the band ended the fight with no line
+and no breath). So the hook holds, now by the break: break him at any point
+before he breathes and he leaves without it. The story plays on either way
+(`battle_phunbaba`, played through TERRA's fight to the win: after the
+breath it opened with three seated, the two the breaths left and TERRA;
+denied, with four). His dying BabaBreath is vanilla's (a dying counter; a
+later unit's rule). The first visit's two records (`$16A`, `$16B`) and
+TERRA's fight (`$16D`) are vanilla's byte for byte (the suite reads them
+against vanilla's bytes). Shields stay 4 and 5.
+Lab (the review round: 5 shields, from Katarin's room, keys `$16 $2C $4C
+$DC $F6`; `build/attempts/wt/v052-tg-wor1/r2/lab/F-phunbaba/`): the line's
+fighter (gen_wor_terra's) broke him before any line on 5 of 5 (WON 5; no line
+and no BabaBreath: the breath denied by the break). A party whose quiet
+members bring him into the band and that chips at the line broke him in no
+fuse of 5: the line on his turn 6-10 and the two BabaBreaths 4-5 party
+actions after it, every time (WON 5 of 5). Kept at 5: the line's own play
+denies the breath by breaking him before any line, and one turn of fuse is
+short for the chips.
 
 **Shields.** 4 and 5, set by measurement.
 
@@ -839,6 +1022,27 @@ the second, certain (vanilla: two in three). CELES's Runic eats it, so
 the fight has two answers, as TunnelArmor's has. Stays verbatim: the
 counters, Rasp.
 
+**Built (wt/v052-tg-wor1, `battle_tritoch`).** The first turn of its
+rotation of three says "Frost climbs the cliff!" (dialogue `$A5`), glows and
+Rasps (vanilla rolled Rasp, Rasp or Ice 3): the line rides that turn. Ice 3
+comes on the second (vanilla rolled Ice 3, Ice 3 or Rasp), and only there:
+the third picks Rasp or Cold Dust (vanilla's Rasp, Cold Dust or Ice 3, made
+Rasp, Cold Dust or Rasp in the review round, so the line is not taught and
+then broken by an unannounced Ice 3). A rotation's count of Ice 3 is one,
+where vanilla's averaged 4/3; it never comes on the first turn. A break in
+between cancels it (`$3240` forgotten): the rotation starts again from its
+first turn, the line with it. Ice 3 struck one member for 12% of its maximum HP on the first round's
+damage run (`build/attempts/wt/v052-tg-wor1/lab/dmg/damage.txt`); on the
+review round's (`build/attempts/wt/v052-tg-wor1/r2/lab/dmg/damage.txt`) its
+one target, char `$02`, took none of 2,329 (not read further). The counters are
+vanilla's. Shields stay 10.
+Lab (the review round: one turn of fuse, 10 shields, from the ice below it,
+keys `$81 $91 $B1 $C1 $E1`; `build/attempts/wt/v052-tg-wor1/r2/lab/F-tritoch/`):
+the line's fighter (`BOSS_FIGHT`) WON 5 of 5; the line came on its first turn
+every time and Ice 3 4-5 party actions after it, before any break. A party
+that Defends to the line and then chips broke it in the fuse on 1 of 5 (key
+`$C1`, 2 actions after the line; WON 5 of 5). Kept at 10.
+
 **Shields.** 10, the capstone band.
 
 **Break story.** All four hold a class key; MOG "lands half of Tritoch's
@@ -885,6 +1089,31 @@ the fuse and he drops it: the species table sets battle switch 0, the
 block's own once-flag, so it is gone for the fight (open question 1).
 Eaten, its Haste shortens his later breaks (bosses-wob.md:77-80). Stays
 verbatim: the Jump, the counters, the cherry's four statuses.
+
+**Built (wt/v052-tg-wor1, `battle_umaroboss`; `battle_umaro` is UMARO's own
+kit).** His first turn under 10,240 HP (vanilla's line) says "He digs out a
+Green Cherry!" (dialogue `$A4`) with vanilla's red flash, a turn of its own,
+and sets battle switch 2 (his monster variable is his tally of spells and
+shares its byte with his monster switches); on his next turn a fire block
+that stands first eats the cherry, whatever his HP reads then (he absorbs
+ice, and a Green Cherry used on him sets battle switch 1: section 1.5). A
+break in between cancels it and the cherry is gone for the fight:
+`OT6_FUSE_SETB0` sets battle switch 0, vanilla's "eaten", so neither his
+line nor a Green Cherry used on him brings it back (his counter's cherry
+block stands behind that switch: read from the ROM by `battle_umaroboss`; no
+party on the line carries a Green Cherry to play it with). Nothing follows
+the announce's label (section 1.5). Vanilla's cherry set
+Protect, Shell, Haste and Regen; Regen does not stand on him (the suite
+reads status 3 `$68`), as in vanilla. He is now immune to Berserk (blocked
+status 2 `$6B` -> `$7B`: a Berserked monster runs no script). Shields stay
+6.
+Lab (the review round: one turn of fuse, 6 shields, from below the carving,
+keys `$0D $AD $BD $DD $ED`; `build/attempts/wt/v052-tg-wor1/r2/lab/F-umaro/`):
+the line's fighter broke him before any line and won on 5 of 5: the line
+never meets the cherry. A party whose quiet member (CYAN's katana, no key of
+his) brings him under the line and that chips at the line broke him in the
+fuse on 2 of 5, the cherry gone, and let him eat it on 3 (WON 5 of 5). Kept
+at 6.
 
 **Shields.** 6, a guard's count for the fight that ends in a recruit.
 
@@ -970,6 +1199,33 @@ route-wor-thamasa.md 5.2 left that as a lab question. Proposed: the
 species table zeroes variable 0 at the break, so a break buys four more
 actions. Stays verbatim: Phantasm, Doom Kiss, Charm, the demon's Bolt 2
 counter, Flash Rain under 15,360.
+
+**Built (wt/v052-tg-wor1, `battle_chadarnook`).** The demon's turn with his
+clock run (40 counts) says "The paint runs!" (dialogue `$A3`) and glows, a
+turn of its own, and the swap comes on his next turn. While it is lit his
+counter's swap (the fifth hit of his tally) waits on monster switch 0, which
+the announce sets: the swap that comes is the announced one, and he cannot
+leave lit and come back with a stale fuse. A break in between cancels it:
+his clock restarts and his tally of hits (now battle variable 2, vanilla's
+0) is cleared (`OT6_FUSE_TIMER`, `OT6_FUSE_VAR2`), so the break holds him
+out for its window and five more blows. His clock runs out inside the break
+(40 counts read as half the global count, which steps every 16 frames: about
+1,280 frames, section 1.1 point 2; a break is 2,159 frames, DESIGN.md
+"Break"; read from the code, not measured here), so the line can come
+again on his first turn back (`battle_chadarnook`'s broken case asserts only
+that it comes once his clock has run 40 counts again). The
+fifth blow he takes while no line is up still sends him back at once with no
+line, as vanilla's did (his counter's swap; the player text says so). The
+swap's turn also clears the tally: each visit counts afresh (vanilla kept
+it). Everything else is vanilla's. Shields stay 6.
+Lab (the review round: one turn of fuse, 6 shields on the demon, from below
+Owzer, keys `$05 $45 $75 $F5`, shifts 11 and 17 sharing `$45`;
+`build/attempts/wt/v052-tg-wor1/r2/lab/F-chadarnook/`): the line's fighter
+(`BOSS_FIGHT`, its focus on the demon) WON 5 of 5: it broke the demon before
+any line on 3 (keys `$05` and `$45` twice), in the fuse on 1 (`$F5`, 3
+actions after the line) and let the swap come on 1 (`$75`). A party that
+Defends to the line and then chips broke him in the fuse on 4 of 5, 1 action
+after the line, and let the swap come on the fifth (WON 5 of 5). Kept at 6.
 
 **Shields.** 6 on the demon.
 
@@ -2093,8 +2349,8 @@ key, before and after.
 | unit | bosses | what it builds | suites |
 |---|---|---|---|
 | A (**built**, section 1.3) | Atma, Gold Drgn, Kefka (and the WoB's AtmaWeapon) | the machinery of 1.2 on fuses vanilla already wrote: the script block moved, the cancel store, the species table, the lit-fuse mark, the roll condition. No change to those scripts | `battle_fuse` (the table, the block, the worked example), `battle_atma`, `battle_golddrgn`, `battle_goner`, `battle_atmaweapon` |
-| B | Tentacles, Dullahan, Phunbaba | the first authored lines; the hostage release; the hit counter cleared by a break | `battle_tentacles`, `battle_dullahan`, `battle_phunbaba` |
-| C | Chadarnook, Umaro, Tritoch | a window fight, a buff denied, a command-keyed boss | `battle_chadarnook`, `battle_umaro`, `battle_tritoch` |
+| B (**built**, section 1.5) | Tentacles, Dullahan, Phunbaba | the first authored lines; the hostage release; the hit counter cleared by a break | `battle_tentacles`, `battle_dullahan`, `battle_phunbaba` |
+| C (**built**, section 1.5) | Chadarnook, Umaro, Tritoch | a window fight, a buff denied, a command-keyed boss | `battle_chadarnook`, `battle_umaroboss` (`battle_umaro` is UMARO's own kit), `battle_tritoch` |
 | D | Storm, Ice and Red Dragons | the growing gauge; a rotation fuse; a clock reset by the break | `battle_stormdrgn`, `battle_icedragon`, `battle_reddragon` |
 | E | MagiMaster, White Drgn, Doom Gaze | the dying move (after question 4); the flight held | `battle_magimaster`, `battle_whitedrgn`, `battle_doomgaze` |
 | F | SrBehemoth, Hidon, Dirt Drgn | vanilla lines given a beat; the fuse to leave alone | `battle_srbehemoth`, `battle_hidon`, `battle_dirtdrgn` |
