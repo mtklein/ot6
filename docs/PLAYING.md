@@ -94,8 +94,8 @@ times), Phunbaba on his return to Mobliz ("He fills his lungs!", on his
 turn once he has lost about a fifth of his HP; his two BabaBreaths come on
 his next turn, and he leaves), Chadarnook's demon ("The paint runs!", a
 turn before he hands the painting back to the goddess when his time on
-the canvas is up; the fifth blow he takes still sends him back at once,
-with no line), Umaro ("He digs out a Green Cherry!") and Tritoch ("Frost
+the canvas is up; outside that warning, the fifth blow he takes still
+sends him back at once, with no line), Umaro ("He digs out a Green Cherry!") and Tritoch ("Frost
 climbs the cliff!", with a Rasp, a turn before Ice 3; it casts Ice 3 at
 no other time). Where a boss counts what you do to earn its move
 (Dadaluma your spells, Chupon your hits, Nerapa your Fights, Dullahan your

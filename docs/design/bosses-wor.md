@@ -1034,7 +1034,7 @@ between cancels it (`$3240` forgotten): the rotation starts again from its
 first turn, the line with it. Ice 3 struck one member for 12% of its maximum HP on the first round's
 damage run (`build/attempts/wt/v052-tg-wor1/lab/dmg/damage.txt`); on the
 review round's (`build/attempts/wt/v052-tg-wor1/r2/lab/dmg/damage.txt`) its
-one target, char `$02`, took none of 2,329 (not read further). The counters are
+line measured a second dispatch inside the suite's staged case and read 0 of 2,329, an artefact; the suite's played hit in the same round took seat 3 from 2,102 to 1,627, about 23% (`landed: Ice 3 on targets $08`). The counters are
 vanilla's. Shields stay 10.
 Lab (the review round: one turn of fuse, 10 shields, from the ice below it,
 keys `$81 $91 $B1 $C1 $E1`; `build/attempts/wt/v052-tg-wor1/r2/lab/F-tritoch/`):

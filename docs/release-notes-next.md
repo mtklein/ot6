@@ -68,8 +68,8 @@ party for the fight that follows, and leaves. Break him at any point
 before he breathes and his breath is gone for the fight: when you drive
 him off, he leaves without it. Chadarnook's demon says "The paint runs!" a
 turn before he hands the painting back to the goddess when his time on the
-canvas is up; the fifth blow he takes still sends him back at once, with
-no line. Break him while the **!** is up and he stays out for the break,
+canvas is up; outside that warning, the fifth blow he takes still sends
+him back at once, with no line. Break him while the **!** is up and he stays out for the break,
 and the count of blows that sends him back starts over. Umaro says "He
 digs out a Green Cherry!" a turn before he eats it; break him while the
 **!** is up and the cherry is gone for the rest of the fight (a Green
