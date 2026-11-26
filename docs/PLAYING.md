@@ -84,9 +84,21 @@ airship ("It inhales!", after he has been hit three times), the Air Force's
 MissileBay ("Missiles lock on!", once it is badly damaged; breaking the bay
 stops it, breaking the Air Force does not), AtmaWeapon once it is badly hurt ("Vast energy
 focused" again, one turn ahead this time) and Nerapa ("The wheel turns!",
-after you have used Fight on it six times). Where a boss counts what you do to
-earn its move (Dadaluma your spells, Chupon your hits, Nerapa your
-Fights), a break starts the count over.
+after you have used Fight on it six times). In the World of Ruin: the
+Tentacles in Figaro Castle ("It coils to seize!", a turn before that
+Tentacle Seizes a member who is Slowed), Dullahan ("Its blade rimes over!",
+after he has been hit eight times), Phunbaba on his return to Mobliz ("He
+fills his lungs!", once he has lost about a fifth of his HP; his
+BabaBreaths come with the hit that drives him off), Chadarnook's demon ("The paint runs!", a turn before
+he hands the painting back to the goddess), Umaro ("He digs out a Green
+Cherry!") and Tritoch ("Frost climbs the cliff!", a turn before Ice 3).
+Where a boss counts what you do to earn its move (Dadaluma your spells,
+Chupon your hits, Nerapa your Fights, Dullahan your hits), a break starts
+the count over. Breaking Phunbaba while the **!** is up means he leaves
+without his BabaBreaths. Breaking the demon while the **!** is up keeps him
+out for the break, and his count of hits starts over. Breaking
+Umaro while the **!** is up costs him the cherry for the rest of the fight.
+Breaking a Tentacle, at any time, frees the member it holds.
 A boss that announces a move cannot be Berserked, and cannot be Muted or
 turned into an Imp when that would stop its move. Not every big move is announced.
 

@@ -4,10 +4,12 @@ Scope: every boss and event fight of the World of Ruin, from the Figaro
 Tentacles to Kefka, in the order the automated line meets them. It is the
 World of Ruin counterpart of [bosses-wob.md](bosses-wob.md) and assumes
 that document's boss contract. Issue #561. It began as a survey that
-changed no ROM byte; **unit A of its build order is now built** (section
-1.3: the cancel, the lit-fuse mark, and the fuses of Atma, the Gold Dragon
-and Kefka, with the World of Balance's AtmaWeapon). Every other telegraph
-here is design text. Each block says what is built, what the vanilla script
+changed no ROM byte; **units A, B and C of its build order are now built**
+(section 1.3: the cancel, the lit-fuse mark, and the fuses of Atma, the Gold
+Dragon and Kefka, with the World of Balance's AtmaWeapon; section 1.5: the
+Tentacles, Dullahan, Phunbaba's second visit, Chadarnook, Umaro and Tritoch,
+with the release and the denied buff). Every other telegraph here is design
+text. Each block says what is built, what the vanilla script
 offers as a wind-up, and what is proposed.
 
 The owner's rulings on the contract (2026-11-23), written into
@@ -222,7 +224,7 @@ rule in one paragraph.
   frees what this body holds", applied at every break, lit or not. The
   release itself is what Discard does (`TargetEffect_44`,
   `battle_main.asm`): four stores on the holder and the member its `$3358`
-  names. Not built; block 1.
+  names. Built by unit B (section 1.5, `OT6_FUSE_RELEASE`).
 - **The suites.** `battle_fuse` (the table against the built scripts, the
   block's home, no roll after an announce, the worked example on a staged
   formation), `battle_atmaweapon`, `battle_atma`, `battle_golddrgn`,
@@ -296,6 +298,48 @@ respect:
   A) zero.** A dirty B there crashed the battle (`Ot6FusePoll` clears it
   after `Ot6FuseLit`'s word loads).
 
+### 1.5 What units B and C built
+
+wt/v052-tg-wor1 (#561): six bosses' telegraphs (blocks 1, 2, 4, 8, 9 and
+11, each with its **Built** paragraph and its suite), and two flags in
+`Ot6FuseTbl` (`ot6_fuse.asm`), its last free ones:
+
+- **`OT6_FUSE_RELEASE`: a break frees what the body holds.** Every break of
+  a body with such a row, lit or not, runs `Ot6FuseRelease`: if the body's
+  `$3358` names a member, Discard's own four stores let it go (the holder's
+  seize target and the member's seize attacker `$FF`, the holder's switch 7
+  clear, the member's bit back in `$3403`), and the member's turns are the
+  game's own from there. The Tentacles' rows carry it (block 1); no other
+  body of this unit holds a member. The Zone Eater's Engulf ends the battle
+  and is no hold (section 5).
+- **`OT6_FUSE_SETB0`: a cancel can take a buff for the fight.** A cancel of
+  such a row also sets battle switch 0, which is Umaro's vanilla "cherry
+  eaten" switch, so a break in his fuse is the cherry gone (block 9;
+  question 1's answer, "earned again", read as its own example: "Umaro's
+  cherry gone").
+- **An announce that does not wait in its own block.** Where the block that
+  notices the trigger has conditions that can flip between the announce and
+  the move (a member's Slow, Umaro's HP line and the cherry fed him), the
+  announce sets a switch and waits, and a block placed first in the script,
+  conditioned on that switch alone, takes the move's turn. The move after
+  the announce's `wait` is never reached; it stands there so that the lit
+  address is followed by the move, as every row's is (`battle_fuse`,
+  `check_fuse_immune`), and `battle_fuse`'s `HAND` reading of each such
+  row says so.
+- **A switch row lit by a turn and fired by a counter.** Phunbaba's second
+  visit (block 4): his turn in the band sets battle switch 1, and his
+  counter's block that the switch conditions brings the move when a blow
+  crosses his line. `battle_fuse` checks that shape (the turn's block sets
+  the switch and speaks; the counter's fire block rolls nothing and clears
+  the switch before its move) and pins the counter's earlier blocks by hand.
+- **The suites' landed case.** Each of the six suites plays one case with
+  nothing staged and nothing held (`M.fuseLanded`; the Tentacles' and
+  Phunbaba's own): the boss's HP is the game's, the party's own Fights earn
+  the trigger (`M.quietArm`: the members whose hands chip nothing on the
+  boss's row, so nothing of the case's own breaks it), and the move is seen
+  to land. The staged cases then hold HP in a band the landed case did not
+  play.
+
 ## 2. Hooks at a glance
 
 "Vanilla" in the telegraph column means the announce is already in the
@@ -303,17 +347,17 @@ script. Shields are today's; an arrow is a proposal (section 3).
 
 | # | Boss | Hook | Telegraph | Shields |
 |---|---|---|---|---|
-| 1 | Tentacles x4 | Hostages: a Slowed member is Seized and is out of the fight until its holder is Broken or dead; each body drinks a different element | Entwine (Slow) -> Seize on that body's next turn (vanilla) | 5 each |
-| 2 | Dullahan | The hit counter: every blow that lands outside a break winds the frost; eight wind it | "Dullahan's blade rimes over" -> the ice combo, Absolute 0 at its end | 10 |
+| 1 | Tentacles x4 | Hostages: a Slowed member is Seized and is out of the fight until its holder is Broken or dead; each body drinks a different element | Entwine (Slow); "It coils to seize!" -> Seize on that member, the body's next turn. **Built** | 5 each |
+| 2 | Dullahan | The hit counter: every blow that lands outside a break winds the frost; eight wind it | "Its blade rimes over!" -> Absolute 0. **Built** | 10 |
 | 3 | Presenter and its head (the tomb's chest) | The Narshe Whelk grown: the shell is the wrong answer. The same hook on purpose, a callback | a hit on the shell -> Giga Volt (vanilla counter) | 0 / 6 |
-| 4 | Phunbaba, the two visits | He ends the fight himself at an HP line. Crossed while Broken, the second visit ends without BabaBreath and nobody is blown out | "Phunbaba fills his lungs" just above the line -> BabaBreath x2 | 4 / 5 |
+| 4 | Phunbaba, the two visits | He ends the fight himself at an HP line. Crossed while Broken, the second visit ends without BabaBreath and nobody is blown out | "He fills his lungs!" under 20,480 HP -> BabaBreath x2 at the line. **Built** | 4 / 5 |
 | 5 | Phunbaba, TERRA's fight | The roster is whoever BabaBreath left, and her Trance is the key | none proposed | 12 |
 | 6 | Storm Drgn | Proposed (Octopath): the gauge grows after each break, 10, 12, 14 | "The Storm Dragon swallows the wind" -> Cyclonic | 14 -> 10 growing to 14 |
 | 7 | Ice Dragon | Freeze and thaw: N. Cross freezes members, and fire, its weakness, is also the thaw | "The air goes still" -> Absolute 0 | 6 |
-| 8 | Tritoch | It answers the command, not the hit: any skill command draws Cold Dust on its user, fire draws Rasp, plain Fight draws nothing, and defence 254 makes Fight a chip and nothing more | "Frost creeps up the cliff" -> Ice 3 | 10 |
-| 9 | Umaro | The recruit's audition: he Jumps at the third spell, Tackles at fire, and under 10,240 HP eats a Green Cherry | "Umaro digs out a Green Cherry" -> the cherry | 6 |
+| 8 | Tritoch | It answers the command, not the hit: any skill command draws Cold Dust on its user, fire draws Rasp, plain Fight draws nothing, and defence 254 makes Fight a chip and nothing more | "Frost climbs the cliff!" -> Ice 3. **Built** | 10 |
+| 9 | Umaro | The recruit's audition: he Jumps at the third spell, Tackles at fire, and under 10,240 HP eats a Green Cherry | "He digs out a Green Cherry!" -> the cherry; a break denies it. **Built** | 6 |
 | 10 | Pugs x3 (Umaro's cave's chest) | A tug of war: each Pug steps forward every turn and stabs when it arrives; three Fights knock it back; a spell draws Pearl | the steps forward (vanilla) -> Knife | 4 each |
-| 11 | Chadarnook | Two bodies in one frame: the demon stands for four of the party's actions or 40 counts; bank on the goddess, spend on him | "The paint runs" -> the swap | 0 / 6 |
+| 11 | Chadarnook | Two bodies in one frame: the demon stands for four of the party's actions or 40 counts; bank on the goddess, spend on him | "The paint runs!" -> the swap. **Built** | 0 / 6 |
 | 12 | White Drgn | No weapons and no weakness: in the tower only the Break spell opens it, and every spell cast draws Dispel on the party | none natural | 6 |
 | 13 | MagiMaster | Every hit re-rolls his wall and a break freezes it; his death is Ultima | "MagiMaster gathers the last of his magic" -> Ultima (a dying move: open question 4) | 8 |
 | 14 | Red Dragon | A clock, not a counter: every 40 counts a fire burst on the party, whatever the party does | "The Red Dragon's scales turn white" -> Flare Star | 6 -> 8 |
@@ -2093,8 +2137,8 @@ key, before and after.
 | unit | bosses | what it builds | suites |
 |---|---|---|---|
 | A (**built**, section 1.3) | Atma, Gold Drgn, Kefka (and the WoB's AtmaWeapon) | the machinery of 1.2 on fuses vanilla already wrote: the script block moved, the cancel store, the species table, the lit-fuse mark, the roll condition. No change to those scripts | `battle_fuse` (the table, the block, the worked example), `battle_atma`, `battle_golddrgn`, `battle_goner`, `battle_atmaweapon` |
-| B | Tentacles, Dullahan, Phunbaba | the first authored lines; the hostage release; the hit counter cleared by a break | `battle_tentacles`, `battle_dullahan`, `battle_phunbaba` |
-| C | Chadarnook, Umaro, Tritoch | a window fight, a buff denied, a command-keyed boss | `battle_chadarnook`, `battle_umaro`, `battle_tritoch` |
+| B (**built**, section 1.5) | Tentacles, Dullahan, Phunbaba | the first authored lines; the hostage release; the hit counter cleared by a break | `battle_tentacles`, `battle_dullahan`, `battle_phunbaba` |
+| C (**built**, section 1.5) | Chadarnook, Umaro, Tritoch | a window fight, a buff denied, a command-keyed boss | `battle_chadarnook`, `battle_umaroboss` (`battle_umaro` is UMARO's own kit), `battle_tritoch` |
 | D | Storm, Ice and Red Dragons | the growing gauge; a rotation fuse; a clock reset by the break | `battle_stormdrgn`, `battle_icedragon`, `battle_reddragon` |
 | E | MagiMaster, White Drgn, Doom Gaze | the dying move (after question 4); the flight held | `battle_magimaster`, `battle_whitedrgn`, `battle_doomgaze` |
 | F | SrBehemoth, Hidon, Dirt Drgn | vanilla lines given a beat; the fuse to leave alone | `battle_srbehemoth`, `battle_hidon`, `battle_dirtdrgn` |
