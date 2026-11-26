@@ -5,7 +5,7 @@
   "ancestors": [
     {
       "path": "build/states/wor_landing.stamp",
-      "sha256": "21728a83fef14718c0a93ba9a0c0f14423af185d5bc77442a968cb29861cab5e"
+      "sha256": "1c2eab7cb935565f044d22681fdd03fbd4c7b30df191c9ea4172f903158bc955"
     }
   ]
 }

@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "95c148aaa6fc64c8de392394534dad36273abca5a623a8d2d80be17ce52b9824",
-    "generator_sig": "318a3548d8910c216daf2c073f9f07105b6b8a93a48a05472312975696016b6c gen_ultros build/checkpoints/esper-mtn-save-v1/manifest.json build/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
+    "generator_sig": "4847868f7c3f5f9fc77a2b186c3e9936a5bd8118dbf07d2794b690ac9b618a2e gen_ultros build/checkpoints/esper-mtn-save-v1/manifest.json build/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/esper-mtn-save-v1/manifest.json",
-        "sha256": "a2d47f2031431bc17f78b68226cb881188bc8fdbfe31a7511846264e79423171"
+        "sha256": "94cbfc3ce888a82e34845a04540a34da653077d03f3034af1f7baf33fa1f21f0"
       }
     ]
   }

@@ -20,7 +20,7 @@
     "ancestors": [
       {
         "path": "build/states/doma_defended.stamp",
-        "sha256": "fa757ac2b8ac17557a1ab5d65858170fbe2b79d9b5ba6a3d5d6aba3045a85bdb"
+        "sha256": "c66f98ecaeb9cece506f55fdfdeffe70f4837057f838803187d6bb8b929514a8"
       }
     ]
   }

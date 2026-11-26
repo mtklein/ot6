@@ -5,7 +5,7 @@
   "ancestors": [
     {
       "path": "build/states/ifrit_entry.stamp",
-      "sha256": "9053369b53bea44ab52d24a0f37ed3986e62c034b77c98232bb15f89bed00bd9"
+      "sha256": "cd9dbda19412059968ef11af38a6ee40e7e8355fd306d634fe88fe94c072c4ae"
     }
   ]
 }

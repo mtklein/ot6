@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "65ca6487035c25378b74baad99295bd743e8d11c27ddbb457440ec528193384f",
-  "generator_sig": "2cb46350b6aa092c59a8a1fe3bb0ca735fee723adae98765b7b57fdb73e56a2e gen_wor_phoenix build/checkpoints/wor-thamasa-v1/manifest.json build/checkpoints/wor-thamasa-v1/wor-thamasa.sram",
+  "payload_sha256": "e1c4ef0d12b51fddaf29e69a05e658a2d307ebcc34947a043536283d91914dd1",
+  "generator_sig": "a1821b1183ca46c7e1ac5949d8461a6b1278b5f96571f869884f00859848e37b gen_wor_phoenix build/checkpoints/wor-thamasa-v1/manifest.json build/checkpoints/wor-thamasa-v1/wor-thamasa.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-thamasa-v1/manifest.json",
-      "sha256": "47738b5eb263d792986734f6d9e2280a7bbc689ba345e693391f364f62143ee6"
+      "sha256": "7e6b2205bb2d962eef2186986b9529d3f088ac1897b026a1b36c8b1aec99b7e3"
     }
   ]
 }

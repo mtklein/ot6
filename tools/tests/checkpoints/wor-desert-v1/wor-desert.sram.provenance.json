@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "280b37ebf26bece53857039b302a9476ef69c2ac64ebe5ca4b8cbc83f628b2b3",
-  "generator_sig": "885507f435e837aa0902d7f2a721a4caab7d568d6318dfc34d8180d6d1de811b gen_wor_desert build/checkpoints/wor-dino-v1/manifest.json build/checkpoints/wor-dino-v1/wor-dino.sram",
+  "payload_sha256": "10dcb54b02d40cd33f83ca9b243d4e0ca54d52da5a84f617fcc67e0c9c37b020",
+  "generator_sig": "d1b2e184459435953c3fbe3a2c2ebe105eb91fedccecb64d50eccc086b7f959e gen_wor_desert build/checkpoints/wor-dino-v1/manifest.json build/checkpoints/wor-dino-v1/wor-dino.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-dino-v1/manifest.json",
-      "sha256": "0d29ab7ac9725f19f6a90198f3e07df498316e1648fd973d2690d8ae95ee48b2"
+      "sha256": "783d53734471ef6639b017cd877f8f2f4130a74e4c90bbd60c637164aeb03348"
     }
   ]
 }

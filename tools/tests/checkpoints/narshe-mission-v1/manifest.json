@@ -16,11 +16,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "1f2c5e53d070ad0856c1cbccf2f6d5ccce4a901a101083f9b207c1f1126feb30",
-    "generator_sig": "347e30008665a25da7b86605e600c050eca04a747f58759a2d2f27a599b50a96 gen_narshe_mission build/checkpoints/terra-returned-v1/manifest.json build/checkpoints/terra-returned-v1/terra-returned.sram",
+    "generator_sig": "1b3589fdf44c204d3a162e52285c815b834cc106ac729486525fa42761382c05 gen_narshe_mission build/checkpoints/terra-returned-v1/manifest.json build/checkpoints/terra-returned-v1/terra-returned.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/terra-returned-v1/manifest.json",
-        "sha256": "635411ebc8e873c0db647b54b8dcbd0753dc9a713ad5c13687ef3bdbcb08db8d"
+        "sha256": "d4d46ad24a4a72b283f554745cc824f9090631418ba32bf95274b4891671ad8a"
       }
     ]
   }

@@ -5,7 +5,7 @@
   "ancestors": [
     {
       "path": "build/states/figaro_entry.stamp",
-      "sha256": "cc216c8d644f6511aeac6c6aca40d9ed5f7bb16ed0305aa42684765e79cbc4e6"
+      "sha256": "287d0cfb2e63f9f47127ecf143b1a5f47c8151fa949812894ea20a81fb5397af"
     }
   ]
 }

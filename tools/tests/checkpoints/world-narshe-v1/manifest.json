@@ -20,7 +20,7 @@
     "ancestors": [
       {
         "path": "build/states/moogle_cleared.stamp",
-        "sha256": "fdee14a60570af7ce4a318fe3635ec934506ff86107df75e3393dedf24f24a4e"
+        "sha256": "8c268b1bd4642d4ce6f35c126603ef3e570b2c88a4b116bdf9ac18d0c578f172"
       }
     ]
   }

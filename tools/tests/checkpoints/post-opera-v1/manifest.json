@@ -20,7 +20,7 @@
     "ancestors": [
       {
         "path": "build/states/blackjack.stamp",
-        "sha256": "06b54a8e3ef536aa1f8ce2285a97196a2499d59745e81362c748f52a90a84085"
+        "sha256": "ea160577722a8cd5084d29b4d9a7de202bc363fc202763c633aa9b7e69e903aa"
       }
     ]
   }

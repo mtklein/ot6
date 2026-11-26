@@ -16,11 +16,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "def718d741a6a63e2be5b9a5b800f8f2a5713a405e60c356e04bbb0b3d2df3d7",
-    "generator_sig": "8c53ffcda4342c056f510e3988ed9c10a5347d6a6f0d6024702d5df8c1ff8983 gen_vector_crash build/checkpoints/gate-cave-save-v1/manifest.json build/checkpoints/gate-cave-save-v1/gate-cave-save.sram",
+    "generator_sig": "2dcf5d2ef0c8d1cb822885e28d2597dcbef8655e608f6884d7dde4477a496239 gen_vector_crash build/checkpoints/gate-cave-save-v1/manifest.json build/checkpoints/gate-cave-save-v1/gate-cave-save.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/gate-cave-save-v1/manifest.json",
-        "sha256": "77138331d6475ef49f23d696c49e580d4f64299a12e514a541dd2fea16ba9075"
+        "sha256": "f926677a12293e1e667f7b2d85472007852d6fdbad9b5f04ea56502dd3789a52"
       }
     ]
   }

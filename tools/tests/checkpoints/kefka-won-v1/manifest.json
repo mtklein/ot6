@@ -20,7 +20,7 @@
     "ancestors": [
       {
         "path": "build/states/kefka_entry.stamp",
-        "sha256": "1097a0024d7fbe1d84d3390e7558db76b48f6631229a70650f3d7847e9da4d7d"
+        "sha256": "35cfc886993a4505d333b46d94418da74df914b5525351200f54d6f4e0bc751c"
       }
     ]
   }
