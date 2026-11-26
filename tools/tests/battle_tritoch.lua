@@ -46,10 +46,19 @@ local writes, pendingIce = {}, false
 local function watchIce()
   emu.addMemoryCallback(function()
     if not pendingIce then return end
+    -- (the write of Ice 3's own action: its command $02 and attack $0A in $B5/$B6.  The review round's replay read
+    -- the first write after the dispatch, the same frame's, which was another action's -- every damage $FFFF and no
+    -- Miss for the target, red: build/attempts/wt/v052-tg-wor2/r2/suites/battle_tritoch-replay-red.log)
+    local b5, b6 = H.readByte(0xB5), H.readByte(0xB6)
+    H.log(string.format("[tritoch] f%d a damage write ($B5 $%02X, $B6 $%02X): Miss bits $%02X; damage %d %d %d %d; "
+      .. "healing %d %d %d %d", H.frame, b5, b6, H.readByte(0x3A5A) & 0x0F, H.readWord(0x33D0), H.readWord(0x33D2),
+      H.readWord(0x33D4), H.readWord(0x33D6), H.readWord(0x33E4), H.readWord(0x33E6), H.readWord(0x33E8),
+      H.readWord(0x33EA)))
+    if b5 ~= 0x02 or b6 ~= ICE3 then return end
     pendingIce = false
-    writes[#writes + 1] = { f = H.frame, miss = H.readByte(0x3A5A) & 0x0F }
-    H.log(string.format("[tritoch] f%d the hit's damage is written: Miss bits $%02X; damage %d %d %d %d", H.frame,
-      H.readByte(0x3A5A) & 0x0F, H.readWord(0x33D0), H.readWord(0x33D2), H.readWord(0x33D4), H.readWord(0x33D6)))
+    local healed = 0
+    for i = 0, 3 do if H.readWord(0x33E4 + 2 * i) ~= 0xFFFF then healed = healed | (1 << i) end end
+    writes[#writes + 1] = { f = H.frame, miss = H.readByte(0x3A5A) & 0x0F, healed = healed }
   end, emu.callbackType.exec, H.sym("_writedamage"), H.sym("_writedamage"))
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xFF
@@ -86,12 +95,13 @@ H.run({ maxFrames = 60000 }, {
   H.fuseLanded({
     tag = "tritoch", species = TRITOCH, line = LINE, move = { cmd = 0x02, atk = ICE3 }, turns = 1,
     landed = function(W, l, m)
-      -- (wt/v052-tg-wor2's replay: Ice 3 went to TERRA alone and her HP, full, did not move -- "Ice 3 on targets $02;
-      -- HP fell: " and red here, build/attempts/wt/v052-tg-wor2/final/suites/battle_tritoch-replay1-red.log; she
-      -- neither absorbs nor nulls ice, $3BCC/$3BCD 00, build/attempts/wt/v052-tg-wor2/final/suites/probe_trit.log: the
-      -- spell missed her.  So the hit is judged as the game deals it, read where the game writes it
-      -- (_writedamage, the first after the dispatch: the target's damage $33D0 and its Miss bit in $3A5A): a target whose
-      -- HP fell, or one the game dealt a Miss, took the move; a target that did neither fails as before)
+      -- (wt/v052-tg-wor2's replays: Ice 3 to a single target whose full HP did not move, red here --
+      -- build/attempts/wt/v052-tg-wor2/final/suites/battle_tritoch-replay1-red.log, TERRA, and .../r2/suites/
+      -- battle_tritoch-replay-red.log, CYAN, who absorbs ice ($3BCC $02, .../final/suites/probe_trit.log).  So the hit
+      -- is judged as the game deals it, read where the game writes it (_writedamage for Ice 3's own action, $B5/$B6 =
+      -- $02/$0A: the target's damage $33D0, its healing $33E4, its Miss bit in $3A5A): a target whose HP fell, one the
+      -- game wrote a Miss, or one it wrote healing (it absorbs ice) took the move; a target with none of these fails,
+      -- as before -- the tritoch_ice3_null mutant, Ice 3 with no power, is that negative)
       local fell, missed = {}, {}
       for i = 0, 3 do
         if H.readByte(0x3ED8 + 2 * i) ~= 0xFF and m.tchars & (1 << i) ~= 0 then
@@ -99,13 +109,16 @@ H.run({ maxFrames = 60000 }, {
           if now < m.hp[i] then fell[#fell + 1] = string.format("seat %d %d -> %d", i, m.hp[i], now)
           elseif writes[1] ~= nil and writes[1].miss & (1 << i) ~= 0 then
             missed[#missed + 1] = string.format("seat %d (the game wrote its Miss at f%d)", i, writes[1].f)
+          elseif writes[1] ~= nil and writes[1].healed & (1 << i) ~= 0 then
+            missed[#missed + 1] = string.format("seat %d (the game wrote it healing: it absorbs ice, f%d)", i,
+              writes[1].f)
           end
         end
       end
-      H.log(string.format("[tritoch] landed: Ice 3 on targets $%02X; HP fell: %s; the game's Miss: %s", m.tchars,
+      H.log(string.format("[tritoch] landed: Ice 3 on targets $%02X; HP fell: %s; the game's Miss or healing: %s", m.tchars,
         table.concat(fell, ", "), table.concat(missed, ", ")))
       H.assertEq(#fell + #missed >= 1, true, "tritoch landed: Ice 3 landed (a target's HP fell within 420 frames, or the "
-        .. "game dealt it a Miss)")
+        .. "game wrote it a Miss, or healing where it absorbs ice)")
     end,
   }),
   H.fuseRestore(S, "tritoch"),
@@ -117,6 +130,12 @@ H.run({ maxFrames = 60000 }, {
     line = LINE, move = { cmd = 0x02, atk = ICE3 }, turns = 1, glows = 1,
     lineText = "Frost climbs the cliff!{wait}",
     arm = "idle", aim = true,
+    -- (a member whose weapon carries a special effect breaks last, M.fuseCases' plainBreaker: on the review round's
+    -- replay CYAN aimed every try's breaking Fight and it never took the staged last shield -- "the moment passed with
+    -- no break" three times, "a break landed outside the fuse in one of 3 tries: got false",
+    -- build/attempts/wt/v052-tg-wor2/r2/suites/battle_tritoch-pending2.log -- as his Tempest's Wind Slash did on the
+    -- demon Chadarnook in wt/v052-tg-wor1)
+    plainBreaker = true,
     onOpen = function() writes, pendingIce = {}, false end,
     -- no fuse lit, and the window just opened: its Ice 3 has just been dispatched (the rotation's second turn), so
     -- two of its turns stand before the next line (any moment with no line lit is before one, but a moment late in

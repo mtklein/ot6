@@ -172,7 +172,10 @@ H.run({ maxFrames = 160000 }, {
       -- clock is about 2,700 frames: build/attempts/wt/v052-tg-wor2/d1/suites/battle_reddragon-2.log.  The arming
       -- turn is the turn before the line's)
       local before = {}
-      for _, t in ipairs(back) do if t.f < C.lines[2].f then before[#before + 1] = t end end
+      -- (the line's own turn is read on its dispatch's frame: <=, the review round's replay read the turn before the
+      -- arming one, "the raw timer at 80 or more: 59", build/attempts/wt/v052-tg-wor2/r2/suites/
+      -- battle_reddragon-replay-red.log)
+      for _, t in ipairs(back) do if t.f <= C.lines[2].f then before[#before + 1] = t end end
       local arm = before[#before - 1]
       H.assertEq(arm ~= nil and arm ~= back[1], true, "red: an arming turn came after its first turn back, before the "
         .. "line's")
@@ -204,13 +207,16 @@ H.run({ maxFrames = 160000 }, {
   H.lazy(function()
     local t0 = H.frame
     local function both()
+      -- (an armed roll counts once its line has come; an unarmed one once its turn has played out, 600 frames)
       local u, o = false, false
       for _, r in ipairs(rollsSeen) do
-        if r.gen == gen then if r.r < r.n then u = true else o = true end end
+        if r.gen == gen then
+          if r.r < r.n then
+            for _, c in ipairs(CW.cmds) do if c.f > r.f and c.cmd == 0x21 and c.arg == LINE then u = true end end
+          elseif H.frame - r.f > 600 then o = true end
+        end
       end
-      -- (the last roll's turn has played out: 600 frames)
-      local last = rollsSeen[#rollsSeen]
-      return u and o and last ~= nil and H.frame - last.f > 600
+      return u and o
     end
     return H.kitBattle({}, { idle = "defend", care = false, maxFrames = 50600, giveUp = function()
       return both() or H.frame - t0 >= 50000

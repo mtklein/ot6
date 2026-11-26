@@ -201,6 +201,19 @@ H.run({ maxFrames = 120000 }, {
     line = LINE, move = { cmd = 0x24 }, turns = 1, glows = 1,
     lineText = "The paint runs!{wait}",
     arm = armTwo, aim = true, plainBreaker = true,
+    -- (the outside case's own arming: the party Defends while his clock runs.  His tally counts the blows of a break's
+    -- window too -- his counter's swap is a story block -- so the breaking Fight, the window's two and armTwo's two
+    -- made five on wt/v052-tg-wor2's review-round replay and swapped him out before his line: "the boss still stands
+    -- and the battle is up (outside): got false", build/attempts/wt/v052-tg-wor2/r2/suites/battle_chadarnook-replay-red.log.
+    -- The clock alone arms him; the tally is asserted only in the broken case)
+    outsideArm = function(pred, max, W)
+      local t0 = nil
+      return H.lazy(function()
+        t0 = H.frame
+        return H.kitBattle({}, { idle = "defend", care = false, maxFrames = max + 600,
+          giveUp = function() return pred() or H.frame - t0 >= max end })
+      end)
+    end,
     bossHp = 12000,
     -- the demon on the field, no fuse lit, his clock short of 40 counts
     partway = function(W)
