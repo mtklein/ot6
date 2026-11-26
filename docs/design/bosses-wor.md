@@ -1492,7 +1492,7 @@ ordinary turns and a fuse lit by a `wait` cannot span them; the roll arms on the
 turn the clock runs out and the line follows, as the CzarDragon's worked
 example has it. Eraser and its line, the Flare phase, the rotation and the
 counter are vanilla's. Flare Star took 10-20% of each member's maximum HP, all
-four its targets (the suite's landed case on the development ROM, `[red]
+four its targets (the suite's landed case, `[red]
 effect`).
 Lab (the final ROM's own fixtures, nine shifts, five distinct keys `$A2 $C2
 $C8 $F2 $F6`; `build/attempts/wt/v052-tg-wor2/final/lab/F-red/`): at 8 the
