@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "b5ee6b7b4a3dc3360dd396b18fb610e6ff6e200534167d9e665b5eac121636df",
-  "generator_sig": "16b0ca4275df67ef1679a336f960e361b3d7f54d356a500923fb1462a73d35c4 gen_wor_kt_atma build/checkpoints/wor-kt-inferno-v1/manifest.json build/checkpoints/wor-kt-inferno-v1/wor-kt-inferno.sram",
+  "payload_sha256": "70423b86c0161ad2e5f6e6cf944b7990294272587839b65b20519487c8f055d9",
+  "generator_sig": "12c1cce31b2591ecf4498826ab20665c6868f73de50719b6c4b688b60390a5eb gen_wor_kt_atma build/checkpoints/wor-kt-inferno-v1/manifest.json build/checkpoints/wor-kt-inferno-v1/wor-kt-inferno.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-kt-inferno-v1/manifest.json",
-      "sha256": "c8ae543a317f30cfd19ab0ca654fd8c74b0473a6e10caf80d79df35f5e21ce87"
+      "sha256": "1f6bf7f504bcc4f651b97b514e1fa92332c84577a9918eead4eb58598dd94041"
     }
   ]
 }
