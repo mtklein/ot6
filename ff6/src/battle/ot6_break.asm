@@ -2461,13 +2461,18 @@ Ot6GrowTbl:
         .byte   2, 14
         .word   $ffff
 
-; x = the body's entity offset.  a8/i16, db=$7e (Ot6Tick's).  preserves
-; x/y; clobbers a (b = 0).
+; x = the body's entity offset.  a8, either index width (DecCounters runs
+; Ot6Tick with 8-bit index registers: a first cut's `cpx #$0008`, assembled
+; for 16, ran its high byte as a BRK and hung the battle at the Storm
+; Dragon's first recovery, build/attempts/wt/v052-tg-wor2/dev/gen_wor_storm.log),
+; db=$7e.  preserves x/y and the index width; clobbers a (b = 0).
 .proc Ot6GaugeGrow
         .a8
-        .i16
-        cpx     #$0008
+        txa                     ; (either width: the offset's low byte)
+        cmp     #$08
         bcc     @out            ; a character: no gauge
+        php
+        longi
         phx
         phy
         txy                     ; y = the body (the table walks in x)
@@ -2496,5 +2501,6 @@ Ot6GrowTbl:
 @none:  shorta0
         ply
         plx
+        plp
 @out:   rts
 .endproc
