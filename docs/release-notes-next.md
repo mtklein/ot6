@@ -80,19 +80,25 @@ on the round's third turn. A break stops it.
 
 Three of the eight dragons announce a move the same way. The Storm
 Dragon, once it has lost a little under two thirds of its HP, sometimes
-says "It swallows the wind!" and uses Cyclonic on its next turn (it leaves each member it hits about a sixteenth of their HP);
-about one round of its attacks in three ends this way, as often as before,
-and it no longer uses Cyclonic without the line. The Ice Dragon says "The
-air goes still!" at the start of each round of its attacks and uses
-Absolute 0 on its next turn (up to half of each member's HP); it no longer uses Absolute 0 on a
-round's third turn. The Red Dragon still bursts into fire whenever its
-clock runs out; when the burst is to be Flare Star (one time in three, as
-before) it says "Its scales turn white!" a turn ahead and Flare Star comes
-on the turn after (a tenth to a fifth of each member's HP), two turns later than it used to. Break it while
-the **!** is up and its clock starts over from the beginning when it
-recovers. The Storm Dragon's shields now grow: it starts with 10 instead
-of 14, and each time it recovers from a break it comes back with two more,
-up to 14. The Red Dragon has 8 shields instead of 6.
+says "It swallows the wind!" and uses Cyclonic on its next turn (it leaves
+each member it hits about a sixteenth of their HP); about one round of its
+attacks in three ends this way, as often as before, and it no longer uses
+Cyclonic without the line. The Ice Dragon no longer casts Absolute 0 as
+part of its attacks. Instead, when a member is Frozen (its N. Cross freezes
+those it hits) at its turn, it gets ready, says "The air goes still!" on
+its next turn, and casts Absolute 0 on the whole party on the turn after.
+Thaw the Frozen member with a Fire spell before the dragon's turn and it
+does not get ready; once it has, thawing the member no longer stops
+Absolute 0, but breaking the dragon while the **!** is up does. The Red
+Dragon still bursts into fire whenever its clock runs out; when the burst
+is to be Flare Star (one time in three, as before) it says "Its scales turn
+white!" a turn ahead and Flare Star comes on the turn after, two turns later
+than it used to, and Flare Star now comes only after its line. Its other
+bursts are S. Cross or L.4 Flare, L.4 Flare now twice as often as S. Cross.
+Break it while the **!** is up and its clock starts over from the beginning
+when it recovers. The Storm Dragon's shields now grow: it starts with 10
+instead of 14, and each time it recovers from a break it comes back with two
+more, up to 14. The Red Dragon has 8 shields instead of 6.
 The Ice Dragon can no longer be Berserked or Muted.
 
 A boss that announces a move can no longer have it taken away by a

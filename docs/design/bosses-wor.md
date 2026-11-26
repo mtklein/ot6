@@ -406,6 +406,12 @@ wt/v052-tg-wor2 (#561): the Storm, Ice and Red Dragons' telegraphs (blocks
   turn back. Its row sets battle switch 0 at the cancel (`OT6_FUSE_SETB0`)
   and its script's first block, conditioned on that switch, restarts the
   clock on its first turn back.
+- **Armed by a status** (the review round's, the Ice Dragon's freeze and
+  thaw): four arming blocks, a seat each, `if_status_set CHAR_SLOT_n, FROZEN`
+  in the Red Dragon's Eraser idiom, set the switch the fuse block (the
+  script's first) waits on; the fuse block reads the switch alone, so a thaw
+  after the arming changes nothing, and a thaw before the dragon's turn arms
+  nothing.
 - **The Ice Dragon immune to Berserk and Mute** (`MonsterProp` splice,
   `battle_main.asm`; `check_fuse_immune`): Absolute 0 costs 20 MP. The Storm
   and Red Dragons were immune already.
@@ -426,7 +432,7 @@ script. Shields are today's; an arrow is a proposal (section 3).
 | 4 | Phunbaba, the two visits | He ends the fight himself at an HP line. Crossed while Broken, the second visit ends without BabaBreath and nobody is blown out | "He fills his lungs!" under 20,480 HP -> BabaBreath x2 on his next turn; any break denies it. **Built** | 4 / 5 |
 | 5 | Phunbaba, TERRA's fight | The roster is whoever BabaBreath left, and her Trance is the key | none proposed | 12 |
 | 6 | Storm Drgn | The gauge grows (Octopath): 10 at the open, two more after each break, to 14 | "It swallows the wind!" -> Cyclonic, a roll of one in three a low rotation. **Built** | 10 growing to 14 (was 14) |
-| 7 | Ice Dragon | Freeze and thaw: N. Cross freezes members, and fire, its weakness, is also the thaw | "The air goes still!" -> Absolute 0, every rotation. **Built** | 6 |
+| 7 | Ice Dragon | Freeze and thaw: N. Cross freezes members, and fire, its weakness, is also the thaw | a Frozen member arms it; "The air goes still!" -> Absolute 0; a thaw in time arms nothing. **Built** | 6 |
 | 8 | Tritoch | It answers the command, not the hit: any skill command draws Cold Dust on its user, fire draws Rasp, plain Fight draws nothing, and defence 254 makes Fight a chip and nothing more | "Frost climbs the cliff!" -> Ice 3. **Built** | 10 |
 | 9 | Umaro | The recruit's audition: he Jumps at the third spell, Tackles at fire, and under 10,240 HP eats a Green Cherry | "He digs out a Green Cherry!" -> the cherry; a break denies it. **Built** | 6 |
 | 10 | Pugs x3 (Umaro's cave's chest) | A tug of war: each Pug steps forward every turn and stabs when it arrives; three Fights knock it back; a spell draws Pearl | the steps forward (vanilla) -> Knife | 4 each |
@@ -1015,7 +1021,12 @@ the line met it on 3 of 7 and broke it in the fuse on 2 (WON 7 of 7). At 14
 flat (the variant ROM, `build/attempts/wt/v052-tg-wor2/v1/lab/F-storm*`) the
 holding party broke it in the fuse on 2 of 7 and LOST 1 (key `$66`), and the
 line's fighter never met the line (WON 7 of 7). Kept at 10 growing to 14: the
-first break is cheap, and a party that watches for the line can answer it.
+first break is cheap, and a party that watches for the line can answer it. On
+the review round's ROM (its own fixtures, the same six keys,
+`build/attempts/wt/v052-tg-wor2/r2/lab/F-storm/`) 19 of 21 WON; LOST: the line's
+fighter on key `$AC` (shift 23, as before) and the holding party on key `$0A`
+(shift 35: Cyclonic fired one action after the line, and the party fell after
+it).
 
 **Shields.** 10, growing to 14 (was 14 flat; section 3.2, 5).
 
@@ -1059,29 +1070,40 @@ two picks in three). The rotation is three beats, so the fuse returns
 every rotation, as AtmaWeapon's does. Build: one `dlg` at :6923; the
 cancel store restarts the bar at its first beat.
 
-**Built (wt/v052-tg-wor2, `battle_icedragon`).** The first beat of its
-rotation of three attacks as vanilla's did (Battle, N. Cross or N. Cross),
-then says "The air goes still!" (dialogue `$A7`) and glows: the line rides that
-turn, after its attack. Absolute 0 comes on the second beat (vanilla rolled
-Battle, Absolute 0 or Absolute 0 there), and only there: the third picks
-Battle, Surge or N. Cross (vanilla's Battle, Surge or Absolute 0), so Absolute
-0 comes only announced, once a rotation (vanilla's average was one). A break in
-between cancels it (`$3240` forgotten): the rotation starts again from its
-first beat, the line with it. It is immune to Berserk and Mute now (Absolute 0
-costs 20 MP). Its counters, and its dying Surge, are vanilla's (question 4 is
-a later unit's). Absolute 0 took 39%, 16% and 50% of three members' maximum HP
-and nothing from MOG, all four its targets (the suite's landed case,
-`[icedragon] effect`). Close in shape to Tritoch's fuse on the next ledge (a
-line on the rotation's first turn, the ice spell on its second); what keeps
-the two apart is the gauge: six shields and a weakness everyone carries (fire)
-against Tritoch's ten behind defence 254.
-Lab (one turn of fuse, 6 shields, from the party arriving on the cliffs, seven
-shifts, six distinct keys `$FE $CA $6A $AE $DA $7A`;
-`build/attempts/wt/v052-tg-wor2/final/lab/F-ice/`): every run WON (21 of 21).
-The line's fighter (gen_wor_narshe's, the walk's on which the line meets it)
-met the line on its first turn every time and took Absolute 0 2-6 times a
-fight, and broke it in a fuse on 3 of 7; a party that holds and then chips broke
-it in a fuse on 3 of 7, and one that keeps its bank on 5 of 7. Kept at 6.
+**Built (wt/v052-tg-wor2, `battle_icedragon`; redesigned in its review
+round).** Freeze and thaw. Its rotation of three (Battle, N. Cross or N.
+Cross; Battle, Battle or Surge; Battle, Surge or Battle) casts no Absolute 0
+(vanilla rolled it on two beats of three); N. Cross, which freezes those it
+hits, keeps its share. On a turn when a seated member is Frozen, one of four
+arming blocks (a seat each, `if_status_set CHAR_SLOT_n, FROZEN` with monster
+switch 0 clear: the Red Dragon's Eraser idiom) takes the turn with Battle,
+Battle or Surge and sets switch 0; its next turn, the fuse block (the
+script's first, conditioned on the switch alone, never on the status), says
+"The air goes still!" (dialogue `$A7`) and glows, a turn of its own; the turn
+after casts Absolute 0. Two answers: thaw the member with fire before the
+dragon's turn and nothing arms, or break it in the fuse (switch 0 cleared,
+`$3240` forgotten). A member thawed after the arming does not stop the line or
+the move. Absolute 0 comes only announced. It is immune to Berserk and Mute
+(Absolute 0 costs 20 MP); its counters and its dying Surge are vanilla's
+(question 4 is a later unit's). The first build (a line on every rotation's
+first beat, Absolute 0 on its second) was Tritoch's fight on the next ledge;
+the review round replaced it with this. The suite saw a Fire on a Frozen
+member thaw it (seat 1 Frozen, the Fire's caster char `$02`; "thawed: its turn
+at f6581 read no one Frozen; at its next (f7035) monster switch 0 0; a line
+none") and an arming survive a thaw ("armed: its turn at f13593 read seat(s)
+$8 Frozen; the thaw at f13791; the line at f14093, Absolute 0 at f14717"), and
+over the suite "43 unarmed turns judged, 6 with a member Frozen; mismatches:
+none" (`build/attempts/wt/v052-tg-wor2/r2/suites/battle_icedragon-replay.log`).
+In one played hit Absolute 0 took 16-21% of three members' maximum HP and
+nothing from MOG, all four its targets (the suite's landed case).
+Lab (the review round's ROM, its own fixtures, seven shifts, six distinct keys
+`$FE $CA $6A $AE $DA $7A`; `build/attempts/wt/v052-tg-wor2/r2/lab/F-ice/`):
+every run WON (21 of 21). The freezes make the line appear in real fights:
+the line's fighter (gen_wor_narshe's options, which thaw no one on purpose) met
+it on 5 of 7 (1, 0, 1, 0, 2, 4, 4 lines a fight) and broke it in the fuse on
+2; a party that Defends and thaws no one met it on 7 of 7 (1-3 a fight) and
+broke it in the fuse on 3; one that keeps its bank met it on 7 of 7 and broke
+it in the fuse on 4. N. Cross's share stays vanilla's. Kept at 6.
 
 **Shields.** 6 by measurement (route-wor-narshe.md 11.4).
 
@@ -1478,15 +1500,21 @@ roll of one in three (85 in 256, `if_roll`, on the arming block) arms monster
 switch 1 with that turn's Fire 2 or Fire Ball; its next turn, the fuse block,
 says "Its scales turn white!" (dialogue `$A8`) and glows, a turn of its own;
 the turn after restarts the clock and casts Flare Star. Unarmed, the burst is
-vanilla's at once, S. Cross or L.4 Flare (S. Cross takes Flare Star's place in
-the pick), so Flare Star comes only announced, in a third of the clocks as
-vanilla's did, and two turns later. A break between the line and Flare Star
+vanilla's at once, S. Cross or L.4 Flare (L.4 Flare takes Flare Star's place in
+the pick: the review round's, so STRAGO meets L.4 Flare at least as often as in
+vanilla, 4/9 a clock against 1/3), so Flare Star comes only announced, in a
+third of the clocks as vanilla's did, and two turns later. A break between the line and Flare Star
 cancels it (switch 1 cleared, `$3240` forgotten) and sets battle switch 0
 (`OT6_FUSE_SETB0`): the clock counts through the break, which outlasts a
 40-count clock, so the script's first block restarts it on the dragon's first
 turn back (with that turn's Fire 2 or Fire Ball). The suite saw the timer read
-185 at its first turn back and 17 at its second, and the next line 3,680
-frames after its first turn back. Not as proposed: the line is not "when the
+193 at its first turn back and 15 at its second, and the arming turn at a raw
+91 (`if_monster_timer 40` reads half the timer: it is met at 80, about 34
+frames a count, so a clock is about 2,700 frames) 6,175 frames after its first
+turn back (`build/attempts/wt/v052-tg-wor2/r2/suites/battle_reddragon-pending2.log`);
+and an armed and an unarmed clock on any draw ("the roll 123/85 at f56659:
+burst $95 at f56665, line none; the roll 56/85 at f69024: burst none, line at
+f69839"). Not as proposed: the line is not "when the
 clock passes 30" with the burst at 40, because between the two the dragon takes
 ordinary turns and a fuse lit by a `wait` cannot span them; the roll arms on the
 turn the clock runs out and the line follows, as the CzarDragon's worked
@@ -1494,19 +1522,29 @@ example has it. Eraser and its line, the Flare phase, the rotation and the
 counter are vanilla's. Flare Star took 10-20% of each member's maximum HP, all
 four its targets (the suite's landed case, `[red]
 effect`).
-Lab (the final ROM's own fixtures, nine shifts, five distinct keys `$A2 $C2
-$C8 $F2 $F6`; `build/attempts/wt/v052-tg-wor2/final/lab/F-red/`): at 8 the
-line's fighter (gen_wor_locke's `BOSS_FIGHT`) broke it before any line on 9 of 9
-(7-10 party actions, frames 4,581-5,110 of the fight) and WON 9 of 9, as did a
-party that keeps its bank. A party that Defends until the line met it on 7 of 9
-(turn 5-10) and never broke it in the fuse (2-4 actions); it LOST 2 (keys `$C2`
-and `$F6`: no line came in three clocks, unannounced bursts and its own Fire
-2s wore down a party that only Defended). At 6 (the development ROM,
+Lab (the review round's ROM and fixtures, 24 shifts, five distinct keys `$02 $08
+$32 $42 $72`; `build/attempts/wt/v052-tg-wor2/r2/lab/F-red/` and `F-red-more/`):
+the line's fighter (gen_wor_locke's `BOSS_FIGHT`) broke it before any line on
+24 of 24 (7-10 party actions) and WON 24 of 24; a party that keeps its bank met
+the line on 6 and broke it in the fuse on all 6 (WON 24 of 24). A party that
+Defends until the line met it on 4 and never broke it in the fuse, and LOST 18
+(keys `$08 $32 $72`: no line in several clocks, and unannounced bursts and its
+Fire 2s wore down a party that only Defended). The review round's `low` policy,
+which reaches the hook -- MOG's boosted Fights (the one member whose hand keys
+the row) take the gauge to 2 before any line, the party holds, and every member
+chips at its bank on the line -- met the line on 13 of 24 and broke it in the
+fuse on all 13; on 7 (key `$08`) it Defended through the break and saw the
+fresh clock in play ("f16533 battle switch 0 clears: the Red Dragon's first
+turn back restarts its clock", `F-red-more/race_red_low_true_17.log`), and on
+the other 6 (key `$32`) the window's queued hits killed it first. It WON 8 and
+LOST 16 (keys `$02 $08 $72`: a party at 2 shields that only Defends, as the hold
+policy). So a break in the fuse and the fresh clock both come in play, for a
+party that sets the break up and waits for the line. At 6 (the development ROM,
 `build/attempts/wt/v052-tg-wor2/d1/lab/F-red/`, keys `$A2 $C2 $C8 $F2`) the
-line's fighter broke it before any line on 7 of 7, in 4 actions on 6 of them (frames 2,667-4,925); the
-holding party LOST 1 (key `$C2`). Raised to 8, the section 3.2 proposal: at 6
-it was the line's shortest boss fight, and at 8 the line still breaks it first
-every time.
+line's fighter broke it before any line on 7 of 7, in 4 actions on 6 of them
+(frames 2,667-4,925); at 8 on the first round's ROM in 7-10 (`final/lab/F-red/`,
+WON 9 of 9). Raised to 8, the section 3.2 proposal: at 6 it was the line's
+shortest boss fight, and at 8 the line still breaks it first every time.
 
 **Shields.** 8 (was 6, the floor's number).
 
