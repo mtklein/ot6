@@ -616,6 +616,11 @@ H.run({ maxFrames = 400000 }, {
   walkInto(24, 10, MAP_MINES, "the cliffs -> the mines (36 (108,12))", exceptOf(CLIFF_DOORS, 24, 10)),
   walkInto(117, 12, MAP_CLIFF_LO, "the mines -> the cliffs (33 (32,10))", exceptOf(MINES_DOORS, 117, 12)),
   walkInto(35, 1, MAP_CLIFF_SAVE, "the cliffs -> the cliffs' save point (34)", CLIFF_DOORS),
+  -- icedragon_field (also= in the graph, wt/v052-tg-wor2): the party on map 34 as it arrives, before the walk past
+  -- the Ice Dragon, which wanders and is met on that walk or touched from the save point by gen_wor_tritoch,
+  -- whichever the draw deals: the boot of the branch leg gen_wor_icedragon (its battle as it comes up, battle_icedragon's
+  -- fixture) and of the race labs
+  H.saveState("icedragon_field.mss"),
   -- the save point (25,5), the walk kept off the Ice Dragon's tile (22,20)
   -- and the tiles beside it (route-wor-narshe.md 9)
   via({ { 18, 28 }, { 16, 22 }, { 18, 12 } }, "the cliffs' west side toward the save point", DRAGON_AVOID),

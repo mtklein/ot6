@@ -38,7 +38,7 @@ local WANT = {
   [0x0E2] = { "Chaos Drgn", 4, SPEAR | BLUNT, ICE, FIRE, 0 },
   [0x0E9] = { "Sea Flower", 2, KATANA, ICE | BOLT, FIRE | WATER, 0 },
   [0x093] = { "Uroburos", 1, BLUNT, ICE, FIRE, 0 },
-  [0x153] = { "Red Dragon", 6, SPEAR, ICE | WATER, FIRE, 0 },
+  [0x153] = { "Red Dragon", 8, SPEAR, ICE | WATER, FIRE, 0 },  -- 8 since wt/v052-tg-wor2 (6 the floor gave it)
   [0x11D] = { "Doom Gaze", 8, SPEAR | RANGED, FIRE | HOLY, ICE | POISON, 0 },
 }
 

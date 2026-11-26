@@ -2957,10 +2957,14 @@ Ot6ShieldTbl:
         .byte   2, OT6_KATANA|OT6_BLUNT ; ursus: two, so it breaks before it
                                 ;   runs.  fire vanilla
         .word   $014b
-        .byte   14, OT6_SWORD|OT6_DAGGER|OT6_KATANA ; storm drgn: 42000 hp; katanas cut
+        .byte   10, OT6_SWORD|OT6_DAGGER|OT6_KATANA ; storm drgn: 42000 hp; katanas cut
                                 ;   the hide (cyan's quadra slam chips four
                                 ;   a turn), bolt (vanilla) finds it; wind
-                                ;   it absorbs (cyan's tempest heals it)
+                                ;   it absorbs (cyan's tempest heals it).
+                                ;   10 at the open, and its gauge grows:
+                                ;   two more after each break, to 14
+                                ;   (Ot6GrowTbl, ot6_break.asm; bosses-wor.md
+                                ;   block 6, wt/v052-tg-wor2: 14 flat before)
         ; ---- the world of ruin: narshe (the town, the mines, the moogle
         ; cave, the cliffs, umaro's cave; the ice dragon, tritoch and umaro;
         ; docs/design/route-wor-narshe.md section 4) ------------------------
@@ -3147,9 +3151,12 @@ Ot6ShieldTbl:
         .byte   1, OT6_BLUNT ; uroburos: 50 hp behind defence 252; one
                                 ;   blow of a rod breaks it.  ice vanilla
         .word   $0153
-        .byte   6, OT6_SPEAR ; red dragon: 30000 hp; mog's spear between
+        .byte   8, OT6_SPEAR ; red dragon: 30000 hp; mog's spear between
                                 ;   the scales, celes's ice; ice|water
-                                ;   vanilla, absorbs fire
+                                ;   vanilla, absorbs fire.  8, not the
+                                ;   floor's 6 (bosses-wor.md block 14,
+                                ;   wt/v052-tg-wor2): at 6 the line's
+                                ;   driver broke it in 4 actions
         .word   $011d
         .byte   8, OT6_SPEAR|OT6_RANGED ; doom gaze: the eye in the sky,
                                 ;   met on the falcon's deck on the way and

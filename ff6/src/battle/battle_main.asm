@@ -17092,6 +17092,8 @@ GHOSTTRAIN_HP_OT6    = 2600
 ;                    Cherry is an item, which Mute and an Imp keep)
 ;   $118 Nerapa      $CE -> $DE (Berserk)
 ;   $12F Chupon      $63 -> $7B (Berserk and Mute: Fire Ball costs 20)
+;   $149 Ice Dragon  $82 -> $9A (Berserk and Mute: Absolute 0 costs 20;
+;                    wt/v052-tg-wor2)
 ;   $150 Gold Dragon $EB -> $FB (Berserk)
 ;   $155 Rizopas     $09 -> $19 (Berserk)
 OT6_IMM1             = 20                       ; +$14: blocked status 1
@@ -17114,7 +17116,9 @@ MonsterProp:
         ot6_imm2 $118, $DE
         .incbin "monster_prop.dat", $118 * 32 + OT6_IMM2 + 1, $12F * 32 - $118 * 32 - 1
         ot6_imm2 $12F, $7B
-        .incbin "monster_prop.dat", $12F * 32 + OT6_IMM2 + 1, $150 * 32 - $12F * 32 - 1
+        .incbin "monster_prop.dat", $12F * 32 + OT6_IMM2 + 1, $149 * 32 - $12F * 32 - 1
+        ot6_imm2 $149, $9A                      ; (wt/v052-tg-wor2: the Ice Dragon, Berserk and Mute)
+        .incbin "monster_prop.dat", $149 * 32 + OT6_IMM2 + 1, $150 * 32 - $149 * 32 - 1
         ot6_imm2 $150, $FB
         .incbin "monster_prop.dat", $150 * 32 + OT6_IMM2 + 1, $155 * 32 - $150 * 32 - 1
         ot6_imm2 $155, $19

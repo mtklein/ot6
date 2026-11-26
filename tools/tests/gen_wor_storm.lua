@@ -32,6 +32,10 @@ local ZOZO_IN_DOORS = { { 12, 44 }, { 11, 17 }, { 21, 15 }, { 52, 57 }, { 47, 47
 local PARTY = { { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { SABIN, "SABIN" } }
 -- event group 133's formation (route_data.py pool event 133: both slots 367)
 local STORM_FORMATION = 367
+-- stormdrgn_entry (also= in the graph): the Storm Dragon's battle as it comes up, before any input -- battle_stormdrgn's
+-- fixture (wt/v052-tg-wor2); stormdrgn_field, the party on the ledge with the dragon shown, before the touch (the race
+-- labs' boot).  Captured with no frames spent (H.battleOpenCapture) and emitted after the fight.
+local STORM_CAP = H.battleOpenCapture(0x14B, "stormdrgn_entry.mss")
 -- the fight driver: CELES on Runic (Wind Slash and Aero are spells), CYAN
 -- on his SwdTech (route-wor-cyan.md 5)
 local STORM_FIGHT = { runic = true, bushido = true }
@@ -565,6 +569,8 @@ H.run({ maxFrames = 300000 }, {
   -- save point, as a person reloads
   stepOn(48, 11, function() return sw(0x0299) == 1 end),
   ride(function() return sw(0x0299) == 1 end, 3000, "the Storm Dragon shows itself"),
+  STORM_CAP.arm(),
+  STORM_CAP.field("stormdrgn_field.mss"),
   touchDragon(),
   H.advanceStory(function()
     return sw(0x029A) == 1 and not H.battleLoadStarted() and map() == MAP_MTZOZO and settled()
@@ -582,6 +588,7 @@ H.run({ maxFrames = 300000 }, {
     H.assertEq(n, 1, "the Storm Dragon's formation was fought once")
     say("storm", "the Storm Dragon is beaten")
   end),
+  STORM_CAP.emit(),
   H.saveState("wor_storm_won.mss"),
 
   -- ---- 3. down to the Falcon ------------------------------------------------

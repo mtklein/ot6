@@ -303,6 +303,22 @@ Ot6FuseTbl:
         ; Ice 3 on its second (its rotation again)
         ot6_fuse $0144, Ot6FuseTritoch, Ot6FuseTritoch, $ff, $ff, 0
         ; ---- end wt/v052-tg-wor1 ----
+        ; ---- wt/v052-tg-wor2: World of Ruin unit D, the three dragons (bosses-wor.md blocks 6, 7, 14) ----
+        ; the Storm Dragon: "It swallows the wind!" on a low rotation's first
+        ; turn (a roll of one in three), Cyclonic on its next (monster switch
+        ; 0, which its fire block takes; switch 1, the rotation's second turn
+        ; due, is clear while lit)
+        ot6_fuse $014B, Ot6FuseStorm, Ot6FuseStorm, $fe, $ff, 0
+        ; the Ice Dragon: armed on a turn a member is Frozen (monster switch 0),
+        ; "The air goes still!" on its next turn, Absolute 0 on the one after
+        ot6_fuse $0149, Ot6FuseIceDragon, Ot6FuseIceDragon, $fe, $ff, 0
+        ; the Red Dragon: "Its scales turn white!" when its clock reaches 40
+        ; (a roll of one in three), Flare Star on its next turn (monster
+        ; switch 1; switch 0 is its Eraser's, kept).  The cancel also sets
+        ; battle switch 0 (OT6_FUSE_SETB0): its clock runs through the break,
+        ; so its first turn back restarts it (its script's first block)
+        ot6_fuse $0153, Ot6FuseRedDragon, Ot6FuseRedDragon, $fd, $ff, OT6_FUSE_SETB0
+        ; ---- end wt/v052-tg-wor2 ----
         .word   $ffff
 
 ; the announce lines a counter speaks (a `dlg` id, low byte; every id is

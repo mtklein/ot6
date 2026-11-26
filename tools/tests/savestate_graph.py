@@ -1053,8 +1053,11 @@ STATES = [
     # and Save there: the `wor-cyan-v1` checkpoint
     # (docs/design/route-wor-cyan.md).  A cut.  wor_narshe below boots its
     # checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    # also: stormdrgn_entry, the Storm Dragon's battle as it comes up
+    # (battle_stormdrgn, wt/v052-tg-wor2), and stormdrgn_field, the party on
+    # the ledge before the touch (the race labs' boot).
     S("wor_storm", gen="gen_wor_storm", prev="wor_cyan",
-      checkpoint="wor-mtzozo-v1", timeout=3600),
+      checkpoint="wor-mtzozo-v1", timeout=3600, also=["stormdrgn_entry", "stormdrgn_field"]),
 
     # wor-mtzozo-v1 -> Mt. Zozo's east cave: a branch beside wor_storm
     # (#502).  The caves' pool (field group 162) walked until every
@@ -1072,8 +1075,20 @@ STATES = [
     # checkpoint, the retry point for the Ice Dragon, Tritoch and Umaro's
     # cave (docs/design/route-wor-narshe.md).  A cut.  Re-cut by
     # checkpoint_drift.py --recut.
+    # also: icedragon_field, the party arriving on map 34 before the walk
+    # past the Ice Dragon (the boot of the branch wor_icedragon below and of
+    # the race labs, wt/v052-tg-wor2).
     S("wor_narshe", gen="gen_wor_narshe", prev="wor_storm",
-      checkpoint="wor-cyan-v1", timeout=3600),
+      checkpoint="wor-cyan-v1", timeout=3600, also=["icedragon_field"]),
+
+    # icedragon_field -> the Ice Dragon touched and fought: a branch beside
+    # wor_narshe (wt/v052-tg-wor2).  The dragon wanders, so the line meets it
+    # on gen_wor_narshe's walk or from gen_wor_tritoch's save point by the
+    # draw; this leg captures its battle as it comes up whichever way the
+    # line went (icedragon_entry, battle_icedragon's fixture).  Nothing on
+    # the line boots it.
+    S("wor_icedragon", gen="gen_wor_icedragon", prev="icedragon_field",
+      timeout=3600, also=["icedragon_entry"]),
 
     # wor-narshe-cliffs-v1 -> the World of Ruin map beside the Falcon parked
     # south of Narshe (115,38): the Ice Dragon (event battle 132), Tritoch
@@ -1159,8 +1174,11 @@ STATES = [
     # `wor-locke-v1` checkpoint (docs/design/route-wor-locke.md).  A cut.
     # wor_ragnarok below boots its checkpoint.  Re-cut by
     # checkpoint_drift.py --recut.
+    # also: reddragon_entry, the Red Dragon's battle as it comes up
+    # (battle_reddragon, wt/v052-tg-wor2), and reddragon_field, party 2 at
+    # the bridge's south end before the walk to it (the race labs' boot).
     S("wor_locke", gen="gen_wor_locke", prev="wor_phoenix",
-      checkpoint="wor-phoenix-v1", timeout=7200),
+      checkpoint="wor-phoenix-v1", timeout=7200, also=["reddragon_entry", "reddragon_field"]),
 
     # wor-locke-v1 -> the World of Ruin map beside the Falcon parked south
     # of Narshe (115,38): the Falcon to Narshe, LOCKE's six locks, the
