@@ -185,6 +185,9 @@ H.run({ maxFrames = 120000 }, {
   H.fuseSnap(S),
   H.fuseLanded({
     tag = "chadarnook", species = DEMON, line = LINE, move = { cmd = 0x24 }, turns = 1,
+    -- (the swap's animation: the demon is off the field some frames after its dispatch; the first run still read him
+    -- present 420 frames on, build/attempts/wt/v052-tg-wor1/dev/dev_battle_chadarnook-1.log)
+    settle = 2400, settled = function(W) return present(DEMON) == nil end,
     landed = function(W, l, m)
       H.log(string.format("[chadarnook] landed: the swap dispatched at f%d; the demon %s, the goddess %s", m.f,
         present(DEMON) and "still on the field" or "gone", present(GODDESS) and "on the field" or "gone"))

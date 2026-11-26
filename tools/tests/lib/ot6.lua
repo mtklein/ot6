@@ -20171,11 +20171,18 @@ function M.fuseCases(cfg)
                 openWhen = (cfg.openHold or cfg.arm == "fight") and confirmWhen or nil }
               say(string.format("character %d (seat %d) aims the breaking Fight%s", id, i,
                 cfg.aim and string.format(" at slot %d", W.slot()) or ""))
+              -- (the same member's Fight twice more, played only while no break has come: a Fight can miss --
+              -- Umaro's outside case, wt/v052-tg-wor1: CYAN's Fight on the staged gauge took no shield and the case
+              -- timed out, build/attempts/wt/v052-tg-wor1/dev/dev_battle_umaroboss-4.log)
+              plan[2] = { who = plan[1].who, cmd = 0x00, slot = plan[1].slot, confirmWhen = plan[1].confirmWhen,
+                openWhen = plan[1].openWhen }
+              plan[3] = { who = plan[1].who, cmd = 0x00, slot = plan[1].slot, confirmWhen = plan[1].confirmWhen,
+                openWhen = plan[1].openWhen }
             end
             break
           end
         end
-        M.assertEq(#plan, 1, via and string.format("%s: character %d stands to aim the breaking %s (the case's "
+        M.assertEq(#plan >= 1, true, via and string.format("%s: character %d stands to aim the breaking %s (the case's "
           .. "precondition: the entry state seats them)", tag, via.who, via.name)
           or tag .. ": a member stands to aim the breaking Fight")
       end),

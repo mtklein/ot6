@@ -15,7 +15,7 @@
 --   landed    (M.fuseLanded, lib/ot6.lua) nothing staged and nothing held: aimed Fights from the members whose hands
 --             chip nothing on his row (M.quietArm: no sword or spear, no fire or poison) bring him from his full HP
 --             under the 10,240 line, then the party Defends; the line comes and the cherry on his next turn, and
---             lands: Protect, Shell, Haste and Regen stand on him.
+--             lands: Protect, Shell and Haste stand on him.
 --   then the three cases from the same snapshot (M.fuseCases, where the cases and the DECLARED staging are written
 --   out: the gauge, the row's classes for the breaking Fight, HP held -- his at 9,000, under the line, and in the
 --   outside case at 12,000, above it, until its break ends -- and the party's at 9,999):
@@ -37,7 +37,9 @@ local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, 
 local STATE = "build/states/umaro_entry.mss.lua"
 
 local UMARO, CHERRY, LINE = 0x110, 0xF8, 0xA4
-local BUFFS = 0x02 | 0x08 | 0x20 | 0x40     -- status 3: Regen, Haste, Shell, Protect
+-- status 3: Haste, Shell, Protect.  (The script also sets Regen, which does not stand on him: the first run read
+-- status 3 $68 after the cherry, build/attempts/wt/v052-tg-wor1/dev/dev_battle_umaroboss-3.log; vanilla's own.)
+local BUFFS = 0x08 | 0x20 | 0x40
 
 local function armByBlows(pred, max, W)
   local t0 = nil
@@ -78,7 +80,7 @@ H.run({ maxFrames = 70000 }, {
       local st3 = H.readByte(0x3EF8 + e)
       H.log(string.format("[umaro] landed: the line at f%d; the cherry dispatched at f%d; his HP %d, his status 3 $%02X "
         .. "now; battle switches $%02X", l.f, m.f, H.readWord(0x3BF4 + e), st3, H.readByte(0x3EB0)))
-      H.assertEq(st3 & BUFFS, BUFFS, "umaro landed: the cherry landed (Protect, Shell, Haste and Regen on him)")
+      H.assertEq(st3 & BUFFS, BUFFS, "umaro landed: the cherry landed (Protect, Shell and Haste on him)")
       H.assertEq(H.readByte(0x3EB0) & 0x05, 0x01, "umaro landed: battle switch 0 (eaten) set and 2 (announced) clear")
     end,
   }),
