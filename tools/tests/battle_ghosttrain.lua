@@ -73,6 +73,28 @@ H.run({ maxFrames = 70000 }, {
     -- (the party Fights while it arms, the gauge staged past their reach: SHADOW's Interceptor counters on the
     -- train's turns, and three of its blows broke it in a second fuse when the party only Defended)
     arm = "fight",
+    -- (the outside case's arming after its break: the party Defends, and the gauge is held past its reach on every
+    -- frame of it, DECLARED.  wt/v052-tg-wor1's replay: the arming Fights spaced the train's turns more than 15
+    -- counts apart, so its Acid Rain clock took every turn, its count of ordinary turns never climbed, and the 63
+    -- staged once was chipped to a break twice before the frame budget ran out, build/attempts/wt/v052-tg-wor1/
+    -- regen1/red/battle_ghosttrain-red.log.  Defending keeps its turns close; the hold keeps the Interceptor's chips
+    -- from breaking it.  The unbroken and broken cases arm as before: their breaker needs the others' Fights.)
+    outsideArm = function(pred, max, W)
+      local t0, on = nil, true
+      emu.addEventCallback(function()
+        if not on then return end
+        local e = W.ent()
+        if e and H.readByte(0x3E88 + e) == 0 and H.readByte(0x3E38 + e) ~= 63 then WRITE.byte(0x3E38 + e, 63) end
+      end, emu.eventType.endFrame)
+      return H.seqStep({
+        H.lazy(function()
+          t0 = H.frame
+          return H.kitBattle({}, { idle = "defend", care = false, maxFrames = max + 600,
+            giveUp = function() return pred() or H.frame - t0 >= max end })
+        end),
+        H.call(function() on = false end),
+      })
+    end,
     bossHp = 2600,
     -- its opening turn taken, nothing counted, nothing armed
     partway = function(W)

@@ -19885,6 +19885,8 @@ end
 --                           its maximum, logged as a [fuse] damage line
 --   cfg.lineShot            (optional) a screenshot "fuse_<tag>_line" this many frames after the first announce
 --                           is dispatched (the line in its window), beside the "_lit" one (the mark)
+--   cfg.outsideArm          (optional) fn(pred, max, W) as cfg.arm's function form, the outside case's arming in its
+--                           place (wt/v052-tg-wor1: the GhostTrain's)
 --   cfg.plainBreaker        (optional) the breaking Fight's member is one whose hands carry no weapon special effect
 --                           where one stands (a Fight that becomes its weapon's special takes no shield;
 --                           wt/v052-tg-wor1)
@@ -19971,7 +19973,23 @@ function M.fuseCases(cfg)
     end)
   end
   -- the party's part while a fuse arms
+  local armDefault
   local function arm(pred, max, what)
+    -- (cfg.outsideArm: the outside case's own arming, wt/v052-tg-wor1 -- the GhostTrain's, whose Acid Rain clock
+    -- takes every turn once the party's Fights space its turns past 15 counts; chosen as the step is reached, when
+    -- the case in play is known)
+    if cfg.outsideArm then
+      return M.lazy(function()
+        if C ~= nil and C.name == "outside" then
+          return M.seqStep({ M.call(function() hold("the party arms the fuse (the outside case's own arming)") end),
+            cfg.outsideArm(pred, max, W) })
+        end
+        return armDefault(pred, max, what)
+      end)
+    end
+    return armDefault(pred, max, what)
+  end
+  function armDefault(pred, max, what)
     if type(cfg.arm) == "function" then
       return M.seqStep({ M.call(function() hold("the party arms the fuse: its play is not to break the boss") end),
         cfg.arm(pred, max, W) })
