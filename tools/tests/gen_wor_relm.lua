@@ -764,6 +764,7 @@ H.run({ maxFrames = 1800000 }, {
   -- (a game over when lost), then $0253
   walkTo(75, 15, "below Owzer"),
   CHAD_CAP.arm(),
+  CHAD_CAP.field("chadarnook_field.mss"),
   talkTo(75, 14, "Owzer (208 NPC_2)"),
   H.advanceStory(function()
     return sw(0x0253) == 1 and not H.battleLoadStarted() and map() == MAP_GODDESS and settled()

@@ -19784,11 +19784,25 @@ function M.battleOpenCapture(species, name)
       end
     end
   end, emu.eventType.endFrame)
-  function C.arm() return M.call(function() C.armed, C.req = true, nil end) end
+  function C.arm() return M.call(function() C.armed, C.req, C.fieldReq = true, nil, nil end) end
+  -- C.field(fieldName): a step, the party on the field a step or a press before the battle's trigger, captured with
+  -- no frames spent: the race labs' boot, where idle frames move the game clock and so the battle's key (InitBattle
+  -- seeds $be from it), as a fixture already in the battle cannot (wt/v052-tg-wor1).  C.emit() emits it too.
+  function C.field(fieldName)
+    return M.call(function()
+      C.fieldName, C.fieldReq = fieldName, M.requestSaveState()
+      M.log(string.format("[fixture] f%d %s: the field before the battle's trigger, (%d,%d) on map %d; captured",
+        M.frame, fieldName, M.fieldX(), M.fieldY(), M.mapId() & 0x3FF))
+    end)
+  end
   function C.emit()
     return M.call(function()
       M.checkReq(C.req, tag .. " capture (the battle with $" .. string.format("%03X", species) .. " as it came up)")
       M.emitBlob(name, C.req.blob)
+      if C.fieldName then
+        M.checkReq(C.fieldReq, C.fieldName .. " capture (the field before the trigger)")
+        M.emitBlob(C.fieldName, C.fieldReq.blob)
+      end
       C.armed = false
     end)
   end
@@ -20171,13 +20185,23 @@ function M.fuseCases(cfg)
                 openWhen = (cfg.openHold or cfg.arm == "fight") and confirmWhen or nil }
               say(string.format("character %d (seat %d) aims the breaking Fight%s", id, i,
                 cfg.aim and string.format(" at slot %d", W.slot()) or ""))
-              -- (the same member's Fight twice more, played only while no break has come: a Fight can miss --
-              -- Umaro's outside case, wt/v052-tg-wor1: CYAN's Fight on the staged gauge took no shield and the case
-              -- timed out, build/attempts/wt/v052-tg-wor1/dev/dev_battle_umaroboss-4.log)
-              plan[2] = { who = plan[1].who, cmd = 0x00, slot = plan[1].slot, confirmWhen = plan[1].confirmWhen,
-                openWhen = plan[1].openWhen }
-              plan[3] = { who = plan[1].who, cmd = 0x00, slot = plan[1].slot, confirmWhen = plan[1].confirmWhen,
-                openWhen = plan[1].openWhen }
+              -- (two more Fights, by the next standing members where there are any, played only while no break has
+              -- come: a Fight can take no shield -- wt/v052-tg-wor1: CYAN's Fight with the Tempest came through
+              -- Ot6ClassChip with no class three times running (OT6_ATKCLASS $00, $F2 $20) on the demon Chadarnook's
+              -- and Umaro's staged gauges, and the cases timed out: build/attempts/wt/v052-tg-wor1/dev/
+              -- dev_battle_umaroboss-4.log, probe_chad3.log)
+              local others = {}
+              for j = 1, 3 do
+                local i2 = (i + j) % 4
+                local id2 = M.readByte(0x3ED8 + 2 * i2)
+                if id2 ~= 0xFF and M.readWord(0x3BF4 + 2 * i2) > 0 and (M.readByte(0x3EE4 + 2 * i2) & 0xC2) == 0 then
+                  others[#others + 1] = id2
+                end
+              end
+              for j = 2, 3 do
+                plan[j] = { who = others[j - 1] or plan[1].who, cmd = 0x00, slot = plan[1].slot,
+                  confirmWhen = plan[1].confirmWhen, openWhen = plan[1].openWhen }
+              end
             end
             break
           end

@@ -436,6 +436,7 @@ H.run({ maxFrames = 300000 }, {
   ride(function() return sw(0x0292) == 1 end, 20000, "Phunbaba is back"),
   H.saveState("wor_terra_phun3.mss"),
   PHUN_CAP.arm(),
+  PHUN_CAP.field("phunbaba_field.mss"),
   stepOn(40, 50, function() return sw(0x00BF) == 1 or H.battleLoadStarted() end),
   ride(function() return sw(0x00BF) == 1 and inParty(TERRA) end, 120000, "Phunbaba's return: TERRA joins"),
   H.saveState("wor_terra_joined.mss"),

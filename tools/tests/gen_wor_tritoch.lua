@@ -918,6 +918,7 @@ H.run({ maxFrames = 500000 }, {
   via({ { 23, 20 }, { 12, 19 } }, "Tritoch's ledge to the ice", { { 9, 14 }, { 9, 12 } }),
   -- (9,14), _cc3719: the thaw and event battle 119, a game over when lost;
   -- Tritoch is given ($029E) and the cave's mouth opens (9,12)
+  TRITOCH_CAP.field("tritoch_field.mss"),
   stepOn(9, 14, function() return sw(0x029E) == 1 or H.battleLoadStarted() end, { { 9, 12 } }),
   H.advanceStory(function()
     return sw(0x029E) == 1 and not H.battleLoadStarted() and map() == MAP_TRITOCH and settled()
@@ -967,6 +968,7 @@ H.run({ maxFrames = 500000 }, {
   -- the carving (283 NPC_1 (57,15), _ccd6eb): "Remove the Magicite?" Yes,
   -- event battle 117, a game over when lost; Terrato given ($027A)
   walkTo(57, 16, "below the carving"),
+  UMARO_CAP.field("umaro_field.mss"),
   talkTo(57, 15, "the carving (283 NPC_1)"),
   H.dialogChoice(0, { inBattle = false, what = "Remove the Magicite? Yes", tag = "the carving" }),
   H.advanceStory(function()

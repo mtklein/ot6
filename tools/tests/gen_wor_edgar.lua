@@ -633,6 +633,7 @@ H.run({ maxFrames = 600000 }, {
   -- edgar-regress/before_snap/k7_s0.log), and a lab draw that met one lost
   -- the Tentacles from 1095/1319 (tent/new_base/er_k7_s0_e64p_w18.log)).
   TENT_CAP.arm(),
+  TENT_CAP.field("tentacles_field.mss"),
   talkUp(29, 16, function() return sw(0x02F4) == 1 end, "Gerad at the engines (29,16)", true),
   H.advanceStory(function()
     return sw(0x00C6) == 1 and H.hasControl() and H.tileAligned() and not H.dialogWaiting()
