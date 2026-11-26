@@ -122,6 +122,16 @@ local function held()
       H.assertEq(sw1(), true, "held: he reached the edge (monster switch 1 set) with the party Defending")
       armedF = H.frame
       stage63()
+      -- (his tally to 8 again where a blow on the way pushed him back a step and cleared it, DECLARED: on
+      -- wt/v052-tg-wor1's replay a counter on the Defending party's turn 8 stepped him back and the tally read 0 at
+      -- the arming, build/attempts/wt/v052-tg-wor1/regen1/red/battle_ultros3-red.log; the case asks what blows do
+      -- with the tally at 8 and the edge held, so the tally is what the case stands on, as the precondition above
+      -- reached it)
+      if tally() < 8 then
+        H.log(string.format("[ultros3] held: the tally read %d at the arming (a blow stepped him back on the way); "
+          .. "staged to 8", tally()))
+        WRITE.byte(0x3EB3, 8)
+      end
       H.log(string.format("[ultros3] held: armed at f%d, steps %d, tally %d; the party attacks through the fuse",
         armedF, steps(), tally()))
     end),

@@ -99,14 +99,18 @@ local function defendUntil(pred, max)
 end
 local function aimedFight(W, when, notSeat, max)
   return H.lazy(function()
-    local who = nil
+    local who, plain = nil, nil
     for i = 0, 3 do
       local id = H.readByte(0x3ED8 + 2 * i)
-      if who == nil and id ~= 0xFF and i ~= notSeat and H.readWord(0x3BF4 + 2 * i) > 0
+      if id ~= 0xFF and i ~= notSeat and H.readWord(0x3BF4 + 2 * i) > 0
          and (H.readByte(0x3EE4 + 2 * i) & 0xC2) == 0 and heldBy(i) == 0xFF then
-        who = id
+        who = who or id
+        -- (one whose hands carry no element first: an absorbed hit takes no shield; readyBreak, below)
+        if plain == nil and (H.weaponElement(H.readByte(0x1600 + 37 * id + 0x1F))
+            | H.weaponElement(H.readByte(0x1600 + 37 * id + 0x20))) == 0 then plain = id end
       end
     end
+    who = plain or who
     H.assertEq(who ~= nil, true, C.name .. ": a free member stands to aim the breaking Fight")
     C.nBreaks = #W.breaks
     local t0 = H.frame
@@ -167,6 +171,10 @@ local function toLine(name)
   })
 end
 
+-- (the Seize's dispatch on the body's next turn, on the announced seat, is the contract's; whether it holds the
+-- member is the game's hit roll: on wt/v052-tg-wor1's replay the broken case's second Seize missed,
+-- build/attempts/wt/v052-tg-wor1/regen1/red/battle_tentacles-red.log, so C.held says which, and a case that needs a
+-- hold plays on to the next announce: landedTry)
 local function seizeLands(name)
   return H.seqStep({
     defendUntil(function() return seizeFrom(C.W, C.li) ~= nil end, 12000),
@@ -179,19 +187,37 @@ local function seizeLands(name)
         sc.tchars, C.seat, heldBy(C.seat), W.species, H.readByte(0x3DAC + W.ent())))
       H.assertEq(sc.turn - C.lc.turn, 1, name .. ": the Seize came on the body's next turn after the announce")
       H.assertEq(sc.tchars & 0x0F, 1 << C.seat, name .. ": the Seize was queued on the announced seat")
-      H.assertEq(heldBy(C.seat), W.ent(), name .. ": the member in the announced seat is held by that body")
-      H.assertEq(H.readByte(0x3DAC + W.ent()) & 0x8F, 0x80, name .. ": the body holds (switch 7) and its seat's "
-        .. "switch is clear")
+      H.assertEq(H.readByte(0x3DAC + W.ent()) & 0x0F, 0, name .. ": the seat's switch is clear after the Seize")
+      C.held = heldBy(C.seat) == W.ent()
+      if C.held then
+        H.assertEq(H.readByte(0x3DAC + W.ent()) & 0x80, 0x80, name .. ": the body holds (switch 7) the member it "
+          .. "Seized")
+      else
+        say("the Seize missed (the game's hit roll): no member held")
+      end
       C.si = si
     end),
   })
 end
 
+-- landed: up to three announces, until a Seize holds its member
+local function landedTry(k)
+  return H.cond(function() return C.done == nil end, {
+    H.call(function() C.from = marks(); say(string.format("try %d: the next announce", k)) end),
+    toLine("landed"),
+    seizeLands("landed"),
+    H.call(function() if C.held then C.done = true end end),
+  }, {})
+end
 local landed = H.seqStep({
   open("landed", false),
-  toLine("landed"),
-  seizeLands("landed"),
-  H.call(function() say("PASS") end),
+  H.call(function() C.done = nil end),
+  landedTry(1), landedTry(2), landedTry(3),
+  H.call(function()
+    H.assertEq(C.done, true, "landed: an announced Seize held the member in the announced seat (that body its seize "
+      .. "attacker) in one of three announces")
+    say("PASS")
+  end),
 })
 
 -- the seats held, and by whom: { [seat] = holder entity }
@@ -205,19 +231,29 @@ local function allBreaks() local n = 0; for _, W in ipairs(Ws) do n = n + #W.bre
 -- waits at its command window (kitBattle's openWhen: the battle runs on) until pick() names the body to break; that
 -- body's gauge is then staged (stageBreak) and the Fight aimed at it (slotFn).  Ends once that body is broken, or
 -- giveUp() says the moment has passed.
+-- (and one whose hands carry no element where one stands: each Tentacle absorbs elements -- $11B fire, $13C ice and
+-- water, $13D and $13E bolt, earth and water -- and an absorbed hit heals, taking no shield: on wt/v052-tg-wor1's
+-- replay CELES's fire blades took nothing off $11B's staged gauge, build/attempts/wt/v052-tg-wor1/regen1/red/
+-- battle_tentacles-release-red.log)
 local function readyBreak(pick, giveUp, max)
   return H.lazy(function()
-    local who, slowed = nil, nil
+    local best, bestRank = nil, -1
     for i = 0, 3 do
       local id = H.readByte(0x3ED8 + 2 * i)
       if id ~= 0xFF and H.readWord(0x3BF4 + 2 * i) > 0 and (H.readByte(0x3EE4 + 2 * i) & 0xC2) == 0
          and heldBy(i) == 0xFF then
-        if (H.readByte(0x3EF8 + 2 * i) & 0x04) == 0 then who = who or id else slowed = slowed or id end
+        local el = H.weaponElement(H.readByte(0x1600 + 37 * id + 0x1F)) | H.weaponElement(H.readByte(0x1600 + 37 * id + 0x20))
+        local rank = (el == 0 and 2 or 0) + ((H.readByte(0x3EF8 + 2 * i) & 0x04) == 0 and 1 or 0)
+        say(string.format("breaker candidate char $%02X (seat %d): hand elements $%02X, status 3 $%02X: rank %d", id, i,
+          el, H.readByte(0x3EF8 + 2 * i), rank))
+        if rank > bestRank then best, bestRank = id, rank end
       end
     end
-    who = who or slowed
+    local who = best
     H.assertEq(who ~= nil, true, C.name .. ": a free member stands to be the breaker")
-    C.W, C.staged = nil, false
+    C.breakerSeat = nil
+    for i = 0, 3 do if H.readByte(0x3ED8 + 2 * i) == who then C.breakerSeat = i end end
+    if C.keepW == nil then C.W, C.staged = nil, false end
     say(string.format("char $%02X waits at its command window to break the body", who))
     local t0 = H.frame
     return H.kitBattle({ { who = who, cmd = 0x00, boost = 0,
@@ -234,7 +270,7 @@ local function readyBreak(pick, giveUp, max)
       { idle = "defend", care = false, maxFrames = max + 600,
         giveUp = function()
           return not up() or (C.W ~= nil and #C.W.breaks > C.nBreaks) or (giveUp ~= nil and giveUp())
-            or H.frame - t0 >= max
+            or (C.breakerSeat ~= nil and heldBy(C.breakerSeat) ~= 0xFF) or H.frame - t0 >= max
         end })
   end)
 end
@@ -336,18 +372,34 @@ local outside = H.seqStep({
   end),
 })
 
+-- the release's breaker: its moment is the first member held (whichever body holds it).  (A breaker who is the one
+-- seized cannot act -- on wt/v052-tg-wor1's replay the Seize took CELES, the breaker waiting at her window, and her
+-- Fight was dropped, build/attempts/wt/v052-tg-wor1/regen1/red/battle_tentacles-release-red.log -- so a held breaker
+-- hands the break to a free member, the same holder still staged)
+local function releasePick()
+  if C.W ~= nil and C.staged then return C.W end
+  for seat, ent in pairs(heldSeats()) do
+    for _, W in ipairs(Ws) do
+      if W.ent() == ent then C.heldSeat = seat; return W end
+    end
+  end
+  return nil
+end
+local function releaseTry(k)
+  return H.cond(function() return C.W == nil or #C.W.breaks <= (C.nBreaks or 0) end, {
+    H.call(function()
+      if k > 1 then
+        say(string.format("try %d: the breaker was seized; a free member breaks the holder", k))
+        C.keepW = true
+      end
+    end),
+    readyBreak(releasePick, nil, 60000),
+  }, {})
+end
 local release = H.seqStep({
   open("release", true),
-  -- the breaker waits at its window from the open; its moment is the first member held (whichever body holds it)
-  H.call(function() C.relAt = #releases end),
-  readyBreak(function()
-    for seat, ent in pairs(heldSeats()) do
-      for _, W in ipairs(Ws) do
-        if W.ent() == ent then C.heldSeat = seat; return W end
-      end
-    end
-    return nil
-  end, nil, 60000),
+  H.call(function() C.relAt = #releases; C.keepW = nil end),
+  releaseTry(1), releaseTry(2), releaseTry(3),
   H.waitFrames(2),
   H.call(function()
     local W = C.W

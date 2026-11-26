@@ -75,12 +75,17 @@ local function sortParty()
     .. "own blows need: the route's CELES swings a sword, no key of his)")
 end
 
--- the quiet members Fight him, aimed, until pred(); the others Defend
-local function quietFights(pred, max)
+-- the quiet members Fight him, aimed, until pred(); the others Defend.  boost: the pips each Fight spends (0 to the
+-- line, so no burst skips the band; the landed case's after it, so the crossing comes in few of his turns: on
+-- wt/v052-tg-wor1's replay his turns after the line drew a member's counter that took his last shields, nothing
+-- staged, build/attempts/wt/v052-tg-wor1/regen1/red/battle_phunbaba-red.log)
+local function quietFights(pred, max, boost)
   return H.lazy(function()
     local t0 = H.frame
     local plan = {}
-    for k = 1, 30 do for _, id in ipairs(quiet) do plan[#plan + 1] = { who = id, cmd = 0x00, boost = 0, slot = W.slot() } end end
+    for k = 1, 30 do
+      for _, id in ipairs(quiet) do plan[#plan + 1] = { who = id, cmd = 0x00, boost = boost or 0, slot = W.slot() } end
+    end
     return H.kitBattle(plan, { idle = "defend", care = true, maxFrames = max + 600,
       giveUp = function() return not up() or pred() or H.frame - t0 >= max end })
   end)
@@ -187,10 +192,51 @@ local function breakInFuse()
   })
 end
 
+-- (on wt/v052-tg-wor1's replay a member's counter took his last shields in the fuse, nothing staged, and the crossing
+-- then ended the battle with no breath, as the rule says: build/attempts/wt/v052-tg-wor1/regen1/red/
+-- battle_phunbaba-red.log.  So the landed case watches for a break of the party's own while lit: the party Defends
+-- through it, and his next turn in the band says the line again; three fuses at most)
+local function landedFuse(k)
+  return H.cond(function() return C.landed == nil and up() end, {
+    H.call(function() C.from = #W.cmds + 1; C.snuffAt = #W.snuffs; say(string.format("fuse %d", k)) end),
+    quietFights(function() return lineFrom(C.from) ~= nil end, 40000),
+    H.call(function()
+      local li, lc = lineFrom(C.from)
+      H.assertEq(li ~= nil, true, string.format("landed: the line came once he was under 20,480 HP (fuse %d)", k))
+      C.li, C.lc = li, lc
+      C.lc1 = C.lc1 or lc
+      say(string.format("the line on his turn %d at his HP %d", lc.turn, hp()))
+    end),
+    defendUntil(function() return lit() and markOn() end, 900),
+    H.call(function()
+      H.assertEq(lit() and W.litBit() and markOn(), true, "landed: battle switch 1, the lit bit and the mark stand "
+        .. "after the line")
+    end),
+    quietFights(function() return #breaths(C.li) >= 2 or #W.snuffs > C.snuffAt end, 40000, 3),
+    H.cond(function() return #W.snuffs > C.snuffAt and #breaths(C.li) == 0 and up() end, {
+      H.call(function() say("broken in the fuse by the party's own play: cancelled; the party Defends through it") end),
+      defendUntil(function() local c = W.cells(); return c ~= nil and c.ticks == 0 end, 4000),
+    }, {
+      defendUntil(function() return false end, 900),
+      H.call(function()
+        local b = breaths(C.li)
+        say(string.format("%d BabaBreath(s) after the line; the battle %s", #b, up() and "is still up" or "ended"))
+        H.assertEq(#b, 2, "landed: two BabaBreaths came on the crossing")
+        H.assertEq(b[1].retal and b[2].retal, true, "landed: both are his counter's (the crossing blow's)")
+        H.assertEq(up(), false, "landed: the battle ended after them (end_battle)")
+        C.landed = true
+      end),
+    }),
+  }, {})
+end
 local landed = H.seqStep({
   open("landed", false),
-  toLine("nothing staged"),
-  crossBreath("li"),
+  landedFuse(1), landedFuse(2), landedFuse(3),
+  H.call(function()
+    H.assertEq(C.landed, true, "landed: the two BabaBreaths landed on a crossing with the breath held, in one of "
+      .. "three fuses")
+    C.lc = C.lc1
+  end),
   H.call(function()
     local nRead = 0
     for _, r in ipairs(D.ptrReads) do if r.f >= C.lc.f and r.id == LINE then nRead = nRead + 1 end end
