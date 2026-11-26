@@ -284,11 +284,11 @@ Ot6FuseTbl:
         ; counted (battle variable 3, vanilla 1), which a break clears
         ot6_fuse $011C, Ot6FuseDullahan, Ot6FuseDullahan, $ff, $ff, OT6_FUSE_VAR3
         ; Phunbaba's second visit: "He fills his lungs!" on a turn under
-        ; 20,480 HP, lit by battle switch 1 until the hit that takes him
-        ; under 15,360 brings two BabaBreaths (his counter's); a break clears
-        ; the switch, and that crossing then ends the battle with no breath
-        .word   $016C, 0
-        .byte   $02, $ff, $fd, OT6_FUSE_SWITCH
+        ; 20,480 HP, two BabaBreaths and the battle's end on his next (battle
+        ; switch 1).  Every break, lit or not, denies the breath for the
+        ; fight (OT6_FUSE_HOLD: battle switch 0 set, 1 cleared); the blow
+        ; that takes him under 15,360 then ends the battle with none
+        ot6_fuse $016C, Ot6FusePhunbaba, Ot6FusePhunbaba, $ff, $fd, OT6_FUSE_HOLD
         ; the demon Chadarnook: "The paint runs!", the swap to the goddess;
         ; armed by his clock (which a break restarts); monster switch 0 holds
         ; his counter's swap while lit, and battle variable 2 (vanilla 0), his
@@ -342,7 +342,9 @@ Ot6FuseLineTbl:
 ; [ a monster's body is seeded: does its species have a fuse? ]
 ; jsr from Ot6SeedShields.  y = entity offset ($08-$12), OT6_SPECIES set.
 ; a8/i16.  Writes OT6_FUSE for the slot ($80 = it has a row, lit clear) and
-; marks the battle (OT6_FUSEPOLL).  preserves x/y; clobbers a (b = 0).
+; marks the battle (OT6_FUSEPOLL); bit 6 too when the species' first row
+; frees a hold (OT6_FUSE_RELEASE: a body that seizes).  preserves x/y; clobbers
+; a (b = 0).
 .proc Ot6FuseSeed
         .a8
         .i16
@@ -364,6 +366,10 @@ Ot6FuseLineTbl:
 @has:   shorta0
         lda     #$80
         tsb     OT6_FUSEPOLL    ; the hud polls this battle
+        lda     f:Ot6FuseTbl+7,x
+        and     #OT6_FUSE_RELEASE
+        ora     #$80            ; (bit 6: a body that seizes, Ot6SeizeCond's
+                                ;   claims; wt/v052-tg-wor1)
 @put:   sta     OT6_FUSE-8,y
         plx
         rts
@@ -517,12 +523,19 @@ Ot6FuseLineTbl:
 
 ; [ a break frees what the body holds ]
 ; Its own proc so the suites can watch it.  y = the monster.  a8/i16, db=$7e.
-; For a body with an OT6_FUSE_RELEASE row, at every break, lit or not: the
-; member its $3358 names is let go, exactly as Discard lets go
-; (TargetEffect_44, battle_main.asm): the holder's seize target and the
-; member's seize attacker invalid ($3358,y / $3359,x = $ff), the holder's
-; switch 7 (it holds) clear, and the member's bit back in $3403 (not seized).
-; The member's turns are the game's own from there, as after a Discard.
+; For a body with an OT6_FUSE_RELEASE row, at every break, lit or not: if
+; its $3358 names a member, the body's own Discard (attack $DB, command $0C)
+; on that member is queued as a counterattack (Ot6QueueDiscard), and runs
+; once the breaking action is done, though the body is Broken (a Broken
+; monster makes no counter of its own, CheckRetal; this one is the break's):
+; vanilla's release, its stores (TargetEffect_44: the holder's seize target
+; and the member's seize attacker $FF, the holder's switch 7 clear, the
+; member's bit back in $3403) and its animation, which carries the member's
+; sprite back to its place.  (wt/v052-tg-wor1's first cut made the stores
+; here, and the member, free, stood drawn in the Tentacle's grip: the review
+; round's screenshot, build/attempts/wt/v052-tg-wor1/r2/shots/.)  A body that
+; holds no one queues nothing.  The member's turns are the game's own from
+; there, as after any Discard.
 ; preserves y; clobbers a/x (b = 0 out).
 .proc Ot6FuseRelease
         .a8
@@ -550,14 +563,7 @@ Ot6FuseLineTbl:
         lda     $3358,y         ; the member it holds
         bmi     @none           ; (none)
         tax                     ; x = the member
-        lda     #$ff
-        sta     $3358,y         ; the holder's seize target invalid
-        sta     $3359,x         ; the member's seize attacker invalid
-        lda     $3dac,y
-        and     #$7f
-        sta     $3dac,y         ; the holder's switch 7 (it holds) clear
-        lda     $3018,x
-        tsb     $3403           ; the member is no longer seized
+        jsl     Ot6QueueDiscard ; the body's Discard, queued as a counter
 @none:  clr_a
         rts
 .endproc
@@ -601,11 +607,177 @@ Ot6FuseLineTbl:
                                 ;   hud's callers take it so, and a dirty
                                 ;   b here crashed the battle (carry kept)
         bcc     @dark
-        lda     #$81
+        lda     OT6_FUSE-8,y
+        and     #$40
+        beq     @lit            ; not a body that seizes
+        jsr     Ot6SeizeFell    ; its member can no longer be held: snuffed
+        bcs     @dark
+@lit:   lda     #$01
         bra     @put
-@dark:  lda     #$80
-@put:   sta     OT6_FUSE-8,y
+@dark:  lda     #$00
+@put:   pha
+        lda     OT6_FUSE-8,y
+        and     #$40            ; (bit 6 stands: Ot6FuseSeed's)
+        ora     #$80
+        ora     1,s
+        sta     OT6_FUSE-8,y
+        pla
 @out:   rts
+.endproc
+
+; [ a seizing body's lit fuse: is its member still one it can hold? ]
+; From Ot6FusePoll, for a body with bit 6 whose fuse is lit (x = its row).
+; The seat is the one its claim names (monster switches 0-3, Ot6SeizeCond's,
+; set at the announce's read).  If that member can no longer be held (dead,
+; stone, a zombie, gone, out of the fight, held by another body:
+; Ot6SeatHoldable), the fuse is snuffed as a break would snuff it
+; (Ot6FuseSnuff: the claim cleared, the `wait` forgotten), and the mark goes
+; with this poll: the one cancel that is not a break, as the body's own death
+; is the one loss (bosses-wor.md block 1).  y = the monster, a8/i16, db=$7e.
+; out: carry set = snuffed.  preserves x/y; clobbers a (b = 0).
+.proc Ot6SeizeFell
+        .a8
+        .i16
+        lda     $3dac,y
+        and     #$0f            ; its claim, one seat at most
+        beq     @keep           ; (none: the poll is ahead of the read)
+        phx
+        ldx     #$0000
+@seat:  inx
+        lsr
+        bcc     @seat
+        txa                     ; the seat, 1-4
+        plx
+        jsr     Ot6SeatHoldable
+        bcs     @keep
+        jsr     Ot6FuseSnuff
+        clr_a
+        sec
+        rts
+@keep:  clr_a
+        clc
+        rts
+.endproc
+
+; [ can the member in this seat be held? ]
+; a = the seat, 1-4.  a8, either index width, db=$7e.  out: carry set = the
+; member there can be Seized now: present ($3aa0.0), not dead, stone or a
+; zombie (status 1 $C2, as UpdateDead), standing ($3a74), not out of the fight
+; ($3f2c: a Jump) and not held already ($3403's bit set).  Seize is not
+; physical and never misses (MagicProp $C8), so nothing else stops it.
+; preserves x/y; clobbers a (b = 0).
+.proc Ot6SeatHoldable
+        .a8
+        phx
+        php
+        longi
+        dec
+        and     #$03
+        asl
+        pha
+        clr_a
+        pla
+        tax                     ; the member's offset, 0-6
+        lda     $3aa0,x
+        lsr
+        bcc     @no             ; not present
+        lda     $3ee4,x
+        and     #$c2
+        bne     @no             ; wound, petrify, zombie
+        lda     $3018,x
+        and     $3a74
+        beq     @no             ; not standing
+        lda     $3018,x
+        and     $3f2c
+        bne     @no             ; out of the fight for now (a Jump)
+        lda     $3018,x
+        and     $3403
+        beq     @no             ; held by a body already
+        plp
+        plx
+        clr_a
+        sec
+        rts
+@no:    plp
+        plx
+        clr_a
+        clc
+        rts
+.endproc
+
+; [ ai conditional $00 with a seat: if_seize_free (ai_script.inc) ]
+; jsl from Ot6AICondSeize (bank $c2).  $3a2e = the seat, 1-4 (0: vanilla's
+; "never", which no script uses: carry clear); $3a2f = 0 at an announce (the
+; claim), 1 at the fire block.  y = the monster (a8/i8, as every
+; conditional), db=$7e.  out: carry set = continue.
+;   the claim: continue only if the seat's member can be held
+;     (Ot6SeatHoldable) and no other standing body that seizes (OT6_FUSE bit
+;     6, present, not dead, stone or a zombie) has claimed the seat (its
+;     monster switch seat-1 set); and then claim it, at once ($3dac: the
+;     announce's read, so a body whose turn is read next sees it, before the
+;     announcing turn's own commands run).  A body that dies with a claim
+;     claims nothing: the test skips it.
+;   the fire block: continue only if the member can still be held; if not,
+;     and the body's claim stands, the claim is dropped (the member fell or
+;     left mid-fuse: Ot6SeizeFell's cancel, read on the move's own turn); the
+;     announce block's claim fails too, so the turn reads on to the rotation.
+.proc Ot6SeizeCond
+        .a8
+        .i8
+        lda     $3a2e
+        beq     @no             ; if_never
+        jsr     Ot6SeatHoldable
+        bcc     @fail
+        lda     $3a2f
+        bne     @yes            ; the fire block: it can be held
+        jsr     @bit
+        sta     $ee
+        phy
+        ldx     #$08
+@body:  txa
+        cmp     1,s
+        beq     @next           ; itself
+        lda     OT6_FUSE-8,x
+        and     #$40
+        beq     @next           ; not a body that seizes
+        lda     $3aa0,x
+        lsr
+        bcc     @next           ; not present
+        lda     $3ee4,x
+        and     #$c2
+        bne     @next           ; dead, stone, a zombie: its claim is no claim
+        lda     $3dac,x
+        and     $ee
+        bne     @taken
+@next:  inx
+        inx
+        cpx     #$14
+        bcc     @body
+        ply
+        lda     $3dac,y
+        ora     $ee
+        sta     $3dac,y         ; the claim
+@yes:   sec
+        rtl
+@taken: ply
+@no:    clc
+        rtl
+@fail:  lda     $3a2f
+        beq     @no             ; the claim: no announce on this seat
+        jsr     @bit
+        eor     #$ff
+        and     $3dac,y
+        sta     $3dac,y         ; the fire block: the claim dropped
+        clc
+        rtl
+@bit:   lda     $3a2e           ; 1 << (seat - 1)
+        tax
+        lda     #$00
+        sec
+@rol:   rol
+        dex
+        bne     @rol
+        rts
 .endproc
 
 ; [ the mark cell of a body whose fuse is lit ]
@@ -629,6 +801,62 @@ Ot6FuseLineTbl:
 .endproc
 
 ; ------------------------------------------------------------------------------
+
+; [ ai conditional $00: if_seize_free (ai_script.inc), vanilla's unused "never" ]
+; In bank $c2's tail, as Ot6AICondRoll; Ot6SeizeCond is the test.
+.segment "battle_code"
+Ot6AICondSeize:
+        jsl     Ot6SeizeCond
+        rts
+
+; [ a Broken holder's Discard, queued as a counterattack ]
+; jsl from Ot6FuseRelease, inside the break (Ot6HitBroke: an action is being
+; resolved).  y = the holder, x = the member (entity offsets), a8, i16, db=$7e.
+; The cells CreateRetalAction reads ($3A7A/$3A7B the command and attack, $B8
+; the targets, $B1 whose bit 6 GetMPCost clears) belong to the action being
+; resolved: each is kept and put back.  preserves x/y; clobbers a.
+Ot6QueueDiscard:
+        .a8
+        .i16
+        php
+        phx
+        phy
+        lda     $b1
+        pha
+        lda     $b8
+        pha
+        lda     $b9
+        pha
+        lda     $3a7a
+        pha
+        lda     $3a7b
+        pha
+        lda     $3018,x         ; the member's mask (a character's: the low
+        sta     $b8             ;   byte)
+        stz     $b9
+        lda     #$0c            ; command $0c, a monster's special
+        sta     $3a7a
+        lda     #$db            ; attack $db, Discard
+        sta     $3a7b
+        tyx                     ; the actor: the holder
+        shorti
+        jsr     CreateRetalAction
+        longi
+        pla
+        sta     $3a7b
+        pla
+        sta     $3a7a
+        pla
+        sta     $b9
+        pla
+        sta     $b8
+        pla
+        sta     $b1
+        ply
+        plx
+        plp
+        rtl
+.segment "ot6_code"
 
 ; [ ai conditional $0a: a roll (if_roll, ai_script.inc) ]
 ; In bank $c2's tail, where AICmd_fc's `jsr (AICondTbl,x)` can reach it: the

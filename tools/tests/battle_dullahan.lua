@@ -30,7 +30,8 @@
 -- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v052-tg-wor1/mutants*/): fuse_never (Ot6FuseCancel+3=80) is red
 -- at "the break during the fuse cancels it"; dull_no_var3 (his row's flags byte 0) at "battle variable 3, his count,
 -- is 0 after the cancel"; dull_combo_back (his rotation's Ice 3 turn picks Absolute 0) at "Absolute 0 comes only
--- announced".  A mechanism test, not play (the landed case writes nothing).
+-- announced"; dull_hand (the fuse block's gate 8 -> 7) at "his fuse block's test compares his count with 8".  A mechanism
+-- test, not play (the landed case writes nothing).
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }
@@ -41,6 +42,9 @@ local function map() return H.mapId() & 0x3ff end
 
 -- battle variable 3, his count, frame by frame while on: each rise is a blow counted
 local count, countOn = {}, false
+-- his fuse block's test as it is made (AICond_0d, if_battle_var_greater, entered for Dullahan on battle variable 3):
+-- { f, gate (the value the script compares with, $3A2F), count ($3EB3) }
+local gates = {}
 local function risesBetween(f0, f1)
   local n = 0
   for k = 2, #count do
@@ -76,6 +80,13 @@ H.run({ maxFrames = 90000 }, {
     local at = H.aiAttacks(DULLAHAN, ABSOLUTE0)
     H.log(string.format("[dullahan] his turn script names Absolute 0 at %d place(s)", #at))
     H.assertEq(#at, 1, "Absolute 0 comes only announced: Dullahan's turn script names it once (the fuse block)")
+    emu.addMemoryCallback(function()
+      local y = emu.getState()["cpu.y"] & 0xFF
+      if not countOn or y < 8 or y > 18 or H.readWord(0x57C0 + (y - 8)) ~= DULLAHAN or H.readByte(0x3A2E) ~= 3 then
+        return
+      end
+      gates[#gates + 1] = { f = H.frame, gate = H.readByte(0x3A2F), count = H.readByte(0x3EB3) }
+    end, emu.callbackType.exec, H.sym("AICond_0d"), H.sym("AICond_0d"))
     emu.addEventCallback(function()
       if not countOn then return end
       local v = H.readByte(0x3EB3)
@@ -137,9 +148,18 @@ H.run({ maxFrames = 90000 }, {
       H.log(string.format("[dullahan] %d blow(s) counted between the cancel (f%d) and the second line (f%d)", n,
         C.brk.f, C.lines[2].f))
       H.assertEq(n >= 8, true, "dullahan: eight blows were counted afresh between the cancel and the second line")
-      -- (the gate itself, the fuse block's `if_battle_var_greater 3, 8`: the count read 8 or more as the second line's
-      -- turn began, and under 8 as his turn before it began -- else that turn would have said it; a gate at seven,
-      -- the dull_hand mutant, says the line with seven counted)
+      -- (the gate itself: the value his fuse block's test compares the count with, read as each test is made --
+      -- AICond_0d's $3A2F, the script's `if_battle_var_greater 3, 8` -- is 8 on every test, which tells 7 from 8 (the
+      -- dull_hand mutant's gate of 7 reads 7 here); and, played, the count read 8 or more as the second line's turn
+      -- began and under 8 as his turn before it began)
+      local tbad, vals = 0, {}
+      for _, g in ipairs(gates) do
+        if g.gate ~= 8 then tbad = tbad + 1 end
+        vals[#vals + 1] = string.format("%d/%d", g.count, g.gate)
+      end
+      H.log(string.format("[dullahan] his fuse block's tests (count/gate): %s", table.concat(vals, " ")))
+      H.assertEq(#gates >= 1 and tbad == 0, true, string.format("dullahan: his fuse block's test compares his count "
+        .. "with 8 on every one of %d tests (the gate the script holds)", #gates))
       local function countAt(f)
         local v = 0
         for _, r in ipairs(count) do if r.f <= f then v = r.v end end
@@ -149,8 +169,8 @@ H.run({ maxFrames = 90000 }, {
       local atLine, before = countAt(W.turns[t2].f), (t2 > 1 and countAt(W.turns[t2 - 1].f) or 0)
       H.log(string.format("[dullahan] the count as his turn %d (the second line's) began: %d; as his turn before it "
         .. "began: %d", t2, atLine, before))
-      H.assertEq(atLine >= 8 and before < 8, true, "dullahan: his gate is eight blows (the count read 8 or more as the "
-        .. "line's turn began, under 8 as the turn before it began)")
+      H.assertEq(atLine >= 8 and before < 8, true, "dullahan: the line came on the turn his count first read 8 or more "
+        .. "(under 8 as the turn before it began)")
     end,
   }),
   H.logStep("[dullahan] PASS: his count, the announce, Absolute 0, the cancel and the count again"),

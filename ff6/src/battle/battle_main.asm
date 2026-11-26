@@ -5098,7 +5098,9 @@ cotarget:
 
 ; ai conditional jump table (ai command $fc)
 AICondTbl:
-@1d55:  .addr   AICond_00
+@1d55:  .addr   Ot6AICondSeize  ; ot6 wt/v052-tg-wor1: if_seize_free (ot6_fuse.asm),
+                                ;   the Tentacles' claim of a seat.  Was
+                                ;   AICond_00, "never": its seat 0 still is
         .addr   AICond_01
         .addr   AICond_02
         .addr   AICond_03

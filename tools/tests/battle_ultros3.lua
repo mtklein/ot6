@@ -81,6 +81,48 @@ local function held()
     return e ~= nil and H.readByte(0x3DAC + e) & 0x02 ~= 0
   end
   local function stage63() WRITE.byte(0x3E38 + W.ent(), 63) end   -- (DECLARED: the gauge held: blows only chip)
+  local tries, armIdx = 0, 1
+  -- one try at the precondition: from the start (no fuse, his steps 0), the tally raised to 8 under two steps out,
+  -- then Defends to the edge; armedF is set when he holds it with the tally at 8 or more, else the fuse plays out
+  local function tryArm(k)
+    return H.cond(function() return armedF == nil and H.battleLoadStarted() end, {
+      H.call(function() tries = k end),
+      H.kitBattle({}, { idle = "defend", care = false, maxFrames = 12000,
+        giveUp = function() return not sw1() and not W.litBit() and steps() == 0 end }),
+      H.call(function()
+        H.assertEq(not sw1() and steps() == 0, true, "held: he stands at the start, no fuse armed")
+        stage63()
+      end),
+      H.lazy(function()
+        return H.kitBattle(attackPlan(W), { idle = "defend", care = false, maxFrames = 12000,
+          giveUp = function() return tally() >= 8 or steps() >= 2 or not H.battleLoadStarted() end })
+      end),
+      H.call(function()
+        H.log(string.format("[ultros3] held: try %d: the tally reads %d with his steps at %d", k, tally(), steps()))
+        -- (short of 8 when he crept two steps out first: the precondition is read at the arming, below)
+        if not (tally() >= 8 and steps() < 2) then
+          H.log(string.format("[ultros3] held: try %d: he crept two steps out before the tally reached 8", k))
+        end
+      end),
+      H.kitBattle({}, { idle = "defend", care = false, maxFrames = 30000,
+        giveUp = function() return sw1() or not H.battleLoadStarted() end }),
+      H.call(function()
+        H.assertEq(sw1(), true, "held: he reached the edge (monster switch 1 set) with the party Defending")
+        stage63()
+        if tally() >= 8 then
+          armedF = H.frame
+          armIdx = #W.cmds + 1
+        else
+          H.log(string.format("[ultros3] held: try %d: the tally read %d at the arming (a blow stepped him back on "
+            .. "the way): this fuse plays out, and the tally is raised again from the start", k, tally()))
+        end
+      end),
+      H.cond(function() return armedF == nil end, {
+        H.kitBattle({}, { idle = "defend", care = false, maxFrames = 20000,
+          giveUp = function() return (not sw1() and steps() == 0) or not H.battleLoadStarted() end }),
+      }, {}),
+    }, {})
+  end
   return H.seqStep({
     H.call(function()
       W = H.fuseWatch(ULTROS3, WRITE); W.on = true; W.pin = { boss = 20000, party = true }
@@ -100,47 +142,25 @@ local function held()
         if x < 8 and (c == 0x00 or c == 0x02) then blows = blows + 1 end
       end, emu.callbackType.exec, d, d)
     end),
-    -- (from the start: no fuse armed or lit, he stands at the start; the party Defends until then)
-    H.kitBattle({}, { idle = "defend", care = false, maxFrames = 12000,
-      giveUp = function() return not sw1() and not W.litBit() and steps() == 0 end }),
+    -- the precondition, played: from the start the party raises his tally to 8, then Defends while he creeps to the
+    -- edge.  A blow on the way (a member's counter on a Defending turn) can step him back and clear the tally: on
+    -- wt/v052-tg-wor1's replay it read 0 at the arming (build/attempts/wt/v052-tg-wor1/regen1/red/
+    -- battle_ultros3-red.log).  Then that fuse plays out (the wave, the sink: his steps back to 0) and the party raises
+    -- the tally again from the start, five tries at most (the review round's first run needed three); nothing is
+    -- written to the tally.
+    tryArm(1), tryArm(2), tryArm(3), tryArm(4), tryArm(5),
     H.call(function()
-      H.assertEq(not sw1() and steps() == 0, true, "held: he stands at the start, no fuse armed")
-      stage63()
-    end),
-    H.lazy(function()
-      return H.kitBattle(attackPlan(W), { idle = "defend", care = false, maxFrames = 12000,
-        giveUp = function() return tally() >= 8 or steps() >= 2 or not H.battleLoadStarted() end })
-    end),
-    H.call(function()
-      H.log(string.format("[ultros3] held: the tally reads %d with his steps at %d", tally(), steps()))
-      H.assertEq(tally() >= 8 and steps() < 2, true, string.format("held: the party raised his tally to 8 while he "
-        .. "stood under two steps out (tally %d, steps %d; the case's precondition)", tally(), steps()))
-    end),
-    H.kitBattle({}, { idle = "defend", care = false, maxFrames = 30000,
-      giveUp = function() return sw1() or not H.battleLoadStarted() end }),
-    H.call(function()
-      H.assertEq(sw1(), true, "held: he reached the edge (monster switch 1 set) with the party Defending")
-      armedF = H.frame
-      stage63()
-      -- (his tally to 8 again where a blow on the way pushed him back a step and cleared it, DECLARED: on
-      -- wt/v052-tg-wor1's replay a counter on the Defending party's turn 8 stepped him back and the tally read 0 at
-      -- the arming, build/attempts/wt/v052-tg-wor1/regen1/red/battle_ultros3-red.log; the case asks what blows do
-      -- with the tally at 8 and the edge held, so the tally is what the case stands on, as the precondition above
-      -- reached it)
-      if tally() < 8 then
-        H.log(string.format("[ultros3] held: the tally read %d at the arming (a blow stepped him back on the way); "
-          .. "staged to 8", tally()))
-        WRITE.byte(0x3EB3, 8)
-      end
+      H.assertEq(armedF ~= nil, true, string.format("held: he reached the edge with his tally at 8 or more (the case's "
+        .. "precondition, played) in one of %d tries", tries))
       H.log(string.format("[ultros3] held: armed at f%d, steps %d, tally %d; the party attacks through the fuse",
         armedF, steps(), tally()))
     end),
     H.lazy(function()
       return H.kitBattle(attackPlan(W), { idle = "defend", care = false, maxFrames = 20000,
-        giveUp = function() return W.find(0x0C, 0x8E, 1) ~= nil or not H.battleLoadStarted() end })
+        giveUp = function() return W.find(0x0C, 0x8E, armIdx) ~= nil or not H.battleLoadStarted() end })
     end),
     H.call(function()
-      local mi, mc = W.find(0x0C, 0x8E, 1)
+      local mi, mc = W.find(0x0C, 0x8E, armIdx)
       H.assertEq(mi ~= nil, true, "held: the wave came after the arming")
       waveF = mc.f
       H.log(string.format("[ultros3] held: the wave at f%d; from the arming %d blow(s) dispatched, the tally at %d "
@@ -242,7 +262,7 @@ local function scene()
 end
 
 -- The cap: three cases of about 12,000 frames each and the held case's about 15,000, so 120,000 is about 2x.
-H.run({ maxFrames = 120000 }, {
+H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),

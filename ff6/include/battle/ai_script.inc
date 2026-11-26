@@ -401,6 +401,21 @@ AI_SCRIPT_INC = 1
         .byte $fc, $00, 0, 0
 .endmac
 
+; ot6 (wt/v052-tg-wor1): continue if the member in `seat` (1-4) can be Seized
+; now (present, standing, not dead, stone, a zombie, out of the fight or held
+; already), conditional $00 (vanilla's unused "never"; Ot6SeizeCond,
+; ot6_fuse.asm).  SEIZE_CLAIM, at an announce: and no other standing body that
+; seizes has claimed the seat; the claim is made at once (the body's monster
+; switch seat-1), so no two bodies announce on one member.  SEIZE_FIRE, at the
+; fire block: if the member can no longer be held, the body's claim is dropped
+; and the block does not run (the one cancel that is not a break).  It must
+; stand last of its block's conditions: it claims when it continues.
+SEIZE_CLAIM = 0
+SEIZE_FIRE = 1
+.mac if_seize_free seat, mode
+        .byte $fc, $00, seat, mode
+.endmac
+
 ; if battle command is used on this monster
 .mac if_cmd cmd1, cmd2
         .byte $fc, $01

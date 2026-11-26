@@ -28,9 +28,12 @@
 --   outside   above the line, a break before any line: nothing is cancelled and the cells stand (battle switch 0
 --             clear: the cherry still his), and once he is under the line the fuse lights and fires.
 -- Mutants (tools/build/mutant_rom.py; build/attempts/wt/v052-tg-wor1/mutants*/): fuse_never (Ot6FuseCancel+3=80) is red
--- at "the break during the fuse cancels it"; umaro_no_setb0 (his row's flags 0) at "battle switch 0 is set after the
--- cancel"; imm_umaro (his blocked status 2 back to vanilla's $6B) at check_fuse_immune.  A mechanism test, not play
--- (the landed case writes nothing).
+-- at "the break during the fuse cancels it"; umaro_no_setb0 (his row's flags 0) at "umaro: no announce and no move in 4
+-- of the boss's turns back: the cancelled move is gone for the fight"; umaro_row_keeps (his row keeps battle switch 2)
+-- at "umaro: the move does not fire when the boss recovers"; imm_umaro (his blocked status 2 back to vanilla's $6B) at
+-- check_fuse_immune.  And read from the ROM: a Green Cherry used on him does nothing once battle switch 0 is set (his
+-- counter's cherry block is conditioned on it; no party here carries one to use, so it is read, not played).  A
+-- mechanism test, not play (the landed case writes nothing).
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }
@@ -65,6 +68,35 @@ H.run({ maxFrames = 70000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x3EB0) & 0x07), 0, "battle switches 0-2 read clear at the open (no cherry eaten, fed or "
       .. "announced)")
+ 
+    -- a Green Cherry used on him: his counter's block (if_item GREEN_CHERRY) stands behind battle switch 0 clear, so
+    -- once the break has set it the cherry used on him does nothing
+    local SIZE = { [0] = 4, 2, 4, 3, 4, 4, 4, 2, 3, 4, 4, 3, 4, 1, 1, 1 }
+    local AI, PTRS = H.sym("AIScript") & 0x3FFFFF, H.sym("AIScriptPtrs") & 0x3FFFFF
+    local x = H.readRomByte(PTRS + 2 * UMARO) | (H.readRomByte(PTRS + 2 * UMARO + 1) << 8)
+    while H.readRomByte(AI + x) ~= 0xFF do
+      local b = H.readRomByte(AI + x); x = x + (b >= 0xF0 and SIZE[b - 0xF0] or 1)
+    end
+    x = x + 1
+    local found, gated = false, false
+    while H.readRomByte(AI + x) ~= 0xFF do
+      local bstart, conds = x, {}
+      while H.readRomByte(AI + x) == 0xFC do
+        conds[#conds + 1] = string.format("%02X %02X %02X", H.readRomByte(AI + x + 1), H.readRomByte(AI + x + 2),
+          H.readRomByte(AI + x + 3))
+        x = x + 4
+      end
+      local c = table.concat(conds, " / ")
+      if c:find("03 F8") then found = true; gated = c:find("15 00 00") ~= nil
+        H.log(string.format("[umaro] his counter's cherry block at ctr: conditions [%s]", c)) end
+      while H.readRomByte(AI + x) ~= 0xFE and H.readRomByte(AI + x) ~= 0xFF do
+        local b = H.readRomByte(AI + x); x = x + (b >= 0xF0 and SIZE[b - 0xF0] or 1)
+      end
+      if H.readRomByte(AI + x) == 0xFE then x = x + 1 end
+    end
+    H.assertEq(found and gated, true, "umaro: a Green Cherry used on him is answered only while battle switch 0 is "
+      .. "clear (his counter's cherry block): after the denial it does nothing")
+    H.log(string.format("[umaro] the party carries %d Green Cherry (none to play the use with)", H.invCountOf(CHERRY)))
   end),
   H.fuseSnap(S),
   H.fuseLanded({

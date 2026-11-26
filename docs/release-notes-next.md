@@ -52,24 +52,32 @@ come only after their line.
 Six World of Ruin bosses announce a move the same way. In Figaro
 Castle's engine room, a Tentacle that finds a member Slowed says "It coils
 to seize!" and Seizes that member on its next turn (before, it Seized at
-once); breaking a Tentacle, at any time, frees the member it holds, who can
-act again. Dullahan says "Its blade rimes over!" once he has
-been hit eight times, and on his next turn casts Absolute 0 on the whole
-party (about a quarter of each member's HP); a break while the **!** is up stops it and starts his count
-over. He no longer follows the count with N.Cross and Ice 2, and Absolute 0
-comes only after the line. When Phunbaba returns to Mobliz, he says "He
-fills his lungs!" once he has lost about a fifth of his HP; the hit that
-drives him off then brings his two BabaBreaths, each of which blows a
-member out of the party for the fight that follows. Break him while the
-**!** is up and drive him off before he recovers, or drive him off before
-he says the line, and he leaves without them; if he recovers still
-standing, he fills his lungs again on his next turn. Chadarnook's demon says "The paint runs!" a turn before he
-hands the painting back to the goddess; break him while the **!** is up and
-he stays out for the break, his count of hits starting over.
-Umaro says "He digs out a Green Cherry!" a turn before he eats it; break
-him while the **!** is up and the cherry is gone for the rest of the fight.
-Tritoch says "Frost climbs the cliff!" at the start of each round of its
-attacks and casts Ice 3 on its next turn (up to about a quarter of a member's HP); a break stops it.
+once). Only one Tentacle goes for each member: none announces on a member
+another has already called, or on a member who is down, out of the fight
+or already held, and if the called member falls before the Seize, the
+**!** goes out and no Seize follows. Breaking a Tentacle, at any time,
+frees the member it holds, who can act again. Dullahan says "Its blade
+rimes over!" once he has been hit eight times, and on his next turn casts
+Absolute 0 on the whole party (about a quarter of each member's HP); a
+break while the **!** is up stops it and starts his count over. He no
+longer follows the count with N.Cross and Ice 2, and Absolute 0 comes only
+after the line. When Phunbaba returns to Mobliz, he says "He fills his
+lungs!" on his turn once he has lost about a fifth of his HP, and on his
+next turn breathes twice, each BabaBreath blowing a member out of the
+party for the fight that follows, and leaves. Break him at any point
+before he breathes and his breath is gone for the fight: when you drive
+him off, he leaves without it. Chadarnook's demon says "The paint runs!" a
+turn before he hands the painting back to the goddess when his time on the
+canvas is up; the fifth blow he takes still sends him back at once, with
+no line. Break him while the **!** is up and he stays out for the break,
+and the count of blows that sends him back starts over. Umaro says "He
+digs out a Green Cherry!" a turn before he eats it; break him while the
+**!** is up and the cherry is gone for the rest of the fight (a Green
+Cherry you use on him then does nothing for him either). Tritoch says
+"Frost climbs the cliff!" at the start of each round of its attacks, and
+casts Rasp with it; Ice 3 comes on its next turn (up to about a quarter of
+a member's HP), and at no other time: Tritoch no longer casts Ice 3 unannounced
+on the round's third turn. A break stops it.
 
 A boss that announces a move can no longer have it taken away by a
 status: the Marshal, Number 128, the Gold Dragon, Rizopas, Chupon and

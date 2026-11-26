@@ -5212,10 +5212,9 @@ AIScript::_271:
 ; vanilla's red flash, a turn of its own, and sets battle switch 2 (his monster variable is his tally of spells and
 ; shares its byte with his monster switches); the cherry comes on his next turn: the fire block, which stands first,
 ; takes that turn whatever his HP reads then.  A break in between cancels it and the cherry is gone for the fight
-; (Ot6FuseTbl: battle switch 2 cleared and battle switch 0, vanilla's "eaten", set: OT6_FUSE_SETB0).  The cherry after
-; the announce's `wait` (the lit address) is never reached while the fire block takes that turn; it is there so the
-; block reads as every fuse block reads (battle_fuse.lua).  The Jump at three spells, the counters and a Green Cherry
-; used on him are vanilla's.
+; (Ot6FuseTbl: battle switch 2 cleared and battle switch 0, vanilla's "eaten", set: OT6_FUSE_SETB0).  The Jump at
+; three spells, the counters and a Green Cherry used on him are vanilla's (a cherry used on him once battle switch 0
+; is set does nothing: its counter block stands behind that switch).
 AIScript::_272:
         if_battle_switch_set 0, 2       ; ot6: the cherry announced (below) is eaten
                 clr_battle_switch 0, 2  ;   the trigger's clear and the once-flag
@@ -5243,16 +5242,6 @@ AIScript::_272:
                 set_battle_switch 0, 2  ; ot6: the fire block (above) takes his next turn
                 wait
 Ot6FuseUmaro:                   ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_battle_switch 0, 2
-                set_battle_switch 0, 0
-                set_target SELF
-                use_item GREEN_CHERRY
-                flash_red MONSTER_1
-                dlg $49
-                set_status PROTECT
-                set_status SHELL
-                set_status HASTE
-                set_status REGEN
                 end_if
         if_battle_var_greater 36, 3
                 cmd JUMP
@@ -5761,31 +5750,36 @@ AIScript::_282:
 ; OT6 (bosses-wor.md block 1, wt/v052-tg-wor1): the Seize is announced.  Vanilla Seized a Slowed member at once, on
 ; the first turn of any Tentacle that found one.  Now that turn says "It coils to seize!" (battle dialogue $A0) and
 ; glows (the body that will Seize), a turn of its own, and Seize on that member's seat comes on the body's next turn,
-; whatever becomes of the member's Slow meanwhile: the fire blocks (one a seat, monster switches 0-3, which the
-; announce sets) come first, so no other block can take the Seize's turn.  A break in between cancels it
-; (Ot6FuseTbl's rows: the seat's switch goes, $3240 forgotten) and the next turn that finds a Slowed member announces
-; again.  And every break of a Tentacle, lit or not, frees the member it holds (OT6_FUSE_RELEASE, Ot6FuseRelease:
-; Discard's own release), so a held member acts again.  The Seize after each announce's `wait` (the lit address) is
-; never reached while the fire block above takes that turn; it is there so the block reads as every fuse block reads
-; (battle_fuse.lua).  The rotation, the drain, Discard after 30 counts, the dying Discard and the counters are
-; vanilla's.
+; whatever becomes of the member's Slow meanwhile: the fire blocks (one a seat, monster switches 0-3) come first, so
+; no other block can take the Seize's turn.  One body a member: the announce claims the seat as its script is read
+; (if_seize_free's claim, the seat's monster switch, Ot6SeizeCond), and no body announces on a member another standing
+; body has claimed, or on one that cannot be held (dead, stone, a zombie, gone, out of the fight, held already).  A
+; break in between cancels it (Ot6FuseTbl's rows: the claim goes, $3240 forgotten); so does the member falling or
+; leaving (Ot6SeizeFell, the HUD's poll, and the fire block's own test: the one cancel that is not a break); a body
+; that dies with a claim claims nothing.  And every break of a Tentacle, lit or not, frees the member it holds
+; (OT6_FUSE_RELEASE, Ot6FuseRelease: Discard's own release), so a held member acts again.  The rotation, the drain,
+; Discard after 30 counts, the dying Discard and the counters are vanilla's.
 AIScript::_283:
         if_monster_switch_set 0         ; ot6: the Seize announced on seat 1 (below)
+        if_seize_free 1, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 0    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_1
                 attack SEIZE
                 end_if
         if_monster_switch_set 1         ; ot6: the Seize announced on seat 2 (below)
+        if_seize_free 2, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 1    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_2
                 attack SEIZE
                 end_if
         if_monster_switch_set 2         ; ot6: the Seize announced on seat 3 (below)
+        if_seize_free 3, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 2    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_3
                 attack SEIZE
                 end_if
         if_monster_switch_set 3         ; ot6: the Seize announced on seat 4 (below)
+        if_seize_free 4, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 3    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_4
                 attack SEIZE
@@ -5796,51 +5790,39 @@ AIScript::_283:
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_1, SLOW
+        if_seize_free 1, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 0), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_4
-                set_monster_switch 0    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent11B_1:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 0
-                set_target CHAR_SLOT_1
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_2, SLOW
+        if_seize_free 2, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 1), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_4
-                set_monster_switch 1    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent11B_2:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 1
-                set_target CHAR_SLOT_2
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_3, SLOW
+        if_seize_free 3, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 2), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_4
-                set_monster_switch 2    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent11B_3:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 2
-                set_target CHAR_SLOT_3
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_4, SLOW
+        if_seize_free 4, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 3), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_4
-                set_monster_switch 3    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent11B_4:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 3
-                set_target CHAR_SLOT_4
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
                 reset_monster_timer
@@ -7176,31 +7158,36 @@ AIScript::_315:
 ; OT6 (bosses-wor.md block 1, wt/v052-tg-wor1): the Seize is announced.  Vanilla Seized a Slowed member at once, on
 ; the first turn of any Tentacle that found one.  Now that turn says "It coils to seize!" (battle dialogue $A0) and
 ; glows (the body that will Seize), a turn of its own, and Seize on that member's seat comes on the body's next turn,
-; whatever becomes of the member's Slow meanwhile: the fire blocks (one a seat, monster switches 0-3, which the
-; announce sets) come first, so no other block can take the Seize's turn.  A break in between cancels it
-; (Ot6FuseTbl's rows: the seat's switch goes, $3240 forgotten) and the next turn that finds a Slowed member announces
-; again.  And every break of a Tentacle, lit or not, frees the member it holds (OT6_FUSE_RELEASE, Ot6FuseRelease:
-; Discard's own release), so a held member acts again.  The Seize after each announce's `wait` (the lit address) is
-; never reached while the fire block above takes that turn; it is there so the block reads as every fuse block reads
-; (battle_fuse.lua).  The rotation, the drain, Discard after 30 counts, the dying Discard and the counters are
-; vanilla's.
+; whatever becomes of the member's Slow meanwhile: the fire blocks (one a seat, monster switches 0-3) come first, so
+; no other block can take the Seize's turn.  One body a member: the announce claims the seat as its script is read
+; (if_seize_free's claim, the seat's monster switch, Ot6SeizeCond), and no body announces on a member another standing
+; body has claimed, or on one that cannot be held (dead, stone, a zombie, gone, out of the fight, held already).  A
+; break in between cancels it (Ot6FuseTbl's rows: the claim goes, $3240 forgotten); so does the member falling or
+; leaving (Ot6SeizeFell, the HUD's poll, and the fire block's own test: the one cancel that is not a break); a body
+; that dies with a claim claims nothing.  And every break of a Tentacle, lit or not, frees the member it holds
+; (OT6_FUSE_RELEASE, Ot6FuseRelease: Discard's own release), so a held member acts again.  The rotation, the drain,
+; Discard after 30 counts, the dying Discard and the counters are vanilla's.
 AIScript::_316:
         if_monster_switch_set 0         ; ot6: the Seize announced on seat 1 (below)
+        if_seize_free 1, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 0    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_1
                 attack SEIZE
                 end_if
         if_monster_switch_set 1         ; ot6: the Seize announced on seat 2 (below)
+        if_seize_free 2, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 1    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_2
                 attack SEIZE
                 end_if
         if_monster_switch_set 2         ; ot6: the Seize announced on seat 3 (below)
+        if_seize_free 3, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 2    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_3
                 attack SEIZE
                 end_if
         if_monster_switch_set 3         ; ot6: the Seize announced on seat 4 (below)
+        if_seize_free 4, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 3    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_4
                 attack SEIZE
@@ -7211,51 +7198,39 @@ AIScript::_316:
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_1, SLOW
+        if_seize_free 1, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 0), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_3
-                set_monster_switch 0    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13C_1:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 0
-                set_target CHAR_SLOT_1
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_2, SLOW
+        if_seize_free 2, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 1), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_3
-                set_monster_switch 1    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13C_2:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 1
-                set_target CHAR_SLOT_2
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_3, SLOW
+        if_seize_free 3, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 2), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_3
-                set_monster_switch 2    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13C_3:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 2
-                set_target CHAR_SLOT_3
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_4, SLOW
+        if_seize_free 4, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 3), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_3
-                set_monster_switch 3    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13C_4:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 3
-                set_target CHAR_SLOT_4
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
                 reset_monster_timer
@@ -7286,31 +7261,36 @@ Ot6FuseTent13C_4:                ; the fuse is lit here (Ot6FuseTbl's row)
 ; OT6 (bosses-wor.md block 1, wt/v052-tg-wor1): the Seize is announced.  Vanilla Seized a Slowed member at once, on
 ; the first turn of any Tentacle that found one.  Now that turn says "It coils to seize!" (battle dialogue $A0) and
 ; glows (the body that will Seize), a turn of its own, and Seize on that member's seat comes on the body's next turn,
-; whatever becomes of the member's Slow meanwhile: the fire blocks (one a seat, monster switches 0-3, which the
-; announce sets) come first, so no other block can take the Seize's turn.  A break in between cancels it
-; (Ot6FuseTbl's rows: the seat's switch goes, $3240 forgotten) and the next turn that finds a Slowed member announces
-; again.  And every break of a Tentacle, lit or not, frees the member it holds (OT6_FUSE_RELEASE, Ot6FuseRelease:
-; Discard's own release), so a held member acts again.  The Seize after each announce's `wait` (the lit address) is
-; never reached while the fire block above takes that turn; it is there so the block reads as every fuse block reads
-; (battle_fuse.lua).  The rotation, the drain, Discard after 30 counts, the dying Discard and the counters are
-; vanilla's.
+; whatever becomes of the member's Slow meanwhile: the fire blocks (one a seat, monster switches 0-3) come first, so
+; no other block can take the Seize's turn.  One body a member: the announce claims the seat as its script is read
+; (if_seize_free's claim, the seat's monster switch, Ot6SeizeCond), and no body announces on a member another standing
+; body has claimed, or on one that cannot be held (dead, stone, a zombie, gone, out of the fight, held already).  A
+; break in between cancels it (Ot6FuseTbl's rows: the claim goes, $3240 forgotten); so does the member falling or
+; leaving (Ot6SeizeFell, the HUD's poll, and the fire block's own test: the one cancel that is not a break); a body
+; that dies with a claim claims nothing.  And every break of a Tentacle, lit or not, frees the member it holds
+; (OT6_FUSE_RELEASE, Ot6FuseRelease: Discard's own release), so a held member acts again.  The rotation, the drain,
+; Discard after 30 counts, the dying Discard and the counters are vanilla's.
 AIScript::_317:
         if_monster_switch_set 0         ; ot6: the Seize announced on seat 1 (below)
+        if_seize_free 1, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 0    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_1
                 attack SEIZE
                 end_if
         if_monster_switch_set 1         ; ot6: the Seize announced on seat 2 (below)
+        if_seize_free 2, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 1    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_2
                 attack SEIZE
                 end_if
         if_monster_switch_set 2         ; ot6: the Seize announced on seat 3 (below)
+        if_seize_free 3, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 2    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_3
                 attack SEIZE
                 end_if
         if_monster_switch_set 3         ; ot6: the Seize announced on seat 4 (below)
+        if_seize_free 4, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 3    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_4
                 attack SEIZE
@@ -7321,51 +7301,39 @@ AIScript::_317:
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_1, SLOW
+        if_seize_free 1, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 0), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_2
-                set_monster_switch 0    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13D_1:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 0
-                set_target CHAR_SLOT_1
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_2, SLOW
+        if_seize_free 2, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 1), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_2
-                set_monster_switch 1    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13D_2:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 1
-                set_target CHAR_SLOT_2
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_3, SLOW
+        if_seize_free 3, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 2), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_2
-                set_monster_switch 2    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13D_3:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 2
-                set_target CHAR_SLOT_3
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_4, SLOW
+        if_seize_free 4, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 3), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_2
-                set_monster_switch 3    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13D_4:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 3
-                set_target CHAR_SLOT_4
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
                 reset_monster_timer
@@ -7396,31 +7364,36 @@ Ot6FuseTent13D_4:                ; the fuse is lit here (Ot6FuseTbl's row)
 ; OT6 (bosses-wor.md block 1, wt/v052-tg-wor1): the Seize is announced.  Vanilla Seized a Slowed member at once, on
 ; the first turn of any Tentacle that found one.  Now that turn says "It coils to seize!" (battle dialogue $A0) and
 ; glows (the body that will Seize), a turn of its own, and Seize on that member's seat comes on the body's next turn,
-; whatever becomes of the member's Slow meanwhile: the fire blocks (one a seat, monster switches 0-3, which the
-; announce sets) come first, so no other block can take the Seize's turn.  A break in between cancels it
-; (Ot6FuseTbl's rows: the seat's switch goes, $3240 forgotten) and the next turn that finds a Slowed member announces
-; again.  And every break of a Tentacle, lit or not, frees the member it holds (OT6_FUSE_RELEASE, Ot6FuseRelease:
-; Discard's own release), so a held member acts again.  The Seize after each announce's `wait` (the lit address) is
-; never reached while the fire block above takes that turn; it is there so the block reads as every fuse block reads
-; (battle_fuse.lua).  The rotation, the drain, Discard after 30 counts, the dying Discard and the counters are
-; vanilla's.
+; whatever becomes of the member's Slow meanwhile: the fire blocks (one a seat, monster switches 0-3) come first, so
+; no other block can take the Seize's turn.  One body a member: the announce claims the seat as its script is read
+; (if_seize_free's claim, the seat's monster switch, Ot6SeizeCond), and no body announces on a member another standing
+; body has claimed, or on one that cannot be held (dead, stone, a zombie, gone, out of the fight, held already).  A
+; break in between cancels it (Ot6FuseTbl's rows: the claim goes, $3240 forgotten); so does the member falling or
+; leaving (Ot6SeizeFell, the HUD's poll, and the fire block's own test: the one cancel that is not a break); a body
+; that dies with a claim claims nothing.  And every break of a Tentacle, lit or not, frees the member it holds
+; (OT6_FUSE_RELEASE, Ot6FuseRelease: Discard's own release), so a held member acts again.  The rotation, the drain,
+; Discard after 30 counts, the dying Discard and the counters are vanilla's.
 AIScript::_318:
         if_monster_switch_set 0         ; ot6: the Seize announced on seat 1 (below)
+        if_seize_free 1, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 0    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_1
                 attack SEIZE
                 end_if
         if_monster_switch_set 1         ; ot6: the Seize announced on seat 2 (below)
+        if_seize_free 2, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 1    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_2
                 attack SEIZE
                 end_if
         if_monster_switch_set 2         ; ot6: the Seize announced on seat 3 (below)
+        if_seize_free 3, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 2    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_3
                 attack SEIZE
                 end_if
         if_monster_switch_set 3         ; ot6: the Seize announced on seat 4 (below)
+        if_seize_free 4, SEIZE_FIRE     ;   and the member can still be held
                 clr_monster_switch 3    ;   the trigger's clear first, then the move
                 set_target CHAR_SLOT_4
                 attack SEIZE
@@ -7431,51 +7404,39 @@ AIScript::_318:
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_1, SLOW
+        if_seize_free 1, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 0), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_1
-                set_monster_switch 0    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13E_1:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 0
-                set_target CHAR_SLOT_1
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_2, SLOW
+        if_seize_free 2, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 1), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_1
-                set_monster_switch 1    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13E_2:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 1
-                set_target CHAR_SLOT_2
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_3, SLOW
+        if_seize_free 3, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 2), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_1
-                set_monster_switch 2    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13E_3:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 2
-                set_target CHAR_SLOT_3
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
         if_status_set CHAR_SLOT_4, SLOW
+        if_seize_free 4, SEIZE_CLAIM    ; ot6: the seat claimed (monster switch 3), last
                 dlg $a0
 ; It coils to seize!
                 short_glow MONSTER_1
-                set_monster_switch 3    ; ot6: the seat's fire block (above) takes its next turn
-                wait
+                wait                    ; ot6: the seat's fire block (above) takes its next turn
 Ot6FuseTent13E_4:                ; the fuse is lit here (Ot6FuseTbl's row)
-                clr_monster_switch 3
-                set_target CHAR_SLOT_4
-                attack SEIZE
                 end_if
         if_monster_switch_clr 7
                 reset_monster_timer
@@ -7585,9 +7546,10 @@ AIScript::_322:
 ; tritoch
 ; OT6 (bosses-wor.md block 8, wt/v052-tg-wor1): Ice 3 is announced.  The first turn of its rotation of three says
 ; "Frost climbs the cliff!" (battle dialogue $A5) and glows, and Rasps (vanilla rolled Rasp, Rasp or Ice 3): the line
-; rides that turn.  Ice 3 comes on the second (vanilla rolled Ice 3, Ice 3 or Rasp).  The rotation's count of Ice 3
-; is vanilla's on average (one, and one in three on its third turn).  A break in between cancels it ($3240
-; forgotten): the rotation starts again from its first turn.  The counters (Rasp for fire, Cold Dust on whoever uses
+; rides that turn.  Ice 3 comes on the second (vanilla rolled Ice 3, Ice 3 or Rasp), and only there: its third turn
+; picks Rasp or Cold Dust (vanilla's Rasp, Cold Dust or Ice 3), so Ice 3 comes only announced, once a rotation
+; (vanilla's average was 4/3).  A break in between cancels it ($3240 forgotten): the rotation starts again from its
+; first turn.  The counters (Rasp for fire, Cold Dust on whoever uses
 ; a skill) are vanilla's.
 AIScript::_324:
         dlg $a5
@@ -7598,7 +7560,7 @@ AIScript::_324:
 Ot6FuseTritoch:                 ; the fuse is lit here (Ot6FuseTbl's row)
         attack ICE_3
         wait
-        attack RASP, COLD_DUST, ICE_3
+        attack RASP, COLD_DUST, RASP    ; ot6: no Ice 3 unannounced (vanilla RASP, COLD_DUST, ICE_3)
         end
 
         if_self_dead
@@ -8712,21 +8674,30 @@ AIScript::_363:
 ; OT6 (bosses-wor.md block 4, wt/v052-tg-wor1): his second visit's BabaBreath is announced.  Vanilla ended the fight
 ; himself when a blow took him under 15,360 HP: two BabaBreaths (each blows one member out of the party for the fight
 ; after), then end_battle.  Now, on his first turn under 20,480 HP, he says "He fills his lungs!" (battle dialogue
-; $A2) and glows, a turn of its own, and sets battle switch 1: the fuse is lit (Ot6FuseTbl's switch row) until a
-; blow takes him under the line, and that blow brings the two BabaBreaths and the battle's end.  A break while it is
-; lit cancels it (the switch goes): the blow that crosses the line then ends the battle with no breath, and if he is
-; still above the line on his next turn after the break he fills his lungs again.  A blow that crosses the line with
-; no breath held (no announce yet, or a break since) ends the battle with none: BabaBreath comes only announced.
-; The announce stands first, so the rotation cannot take its turn; the fire block is his counter's first after his
-; death's.  His dying BabaBreath is vanilla's, unchanged (the dying-attack rule is a later unit's).  The rotation is
-; vanilla's.
+; $A2) and glows, a turn of its own, and sets battle switch 1; on his next turn the fire block, which stands first,
+; takes that turn whatever his HP reads then: the two BabaBreaths and the battle's end.  Every break of him, lit or
+; not, sets battle switch 0 and clears switch 1 (Ot6FuseTbl's row, OT6_FUSE_HOLD): the breath is denied for the
+; fight, and a break in the fuse cancels it besides ($3240 forgotten).  Once denied, the blow that takes him under
+; 15,360 ends the battle with no breath (the counter's block, a story block: it runs while he is Broken), as vanilla's
+; Broken crossing did.  Not denied, that blow ends nothing: the breath is his turn's.  His dying BabaBreath is
+; vanilla's, unchanged (the dying-attack rule is a later unit's).  The rotation is vanilla's.
 AIScript::_364:
-        if_battle_switch_clr 0, 1
+        if_battle_switch_set 0, 1       ; ot6: the breath announced (below)
+                clr_battle_switch 0, 1  ;   the trigger's clear first, then the move
+                set_target RAND_CHAR
+                attack BABABREATH
+                set_target RAND_CHAR
+                attack BABABREATH
+                end_battle
+                end_if
+        if_battle_switch_clr 0, 0
         if_hp SELF, 20480
                 dlg $a2
 ; He fills his lungs!
                 short_glow MONSTER_1
-                set_battle_switch 0, 1  ; ot6: lit (Ot6FuseTbl's switch row)
+                set_battle_switch 0, 1  ; ot6: the fire block (above) takes his next turn
+                wait
+Ot6FusePhunbaba:                ; the fuse is lit here (Ot6FuseTbl's row)
                 end_if
         attack BATTLE, BATTLE, SPECIAL
         wait
@@ -8740,18 +8711,9 @@ AIScript::_364:
                 attack BABABREATH
                 boss_death
                 end_if
-        if_hit
-        if_hp SELF, 15360
-        if_battle_switch_set 0, 1       ; ot6: the breath held: the move
-                clr_battle_switch 0, 1  ;   the trigger's clear first, then the move
-                set_target RAND_CHAR
-                attack BABABREATH
-                set_target RAND_CHAR
-                attack BABABREATH
-                end_battle
-                end_if
-        if_hit                          ; ot6: no breath held (none announced, or a
-        if_hp SELF, 15360               ;   break since): the battle ends with none
+        if_hit                          ; ot6: the breath denied (a break: battle
+        if_hp SELF, 15360               ;   switch 0): the battle ends with none
+        if_battle_switch_set 0, 0
                 end_battle
                 end_if
         end_retal
