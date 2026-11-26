@@ -22,17 +22,17 @@ local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15 and not H.dialogWaiting()
 end
 
--- (gen_wor_tritoch's dragonObj) map 34's live objects are its two NPCs: the save point (NPC_1, posted on (25,5)) and
--- the Ice Dragon (NPC_2), which wanders, so it is the one object standing anywhere but the save point
+-- map 34's NPCs are the save point (NPC_1, object $10, posted on (25,5)) and the Ice Dragon (NPC_2, object $11), which
+-- wanders.  (gen_wor_tritoch's dragonObj, the one object anywhere but the save point, reads after a Continue; on the
+-- walk in, two objects of the map before stand at junk tiles too: "$28(110,16) $29(87,45)",
+-- build/attempts/wt/v052-tg-wor2/dev/probe_objs.log, so this leg's first run failed "got 3, want 1")
 local function dragonObj()
-  local found = {}
-  for o = 0x10, 0x2F do
-    local ox, oy = H.objX(o), H.objY(o)
-    if not (ox == 0 and oy == 0) and not (ox == 25 and oy == 5) then found[#found + 1] = o end
-  end
-  H.assertEq(#found, 1, "map 34 holds one live object besides the save point (the Ice Dragon)")
-  H.log(string.format("[npc] the Ice Dragon: object $%02X at (%d,%d)", found[1], H.objX(found[1]), H.objY(found[1])))
-  return found[1]
+  local o = 0x11
+  H.log(string.format("[npc] the Ice Dragon: object $%02X at (%d,%d); the save point $10 at (%d,%d)", o, H.objX(o),
+    H.objY(o), H.objX(0x10), H.objY(0x10)))
+  H.assertEq(H.objX(0x10) == 25 and H.objY(0x10) == 5 and not (H.objX(o) == 0 and H.objY(o) == 0), true,
+    "map 34's save point is object $10 on (25,5) and the Ice Dragon object $11 stands on the map")
+  return o
 end
 local function begun()
   return (H.battleLoadStarted() and H.formationHas({ [ICEDRAGON] = true })) or sw(0x0695) == 0

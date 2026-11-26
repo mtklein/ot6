@@ -14,8 +14,8 @@
 --
 -- Boots stormdrgn_entry (gen_wor_storm: the Storm Dragon's battle, event battle 133, as it comes up).  From a
 -- snapshot at the battle's open:
---   grows     nothing staged and nothing held: the party's own aimed Fights (Defending while it is Broken) break it
---             from its opening gauge; at each recovery (up to two) its max reads two more, to 14, the count is the
+--   grows     nothing staged and nothing held: the route's own fight driver (gen_wor_storm's STORM_FIGHT under the
+--             tactical base) breaks it from its opening gauge; at each recovery (up to two) its max reads two more, to 14, the count is the
 --             max, and the HUD's count tile for its slot is that count.  The first recovery is from 10.
 --   cap       (DECLARED: the gauge staged to 1 and every class a key before each breaking Fight, M.fuseCases' own
 --             staging) three breaks in a row: its max reads 12, 14, then 14 -- at its cap it stays.
@@ -99,23 +99,51 @@ local function watchAll()
     local r = rollsSeen[#rollsSeen]
     if r ~= nil and r.gen == gen and r.sw == 0 and H.readByte(0x3DAC + e) & 0x01 ~= 0 then r.armed = true end
     local ticks, mx = H.readByte(0x3E88 + e), H.readByte(0x3E39 + e)
+    -- the HUD's count tile for its slot: the frames from the recovery until the flush has uploaded the new count
+    local lr = recs[#recs]
+    if watching and lr ~= nil and lr.hudF == nil and H.frame - lr.f <= 60 and H.readByte(HAVE + lr.slot) == lr.count then
+      lr.hudF = H.frame - lr.f
+      H.log(string.format("[storm] f%d the HUD's count tile for slot %d reads %d, %d frame(s) after the recovery",
+        H.frame, lr.slot, lr.count, lr.hudF))
+    end
     if watching and lastTicks ~= nil and lastTicks > 0 and ticks == 0 then
-      recs[#recs + 1] = { f = H.frame, before = lastMax, after = mx, count = H.readByte(0x3E38 + e), slot = slotOf() }
-      H.log(string.format("[storm] f%d recovered from a break: max %d -> %d, count %d", H.frame, lastMax, mx,
-        H.readByte(0x3E38 + e)))
+      recs[#recs + 1] = { f = H.frame, before = lastMax, after = mx, count = H.readByte(0x3E38 + e), slot = slotOf(),
+        hp = H.readWord(0x3BF4 + e) }
+      H.log(string.format("[storm] f%d recovered from a break: max %d -> %d, count %d; its HP %d, status 1 $%02X; the "
+        .. "HUD's tile for its slot reads %d", H.frame, lastMax, mx, H.readByte(0x3E38 + e), H.readWord(0x3BF4 + e),
+        H.readByte(0x3EE4 + e), H.readByte(HAVE + slotOf())))
     end
     lastTicks, lastMax = ticks, mx
   end, emu.eventType.endFrame)
 end
--- the HUD's count tile for the dragon's slot, once the flush has uploaded it (up to 60 frames after the recovery)
-local function hudCheck(rec, what)
+-- the HUD's count tile for the dragon's slot drew each recovery's new count within 60 frames of it (the watcher's
+-- hudF); waits out the last recovery's 60 frames while the battle stands, then stops the watch.  A recovery the
+-- battle's end cut short of its 60 frames is logged and not judged.
+local function hudCheck(what)
   return H.seqStep({
-    H.waitUntil(function() return H.readByte(HAVE + rec.slot) == rec.count end, 60, what .. ": the HUD's count tile "
-      .. "draws the new count", 1),
+    H.waitUntil(function()
+      local r = recs[#recs]
+      return r == nil or r.hudF ~= nil or H.frame - r.f > 60 or not H.battleLoadStarted()
+    end, 120, what .. ": the last recovery's 60 frames", 1),
     H.call(function()
-      H.log(string.format("[storm] %s: the HUD's count tile for slot %d reads %d (the count %d)", what, rec.slot,
-        H.readByte(HAVE + rec.slot), rec.count))
-      H.assertEq(H.readByte(HAVE + rec.slot), rec.count, what .. ": the HUD's count tile for its slot is the new count")
+      watching = false
+      local e = ent()
+      for k, r in ipairs(recs) do
+        local gone = not H.battleLoadStarted() or e == nil or H.readWord(0x3BF4 + e) == 0
+          or (H.readByte(0x3EE4 + e) & 0xC0) ~= 0
+        if r.hudF == nil and k == #recs and gone then
+          H.log(string.format("[storm] %s: recovery %d's HUD tile not judged: the dragon fell or the battle ended "
+            .. "within its 60 frames (the line draws empty)", what, k))
+        else
+          if r.hudF == nil then
+            H.log(string.format("[storm] %s: recovery %d: the HUD's tile for slot %d reads %d now (the count %d), the "
+              .. "dragon's HP %d, status 1 $%02X", what, k, r.slot, H.readByte(HAVE + r.slot), r.count,
+              e and H.readWord(0x3BF4 + e) or -1, e and H.readByte(0x3EE4 + e) or -1))
+          end
+          H.assertEq(r.hudF ~= nil, true, string.format("%s: recovery %d: the HUD's count tile for its slot drew the new "
+            .. "count (%d) within 60 frames", what, k, r.count))
+        end
+      end
     end),
   })
 end
@@ -138,24 +166,16 @@ local function effect(m)
   return fell
 end
 
--- the party's aimed Fights while the dragon stands unbroken, Defending while it is Broken, until done()
-local function chipUntil(done, max)
-  local t0 = nil
-  return H.lazy(function()
-    t0 = H.frame
-    local plan = {}
-    for k = 1, 30 do
-      for i = 0, 3 do
-        local id = H.readByte(0x3ED8 + 2 * i)
-        -- (a Fight while it is Broken would only pile up damage: the member waits on its command window, which does
-        -- not stop the battle's clock, until it stands again)
-        if id ~= 0xFF then plan[#plan + 1] = { who = id, cmd = 0x00, boost = 0, slot = slotOf(),
-          openWhen = function() local e = ent(); return e == nil or H.readByte(0x3E88 + e) == 0 end } end
-      end
-    end
-    return H.kitBattle(plan, { idle = "defend", care = true, maxFrames = max + 600,
-      giveUp = function() return done() or H.frame - t0 >= max or ent() == nil end })
-  end)
+-- the route's own fight driver (gen_wor_storm's STORM_FIGHT under the tactical base) until done() or the battle ends
+-- (the first cut's plain aimed Fights, Tonics for care, wiped on the replay's draw after the first recovery:
+-- build/attempts/wt/v052-tg-wor2/d1/suites/battle_stormdrgn-1.log)
+local function routeUntil(done, max, what)
+  local F = nil
+  return H.seqStep({
+    H.call(function() F = H.fightDriverFor("storm-" .. what, BASE, STORM_FIGHT) end),
+    H.driveUntil(function() return done() or not H.battleLoadStarted() or ent() == nil end, max,
+      { H.call(function() F.frame() end) }, "storm " .. what .. ": the route's driver"),
+  })
 end
 
 local S = {}
@@ -193,12 +213,12 @@ H.run({ maxFrames = 140000 }, {
     gen = gen + 1; watching = true; recs = {}
     H.log("[storm] case grows, from the battle's open; nothing staged, nothing held")
   end),
-  chipUntil(function() return #recs >= 2 end, 40000),
+  routeUntil(function() return #recs >= 2 end, 40000, "grows"),
+  hudCheck("storm grows"),
   H.call(function()
-    watching = false
     H.log(string.format("[storm] grows: %d recovery(ies) seen; the dragon's HP %d", #recs,
       ent() and H.readWord(0x3BF4 + ent()) or -1))
-    H.assertEq(#recs >= 1, true, "storm grows: the party's own Fights broke the dragon and it recovered (one or more)")
+    H.assertEq(#recs >= 1, true, "storm grows: the route's driver broke the dragon by its own play and it recovered (one or more)")
     H.assertEq(recs[1].before, OPEN, "storm grows: the first break was of its opening gauge (10)")
     H.assertEq(recs[1].after, OPEN + STEP, "storm grows: the gauge came back from its first break with two more "
       .. "(10 -> 12)")
@@ -208,7 +228,6 @@ H.run({ maxFrames = 140000 }, {
       H.assertEq(r.count, r.after, string.format("storm grows: recovery %d: the count is the new max", k))
     end
   end),
-  H.lazy(function() return hudCheck(recs[#recs], "storm grows") end),
   H.fuseRestore(S, "storm grows"),
 
   -- ---- cap: three staged breaks in a row ----
@@ -246,8 +265,8 @@ H.run({ maxFrames = 140000 }, {
     end
     return H.seqStep(steps)
   end)(),
+  hudCheck("storm cap"),
   H.call(function()
-    watching = false
     local t = {}
     for _, r in ipairs(recs) do t[#t + 1] = string.format("%d -> %d", r.before, r.after) end
     H.log(string.format("[storm] cap: the recoveries: %s", table.concat(t, ", ")))
@@ -257,7 +276,6 @@ H.run({ maxFrames = 140000 }, {
     H.assertEq(recs[3].after, CAP, "storm cap: at its cap the gauge stays 14 (the third recovery reads 14)")
     H.assertEq(recs[3].count, CAP, "storm cap: the count at the cap is 14")
   end),
-  H.lazy(function() return hudCheck(recs[#recs], "storm cap") end),
   H.fuseRestore(S, "storm cap"),
 
   -- ---- landed: the route's driver to the line, nothing written ----
