@@ -63,6 +63,12 @@
 -- turn that fires, the trigger's clears come before the move".
 -- wt/v051-tg-wob1's vargas_hand (Vargas's fuse condition, switch 0 -> 1) is red at "Vargas: the blocks before the
 -- fuse block and its own conditions are the ones read by hand" (build/attempts/wt/v051-tg-wob1/merged/mutants-merged/).
+-- wt/v052-tg-wor1's review round (build/attempts/wt/v052-tg-wor1/r2/mutants2/): a fuse block with no move after its
+-- label is read through its fire block (the earlier block conditioned on the switch its announce sets: the Tentacles',
+-- Umaro's, Phunbaba's second visit's); umaro_fire_roll (Umaro's fire block's cherry a rolled item, F6 00 F8 F0) is red
+-- at "the fire block that takes the move's turn rolls nothing", phun_fire_late (Phunbaba's fire block's clear moved
+-- behind his two breaths) at "in the turn that fires, the trigger's clears come before the move", and dull_hand
+-- (Dullahan's gate 8 -> 7) at his HAND reading.
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the suite's declared writers (M.fuseCases stages the gauge, the row and held HP through them, and nothing else)
 local WRITE = { byte = function(a, v) H.writeByte(a, v) end, word = function(a, v) H.writeWord(a, v) end }
