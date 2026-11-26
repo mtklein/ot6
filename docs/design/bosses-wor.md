@@ -1519,7 +1519,7 @@ clock passes 30" with the burst at 40, because between the two the dragon takes
 ordinary turns and a fuse lit by a `wait` cannot span them; the roll arms on the
 turn the clock runs out and the line follows, as the CzarDragon's worked
 example has it. Eraser and its line, the Flare phase, the rotation and the
-counter are vanilla's. Flare Star took 10-20% of each member's maximum HP, all
+counter are vanilla's. Flare Star took 10-27% of a member's maximum HP across the runs read (the review round's gate run: 27% and 23%), all
 four its targets (the suite's landed case, `[red]
 effect`).
 Lab (the review round's ROM and fixtures, 24 shifts, five distinct keys `$02 $08

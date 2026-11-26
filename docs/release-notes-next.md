@@ -87,7 +87,7 @@ Cyclonic without the line. The Ice Dragon no longer casts Absolute 0 as
 part of its attacks. Instead, when a member is Frozen (its N. Cross freezes
 those it hits) at its turn, it gets ready, says "The air goes still!" on
 its next turn, and casts Absolute 0 on the whole party on the turn after.
-Thaw the Frozen member with a Fire spell before the dragon's turn and it
+Thaw the Frozen member with fire (a Fire spell, for one) before the dragon's turn and it
 does not get ready; once it has, thawing the member no longer stops
 Absolute 0, but breaking the dragon while the **!** is up does. The Red
 Dragon still bursts into fire whenever its clock runs out; when the burst

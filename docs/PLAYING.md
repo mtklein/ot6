@@ -111,7 +111,7 @@ hurt, sometimes says "It swallows the wind!" and uses Cyclonic on its next
 turn; it never uses Cyclonic without the line. The Ice Dragon gets ready
 when one of your members is Frozen at its turn: it says "The air goes
 still!" on its next turn and uses Absolute 0 on the turn after, and at no
-other time. Thawing the member with a Fire spell before its turn stops it getting
+other time. Thawing the member with fire (a Fire spell, for one) before its turn stops it getting
 ready; once it is ready, only a break stops Absolute 0. The Red Dragon's clock still brings a
 burst of fire every so often; when the burst is to be Flare Star it says
 "Its scales turn white!" first, and Flare Star comes on its next turn.
