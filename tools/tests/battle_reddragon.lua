@@ -17,7 +17,8 @@
 --             comes and Flare Star on its next turn, and lands: a member's HP falls.  The effect is logged member by
 --             member.
 --   then the three cases from the same snapshot (M.fuseCases, where the cases and the DECLARED staging are written
---   out: the gauge, the row's classes for the breaking Fight, the party's HP held; its HP is not held):
+--   out: the gauge, the row's classes for the breaking Fight, HP held -- its at 20,000, above its Flare phase, since
+--   UMARO fights on his own -- and the party's):
 --   unbroken  the party Defends; the line shows; the lit-fuse mark stands; Flare Star is dispatched on its next turn,
 --             a glow between; the mark goes; the line reads "Its scales turn white!" where the dialogue table points.
 --   broken    an aimed Fight confirmed once the mark is up breaks it: the cancel fires, monster switch 1 reads clear
@@ -136,6 +137,10 @@ H.run({ maxFrames = 100000 }, {
     line = LINE, move = { cmd = 0x0C, atk = FLARESTAR }, turns = 1, glows = 1,
     lineText = "Its scales turn white!{wait}",
     arm = "idle", aim = true, plainBreaker = true,
+    -- (its HP held at 20,000, above its Flare phase's 10,240 line: UMARO, whom no one commands, fights on his own,
+    -- and on the first run's draw he and the breaking Fight took it from 22,096 to 2,794 in the break's window, too
+    -- little to wait out a fresh clock, build/attempts/wt/v052-tg-wor2/d1/suites/battle_reddragon-1.log)
+    bossHp = 20000,
     onOpen = function() gen = gen + 1 end,
     -- no fuse lit or armed, early in a clock (under 20 counts: the line is at least a turn and 20 counts away)
     partway = function(W)
