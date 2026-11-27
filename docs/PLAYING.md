@@ -66,7 +66,8 @@ where it left off: it has to earn it again the way it did the first time.
 For most bosses that means several more turns or hits. Kefka's move comes
 from how hurt he is, so he announces it again on his first turn back and
 uses it on the turn after. A move that has been announced always comes unless
-you break the boss first. AtmaWeapon's Flare Star, Atma's Ultima, the Gold
+you break the boss first (or the boss falls, or you drain away the MP the
+move needs). AtmaWeapon's Flare Star, Atma's Ultima, the Gold
 Dragon's Bolt 3 and Kefka's Goner work this way. So do the early bosses: the Whelk
 ("It draws in!", before its head hides), the Marshal ("Strike as one!"),
 Vargas ("Feel the wind!"), Ultros at the Lete River ("Squirm, BANON!"),

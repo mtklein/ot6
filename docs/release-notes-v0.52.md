@@ -1,0 +1,140 @@
+# OT6 v0.52
+
+OT6 is a Final Fantasy VI ROM hack. This release contains a BPS patch.
+
+## How to play
+
+Use a Final Fantasy III (USA) 1.0 ROM with SHA-1
+`4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`.
+
+Unzip `ot6-v0.52.zip`. Put `Final Fantasy III (USA).bps` beside the ROM and
+open the ROM. Mesen, bsnes, Snes9x, and other compatible emulators apply the
+patch without changing the ROM. Otherwise, apply the patch with a BPS patcher
+such as Flips or beat.
+
+## Changes
+
+
+Six more World of Balance bosses announce a move before they use it, with
+the yellow **!** in front of the shield icon until it comes; break the boss
+while the **!** is up and the move is cancelled, and the boss has to earn
+it again. Dadaluma says "He crouches!" a turn before he Jumps; he still
+jumps only after you have cast spells at him three times. Ultros at the
+opera says "Imp! Pal! Buddy!" a turn before Imp Song. Ifrit and Shiva say
+"It inhales!" a turn before Fire 2 or Ice 2 on the whole party. Number 024
+says "Its wall glows!" a turn before Ice 2, Fire 2 or Bolt 2 on the whole
+party, the spell that goes with the wall he has just put up, and while the
+**!** stands his wall does not change. Number 128 says "Its core heats!" a
+turn before Atomic Ray on the whole party; each blade you cut down starts
+it. Each of the Cranes says "Deck groans!" a turn before it shakes the
+deck; each Crane now has its own clock (before, one clock served both),
+the left Crane's as long as before and the right Crane's half again as
+long. Ifrit's Fire 2, Shiva's Ice 2, Number 024's second-tier spells and
+Number 128's Atomic Ray now come only after their line. Ifrit has 7
+shields instead of 6.
+
+Most of the rest of the World of Balance's bosses announce a move the same
+way (Ultros on the airship does not; Chupon beside him does).
+Ultros at Esper Mountain creeps toward you one step every other turn, and
+enough hits push him back a step, but no longer once he holds the edge.
+Three of his turns after he reaches four steps out he says "He looms over
+you!", and on his next turn Aqua Rake hits the whole party (about a
+quarter of each member's HP); on the turn after he sinks back to where he
+started. A break while the **!** is up stops the wave and sends him back
+to the start. He no longer uses Magnitude8, and the edge is four steps out where it was
+eight, so the wave comes sooner than it used to. FlameEater says "It swells
+with flame!" a turn before Fire Ball on the whole party (about a fifth of
+each member's HP). On the airship, Chupon says "It inhales!" a turn
+before Fire Ball on the whole party (about a fifth of each member's HP),
+once he has been hit three times; a break while the **!** is up also
+starts his count of hits over. The Air Force's MissileBay fires Missiles
+until it is badly damaged, as before; from then on it says "Missiles lock
+on!" a turn before each Launcher barrage, whose hits fall at random and
+can take nearly all of a member's HP. Breaking the bay
+stops the barrage; breaking the Air Force itself does not; a bay destroyed
+while the **!** is up fires nothing. Once AtmaWeapon is badly hurt it says
+"Vast energy focused" again and uses Flare Star on its next turn (about
+half of each member's HP), where before it no longer used Flare Star at
+that point. Nerapa says "The wheel turns!" a turn before Roulette, which
+kills one target at random and which it uses after you have used Fight on
+it six times; a break while the **!** is up also starts that count over.
+FlameEater's and Chupon's Fire Ball and the MissileBay's Launcher now
+come only after their line.
+
+Six World of Ruin bosses announce a move the same way. In Figaro
+Castle's engine room, a Tentacle that finds a member Slowed says "It coils
+to seize!" and Seizes that member on its next turn (before, it Seized at
+once). Only one Tentacle goes for each member: none announces on a member
+another has already called, or on a member who is down, out of the fight
+or already held, and if the called member falls before the Seize, the
+**!** goes out and no Seize follows. Curing the member's Slow after the
+line does not stop the Seize. Breaking a Tentacle, at any time,
+frees the member it holds, who can act again. Dullahan says "Its blade
+rimes over!" once he has been hit eight times, and on his next turn casts
+Absolute 0 on the whole party (about a quarter of each member's HP); a
+break while the **!** is up stops it and starts his count over. He no
+longer follows the count with N.Cross and Ice 2 (N.Cross is gone from the
+fight), and Absolute 0 comes only
+after the line. When Phunbaba returns to Mobliz, he says "He fills his
+lungs!" on his turn once he has lost about a fifth of his HP, and on his
+next turn breathes twice, each BabaBreath blowing a member out of the
+party for the fight that follows, and leaves. Break him at any point
+before he breathes and his breath is gone for the fight: when you drive
+him off, he leaves without it. Chadarnook's demon says "The paint runs!" a
+turn before he hands the painting back to the goddess when his time on the
+canvas is up; outside that warning, the fifth blow he takes still sends
+him back at once, with no line. Break him while the **!** is up and he stays out for the break,
+and the count of blows that sends him back starts over. Umaro says "He
+digs out a Green Cherry!" a turn before he eats it; break him while the
+**!** is up and the cherry is gone for the rest of the fight (a Green
+Cherry you use on him then does nothing for him either). Tritoch says
+"Frost climbs the cliff!" at the start of each round of its attacks, and
+casts Rasp with it; Ice 3 comes on its next turn, and at no other time: Tritoch no longer casts Ice 3 unannounced
+on the round's third turn. A break stops it.
+
+Three of the eight dragons announce a move the same way. The Storm
+Dragon, once it has lost a little under two thirds of its HP, sometimes
+says "It swallows the wind!" and uses Cyclonic on its next turn (it leaves
+each member it hits about a sixteenth of their HP); about one round of its
+attacks in three ends this way, as often as before, and it no longer uses
+Cyclonic without the line. The Ice Dragon no longer casts Absolute 0 as
+part of its attacks. Instead, when a member is Frozen (its N. Cross freezes
+those it hits) at its turn, it gets ready, says "The air goes still!" on
+its next turn, and casts Absolute 0 on the whole party on the turn after.
+Thaw the Frozen member with fire (a Fire spell, for one) before the dragon's turn and it
+does not get ready; once it has, thawing the member no longer stops
+Absolute 0, but breaking the dragon while the **!** is up does. The Red
+Dragon still bursts into fire whenever its clock runs out; when the burst
+is to be Flare Star (one time in three, as before) it says "Its scales turn
+white!" a turn ahead and Flare Star comes on the turn after, two turns later
+than it used to, and Flare Star now comes only after its line. Its other
+bursts are S. Cross or L.4 Flare, L.4 Flare now twice as often as S. Cross.
+Break it while the **!** is up and its clock starts over from the beginning
+when it recovers. The Storm Dragon's shields now grow: it starts with 10
+instead of 14, and each time it recovers from a break it comes back with two
+more, up to 14. The Red Dragon has 8 shields instead of 6.
+The Ice Dragon can no longer be Berserked or Muted.
+
+A boss that announces a move can no longer have it taken away by a
+status: the Marshal, Number 128, the Gold Dragon, Rizopas, Chupon and
+Nerapa can no longer be Berserked, Chupon can no longer be Muted, and
+Number 024 can no longer be turned into an Imp. Umaro can no longer be
+Berserked.
+Sleep, Stop and Muddle still delay a boss's turn, and draining a boss's
+MP still works.
+
+## Saves
+
+
+Saves from v0.28 and later load in this release. A save from before v0.44
+starts with no esper progress. A save from before v0.51 keeps its revealed
+weaknesses, each shown as the new type that weakness became for that
+monster; a few early enemies show two types or lose one, which is found
+again by hitting them.
+
+The zip also holds `ot6-manual.pdf`, an instruction booklet in the style of a
+1990s cartridge manual.
+
+The zip has a `saves` folder: saves at points through the story, from
+Narshe to the World of Ruin. Each save is in slot 3. `saves/README.txt` says
+how to use one.
