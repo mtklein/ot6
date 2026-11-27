@@ -1,0 +1,12 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "battery.sram",
+  "slot": 3,
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "aae60b822e4bf325fde4d3c4ca33bfbba1038d7d4ca1abf9ee54f8e16517c57e",
+  "provenance": "v0.52 release zip ot6-v0.52.zip (sha256 f824b52740064b8af7c1ea33c4fea7a18b6e20dac01db0558d4600cac6dabc14), saves/03 - Mt. Kolts, summit save point.srm, as published; a release artifact, not a capture",
+  "golden": {
+    "esper": "signed"
+  }
+}

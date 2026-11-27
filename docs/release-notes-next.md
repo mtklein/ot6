@@ -7,7 +7,6 @@ and its effect. Cite evidence in the commit message.
 
 ## Saves
 
-
 Saves from v0.28 and later load in this release. A save from before v0.44
 starts with no esper progress. A save from before v0.51 keeps its revealed
 weaknesses, each shown as the new type that weakness became for that
